@@ -221,7 +221,7 @@ configure(libraryProjects) {
         testImplementation("org.assertj:assertj-core:3.27.2")
         testImplementation("org.mockito:mockito-core:5.15.2")
         testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
-        testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+        testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
         testRuntimeOnly("ch.qos.logback:logback-classic:1.5.15")
     }
 }

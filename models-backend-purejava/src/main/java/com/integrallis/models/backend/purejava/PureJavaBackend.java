@@ -1,0 +1,115 @@
+/*
+ * Copyright 2025-2026 Integrallis Software, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.integrallis.models.backend.purejava;
+
+import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.purejava.cache.KvCache;
+import com.integrallis.models.backend.purejava.gguf.GgufFile;
+import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.backend.purejava.llama.LlamaConfig;
+import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
+import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.foreign.Arena;
+import java.nio.file.Path;
+
+/**
+ * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
+ * any native dependencies.
+ */
+public final class PureJavaBackend implements InferenceBackend {
+
+  private final Arena arena;
+  private final LlamaConfig config;
+  private final GgufTokenizer tokenizer;
+  private final LlamaForwardPass forwardPass;
+  private final ModelMetadata modelMetadata;
+
+  private PureJavaBackend(
+      Arena arena,
+      LlamaConfig config,
+      GgufTokenizer tokenizer,
+      LlamaForwardPass forwardPass,
+      ModelMetadata modelMetadata) {
+    this.arena = arena;
+    this.config = config;
+    this.tokenizer = tokenizer;
+    this.forwardPass = forwardPass;
+    this.modelMetadata = modelMetadata;
+  }
+
+  /** Loads a GGUF model file and returns a ready-to-use backend. */
+  public static PureJavaBackend load(Path modelPath) {
+    Arena arena = Arena.ofShared();
+    try {
+      GgufFile file = GgufParser.parse(modelPath, arena);
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
+      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
+
+      String modelName =
+          file.metadata().getString("general.name").orElse(modelPath.getFileName().toString());
+      String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
+
+      ModelMetadata metadata =
+          new ModelMetadata(
+              modelFamily,
+              modelName,
+              config.contextLength(),
+              config.vocabSize(),
+              config.embeddingDim(),
+              config.numLayers(),
+              config.numHeads(),
+              config.numKvHeads());
+
+      return new PureJavaBackend(arena, config, tokenizer, forwardPass, metadata);
+    } catch (IOException e) {
+      arena.close();
+      throw new UncheckedIOException("Failed to load model: " + modelPath, e);
+    }
+  }
+
+  @Override
+  public String name() {
+    return "pure-java";
+  }
+
+  @Override
+  public ModelMetadata metadata() {
+    return modelMetadata;
+  }
+
+  @Override
+  public Tokenizer tokenizer() {
+    return tokenizer;
+  }
+
+  @Override
+  public float[] forward(int token, int position) {
+    return forwardPass.forward(token, position);
+  }
+
+  @Override
+  public void close() {
+    arena.close();
+  }
+}
