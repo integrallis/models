@@ -135,6 +135,8 @@ configure(libraryProjects) {
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         }
         maxParallelForks = 1
+        // Real model inference needs more heap than the default
+        maxHeapSize = "4g"
     }
 
     // Default 'test' task excludes infrastructure-heavy tags

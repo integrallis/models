@@ -73,8 +73,8 @@ public final class LlamaForwardPass {
     int numKvHeads = config.numKvHeads();
     int kvDim = config.kvDim();
 
-    // Token embedding
-    System.arraycopy(weights.tokenEmbedding(), token * dim, x, 0, dim);
+    // Token embedding (dequantizes only the single row for this token)
+    weights.embedToken(token, x);
 
     // Process each transformer layer
     for (int layer = 0; layer < config.numLayers(); layer++) {
@@ -172,7 +172,8 @@ public final class LlamaForwardPass {
     TensorOps.rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
 
     // Output logits
-    TensorOps.matmul(logits, xNorm, weights.outputWeight(), config.vocabSize(), dim);
+    matmulDispatch(
+        logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
 
     return logits.clone();
   }

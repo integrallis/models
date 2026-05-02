@@ -18,6 +18,9 @@ package com.integrallis.models.backend.purejava.llama;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.quant.F16Dequantizer;
+import com.integrallis.models.backend.purejava.quant.Q4_0Dequantizer;
+import com.integrallis.models.backend.purejava.quant.Q8_0Dequantizer;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
@@ -25,9 +28,12 @@ import java.nio.ByteOrder;
 /** Holds references to weight tensors from a parsed GGUF file for a Llama-family model. */
 public final class LlamaWeights {
 
-  private final float[] tokenEmbedding;
+  private final MemorySegment tokenEmbeddingSegment;
+  private final GgufTensorType tokenEmbeddingType;
+  private final int embeddingDim;
   private final float[] outputNormWeight;
-  private final float[] outputWeight;
+  private final MemorySegment outputSegment;
+  private final GgufTensorType outputType;
   private final LayerWeights[] layers;
 
   /** Per-layer weight tensors. */
@@ -50,24 +56,30 @@ public final class LlamaWeights {
       GgufTensorType ffnDownType) {}
 
   private LlamaWeights(
-      float[] tokenEmbedding,
+      MemorySegment tokenEmbeddingSegment,
+      GgufTensorType tokenEmbeddingType,
+      int embeddingDim,
       float[] outputNormWeight,
-      float[] outputWeight,
+      MemorySegment outputSegment,
+      GgufTensorType outputType,
       LayerWeights[] layers) {
-    this.tokenEmbedding = tokenEmbedding;
+    this.tokenEmbeddingSegment = tokenEmbeddingSegment;
+    this.tokenEmbeddingType = tokenEmbeddingType;
+    this.embeddingDim = embeddingDim;
     this.outputNormWeight = outputNormWeight;
-    this.outputWeight = outputWeight;
+    this.outputSegment = outputSegment;
+    this.outputType = outputType;
     this.layers = layers;
   }
 
   /** Loads weights from a parsed GGUF file using the standard Llama tensor naming convention. */
   public static LlamaWeights fromGgufFile(GgufFile file, LlamaConfig config) {
-    float[] tokenEmbed = loadF32Tensor(file, "token_embd.weight");
+    GgufTensorData tokenEmbed = file.getTensor("token_embd.weight");
     float[] outputNorm = loadF32Tensor(file, "output_norm.weight");
 
-    float[] output;
+    GgufTensorData output;
     try {
-      output = loadF32Tensor(file, "output.weight");
+      output = file.getTensor("output.weight");
     } catch (IllegalArgumentException e) {
       // Some models tie output weights to token embeddings
       output = tokenEmbed;
@@ -106,39 +118,107 @@ public final class LlamaWeights {
               ffnDown.type());
     }
 
-    return new LlamaWeights(tokenEmbed, outputNorm, output, layers);
+    return new LlamaWeights(
+        tokenEmbed.dataSegment(),
+        tokenEmbed.type(),
+        config.embeddingDim(),
+        outputNorm,
+        output.dataSegment(),
+        output.type(),
+        layers);
   }
 
-  public float[] tokenEmbedding() {
-    return tokenEmbedding;
+  /**
+   * Dequantizes a single token embedding row into the provided output buffer. Only dequantizes one
+   * row of [embeddingDim] floats — avoids materializing the full vocab×dim table.
+   */
+  public void embedToken(int token, float[] out) {
+    dequantizeRow(tokenEmbeddingSegment, tokenEmbeddingType, token, embeddingDim, out);
+  }
+
+  /** Returns the quantized output (language model head) weight segment. */
+  public MemorySegment outputSegment() {
+    return outputSegment;
+  }
+
+  /** Returns the quantization type of the output weight. */
+  public GgufTensorType outputType() {
+    return outputType;
   }
 
   public float[] outputNormWeight() {
     return outputNormWeight;
   }
 
-  public float[] outputWeight() {
-    return outputWeight;
-  }
-
   public LayerWeights layer(int i) {
     return layers[i];
   }
 
+  /**
+   * Dequantizes a single row of a quantized 2D tensor. For F32 data, directly copies. For quantized
+   * types, dequantizes just the row.
+   */
+  private static void dequantizeRow(
+      MemorySegment segment, GgufTensorType type, int row, int cols, float[] out) {
+    switch (type) {
+      case F32 -> {
+        long offset = (long) row * cols * 4;
+        for (int i = 0; i < cols; i++) {
+          out[i] =
+              segment.get(
+                  ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
+                  offset + (long) i * 4);
+        }
+      }
+      case F16 -> {
+        long offset = (long) row * cols * 2;
+        new F16Dequantizer().dequantize(segment, offset, out, 0, cols);
+      }
+      case Q4_0 -> {
+        // Q4_0: 32 values per block, 18 bytes per block
+        int blocksPerRow = cols / 32;
+        long bytesPerRow = (long) blocksPerRow * 18;
+        long offset = (long) row * bytesPerRow;
+        new Q4_0Dequantizer().dequantize(segment, offset, out, 0, cols);
+      }
+      case Q8_0 -> {
+        // Q8_0: 32 values per block, 34 bytes per block
+        int blocksPerRow = cols / 32;
+        long bytesPerRow = (long) blocksPerRow * 34;
+        long offset = (long) row * bytesPerRow;
+        new Q8_0Dequantizer().dequantize(segment, offset, out, 0, cols);
+      }
+      default -> throw new IllegalArgumentException("Unsupported embedding tensor type: " + type);
+    }
+  }
+
+  /**
+   * Loads a tensor and dequantizes it to F32 if needed. Supports F32, F16, Q4_0, and Q8_0 source
+   * formats.
+   */
   private static float[] loadF32Tensor(GgufFile file, String name) {
     GgufTensorData tensor = file.getTensor(name);
-    if (tensor.type() != GgufTensorType.F32) {
-      throw new IllegalArgumentException(
-          "Expected F32 tensor for " + name + " but got " + tensor.type());
-    }
     int count = (int) tensor.info().elementCount();
     float[] result = new float[count];
     MemorySegment seg = tensor.dataSegment();
-    for (int i = 0; i < count; i++) {
-      result[i] =
-          seg.get(
-              ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN), (long) i * 4);
+
+    switch (tensor.type()) {
+      case F32 -> {
+        for (int i = 0; i < count; i++) {
+          result[i] =
+              seg.get(
+                  ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
+                  (long) i * 4);
+        }
+      }
+      case F16 -> new F16Dequantizer().dequantize(seg, 0, result, 0, count);
+      case Q4_0 -> new Q4_0Dequantizer().dequantize(seg, 0, result, 0, count);
+      case Q8_0 -> new Q8_0Dequantizer().dequantize(seg, 0, result, 0, count);
+      default ->
+          throw new IllegalArgumentException(
+              "Unsupported tensor type for dequantization: " + tensor.type() + " in " + name);
     }
+
     return result;
   }
 }

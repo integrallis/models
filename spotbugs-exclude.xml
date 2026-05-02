@@ -4,4 +4,33 @@
     <Match>
         <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
     </Match>
+    <!-- MemorySegment and internal-state fields throughout the inference pipeline are
+         performance-critical views over mmap'd file data or shared state. Defensive copies
+         are not feasible (would defeat zero-copy design). -->
+    <Match>
+        <Package name="com.integrallis.models.backend.purejava.llama"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="com.integrallis.models.backend.purejava.gguf"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="com.integrallis.models.backend.purejava.cache"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="com.integrallis.models.backend.purejava"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <!-- bytes_to_unicode mapping: byte value is known <=255 by construction (loop 0..255) -->
+    <Match>
+        <Class name="com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer"/>
+        <Bug pattern="UC_USELESS_CONDITION"/>
+    </Match>
+    <!-- PureJavaBackend.load: metadata getString returning Optional is handled by orElse -->
+    <Match>
+        <Class name="com.integrallis.models.backend.purejava.PureJavaBackend"/>
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+    </Match>
 </FindBugsFilter>
