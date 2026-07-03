@@ -2,7 +2,4 @@
 
 dependencies {
     api(project(":models-api"))
-
-    // Observability
-    implementation("io.micrometer:micrometer-core:1.14.4")
 }
