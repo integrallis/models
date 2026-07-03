@@ -178,6 +178,11 @@ public final class LlamaForwardPass {
     return logits.clone();
   }
 
+  /** Clears the autoregressive key-value cache before processing a new sequence. */
+  public void reset() {
+    cache.clear();
+  }
+
   private void matmulDispatch(
       float[] out, float[] input, MemorySegment weight, GgufTensorType type, int rows, int cols) {
     if (type == GgufTensorType.F32) {

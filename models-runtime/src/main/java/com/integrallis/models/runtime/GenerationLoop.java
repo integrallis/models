@@ -23,7 +23,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Autoregressive generation loop that drives an inference backend to generate text. */
+/**
+ * Autoregressive generation loop that drives an inference backend to generate text.
+ *
+ * <p>Generation resets request-specific backend state before prefill. Calls that share the same
+ * backend instance are serialized because stateful backends may own a single key-value cache.
+ */
 public final class GenerationLoop {
 
   private final InferenceBackend backend;
@@ -70,44 +75,50 @@ public final class GenerationLoop {
     Objects.requireNonNull(options, "options");
     Objects.requireNonNull(stream, "stream");
 
-    Tokenizer tokenizer = backend.tokenizer();
-    int[] promptTokens = tokenizer.encode(prompt);
-    int eosToken = tokenizer.eosToken();
-
-    Sampler sampler = new Sampler(options);
-    List<Integer> allTokens = new ArrayList<>();
-
-    try {
-      // Prefill: process all prompt tokens
-      int position = 0;
-      float[] logits = null;
-      for (int token : promptTokens) {
-        logits = backend.forward(token, position);
-        allTokens.add(token);
-        position++;
+    synchronized (backend) {
+      backend.reset();
+      Tokenizer tokenizer = backend.tokenizer();
+      int[] promptTokens = tokenizer.encode(prompt);
+      if (promptTokens.length == 0) {
+        throw new IllegalArgumentException("prompt produced no tokens");
       }
+      int eosToken = tokenizer.eosToken();
 
-      // Autoregressive decoding
-      int generated = 0;
-      while (generated < options.maxTokens()) {
-        int nextToken = sampler.sample(logits, allTokens);
+      Sampler sampler = new Sampler(options);
+      List<Integer> allTokens = new ArrayList<>();
 
-        if (nextToken == eosToken) {
-          break;
+      try {
+        // Prefill: process all prompt tokens
+        int position = 0;
+        float[] logits = null;
+        for (int token : promptTokens) {
+          logits = backend.forward(token, position);
+          allTokens.add(token);
+          position++;
         }
 
-        String tokenStr = tokenizer.decode(nextToken);
-        stream.onToken(tokenStr);
-        allTokens.add(nextToken);
+        // Autoregressive decoding
+        int generated = 0;
+        while (generated < options.maxTokens()) {
+          int nextToken = sampler.sample(logits, allTokens);
 
-        logits = backend.forward(nextToken, position);
-        position++;
-        generated++;
+          if (nextToken == eosToken) {
+            break;
+          }
+
+          String tokenStr = tokenizer.decode(nextToken);
+          stream.onToken(tokenStr);
+          allTokens.add(nextToken);
+
+          logits = backend.forward(nextToken, position);
+          position++;
+          generated++;
+        }
+
+        stream.onComplete();
+      } catch (Exception e) {
+        stream.onError(e);
       }
-
-      stream.onComplete();
-    } catch (Exception e) {
-      stream.onError(e);
     }
   }
 }
