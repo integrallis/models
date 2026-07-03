@@ -1,5 +1,16 @@
 rootProject.name = "models"
 
+// Composite build: the sibling java-vectors repo is consumed in-place so the embedding bridge
+// (models-embedding) can depend on vectors-db / vectors-cache-semantic-db without requiring those
+// artifacts to be published. Gradle resolves the requested coordinates to the local source build.
+includeBuild("../vectors") {
+    dependencySubstitution {
+        substitute(module("com.integrallis:vectors-db")).using(project(":vectors-db"))
+        substitute(module("com.integrallis:vectors-cache-semantic-db"))
+            .using(project(":vectors-cache-semantic-db"))
+    }
+}
+
 // --- Core ---
 include("models-api")
 include("models-runtime")

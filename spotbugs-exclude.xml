@@ -33,4 +33,16 @@
         <Class name="com.integrallis.models.backend.purejava.PureJavaBackend"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>
+
+    <!-- models-embedding: VectorCollectionEmbeddingSink intentionally exposes the wrapped
+         VectorCollection and EmbeddingBackend via accessors so callers can interleave bulk
+         operations and direct backend calls. Defensive copies of these references would defeat
+         the bridge's purpose (the entire point is to share state with the downstream collection). -->
+    <Match>
+        <Class name="com.integrallis.models.embedding.VectorCollectionEmbeddingSink"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
 </FindBugsFilter>
