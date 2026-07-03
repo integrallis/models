@@ -2,9 +2,9 @@
 
 ## Supported Versions
 
-| Version     | Supported          |
-|-------------|--------------------|
-| 0.1.x       | :white_check_mark: |
+| Version            | Status                         |
+|--------------------|--------------------------------|
+| 0.1.x (unreleased) | Pre-release security fixes only |
 
 ## Reporting a Vulnerability
 
@@ -55,19 +55,31 @@ We follow a **90-day coordinated disclosure policy**:
 
 ## Security-Relevant Design Properties
 
-models is designed with security in mind:
+Security-relevant boundaries:
 
-- **Pure Java** — The pure-java backend has no JNI, no FFM bindings to native code. The entire inference path is Java, eliminating classes of native memory corruption bugs.
-- **No cryptographic operations** — models does not implement or depend on cryptographic primitives. Artifact signing uses Sigstore (external tooling), not library code.
-- **Arena-based memory management** — All off-heap memory (mmap'd model weights, KV cache) is managed through `java.lang.foreign.Arena`, providing spatial and temporal safety guarantees enforced by the JVM.
-- **No network I/O in core** — The core inference modules perform no network operations. Model downloading is opt-in and isolated.
-- **Minimal dependencies** — Library modules depend only on `slf4j-api` at runtime, minimizing supply chain attack surface.
+- **The published backend is Java bytecode** — It requires no JNI or native inference library.
+  GGUF weights are memory-mapped with the FFM API; the KV cache itself is on-heap.
+- **No downloader is implemented in 0.1.x** — The published core modules perform no network I/O.
+  Users supply a local model path.
+- **Arena-based model mapping** — The backend owns a shared `Arena` and closes it from
+  `PureJavaBackend.close()`; using the backend after close is unsupported.
+- **Artifact signing is external** — JReleaser signs staged Maven artifacts with the maintainer's
+  GPG key. Runtime libraries do not perform release-signing operations.
+- **Experimental modules are excluded** — ONNX, native, and framework directories are scaffolding
+  and are not Maven Central publications in 0.1.x.
 
 ## Supply Chain Security
 
-- **SBOM generation** — CycloneDX SBOMs are generated for every module on every build
+- **SBOM generation** — CycloneDX SBOMs for every published module are generated and validated by
+  `complianceCheck`
 - **Dependency locking** — Gradle lockfiles pin all transitive dependency versions
-- **Vulnerability scanning** — OWASP Dependency-Check scans for known CVEs (CVSS >= 7.0 fails the build)
-- **Artifact signing** — Release artifacts are signed with Sigstore for tamper-evident distribution
-- **Reproducible builds** — JAR artifacts are reproducible (deterministic timestamps and file ordering)
-- **SAST** — GitHub CodeQL runs on every pull request
+- **Vulnerability scanning** — OWASP Dependency-Check is available as an explicit release audit;
+  findings with CVSS >= 7.0 fail that task
+- **Artifact signing** — The release workflow is configured to sign Maven
+  Central artifacts with GPG through JReleaser; no 0.1.0 release has been
+  signed yet.
+- **Deterministic JAR settings** — JAR tasks disable file timestamps and use
+  reproducible file order. A byte-for-byte clean-room rebuild has not yet been
+  independently verified.
+- **SAST** — A GitHub CodeQL workflow is configured for pull requests, pushes
+  to `main`, and a weekly schedule.

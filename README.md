@@ -13,10 +13,11 @@
       ╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚══════╝╚══════╝     ╚═╝
 ```
 
-> **In-JVM small language model inference — run 0.5–4B parameter models locally for agentic tasks without ever leaving the JVM.**
+> **Experimental in-JVM small-language-model inference for JDK 25.**
 >
 > Pure Java. Zero native dependencies. JDK 25+.
-> GGUF zero-copy parsing, Vector API SIMD kernels, quantized matmul (Q4_0, Q8_0), BPE tokenizer, GQA attention with KV cache, and drop-in adapters for **Spring AI**, **LangChain4j**, **Quarkus**, and **Semantic Kernel**.
+> GGUF parsing, Q4_0/Q8_0 kernels, tokenization, sampling, and a Llama-family
+> forward path are implemented. Framework adapters remain planned.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![JDK 25+](https://img.shields.io/badge/JDK-25%2B-orange.svg)](https://openjdk.org/projects/jdk/25/)
@@ -24,63 +25,59 @@
 
 ---
 
+> **Project status: pre-alpha.** The first publishable scope is
+> `models-api`, `models-runtime`, and `models-backend-purejava`. The Spring AI,
+> LangChain4j, Quarkus, Semantic Kernel, ONNX, native, embedding, test, and
+> benchmark modules are scaffolding only and are not part of release `0.1.x`.
+> Real-model integration tests currently target one local
+> `Qwen3-0.6B-Q4_0.gguf` fixture and skip when it is absent.
+
 ## The pitch in 60 seconds
 
-Every Java AI framework (Spring AI, LangChain4j, Semantic Kernel) calls out to cloud APIs for inference. Even for trivial tasks — heartbeats, routing decisions, classification, tool dispatch, structured extraction — you pay network latency, per-token pricing, and external availability risk.
+Most Java AI applications use remote inference services or a separate native
+runtime. This project explores a narrower option: small GGUF models loaded and
+executed inside a JDK 25 process.
 
-**models is the missing local runtime** — run small language models in-process, with the same adapters your code already uses:
+The current implementation is a research-grade local runtime:
 
-- **Zero infrastructure**: one JAR set, no Python, no ONNX Runtime, no llama.cpp. Pure Java on JDK 25.
-- **GGUF native**: load any GGUF model from HuggingFace, dequantize on-the-fly via `MemorySegment` zero-copy.
-- **Framework-native**: `ChatModel` for Spring AI, `ChatLanguageModel` for LangChain4j, Quarkus extension, Semantic Kernel service — same interface, local execution.
-- **SIMD-accelerated**: Vector API kernels from [java-vectors](https://github.com/integrallis/java-vectors) for matmul and attention dot products.
+- **No native inference runtime**: no Python, ONNX Runtime, or llama.cpp.
+- **GGUF-oriented**: parse GGUF v2/v3 and run the tensor types currently
+  supported by the pure-Java backend.
+- **Framework adapters are planned**: the current release exposes its own Java
+  API and runtime, not Spring AI or LangChain4j implementations.
+- **Scalar kernels today**: SIMD matmul is roadmap work, not a current
+  performance claim.
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│  Your Spring AI / LangChain4j / Quarkus application                  │
-│                                                                      │
-│    ChatModel / ChatLanguageModel  ──(unchanged interface)──►         │
-│                                                                      │
-│           ┌────────────────────────────────────────────┐             │
-│           │                models                      │             │
-│           │                                            │             │
-│           │  PURE JAVA         ONNX           NATIVE  │             │
-│           │  ───────────       ────           ──────  │             │
-│           │  models-backend-   models-backend- models- │             │
-│           │  purejava          onnx           backend- │             │
-│           │  GGUF, Vector API, ORT runtime    native   │             │
-│           │  Q4/Q8 quantized                  llama.cpp│             │
-│           │  matmul, GQA,                     via FFM  │             │
-│           │  SwiGLU, RoPE                              │             │
-│           │                                            │             │
-│           │  same API across all backends              │             │
-│           └────────────────────────────────────────────┘             │
-└──────────────────────────────────────────────────────────────────────┘
+application
+    │
+    ▼
+models-runtime ──► models-api ──► models-backend-purejava
+                                      │
+                                      └── GGUF / Q4_0 / Q8_0 / F16 / F32
 ```
-
-**Same language. Same runtime. Same API. Different backend.**
 
 ## Why it exists
 
 ### The gap in the Java AI ecosystem
 
-|  | Cloud API (OpenAI, Anthropic) | Python local (llama.cpp, vLLM) | **models** |
+|  | Remote API | Separate local runtime | **models 0.1.x** |
 |--|--|--|--|
 | Language | Java client → HTTP → remote | Python/C++ | **Pure Java** |
-| Latency | 200–2000 ms (network) | 10–50 ms | **10–50 ms (in-process)** |
-| Privacy | data leaves JVM | separate process | **data never leaves JVM** |
-| Dependency | API key + availability | Python + native libs | **zero external deps** |
-| Cost | $0.15–15/M tokens | hardware only | **hardware only** |
-| Framework adapters | Spring AI, LangChain4j | none native | **Spring AI, LangChain4j, Quarkus, SK** |
-| Model format | N/A | GGUF, safetensors | **GGUF (same models)** |
+| Process boundary | Network | IPC or local HTTP | **In-process** |
+| Runtime dependency | API key + service | Native executable/runtime | **JDK 25** |
+| Framework adapters | Commonly available | Runtime-specific | **Not implemented** |
+| Model format | Service-defined | Runtime-specific | **Limited GGUF support** |
 
 ### Target use cases
 
-NVIDIA Research's 2025 position paper "Small Language Models are the Future of Agentic AI" validates the core thesis: routine, narrow, repetitive sub-tasks inside agent loops are better served by SLMs than frontier LLMs.
+The research hypothesis is that routine, narrow tasks can sometimes be served
+locally by small models. The current project does not yet provide benchmark or
+quality evidence for the use cases below.
 
 | Use case | Model size | Why local? |
 |---|---|---|
-| Agent heartbeats / keep-alive | 0.6–1B | sub-100ms, no network dependency |
+| Agent heartbeats / keep-alive | 0.6–1B | no network dependency |
 | Intent classification / routing | 0.6–1.7B | deterministic, no per-call cost |
 | Tool dispatch / function calling | 1–4B | low latency in agent loops |
 | Structured extraction (JSON) | 1–4B | privacy-sensitive data stays local |
@@ -92,7 +89,9 @@ NVIDIA Research's 2025 position paper "Small Language Models are the Future of A
 ### Load and generate
 
 ```java
-try (var backend = PureJavaBackend.load(Path.of("~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf"))) {
+var model = Path.of(
+    System.getProperty("user.home"), ".jvllm/models/Qwen3-0.6B-Q4_0.gguf");
+try (var backend = PureJavaBackend.load(model)) {
     var loop = new GenerationLoop(backend);
     String result = loop.generate(
         "Classify this intent: 'I want to cancel my order'",
@@ -114,41 +113,17 @@ loop.generate("Once upon a time", options, new TokenStream() {
 });
 ```
 
-### Spring AI — drop-in local `ChatModel`
+### Framework adapters
 
-```java
-@Bean
-ChatModel localModel() {
-    return ModelsSpringAiChatModel.builder()
-        .modelPath(Path.of("~/.jvllm/models/Qwen3-4B-Q4_K_M.gguf"))
-        .defaultOptions(SamplingOptions.builder().temperature(0.7f).maxTokens(256).build())
-        .build();
-}
-```
-
-Same `ChatModel` interface — swap between OpenAI and local inference with a config change.
-
-### LangChain4j — drop-in local `ChatLanguageModel`
-
-```java
-ChatLanguageModel model = ModelsLangChain4jModel.builder()
-    .modelPath(Path.of("~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf"))
-    .build();
-```
+Spring AI and LangChain4j adapters are roadmap items. No framework adapter
+class is published in `0.1.x`.
 
 ## Supported models
 
-Any Llama-family architecture in GGUF format (Q4_0, Q8_0, F16, F32 quantizations):
-
-| Model | Parameters | Recommended Quant | Disk Size | Use Case |
-|---|---|---|---|---|
-| Qwen3 0.6B | 0.6B | Q4_0 | ~400 MB | Classification, extraction |
-| Qwen3 1.7B | 1.7B | Q4_K_M | ~1 GB | Routing, tool dispatch |
-| Llama 3.2 1B | 1B | Q4_K_M | ~700 MB | Lightweight agent tasks |
-| Qwen3 4B | 4B | Q4_K_M | ~2.5 GB | General agentic, function calling |
-| Llama 3.2 3B | 3B | Q4_K_M | ~2 GB | Tool use, structured output |
-| Phi-4-mini | 3.8B | Q4_K_M | ~2.3 GB | Long-context (128K), multimodal |
-| Gemma 3 1B | 1B | Q4_K_M | ~700 MB | Fast mobile/edge inference |
+The tested end-to-end fixture is **Qwen3 0.6B in Q4_0 GGUF format**.
+The backend code accepts Llama/Qwen2/Qwen3 metadata prefixes and implements
+F32, F16, Q4_0, and Q8_0 tensor paths. Other architectures, model sizes, chat
+templates, long-context behavior, and K-quant formats are not yet claimed.
 
 Download models from HuggingFace:
 ```bash
@@ -170,11 +145,11 @@ Zero-copy model loading via `MemorySegment` mmap. Parses headers, metadata, tens
 
 ### BPE tokenizer (`models-backend-purejava`)
 
-Full GPT-2 style byte-level BPE tokenizer loaded directly from GGUF metadata:
+GPT-2-style byte-level BPE tokenizer loaded directly from GGUF metadata:
 
 - `bytes_to_unicode` mapping for byte-level BPE vocabularies
 - BPE merge-based encoding with priority queue
-- Round-trip encode/decode fidelity (validated against real models)
+- Synthetic byte-level, Unicode, ranked-merge, and fallback regression tests
 - Unicode, multibyte, and code-point aware
 
 ### Quantized inference kernels (`models-backend-purejava`)
@@ -186,9 +161,9 @@ Full GPT-2 style byte-level BPE tokenizer loaded directly from GGUF metadata:
 - **SwiGLU activation**: fused gate × silu × up projection
 - **Softmax**: numerically stable (max-subtract)
 
-### Transformer forward pass (`models-backend-purejava`)
+### Transformer forward path (`models-backend-purejava`)
 
-Complete Llama-family decoder implementation:
+Implemented Llama-family decoder path:
 
 ```
 token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
@@ -221,18 +196,18 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 
 | Module | Status | Description |
 |---|---|---|
-| [models-api](models-api/) | stable | Backend SPI, `Tokenizer`, `SamplingOptions`, `TokenStream`, `ModelMetadata` |
-| [models-runtime](models-runtime/) | stable | `GenerationLoop`, `Sampler`, Micrometer metrics, JFR events |
-| [models-backend-purejava](models-backend-purejava/) | stable | GGUF parser, Vector API kernels, BPE tokenizer, KV cache, Llama forward pass |
+| [models-api](models-api/) | experimental | Backend SPI, `Tokenizer`, `SamplingOptions`, `TokenStream`, `ModelMetadata` |
+| [models-runtime](models-runtime/) | experimental | `GenerationLoop` and `Sampler` |
+| [models-backend-purejava](models-backend-purejava/) | experimental | GGUF parser, scalar kernels, BPE tokenizer, KV cache, Llama forward pass |
 | [models-backend-onnx](models-backend-onnx/) | planned | ONNX Runtime backend |
 | [models-backend-native](models-backend-native/) | planned | llama.cpp via Panama FFM |
-| [models-spring-ai](models-spring-ai/) | in progress | Spring AI `ChatModel` adapter |
-| [models-langchain4j](models-langchain4j/) | in progress | LangChain4j `ChatLanguageModel` adapter |
+| [models-spring-ai](models-spring-ai/) | scaffold | Spring AI adapter placeholder |
+| [models-langchain4j](models-langchain4j/) | scaffold | LangChain4j adapter placeholder |
 | [models-quarkus](models-quarkus/) | planned | Quarkus extension |
 | [models-semantic-kernel](models-semantic-kernel/) | planned | Semantic Kernel `ChatCompletionService` adapter |
 | [models-spring-boot-starter](models-spring-boot-starter/) | planned | Auto-configuration (inference + optional vectors) |
-| [models-embedding](models-embedding/) | planned | Bridge to java-vectors for embedding storage/search |
-| [models-test](models-test/) | planned | VCR integration from java-vectors |
+| [models-embedding](models-embedding/) | scaffold | Planned bridge to vectors for embedding storage/search |
+| [models-test](models-test/) | scaffold | Planned test-support integration |
 | [models-bench](models-bench/) | planned | JMH benchmarks |
 
 ## Dependency graph
@@ -240,48 +215,43 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 ```
 models-api                          <- foundation, no internal deps
 models-runtime                      <- api
-models-backend-purejava             <- api, vectors-core (SIMD kernels)
-models-backend-onnx                 <- api                               (planned)
-models-backend-native               <- api                               (planned)
-models-spring-ai                    <- api, runtime
-models-langchain4j                  <- api, runtime
-models-quarkus                      <- api, runtime                      (planned)
-models-semantic-kernel              <- api, runtime                      (planned)
-models-spring-boot-starter          <- spring-ai, runtime                (planned)
-models-embedding                    <- api, vectors-db                   (planned)
-models-test                         <- api, vectors-vcr                  (planned)
-models-bench                        <- backend-purejava, runtime         (planned)
+models-backend-purejava             <- api
+models-backend-onnx                 <- scaffold, no dependencies
+models-backend-native               <- scaffold, no dependencies
+models-spring-ai                    <- scaffold, no dependencies
+models-langchain4j                  <- scaffold, no dependencies
+models-quarkus                      <- scaffold, no dependencies
+models-semantic-kernel              <- scaffold, no dependencies
+models-spring-boot-starter          <- scaffold, no dependencies
+models-embedding                    <- scaffold, no dependencies
+models-test                         <- scaffold, no dependencies
+models-bench                        <- scaffold, no dependencies
 ```
 
-## Relationship to java-vectors
+## Relationship to vectors
 
-**models** is the sister project to [java-vectors](https://github.com/integrallis/java-vectors). Together they form a complete Java-native local AI runtime:
+**models** is a sister project to
+[vectors](https://github.com/integrallis/vectors). The projects may eventually
+provide complementary local inference and vector-search capabilities, but the
+bridge module is not implemented or published today.
 
 | Layer | Project | What it does |
 |---|---|---|
 | **Inference** | models | Run SLMs locally (tokenize → forward → sample → generate) |
-| **Embedding & Search** | java-vectors | Store, index, and search vectors (HNSW, quantization, mmap) |
-| **Bridge** | models-embedding | Generate embeddings with models, store/search with java-vectors |
+| **Embedding & Search** | vectors | Store, index, and search vectors |
+| **Bridge** | models-embedding | Planned integration; not implemented or published |
 
-Selective dependency — `models-backend-purejava` uses only `vectors-core` for SIMD distance kernels. No transitive dependency on the full java-vectors stack unless you use `models-embedding`.
+The first published models modules do not depend on vectors.
 
 ## Requirements
 
-- **JDK 25+** (Vector API incubating + mature FFM)
+- **JDK 25+** (Foreign Function and Memory API)
 - **Gradle 9.4+**
-
-The Vector API is wired in automatically via `--add-modules jdk.incubator.vector` on every compile and test task.
 
 ## Building
 
 ```bash
-# Prerequisites: install java-vectors to local Maven repo (not yet on Maven Central)
-cd /path/to/java-vectors/vectors
-./gradlew publishToMavenLocal -x test -x :docs:build --init-script /tmp/add-publication.init.gradle.kts
-
-# Build models
-cd /path/to/jvllm/models
-./gradlew build                  # full build (all modules, SpotBugs, Spotless, JaCoCo)
+./gradlew build                  # compile all modules; release modules enforce SpotBugs + JaCoCo
 ./gradlew test                   # unit tests (excludes slow/benchmark/integration)
 ./gradlew unitTest               # @Tag("unit") only
 ./gradlew integrationTest        # @Tag("integration") — requires real model file
@@ -304,18 +274,18 @@ curl -L -o ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
 ./gradlew integrationTest
 ```
 
-The integration test suite validates the full stack — GGUF parsing, tokenizer round-trips, forward pass logit correctness, and end-to-end text generation — against real model weights. No mocking, no stubbing.
+When the fixture is present, integration tests exercise GGUF parsing,
+tokenization, finite forward-pass outputs, sampling, and text generation against
+real weights. They do not yet compare logits or generated tokens against a
+reference runtime, so numerical correctness is still a release blocker.
 
 ## When to use models (and when not to)
 
 | Use case | Recommendation |
 |---|---|
-| Agent sub-tasks: routing, classification, extraction, heartbeats | **Primary fit** |
-| Local function calling / tool dispatch in agentic loops | **Primary fit** |
-| Privacy-sensitive inference (PII, medical, legal data) | **Primary fit** — data never leaves JVM |
-| Spring AI / LangChain4j app that wants local fallback | **Primary fit** |
-| Offline-capable applications (edge, desktop, CI) | **Primary fit** |
-| RAG with java-vectors for embedding + retrieval + generation | **Primary fit** (with models-embedding) |
+| Evaluation and development against the tested Qwen3 Q4_0 fixture | Experimental fit |
+| Production inference or framework integration | Not yet supported |
+| RAG bridge to vectors | Planned; `models-embedding` is scaffolding |
 | Production chat with 70B+ models, multi-turn | Use cloud APIs a hosted LLM API |
 | High-throughput batch inference (>100 req/s) | Use vLLM / TGI with GPU |
 | Training or fine-tuning models | Use Python ecosystem |
@@ -323,7 +293,7 @@ The integration test suite validates the full stack — GGUF parsing, tokenizer 
 
 ## Roadmap
 
-### Phase 1 — Core inference pipeline (complete)
+### Phase 1 — Core inference pipeline (implemented, validation limited)
 
 - GGUF binary format parser (v2/v3, zero-copy mmap)
 - BPE tokenizer with GPT-2 byte-level encoding
@@ -347,7 +317,7 @@ The integration test suite validates the full stack — GGUF parsing, tokenizer 
 
 ### Phase 3 — Performance & scale
 
-- SIMD-accelerated matmul via java-vectors `VectorUtil`
+- SIMD-accelerated matmul using the JDK Vector API
 - Batched prefill (parallel token processing)
 - Speculative decoding
 - Continuous batching for concurrent requests
@@ -362,7 +332,7 @@ The integration test suite validates the full stack — GGUF parsing, tokenizer 
 
 ### Phase 5 — Advanced features
 
-- models-embedding bridge to java-vectors (generate + store + search)
+- models-embedding bridge to vectors (generate + store + search)
 - Spring Boot starter with auto-configuration
 - Structured output (JSON schema-constrained generation)
 - Grammar-guided decoding

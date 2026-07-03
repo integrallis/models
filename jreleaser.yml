@@ -1,0 +1,48 @@
+# JReleaser signs the Gradle-staged artifacts and uploads one validated deployment
+# to the Maven Central Publisher Portal.
+
+project:
+  name: models
+  description: In-JVM small language model inference for Java
+  longDescription: |
+    models provides a Java API, generation runtime, and pure-Java GGUF backend
+    for local small-language-model inference on JDK 25.
+  authors:
+    - Brian Sam-Bodden
+  license: Apache-2.0
+  inceptionYear: "2026"
+  links:
+    homepage: https://github.com/integrallis/models
+  java:
+    groupId: com.integrallis
+    version: "25"
+
+signing:
+  active: ALWAYS
+  pgp:
+    armored: true
+
+deploy:
+  maven:
+    mavenCentral:
+      sonatype:
+        active: RELEASE
+        url: https://central.sonatype.com/api/v1/publisher
+        namespace: com.integrallis
+        applyMavenCentralRules: true
+        stagingRepositories:
+          - build/staging-deploy
+
+release:
+  github:
+    owner: integrallis
+    name: models
+    tagName: 'v{{projectVersion}}'
+    releaseName: 'models {{projectVersion}}'
+    skipTag: false
+    overwrite: true
+    changelog:
+      formatted: ALWAYS
+      preset: conventional-commits
+      contributors:
+        enabled: false

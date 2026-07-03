@@ -109,6 +109,11 @@ public final class PureJavaBackend implements InferenceBackend {
   }
 
   @Override
+  public void reset() {
+    forwardPass.reset();
+  }
+
+  @Override
   public void close() {
     arena.close();
   }

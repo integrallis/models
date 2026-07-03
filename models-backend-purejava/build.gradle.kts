@@ -1,11 +1,7 @@
-// models-backend-purejava — GGUF parser, Vector API kernels, KV cache
-// Depends on vectors-core for SIMD distance kernels (VectorUtil, PanamaVectorUtilSupport)
+// models-backend-purejava — GGUF parser, scalar inference kernels, KV cache
 
 dependencies {
     api(project(":models-api"))
-
-    // SIMD kernels from java-vectors (zero transitive deps)
-    implementation("com.integrallis:vectors-core:0.1.0-SNAPSHOT")
 
     // Integration tests use GenerationLoop from models-runtime
     testImplementation(project(":models-runtime"))

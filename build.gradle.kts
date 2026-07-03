@@ -6,7 +6,6 @@ plugins {
     id("com.diffplug.spotless") version "6.25.0" apply false
     id("org.cyclonedx.bom") version "3.2.4" apply false
     id("org.owasp.dependencycheck") version "12.2.1" apply false
-    id("dev.sigstore.sign") version "2.0.0" apply false
     jacoco
 }
 
@@ -14,13 +13,15 @@ allprojects {
     group = "com.integrallis"
 
     repositories {
-        mavenLocal()
         mavenCentral()
     }
 }
 
 // Library subprojects (excludes benchmarks)
 val libraryProjects = subprojects.filter { it.name != "models-bench" }
+val publishedModuleNames = setOf("models-api", "models-runtime", "models-backend-purejava")
+val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
+val scaffoldProjects = libraryProjects.filterNot { it.name in publishedModuleNames }
 
 val apacheLicenseHeader = """
     /*
@@ -43,17 +44,35 @@ val apacheLicenseHeader = """
 configure(libraryProjects) {
     apply(plugin = "java")
     apply(plugin = "java-library")
-    apply(plugin = "maven-publish")
     apply(plugin = "com.github.spotbugs")
     apply(plugin = "com.diffplug.spotless")
     apply(plugin = "jacoco")
-    apply(plugin = "org.cyclonedx.bom")
     apply(plugin = "org.owasp.dependencycheck")
-    apply(plugin = "dev.sigstore.sign")
+    if (project.name in publishedModuleNames) {
+        apply(plugin = "org.cyclonedx.bom")
+        // Realize the plugin's outgoing configuration before maven-publish observes variants.
+        tasks.named("cyclonedxDirectBom").get()
+    }
 
     // Dependency locking — enforced when lockfiles exist, lenient otherwise
     dependencyLocking {
         lockAllConfigurations()
+    }
+
+    tasks.register("resolveAndLockAllConfigurations") {
+        group = "verification"
+        description = "Resolve this module's dependencies and write its lockfile"
+        notCompatibleWithConfigurationCache("Resolves and locks every module configuration")
+        doFirst {
+            require(gradle.startParameter.isWriteDependencyLocks) {
+                "${path} must be run with the --write-locks flag"
+            }
+        }
+        doLast {
+            configurations.filter { it.isCanBeResolved }.forEach { configuration ->
+                configuration.resolve()
+            }
+        }
     }
 
     java {
@@ -64,14 +83,6 @@ configure(libraryProjects) {
         withSourcesJar()
     }
 
-    configure<PublishingExtension> {
-        publications {
-            create<MavenPublication>("mavenJava") {
-                from(components["java"])
-            }
-        }
-    }
-
     tasks.withType<JavaCompile> {
         options.encoding = "UTF-8"
         options.compilerArgs.addAll(listOf(
@@ -80,20 +91,18 @@ configure(libraryProjects) {
             "-Xlint:-processing",
             "-Xlint:-incubating",
             "-Xlint:-classfile",
-            "-Werror",
-            "--add-modules", "jdk.incubator.vector"
+            "-Werror"
         ))
     }
 
     // Common JVM args and logging for ALL Test tasks
     tasks.withType<Test> {
-        jvmArgs("--add-modules", "jdk.incubator.vector")
         testLogging {
             events("passed", "skipped", "failed")
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             showStandardStreams = false
         }
-        maxParallelForks = Runtime.getRuntime().availableProcessors()
+        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 4).coerceAtLeast(1)
     }
 
     tasks.register<Test>("unitTest") {
@@ -150,8 +159,8 @@ configure(libraryProjects) {
         val javadocOptions = options as StandardJavadocDocletOptions
         javadocOptions.addBooleanOption("Xdoclint:all,-missing", true)
         javadocOptions.addBooleanOption("html5", true)
-        javadocOptions.addStringOption("-add-modules", "jdk.incubator.vector")
-        isFailOnError = false
+        isFailOnError = true
+        enabled = project !in scaffoldProjects
     }
 
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
@@ -183,12 +192,20 @@ configure(libraryProjects) {
     }
 
     tasks.jacocoTestCoverageVerification {
+        dependsOn(tasks.test)
+        enabled = project in publishedProjects
         violationRules {
             rule {
                 limit {
                     minimum = "0.80".toBigDecimal()
                 }
             }
+        }
+    }
+
+    if (project in publishedProjects) {
+        tasks.named("check") {
+            dependsOn(tasks.jacocoTestCoverageVerification)
         }
     }
 
@@ -215,16 +232,60 @@ configure(libraryProjects) {
     }
 
     dependencies {
-        // Logging
-        implementation("org.slf4j:slf4j-api:2.0.16")
-
         // Testing
         testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
         testImplementation("org.assertj:assertj-core:3.27.2")
         testImplementation("org.mockito:mockito-core:5.15.2")
         testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
         testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
-        testRuntimeOnly("ch.qos.logback:logback-classic:1.5.15")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Publishing: only implemented 0.1.x modules stage for Maven Central.
+// ---------------------------------------------------------------------------
+
+configure(publishedProjects) {
+    apply(plugin = "maven-publish")
+
+    configure<PublishingExtension> {
+        publications {
+            create<MavenPublication>("maven") {
+                from(components["java"])
+                pom {
+                    name.set(project.name)
+                    description.set(provider { project.description ?: "models — ${project.name}" })
+                    url.set("https://github.com/integrallis/models")
+                    licenses {
+                        license {
+                            name.set("The Apache License, Version 2.0")
+                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                            distribution.set("repo")
+                        }
+                    }
+                    developers {
+                        developer {
+                            id.set("bsbodden")
+                            name.set("Brian Sam-Bodden")
+                            email.set("bsbodden@gmail.com")
+                            organization.set("Integrallis Software")
+                            organizationUrl.set("https://integrallis.com")
+                        }
+                    }
+                    scm {
+                        connection.set("scm:git:https://github.com/integrallis/models.git")
+                        developerConnection.set("scm:git:ssh://git@github.com/integrallis/models.git")
+                        url.set("https://github.com/integrallis/models")
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = "staging"
+                url = uri(rootProject.layout.buildDirectory.dir("staging-deploy").get().asFile)
+            }
+        }
     }
 }
 
@@ -234,10 +295,10 @@ configure(libraryProjects) {
 
 tasks.register("verifySbom") {
     group = "verification"
-    description = "Verify CycloneDX SBOM generation for all library modules"
-    dependsOn(libraryProjects.map { "${it.path}:cyclonedxDirectBom" })
+    description = "Verify CycloneDX SBOM generation for every published module"
+    dependsOn(publishedProjects.map { "${it.path}:cyclonedxDirectBom" })
     doLast {
-        libraryProjects.forEach { proj ->
+        publishedProjects.forEach { proj ->
             val file = proj.layout.buildDirectory.file("reports/cyclonedx-direct/bom.json").get().asFile
             require(file.exists()) { "SBOM not found: ${file.absolutePath}" }
             @Suppress("UNCHECKED_CAST")
@@ -267,15 +328,80 @@ tasks.register("verifyGovernanceFiles") {
     }
 }
 
-tasks.register("verifySigningConfigured") {
+tasks.register("resolveAndLockAll") {
     group = "verification"
-    description = "Verify Sigstore signing plugin is applied to all library modules"
+    description = "Resolve all library dependencies and write lockfiles (run with --write-locks)"
+    dependsOn(libraryProjects.map { "${it.path}:resolveAndLockAllConfigurations" })
+}
+
+tasks.register("verifyLockfiles") {
+    group = "verification"
+    description = "Verify dependency lockfiles exist for every library module"
     doLast {
         libraryProjects.forEach { proj ->
-            require(proj.plugins.hasPlugin("dev.sigstore.sign")) {
-                "Sigstore plugin not applied to ${proj.name}"
+            val lockfile = proj.file("gradle.lockfile")
+            require(lockfile.isFile) { "Missing lockfile: ${lockfile.absolutePath}" }
+            println("  Lockfile: ${proj.name}")
+        }
+    }
+}
+
+tasks.register("verifyPublishingConfigured") {
+    group = "verification"
+    description = "Verify Maven publications and JReleaser configuration for release modules"
+    doLast {
+        require(file("jreleaser.yml").isFile) { "jreleaser.yml not found" }
+        publishedProjects.forEach { proj ->
+            require(proj.plugins.hasPlugin("maven-publish")) {
+                "maven-publish plugin not applied to ${proj.name}"
             }
-            println("  Sigstore configured: ${proj.name}")
+            val publishing = proj.extensions.getByType<PublishingExtension>()
+            require("maven" in publishing.publications.names) {
+                "Maven publication not configured for ${proj.name}"
+            }
+            println("  Maven publication configured: ${proj.name}")
+        }
+    }
+}
+
+tasks.register("verifyStagedPublications") {
+    group = "verification"
+    description = "Stage and validate every Maven Central artifact and its internal dependencies"
+    dependsOn(publishedProjects.map { "${it.path}:publishMavenPublicationToStagingRepository" })
+    doLast {
+        val releaseVersion = project.version.toString()
+        val stagingRoot = layout.buildDirectory.dir("staging-deploy/com/integrallis").get().asFile
+        val internalDependency = Regex(
+            """<dependency>\s*<groupId>com\.integrallis</groupId>\s*<artifactId>([^<]+)</artifactId>"""
+        )
+        publishedProjects.forEach { proj ->
+            val versionDir = stagingRoot.resolve("${proj.name}/$releaseVersion")
+            val pomFile = versionDir.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(".pom") }
+                ?.maxByOrNull { it.lastModified() }
+                ?: error("Missing staged POM in $versionDir")
+            val artifactBase = pomFile.name.removeSuffix(".pom")
+            listOf(
+                "$artifactBase.jar",
+                "$artifactBase-sources.jar",
+                "$artifactBase-javadoc.jar"
+            ).forEach { name ->
+                require(versionDir.resolve(name).isFile) {
+                    "Missing staged artifact: ${versionDir.resolve(name)}"
+                }
+            }
+
+            val pom = pomFile.readText()
+            require("<licenses>" in pom && "<developers>" in pom && "<scm>" in pom) {
+                "Incomplete Maven Central metadata in ${proj.name} POM"
+            }
+            internalDependency.findAll(pom).forEach { match ->
+                val artifactId = match.groupValues[1]
+                require(artifactId in publishedModuleNames) {
+                    "${proj.name} publishes an unavailable internal dependency: $artifactId"
+                }
+            }
+            println("  Staged publication valid: ${proj.name}")
         }
     }
 }
@@ -298,14 +424,31 @@ tasks.register("verifyReproducibleBuild") {
     }
 }
 
+tasks.register("verifyGithubWorkflows") {
+    group = "verification"
+    description = "Verify GitHub Actions workflow files exist"
+    doLast {
+        val workflowDir = rootProject.file(".github/workflows")
+        listOf("ci.yml", "scorecard.yml", "codeql.yml", "release.yml").forEach { name ->
+            val f = workflowDir.resolve(name)
+            require(f.exists()) { "Missing workflow: ${f.absolutePath}" }
+            require(f.readText().contains("jobs:")) { "$name missing 'jobs:' section" }
+            println("  Workflow: $name")
+        }
+    }
+}
+
 tasks.register("complianceCheck") {
     group = "verification"
     description = "Run all compliance verification tasks"
     dependsOn(
         "verifySbom",
         "verifyGovernanceFiles",
-        "verifySigningConfigured",
-        "verifyReproducibleBuild"
+        "verifyLockfiles",
+        "verifyPublishingConfigured",
+        "verifyStagedPublications",
+        "verifyReproducibleBuild",
+        "verifyGithubWorkflows"
     )
 }
 
@@ -336,8 +479,7 @@ tasks.register<Javadoc>("aggregateJavadoc") {
         splitIndex(true)
         links("https://docs.oracle.com/en/java/javase/25/docs/api/")
         addStringOption("Xdoclint:-missing", "-quiet")
-        addStringOption("-add-modules", "jdk.incubator.vector")
     }
 
-    isFailOnError = false
+    isFailOnError = true
 }

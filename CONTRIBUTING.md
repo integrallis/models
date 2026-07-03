@@ -6,20 +6,15 @@ Thank you for your interest in contributing to models! This guide will help you 
 
 ### Prerequisites
 
-- **JDK 25** — The Vector API (incubating) and mature FFM require JDK 25+
+- **JDK 25** — Required by the current API and FFM-based GGUF loader
 - **Gradle 9.4.1** — Included via the Gradle Wrapper (`./gradlew`)
 - **Git** — For version control
-- **java-vectors** — Sister project, installed to local Maven repo
 
 ### Clone and Build
 
 ```bash
-# First, install java-vectors to local Maven repo
-cd /path/to/java-vectors/vectors
-./gradlew publishToMavenLocal -x test
-
-# Then build models
-cd /path/to/jvllm/models
+git clone https://github.com/integrallis/models.git
+cd models
 ./gradlew build
 ```
 
@@ -90,12 +85,12 @@ Always add the appropriate `@Tag` annotation to new test classes.
 ```
 models-api/                  — Backend SPI, ChatModel, Tokenizer, SamplingOptions, TokenStream
 models-runtime/              — Generation lifecycle, templates, sampling, observability
-models-backend-purejava/     — GGUF parser, Vector API kernels, KV cache
-models-spring-ai/            — Spring AI ChatModel adapter
-models-langchain4j/          — LangChain4j ChatLanguageModel adapter
-models-embedding/            — Bridge to java-vectors (VectorCollection, SemanticCache)
-models-test/                 — VCR record/replay test harness
-models-bench/                — JMH benchmarks
+models-backend-purejava/     — GGUF parser, scalar kernels, KV cache
+models-spring-ai/            — planned adapter scaffold
+models-langchain4j/          — planned adapter scaffold
+models-embedding/            — planned vectors bridge scaffold
+models-test/                 — planned test-support scaffold
+models-bench/                — planned benchmark scaffold
 ```
 
 Dependencies flow downward: `api -> runtime -> backend-purejava`.
@@ -107,8 +102,7 @@ Dependencies flow downward: `api -> runtime -> backend-purejava`.
 3. **Keep changes focused** — one feature or fix per PR
 4. **Run the full build** before submitting:
    ```bash
-   ./gradlew build
-   ./gradlew spotlessCheck
+   ./gradlew spotlessCheck build complianceCheck
    ```
 5. **Write a clear PR description** — explain what changed and why
 6. **CI must pass** — the GitHub Actions pipeline runs build + test + SBOM generation

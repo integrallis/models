@@ -30,6 +30,12 @@ public interface InferenceBackend extends AutoCloseable {
   /** Runs a single forward pass for the given token at the given position, returning logits. */
   float[] forward(int token, int position);
 
+  /**
+   * Clears request-specific state before a new generation. Stateless backends may keep the default
+   * no-op implementation.
+   */
+  default void reset() {}
+
   @Override
   void close();
 }
