@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assumptions.assumeThat;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.runtime.GenerationLoop;
-import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -36,8 +36,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end integration tests that load a real GGUF model, run the full inference pipeline, and
- * validate that the generated text is coherent. These tests exercise the entire stack: GGUF
- * parsing, tokenizer, forward pass, sampling, and generation loop.
+ * validate basic structural properties of the generated text. These tests exercise the entire
+ * stack: GGUF parsing, tokenizer, forward pass, sampling, and generation loop. They do not compare
+ * logits or generated tokens with a reference runtime.
  *
  * <p>No mocking, no stubbing — this is the real thing.
  */
@@ -81,22 +82,19 @@ class EndToEndGenerationIntegrationTest {
     }
 
     @Test
-    void generatedTextIsValidUtf8() {
+    void generatedTextCanBeEncodedAsUtf8WithoutReplacement() {
       GenerationLoop loop = new GenerationLoop(backend);
       String result =
           loop.generate(
               "The capital of France is",
               SamplingOptions.builder().temperature(0.0f).maxTokens(20).build());
 
-      // Verify the string is valid UTF-8 by re-encoding and decoding
-      CharsetDecoder decoder =
+      CharsetEncoder encoder =
           StandardCharsets.UTF_8
-              .newDecoder()
+              .newEncoder()
               .onMalformedInput(CodingErrorAction.REPORT)
               .onUnmappableCharacter(CodingErrorAction.REPORT);
-      byte[] bytes = result.getBytes(StandardCharsets.UTF_8);
-      // If this doesn't throw, the text is valid UTF-8
-      assertThat(new String(bytes, StandardCharsets.UTF_8)).isEqualTo(result);
+      assertThat(encoder.canEncode(result)).isTrue();
     }
 
     @Test
@@ -104,27 +102,10 @@ class EndToEndGenerationIntegrationTest {
       GenerationLoop loop1 = new GenerationLoop(backend);
       GenerationLoop loop2 = new GenerationLoop(backend);
 
-      // NOTE: PureJavaBackend uses shared KV cache, so for determinism test
-      // we need to load two separate backends or use the same one (greedy = no RNG)
-      // Since greedy decoding doesn't use randomness, same logits = same sequence.
-      // We test that the same prompt + same options = same first few tokens
       String prompt = "2 + 2 =";
       SamplingOptions opts = SamplingOptions.builder().temperature(0.0f).maxTokens(5).build();
 
-      // Use PureJavaBackend.load twice would be expensive. Instead, test that
-      // greedy argmax on the same logits gives the same token
-      float[] logits = backend.forward(backend.tokenizer().encode("Hi")[0], 0);
-      int argmax1 = argmax(logits);
-      int argmax2 = argmax(logits);
-      assertThat(argmax1).isEqualTo(argmax2);
-    }
-
-    private int argmax(float[] arr) {
-      int best = 0;
-      for (int i = 1; i < arr.length; i++) {
-        if (arr[i] > arr[best]) best = i;
-      }
-      return best;
+      assertThat(loop1.generate(prompt, opts)).isEqualTo(loop2.generate(prompt, opts));
     }
   }
 
@@ -133,12 +114,11 @@ class EndToEndGenerationIntegrationTest {
 
     @Test
     void streamingMatchesNonStreaming() {
-      // Due to shared KV cache in the backend, we can't run two independent generation loops.
-      // Instead, test that streaming collects the same result as the returned string.
       GenerationLoop loop = new GenerationLoop(backend);
       String prompt = "Hello";
       SamplingOptions opts =
           SamplingOptions.builder().temperature(0.0f).maxTokens(10).seed(42L).build();
+      String blockingResult = loop.generate(prompt, opts);
 
       List<String> streamedTokens = new ArrayList<>();
       boolean[] completed = {false};
@@ -169,7 +149,7 @@ class EndToEndGenerationIntegrationTest {
       assertThat(streamedTokens).isNotEmpty();
 
       String streamedResult = String.join("", streamedTokens);
-      assertThat(streamedResult).isNotEmpty();
+      assertThat(streamedResult).isEqualTo(blockingResult);
     }
   }
 
@@ -214,14 +194,12 @@ class EndToEndGenerationIntegrationTest {
   class SamplingStrategies {
 
     @Test
-    void temperatureSamplingProducesVariation() {
+    void highTemperatureGenerationCompletes() {
       GenerationLoop loop = new GenerationLoop(backend);
       SamplingOptions highTemp =
           SamplingOptions.builder().temperature(1.5f).topK(40).topP(0.9f).maxTokens(10).build();
 
-      // Run generation multiple times with high temperature (no seed = different each time)
       String result1 = loop.generate("Once upon", highTemp);
-      // Can't guarantee results differ with shared KV cache, but they should be non-empty
       assertThat(result1).isNotEmpty();
     }
 

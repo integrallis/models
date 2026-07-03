@@ -79,6 +79,30 @@ class GgufTokenizerTest {
     return new GgufMetadata(entries);
   }
 
+  private GgufMetadata createByteLevelMetadata() {
+    List<String> tokens =
+        List.of("<unk>", "h", "i", "\u0120", "hi", "hi\u0120", "<0x41>", "\u20ac", "<s>", "</s>");
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(s -> (GgufMetadataValue) new GgufMetadataValue.StringValue(s))
+                .toList()));
+    entries.put(
+        "tokenizer.ggml.merges",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            List.of("h i", "hi \u0120").stream()
+                .map(s -> (GgufMetadataValue) new GgufMetadataValue.StringValue(s))
+                .toList()));
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
+    entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(8));
+    entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(9));
+    return new GgufMetadata(entries);
+  }
+
   @Nested
   class BasicEncoding {
 
@@ -131,6 +155,36 @@ class GgufTokenizerTest {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
       assertThat(tokenizer.decode(-1)).isEmpty();
       assertThat(tokenizer.decode(999)).isEmpty();
+    }
+  }
+
+  @Nested
+  class ByteLevelBpe {
+
+    @Test
+    void appliesRankedMergesAndRoundTripsSpace() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata());
+
+      int[] encoded = tokenizer.encode("hi ");
+
+      assertThat(encoded).containsExactly(5);
+      assertThat(tokenizer.decode(encoded)).isEqualTo("hi ");
+      assertThat(tokenizer.decode(5)).isEqualTo("hi ");
+    }
+
+    @Test
+    void fallsBackToExplicitByteToken() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata());
+
+      assertThat(tokenizer.encode("A")).containsExactly(6);
+      assertThat(tokenizer.decode(new int[] {6})).isEqualTo("A");
+    }
+
+    @Test
+    void skipsInvalidIdsAndEncodesUnknownVocabularyCharacters() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata());
+
+      assertThat(tokenizer.decode(new int[] {-1, 7, 99})).isEqualTo("\u20ac");
     }
   }
 
