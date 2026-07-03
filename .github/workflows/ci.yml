@@ -23,27 +23,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Install java-vectors to local Maven repo
-        working-directory: ../java-vectors/vectors
-        run: ./gradlew publishToMavenLocal -x test
-
       - name: Build + Test
-        working-directory: models
-        run: ./gradlew build
+        run: ./gradlew spotlessCheck build
 
       - name: Generate SBOM
-        working-directory: models
         run: ./gradlew cyclonedxDirectBom
 
       - name: Compliance Check
-        working-directory: models
         run: ./gradlew complianceCheck
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
           name: sbom
-          path: models/*/build/reports/cyclonedx-direct/bom.json
+          path: '*/build/reports/cyclonedx-direct/bom.json'
           retention-days: 90
 
       - name: Upload Test Reports
@@ -51,5 +44,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: models/*/build/reports/tests/
+          path: '*/build/reports/tests/'
           retention-days: 30
