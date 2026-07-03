@@ -103,6 +103,10 @@ configure(libraryProjects) {
             showStandardStreams = false
         }
         maxParallelForks = (Runtime.getRuntime().availableProcessors() / 4).coerceAtLeast(1)
+        // java-vectors (consumed by models-embedding via the composite build) links the incubating
+        // Panama Vector API in its shared PanamaConstants class, so any test that exercises a
+        // VectorCollection must have jdk.incubator.vector in the module graph or it fails to link.
+        jvmArgs("--add-modules", "jdk.incubator.vector")
     }
 
     tasks.register<Test>("unitTest") {
