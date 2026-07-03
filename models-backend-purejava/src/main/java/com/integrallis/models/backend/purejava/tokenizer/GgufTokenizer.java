@@ -35,7 +35,7 @@ public final class GgufTokenizer implements Tokenizer {
   private final String[] vocab;
   private final float[] scores;
   private final Map<String, Integer> tokenToId;
-  private final Map<Long, Integer> mergeRanks;
+  private final Map<String, Integer> mergeRanks;
   private final int bosTokenId;
   private final int eosTokenId;
   private final boolean useByteLevel;
@@ -46,7 +46,7 @@ public final class GgufTokenizer implements Tokenizer {
       String[] vocab,
       float[] scores,
       Map<String, Integer> tokenToId,
-      Map<Long, Integer> mergeRanks,
+      Map<String, Integer> mergeRanks,
       int bosTokenId,
       int eosTokenId,
       boolean useByteLevel) {
@@ -121,13 +121,13 @@ public final class GgufTokenizer implements Tokenizer {
       tokenToId.put(vocab[i], i);
     }
 
-    Map<Long, Integer> mergeRanks = new HashMap<>();
+    Map<String, Integer> mergeRanks = new HashMap<>();
     metadata
         .getStringArray("tokenizer.ggml.merges")
         .ifPresent(
             merges -> {
               for (int i = 0; i < merges.size(); i++) {
-                mergeRanks.put(mergeKey(merges.get(i)), i);
+                mergeRanks.put(merges.get(i), i);
               }
             });
 
@@ -270,7 +270,7 @@ public final class GgufTokenizer implements Tokenizer {
 
       for (int i = 0; i < result.size() - 1; i++) {
         String pair = vocab[result.get(i)] + " " + vocab[result.get(i + 1)];
-        Integer rank = mergeRanks.get(mergeKey(pair));
+        Integer rank = mergeRanks.get(pair);
         if (rank != null && rank < bestRank) {
           bestRank = rank;
           bestIdx = i;
@@ -400,9 +400,5 @@ public final class GgufTokenizer implements Tokenizer {
   @Override
   public int eosToken() {
     return eosTokenId;
-  }
-
-  private static long mergeKey(String mergeStr) {
-    return (long) mergeStr.hashCode();
   }
 }
