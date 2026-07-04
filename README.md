@@ -286,7 +286,7 @@ reference runtime, so numerical correctness is still a release blocker.
 | Evaluation and development against the tested Qwen3 Q4_0 fixture | Experimental fit |
 | Production inference or framework integration | Not yet supported |
 | RAG bridge to vectors | Planned; `models-embedding` is scaffolding |
-| Production chat with 70B+ models, multi-turn | Use cloud APIs a hosted LLM API |
+| Production chat with 70B+ models, multi-turn | Use a hosted LLM API |
 | High-throughput batch inference (>100 req/s) | Use vLLM / TGI with GPU |
 | Training or fine-tuning models | Use Python ecosystem |
 | Multi-modal inference (images, audio) | Not yet supported |
@@ -340,8 +340,7 @@ reference runtime, so numerical correctness is still a release blocker.
 
 ## Further reading
 
-- [`research.md`](../research.md) — consolidated research from three independent investigations
-- [`research.md`](../research.md) — detailed architecture and feasibility analysis
+- [`research.md`](../research.md) — consolidated research from independent investigations
 - [`auggie-research.md`](../auggie-research.md) — model landscape and agentic AI positioning
 - [`codex-research.md`](../codex-research.md) — JVM precedents and technical approach
 
