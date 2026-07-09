@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.llama;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 
 /**
@@ -72,6 +73,8 @@ public final class LlamaForwardPass {
     int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads();
     int kvDim = config.kvDim();
+    float[] keyCache = cache.keyBuffer();
+    float[] valueCache = cache.valueBuffer();
 
     // Token embedding (dequantizes only the single row for this token)
     weights.embedToken(token, x);
@@ -120,11 +123,8 @@ public final class LlamaForwardPass {
         // Compute attention scores over all cached positions
         float[] scores = new float[position + 1];
         for (int p = 0; p <= position; p++) {
-          float[] cachedK = cache.key(layer, p);
-          float dot = 0;
-          for (int d = 0; d < headDim; d++) {
-            dot += q[qOff + d] * cachedK[kvHead * headDim + d];
-          }
+          int cacheOffset = cache.vectorOffset(layer, p) + kvHead * headDim;
+          float dot = VectorUtil.dotProduct(q, qOff, keyCache, cacheOffset, headDim);
           scores[p] = dot * scale;
         }
 
@@ -133,10 +133,10 @@ public final class LlamaForwardPass {
 
         // Weighted sum of values
         for (int p = 0; p <= position; p++) {
-          float[] cachedV = cache.value(layer, p);
+          int cacheOffset = cache.vectorOffset(layer, p) + kvHead * headDim;
           float weight = scores[p];
           for (int d = 0; d < headDim; d++) {
-            attnOut[qOff + d] += weight * cachedV[kvHead * headDim + d];
+            attnOut[qOff + d] += weight * valueCache[cacheOffset + d];
           }
         }
       }
