@@ -16,9 +16,16 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.vectors.core.VectorUtil;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -105,6 +112,110 @@ class TensorOpsTest {
       for (int row = 0; row < rows; row++) {
         assertThat(actual[row]).isCloseTo(expected[row], within(1e-5f));
       }
+    }
+  }
+
+  @Nested
+  static class QuantizedMatmul {
+
+    @Test
+    void q4_0MatchesVectorsFusedDotSemantics() {
+      float[] x = repeatingQuery(32);
+      byte[] row = q4Block(0.5f);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        expected[0] = VectorUtil.ggufQ4_0DotProduct(x, qWeight, 0, 32);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q4_0, 1, 32);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
+    void q8_0MatchesVectorsFusedDotSemantics() {
+      float[] x = repeatingQuery(32);
+      byte[] row = q8Block(0.25f);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        expected[0] = VectorUtil.ggufQ8_0DotProduct(x, qWeight, 0, 32);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q8_0, 1, 32);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
+    void rejectsNonBlockAlignedQ4_0Dimensions() {
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, q4Block(1.0f));
+
+        assertThatThrownBy(
+                () ->
+                    TensorOps.quantizedMatmul(
+                        new float[1], repeatingQuery(31), qWeight, GgufTensorType.Q4_0, 1, 31))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("multiple of 32");
+      }
+    }
+
+    @Test
+    void rejectsNonBlockAlignedQ8_0Dimensions() {
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, q8Block(1.0f));
+
+        assertThatThrownBy(
+                () ->
+                    TensorOps.quantizedMatmul(
+                        new float[1], repeatingQuery(31), qWeight, GgufTensorType.Q8_0, 1, 31))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("multiple of 32");
+      }
+    }
+
+    private static float[] repeatingQuery(int length) {
+      float[] out = new float[length];
+      for (int i = 0; i < length; i++) {
+        out[i] = (i % 7) - 3.0f;
+      }
+      return out;
+    }
+
+    private static byte[] q4Block(float scale) {
+      byte[] block = new byte[18];
+      ByteBuffer.wrap(block)
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .putShort(0, Float.floatToFloat16(scale));
+      for (int i = 0; i < 16; i++) {
+        int lo = i & 0x0F;
+        int hi = 15 - i;
+        block[2 + i] = (byte) (lo | (hi << 4));
+      }
+      return block;
+    }
+
+    private static byte[] q8Block(float scale) {
+      byte[] block = new byte[34];
+      ByteBuffer.wrap(block)
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .putShort(0, Float.floatToFloat16(scale));
+      for (int i = 0; i < 32; i++) {
+        block[2 + i] = (byte) (i - 16);
+      }
+      return block;
+    }
+
+    private static MemorySegment copy(Arena arena, byte[] bytes) {
+      MemorySegment segment = arena.allocate(bytes.length);
+      MemorySegment.copy(bytes, 0, segment, ValueLayout.JAVA_BYTE, 0, bytes.length);
+      return segment;
     }
   }
 

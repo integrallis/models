@@ -16,17 +16,11 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
-import com.integrallis.models.backend.purejava.quant.Dequantizer;
-import com.integrallis.models.backend.purejava.quant.Q4_0Dequantizer;
-import com.integrallis.models.backend.purejava.quant.Q8_0Dequantizer;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 
 /** Core tensor operations for transformer inference. */
 public final class TensorOps {
-
-  private static final Q4_0Dequantizer Q4_0 = new Q4_0Dequantizer();
-  private static final Q8_0Dequantizer Q8_0 = new Q8_0Dequantizer();
 
   private TensorOps() {}
 
@@ -49,23 +43,16 @@ public final class TensorOps {
   }
 
   /**
-   * Matrix-vector multiplication with quantized weight. Dequantizes one row at a time and computes
-   * the dot product.
+   * Matrix-vector multiplication with quantized weight. Uses vectors-core fused quantized dot
+   * kernels so rows are not materialized as temporary F32 buffers.
    */
   public static void quantizedMatmul(
       float[] out, float[] x, MemorySegment qWeight, GgufTensorType type, int rows, int cols) {
-    Dequantizer dequant = getDequantizer(type);
-    long rowBytes = rowByteSize(type, cols);
-    float[] rowBuf = new float[cols];
-
-    for (int row = 0; row < rows; row++) {
-      long rowOffset = (long) row * rowBytes;
-      dequant.dequantize(qWeight, rowOffset, rowBuf, 0, cols);
-      float sum = 0.0f;
-      for (int col = 0; col < cols; col++) {
-        sum += rowBuf[col] * x[col];
-      }
-      out[row] = sum;
+    switch (type) {
+      case Q4_0 -> VectorUtil.ggufQ4_0BatchDotProduct(x, qWeight, rows, cols, out);
+      case Q8_0 -> VectorUtil.ggufQ8_0BatchDotProduct(x, qWeight, rows, cols, out);
+      default ->
+          throw new UnsupportedOperationException("Quantized matmul not supported for: " + type);
     }
   }
 
@@ -115,19 +102,5 @@ public final class TensorOps {
       float silu = x / (1.0f + (float) Math.exp(-x));
       out[i] = silu * up[i];
     }
-  }
-
-  private static Dequantizer getDequantizer(GgufTensorType type) {
-    return switch (type) {
-      case Q4_0 -> Q4_0;
-      case Q8_0 -> Q8_0;
-      default ->
-          throw new UnsupportedOperationException("Quantized matmul not supported for: " + type);
-    };
-  }
-
-  private static long rowByteSize(GgufTensorType type, int cols) {
-    long blocks = (cols + type.blockSize() - 1) / type.blockSize();
-    return blocks * type.typeSize();
   }
 }
