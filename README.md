@@ -15,7 +15,7 @@
 
 > **Experimental in-JVM small-language-model inference for JDK 25.**
 >
-> Pure Java. Zero native dependencies. JDK 25+.
+> Pure-Java core backend. Optional platform bridge modules are isolated. JDK 25+.
 > GGUF parsing, Q4_0/Q8_0 kernels, tokenization, sampling, and a Llama-family
 > forward path are implemented. Framework adapters remain planned.
 
@@ -27,8 +27,9 @@
 
 > **Project status: pre-alpha.** The first publishable scope is
 > `models-api`, `models-runtime`, and `models-backend-purejava`. The Spring AI,
-> LangChain4j, Quarkus, Semantic Kernel, ONNX, native, embedding, test, and
-> benchmark modules are scaffolding only and are not part of release `0.1.x`.
+> LangChain4j, Quarkus, Semantic Kernel, ONNX, Apple, native, embedding, test,
+> and benchmark modules are scaffolding or experimental only and are not part of
+> release `0.1.x`.
 > Real-model integration tests currently target one local
 > `Qwen3-0.6B-Q4_0.gguf` fixture and skip when it is absent.
 
@@ -40,7 +41,8 @@ executed inside a JDK 25 process.
 
 The current implementation is a research-grade local runtime:
 
-- **No native inference runtime**: no Python, ONNX Runtime, or llama.cpp.
+- **No native inference runtime in the pure-Java backend**: no Python, ONNX Runtime,
+  or llama.cpp for `models-backend-purejava`.
 - **GGUF-oriented**: parse GGUF v2/v3 and run the tensor types currently
   supported by the pure-Java backend.
 - **Framework adapters are planned**: the current release exposes its own Java
@@ -199,6 +201,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 | [models-api](models-api/) | experimental | Backend SPI, `Tokenizer`, `SamplingOptions`, `TokenStream`, `ModelMetadata` |
 | [models-runtime](models-runtime/) | experimental | `GenerationLoop` and `Sampler` |
 | [models-backend-purejava](models-backend-purejava/) | experimental | GGUF parser, vectors-backed kernels, BPE tokenizer, KV cache, Llama forward pass |
+| [models-backend-apple](models-backend-apple/) | experimental | Optional Apple Foundation Models bridge via Java FFM and a tiny Swift C ABI dylib |
 | [models-backend-onnx](models-backend-onnx/) | planned | ONNX Runtime backend |
 | [models-backend-native](models-backend-native/) | planned | llama.cpp via Panama FFM |
 | [models-spring-ai](models-spring-ai/) | scaffold | Spring AI adapter placeholder |
@@ -216,6 +219,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 models-api                          <- foundation, no internal deps
 models-runtime                      <- api
 models-backend-purejava             <- api + vectors-core
+models-backend-apple                <- api + optional Apple Foundation Models dylib
 models-backend-onnx                 <- scaffold, no dependencies
 models-backend-native               <- scaffold, no dependencies
 models-spring-ai                    <- scaffold, no dependencies

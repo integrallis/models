@@ -20,6 +20,7 @@ include("models-runtime")
 include("models-backend-purejava")
 include("models-backend-onnx")
 include("models-backend-native")
+include("models-backend-apple")
 
 // --- Framework adapters ---
 include("models-spring-ai")
