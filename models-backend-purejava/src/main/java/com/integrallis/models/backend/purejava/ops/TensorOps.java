@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.quant.Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q4_0Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q8_0Dequantizer;
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 
 /** Core tensor operations for transformer inference. */
@@ -44,14 +45,7 @@ public final class TensorOps {
 
   /** Matrix-vector multiplication: out = weight * x where weight is [rows x cols] row-major. */
   public static void matmul(float[] out, float[] x, float[] weight, int rows, int cols) {
-    for (int row = 0; row < rows; row++) {
-      float sum = 0.0f;
-      int base = row * cols;
-      for (int col = 0; col < cols; col++) {
-        sum += weight[base + col] * x[col];
-      }
-      out[row] = sum;
-    }
+    VectorUtil.batchDotProduct(x, weight, rows, cols, out);
   }
 
   /**

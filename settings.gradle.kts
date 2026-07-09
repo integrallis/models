@@ -5,6 +5,7 @@ rootProject.name = "models"
 // artifacts to be published. Gradle resolves the requested coordinates to the local source build.
 includeBuild("../vectors") {
     dependencySubstitution {
+        substitute(module("com.integrallis:vectors-core")).using(project(":vectors-core"))
         substitute(module("com.integrallis:vectors-db")).using(project(":vectors-db"))
         substitute(module("com.integrallis:vectors-cache-semantic-db"))
             .using(project(":vectors-cache-semantic-db"))

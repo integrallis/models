@@ -198,7 +198,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 |---|---|---|
 | [models-api](models-api/) | experimental | Backend SPI, `Tokenizer`, `SamplingOptions`, `TokenStream`, `ModelMetadata` |
 | [models-runtime](models-runtime/) | experimental | `GenerationLoop` and `Sampler` |
-| [models-backend-purejava](models-backend-purejava/) | experimental | GGUF parser, scalar kernels, BPE tokenizer, KV cache, Llama forward pass |
+| [models-backend-purejava](models-backend-purejava/) | experimental | GGUF parser, vectors-backed kernels, BPE tokenizer, KV cache, Llama forward pass |
 | [models-backend-onnx](models-backend-onnx/) | planned | ONNX Runtime backend |
 | [models-backend-native](models-backend-native/) | planned | llama.cpp via Panama FFM |
 | [models-spring-ai](models-spring-ai/) | scaffold | Spring AI adapter placeholder |
@@ -206,7 +206,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 | [models-quarkus](models-quarkus/) | planned | Quarkus extension |
 | [models-semantic-kernel](models-semantic-kernel/) | planned | Semantic Kernel `ChatCompletionService` adapter |
 | [models-spring-boot-starter](models-spring-boot-starter/) | planned | Auto-configuration (inference + optional vectors) |
-| [models-embedding](models-embedding/) | scaffold | Planned bridge to vectors for embedding storage/search |
+| [models-embedding](models-embedding/) | experimental | Optional bridge to vectors for embedding storage/search |
 | [models-test](models-test/) | scaffold | Planned test-support integration |
 | [models-bench](models-bench/) | planned | JMH benchmarks |
 
@@ -215,7 +215,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 ```
 models-api                          <- foundation, no internal deps
 models-runtime                      <- api
-models-backend-purejava             <- api
+models-backend-purejava             <- api + vectors-core
 models-backend-onnx                 <- scaffold, no dependencies
 models-backend-native               <- scaffold, no dependencies
 models-spring-ai                    <- scaffold, no dependencies
@@ -223,7 +223,7 @@ models-langchain4j                  <- scaffold, no dependencies
 models-quarkus                      <- scaffold, no dependencies
 models-semantic-kernel              <- scaffold, no dependencies
 models-spring-boot-starter          <- scaffold, no dependencies
-models-embedding                    <- scaffold, no dependencies
+models-embedding                    <- api + vectors-db + vectors-cache-semantic-db
 models-test                         <- scaffold, no dependencies
 models-bench                        <- scaffold, no dependencies
 ```
@@ -231,17 +231,19 @@ models-bench                        <- scaffold, no dependencies
 ## Relationship to vectors
 
 **models** is a sister project to
-[vectors](https://github.com/integrallis/vectors). The projects may eventually
-provide complementary local inference and vector-search capabilities, but the
-bridge module is not implemented or published today.
+[vectors](https://github.com/integrallis/vectors). Low-level SIMD and
+MemorySegment-friendly numeric kernels live in `vectors`; model loading,
+tokenization, transformer semantics, KV cache, and generation stay in `models`.
 
 | Layer | Project | What it does |
 |---|---|---|
 | **Inference** | models | Run SLMs locally (tokenize → forward → sample → generate) |
+| **SIMD kernels** | vectors-core | JDK Vector API primitives reused by the pure-Java backend |
 | **Embedding & Search** | vectors | Store, index, and search vectors |
-| **Bridge** | models-embedding | Planned integration; not implemented or published |
+| **Bridge** | models-embedding | Optional embedding storage/search integration; not published in 0.1.x |
 
-The first published models modules do not depend on vectors.
+`models-backend-purejava` depends on `vectors-core` for dense GEMV kernels. The
+runtime and public API modules remain independent.
 
 ## Requirements
 
@@ -285,7 +287,7 @@ reference runtime, so numerical correctness is still a release blocker.
 |---|---|
 | Evaluation and development against the tested Qwen3 Q4_0 fixture | Experimental fit |
 | Production inference or framework integration | Not yet supported |
-| RAG bridge to vectors | Planned; `models-embedding` is scaffolding |
+| RAG bridge to vectors | Experimental; `models-embedding` provides the optional vectors bridge |
 | Production chat with 70B+ models, multi-turn | Use a hosted LLM API |
 | High-throughput batch inference (>100 req/s) | Use vLLM / TGI with GPU |
 | Training or fine-tuning models | Use Python ecosystem |

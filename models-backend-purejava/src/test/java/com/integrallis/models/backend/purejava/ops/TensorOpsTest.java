@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.ops;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import com.integrallis.vectors.core.VectorUtil;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -84,6 +85,26 @@ class TensorOpsTest {
       assertThat(out[0]).isEqualTo(5.0f);
       assertThat(out[1]).isEqualTo(11.0f);
       assertThat(out[2]).isEqualTo(17.0f);
+    }
+
+    @Test
+    void delegatesToVectorsRowMajorGemvSemantics() {
+      int rows = 5;
+      int cols = 7;
+      float[] x = {0.25f, -1.0f, 2.5f, 0.0f, 3.0f, -0.5f, 1.25f};
+      float[] weight = new float[rows * cols];
+      for (int i = 0; i < weight.length; i++) {
+        weight[i] = (i % 9 - 4) * 0.125f;
+      }
+      float[] expected = new float[rows];
+      float[] actual = new float[rows];
+
+      VectorUtil.batchDotProduct(x, weight, rows, cols, expected);
+      TensorOps.matmul(actual, x, weight, rows, cols);
+
+      for (int row = 0; row < rows; row++) {
+        assertThat(actual[row]).isCloseTo(expected[row], within(1e-5f));
+      }
     }
   }
 
