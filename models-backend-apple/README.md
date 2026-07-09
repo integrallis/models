@@ -67,12 +67,52 @@ The Swift side follows the same foundation used in Apfel:
 - pass `GenerationOptions(maximumResponseTokens:)`
 - call `session.respond(to:options:)`
 
+## Stub Mode
+
+Until real Apple Intelligence hardware is available, use the deterministic stub
+mode to exercise the Java availability and generation paths on any development
+machine:
+
+```bash
+java -Dmodels.apple.foundation.mode=stub ...
+```
+
+or:
+
+```bash
+export MODELS_APPLE_FOUNDATION_MODE=stub
+```
+
+The stub reports `available=true` and returns deterministic text such as
+`hello`, `Stub summary: ...`, or `Stub response: ...`. It is not a model and it
+does not claim quality or compatibility with FoundationModels outputs. Its job
+is to keep application wiring, error handling, and smoke tests moving until a
+real Apple Silicon Mac with Apple Intelligence can run the true integration
+test.
+
+There is also a native C ABI stub for the FFM boundary:
+
+```bash
+models-backend-apple/src/native/apple-foundation-models/build-stub-bridge.sh
+```
+
+That library exports the same symbols as the Swift bridge, so the Java FFM
+loader, pointer ownership, and native error path can be tested without importing
+Apple's `FoundationModels` framework.
+
 ## Testing
 
 Intel Macs and ordinary CI can run the unit tests:
 
 ```bash
 ./gradlew :models-backend-apple:test
+```
+
+The FFM/native ABI smoke test builds the C stub and is part of the module's
+integration task:
+
+```bash
+./gradlew :models-backend-apple:integrationTest
 ```
 
 The real Apple Intelligence smoke test is tagged `integration` and skips unless

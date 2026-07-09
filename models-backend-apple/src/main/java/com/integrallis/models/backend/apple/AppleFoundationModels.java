@@ -23,6 +23,19 @@ import java.util.Optional;
 /** Factory for the optional Apple Foundation Models bridge. */
 public final class AppleFoundationModels {
 
+  /**
+   * System property that controls the bridge mode. The supported non-default value is {@code stub}.
+   */
+  public static final String MODE_PROPERTY = "models.apple.foundation.mode";
+
+  /**
+   * Environment variable that controls the bridge mode. The supported non-default value is {@code
+   * stub}.
+   */
+  public static final String MODE_ENV = "MODELS_APPLE_FOUNDATION_MODE";
+
+  private static final String STUB_MODE = "stub";
+
   private AppleFoundationModels() {}
 
   /**
@@ -30,9 +43,23 @@ public final class AppleFoundationModels {
    *
    * <p>The native bridge path can be supplied with the {@code models.apple.foundation.library}
    * system property or {@code MODELS_APPLE_FOUNDATION_LIBRARY} environment variable.
+   *
+   * <p>For local development on machines without Apple Intelligence, set {@code
+   * models.apple.foundation.mode=stub} or {@code MODELS_APPLE_FOUNDATION_MODE=stub}.
    */
   public static AppleFoundationModelsClient create() {
+    if (stubModeEnabled()) {
+      return createStub();
+    }
     return create(ApplePlatform.current(), NativeLibraryLocator.system());
+  }
+
+  /**
+   * Creates a deterministic stub client that simulates an available Apple Foundation Models
+   * runtime.
+   */
+  public static AppleFoundationModelsClient createStub() {
+    return AppleFoundationModelsClient.of(new StubAppleFoundationModelsBridge());
   }
 
   static AppleFoundationModelsClient create(
@@ -64,5 +91,13 @@ public final class AppleFoundationModels {
           AppleFoundationModelsAvailability.unavailable(
               "Apple Foundation Models native bridge failed to load: " + e.getMessage()));
     }
+  }
+
+  private static boolean stubModeEnabled() {
+    String mode = System.getProperty(MODE_PROPERTY);
+    if (mode == null || mode.isBlank()) {
+      mode = System.getenv(MODE_ENV);
+    }
+    return mode != null && STUB_MODE.equalsIgnoreCase(mode.trim());
   }
 }

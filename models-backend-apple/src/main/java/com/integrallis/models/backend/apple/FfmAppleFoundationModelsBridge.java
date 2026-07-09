@@ -82,7 +82,7 @@ final class FfmAppleFoundationModelsBridge implements AppleFoundationModelsBridg
     try {
       int available = (int) availableHandle.invoke();
       if (available == 1) {
-        return AppleFoundationModelsAvailability.availableNow();
+        return new AppleFoundationModelsAvailability(true, true, lastError());
       }
       return AppleFoundationModelsAvailability.unavailable(lastError());
     } catch (Throwable t) {
