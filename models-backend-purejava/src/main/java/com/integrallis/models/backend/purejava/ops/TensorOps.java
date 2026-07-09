@@ -77,21 +77,32 @@ public final class TensorOps {
 
   /** In-place rotary position embedding on q and k vectors. */
   public static void rope(float[] q, float[] k, int position, int headDim, float ropeTheta) {
+    rope(q, 0, k, 0, position, headDim, ropeTheta);
+  }
+
+  /** In-place rotary position embedding on q and k sub-vectors. */
+  public static void rope(
+      float[] q, int qOffset, float[] k, int kOffset, int position, int headDim, float ropeTheta) {
     for (int i = 0; i < headDim; i += 2) {
       float freq = (float) (1.0 / Math.pow(ropeTheta, (double) i / headDim));
       float angle = position * freq;
       float cos = (float) Math.cos(angle);
       float sin = (float) Math.sin(angle);
 
-      float q0 = q[i];
-      float q1 = q[i + 1];
-      q[i] = q0 * cos - q1 * sin;
-      q[i + 1] = q0 * sin + q1 * cos;
+      rotatePair(q, qOffset + i, cos, sin);
+      rotatePair(k, kOffset + i, cos, sin);
+    }
+  }
 
-      float k0 = k[i];
-      float k1 = k[i + 1];
-      k[i] = k0 * cos - k1 * sin;
-      k[i + 1] = k0 * sin + k1 * cos;
+  /** In-place rotary position embedding on one sub-vector. */
+  public static void rope(float[] vector, int offset, int position, int headDim, float ropeTheta) {
+    for (int i = 0; i < headDim; i += 2) {
+      float freq = (float) (1.0 / Math.pow(ropeTheta, (double) i / headDim));
+      float angle = position * freq;
+      float cos = (float) Math.cos(angle);
+      float sin = (float) Math.sin(angle);
+
+      rotatePair(vector, offset + i, cos, sin);
     }
   }
 
@@ -102,5 +113,12 @@ public final class TensorOps {
       float silu = x / (1.0f + (float) Math.exp(-x));
       out[i] = silu * up[i];
     }
+  }
+
+  private static void rotatePair(float[] vector, int offset, float cos, float sin) {
+    float x0 = vector[offset];
+    float x1 = vector[offset + 1];
+    vector[offset] = x0 * cos - x1 * sin;
+    vector[offset + 1] = x0 * sin + x1 * cos;
   }
 }

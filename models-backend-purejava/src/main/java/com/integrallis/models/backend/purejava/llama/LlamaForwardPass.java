@@ -93,19 +93,10 @@ public final class LlamaForwardPass {
 
       // RoPE for each head
       for (int h = 0; h < numHeads; h++) {
-        int qOff = h * headDim;
-        int kOff = (h % numKvHeads) * headDim;
-        float[] qHead = new float[headDim];
-        float[] kHead = new float[headDim];
-        System.arraycopy(q, qOff, qHead, 0, headDim);
-        if (h < numKvHeads) {
-          System.arraycopy(k, kOff, kHead, 0, headDim);
-        }
-        TensorOps.rope(qHead, kHead, position, headDim, config.ropeTheta());
-        System.arraycopy(qHead, 0, q, qOff, headDim);
-        if (h < numKvHeads) {
-          System.arraycopy(kHead, 0, k, kOff, headDim);
-        }
+        TensorOps.rope(q, h * headDim, position, headDim, config.ropeTheta());
+      }
+      for (int h = 0; h < numKvHeads; h++) {
+        TensorOps.rope(k, h * headDim, position, headDim, config.ropeTheta());
       }
 
       // Store K,V in cache

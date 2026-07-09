@@ -300,6 +300,43 @@ class TensorOpsTest {
       assertThat(norm(k)).isCloseTo(kNormBefore, within(1e-4f));
     }
 
+    @Test
+    void offsetAwareRopeMatchesCopiedHeadSemantics() {
+      float[] q = {99.0f, 1.0f, 2.0f, 3.0f, 4.0f, 98.0f};
+      float[] k = {97.0f, 5.0f, 6.0f, 7.0f, 8.0f, 96.0f};
+      float[] expectedQ = {1.0f, 2.0f, 3.0f, 4.0f};
+      float[] expectedK = {5.0f, 6.0f, 7.0f, 8.0f};
+
+      TensorOps.rope(expectedQ, expectedK, 7, 4, 10000.0f);
+      TensorOps.rope(q, 1, k, 1, 7, 4, 10000.0f);
+
+      assertThat(q[0]).isEqualTo(99.0f);
+      assertThat(q[5]).isEqualTo(98.0f);
+      assertThat(k[0]).isEqualTo(97.0f);
+      assertThat(k[5]).isEqualTo(96.0f);
+      for (int i = 0; i < expectedQ.length; i++) {
+        assertThat(q[1 + i]).isCloseTo(expectedQ[i], within(1e-5f));
+        assertThat(k[1 + i]).isCloseTo(expectedK[i], within(1e-5f));
+      }
+    }
+
+    @Test
+    void offsetAwareSingleVectorRopeMatchesCopiedHeadSemantics() {
+      float[] q = {99.0f, 98.0f, 1.0f, 2.0f, 3.0f, 4.0f, 97.0f};
+      float[] expectedQ = {1.0f, 2.0f, 3.0f, 4.0f};
+      float[] ignoredK = new float[4];
+
+      TensorOps.rope(expectedQ, ignoredK, 9, 4, 10000.0f);
+      TensorOps.rope(q, 2, 9, 4, 10000.0f);
+
+      assertThat(q[0]).isEqualTo(99.0f);
+      assertThat(q[1]).isEqualTo(98.0f);
+      assertThat(q[6]).isEqualTo(97.0f);
+      for (int i = 0; i < expectedQ.length; i++) {
+        assertThat(q[2 + i]).isCloseTo(expectedQ[i], within(1e-5f));
+      }
+    }
+
     private float norm(float[] v) {
       float sum = 0;
       for (float x : v) sum += x * x;
