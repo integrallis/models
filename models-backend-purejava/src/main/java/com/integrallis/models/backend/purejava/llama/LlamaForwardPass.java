@@ -126,9 +126,7 @@ public final class LlamaForwardPass {
         for (int p = 0; p <= position; p++) {
           int cacheOffset = cache.vectorOffset(layer, p) + kvHead * headDim;
           float weight = scores[p];
-          for (int d = 0; d < headDim; d++) {
-            attnOut[qOff + d] += weight * valueCache[cacheOffset + d];
-          }
+          VectorUtil.addScaledInPlace(attnOut, qOff, valueCache, cacheOffset, headDim, weight);
         }
       }
 
