@@ -2,9 +2,11 @@
 
 dependencies {
     api(project(":models-api"))
+    api("org.modeljars:modeljars-core:0.1.0-SNAPSHOT")
 
     implementation("com.integrallis:vectors-core:0.1.0-SNAPSHOT")
 
     // Integration tests use GenerationLoop from models-runtime
     testImplementation(project(":models-runtime"))
+    testRuntimeOnly("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")
 }

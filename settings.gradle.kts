@@ -12,6 +12,16 @@ includeBuild("../vectors") {
     }
 }
 
+// ModelJars is a sibling OSS marker-JAR project. Consuming it through a composite
+// build keeps local development independent of publication to modeljars.org.
+includeBuild("../model-jars") {
+    dependencySubstitution {
+        substitute(module("org.modeljars:modeljars-core")).using(project(":modeljars-core"))
+        substitute(module("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0"))
+            .using(project(":modeljars-catalog-qwen3-0-6b-q4-0"))
+    }
+}
+
 // --- Core ---
 include("models-api")
 include("models-runtime")

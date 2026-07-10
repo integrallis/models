@@ -45,7 +45,7 @@ class PureJavaBackendTest {
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
 
-  private Path buildNanoModelFile(Path dir, Random rng) throws IOException {
+  static Path buildNanoModelFile(Path dir, Random rng) throws IOException {
     List<String> tokens = new ArrayList<>();
     for (int i = 0; i < VOCAB_SIZE; i++) {
       tokens.add("t" + i);

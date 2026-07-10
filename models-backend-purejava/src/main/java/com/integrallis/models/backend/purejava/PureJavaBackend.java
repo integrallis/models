@@ -29,6 +29,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
+import java.util.Objects;
+import org.modeljars.ModelJarDescriptor;
+import org.modeljars.ModelJarException;
+import org.modeljars.ModelJarRegistry;
+import org.modeljars.ModelJarRequirement;
 
 /**
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
@@ -86,6 +91,38 @@ public final class PureJavaBackend implements InferenceBackend {
       arena.close();
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
     }
+  }
+
+  /** Resolves a model from classpath ModelJars metadata and loads it. */
+  public static PureJavaBackend load(ModelJarRequirement requirement) {
+    Objects.requireNonNull(requirement, "requirement");
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath()
+            .resolve(requirement)
+            .orElseThrow(
+                () -> new ModelJarException("No ModelJars descriptor matched " + requirement));
+    return load(descriptor);
+  }
+
+  /** Loads a GGUF model described by a ModelJars marker descriptor. */
+  public static PureJavaBackend load(ModelJarDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    if (!descriptor.supportsBackend("pure-java")) {
+      throw new ModelJarException(
+          "ModelJars descriptor does not support pure-java backend: " + descriptor.alias());
+    }
+    if (!"gguf".equals(descriptor.format())) {
+      throw new ModelJarException(
+          "PureJavaBackend only supports GGUF ModelJars descriptors: " + descriptor.alias());
+    }
+    Path modelPath =
+        descriptor
+            .localPath()
+            .orElseThrow(
+                () ->
+                    new ModelJarException(
+                        "ModelJars descriptor has no local path: " + descriptor.alias()));
+    return load(modelPath);
   }
 
   @Override
