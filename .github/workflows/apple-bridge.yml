@@ -1,0 +1,83 @@
+name: Apple Bridge CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apple-bridge.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "models-api/**"
+      - "models-backend-apple/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/apple-bridge.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "models-api/**"
+      - "models-backend-apple/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apple-bridge:
+    name: Compile and test Apple bridge
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Show Apple toolchain
+        run: |
+          uname -a
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+          java -version
+
+      - name: Compile Swift FoundationModels bridge
+        run: |
+          bridge_dir="$RUNNER_TEMP/apple-foundation-bridge"
+          bridge="$(models-backend-apple/src/native/apple-foundation-models/build-bridge.sh "$bridge_dir")"
+          test -f "$bridge"
+          echo "MODELS_APPLE_FOUNDATION_LIBRARY=$bridge" >> "$GITHUB_ENV"
+
+      - name: Compile native stub bridge
+        run: |
+          stub_dir="$RUNNER_TEMP/apple-foundation-stub"
+          stub="$(models-backend-apple/src/native/apple-foundation-models/build-stub-bridge.sh "$stub_dir")"
+          test -f "$stub"
+
+      - name: Run Apple backend checks
+        run: >
+          ./gradlew
+          :models-backend-apple:spotlessCheck
+          :models-backend-apple:test
+          :models-backend-apple:integrationTest
+          --no-daemon
+          --stacktrace
+
+      - name: Upload Apple backend test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: apple-backend-test-reports
+          path: models-backend-apple/build/reports/tests/
+          retention-days: 30
