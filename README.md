@@ -16,8 +16,8 @@
 > **Experimental in-JVM small-language-model inference for JDK 25.**
 >
 > Pure-Java core backend. Optional platform bridge modules are isolated. JDK 25+.
-> GGUF parsing, Q4_0/Q8_0 kernels, tokenization, sampling, and a Llama-family
-> forward path are implemented. Framework adapters remain planned.
+> GGUF parsing, vectors-backed F32/Q4_0/Q8_0/Q6_K kernels, tokenization,
+> sampling, and a Llama-family forward path are implemented.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![JDK 25+](https://img.shields.io/badge/JDK-25%2B-orange.svg)](https://openjdk.org/projects/jdk/25/)
@@ -26,10 +26,9 @@
 ---
 
 > **Project status: pre-alpha.** The first publishable scope is
-> `models-api`, `models-runtime`, and `models-backend-purejava`. The Spring AI,
-> LangChain4j, Quarkus, Semantic Kernel, ONNX, Apple, native, embedding, test,
-> and benchmark modules are scaffolding or experimental only and are not part of
-> release `0.1.x`.
+> `models-api`, `models-runtime`, and `models-backend-purejava`. Framework,
+> Apple, ONNX, native, embedding, test, and benchmark modules remain experimental
+> or scaffolded and are not part of release `0.1.x`.
 > Real-model integration tests download and run the configured Qwen/Qwen-Coder
 > GGUF fixtures before passing.
 
@@ -45,10 +44,11 @@ The current implementation is a research-grade local runtime:
   or llama.cpp for `models-backend-purejava`.
 - **GGUF-oriented**: parse GGUF v2/v3 and run the tensor types currently
   supported by the pure-Java backend.
-- **Framework adapters are planned**: the current release exposes its own Java
-  API and runtime, not Spring AI or LangChain4j implementations.
-- **Scalar kernels today**: SIMD matmul is roadmap work, not a current
-  performance claim.
+- **Framework integration is emerging**: a LangChain4j `ChatModel` and Spring
+  Boot ModelJars auto-configuration are implemented; broader Spring AI support
+  remains experimental.
+- **Vectors-backed kernels**: mapped F32 and quantized GEMV use `vectors-core`,
+  with Panama Vector API SIMD when available and a scalar fallback.
 
 ```
 application
@@ -56,7 +56,7 @@ application
     ▼
 models-runtime ──► models-api ──► models-backend-purejava
                                       │
-                                      └── GGUF / Q4_0 / Q8_0 / F16 / F32
+                                      └── GGUF / F32 / Q4_0 / Q8_0 / Q6_K
 ```
 
 ## Why it exists
@@ -91,9 +91,14 @@ quality evidence for the use cases below.
 ### Load and generate
 
 ```java
-var model = Path.of(
-    System.getProperty("user.home"), ".jvllm/models/Qwen3-0.6B-Q4_0.gguf");
-try (var backend = PureJavaBackend.load(model)) {
+var requirement = ModelJarRequirement.forSource("hf://ggml-org/Qwen3-0.6B-GGUF")
+    .versionRange("[3.0.0,4.0.0)")
+    .variant("q4_0")
+    .backend("pure-java")
+    .build();
+var registry = ModelJarRegistry.fromClasspath();
+new ModelJarInstaller(registry).install(requirement);
+try (var backend = PureJavaBackend.load(requirement)) {
     var loop = new GenerationLoop(backend);
     String result = loop.generate(
         "Classify this intent: 'I want to cancel my order'",
@@ -117,50 +122,26 @@ loop.generate("Once upon a time", options, new TokenStream() {
 
 ### Framework adapters
 
-Spring AI and LangChain4j adapters are roadmap items. No framework adapter
-class is published in `0.1.x`.
+`models-langchain4j` provides `ModelsChatModel`. The Spring Boot starter resolves
+ModelJars descriptors and is the foundation for Spring AI auto-configuration.
 
 ## Supported models
 
-The tested end-to-end fixtures are **Qwen3 0.6B Q4_0 GGUF**,
+The tested real-model fixtures are **Qwen3 0.6B Q4_0 GGUF**,
 **Qwen3 1.7B Q8_0 GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0
 GGUF**, and **SmolLM2 360M Q8_0 GGUF**, resolved through ModelJars marker JARs.
-The backend code accepts Llama/Qwen2/Qwen3 metadata prefixes and implements F32,
-F16, Q4_0, Q8_0, and Q6_K tensor paths. Other architectures, model sizes, chat
-templates, long-context behavior, and remaining K-quant formats are not yet
-claimed.
+The 0.5B Qwen2.5 and 0.6B Qwen3 fixtures also have exact greedy-token reference
+checks against pinned `llama.cpp` behavior. The backend accepts Llama/Qwen2/Qwen3
+metadata prefixes. Projection kernels support F32, Q4_0, Q8_0, and Q6_K; embedding
+rows and small tensors also support F16. Other architectures, chat templates,
+long-context quality, and remaining K-quant formats are not yet claimed.
 The larger **Qwen2.5-Coder 7B Q4_0 GGUF** fixture is covered by the strict
 `slowTest` path instead of the default PR integration suite.
 
-Download models from HuggingFace:
+Resolve, download, and checksum the pinned fixtures through ModelJars:
 ```bash
-mkdir -p ~/.jvllm/models
-curl -L -o ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
-  https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf
-
-curl -L -o ~/.jvllm/models/Qwen3-1.7B-Q8_0.gguf \
-  https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
-
-curl -L -o ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_0.gguf
-
-curl -L -o ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q8_0.gguf
-
-curl -L -o ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_0.gguf
-
-curl -L -o ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf
-
-curl -L -o ~/.jvllm/models/qwen2.5-coder-3b-instruct-q4_0.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_0.gguf
-
-curl -L -o ~/.jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_0.gguf
-
-curl -L -o ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf \
-  https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf
+./gradlew :models-backend-purejava:downloadQwen306BQ40Model
+./gradlew :models-backend-purejava:downloadSmolLm2360MQ80Model
 ```
 
 ## What's inside
@@ -234,10 +215,10 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 | [models-backend-onnx](models-backend-onnx/) | planned | ONNX Runtime backend |
 | [models-backend-native](models-backend-native/) | planned | llama.cpp via Panama FFM |
 | [models-spring-ai](models-spring-ai/) | scaffold | Spring AI adapter placeholder |
-| [models-langchain4j](models-langchain4j/) | scaffold | LangChain4j adapter placeholder |
+| [models-langchain4j](models-langchain4j/) | experimental | LangChain4j `ChatModel` adapter |
 | [models-quarkus](models-quarkus/) | planned | Quarkus extension |
 | [models-semantic-kernel](models-semantic-kernel/) | planned | Semantic Kernel `ChatCompletionService` adapter |
-| [models-spring-boot-starter](models-spring-boot-starter/) | planned | Auto-configuration (inference + optional vectors) |
+| [models-spring-boot-starter](models-spring-boot-starter/) | experimental | ModelJars registry and descriptor auto-configuration |
 | [models-embedding](models-embedding/) | experimental | Optional bridge to vectors for embedding storage/search |
 | [models-test](models-test/) | scaffold | Planned test-support integration |
 | [models-bench](models-bench/) | planned | JMH benchmarks |
@@ -252,10 +233,10 @@ models-backend-apple                <- api + optional Apple Foundation Models dy
 models-backend-onnx                 <- scaffold, no dependencies
 models-backend-native               <- scaffold, no dependencies
 models-spring-ai                    <- scaffold, no dependencies
-models-langchain4j                  <- scaffold, no dependencies
+models-langchain4j                  <- api + runtime + LangChain4j
 models-quarkus                      <- scaffold, no dependencies
 models-semantic-kernel              <- scaffold, no dependencies
-models-spring-boot-starter          <- scaffold, no dependencies
+models-spring-boot-starter          <- ModelJars core + Spring Boot
 models-embedding                    <- api + vectors-db + vectors-cache-semantic-db
 models-test                         <- scaffold, no dependencies
 models-bench                        <- scaffold, no dependencies
@@ -289,7 +270,7 @@ runtime and public API modules remain independent.
 ./gradlew build                  # compile all modules; release modules enforce SpotBugs + JaCoCo
 ./gradlew test                   # unit tests (excludes slow/benchmark/integration)
 ./gradlew unitTest               # @Tag("unit") only
-./gradlew integrationTest        # @Tag("integration") — requires real model file
+./gradlew integrationTest        # downloads, verifies, and runs real-model fixtures
 ./gradlew spotlessApply          # Google Java Format 1.35.0
 ./gradlew publishToMavenLocal    # install to local repo
 
@@ -299,20 +280,16 @@ runtime and public API modules remain independent.
 
 ### Integration tests
 
-Integration tests run against a real Qwen3-0.6B-Q4_0 GGUF model (~409 MB). Download it first:
+Integration tests resolve immutable model revisions from the ModelJars catalog,
+download missing files, verify size and SHA-256, and then execute the real weights:
 
 ```bash
-mkdir -p ~/.jvllm/models
-curl -L -o ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
-  https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf
-
-./gradlew integrationTest
+./gradlew :models-backend-purejava:integrationTest
 ```
 
-When the fixture is present, integration tests exercise GGUF parsing,
-tokenization, finite forward-pass outputs, sampling, and text generation against
-real weights. They do not yet compare logits or generated tokens against a
-reference runtime, so numerical correctness is still a release blocker.
+The suite exercises GGUF parsing, tokenization, finite forward-pass outputs,
+sampling, and generation. Qwen2.5-Coder 0.5B Q4_0 and Qwen3 0.6B Q4_0 must also
+match exact greedy token sequences captured from `llama.cpp` b9960.
 
 The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, and SmolLM2 360M integration tests are strict:
 the Gradle `integrationTest` task downloads the model fixtures before the tests
@@ -323,11 +300,10 @@ The 7B Q4_0 fixture is strict too, but lives under `slowTest` and
 `.github/workflows/model-large-integration.yml` so the default PR cache does not
 exceed practical GitHub Actions limits.
 
-For larger-model smoke coverage, the pure-Java backend accepts
-`models.purejava.maxContextLength`. This caps runtime KV-cache allocation while
-preserving the model metadata context length, which lets integration tests expose
-GGUF, tokenizer, tensor, and forward-pass issues without allocating full
-long-context cache sizes.
+The KV cache starts with 16 positions and grows geometrically, so loading a
+long-context model no longer allocates its full advertised cache. The optional
+`models.purejava.maxContextLength` property sets a hard runtime sequence limit
+without changing the model metadata reported to callers.
 
 ```bash
 ./gradlew :models-backend-purejava:integrationTest \
@@ -362,21 +338,21 @@ long-context cache sizes.
 - Llama-family forward pass (supports Qwen2/Qwen3/Llama architectures)
 - Sampling strategies (greedy, temperature, top-k, top-p, repetition penalty)
 - Generation loop with streaming
-- Integration tests against real Qwen3-0.6B
+- Strict integration tests against real Qwen, Qwen-Coder, and SmolLM2 fixtures
 
 ### Phase 2 — Framework adapters & production hardening
 
 - Spring AI `ChatModel` adapter
 - LangChain4j `ChatLanguageModel` adapter
 - Chat template processing (Jinja2-style)
-- Model auto-download from HuggingFace
+- Additional ModelJars catalog entries and repository providers
 - Micrometer metrics (tok/s, latency histograms)
 - JFR events for profiling
 - Q4_K_M and Q6_K quantization support (wider quant format coverage)
 
 ### Phase 3 — Performance & scale
 
-- SIMD-accelerated matmul using the JDK Vector API
+- Broader SIMD coverage and kernel benchmarking
 - Batched prefill (parallel token processing)
 - Speculative decoding
 - Continuous batching for concurrent requests
