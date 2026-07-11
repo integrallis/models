@@ -123,13 +123,12 @@ class is published in `0.1.x`.
 ## Supported models
 
 The tested end-to-end fixtures are **Qwen3 0.6B Q4_0 GGUF**,
-**Qwen3 1.7B Q8_0 GGUF**, and **Qwen2.5-Coder 0.5B/1.5B Q4_0 GGUF**,
+**Qwen3 1.7B Q8_0 GGUF**, and **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 GGUF**,
 resolved through ModelJars marker JARs.
-Qwen2.5-Coder Q8_0 markers are present for registry coverage, but strict
-runtime tests start with Q4_0 to keep CI cost bounded. The backend code accepts
-Llama/Qwen2/Qwen3 metadata prefixes and implements F32, F16, Q4_0, Q8_0, and
-Q6_K tensor paths. Other architectures, model sizes, chat templates,
-long-context behavior, and remaining K-quant formats are not yet claimed.
+The backend code accepts Llama/Qwen2/Qwen3 metadata prefixes and implements F32,
+F16, Q4_0, Q8_0, and Q6_K tensor paths. Other architectures, model sizes, chat
+templates, long-context behavior, and remaining K-quant formats are not yet
+claimed.
 
 Download models from HuggingFace:
 ```bash
@@ -143,8 +142,14 @@ curl -L -o ~/.jvllm/models/Qwen3-1.7B-Q8_0.gguf \
 curl -L -o ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf \
   https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_0.gguf
 
+curl -L -o ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf \
+  https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q8_0.gguf
+
 curl -L -o ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf \
   https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_0.gguf
+
+curl -L -o ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf \
+  https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf
 ```
 
 ## What's inside

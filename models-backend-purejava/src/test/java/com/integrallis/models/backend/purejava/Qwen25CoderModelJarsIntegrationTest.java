@@ -37,10 +37,26 @@ class Qwen25CoderModelJarsIntegrationTest {
           .capability("code-completion")
           .build();
 
+  private static final ModelJarRequirement QWEN25_CODER_0_5B_Q8_0 =
+      ModelJarRequirement.forSource("hf://Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF")
+          .versionRange("[2.5.0,3.0.0)")
+          .variant("q8_0")
+          .backend("pure-java")
+          .capability("code-completion")
+          .build();
+
   private static final ModelJarRequirement QWEN25_CODER_1_5B_Q4_0 =
       ModelJarRequirement.forSource("hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF")
           .versionRange("[2.5.0,3.0.0)")
           .variant("q4_0")
+          .backend("pure-java")
+          .capability("code-completion")
+          .build();
+
+  private static final ModelJarRequirement QWEN25_CODER_1_5B_Q8_0 =
+      ModelJarRequirement.forSource("hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF")
+          .versionRange("[2.5.0,3.0.0)")
+          .variant("q8_0")
           .backend("pure-java")
           .capability("code-completion")
           .build();
@@ -51,8 +67,18 @@ class Qwen25CoderModelJarsIntegrationTest {
   }
 
   @Test
+  void loadsQwen25Coder05BQ80ThroughModelJars() {
+    assertLoadsQwen25Coder(QWEN25_CODER_0_5B_Q8_0);
+  }
+
+  @Test
   void loadsQwen25Coder15BQ40ThroughModelJars() {
     assertLoadsQwen25Coder(QWEN25_CODER_1_5B_Q4_0);
+  }
+
+  @Test
+  void loadsQwen25Coder15BQ80ThroughModelJars() {
+    assertLoadsQwen25Coder(QWEN25_CODER_1_5B_Q8_0);
   }
 
   private static void assertLoadsQwen25Coder(ModelJarRequirement requirement) {

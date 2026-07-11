@@ -14,16 +14,24 @@ val qwen317BQ80Url =
 val qwen25Coder05BQ40FileName = "qwen2.5-coder-0.5b-instruct-q4_0.gguf"
 val qwen25Coder05BQ40Url =
     "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/$qwen25Coder05BQ40FileName"
+val qwen25Coder05BQ80FileName = "qwen2.5-coder-0.5b-instruct-q8_0.gguf"
+val qwen25Coder05BQ80Url =
+    "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/$qwen25Coder05BQ80FileName"
 val qwen25Coder15BQ40FileName = "qwen2.5-coder-1.5b-instruct-q4_0.gguf"
 val qwen25Coder15BQ40Url =
     "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/$qwen25Coder15BQ40FileName"
+val qwen25Coder15BQ80FileName = "qwen2.5-coder-1.5b-instruct-q8_0.gguf"
+val qwen25Coder15BQ80Url =
+    "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/$qwen25Coder15BQ80FileName"
 val modelsCacheDir =
     providers.gradleProperty("models.cacheDir")
         .orElse(providers.systemProperty("user.home").map { "$it/.jvllm/models" })
 val qwen306BQ40Path = modelsCacheDir.map { "$it/$qwen306BQ40FileName" }
 val qwen317BQ80Path = modelsCacheDir.map { "$it/$qwen317BQ80FileName" }
 val qwen25Coder05BQ40Path = modelsCacheDir.map { "$it/$qwen25Coder05BQ40FileName" }
+val qwen25Coder05BQ80Path = modelsCacheDir.map { "$it/$qwen25Coder05BQ80FileName" }
 val qwen25Coder15BQ40Path = modelsCacheDir.map { "$it/$qwen25Coder15BQ40FileName" }
+val qwen25Coder15BQ80Path = modelsCacheDir.map { "$it/$qwen25Coder15BQ80FileName" }
 
 dependencies {
     api(project(":models-api"))
@@ -93,15 +101,31 @@ registerModelDownloadTask(
 )
 
 registerModelDownloadTask(
+    "downloadQwen25Coder05BQ80Model",
+    "Qwen2.5-Coder 0.5B Q8_0",
+    qwen25Coder05BQ80Url,
+    qwen25Coder05BQ80Path,
+)
+
+registerModelDownloadTask(
     "downloadQwen25Coder15BQ40Model",
     "Qwen2.5-Coder 1.5B Q4_0",
     qwen25Coder15BQ40Url,
     qwen25Coder15BQ40Path,
 )
 
+registerModelDownloadTask(
+    "downloadQwen25Coder15BQ80Model",
+    "Qwen2.5-Coder 1.5B Q8_0",
+    qwen25Coder15BQ80Url,
+    qwen25Coder15BQ80Path,
+)
+
 tasks.named<Test>("integrationTest") {
     dependsOn(tasks.named("downloadQwen306BQ40Model"))
     dependsOn(tasks.named("downloadQwen317BQ80Model"))
     dependsOn(tasks.named("downloadQwen25Coder05BQ40Model"))
+    dependsOn(tasks.named("downloadQwen25Coder05BQ80Model"))
     dependsOn(tasks.named("downloadQwen25Coder15BQ40Model"))
+    dependsOn(tasks.named("downloadQwen25Coder15BQ80Model"))
 }

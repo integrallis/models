@@ -68,8 +68,10 @@ jobs:
             ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf
             ~/.jvllm/models/Qwen3-1.7B-Q8_0.gguf
             ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf
+            ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf
             ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf
-          key: qwen-purejava-fixtures-v2
+            ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf
+          key: qwen-purejava-fixtures-v3
 
       - name: Download Qwen fixtures
         working-directory: models
@@ -78,7 +80,9 @@ jobs:
           :models-backend-purejava:downloadQwen306BQ40Model
           :models-backend-purejava:downloadQwen317BQ80Model
           :models-backend-purejava:downloadQwen25Coder05BQ40Model
+          :models-backend-purejava:downloadQwen25Coder05BQ80Model
           :models-backend-purejava:downloadQwen25Coder15BQ40Model
+          :models-backend-purejava:downloadQwen25Coder15BQ80Model
           --no-daemon
           --stacktrace
 
