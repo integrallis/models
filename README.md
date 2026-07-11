@@ -290,6 +290,17 @@ tokenization, finite forward-pass outputs, sampling, and text generation against
 real weights. They do not yet compare logits or generated tokens against a
 reference runtime, so numerical correctness is still a release blocker.
 
+The Qwen2.5-Coder 0.5B Q4_0 integration test is stricter: the Gradle
+`integrationTest` task downloads the model fixture before the test runs, and the
+test fails if the real model cannot be loaded. CI runs this path in
+`.github/workflows/model-integration.yml` with the downloaded GGUF cached under
+`~/.jvllm/models`.
+
+```bash
+./gradlew :models-backend-purejava:integrationTest \
+  --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
+```
+
 ## When to use models (and when not to)
 
 | Use case | Recommendation |

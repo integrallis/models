@@ -16,7 +16,6 @@
 package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
@@ -41,7 +40,7 @@ class Qwen25CoderModelJarsIntegrationTest {
     ModelJarDescriptor descriptor =
         ModelJarRegistry.fromClasspath().resolve(QWEN25_CODER_0_5B_Q4_0).orElseThrow();
 
-    assumeThat(Files.exists(descriptor.localPath().orElseThrow()))
+    assertThat(Files.exists(descriptor.localPath().orElseThrow()))
         .as(
             "%s must be present. Download with: curl -L -o %s %s/resolve/main/%s",
             descriptor.localPath().orElseThrow(),
@@ -56,7 +55,7 @@ class Qwen25CoderModelJarsIntegrationTest {
       assertThat(backend.metadata().contextLength()).isGreaterThanOrEqualTo(32_768);
 
       int[] tokens = backend.tokenizer().encode("public static void main");
-      assumeThat(tokens).isNotEmpty();
+      assertThat(tokens).isNotEmpty();
 
       float[] logits = backend.forward(tokens[0], 0);
       assertThat(logits).hasSize(backend.metadata().vocabSize());
