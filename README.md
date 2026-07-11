@@ -123,8 +123,8 @@ class is published in `0.1.x`.
 ## Supported models
 
 The tested end-to-end fixtures are **Qwen3 0.6B Q4_0 GGUF**,
-**Qwen3 1.7B Q8_0 GGUF**, and **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 GGUF**,
-resolved through ModelJars marker JARs.
+**Qwen3 1.7B Q8_0 GGUF**, and **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B
+Q4_0 GGUF**, resolved through ModelJars marker JARs.
 The backend code accepts Llama/Qwen2/Qwen3 metadata prefixes and implements F32,
 F16, Q4_0, Q8_0, and Q6_K tensor paths. Other architectures, model sizes, chat
 templates, long-context behavior, and remaining K-quant formats are not yet
@@ -150,6 +150,9 @@ curl -L -o ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf \
 
 curl -L -o ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf \
   https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf
+
+curl -L -o ~/.jvllm/models/qwen2.5-coder-3b-instruct-q4_0.gguf \
+  https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_0.gguf
 ```
 
 ## What's inside
@@ -303,7 +306,7 @@ tokenization, finite forward-pass outputs, sampling, and text generation against
 real weights. They do not yet compare logits or generated tokens against a
 reference runtime, so numerical correctness is still a release blocker.
 
-The Qwen3 0.6B/1.7B and Qwen2.5-Coder 0.5B/1.5B integration tests are strict:
+The Qwen3 0.6B/1.7B and Qwen2.5-Coder 0.5B/1.5B/3B integration tests are strict:
 the Gradle `integrationTest` task downloads the model fixtures before the tests
 run, and the tests fail if any real model cannot be loaded. CI runs this path in
 `.github/workflows/model-integration.yml` with the downloaded GGUF cached under

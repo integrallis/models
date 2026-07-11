@@ -61,6 +61,14 @@ class Qwen25CoderModelJarsIntegrationTest {
           .capability("code-completion")
           .build();
 
+  private static final ModelJarRequirement QWEN25_CODER_3B_Q4_0 =
+      ModelJarRequirement.forSource("hf://Qwen/Qwen2.5-Coder-3B-Instruct-GGUF")
+          .versionRange("[2.5.0,3.0.0)")
+          .variant("q4_0")
+          .backend("pure-java")
+          .capability("code-completion")
+          .build();
+
   @Test
   void loadsQwen25Coder05BQ40ThroughModelJars() {
     assertLoadsQwen25Coder(QWEN25_CODER_0_5B_Q4_0);
@@ -79,6 +87,11 @@ class Qwen25CoderModelJarsIntegrationTest {
   @Test
   void loadsQwen25Coder15BQ80ThroughModelJars() {
     assertLoadsQwen25Coder(QWEN25_CODER_1_5B_Q8_0);
+  }
+
+  @Test
+  void loadsQwen25Coder3BQ40ThroughModelJars() {
+    assertLoadsQwen25Coder(QWEN25_CODER_3B_Q4_0);
   }
 
   private static void assertLoadsQwen25Coder(ModelJarRequirement requirement) {
