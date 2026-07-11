@@ -29,6 +29,9 @@ val qwen25Coder3BQ40Url =
 val qwen25Coder7BQ40FileName = "qwen2.5-coder-7b-instruct-q4_0.gguf"
 val qwen25Coder7BQ40Url =
     "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/$qwen25Coder7BQ40FileName"
+val smolLm2360MQ80FileName = "smollm2-360m-instruct-q8_0.gguf"
+val smolLm2360MQ80Url =
+    "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/$smolLm2360MQ80FileName"
 val modelsCacheDir =
     providers.gradleProperty("models.cacheDir")
         .orElse(providers.systemProperty("user.home").map { "$it/.jvllm/models" })
@@ -40,6 +43,7 @@ val qwen25Coder15BQ40Path = modelsCacheDir.map { "$it/$qwen25Coder15BQ40FileName
 val qwen25Coder15BQ80Path = modelsCacheDir.map { "$it/$qwen25Coder15BQ80FileName" }
 val qwen25Coder3BQ40Path = modelsCacheDir.map { "$it/$qwen25Coder3BQ40FileName" }
 val qwen25Coder7BQ40Path = modelsCacheDir.map { "$it/$qwen25Coder7BQ40FileName" }
+val smolLm2360MQ80Path = modelsCacheDir.map { "$it/$smolLm2360MQ80FileName" }
 
 dependencies {
     api(project(":models-api"))
@@ -57,6 +61,7 @@ dependencies {
     testRuntimeOnly("org.modeljars.huggingface:qwen.qwen2.5-coder-1.5b-instruct-gguf.q8_0:2.5.0-q8_0.1")
     testRuntimeOnly("org.modeljars.huggingface:qwen.qwen2.5-coder-3b-instruct-gguf.q4_0:2.5.0-q4_0.1")
     testRuntimeOnly("org.modeljars.huggingface:qwen.qwen2.5-coder-7b-instruct-gguf.q4_0:2.5.0-q4_0.1")
+    testRuntimeOnly("org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0:2.0.0-q8_0.1")
 }
 
 fun registerModelDownloadTask(
@@ -145,6 +150,13 @@ registerModelDownloadTask(
     qwen25Coder7BQ40Path,
 )
 
+registerModelDownloadTask(
+    "downloadSmolLm2360MQ80Model",
+    "SmolLM2 360M Q8_0",
+    smolLm2360MQ80Url,
+    smolLm2360MQ80Path,
+)
+
 tasks.named<Test>("integrationTest") {
     dependsOn(tasks.named("downloadQwen306BQ40Model"))
     dependsOn(tasks.named("downloadQwen317BQ80Model"))
@@ -153,6 +165,7 @@ tasks.named<Test>("integrationTest") {
     dependsOn(tasks.named("downloadQwen25Coder15BQ40Model"))
     dependsOn(tasks.named("downloadQwen25Coder15BQ80Model"))
     dependsOn(tasks.named("downloadQwen25Coder3BQ40Model"))
+    dependsOn(tasks.named("downloadSmolLm2360MQ80Model"))
 }
 
 tasks.named<Test>("slowTest") {

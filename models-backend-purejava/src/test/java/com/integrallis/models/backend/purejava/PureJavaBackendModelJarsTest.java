@@ -96,6 +96,14 @@ class PureJavaBackendModelJarsTest {
           .capability("code-completion")
           .build();
 
+  private static final ModelJarRequirement SMOLLM2_360M_Q8_0 =
+      ModelJarRequirement.forSource("hf://HuggingFaceTB/SmolLM2-360M-Instruct-GGUF")
+          .versionRange("[2.0.0,3.0.0)")
+          .variant("q8_0")
+          .backend("pure-java")
+          .capability("chat")
+          .build();
+
   @Test
   void resolvesQwenMarkerJarFromClasspath() {
     ModelJarDescriptor descriptor =
@@ -190,6 +198,20 @@ class PureJavaBackendModelJarsTest {
     assertThat(descriptor.capabilities()).contains("text-generation", "chat", "code-completion");
     assertThat(descriptor.localPath().orElseThrow().toString())
         .endsWith(".jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf");
+  }
+
+  @Test
+  void resolvesSmolLm2PureJavaMarkerJarFromClasspath() {
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath().resolve(SMOLLM2_360M_Q8_0).orElseThrow();
+
+    assertThat(descriptor.markerCoordinate().groupId()).isEqualTo("org.modeljars.huggingface");
+    assertThat(descriptor.format()).isEqualTo("gguf");
+    assertThat(descriptor.architecture()).isEqualTo("llama");
+    assertThat(descriptor.quantization()).isEqualTo("Q8_0");
+    assertThat(descriptor.capabilities()).contains("text-generation", "chat");
+    assertThat(descriptor.localPath().orElseThrow().toString())
+        .endsWith(".jvllm/models/smollm2-360m-instruct-q8_0.gguf");
   }
 
   @Test

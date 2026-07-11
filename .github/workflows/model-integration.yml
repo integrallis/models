@@ -72,7 +72,8 @@ jobs:
             ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf
             ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf
             ~/.jvllm/models/qwen2.5-coder-3b-instruct-q4_0.gguf
-          key: qwen-purejava-fixtures-v4
+            ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf
+          key: qwen-smollm-purejava-fixtures-v1
 
       - name: Download Qwen fixtures
         working-directory: models
@@ -85,6 +86,7 @@ jobs:
           :models-backend-purejava:downloadQwen25Coder15BQ40Model
           :models-backend-purejava:downloadQwen25Coder15BQ80Model
           :models-backend-purejava:downloadQwen25Coder3BQ40Model
+          :models-backend-purejava:downloadSmolLm2360MQ80Model
           --no-daemon
           --stacktrace
 
@@ -95,6 +97,7 @@ jobs:
           :models-backend-purejava:integrationTest
           --tests com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest
           --no-daemon
           --stacktrace
 

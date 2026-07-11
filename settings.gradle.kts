@@ -33,6 +33,8 @@ includeBuild("../model-jars") {
             .using(project(":modeljars-catalog-qwen2-5-coder-3b-instruct-q4-0"))
         substitute(module("org.modeljars.huggingface:qwen.qwen2.5-coder-7b-instruct-gguf.q4_0"))
             .using(project(":modeljars-catalog-qwen2-5-coder-7b-instruct-q4-0"))
+        substitute(module("org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0"))
+            .using(project(":modeljars-catalog-huggingfacetb-smollm2-360m-instruct-q8-0"))
     }
 }
 
