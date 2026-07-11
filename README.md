@@ -129,6 +129,8 @@ The backend code accepts Llama/Qwen2/Qwen3 metadata prefixes and implements F32,
 F16, Q4_0, Q8_0, and Q6_K tensor paths. Other architectures, model sizes, chat
 templates, long-context behavior, and remaining K-quant formats are not yet
 claimed.
+The larger **Qwen2.5-Coder 7B Q4_0 GGUF** fixture is covered by the strict
+`slowTest` path instead of the default PR integration suite.
 
 Download models from HuggingFace:
 ```bash
@@ -153,6 +155,9 @@ curl -L -o ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf \
 
 curl -L -o ~/.jvllm/models/qwen2.5-coder-3b-instruct-q4_0.gguf \
   https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_0.gguf
+
+curl -L -o ~/.jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf \
+  https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_0.gguf
 ```
 
 ## What's inside
@@ -311,6 +316,9 @@ the Gradle `integrationTest` task downloads the model fixtures before the tests
 run, and the tests fail if any real model cannot be loaded. CI runs this path in
 `.github/workflows/model-integration.yml` with the downloaded GGUF cached under
 `~/.jvllm/models`.
+The 7B Q4_0 fixture is strict too, but lives under `slowTest` and
+`.github/workflows/model-large-integration.yml` so the default PR cache does not
+exceed practical GitHub Actions limits.
 
 For larger-model smoke coverage, the pure-Java backend accepts
 `models.purejava.maxContextLength`. This caps runtime KV-cache allocation while
@@ -321,6 +329,9 @@ long-context cache sizes.
 ```bash
 ./gradlew :models-backend-purejava:integrationTest \
   --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
+
+./gradlew :models-backend-purejava:slowTest \
+  --tests com.integrallis.models.backend.purejava.Qwen25CoderLargeModelJarsSlowTest
 ```
 
 ## When to use models (and when not to)

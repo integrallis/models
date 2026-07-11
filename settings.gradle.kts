@@ -31,6 +31,8 @@ includeBuild("../model-jars") {
             .using(project(":modeljars-catalog-qwen2-5-coder-1-5b-instruct-q8-0"))
         substitute(module("org.modeljars.huggingface:qwen.qwen2.5-coder-3b-instruct-gguf.q4_0"))
             .using(project(":modeljars-catalog-qwen2-5-coder-3b-instruct-q4-0"))
+        substitute(module("org.modeljars.huggingface:qwen.qwen2.5-coder-7b-instruct-gguf.q4_0"))
+            .using(project(":modeljars-catalog-qwen2-5-coder-7b-instruct-q4-0"))
     }
 }
 
