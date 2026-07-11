@@ -30,8 +30,8 @@
 > LangChain4j, Quarkus, Semantic Kernel, ONNX, Apple, native, embedding, test,
 > and benchmark modules are scaffolding or experimental only and are not part of
 > release `0.1.x`.
-> Real-model integration tests currently target one local
-> `Qwen3-0.6B-Q4_0.gguf` fixture and skip when it is absent.
+> Real-model integration tests download and run the configured Qwen/Qwen-Coder
+> GGUF fixtures before passing.
 
 ## The pitch in 60 seconds
 
@@ -122,8 +122,9 @@ class is published in `0.1.x`.
 
 ## Supported models
 
-The tested end-to-end fixtures are **Qwen3 0.6B Q4_0 GGUF** and
-**Qwen2.5-Coder 0.5B/1.5B Q4_0 GGUF**, resolved through ModelJars marker JARs.
+The tested end-to-end fixtures are **Qwen3 0.6B Q4_0 GGUF**,
+**Qwen3 1.7B Q8_0 GGUF**, and **Qwen2.5-Coder 0.5B/1.5B Q4_0 GGUF**,
+resolved through ModelJars marker JARs.
 Qwen2.5-Coder Q8_0 markers are present for registry coverage, but strict
 runtime tests start with Q4_0 to keep CI cost bounded. The backend code accepts
 Llama/Qwen2/Qwen3 metadata prefixes and implements F32, F16, Q4_0, Q8_0, and
@@ -135,6 +136,9 @@ Download models from HuggingFace:
 mkdir -p ~/.jvllm/models
 curl -L -o ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf
+
+curl -L -o ~/.jvllm/models/Qwen3-1.7B-Q8_0.gguf \
+  https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
 
 curl -L -o ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf \
   https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_0.gguf
@@ -294,9 +298,9 @@ tokenization, finite forward-pass outputs, sampling, and text generation against
 real weights. They do not yet compare logits or generated tokens against a
 reference runtime, so numerical correctness is still a release blocker.
 
-The Qwen2.5-Coder 0.5B and 1.5B Q4_0 integration tests are strict: the Gradle
-`integrationTest` task downloads both model fixtures before the tests run, and
-the tests fail if either real model cannot be loaded. CI runs this path in
+The Qwen3 0.6B/1.7B and Qwen2.5-Coder 0.5B/1.5B integration tests are strict:
+the Gradle `integrationTest` task downloads the model fixtures before the tests
+run, and the tests fail if any real model cannot be loaded. CI runs this path in
 `.github/workflows/model-integration.yml` with the downloaded GGUF cached under
 `~/.jvllm/models`.
 

@@ -19,6 +19,8 @@ includeBuild("../model-jars") {
         substitute(module("org.modeljars:modeljars-core")).using(project(":modeljars-core"))
         substitute(module("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0"))
             .using(project(":modeljars-catalog-qwen3-0-6b-q4-0"))
+        substitute(module("org.modeljars.huggingface:qwen.qwen3-1.7b-gguf.q8_0"))
+            .using(project(":modeljars-catalog-qwen3-1-7b-q8-0"))
         substitute(module("org.modeljars.huggingface:qwen.qwen2.5-coder-0.5b-instruct-gguf.q4_0"))
             .using(project(":modeljars-catalog-qwen2-5-coder-0-5b-instruct-q4-0"))
         substitute(module("org.modeljars.huggingface:qwen.qwen2.5-coder-0.5b-instruct-gguf.q8_0"))

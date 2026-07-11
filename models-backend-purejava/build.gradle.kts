@@ -5,6 +5,12 @@ import java.nio.file.StandardCopyOption
 
 // models-backend-purejava — GGUF parser, scalar inference kernels, KV cache
 
+val qwen306BQ40FileName = "Qwen3-0.6B-Q4_0.gguf"
+val qwen306BQ40Url =
+    "https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/$qwen306BQ40FileName"
+val qwen317BQ80FileName = "Qwen3-1.7B-Q8_0.gguf"
+val qwen317BQ80Url =
+    "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/$qwen317BQ80FileName"
 val qwen25Coder05BQ40FileName = "qwen2.5-coder-0.5b-instruct-q4_0.gguf"
 val qwen25Coder05BQ40Url =
     "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/$qwen25Coder05BQ40FileName"
@@ -14,6 +20,8 @@ val qwen25Coder15BQ40Url =
 val modelsCacheDir =
     providers.gradleProperty("models.cacheDir")
         .orElse(providers.systemProperty("user.home").map { "$it/.jvllm/models" })
+val qwen306BQ40Path = modelsCacheDir.map { "$it/$qwen306BQ40FileName" }
+val qwen317BQ80Path = modelsCacheDir.map { "$it/$qwen317BQ80FileName" }
 val qwen25Coder05BQ40Path = modelsCacheDir.map { "$it/$qwen25Coder05BQ40FileName" }
 val qwen25Coder15BQ40Path = modelsCacheDir.map { "$it/$qwen25Coder15BQ40FileName" }
 
@@ -26,6 +34,7 @@ dependencies {
     // Integration tests use GenerationLoop from models-runtime
     testImplementation(project(":models-runtime"))
     testRuntimeOnly("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")
+    testRuntimeOnly("org.modeljars.huggingface:qwen.qwen3-1.7b-gguf.q8_0:3.0.0-q8_0.1")
     testRuntimeOnly("org.modeljars.huggingface:qwen.qwen2.5-coder-0.5b-instruct-gguf.q4_0:2.5.0-q4_0.1")
     testRuntimeOnly("org.modeljars.huggingface:qwen.qwen2.5-coder-0.5b-instruct-gguf.q8_0:2.5.0-q8_0.1")
     testRuntimeOnly("org.modeljars.huggingface:qwen.qwen2.5-coder-1.5b-instruct-gguf.q4_0:2.5.0-q4_0.1")
@@ -63,6 +72,20 @@ fun registerModelDownloadTask(
 }
 
 registerModelDownloadTask(
+    "downloadQwen306BQ40Model",
+    "Qwen3 0.6B Q4_0",
+    qwen306BQ40Url,
+    qwen306BQ40Path,
+)
+
+registerModelDownloadTask(
+    "downloadQwen317BQ80Model",
+    "Qwen3 1.7B Q8_0",
+    qwen317BQ80Url,
+    qwen317BQ80Path,
+)
+
+registerModelDownloadTask(
     "downloadQwen25Coder05BQ40Model",
     "Qwen2.5-Coder 0.5B Q4_0",
     qwen25Coder05BQ40Url,
@@ -77,6 +100,8 @@ registerModelDownloadTask(
 )
 
 tasks.named<Test>("integrationTest") {
+    dependsOn(tasks.named("downloadQwen306BQ40Model"))
+    dependsOn(tasks.named("downloadQwen317BQ80Model"))
     dependsOn(tasks.named("downloadQwen25Coder05BQ40Model"))
     dependsOn(tasks.named("downloadQwen25Coder15BQ40Model"))
 }
