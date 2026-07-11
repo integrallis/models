@@ -123,15 +123,20 @@ class is published in `0.1.x`.
 ## Supported models
 
 The tested end-to-end fixture is **Qwen3 0.6B in Q4_0 GGUF format**.
-The backend code accepts Llama/Qwen2/Qwen3 metadata prefixes and implements
-F32, F16, Q4_0, and Q8_0 tensor paths. Other architectures, model sizes, chat
-templates, long-context behavior, and K-quant formats are not yet claimed.
+The next pure-Java coder targets are **Qwen2.5-Coder 0.5B and 1.5B in Q4_0/Q8_0
+GGUF format**, resolved through ModelJars marker JARs. The backend code accepts
+Llama/Qwen2/Qwen3 metadata prefixes and implements F32, F16, Q4_0, and Q8_0
+tensor paths. Other architectures, model sizes, chat templates, long-context
+behavior, and K-quant formats are not yet claimed.
 
 Download models from HuggingFace:
 ```bash
 mkdir -p ~/.jvllm/models
 curl -L -o ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf
+
+curl -L -o ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf \
+  https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_0.gguf
 ```
 
 ## What's inside
