@@ -153,6 +153,24 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void capsRuntimeContextLengthWithoutChangingModelMetadata(@TempDir Path dir)
+        throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(43));
+      String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+      System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "4");
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertThat(backend.metadata().contextLength()).isEqualTo(CONTEXT);
+        assertThat(backend.forward(5, 3)).hasSize(VOCAB_SIZE);
+        assertThatThrownBy(() -> backend.forward(5, 4))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("position out of range");
+      } finally {
+        restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+      }
+    }
+
+    @Test
     void nonExistentFileThrows(@TempDir Path dir) {
       Path noFile = dir.resolve("missing.gguf");
       assertThatThrownBy(() -> PureJavaBackend.load(noFile))
@@ -176,5 +194,13 @@ class PureJavaBackendTest {
       buf.putFloat(i * 4, 1.0f);
     }
     return data;
+  }
+
+  private static void restoreSystemProperty(String name, String previous) {
+    if (previous == null) {
+      System.clearProperty(name);
+    } else {
+      System.setProperty(name, previous);
+    }
   }
 }

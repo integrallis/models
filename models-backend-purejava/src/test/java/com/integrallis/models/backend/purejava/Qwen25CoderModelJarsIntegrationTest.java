@@ -27,6 +27,8 @@ import org.modeljars.ModelJarRequirement;
 @Tag("integration")
 class Qwen25CoderModelJarsIntegrationTest {
 
+  private static final int INTEGRATION_CONTEXT_LENGTH = 128;
+
   private static final ModelJarRequirement QWEN25_CODER_0_5B_Q4_0 =
       ModelJarRequirement.forSource("hf://Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF")
           .versionRange("[2.5.0,3.0.0)")
@@ -35,19 +37,38 @@ class Qwen25CoderModelJarsIntegrationTest {
           .capability("code-completion")
           .build();
 
+  private static final ModelJarRequirement QWEN25_CODER_1_5B_Q4_0 =
+      ModelJarRequirement.forSource("hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF")
+          .versionRange("[2.5.0,3.0.0)")
+          .variant("q4_0")
+          .backend("pure-java")
+          .capability("code-completion")
+          .build();
+
   @Test
-  void loadsQwen25CoderThroughModelJarsWhenLocalFileIsPresent() {
+  void loadsQwen25Coder05BQ40ThroughModelJars() {
+    assertLoadsQwen25Coder(QWEN25_CODER_0_5B_Q4_0);
+  }
+
+  @Test
+  void loadsQwen25Coder15BQ40ThroughModelJars() {
+    assertLoadsQwen25Coder(QWEN25_CODER_1_5B_Q4_0);
+  }
+
+  private static void assertLoadsQwen25Coder(ModelJarRequirement requirement) {
     ModelJarDescriptor descriptor =
-        ModelJarRegistry.fromClasspath().resolve(QWEN25_CODER_0_5B_Q4_0).orElseThrow();
+        ModelJarRegistry.fromClasspath().resolve(requirement).orElseThrow();
 
     assertThat(Files.exists(descriptor.localPath().orElseThrow()))
         .as(
-            "%s must be present. Download with: curl -L -o %s %s/resolve/main/%s",
-            descriptor.localPath().orElseThrow(),
-            descriptor.localPath().orElseThrow(),
-            descriptor.sourceUri().orElseThrow(),
-            descriptor.localPath().orElseThrow().getFileName())
+            "%s must be present. Run :models-backend-purejava:integrationTest or the fixture"
+                + " download task before running this test.",
+            descriptor.localPath().orElseThrow())
         .isTrue();
+
+    String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
 
     try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
       assertThat(backend.name()).isEqualTo("pure-java");
@@ -62,6 +83,16 @@ class Qwen25CoderModelJarsIntegrationTest {
       for (int i = 0; i < logits.length; i++) {
         assertThat(logits[i]).as("Logit at index %d should be finite", i).isFinite();
       }
+    } finally {
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
+  }
+
+  private static void restoreSystemProperty(String name, String previous) {
+    if (previous == null) {
+      System.clearProperty(name);
+    } else {
+      System.setProperty(name, previous);
     }
   }
 }

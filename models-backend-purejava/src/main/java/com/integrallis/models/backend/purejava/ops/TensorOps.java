@@ -51,6 +51,7 @@ public final class TensorOps {
     switch (type) {
       case Q4_0 -> VectorUtil.ggufQ4_0BatchDotProduct(x, qWeight, rows, cols, out);
       case Q8_0 -> VectorUtil.ggufQ8_0BatchDotProduct(x, qWeight, rows, cols, out);
+      case Q6_K -> VectorUtil.ggufQ6_KBatchDotProduct(x, qWeight, rows, cols, out);
       default ->
           throw new UnsupportedOperationException("Quantized matmul not supported for: " + type);
     }

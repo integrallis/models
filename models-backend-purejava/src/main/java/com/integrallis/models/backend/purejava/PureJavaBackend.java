@@ -41,6 +41,8 @@ import org.modeljars.ModelJarRequirement;
  */
 public final class PureJavaBackend implements InferenceBackend {
 
+  static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
+
   private final Arena arena;
   private final LlamaConfig config;
   private final GgufTokenizer tokenizer;
@@ -68,7 +70,7 @@ public final class PureJavaBackend implements InferenceBackend {
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache = new KvCache(config.numLayers(), runtimeContextLength(config), config.kvDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       String modelName =
@@ -153,5 +155,24 @@ public final class PureJavaBackend implements InferenceBackend {
   @Override
   public void close() {
     arena.close();
+  }
+
+  private static int runtimeContextLength(LlamaConfig config) {
+    String value = System.getProperty(MAX_CONTEXT_LENGTH_PROPERTY);
+    if (value == null || value.isBlank()) {
+      return config.contextLength();
+    }
+    int maxContextLength;
+    try {
+      maxContextLength = Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value, e);
+    }
+    if (maxContextLength <= 0) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value);
+    }
+    return Math.min(config.contextLength(), maxContextLength);
   }
 }

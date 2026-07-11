@@ -47,6 +47,12 @@ jobs:
           repository: ModelJars/modeljars
           path: model-jars
 
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          path: vectors
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -58,14 +64,17 @@ jobs:
       - name: Cache local model fixtures
         uses: actions/cache@v5
         with:
-          path: ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf
-          key: qwen2-5-coder-0-5b-q4-0-v1
+          path: |
+            ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf
+            ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf
+          key: qwen2-5-coder-q4-0-fixtures-v1
 
-      - name: Download Qwen2.5-Coder fixture
+      - name: Download Qwen2.5-Coder fixtures
         working-directory: models
         run: >
           ./gradlew
           :models-backend-purejava:downloadQwen25Coder05BQ40Model
+          :models-backend-purejava:downloadQwen25Coder15BQ40Model
           --no-daemon
           --stacktrace
 

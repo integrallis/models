@@ -26,6 +26,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.function.IntUnaryOperator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -153,6 +154,23 @@ class TensorOpsTest {
     }
 
     @Test
+    void q6_KMatchesVectorsFusedDotSemantics() {
+      float[] x = repeatingQuery(256);
+      byte[] row = q6KBlock(0.125f, i -> (i % 64) - 32, i -> (i % 7) - 3);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        expected[0] = VectorUtil.ggufQ6_KDotProduct(x, qWeight, 0, 256);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q6_K, 1, 256);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
     void rejectsNonBlockAlignedQ4_0Dimensions() {
       try (Arena arena = Arena.ofConfined()) {
         MemorySegment qWeight = copy(arena, q4Block(1.0f));
@@ -208,6 +226,38 @@ class TensorOpsTest {
           .putShort(0, Float.floatToFloat16(scale));
       for (int i = 0; i < 32; i++) {
         block[2 + i] = (byte) (i - 16);
+      }
+      return block;
+    }
+
+    private static byte[] q6KBlock(
+        float scale, IntUnaryOperator quantFactory, IntUnaryOperator scaleFactory) {
+      byte[] block = new byte[210];
+      for (int i = 0; i < 16; i++) {
+        block[192 + i] = (byte) scaleFactory.applyAsInt(i);
+      }
+      ByteBuffer.wrap(block)
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .putShort(208, Float.floatToFloat16(scale));
+
+      for (int superBlock = 0; superBlock < 2; superBlock++) {
+        int positionBase = superBlock * 128;
+        int qlBase = superBlock * 64;
+        int qhBase = 128 + superBlock * 32;
+        for (int l = 0; l < 32; l++) {
+          int q1 = quantFactory.applyAsInt(positionBase + l) + 32;
+          int q2 = quantFactory.applyAsInt(positionBase + l + 32) + 32;
+          int q3 = quantFactory.applyAsInt(positionBase + l + 64) + 32;
+          int q4 = quantFactory.applyAsInt(positionBase + l + 96) + 32;
+          block[qlBase + l] = (byte) ((q1 & 0x0F) | ((q3 & 0x0F) << 4));
+          block[qlBase + 32 + l] = (byte) ((q2 & 0x0F) | ((q4 & 0x0F) << 4));
+          block[qhBase + l] =
+              (byte)
+                  (((q1 >>> 4) & 0x03)
+                      | (((q2 >>> 4) & 0x03) << 2)
+                      | (((q3 >>> 4) & 0x03) << 4)
+                      | (((q4 >>> 4) & 0x03) << 6));
+        }
       }
       return block;
     }

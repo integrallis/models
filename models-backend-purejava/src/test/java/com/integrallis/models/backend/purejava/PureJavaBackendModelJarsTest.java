@@ -48,6 +48,14 @@ class PureJavaBackendModelJarsTest {
           .capability("code-completion")
           .build();
 
+  private static final ModelJarRequirement QWEN25_CODER_1_5B_Q4_0 =
+      ModelJarRequirement.forSource("hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF")
+          .versionRange("[2.5.0,3.0.0)")
+          .variant("q4_0")
+          .backend("pure-java")
+          .capability("code-completion")
+          .build();
+
   @Test
   void resolvesQwenMarkerJarFromClasspath() {
     ModelJarDescriptor descriptor =
@@ -72,6 +80,20 @@ class PureJavaBackendModelJarsTest {
     assertThat(descriptor.capabilities()).contains("text-generation", "chat", "code-completion");
     assertThat(descriptor.localPath().orElseThrow().toString())
         .endsWith(".jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf");
+  }
+
+  @Test
+  void resolvesQwen25Coder15BPureJavaMarkerJarFromClasspath() {
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath().resolve(QWEN25_CODER_1_5B_Q4_0).orElseThrow();
+
+    assertThat(descriptor.markerCoordinate().groupId()).isEqualTo("org.modeljars.huggingface");
+    assertThat(descriptor.format()).isEqualTo("gguf");
+    assertThat(descriptor.architecture()).isEqualTo("qwen2");
+    assertThat(descriptor.quantization()).isEqualTo("Q4_0");
+    assertThat(descriptor.capabilities()).contains("text-generation", "chat", "code-completion");
+    assertThat(descriptor.localPath().orElseThrow().toString())
+        .endsWith(".jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf");
   }
 
   @Test
