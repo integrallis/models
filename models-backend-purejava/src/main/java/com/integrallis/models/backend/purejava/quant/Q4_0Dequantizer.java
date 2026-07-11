@@ -50,8 +50,8 @@ public final class Q4_0Dequantizer implements Dequantizer {
         byte packed = src.get(ValueLayout.JAVA_BYTE, nibbleOffset + i);
         int lo = (packed & 0x0F) - 8;
         int hi = ((packed >>> 4) & 0x0F) - 8;
-        dst[outIdx + i * 2] = lo * scale;
-        dst[outIdx + i * 2 + 1] = hi * scale;
+        dst[outIdx + i] = lo * scale;
+        dst[outIdx + i + 16] = hi * scale;
       }
     }
   }

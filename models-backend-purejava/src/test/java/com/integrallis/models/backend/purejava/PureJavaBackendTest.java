@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.foreign.Arena;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -161,7 +162,9 @@ class PureJavaBackendTest {
 
       try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
         assertThat(backend.metadata().contextLength()).isEqualTo(CONTEXT);
-        assertThat(backend.forward(5, 3)).hasSize(VOCAB_SIZE);
+        for (int position = 0; position <= 3; position++) {
+          assertThat(backend.forward(5, position)).hasSize(VOCAB_SIZE);
+        }
         assertThatThrownBy(() -> backend.forward(5, 4))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("position out of range");
@@ -175,6 +178,17 @@ class PureJavaBackendTest {
       Path noFile = dir.resolve("missing.gguf");
       assertThatThrownBy(() -> PureJavaBackend.load(noFile))
           .isInstanceOf(UncheckedIOException.class);
+    }
+
+    @Test
+    void closesOwnedArenaWhenRuntimeFailureInterruptsLoading(@TempDir Path dir) throws IOException {
+      Path invalidModel = dir.resolve("invalid.gguf");
+      Files.write(invalidModel, new byte[32]);
+      Arena arena = Arena.ofShared();
+
+      assertThatThrownBy(() -> PureJavaBackend.load(invalidModel, arena))
+          .isInstanceOf(RuntimeException.class);
+      assertThat(arena.scope().isAlive()).isFalse();
     }
   }
 

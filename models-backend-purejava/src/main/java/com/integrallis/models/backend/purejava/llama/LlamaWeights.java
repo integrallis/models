@@ -41,10 +41,15 @@ public final class LlamaWeights {
       float[] attentionNorm,
       MemorySegment wq,
       GgufTensorType wqType,
+      float[] qBias,
+      float[] qNorm,
       MemorySegment wk,
       GgufTensorType wkType,
+      float[] kBias,
+      float[] kNorm,
       MemorySegment wv,
       GgufTensorType wvType,
+      float[] vBias,
       MemorySegment wo,
       GgufTensorType woType,
       float[] ffnNorm,
@@ -92,6 +97,11 @@ public final class LlamaWeights {
       GgufTensorData wq = file.getTensor(prefix + "attn_q.weight");
       GgufTensorData wk = file.getTensor(prefix + "attn_k.weight");
       GgufTensorData wv = file.getTensor(prefix + "attn_v.weight");
+      float[] qBias = loadOptionalF32Tensor(file, prefix + "attn_q.bias", config.queryDim());
+      float[] qNorm = loadOptionalF32Tensor(file, prefix + "attn_q_norm.weight", config.headDim());
+      float[] kBias = loadOptionalF32Tensor(file, prefix + "attn_k.bias", config.keyDim());
+      float[] kNorm = loadOptionalF32Tensor(file, prefix + "attn_k_norm.weight", config.headDim());
+      float[] vBias = loadOptionalF32Tensor(file, prefix + "attn_v.bias", config.valueDim());
       GgufTensorData wo = file.getTensor(prefix + "attn_output.weight");
       float[] ffnNorm = loadF32Tensor(file, prefix + "ffn_norm.weight");
       GgufTensorData ffnGate = file.getTensor(prefix + "ffn_gate.weight");
@@ -103,10 +113,15 @@ public final class LlamaWeights {
               attnNorm,
               wq.dataSegment(),
               wq.type(),
+              qBias,
+              qNorm,
               wk.dataSegment(),
               wk.type(),
+              kBias,
+              kNorm,
               wv.dataSegment(),
               wv.type(),
+              vBias,
               wo.dataSegment(),
               wo.type(),
               ffnNorm,
@@ -220,5 +235,21 @@ public final class LlamaWeights {
     }
 
     return result;
+  }
+
+  private static float[] loadOptionalF32Tensor(GgufFile file, String name, int expectedLength) {
+    try {
+      float[] values = loadF32Tensor(file, name);
+      if (values.length != expectedLength) {
+        throw new IllegalArgumentException(
+            name + " length must be " + expectedLength + ", got " + values.length);
+      }
+      return values;
+    } catch (IllegalArgumentException e) {
+      if (e.getMessage() != null && e.getMessage().contains("Tensor not found")) {
+        return new float[0];
+      }
+      throw e;
+    }
   }
 }

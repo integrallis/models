@@ -54,9 +54,8 @@ class DequantizerTest {
 
     @Test
     void knownNibblePatternWithScale() {
-      // Block: scale=2.0 (f16 0x4000), first nibble byte = 0x98 (lo=8,hi=9)
-      // lo nibble = 8: value = (8-8)*2.0 = 0.0
-      // hi nibble = 9: value = (9-8)*2.0 = 2.0
+      // GGML stores the low nibbles at positions 0..15 and high nibbles at 16..31.
+      // Block: scale=2.0 (f16 0x4000), first nibble byte = 0x98 (lo=8,hi=9).
       byte[] block = new byte[18];
       ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN).putShort(0, (short) 0x4000);
       block[2] = (byte) 0x98; // lo=8, hi=9
@@ -68,7 +67,8 @@ class DequantizerTest {
       new Q4_0Dequantizer().dequantize(segment, 0, dst, 0, 32);
 
       assertThat(dst[0]).isCloseTo(0.0f, within(0.001f));
-      assertThat(dst[1]).isCloseTo(2.0f, within(0.001f));
+      assertThat(dst[1]).isCloseTo(-16.0f, within(0.001f));
+      assertThat(dst[16]).isCloseTo(2.0f, within(0.001f));
     }
 
     @Test

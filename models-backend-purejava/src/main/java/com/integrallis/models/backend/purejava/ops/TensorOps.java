@@ -26,14 +26,17 @@ public final class TensorOps {
 
   /** RMS normalization: out[i] = x[i] / rms(x) * weight[i]. */
   public static void rmsNorm(float[] out, float[] x, float[] weight, int size, float eps) {
-    float sumSq = 0.0f;
-    for (int i = 0; i < size; i++) {
-      sumSq += x[i] * x[i];
-    }
+    rmsNorm(out, 0, x, 0, weight, size, eps);
+  }
+
+  /** Offset-aware RMS normalization for attention heads stored in contiguous buffers. */
+  public static void rmsNorm(
+      float[] out, int outOffset, float[] x, int xOffset, float[] weight, int size, float eps) {
+    float sumSq = VectorUtil.dotProduct(x, xOffset, x, xOffset, size);
     float rms = (float) Math.sqrt(sumSq / size + eps);
     float scale = 1.0f / rms;
     for (int i = 0; i < size; i++) {
-      out[i] = x[i] * scale * weight[i];
+      out[outOffset + i] = x[xOffset + i] * scale * weight[i];
     }
   }
 
@@ -43,18 +46,24 @@ public final class TensorOps {
   }
 
   /**
-   * Matrix-vector multiplication with quantized weight. Uses vectors-core fused quantized dot
-   * kernels so rows are not materialized as temporary F32 buffers.
+   * Matrix-vector multiplication over a mapped GGUF tensor. Uses vectors-core fused kernels so rows
+   * are not materialized as temporary F32 buffers.
    */
-  public static void quantizedMatmul(
+  public static void ggufMatmul(
       float[] out, float[] x, MemorySegment qWeight, GgufTensorType type, int rows, int cols) {
     switch (type) {
+      case F32 -> VectorUtil.ggufF32BatchDotProduct(x, qWeight, rows, cols, out);
       case Q4_0 -> VectorUtil.ggufQ4_0BatchDotProduct(x, qWeight, rows, cols, out);
       case Q8_0 -> VectorUtil.ggufQ8_0BatchDotProduct(x, qWeight, rows, cols, out);
       case Q6_K -> VectorUtil.ggufQ6_KBatchDotProduct(x, qWeight, rows, cols, out);
-      default ->
-          throw new UnsupportedOperationException("Quantized matmul not supported for: " + type);
+      default -> throw new UnsupportedOperationException("GGUF matmul not supported for: " + type);
     }
+  }
+
+  /** Matrix-vector multiplication with a quantized GGUF weight. */
+  public static void quantizedMatmul(
+      float[] out, float[] x, MemorySegment qWeight, GgufTensorType type, int rows, int cols) {
+    ggufMatmul(out, x, qWeight, type, rows, cols);
   }
 
   /** In-place numerically stable softmax over x[offset..offset+size). */
@@ -107,6 +116,20 @@ public final class TensorOps {
     }
   }
 
+  /** In-place NeoX rotary embedding whose coordinate pairs are separated by half a head. */
+  public static void ropeNeox(
+      float[] vector, int offset, int position, int headDim, float ropeTheta) {
+    int half = headDim / 2;
+    for (int i = 0; i < half; i++) {
+      float freq = (float) (1.0 / Math.pow(ropeTheta, (double) (2 * i) / headDim));
+      float angle = position * freq;
+      float cos = (float) Math.cos(angle);
+      float sin = (float) Math.sin(angle);
+
+      rotateSplitPair(vector, offset + i, offset + half + i, cos, sin);
+    }
+  }
+
   /** SwiGLU activation: out[i] = silu(gate[i]) * up[i]. */
   public static void swiGlu(float[] out, float[] gate, float[] up, int size) {
     for (int i = 0; i < size; i++) {
@@ -121,5 +144,12 @@ public final class TensorOps {
     float x1 = vector[offset + 1];
     vector[offset] = x0 * cos - x1 * sin;
     vector[offset + 1] = x0 * sin + x1 * cos;
+  }
+
+  private static void rotateSplitPair(float[] vector, int first, int second, float cos, float sin) {
+    float x0 = vector[first];
+    float x1 = vector[second];
+    vector[first] = x0 * cos - x1 * sin;
+    vector[second] = x0 * sin + x1 * cos;
   }
 }

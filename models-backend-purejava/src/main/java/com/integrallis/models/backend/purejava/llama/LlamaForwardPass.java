@@ -39,10 +39,14 @@ public final class LlamaForwardPass {
   private final float[] k;
   private final float[] v;
   private final float[] attnOut;
+  private final float[] attentionScores;
+  private final float[] attnProjected;
   private final float[] ffnGate;
   private final float[] ffnUp;
   private final float[] ffnOut;
+  private final float[] ffnProjected;
   private final float[] logits;
+  private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
     this.config = config;
@@ -50,31 +54,39 @@ public final class LlamaForwardPass {
     this.cache = cache;
 
     int dim = config.embeddingDim();
-    int kvDim = config.kvDim();
     int hiddenDim = config.hiddenDim();
     int vocabSize = config.vocabSize();
 
     this.x = new float[dim];
     this.xNorm = new float[dim];
-    this.q = new float[dim];
-    this.k = new float[kvDim];
-    this.v = new float[kvDim];
-    this.attnOut = new float[dim];
+    this.q = new float[config.queryDim()];
+    this.k = new float[config.keyDim()];
+    this.v = new float[config.valueDim()];
+    this.attnOut = new float[config.attentionOutputDim()];
+    this.attentionScores = new float[cache.maxSeqLen()];
+    this.attnProjected = new float[dim];
     this.ffnGate = new float[hiddenDim];
     this.ffnUp = new float[hiddenDim];
     this.ffnOut = new float[hiddenDim];
+    this.ffnProjected = new float[dim];
     this.logits = new float[vocabSize];
   }
 
   /** Runs a single forward pass for the given token at the given position. Returns logits. */
   public float[] forward(int token, int position) {
+    if (position != nextPosition) {
+      throw new IllegalArgumentException(
+          "position must be sequential: expected " + nextPosition + ", got " + position);
+    }
+    if (position >= cache.maxSeqLen()) {
+      throw new IllegalArgumentException("position out of range: " + position);
+    }
+
     int dim = config.embeddingDim();
-    int headDim = config.headDim();
+    int keyLength = config.keyLength();
+    int valueLength = config.valueLength();
     int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads();
-    int kvDim = config.kvDim();
-    float[] keyCache = cache.keyBuffer();
-    float[] valueCache = cache.valueBuffer();
 
     // Token embedding (dequantizes only the single row for this token)
     weights.embedToken(token, x);
@@ -87,52 +99,62 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
 
       // QKV projections
-      matmulDispatch(q, xNorm, lw.wq(), lw.wqType(), dim, dim);
-      matmulDispatch(k, xNorm, lw.wk(), lw.wkType(), kvDim, dim);
-      matmulDispatch(v, xNorm, lw.wv(), lw.wvType(), kvDim, dim);
+      matmulDispatch(q, xNorm, lw.wq(), lw.wqType(), config.queryDim(), dim);
+      matmulDispatch(k, xNorm, lw.wk(), lw.wkType(), config.keyDim(), dim);
+      matmulDispatch(v, xNorm, lw.wv(), lw.wvType(), config.valueDim(), dim);
+      addOptionalBias(q, lw.qBias());
+      addOptionalBias(k, lw.kBias());
+      addOptionalBias(v, lw.vBias());
 
       // RoPE for each head
       for (int h = 0; h < numHeads; h++) {
-        TensorOps.rope(q, h * headDim, position, headDim, config.ropeTheta());
+        int offset = h * keyLength;
+        normalizeHead(q, offset, lw.qNorm(), keyLength);
+        applyRope(q, offset, position, keyLength);
       }
       for (int h = 0; h < numKvHeads; h++) {
-        TensorOps.rope(k, h * headDim, position, headDim, config.ropeTheta());
+        int offset = h * keyLength;
+        normalizeHead(k, offset, lw.kNorm(), keyLength);
+        applyRope(k, offset, position, keyLength);
       }
 
       // Store K,V in cache
       cache.store(layer, position, k, v);
+      float[] keyCache = cache.keyBuffer();
+      float[] valueCache = cache.valueBuffer();
 
       // Grouped-query attention
       java.util.Arrays.fill(attnOut, 0.0f);
       int groupSize = numHeads / numKvHeads;
-      float scale = (float) (1.0 / Math.sqrt(headDim));
+      float scale = (float) (1.0 / Math.sqrt(keyLength));
 
       for (int h = 0; h < numHeads; h++) {
         int kvHead = h / groupSize;
-        int qOff = h * headDim;
+        int qOff = h * keyLength;
+        int outputOffset = h * valueLength;
 
         // Compute attention scores over all cached positions
-        float[] scores = new float[position + 1];
         for (int p = 0; p <= position; p++) {
-          int cacheOffset = cache.vectorOffset(layer, p) + kvHead * headDim;
-          float dot = VectorUtil.dotProduct(q, qOff, keyCache, cacheOffset, headDim);
-          scores[p] = dot * scale;
+          int cacheOffset = cache.keyOffset(layer, p) + kvHead * keyLength;
+          float dot = VectorUtil.dotProduct(q, qOff, keyCache, cacheOffset, keyLength);
+          attentionScores[p] = dot * scale;
         }
 
         // Softmax over scores
-        TensorOps.softmax(scores, 0, position + 1);
+        TensorOps.softmax(attentionScores, 0, position + 1);
 
         // Weighted sum of values
         for (int p = 0; p <= position; p++) {
-          int cacheOffset = cache.vectorOffset(layer, p) + kvHead * headDim;
-          float weight = scores[p];
-          VectorUtil.addScaledInPlace(attnOut, qOff, valueCache, cacheOffset, headDim, weight);
+          int cacheOffset = cache.valueOffset(layer, p) + kvHead * valueLength;
+          float weight = attentionScores[p];
+          VectorUtil.addScaledInPlace(
+              attnOut, outputOffset, valueCache, cacheOffset, valueLength, weight);
         }
       }
 
       // Output projection
-      float[] attnProjected = new float[dim];
-      matmulDispatch(attnProjected, attnOut, lw.wo(), lw.woType(), dim, dim);
+      matmulDispatch(
+          attnProjected, attnOut, lw.wo(), lw.woType(), dim, config.attentionOutputDim());
 
       // Residual connection
       for (int i = 0; i < dim; i++) {
@@ -148,7 +170,6 @@ public final class LlamaForwardPass {
       TensorOps.swiGlu(ffnOut, ffnGate, ffnUp, config.hiddenDim());
 
       // Down projection
-      float[] ffnProjected = new float[dim];
       matmulDispatch(ffnProjected, ffnOut, lw.ffnDown(), lw.ffnDownType(), dim, config.hiddenDim());
 
       // Residual connection
@@ -164,29 +185,38 @@ public final class LlamaForwardPass {
     matmulDispatch(
         logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
 
+    nextPosition++;
     return logits.clone();
   }
 
   /** Clears the autoregressive key-value cache before processing a new sequence. */
   public void reset() {
     cache.clear();
+    nextPosition = 0;
+  }
+
+  private void normalizeHead(float[] vector, int offset, float[] weight, int headDim) {
+    if (weight.length != 0) {
+      TensorOps.rmsNorm(vector, offset, vector, offset, weight, headDim, config.rmsNormEps());
+    }
+  }
+
+  private void applyRope(float[] vector, int offset, int position, int headDim) {
+    if (config.usesNeoxRope()) {
+      TensorOps.ropeNeox(vector, offset, position, headDim, config.ropeTheta());
+    } else {
+      TensorOps.rope(vector, offset, position, headDim, config.ropeTheta());
+    }
+  }
+
+  private static void addOptionalBias(float[] vector, float[] bias) {
+    if (bias.length != 0) {
+      VectorUtil.addInPlace(vector, bias);
+    }
   }
 
   private void matmulDispatch(
       float[] out, float[] input, MemorySegment weight, GgufTensorType type, int rows, int cols) {
-    if (type == GgufTensorType.F32) {
-      // Read F32 weight into temporary buffer
-      float[] w = new float[rows * cols];
-      for (int i = 0; i < w.length; i++) {
-        w[i] =
-            weight.get(
-                java.lang.foreign.ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(
-                    java.nio.ByteOrder.LITTLE_ENDIAN),
-                (long) i * 4);
-      }
-      TensorOps.matmul(out, input, w, rows, cols);
-    } else {
-      TensorOps.quantizedMatmul(out, input, weight, type, rows, cols);
-    }
+    TensorOps.ggufMatmul(out, input, weight, type, rows, cols);
   }
 }

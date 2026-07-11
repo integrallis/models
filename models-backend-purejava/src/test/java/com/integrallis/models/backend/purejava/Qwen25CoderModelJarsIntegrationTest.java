@@ -94,6 +94,15 @@ class Qwen25CoderModelJarsIntegrationTest {
     assertLoadsQwen25Coder(QWEN25_CODER_3B_Q4_0);
   }
 
+  @Test
+  void matchesLlamaCppGreedyTokensForQwen25Coder05BQ40() {
+    assertGreedyReference(
+        QWEN25_CODER_0_5B_Q4_0,
+        "public static void main",
+        new int[] {888, 1099, 737, 1887},
+        new int[] {2242, 1294, 2827, 8});
+  }
+
   private static void assertLoadsQwen25Coder(ModelJarRequirement requirement) {
     ModelJarDescriptor descriptor =
         ModelJarRegistry.fromClasspath().resolve(requirement).orElseThrow();
@@ -133,5 +142,54 @@ class Qwen25CoderModelJarsIntegrationTest {
     } else {
       System.setProperty(name, previous);
     }
+  }
+
+  private static void assertGreedyReference(
+      ModelJarRequirement requirement,
+      String prompt,
+      int[] expectedPromptTokens,
+      int[] expectedGeneratedTokens) {
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath().resolve(requirement).orElseThrow();
+    String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+
+    try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
+      int[] promptTokens = backend.tokenizer().encode(prompt);
+      assertThat(promptTokens).containsExactly(expectedPromptTokens);
+      assertThat(greedyTokens(backend, promptTokens, expectedGeneratedTokens.length))
+          .as("greedy token IDs must match llama.cpp b9960 for the pinned GGUF")
+          .containsExactly(expectedGeneratedTokens);
+    } finally {
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
+  }
+
+  private static int[] greedyTokens(PureJavaBackend backend, int[] promptTokens, int count) {
+    backend.reset();
+    float[] logits = null;
+    int position = 0;
+    for (int token : promptTokens) {
+      logits = backend.forward(token, position++);
+    }
+
+    int[] generated = new int[count];
+    for (int index = 0; index < count; index++) {
+      int token = argmax(logits);
+      generated[index] = token;
+      logits = backend.forward(token, position++);
+    }
+    return generated;
+  }
+
+  private static int argmax(float[] values) {
+    int best = 0;
+    for (int index = 1; index < values.length; index++) {
+      if (values[index] > values[best]) {
+        best = index;
+      }
+    }
+    return best;
   }
 }

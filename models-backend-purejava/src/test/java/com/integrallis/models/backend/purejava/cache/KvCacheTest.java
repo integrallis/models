@@ -123,8 +123,40 @@ class KvCacheTest {
       cache.clear();
 
       assertThat(cache.key(0, 0)).isNull();
-      assertThat(cache.keyBuffer()).containsOnly(0.0f);
-      assertThat(cache.valueBuffer()).containsOnly(0.0f);
+      assertThat(cache.value(0, 0)).isNull();
+
+      cache.store(0, 0, new float[] {5, 6}, new float[] {7, 8});
+      assertThat(cache.key(0, 0)).containsExactly(5, 6);
+      assertThat(cache.value(0, 0)).containsExactly(7, 8);
+    }
+  }
+
+  @Nested
+  static class Growth {
+
+    @Test
+    void largeLogicalContextStartsWithSmallPhysicalCapacity() {
+      var cache = new KvCache(2, 10_000, 4);
+
+      assertThat(cache.allocatedSequenceCapacity()).isEqualTo(16);
+      assertThat(cache.keyBuffer()).hasSize(2 * 16 * 4);
+      assertThat(cache.valueBuffer()).hasSize(2 * 16 * 4);
+    }
+
+    @Test
+    void growthPreservesEntriesAndLayerIsolation() {
+      var cache = new KvCache(2, 40, 2, 3);
+      cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20, 30});
+      cache.store(1, 0, new float[] {3, 4}, new float[] {40, 50, 60});
+
+      cache.store(0, 20, new float[] {5, 6}, new float[] {70, 80, 90});
+
+      assertThat(cache.allocatedSequenceCapacity()).isEqualTo(32);
+      assertThat(cache.key(0, 0)).containsExactly(1, 2);
+      assertThat(cache.value(1, 0)).containsExactly(40, 50, 60);
+      assertThat(cache.key(0, 20)).containsExactly(5, 6);
+      assertThat(cache.keyOffset(1, 0)).isEqualTo(32 * 2);
+      assertThat(cache.valueOffset(1, 0)).isEqualTo(32 * 3);
     }
   }
 

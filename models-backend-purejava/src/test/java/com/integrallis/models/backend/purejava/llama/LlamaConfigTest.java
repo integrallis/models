@@ -20,7 +20,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadataValue;
+import com.integrallis.models.backend.purejava.gguf.GgufValueType;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -95,6 +97,50 @@ class LlamaConfigTest {
       assertThat(config.contextLength()).isEqualTo(2048);
       assertThat(config.ropeTheta()).isEqualTo(10000.0f);
       assertThat(config.rmsNormEps()).isEqualTo(1e-5f);
+    }
+
+    @Test
+    void readsExplicitQwenHeadWidthsAndRopeLayout() {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));
+      entries.put("qwen3.embedding_length", new GgufMetadataValue.Uint32Value(1024));
+      entries.put("qwen3.block_count", new GgufMetadataValue.Uint32Value(28));
+      entries.put("qwen3.attention.head_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put("qwen3.attention.head_count_kv", new GgufMetadataValue.Uint32Value(8));
+      entries.put("qwen3.attention.key_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("qwen3.attention.value_length", new GgufMetadataValue.Uint32Value(128));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.keyLength()).isEqualTo(128);
+      assertThat(config.valueLength()).isEqualTo(128);
+      assertThat(config.queryDim()).isEqualTo(2048);
+      assertThat(config.keyDim()).isEqualTo(1024);
+      assertThat(config.valueDim()).isEqualTo(1024);
+      assertThat(config.attentionOutputDim()).isEqualTo(2048);
+      assertThat(config.usesNeoxRope()).isTrue();
+    }
+
+    @Test
+    void derivesVocabSizeFromTokenizerTokensWhenArchitectureKeyIsMissing() {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));
+      entries.put("qwen3.embedding_length", new GgufMetadataValue.Uint32Value(1024));
+      entries.put("qwen3.block_count", new GgufMetadataValue.Uint32Value(28));
+      entries.put("qwen3.attention.head_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put("qwen3.attention.head_count_kv", new GgufMetadataValue.Uint32Value(8));
+      entries.put(
+          "tokenizer.ggml.tokens",
+          new GgufMetadataValue.ArrayValue(
+              GgufValueType.STRING,
+              List.of(
+                  new GgufMetadataValue.StringValue("a"),
+                  new GgufMetadataValue.StringValue("b"),
+                  new GgufMetadataValue.StringValue("c"))));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.vocabSize()).isEqualTo(3);
     }
   }
 }

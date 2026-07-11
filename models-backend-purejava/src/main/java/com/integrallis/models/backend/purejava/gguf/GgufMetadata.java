@@ -73,6 +73,13 @@ public record GgufMetadata(Map<String, GgufMetadataValue> entries) {
         .map(v -> ((GgufMetadataValue.Uint64Value) v).value());
   }
 
+  /** Returns the number of elements in an array value without copying its contents. */
+  public Optional<Integer> getArraySize(String key) {
+    return get(key)
+        .filter(v -> v instanceof GgufMetadataValue.ArrayValue)
+        .map(v -> ((GgufMetadataValue.ArrayValue) v).elements().size());
+  }
+
   /** Returns a string array value for the given key. */
   public Optional<List<String>> getStringArray(String key) {
     return get(key)

@@ -114,6 +114,25 @@ class TensorOpsTest {
         assertThat(actual[row]).isCloseTo(expected[row], within(1e-5f));
       }
     }
+
+    @Test
+    void ggufF32MatrixUsesMappedVectorsKernel() {
+      float[] x = {1.0f, 2.0f};
+      ByteBuffer bytes = ByteBuffer.allocate(6 * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+      for (float value : new float[] {1, 2, 3, 4, 5, 6}) {
+        bytes.putFloat(value);
+      }
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment weight = arena.allocate(bytes.capacity());
+        MemorySegment.copy(bytes.array(), 0, weight, ValueLayout.JAVA_BYTE, 0, bytes.capacity());
+        float[] actual = new float[3];
+
+        TensorOps.ggufMatmul(actual, x, weight, GgufTensorType.F32, 3, 2);
+
+        assertThat(actual).containsExactly(5.0f, 11.0f, 17.0f);
+      }
+    }
   }
 
   @Nested
@@ -385,6 +404,22 @@ class TensorOpsTest {
       for (int i = 0; i < expectedQ.length; i++) {
         assertThat(q[2 + i]).isCloseTo(expectedQ[i], within(1e-5f));
       }
+    }
+
+    @Test
+    void neoxLayoutRotatesPairsSeparatedByHalfAHead() {
+      float[] vector = {1.0f, 2.0f, 3.0f, 4.0f};
+      float cos = (float) Math.cos(1.0);
+      float sin = (float) Math.sin(1.0);
+
+      TensorOps.ropeNeox(vector, 0, 1, 4, 10_000.0f);
+
+      assertThat(vector[0]).isCloseTo(1.0f * cos - 3.0f * sin, within(1e-6f));
+      assertThat(vector[2]).isCloseTo(1.0f * sin + 3.0f * cos, within(1e-6f));
+      float secondCos = (float) Math.cos(0.01);
+      float secondSin = (float) Math.sin(0.01);
+      assertThat(vector[1]).isCloseTo(2.0f * secondCos - 4.0f * secondSin, within(1e-6f));
+      assertThat(vector[3]).isCloseTo(2.0f * secondSin + 4.0f * secondCos, within(1e-6f));
     }
 
     private float norm(float[] v) {

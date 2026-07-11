@@ -64,13 +64,20 @@ public final class PureJavaBackend implements InferenceBackend {
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
   public static PureJavaBackend load(Path modelPath) {
-    Arena arena = Arena.ofShared();
+    return load(modelPath, Arena.ofShared());
+  }
+
+  static PureJavaBackend load(Path modelPath, Arena arena) {
+    Objects.requireNonNull(arena, "arena");
     try {
+      Objects.requireNonNull(modelPath, "modelPath");
       GgufFile file = GgufParser.parse(modelPath, arena);
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
-      KvCache cache = new KvCache(config.numLayers(), runtimeContextLength(config), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       String modelName =
@@ -90,8 +97,11 @@ public final class PureJavaBackend implements InferenceBackend {
 
       return new PureJavaBackend(arena, config, tokenizer, forwardPass, metadata);
     } catch (IOException e) {
-      arena.close();
+      closeAfterFailure(arena, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
+    } catch (RuntimeException | Error e) {
+      closeAfterFailure(arena, e);
+      throw e;
     }
   }
 
@@ -174,5 +184,13 @@ public final class PureJavaBackend implements InferenceBackend {
           MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value);
     }
     return Math.min(config.contextLength(), maxContextLength);
+  }
+
+  private static void closeAfterFailure(Arena arena, Throwable failure) {
+    try {
+      arena.close();
+    } catch (RuntimeException closeFailure) {
+      failure.addSuppressed(closeFailure);
+    }
   }
 }
