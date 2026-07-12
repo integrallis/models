@@ -16,6 +16,7 @@ jobs:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       security-events: write
     defaults:
@@ -55,3 +56,5 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
+        with:
+          checkout_path: ${{ github.workspace }}/models
