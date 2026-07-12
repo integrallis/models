@@ -29,6 +29,15 @@ val modelFixtures =
             "text-generation",
         ),
         ModelFixture(
+            "downloadQwen38BQ4KMModel",
+            "Qwen3 8B Q4_K_M",
+            "hf://Qwen/Qwen3-8B-GGUF",
+            "[3.0.0,4.0.0)",
+            "q4_k_m",
+            "chat",
+            slow = true,
+        ),
+        ModelFixture(
             "downloadQwen25Coder05BQ40Model",
             "Qwen2.5-Coder 0.5B Q4_0",
             "hf://Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF",
@@ -192,6 +201,12 @@ listOf(
         "DeepSeek-Coder 6.7B",
         "downloadDeepSeekCoder67BQ4KMModel",
         "com.integrallis.models.backend.purejava.DeepSeekCoderLargeModelJarsSlowTest",
+    ),
+    LargeModelTest(
+        "qwen38BSlowTest",
+        "Qwen3 8B",
+        "downloadQwen38BQ4KMModel",
+        "com.integrallis.models.backend.purejava.Qwen3LargeModelJarsSlowTest",
     ),
 ).forEach { largeModelTest ->
     tasks.register<Test>(largeModelTest.taskName) {
