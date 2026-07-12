@@ -110,6 +110,14 @@ val modelFixtures =
             "code-completion",
             slow = true,
         ),
+        ModelFixture(
+            "downloadMiniCpm51BQ4KMModel",
+            "MiniCPM5 1B Q4_K_M",
+            "hf://openbmb/MiniCPM5-1B-GGUF",
+            "[5.0.0,6.0.0)",
+            "q4_k_m",
+            "text-generation",
+        ),
     )
 
 dependencies {
