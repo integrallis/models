@@ -96,7 +96,29 @@ class LlamaConfigTest {
       assertThat(config.vocabSize()).isEqualTo(32000);
       assertThat(config.contextLength()).isEqualTo(2048);
       assertThat(config.ropeTheta()).isEqualTo(10000.0f);
+      assertThat(config.ropeFrequencyScale()).isEqualTo(1.0f);
       assertThat(config.rmsNormEps()).isEqualTo(1e-5f);
+    }
+
+    @Test
+    void readsLegacyLinearRopeScale() {
+      Map<String, GgufMetadataValue> entries = requiredLlamaEntries();
+      entries.put("llama.rope.scale_linear", new GgufMetadataValue.Float32Value(4.0f));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.ropeFrequencyScale()).isEqualTo(0.25f);
+    }
+
+    @Test
+    void readsModernLinearRopeScalingFactor() {
+      Map<String, GgufMetadataValue> entries = requiredLlamaEntries();
+      entries.put("llama.rope.scaling.type", new GgufMetadataValue.StringValue("linear"));
+      entries.put("llama.rope.scaling.factor", new GgufMetadataValue.Float32Value(8.0f));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.ropeFrequencyScale()).isEqualTo(0.125f);
     }
 
     @Test
@@ -141,6 +163,15 @@ class LlamaConfigTest {
       LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
 
       assertThat(config.vocabSize()).isEqualTo(3);
+    }
+
+    private static Map<String, GgufMetadataValue> requiredLlamaEntries() {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("llama.embedding_length", new GgufMetadataValue.Uint32Value(512));
+      entries.put("llama.block_count", new GgufMetadataValue.Uint32Value(4));
+      entries.put("llama.attention.head_count", new GgufMetadataValue.Uint32Value(8));
+      entries.put("llama.attention.head_count_kv", new GgufMetadataValue.Uint32Value(2));
+      return entries;
     }
   }
 }

@@ -21,6 +21,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.quant.F16Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q4_0Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q8_0Dequantizer;
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
@@ -195,6 +196,12 @@ public final class LlamaWeights {
         long bytesPerRow = (long) blocksPerRow * 18;
         long offset = (long) row * bytesPerRow;
         new Q4_0Dequantizer().dequantize(segment, offset, out, 0, cols);
+      }
+      case Q4_K -> {
+        int blocksPerRow = cols / type.blockSize();
+        long bytesPerRow = (long) blocksPerRow * type.typeSize();
+        long offset = (long) row * bytesPerRow;
+        VectorUtil.ggufQ4_KDequantize(segment, offset, out, 0, cols);
       }
       case Q8_0 -> {
         // Q8_0: 32 values per block, 34 bytes per block
