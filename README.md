@@ -129,10 +129,12 @@ ModelJars descriptors and is the foundation for Spring AI auto-configuration.
 
 The tested real-model fixtures are **Qwen3 0.6B Q4_0 GGUF**,
 **Qwen3 1.7B Q8_0 GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0
-GGUF**, **SmolLM2 360M Q8_0 GGUF**, **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**, and
-**DeepSeek-Coder 1.3B Instruct Q4_K_M GGUF**, resolved through ModelJars marker
-JARs. The DeepSeek fixture validates a mixed Q4_K/Q5_0/Q8_0/Q6_K tensor file and
-legacy linear RoPE scaling. The 0.5B Qwen2.5, 0.6B Qwen3, TinyLlama, and DeepSeek
+GGUF**, **SmolLM2 360M Q8_0 GGUF**, **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
+**DeepSeek-Coder 1.3B Instruct Q4_K_M GGUF**, and **MiniCPM5 1B Q4_K_M GGUF**,
+resolved through ModelJars marker JARs. The DeepSeek fixture validates a mixed
+Q4_K/Q5_0/Q8_0/Q6_K tensor file and legacy linear RoPE scaling. MiniCPM5
+validates explicit Q/K/V head widths, 131K context metadata, and its Llama-style
+byte BPE. The 0.5B Qwen2.5, 0.6B Qwen3, TinyLlama, DeepSeek, and MiniCPM5
 fixtures have exact greedy-token reference checks against pinned `llama.cpp`
 behavior. The backend accepts Llama/Qwen2/Qwen3 metadata prefixes. Projection
 kernels support F32, Q4_0, Q5_0, Q8_0, Q4_K, and Q6_K; embedding rows and small
@@ -149,6 +151,7 @@ Resolve, download, and checksum the pinned fixtures through ModelJars:
 ./gradlew :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
 ./gradlew :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
 ./gradlew :models-backend-purejava:downloadDeepSeekCoder67BQ4KMModel
+./gradlew :models-backend-purejava:downloadMiniCpm51BQ4KMModel
 ```
 
 ## What's inside
@@ -298,11 +301,11 @@ download missing files, verify size and SHA-256, and then execute the real weigh
 
 The suite exercises GGUF parsing, tokenization, finite forward-pass outputs,
 sampling, and generation. Qwen2.5-Coder 0.5B Q4_0, Qwen3 0.6B Q4_0, TinyLlama
-1.1B Q4_0, and DeepSeek-Coder 1.3B Q4_K_M must also match exact greedy token
-sequences captured from `llama.cpp` b9960.
+1.1B Q4_0, DeepSeek-Coder 1.3B Q4_K_M, and MiniCPM5 1B Q4_K_M must also match
+exact greedy token sequences captured from `llama.cpp` b9960.
 
-The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, SmolLM2 360M, and TinyLlama
-1.1B, and DeepSeek-Coder 1.3B integration tests are strict:
+The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, SmolLM2 360M, TinyLlama
+1.1B, DeepSeek-Coder 1.3B, and MiniCPM5 1B integration tests are strict:
 the Gradle `integrationTest` task downloads the model fixtures before the tests
 run, and the tests fail if any real model cannot be loaded. CI runs this path in
 `.github/workflows/model-integration.yml` with the downloaded GGUF cached under
@@ -321,9 +324,12 @@ without changing the model metadata reported to callers.
 
 ```bash
 ./gradlew :models-backend-purejava:integrationTest \
+  --tests com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest \
   --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest \
   --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
+  --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest \
+  --tests com.integrallis.models.backend.purejava.DeepSeekCoderModelJarsIntegrationTest \
+  --tests com.integrallis.models.backend.purejava.MiniCpm5ModelJarsIntegrationTest
 
 ./gradlew :models-backend-purejava:qwen25Coder7BSlowTest
 ./gradlew :models-backend-purejava:deepSeekCoder67BSlowTest
