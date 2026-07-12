@@ -66,11 +66,11 @@ class TinyLlamaModelJarsIntegrationTest {
     String previous = useIntegrationContextLength();
 
     try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
-      int[] promptTokens = backend.tokenizer().encode("Hello from Java");
-      assertThat(promptTokens).containsExactly(1, 15043, 515, 3355);
+      int[] promptTokens = backend.tokenizer().encode("The quick brown fox");
+      assertThat(promptTokens).containsExactly(1, 450, 4996, 17354, 1701, 29916);
       assertThat(greedyTokens(backend, promptTokens, 4))
-          .as("greedy token IDs must match llama.cpp b9960 for the pinned GGUF")
-          .containsExactly(29991, 13, 13, 8404);
+          .as("greedy token IDs must match llama.cpp b9960 raw completion for the pinned GGUF")
+          .containsExactly(432, 17204, 975, 278);
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
     }
