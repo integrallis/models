@@ -139,7 +139,7 @@ class TensorOpsTest {
   static class QuantizedMatmul {
 
     @Test
-    void q4_0MatchesVectorsFusedDotSemantics() {
+    void q4_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
       float[] x = repeatingQuery(32);
       byte[] row = q4Block(0.5f);
       float[] expected = new float[1];
@@ -148,7 +148,8 @@ class TensorOpsTest {
       try (Arena arena = Arena.ofConfined()) {
         MemorySegment qWeight = copy(arena, row);
 
-        expected[0] = VectorUtil.ggufQ4_0DotProduct(x, qWeight, 0, 32);
+        VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
+            x, qWeight, 1, 32, expected, new byte[32], new float[1]);
         TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q4_0, 1, 32);
 
         assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
@@ -156,7 +157,7 @@ class TensorOpsTest {
     }
 
     @Test
-    void q8_0MatchesVectorsFusedDotSemantics() {
+    void q8_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
       float[] x = repeatingQuery(32);
       byte[] row = q8Block(0.25f);
       float[] expected = new float[1];
@@ -165,7 +166,8 @@ class TensorOpsTest {
       try (Arena arena = Arena.ofConfined()) {
         MemorySegment qWeight = copy(arena, row);
 
-        expected[0] = VectorUtil.ggufQ8_0DotProduct(x, qWeight, 0, 32);
+        VectorUtil.ggufQ8_0Q8_0BatchDotProduct(
+            x, qWeight, 1, 32, expected, new byte[32], new float[1]);
         TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q8_0, 1, 32);
 
         assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
@@ -173,7 +175,7 @@ class TensorOpsTest {
     }
 
     @Test
-    void q6_KMatchesVectorsFusedDotSemantics() {
+    void q6_KMatchesVectorsGgmlQ8_KActivationSemantics() {
       float[] x = repeatingQuery(256);
       byte[] row = q6KBlock(0.125f, i -> (i % 64) - 32, i -> (i % 7) - 3);
       float[] expected = new float[1];
@@ -182,7 +184,8 @@ class TensorOpsTest {
       try (Arena arena = Arena.ofConfined()) {
         MemorySegment qWeight = copy(arena, row);
 
-        expected[0] = VectorUtil.ggufQ6_KDotProduct(x, qWeight, 0, 256);
+        VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
+            x, qWeight, 1, 256, expected, new byte[256], new float[1]);
         TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q6_K, 1, 256);
 
         assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));

@@ -46,6 +46,8 @@ public final class LlamaForwardPass {
   private final float[] ffnOut;
   private final float[] ffnProjected;
   private final float[] logits;
+  private final byte[] quantizedActivation;
+  private final float[] quantizedActivationScales;
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
@@ -70,6 +72,9 @@ public final class LlamaForwardPass {
     this.ffnOut = new float[hiddenDim];
     this.ffnProjected = new float[dim];
     this.logits = new float[vocabSize];
+    int maxProjectionInput = Math.max(Math.max(dim, hiddenDim), config.attentionOutputDim());
+    this.quantizedActivation = new byte[maxProjectionInput];
+    this.quantizedActivationScales = new float[(maxProjectionInput + 31) / 32];
   }
 
   /** Runs a single forward pass for the given token at the given position. Returns logits. */
@@ -217,6 +222,7 @@ public final class LlamaForwardPass {
 
   private void matmulDispatch(
       float[] out, float[] input, MemorySegment weight, GgufTensorType type, int rows, int cols) {
-    TensorOps.ggufMatmul(out, input, weight, type, rows, cols);
+    TensorOps.ggufMatmul(
+        out, input, weight, type, rows, cols, quantizedActivation, quantizedActivationScales);
   }
 }

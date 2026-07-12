@@ -51,11 +51,38 @@ public final class TensorOps {
    */
   public static void ggufMatmul(
       float[] out, float[] x, MemorySegment qWeight, GgufTensorType type, int rows, int cols) {
+    if (type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0 || type == GgufTensorType.Q6_K) {
+      int activationBlockSize = type == GgufTensorType.Q6_K ? 256 : 32;
+      ggufMatmul(
+          out, x, qWeight, type, rows, cols, new byte[cols], new float[cols / activationBlockSize]);
+      return;
+    }
+    ggufMatmul(out, x, qWeight, type, rows, cols, null, null);
+  }
+
+  /**
+   * Matrix-vector multiplication with reusable Q8 activation scratch for GGML quantized kernels.
+   */
+  public static void ggufMatmul(
+      float[] out,
+      float[] x,
+      MemorySegment qWeight,
+      GgufTensorType type,
+      int rows,
+      int cols,
+      byte[] quantizedActivation,
+      float[] quantizedActivationScales) {
     switch (type) {
       case F32 -> VectorUtil.ggufF32BatchDotProduct(x, qWeight, rows, cols, out);
-      case Q4_0 -> VectorUtil.ggufQ4_0BatchDotProduct(x, qWeight, rows, cols, out);
-      case Q8_0 -> VectorUtil.ggufQ8_0BatchDotProduct(x, qWeight, rows, cols, out);
-      case Q6_K -> VectorUtil.ggufQ6_KBatchDotProduct(x, qWeight, rows, cols, out);
+      case Q4_0 ->
+          VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
+              x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
+      case Q8_0 ->
+          VectorUtil.ggufQ8_0Q8_0BatchDotProduct(
+              x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
+      case Q6_K ->
+          VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
+              x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
       default -> throw new UnsupportedOperationException("GGUF matmul not supported for: " + type);
     }
   }
