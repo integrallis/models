@@ -57,10 +57,10 @@ class GgufTensorTypeTest {
     }
 
     @Test
-    void q4_kMHasCorrectProperties() {
-      assertThat(GgufTensorType.Q4_K_M.id()).isEqualTo(15);
-      assertThat(GgufTensorType.Q4_K_M.blockSize()).isEqualTo(256);
-      assertThat(GgufTensorType.Q4_K_M.typeSize()).isEqualTo(144);
+    void q8_kHasCorrectProperties() {
+      assertThat(GgufTensorType.Q8_K.id()).isEqualTo(15);
+      assertThat(GgufTensorType.Q8_K.blockSize()).isEqualTo(256);
+      assertThat(GgufTensorType.Q8_K.typeSize()).isEqualTo(292);
     }
   }
 

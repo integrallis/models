@@ -48,6 +48,7 @@ public final class LlamaForwardPass {
   private final float[] logits;
   private final byte[] quantizedActivation;
   private final float[] quantizedActivationScales;
+  private final short[] quantizedActivationSums;
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
@@ -75,6 +76,7 @@ public final class LlamaForwardPass {
     int maxProjectionInput = Math.max(Math.max(dim, hiddenDim), config.attentionOutputDim());
     this.quantizedActivation = new byte[maxProjectionInput];
     this.quantizedActivationScales = new float[(maxProjectionInput + 31) / 32];
+    this.quantizedActivationSums = new short[(maxProjectionInput + 15) / 16];
   }
 
   /** Runs a single forward pass for the given token at the given position. Returns logits. */
@@ -208,9 +210,11 @@ public final class LlamaForwardPass {
 
   private void applyRope(float[] vector, int offset, int position, int headDim) {
     if (config.usesNeoxRope()) {
-      TensorOps.ropeNeox(vector, offset, position, headDim, config.ropeTheta());
+      TensorOps.ropeNeox(
+          vector, offset, position, headDim, config.ropeTheta(), config.ropeFrequencyScale());
     } else {
-      TensorOps.rope(vector, offset, position, headDim, config.ropeTheta());
+      TensorOps.rope(
+          vector, offset, position, headDim, config.ropeTheta(), config.ropeFrequencyScale());
     }
   }
 
@@ -223,6 +227,14 @@ public final class LlamaForwardPass {
   private void matmulDispatch(
       float[] out, float[] input, MemorySegment weight, GgufTensorType type, int rows, int cols) {
     TensorOps.ggufMatmul(
-        out, input, weight, type, rows, cols, quantizedActivation, quantizedActivationScales);
+        out,
+        input,
+        weight,
+        type,
+        rows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
   }
 }

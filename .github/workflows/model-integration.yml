@@ -31,8 +31,8 @@ permissions:
   contents: read
 
 jobs:
-  qwen25-coder:
-    name: Qwen pure-Java integration
+  pure-java-models:
+    name: Pure-Java model integration
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -74,7 +74,8 @@ jobs:
             ~/.jvllm/models/qwen2.5-coder-3b-instruct-q4_0.gguf
             ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf
             ~/.jvllm/models/tinyllama-1.1b-chat-v1.0.Q4_0.gguf
-          key: qwen-smollm-tinyllama-purejava-fixtures-v1
+            ~/.jvllm/models/deepseek-coder-1.3b-instruct.Q4_K_M.gguf
+          key: purejava-model-fixtures-v2
 
       - name: Download pure-Java model fixtures
         working-directory: models
@@ -89,6 +90,7 @@ jobs:
           :models-backend-purejava:downloadQwen25Coder3BQ40Model
           :models-backend-purejava:downloadSmolLm2360MQ80Model
           :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
+          :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
           --no-daemon
           --stacktrace
 
@@ -101,6 +103,7 @@ jobs:
           --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.DeepSeekCoderModelJarsIntegrationTest
           --no-daemon
           --stacktrace
 

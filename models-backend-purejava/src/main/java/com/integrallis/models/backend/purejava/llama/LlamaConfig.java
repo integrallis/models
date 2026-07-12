@@ -29,6 +29,7 @@ public record LlamaConfig(
     int contextLength,
     int hiddenDim,
     float ropeTheta,
+    float ropeFrequencyScale,
     float rmsNormEps,
     boolean archUsesNeoxRope) {
 
@@ -43,6 +44,10 @@ public record LlamaConfig(
     if (keyLength <= 0) throw new IllegalArgumentException("keyLength must be > 0");
     if (valueLength <= 0) throw new IllegalArgumentException("valueLength must be > 0");
     if (vocabSize <= 0) throw new IllegalArgumentException("vocabSize must be > 0");
+    if (!(ropeFrequencyScale > 0.0f) || !Float.isFinite(ropeFrequencyScale)) {
+      throw new IllegalArgumentException(
+          "ropeFrequencyScale must be finite and > 0: " + ropeFrequencyScale);
+    }
   }
 
   /** Query/key dimensions per attention head. */
@@ -119,6 +124,7 @@ public record LlamaConfig(
     int contextLength = getArchKey(metadata, arch, "context_length").orElse(2048);
     int hiddenDim = getArchKey(metadata, arch, "feed_forward_length").orElse(embeddingDim * 4);
     float ropeTheta = getArchFloatKey(metadata, arch, "rope.freq_base").orElse(10000.0f);
+    float ropeFrequencyScale = ropeFrequencyScale(metadata, arch);
     float rmsNormEps =
         getArchFloatKey(metadata, arch, "attention.layer_norm_rms_epsilon").orElse(1e-5f);
 
@@ -133,8 +139,20 @@ public record LlamaConfig(
         contextLength,
         hiddenDim,
         ropeTheta,
+        ropeFrequencyScale,
         rmsNormEps,
         arch.equals("qwen2") || arch.equals("qwen3"));
+  }
+
+  private static float ropeFrequencyScale(GgufMetadata metadata, String arch) {
+    float factor =
+        getArchFloatKey(metadata, arch, "rope.scaling.factor")
+            .or(() -> getArchFloatKey(metadata, arch, "rope.scale_linear"))
+            .orElse(1.0f);
+    if (!(factor > 0.0f) || !Float.isFinite(factor)) {
+      throw new IllegalArgumentException("RoPE scaling factor must be finite and > 0: " + factor);
+    }
+    return 1.0f / factor;
   }
 
   /**

@@ -93,6 +93,14 @@ val modelFixtures =
             "q4_0",
             "chat",
         ),
+        ModelFixture(
+            "downloadDeepSeekCoder13BQ4KMModel",
+            "DeepSeek-Coder 1.3B Instruct Q4_K_M",
+            "hf://TheBloke/deepseek-coder-1.3b-instruct-GGUF",
+            "[1.3.0,2.0.0)",
+            "q4_k_m",
+            "code-completion",
+        ),
     )
 
 dependencies {

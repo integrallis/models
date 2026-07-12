@@ -193,6 +193,42 @@ class TensorOpsTest {
     }
 
     @Test
+    void q4_KMatchesVectorsGgmlQ8_KActivationSemantics() {
+      float[] x = repeatingQuery(256);
+      byte[] row = q4KBlock(0.125f, 0.0625f, 7);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        VectorUtil.ggufQ4_KQ8_KBatchDotProduct(
+            x, qWeight, 1, 256, expected, new byte[256], new float[1], new short[16]);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q4_K, 1, 256);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
+    void q5_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
+      float[] x = repeatingQuery(32);
+      byte[] row = q5Block(0.25f, i -> (i * 7) % 32 - 16);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        VectorUtil.ggufQ5_0Q8_0BatchDotProduct(
+            x, qWeight, 1, 32, expected, new byte[32], new float[1]);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q5_0, 1, 32);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
     void rejectsNonBlockAlignedQ4_0Dimensions() {
       try (Arena arena = Arena.ofConfined()) {
         MemorySegment qWeight = copy(arena, q4Block(1.0f));
@@ -249,6 +285,37 @@ class TensorOpsTest {
       for (int i = 0; i < 32; i++) {
         block[2 + i] = (byte) (i - 16);
       }
+      return block;
+    }
+
+    private static byte[] q4KBlock(float scale, float minScale, int quant) {
+      byte[] block = new byte[144];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, Float.floatToFloat16(scale));
+      buffer.putShort(2, Float.floatToFloat16(minScale));
+      for (int group = 0; group < 4; group++) {
+        block[4 + group] = 1;
+      }
+      for (int group = 4; group < 8; group++) {
+        block[4 + group + 4] = 1;
+      }
+      java.util.Arrays.fill(block, 16, block.length, (byte) (quant | (quant << 4)));
+      return block;
+    }
+
+    private static byte[] q5Block(float scale, IntUnaryOperator quantFactory) {
+      byte[] block = new byte[22];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, Float.floatToFloat16(scale));
+      int highBits = 0;
+      for (int index = 0; index < 16; index++) {
+        int lowQuant = quantFactory.applyAsInt(index) + 16;
+        int highQuant = quantFactory.applyAsInt(index + 16) + 16;
+        block[6 + index] = (byte) ((lowQuant & 0x0F) | ((highQuant & 0x0F) << 4));
+        highBits |= ((lowQuant >>> 4) & 1) << index;
+        highBits |= ((highQuant >>> 4) & 1) << (index + 16);
+      }
+      buffer.putInt(2, highBits);
       return block;
     }
 
@@ -423,6 +490,21 @@ class TensorOpsTest {
       float secondSin = (float) Math.sin(0.01);
       assertThat(vector[1]).isCloseTo(2.0f * secondCos - 4.0f * secondSin, within(1e-6f));
       assertThat(vector[3]).isCloseTo(2.0f * secondSin + 4.0f * secondCos, within(1e-6f));
+    }
+
+    @Test
+    void appliesFrequencyScaleToNormalAndNeoxRope() {
+      float[] normal = {1.0f, 2.0f};
+      float[] neox = {1.0f, 2.0f};
+      float cos = (float) Math.cos(0.5f);
+      float sin = (float) Math.sin(0.5f);
+
+      TensorOps.rope(normal, 0, 2, 2, 10_000.0f, 0.25f);
+      TensorOps.ropeNeox(neox, 0, 2, 2, 10_000.0f, 0.25f);
+
+      assertThat(normal[0]).isCloseTo(cos - 2.0f * sin, within(1e-6f));
+      assertThat(normal[1]).isCloseTo(sin + 2.0f * cos, within(1e-6f));
+      assertThat(neox).containsExactly(normal);
     }
 
     private float norm(float[] v) {

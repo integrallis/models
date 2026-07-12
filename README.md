@@ -16,7 +16,7 @@
 > **Experimental in-JVM small-language-model inference for JDK 25.**
 >
 > Pure-Java core backend. Optional platform bridge modules are isolated. JDK 25+.
-> GGUF parsing, vectors-backed F32/Q4_0/Q8_0/Q6_K kernels, tokenization,
+> GGUF parsing, vectors-backed F32/Q4_0/Q5_0/Q8_0/Q4_K/Q6_K kernels, tokenization,
 > sampling, and a Llama-family forward path are implemented.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -29,8 +29,8 @@
 > `models-api`, `models-runtime`, and `models-backend-purejava`. Framework,
 > Apple, ONNX, native, embedding, test, and benchmark modules remain experimental
 > or scaffolded and are not part of release `0.1.x`.
-> Real-model integration tests download and run the configured Qwen/Qwen-Coder
-> GGUF fixtures before passing.
+> Real-model integration tests download and run the configured Qwen,
+> Qwen-Coder, SmolLM2, TinyLlama, and DeepSeek-Coder GGUF fixtures before passing.
 
 ## The pitch in 60 seconds
 
@@ -56,7 +56,7 @@ application
     ▼
 models-runtime ──► models-api ──► models-backend-purejava
                                       │
-                                      └── GGUF / F32 / Q4_0 / Q8_0 / Q6_K
+                                      └── GGUF / F32 / Q4_0 / Q5_0 / Q8_0 / Q4_K / Q6_K
 ```
 
 ## Why it exists
@@ -129,13 +129,15 @@ ModelJars descriptors and is the foundation for Spring AI auto-configuration.
 
 The tested real-model fixtures are **Qwen3 0.6B Q4_0 GGUF**,
 **Qwen3 1.7B Q8_0 GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0
-GGUF**, **SmolLM2 360M Q8_0 GGUF**, and **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
-resolved through ModelJars marker JARs. The 0.5B Qwen2.5, 0.6B Qwen3, and TinyLlama
-fixtures also have exact greedy-token reference checks against pinned `llama.cpp`
+GGUF**, **SmolLM2 360M Q8_0 GGUF**, **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**, and
+**DeepSeek-Coder 1.3B Instruct Q4_K_M GGUF**, resolved through ModelJars marker
+JARs. The DeepSeek fixture validates a mixed Q4_K/Q5_0/Q8_0/Q6_K tensor file and
+legacy linear RoPE scaling. The 0.5B Qwen2.5, 0.6B Qwen3, TinyLlama, and DeepSeek
+fixtures have exact greedy-token reference checks against pinned `llama.cpp`
 behavior. The backend accepts Llama/Qwen2/Qwen3 metadata prefixes. Projection
-kernels support F32, Q4_0, Q8_0, and Q6_K; embedding rows and small tensors also
-support F16. Other architectures, chat templates, long-context quality, and
-remaining K-quant formats are not yet claimed.
+kernels support F32, Q4_0, Q5_0, Q8_0, Q4_K, and Q6_K; embedding rows and small
+tensors also support F16. Other architectures, chat templates, long-context
+quality, and remaining K-quant formats are not yet claimed.
 The larger **Qwen2.5-Coder 7B Q4_0 GGUF** fixture is covered by the strict
 `slowTest` path instead of the default PR integration suite.
 
@@ -144,6 +146,7 @@ Resolve, download, and checksum the pinned fixtures through ModelJars:
 ./gradlew :models-backend-purejava:downloadQwen306BQ40Model
 ./gradlew :models-backend-purejava:downloadSmolLm2360MQ80Model
 ./gradlew :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
+./gradlew :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
 ```
 
 ## What's inside
@@ -170,10 +173,10 @@ from GGUF metadata:
 
 ### Quantized inference kernels (`models-backend-purejava`)
 
-- **Dequantization**: Q4_0 (4-bit, 18-byte blocks), Q8_0 (8-bit, 34-byte blocks), F16 → F32
+- **Dequantization**: Q4_0, Q4_K, Q5_0, Q8_0, Q6_K, and F16 storage paths
 - **Quantized matmul**: operates directly on quantized `MemorySegment` data — no full dequantization needed
 - **RMSNorm**: fused normalize + scale
-- **Rotary Position Embeddings (RoPE)**: in-place, configurable theta
+- **Rotary Position Embeddings (RoPE)**: normal and NeoX layouts, configurable theta, modern and legacy linear scaling
 - **SwiGLU activation**: fused gate × silu × up projection
 - **Softmax**: numerically stable (max-subtract)
 
@@ -345,7 +348,7 @@ without changing the model metadata reported to callers.
 - Llama-family forward pass (supports Qwen2/Qwen3/Llama architectures)
 - Sampling strategies (greedy, temperature, top-k, top-p, repetition penalty)
 - Generation loop with streaming
-- Strict integration tests against real Qwen, Qwen-Coder, SmolLM2, and TinyLlama fixtures
+- Strict integration tests against real Qwen, Qwen-Coder, SmolLM2, TinyLlama, and DeepSeek-Coder fixtures
 
 ### Phase 2 — Framework adapters & production hardening
 
@@ -355,7 +358,7 @@ without changing the model metadata reported to callers.
 - Additional ModelJars catalog entries and repository providers
 - Micrometer metrics (tok/s, latency histograms)
 - JFR events for profiling
-- Q4_K_M and additional K-quant support (wider quant format coverage)
+- Additional K-quant support beyond mixed Q4_K_M files
 
 ### Phase 3 — Performance & scale
 

@@ -51,13 +51,26 @@ public final class TensorOps {
    */
   public static void ggufMatmul(
       float[] out, float[] x, MemorySegment qWeight, GgufTensorType type, int rows, int cols) {
-    if (type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0 || type == GgufTensorType.Q6_K) {
-      int activationBlockSize = type == GgufTensorType.Q6_K ? 256 : 32;
+    if (type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q5_0
+        || type == GgufTensorType.Q8_0
+        || type == GgufTensorType.Q4_K
+        || type == GgufTensorType.Q6_K) {
+      int activationBlockSize =
+          type == GgufTensorType.Q4_K || type == GgufTensorType.Q6_K ? 256 : 32;
       ggufMatmul(
-          out, x, qWeight, type, rows, cols, new byte[cols], new float[cols / activationBlockSize]);
+          out,
+          x,
+          qWeight,
+          type,
+          rows,
+          cols,
+          new byte[cols],
+          new float[cols / activationBlockSize],
+          new short[(cols + 15) / 16]);
       return;
     }
-    ggufMatmul(out, x, qWeight, type, rows, cols, null, null);
+    ggufMatmul(out, x, qWeight, type, rows, cols, null, null, null);
   }
 
   /**
@@ -72,14 +85,50 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivation,
       float[] quantizedActivationScales) {
+    ggufMatmul(
+        out,
+        x,
+        qWeight,
+        type,
+        rows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        type == GgufTensorType.Q4_K ? new short[(cols + 15) / 16] : null);
+  }
+
+  /** Matrix-vector multiplication with reusable Q8 activation and Q8_K sum scratch. */
+  public static void ggufMatmul(
+      float[] out,
+      float[] x,
+      MemorySegment qWeight,
+      GgufTensorType type,
+      int rows,
+      int cols,
+      byte[] quantizedActivation,
+      float[] quantizedActivationScales,
+      short[] quantizedActivationSums) {
     switch (type) {
       case F32 -> VectorUtil.ggufF32BatchDotProduct(x, qWeight, rows, cols, out);
       case Q4_0 ->
           VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
+      case Q5_0 ->
+          VectorUtil.ggufQ5_0Q8_0BatchDotProduct(
+              x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
       case Q8_0 ->
           VectorUtil.ggufQ8_0Q8_0BatchDotProduct(
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
+      case Q4_K ->
+          VectorUtil.ggufQ4_KQ8_KBatchDotProduct(
+              x,
+              qWeight,
+              rows,
+              cols,
+              out,
+              quantizedActivation,
+              quantizedActivationScales,
+              quantizedActivationSums);
       case Q6_K ->
           VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
@@ -120,9 +169,23 @@ public final class TensorOps {
   /** In-place rotary position embedding on q and k sub-vectors. */
   public static void rope(
       float[] q, int qOffset, float[] k, int kOffset, int position, int headDim, float ropeTheta) {
+    rope(q, qOffset, k, kOffset, position, headDim, ropeTheta, 1.0f);
+  }
+
+  /** Offset-aware rotary embedding with a GGUF frequency scale. */
+  public static void rope(
+      float[] q,
+      int qOffset,
+      float[] k,
+      int kOffset,
+      int position,
+      int headDim,
+      float ropeTheta,
+      float frequencyScale) {
+    float scaledPosition = position * frequencyScale;
     for (int i = 0; i < headDim; i += 2) {
       float freq = (float) (1.0 / Math.pow(ropeTheta, (double) i / headDim));
-      float angle = position * freq;
+      float angle = scaledPosition * freq;
       float cos = (float) Math.cos(angle);
       float sin = (float) Math.sin(angle);
 
@@ -133,9 +196,21 @@ public final class TensorOps {
 
   /** In-place rotary position embedding on one sub-vector. */
   public static void rope(float[] vector, int offset, int position, int headDim, float ropeTheta) {
+    rope(vector, offset, position, headDim, ropeTheta, 1.0f);
+  }
+
+  /** In-place rotary position embedding on one sub-vector with a GGUF frequency scale. */
+  public static void rope(
+      float[] vector,
+      int offset,
+      int position,
+      int headDim,
+      float ropeTheta,
+      float frequencyScale) {
+    float scaledPosition = position * frequencyScale;
     for (int i = 0; i < headDim; i += 2) {
       float freq = (float) (1.0 / Math.pow(ropeTheta, (double) i / headDim));
-      float angle = position * freq;
+      float angle = scaledPosition * freq;
       float cos = (float) Math.cos(angle);
       float sin = (float) Math.sin(angle);
 
@@ -146,10 +221,22 @@ public final class TensorOps {
   /** In-place NeoX rotary embedding whose coordinate pairs are separated by half a head. */
   public static void ropeNeox(
       float[] vector, int offset, int position, int headDim, float ropeTheta) {
+    ropeNeox(vector, offset, position, headDim, ropeTheta, 1.0f);
+  }
+
+  /** In-place NeoX rotary embedding with a GGUF frequency scale. */
+  public static void ropeNeox(
+      float[] vector,
+      int offset,
+      int position,
+      int headDim,
+      float ropeTheta,
+      float frequencyScale) {
     int half = headDim / 2;
+    float scaledPosition = position * frequencyScale;
     for (int i = 0; i < half; i++) {
       float freq = (float) (1.0 / Math.pow(ropeTheta, (double) (2 * i) / headDim));
-      float angle = position * freq;
+      float angle = scaledPosition * freq;
       float cos = (float) Math.cos(angle);
       float sin = (float) Math.sin(angle);
 
