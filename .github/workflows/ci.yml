@@ -12,8 +12,26 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: models
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          path: vectors
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          path: model-jars
 
       - uses: actions/setup-java@v5
         with:
@@ -36,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: sbom
-          path: '*/build/reports/cyclonedx-direct/bom.json'
+          path: 'models/*/build/reports/cyclonedx-direct/bom.json'
           retention-days: 90
 
       - name: Upload Test Reports
@@ -44,5 +62,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-reports
-          path: '*/build/reports/tests/'
+          path: 'models/*/build/reports/tests/'
           retention-days: 30

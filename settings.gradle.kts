@@ -5,9 +5,20 @@ rootProject.name = "models"
 // artifacts to be published. Gradle resolves the requested coordinates to the local source build.
 includeBuild("../vectors") {
     dependencySubstitution {
+        substitute(module("com.integrallis:vectors-core")).using(project(":vectors-core"))
         substitute(module("com.integrallis:vectors-db")).using(project(":vectors-db"))
         substitute(module("com.integrallis:vectors-cache-semantic-db"))
             .using(project(":vectors-cache-semantic-db"))
+    }
+}
+
+// ModelJars is a sibling OSS marker-JAR project. Consuming it through a composite
+// build keeps local development independent of publication to modeljars.org.
+includeBuild("../model-jars") {
+    dependencySubstitution {
+        substitute(module("org.modeljars:modeljars-core")).using(project(":modeljars-core"))
+        substitute(module("org.modeljars:modeljars-catalog"))
+            .using(project(":modeljars-catalog"))
     }
 }
 
@@ -19,6 +30,7 @@ include("models-runtime")
 include("models-backend-purejava")
 include("models-backend-onnx")
 include("models-backend-native")
+include("models-backend-apple")
 
 // --- Framework adapters ---
 include("models-spring-ai")

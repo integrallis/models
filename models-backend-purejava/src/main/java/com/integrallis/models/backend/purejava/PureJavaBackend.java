@@ -29,12 +29,19 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
+import java.util.Objects;
+import org.modeljars.ModelJarDescriptor;
+import org.modeljars.ModelJarException;
+import org.modeljars.ModelJarRegistry;
+import org.modeljars.ModelJarRequirement;
 
 /**
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
  * any native dependencies.
  */
 public final class PureJavaBackend implements InferenceBackend {
+
+  static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
   private final Arena arena;
   private final LlamaConfig config;
@@ -57,13 +64,20 @@ public final class PureJavaBackend implements InferenceBackend {
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
   public static PureJavaBackend load(Path modelPath) {
-    Arena arena = Arena.ofShared();
+    return load(modelPath, Arena.ofShared());
+  }
+
+  static PureJavaBackend load(Path modelPath, Arena arena) {
+    Objects.requireNonNull(arena, "arena");
     try {
+      Objects.requireNonNull(modelPath, "modelPath");
       GgufFile file = GgufParser.parse(modelPath, arena);
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       String modelName =
@@ -83,9 +97,44 @@ public final class PureJavaBackend implements InferenceBackend {
 
       return new PureJavaBackend(arena, config, tokenizer, forwardPass, metadata);
     } catch (IOException e) {
-      arena.close();
+      closeAfterFailure(arena, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
+    } catch (RuntimeException | Error e) {
+      closeAfterFailure(arena, e);
+      throw e;
     }
+  }
+
+  /** Resolves a model from classpath ModelJars metadata and loads it. */
+  public static PureJavaBackend load(ModelJarRequirement requirement) {
+    Objects.requireNonNull(requirement, "requirement");
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath()
+            .resolve(requirement)
+            .orElseThrow(
+                () -> new ModelJarException("No ModelJars descriptor matched " + requirement));
+    return load(descriptor);
+  }
+
+  /** Loads a GGUF model described by a ModelJars marker descriptor. */
+  public static PureJavaBackend load(ModelJarDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    if (!descriptor.supportsBackend("pure-java")) {
+      throw new ModelJarException(
+          "ModelJars descriptor does not support pure-java backend: " + descriptor.alias());
+    }
+    if (!"gguf".equals(descriptor.format())) {
+      throw new ModelJarException(
+          "PureJavaBackend only supports GGUF ModelJars descriptors: " + descriptor.alias());
+    }
+    Path modelPath =
+        descriptor
+            .localPath()
+            .orElseThrow(
+                () ->
+                    new ModelJarException(
+                        "ModelJars descriptor has no local path: " + descriptor.alias()));
+    return load(modelPath);
   }
 
   @Override
@@ -116,5 +165,32 @@ public final class PureJavaBackend implements InferenceBackend {
   @Override
   public void close() {
     arena.close();
+  }
+
+  private static int runtimeContextLength(LlamaConfig config) {
+    String value = System.getProperty(MAX_CONTEXT_LENGTH_PROPERTY);
+    if (value == null || value.isBlank()) {
+      return config.contextLength();
+    }
+    int maxContextLength;
+    try {
+      maxContextLength = Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value, e);
+    }
+    if (maxContextLength <= 0) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value);
+    }
+    return Math.min(config.contextLength(), maxContextLength);
+  }
+
+  private static void closeAfterFailure(Arena arena, Throwable failure) {
+    try {
+      arena.close();
+    } catch (RuntimeException closeFailure) {
+      failure.addSuppressed(closeFailure);
+    }
   }
 }

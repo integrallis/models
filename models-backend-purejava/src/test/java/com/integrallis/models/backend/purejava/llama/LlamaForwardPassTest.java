@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.llama;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
@@ -165,6 +166,48 @@ class LlamaForwardPassTest {
 
       assertThat(logits0).isNotEqualTo(logits1);
     }
+
+    @Test
+    void rejectsNonSequentialPositions() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
+
+      assertThatThrownBy(() -> forwardPass.forward(5, 1))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("expected 0");
+    }
+
+    @Test
+    void cacheGrowthAndResetPreserveSequenceResults() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
+      int[] tokens = new int[20];
+      for (int i = 0; i < tokens.length; i++) {
+        tokens[i] = i % VOCAB_SIZE;
+      }
+
+      float[] first = runSequence(forwardPass, tokens);
+      assertThat(cache.allocatedSequenceCapacity()).isEqualTo(32);
+
+      forwardPass.reset();
+      float[] second = runSequence(forwardPass, tokens);
+
+      assertThat(second).containsExactly(first);
+    }
+  }
+
+  private static float[] runSequence(LlamaForwardPass forwardPass, int[] tokens) {
+    float[] logits = null;
+    for (int position = 0; position < tokens.length; position++) {
+      logits = forwardPass.forward(tokens[position], position);
+    }
+    return logits;
   }
 
   private static byte[] randomF32(Random rng, int count) {

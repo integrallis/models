@@ -19,6 +19,7 @@ allprojects {
 
 // Library subprojects (excludes benchmarks)
 val libraryProjects = subprojects.filter { it.name != "models-bench" }
+val libraryModuleNames = libraryProjects.map { it.name }.toSet()
 val publishedModuleNames = setOf("models-api", "models-runtime", "models-backend-purejava")
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
 val scaffoldProjects = libraryProjects.filterNot { it.name in publishedModuleNames }
@@ -401,8 +402,10 @@ tasks.register("verifyStagedPublications") {
             }
             internalDependency.findAll(pom).forEach { match ->
                 val artifactId = match.groupValues[1]
-                require(artifactId in publishedModuleNames) {
-                    "${proj.name} publishes an unavailable internal dependency: $artifactId"
+                if (artifactId in libraryModuleNames) {
+                    require(artifactId in publishedModuleNames) {
+                        "${proj.name} publishes an unavailable internal dependency: $artifactId"
+                    }
                 }
             }
             println("  Staged publication valid: ${proj.name}")

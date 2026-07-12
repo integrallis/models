@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.foreign.Arena;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -45,7 +46,7 @@ class PureJavaBackendTest {
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
 
-  private Path buildNanoModelFile(Path dir, Random rng) throws IOException {
+  static Path buildNanoModelFile(Path dir, Random rng) throws IOException {
     List<String> tokens = new ArrayList<>();
     for (int i = 0; i < VOCAB_SIZE; i++) {
       tokens.add("t" + i);
@@ -153,10 +154,41 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void capsRuntimeContextLengthWithoutChangingModelMetadata(@TempDir Path dir)
+        throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(43));
+      String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+      System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "4");
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertThat(backend.metadata().contextLength()).isEqualTo(CONTEXT);
+        for (int position = 0; position <= 3; position++) {
+          assertThat(backend.forward(5, position)).hasSize(VOCAB_SIZE);
+        }
+        assertThatThrownBy(() -> backend.forward(5, 4))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("position out of range");
+      } finally {
+        restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+      }
+    }
+
+    @Test
     void nonExistentFileThrows(@TempDir Path dir) {
       Path noFile = dir.resolve("missing.gguf");
       assertThatThrownBy(() -> PureJavaBackend.load(noFile))
           .isInstanceOf(UncheckedIOException.class);
+    }
+
+    @Test
+    void closesOwnedArenaWhenRuntimeFailureInterruptsLoading(@TempDir Path dir) throws IOException {
+      Path invalidModel = dir.resolve("invalid.gguf");
+      Files.write(invalidModel, new byte[32]);
+      Arena arena = Arena.ofShared();
+
+      assertThatThrownBy(() -> PureJavaBackend.load(invalidModel, arena))
+          .isInstanceOf(RuntimeException.class);
+      assertThat(arena.scope().isAlive()).isFalse();
     }
   }
 
@@ -176,5 +208,13 @@ class PureJavaBackendTest {
       buf.putFloat(i * 4, 1.0f);
     }
     return data;
+  }
+
+  private static void restoreSystemProperty(String name, String previous) {
+    if (previous == null) {
+      System.clearProperty(name);
+    } else {
+      System.setProperty(name, previous);
+    }
   }
 }

@@ -1,0 +1,113 @@
+name: Model Integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/model-integration.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "models-api/**"
+      - "models-runtime/**"
+      - "models-backend-purejava/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/model-integration.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "models-api/**"
+      - "models-runtime/**"
+      - "models-backend-purejava/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qwen25-coder:
+    name: Qwen pure-Java integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          path: model-jars
+
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          path: vectors
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache local model fixtures
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf
+            ~/.jvllm/models/Qwen3-1.7B-Q8_0.gguf
+            ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf
+            ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf
+            ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q4_0.gguf
+            ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf
+            ~/.jvllm/models/qwen2.5-coder-3b-instruct-q4_0.gguf
+            ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf
+            ~/.jvllm/models/tinyllama-1.1b-chat-v1.0.Q4_0.gguf
+          key: qwen-smollm-tinyllama-purejava-fixtures-v1
+
+      - name: Download pure-Java model fixtures
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-backend-purejava:downloadQwen306BQ40Model
+          :models-backend-purejava:downloadQwen317BQ80Model
+          :models-backend-purejava:downloadQwen25Coder05BQ40Model
+          :models-backend-purejava:downloadQwen25Coder05BQ80Model
+          :models-backend-purejava:downloadQwen25Coder15BQ40Model
+          :models-backend-purejava:downloadQwen25Coder15BQ80Model
+          :models-backend-purejava:downloadQwen25Coder3BQ40Model
+          :models-backend-purejava:downloadSmolLm2360MQ80Model
+          :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
+          --no-daemon
+          --stacktrace
+
+      - name: Run pure-Java model integration tests
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-backend-purejava:integrationTest
+          --tests com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
+          --no-daemon
+          --stacktrace
+
+      - name: Upload pure-Java integration reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: purejava-model-integration-test-reports
+          path: models/models-backend-purejava/build/reports/tests/
+          retention-days: 30

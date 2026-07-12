@@ -14,11 +14,33 @@ permissions:
 jobs:
   analyze:
     name: CodeQL Analysis
+    # Private repositories require a paid GitHub Code Security entitlement for SARIF upload.
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-latest
     permissions:
+      actions: read
+      contents: read
       security-events: write
+    defaults:
+      run:
+        working-directory: models
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          path: vectors
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          path: model-jars
 
       - uses: actions/setup-java@v5
         with:
@@ -36,3 +58,5 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
+        with:
+          checkout_path: ${{ github.workspace }}/models

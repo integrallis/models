@@ -17,18 +17,19 @@ package com.integrallis.models.backend.purejava.tokenizer;
 
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.PriorityQueue;
 
 /**
- * BPE tokenizer loaded from GGUF metadata. Reads vocabulary, scores, and merges from standard GGUF
- * keys. Supports GPT-2 style byte-level BPE where bytes 0-255 are mapped to printable Unicode
- * characters in the vocabulary.
+ * Tokenizer loaded from GGUF metadata. Supports GPT-2 byte-level BPE, Llama SentencePiece-style
+ * score-ordered merges, and the legacy plain-BPE fallback.
  */
 public final class GgufTokenizer implements Tokenizer {
 
@@ -39,6 +40,11 @@ public final class GgufTokenizer implements Tokenizer {
   private final int bosTokenId;
   private final int eosTokenId;
   private final boolean useByteLevel;
+  private final boolean useSentencePiece;
+  private final boolean addBosToken;
+  private final boolean addEosToken;
+  private final boolean addSpacePrefix;
+  private final int unknownTokenId;
   private final char[] byteToChar;
   private final int[] charToByte;
 
@@ -49,7 +55,12 @@ public final class GgufTokenizer implements Tokenizer {
       Map<String, Integer> mergeRanks,
       int bosTokenId,
       int eosTokenId,
-      boolean useByteLevel) {
+      boolean useByteLevel,
+      boolean useSentencePiece,
+      boolean addBosToken,
+      boolean addEosToken,
+      boolean addSpacePrefix,
+      int unknownTokenId) {
     this.vocab = vocab;
     this.scores = scores;
     this.tokenToId = tokenToId;
@@ -57,6 +68,11 @@ public final class GgufTokenizer implements Tokenizer {
     this.bosTokenId = bosTokenId;
     this.eosTokenId = eosTokenId;
     this.useByteLevel = useByteLevel;
+    this.useSentencePiece = useSentencePiece;
+    this.addBosToken = addBosToken;
+    this.addEosToken = addEosToken;
+    this.addSpacePrefix = addSpacePrefix;
+    this.unknownTokenId = unknownTokenId;
     this.byteToChar = buildBytesToUnicode();
     this.charToByte = buildUnicodeToBytes(byteToChar);
   }
@@ -137,11 +153,28 @@ public final class GgufTokenizer implements Tokenizer {
     // Detect GPT-2 style byte-level BPE: check if the model uses "gpt2" or "bpe" tokenizer type,
     // or if the vocabulary contains the characteristic Ġ (U+0120) characters that indicate
     // the bytes_to_unicode mapping is in use
-    Optional<String> tokenizerModel = metadata.getString("tokenizer.ggml.model");
-    boolean useByteLevel = detectByteLevel(tokenizerModel.orElse(""), vocab, tokenToId);
+    String tokenizerModel = metadata.getString("tokenizer.ggml.model").orElse("");
+    boolean useSentencePiece = "llama".equals(tokenizerModel);
+    boolean useByteLevel = !useSentencePiece && detectByteLevel(tokenizerModel, vocab, tokenToId);
+    boolean addBosToken = metadata.getBool("tokenizer.ggml.add_bos_token").orElse(useSentencePiece);
+    boolean addEosToken = metadata.getBool("tokenizer.ggml.add_eos_token").orElse(false);
+    boolean addSpacePrefix =
+        metadata.getBool("tokenizer.ggml.add_space_prefix").orElse(useSentencePiece);
+    int unknownTokenId = metadata.getUint32("tokenizer.ggml.unknown_token_id").orElse(0);
 
     return new GgufTokenizer(
-        vocab, scores, tokenToId, mergeRanks, bosTokenId, eosTokenId, useByteLevel);
+        vocab,
+        scores,
+        tokenToId,
+        mergeRanks,
+        bosTokenId,
+        eosTokenId,
+        useByteLevel,
+        useSentencePiece,
+        addBosToken,
+        addEosToken,
+        addSpacePrefix,
+        unknownTokenId);
   }
 
   /**
@@ -164,14 +197,132 @@ public final class GgufTokenizer implements Tokenizer {
 
   @Override
   public int[] encode(String text) {
-    if (text == null || text.isEmpty()) {
+    if (text == null) {
       return new int[0];
     }
 
+    if (useSentencePiece) {
+      return encodeSentencePiece(text);
+    }
+    if (text.isEmpty()) {
+      return new int[0];
+    }
     if (useByteLevel) {
       return encodeByteLevelBpe(text);
     } else {
       return encodePlainBpe(text);
+    }
+  }
+
+  private int[] encodeSentencePiece(String text) {
+    List<Integer> tokens = new ArrayList<>();
+    if (addBosToken) {
+      tokens.add(bosTokenId);
+    }
+
+    if (!text.isEmpty()) {
+      String normalized = (addSpacePrefix ? " " : "") + text;
+      normalized = normalized.replace(' ', '\u2581');
+
+      List<String> symbols =
+          normalized
+              .codePoints()
+              .mapToObj(codePoint -> new String(Character.toChars(codePoint)))
+              .toList();
+      symbols = applySentencePieceMerges(symbols);
+
+      for (String symbol : symbols) {
+        Integer token = tokenToId.get(symbol);
+        if (token != null) {
+          tokens.add(token);
+        } else {
+          appendByteFallback(tokens, symbol);
+        }
+      }
+    }
+
+    if (addEosToken) {
+      tokens.add(eosTokenId);
+    }
+    return tokens.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  private List<String> applySentencePieceMerges(List<String> initialSymbols) {
+    if (initialSymbols.size() < 2) {
+      return initialSymbols;
+    }
+
+    List<SentencePieceSymbol> symbols = new ArrayList<>(initialSymbols.size());
+    for (int index = 0; index < initialSymbols.size(); index++) {
+      symbols.add(
+          new SentencePieceSymbol(
+              initialSymbols.get(index),
+              index - 1,
+              index + 1 < initialSymbols.size() ? index + 1 : -1));
+    }
+
+    PriorityQueue<SentencePieceBigram> workQueue =
+        new PriorityQueue<>(
+            Comparator.comparingDouble(SentencePieceBigram::score)
+                .reversed()
+                .thenComparingInt(SentencePieceBigram::left));
+    for (int right = 1; right < symbols.size(); right++) {
+      addSentencePieceBigram(workQueue, symbols, right - 1, right);
+    }
+
+    while (!workQueue.isEmpty()) {
+      SentencePieceBigram bigram = workQueue.remove();
+      SentencePieceSymbol left = symbols.get(bigram.left());
+      SentencePieceSymbol right = symbols.get(bigram.right());
+      if (!left.active
+          || !right.active
+          || left.next != bigram.right()
+          || left.version != bigram.leftVersion()
+          || right.version != bigram.rightVersion()) {
+        continue;
+      }
+
+      left.text += right.text;
+      left.version++;
+      left.next = right.next;
+      right.active = false;
+      if (right.next >= 0) {
+        symbols.get(right.next).previous = bigram.left();
+      }
+
+      addSentencePieceBigram(workQueue, symbols, left.previous, bigram.left());
+      addSentencePieceBigram(workQueue, symbols, bigram.left(), left.next);
+    }
+
+    List<String> merged = new ArrayList<>();
+    for (int index = 0; index >= 0; index = symbols.get(index).next) {
+      merged.add(symbols.get(index).text);
+    }
+    return merged;
+  }
+
+  private void addSentencePieceBigram(
+      PriorityQueue<SentencePieceBigram> workQueue,
+      List<SentencePieceSymbol> symbols,
+      int leftIndex,
+      int rightIndex) {
+    if (leftIndex < 0 || rightIndex < 0) {
+      return;
+    }
+    SentencePieceSymbol left = symbols.get(leftIndex);
+    SentencePieceSymbol right = symbols.get(rightIndex);
+    Integer token = tokenToId.get(left.text + right.text);
+    if (token != null) {
+      workQueue.add(
+          new SentencePieceBigram(
+              leftIndex, rightIndex, scores[token], left.version, right.version));
+    }
+  }
+
+  private void appendByteFallback(List<Integer> tokens, String symbol) {
+    for (byte value : symbol.getBytes(StandardCharsets.UTF_8)) {
+      Integer token = tokenToId.get(String.format("<0x%02X>", value & 0xFF));
+      tokens.add(token != null ? token : unknownTokenId);
     }
   }
 
@@ -297,6 +448,9 @@ public final class GgufTokenizer implements Tokenizer {
 
   @Override
   public String decode(int[] tokens) {
+    if (useSentencePiece) {
+      return decodeSentencePiece(tokens);
+    }
     if (!useByteLevel) {
       StringBuilder sb = new StringBuilder();
       for (int token : tokens) {
@@ -346,21 +500,42 @@ public final class GgufTokenizer implements Tokenizer {
     return new String(bytes, StandardCharsets.UTF_8);
   }
 
+  private String decodeSentencePiece(int[] tokens) {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    for (int token : tokens) {
+      if (token < 0 || token >= vocab.length || token == bosTokenId || token == eosTokenId) {
+        continue;
+      }
+      String piece = vocab[token];
+      Integer byteValue = explicitByteValue(piece);
+      if (byteValue != null) {
+        bytes.write(byteValue);
+      } else {
+        bytes.writeBytes(piece.replace('\u2581', ' ').getBytes(StandardCharsets.UTF_8));
+      }
+    }
+
+    String decoded = bytes.toString(StandardCharsets.UTF_8);
+    if (addSpacePrefix && decoded.startsWith(" ")) {
+      return decoded.substring(1);
+    }
+    return decoded;
+  }
+
   @Override
   public String decode(int token) {
     if (token < 0 || token >= vocab.length) {
       return "";
     }
+    if (useSentencePiece && (token == bosTokenId || token == eosTokenId)) {
+      return "";
+    }
     String piece = vocab[token];
 
     // Handle byte-level fallback tokens like <0xNN>
-    if (piece.startsWith("<0x") && piece.endsWith(">") && piece.length() == 6) {
-      try {
-        int byteVal = Integer.parseInt(piece.substring(3, 5), 16);
-        return new String(new byte[] {(byte) byteVal}, StandardCharsets.UTF_8);
-      } catch (NumberFormatException e) {
-        return piece;
-      }
+    Integer byteValue = explicitByteValue(piece);
+    if (byteValue != null) {
+      return new String(new byte[] {byteValue.byteValue()}, StandardCharsets.UTF_8);
     }
 
     if (useByteLevel) {
@@ -384,8 +559,40 @@ public final class GgufTokenizer implements Tokenizer {
       return new String(bytes, StandardCharsets.UTF_8);
     }
 
+    if (useSentencePiece) {
+      return piece.replace('\u2581', ' ');
+    }
+
     return piece;
   }
+
+  private static Integer explicitByteValue(String piece) {
+    if (!piece.startsWith("<0x") || !piece.endsWith(">") || piece.length() != 6) {
+      return null;
+    }
+    try {
+      return Integer.parseInt(piece.substring(3, 5), 16);
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private static final class SentencePieceSymbol {
+    private String text;
+    private int previous;
+    private int next;
+    private int version;
+    private boolean active = true;
+
+    private SentencePieceSymbol(String text, int previous, int next) {
+      this.text = text;
+      this.previous = previous;
+      this.next = next;
+    }
+  }
+
+  private record SentencePieceBigram(
+      int left, int right, float score, int leftVersion, int rightVersion) {}
 
   @Override
   public int vocabSize() {

@@ -15,9 +15,11 @@ are intentionally excluded.
 3. Run **Actions → Release** with `dry_run` enabled.
 4. After validation succeeds, rerun with `dry_run` disabled.
 
-The three published modules have no dependency on `vectors`. Placeholder
-modules also declare no dependencies until they contain an implementation, so
-models CI and release builds are standalone.
+`models-backend-purejava` depends on `vectors-core` for JDK Vector API numeric
+kernels. Local development resolves that dependency through the sibling
+composite build; releases consume the published `vectors-core` artifact.
+Placeholder modules still declare no dependencies until they contain an
+implementation.
 
 The workflow uses the same Maven Central and GPG secrets as `mfcqi-java`:
 `MAVENCENTRAL_USERNAME`, `MAVENCENTRAL_PASSWORD`, `GPG_PUBLIC_KEY`,

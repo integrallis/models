@@ -23,28 +23,64 @@ public record LlamaConfig(
     int numLayers,
     int numHeads,
     int numKvHeads,
+    int keyLength,
+    int valueLength,
     int vocabSize,
     int contextLength,
     int hiddenDim,
     float ropeTheta,
-    float rmsNormEps) {
+    float rmsNormEps,
+    boolean archUsesNeoxRope) {
 
   public LlamaConfig {
     if (embeddingDim <= 0) throw new IllegalArgumentException("embeddingDim must be > 0");
     if (numLayers <= 0) throw new IllegalArgumentException("numLayers must be > 0");
     if (numHeads <= 0) throw new IllegalArgumentException("numHeads must be > 0");
     if (numKvHeads <= 0) throw new IllegalArgumentException("numKvHeads must be > 0");
+    if (numHeads % numKvHeads != 0) {
+      throw new IllegalArgumentException("numHeads must be divisible by numKvHeads");
+    }
+    if (keyLength <= 0) throw new IllegalArgumentException("keyLength must be > 0");
+    if (valueLength <= 0) throw new IllegalArgumentException("valueLength must be > 0");
     if (vocabSize <= 0) throw new IllegalArgumentException("vocabSize must be > 0");
   }
 
-  /** Head dimension = embedding_dim / num_heads. */
+  /** Query/key dimensions per attention head. */
   public int headDim() {
-    return embeddingDim / numHeads;
+    return keyLength;
   }
 
-  /** KV dimension = head_dim * num_kv_heads. */
+  /** Total query projection dimension. */
+  public int queryDim() {
+    return keyLength * numHeads;
+  }
+
+  /** Total key-cache dimension per layer and position. */
+  public int keyDim() {
+    return keyLength * numKvHeads;
+  }
+
+  /** Total value-cache dimension per layer and position. */
+  public int valueDim() {
+    return valueLength * numKvHeads;
+  }
+
+  /** Concatenated attention value dimension before the output projection. */
+  public int attentionOutputDim() {
+    return valueLength * numHeads;
+  }
+
+  /** Legacy key/value dimension accessor for architectures whose K and V widths match. */
   public int kvDim() {
-    return headDim() * numKvHeads;
+    if (keyDim() != valueDim()) {
+      throw new IllegalStateException("key and value dimensions differ");
+    }
+    return keyDim();
+  }
+
+  /** Qwen-family GGUF models use NeoX split-half rotary layout. */
+  public boolean usesNeoxRope() {
+    return archUsesNeoxRope;
   }
 
   /**
@@ -72,7 +108,14 @@ public record LlamaConfig(
         getArchKey(metadata, arch, "attention.head_count_kv")
             .orElseThrow(
                 () -> new IllegalArgumentException("Missing " + arch + ".attention.head_count_kv"));
-    int vocabSize = getArchKey(metadata, arch, "vocab_size").orElse(32000);
+    int defaultHeadLength = embeddingDim / numHeads;
+    int keyLength = getArchKey(metadata, arch, "attention.key_length").orElse(defaultHeadLength);
+    int valueLength =
+        getArchKey(metadata, arch, "attention.value_length").orElse(defaultHeadLength);
+    int vocabSize =
+        getArchKey(metadata, arch, "vocab_size")
+            .or(() -> metadata.getArraySize("tokenizer.ggml.tokens"))
+            .orElse(32000);
     int contextLength = getArchKey(metadata, arch, "context_length").orElse(2048);
     int hiddenDim = getArchKey(metadata, arch, "feed_forward_length").orElse(embeddingDim * 4);
     float ropeTheta = getArchFloatKey(metadata, arch, "rope.freq_base").orElse(10000.0f);
@@ -84,11 +127,14 @@ public record LlamaConfig(
         numLayers,
         numHeads,
         numKvHeads,
+        keyLength,
+        valueLength,
         vocabSize,
         contextLength,
         hiddenDim,
         ropeTheta,
-        rmsNormEps);
+        rmsNormEps,
+        arch.equals("qwen2") || arch.equals("qwen3"));
   }
 
   /**

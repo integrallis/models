@@ -1,0 +1,75 @@
+name: Large Model Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      modeljars-ref:
+        description: "ModelJars ref to test against"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  qwen25-coder-7b:
+    name: Qwen2.5-Coder 7B pure-Java slow test
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          ref: ${{ github.event.inputs['modeljars-ref'] || 'main' }}
+          path: model-jars
+
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          path: vectors
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache Qwen2.5-Coder 7B fixture
+        uses: actions/cache@v5
+        with:
+          path: ~/.jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf
+          key: qwen25-coder-7b-q4_0-fixture-v1
+
+      - name: Download Qwen2.5-Coder 7B fixture
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-backend-purejava:downloadQwen25Coder7BQ40Model
+          --no-daemon
+          --stacktrace
+
+      - name: Run Qwen2.5-Coder 7B slow test
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-backend-purejava:slowTest
+          --tests com.integrallis.models.backend.purejava.Qwen25CoderLargeModelJarsSlowTest
+          --no-daemon
+          --stacktrace
+
+      - name: Upload large-model integration reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: qwen25-coder-7b-slow-test-reports
+          path: models/models-backend-purejava/build/reports/tests/
+          retention-days: 30

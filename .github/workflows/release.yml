@@ -19,11 +19,27 @@ jobs:
   release:
     name: Release to Maven Central and GitHub
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: models
     steps:
-      - name: Checkout
+      - name: Checkout models
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          path: models
+
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          path: vectors
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          path: model-jars
 
       - name: Set up JDK
         uses: actions/setup-java@v5
@@ -57,6 +73,7 @@ jobs:
         uses: jreleaser/release-action@v2
         with:
           arguments: deploy --dry-run
+          working-directory: models
         env:
           JRELEASER_PROJECT_VERSION: ${{ steps.version.outputs.version }}
           JRELEASER_MAVENCENTRAL_SONATYPE_USERNAME: ${{ secrets.MAVENCENTRAL_USERNAME }}
@@ -70,6 +87,7 @@ jobs:
         uses: jreleaser/release-action@v2
         with:
           arguments: deploy
+          working-directory: models
         env:
           JRELEASER_PROJECT_VERSION: ${{ steps.version.outputs.version }}
           JRELEASER_MAVENCENTRAL_SONATYPE_USERNAME: ${{ secrets.MAVENCENTRAL_USERNAME }}
@@ -101,5 +119,5 @@ jobs:
           name: jreleaser-logs
           if-no-files-found: ignore
           path: |
-            out/jreleaser/trace.log
-            out/jreleaser/output.properties
+            models/out/jreleaser/trace.log
+            models/out/jreleaser/output.properties

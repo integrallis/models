@@ -16,8 +16,17 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.vectors.core.VectorUtil;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.function.IntUnaryOperator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -84,6 +93,201 @@ class TensorOpsTest {
       assertThat(out[0]).isEqualTo(5.0f);
       assertThat(out[1]).isEqualTo(11.0f);
       assertThat(out[2]).isEqualTo(17.0f);
+    }
+
+    @Test
+    void delegatesToVectorsRowMajorGemvSemantics() {
+      int rows = 5;
+      int cols = 7;
+      float[] x = {0.25f, -1.0f, 2.5f, 0.0f, 3.0f, -0.5f, 1.25f};
+      float[] weight = new float[rows * cols];
+      for (int i = 0; i < weight.length; i++) {
+        weight[i] = (i % 9 - 4) * 0.125f;
+      }
+      float[] expected = new float[rows];
+      float[] actual = new float[rows];
+
+      VectorUtil.batchDotProduct(x, weight, rows, cols, expected);
+      TensorOps.matmul(actual, x, weight, rows, cols);
+
+      for (int row = 0; row < rows; row++) {
+        assertThat(actual[row]).isCloseTo(expected[row], within(1e-5f));
+      }
+    }
+
+    @Test
+    void ggufF32MatrixUsesMappedVectorsKernel() {
+      float[] x = {1.0f, 2.0f};
+      ByteBuffer bytes = ByteBuffer.allocate(6 * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+      for (float value : new float[] {1, 2, 3, 4, 5, 6}) {
+        bytes.putFloat(value);
+      }
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment weight = arena.allocate(bytes.capacity());
+        MemorySegment.copy(bytes.array(), 0, weight, ValueLayout.JAVA_BYTE, 0, bytes.capacity());
+        float[] actual = new float[3];
+
+        TensorOps.ggufMatmul(actual, x, weight, GgufTensorType.F32, 3, 2);
+
+        assertThat(actual).containsExactly(5.0f, 11.0f, 17.0f);
+      }
+    }
+  }
+
+  @Nested
+  static class QuantizedMatmul {
+
+    @Test
+    void q4_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
+      float[] x = repeatingQuery(32);
+      byte[] row = q4Block(0.5f);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
+            x, qWeight, 1, 32, expected, new byte[32], new float[1]);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q4_0, 1, 32);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
+    void q8_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
+      float[] x = repeatingQuery(32);
+      byte[] row = q8Block(0.25f);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        VectorUtil.ggufQ8_0Q8_0BatchDotProduct(
+            x, qWeight, 1, 32, expected, new byte[32], new float[1]);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q8_0, 1, 32);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
+    void q6_KMatchesVectorsGgmlQ8_KActivationSemantics() {
+      float[] x = repeatingQuery(256);
+      byte[] row = q6KBlock(0.125f, i -> (i % 64) - 32, i -> (i % 7) - 3);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
+            x, qWeight, 1, 256, expected, new byte[256], new float[1]);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q6_K, 1, 256);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
+    void rejectsNonBlockAlignedQ4_0Dimensions() {
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, q4Block(1.0f));
+
+        assertThatThrownBy(
+                () ->
+                    TensorOps.quantizedMatmul(
+                        new float[1], repeatingQuery(31), qWeight, GgufTensorType.Q4_0, 1, 31))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("multiple of 32");
+      }
+    }
+
+    @Test
+    void rejectsNonBlockAlignedQ8_0Dimensions() {
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, q8Block(1.0f));
+
+        assertThatThrownBy(
+                () ->
+                    TensorOps.quantizedMatmul(
+                        new float[1], repeatingQuery(31), qWeight, GgufTensorType.Q8_0, 1, 31))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("multiple of 32");
+      }
+    }
+
+    private static float[] repeatingQuery(int length) {
+      float[] out = new float[length];
+      for (int i = 0; i < length; i++) {
+        out[i] = (i % 7) - 3.0f;
+      }
+      return out;
+    }
+
+    private static byte[] q4Block(float scale) {
+      byte[] block = new byte[18];
+      ByteBuffer.wrap(block)
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .putShort(0, Float.floatToFloat16(scale));
+      for (int i = 0; i < 16; i++) {
+        int lo = i & 0x0F;
+        int hi = 15 - i;
+        block[2 + i] = (byte) (lo | (hi << 4));
+      }
+      return block;
+    }
+
+    private static byte[] q8Block(float scale) {
+      byte[] block = new byte[34];
+      ByteBuffer.wrap(block)
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .putShort(0, Float.floatToFloat16(scale));
+      for (int i = 0; i < 32; i++) {
+        block[2 + i] = (byte) (i - 16);
+      }
+      return block;
+    }
+
+    private static byte[] q6KBlock(
+        float scale, IntUnaryOperator quantFactory, IntUnaryOperator scaleFactory) {
+      byte[] block = new byte[210];
+      for (int i = 0; i < 16; i++) {
+        block[192 + i] = (byte) scaleFactory.applyAsInt(i);
+      }
+      ByteBuffer.wrap(block)
+          .order(ByteOrder.LITTLE_ENDIAN)
+          .putShort(208, Float.floatToFloat16(scale));
+
+      for (int superBlock = 0; superBlock < 2; superBlock++) {
+        int positionBase = superBlock * 128;
+        int qlBase = superBlock * 64;
+        int qhBase = 128 + superBlock * 32;
+        for (int l = 0; l < 32; l++) {
+          int q1 = quantFactory.applyAsInt(positionBase + l) + 32;
+          int q2 = quantFactory.applyAsInt(positionBase + l + 32) + 32;
+          int q3 = quantFactory.applyAsInt(positionBase + l + 64) + 32;
+          int q4 = quantFactory.applyAsInt(positionBase + l + 96) + 32;
+          block[qlBase + l] = (byte) ((q1 & 0x0F) | ((q3 & 0x0F) << 4));
+          block[qlBase + 32 + l] = (byte) ((q2 & 0x0F) | ((q4 & 0x0F) << 4));
+          block[qhBase + l] =
+              (byte)
+                  (((q1 >>> 4) & 0x03)
+                      | (((q2 >>> 4) & 0x03) << 2)
+                      | (((q3 >>> 4) & 0x03) << 4)
+                      | (((q4 >>> 4) & 0x03) << 6));
+        }
+      }
+      return block;
+    }
+
+    private static MemorySegment copy(Arena arena, byte[] bytes) {
+      MemorySegment segment = arena.allocate(bytes.length);
+      MemorySegment.copy(bytes, 0, segment, ValueLayout.JAVA_BYTE, 0, bytes.length);
+      return segment;
     }
   }
 
@@ -166,6 +370,59 @@ class TensorOpsTest {
 
       assertThat(norm(q)).isCloseTo(qNormBefore, within(1e-4f));
       assertThat(norm(k)).isCloseTo(kNormBefore, within(1e-4f));
+    }
+
+    @Test
+    void offsetAwareRopeMatchesCopiedHeadSemantics() {
+      float[] q = {99.0f, 1.0f, 2.0f, 3.0f, 4.0f, 98.0f};
+      float[] k = {97.0f, 5.0f, 6.0f, 7.0f, 8.0f, 96.0f};
+      float[] expectedQ = {1.0f, 2.0f, 3.0f, 4.0f};
+      float[] expectedK = {5.0f, 6.0f, 7.0f, 8.0f};
+
+      TensorOps.rope(expectedQ, expectedK, 7, 4, 10000.0f);
+      TensorOps.rope(q, 1, k, 1, 7, 4, 10000.0f);
+
+      assertThat(q[0]).isEqualTo(99.0f);
+      assertThat(q[5]).isEqualTo(98.0f);
+      assertThat(k[0]).isEqualTo(97.0f);
+      assertThat(k[5]).isEqualTo(96.0f);
+      for (int i = 0; i < expectedQ.length; i++) {
+        assertThat(q[1 + i]).isCloseTo(expectedQ[i], within(1e-5f));
+        assertThat(k[1 + i]).isCloseTo(expectedK[i], within(1e-5f));
+      }
+    }
+
+    @Test
+    void offsetAwareSingleVectorRopeMatchesCopiedHeadSemantics() {
+      float[] q = {99.0f, 98.0f, 1.0f, 2.0f, 3.0f, 4.0f, 97.0f};
+      float[] expectedQ = {1.0f, 2.0f, 3.0f, 4.0f};
+      float[] ignoredK = new float[4];
+
+      TensorOps.rope(expectedQ, ignoredK, 9, 4, 10000.0f);
+      TensorOps.rope(q, 2, 9, 4, 10000.0f);
+
+      assertThat(q[0]).isEqualTo(99.0f);
+      assertThat(q[1]).isEqualTo(98.0f);
+      assertThat(q[6]).isEqualTo(97.0f);
+      for (int i = 0; i < expectedQ.length; i++) {
+        assertThat(q[2 + i]).isCloseTo(expectedQ[i], within(1e-5f));
+      }
+    }
+
+    @Test
+    void neoxLayoutRotatesPairsSeparatedByHalfAHead() {
+      float[] vector = {1.0f, 2.0f, 3.0f, 4.0f};
+      float cos = (float) Math.cos(1.0);
+      float sin = (float) Math.sin(1.0);
+
+      TensorOps.ropeNeox(vector, 0, 1, 4, 10_000.0f);
+
+      assertThat(vector[0]).isCloseTo(1.0f * cos - 3.0f * sin, within(1e-6f));
+      assertThat(vector[2]).isCloseTo(1.0f * sin + 3.0f * cos, within(1e-6f));
+      float secondCos = (float) Math.cos(0.01);
+      float secondSin = (float) Math.sin(0.01);
+      assertThat(vector[1]).isCloseTo(2.0f * secondCos - 4.0f * secondSin, within(1e-6f));
+      assertThat(vector[3]).isCloseTo(2.0f * secondSin + 4.0f * secondCos, within(1e-6f));
     }
 
     private float norm(float[] v) {
