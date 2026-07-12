@@ -101,6 +101,15 @@ val modelFixtures =
             "q4_k_m",
             "code-completion",
         ),
+        ModelFixture(
+            "downloadDeepSeekCoder67BQ4KMModel",
+            "DeepSeek-Coder 6.7B Instruct Q4_K_M",
+            "hf://TheBloke/deepseek-coder-6.7B-instruct-GGUF",
+            "[6.7.0,7.0.0)",
+            "q4_k_m",
+            "code-completion",
+            slow = true,
+        ),
     )
 
 dependencies {
@@ -154,4 +163,44 @@ tasks.named<Test>("slowTest") {
     )
     maxParallelForks = 1
     maxHeapSize = "8g"
+}
+
+data class LargeModelTest(
+    val taskName: String,
+    val displayName: String,
+    val fixtureTaskName: String,
+    val testClassName: String,
+)
+
+listOf(
+    LargeModelTest(
+        "qwen25Coder7BSlowTest",
+        "Qwen2.5-Coder 7B",
+        "downloadQwen25Coder7BQ40Model",
+        "com.integrallis.models.backend.purejava.Qwen25CoderLargeModelJarsSlowTest",
+    ),
+    LargeModelTest(
+        "deepSeekCoder67BSlowTest",
+        "DeepSeek-Coder 6.7B",
+        "downloadDeepSeekCoder67BQ4KMModel",
+        "com.integrallis.models.backend.purejava.DeepSeekCoderLargeModelJarsSlowTest",
+    ),
+).forEach { largeModelTest ->
+    tasks.register<Test>(largeModelTest.taskName) {
+        group = "verification"
+        description =
+            "Resolve, verify, and run the ${largeModelTest.displayName} pure-Java slow test"
+        dependsOn(tasks.named(largeModelTest.fixtureTaskName))
+        testClassesDirs = sourceSets["test"].output.classesDirs
+        classpath = sourceSets["test"].runtimeClasspath
+        useJUnitPlatform {
+            includeTags("slow")
+        }
+        filter {
+            includeTestsMatching(largeModelTest.testClassName)
+        }
+        outputs.upToDateWhen { false }
+        maxParallelForks = 1
+        maxHeapSize = "8g"
+    }
 }
