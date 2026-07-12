@@ -14,6 +14,8 @@ permissions:
 jobs:
   analyze:
     name: CodeQL Analysis
+    # Private repositories require a paid GitHub Code Security entitlement for SARIF upload.
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
