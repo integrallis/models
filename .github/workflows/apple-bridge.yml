@@ -33,8 +33,26 @@ jobs:
     name: Compile and test Apple bridge
     runs-on: macos-26
     timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: models
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          path: vectors
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          path: model-jars
 
       - uses: actions/setup-java@v5
         with:
@@ -79,5 +97,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: apple-backend-test-reports
-          path: models-backend-apple/build/reports/tests/
+          path: models/models-backend-apple/build/reports/tests/
           retention-days: 30
