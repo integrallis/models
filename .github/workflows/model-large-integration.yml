@@ -1,6 +1,30 @@
 name: Large Model Integration
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/model-large-integration.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "models-api/**"
+      - "models-runtime/**"
+      - "models-backend-purejava/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/model-large-integration.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "models-api/**"
+      - "models-runtime/**"
+      - "models-backend-purejava/**"
   workflow_dispatch:
     inputs:
       modeljars-ref:
@@ -12,10 +36,24 @@ permissions:
   contents: read
 
 jobs:
-  qwen25-coder-7b:
-    name: Qwen2.5-Coder 7B pure-Java slow test
+  pure-java-large-model:
+    name: ${{ matrix.name }} pure-Java slow test
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Qwen2.5-Coder 7B
+            cachePath: ~/.jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf
+            cacheKey: qwen25-coder-7b-q4_0-fixture-v1
+            gradleTask: ":models-backend-purejava:qwen25Coder7BSlowTest"
+            reportName: qwen25-coder-7b-slow-test-reports
+          - name: DeepSeek-Coder 6.7B
+            cachePath: ~/.jvllm/models/deepseek-coder-6.7b-instruct.Q4_K_M.gguf
+            cacheKey: deepseek-coder-6.7b-q4_k_m-fixture-v1
+            gradleTask: ":models-backend-purejava:deepSeekCoder67BSlowTest"
+            reportName: deepseek-coder-6.7b-slow-test-reports
     steps:
       - name: Checkout models
         uses: actions/checkout@v5
@@ -43,26 +81,17 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Cache Qwen2.5-Coder 7B fixture
+      - name: Cache large-model fixture
         uses: actions/cache@v5
         with:
-          path: ~/.jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf
-          key: qwen25-coder-7b-q4_0-fixture-v1
+          path: ${{ matrix.cachePath }}
+          key: ${{ matrix.cacheKey }}
 
-      - name: Download Qwen2.5-Coder 7B fixture
+      - name: Resolve fixture and run large-model slow test
         working-directory: models
         run: >
           ./gradlew
-          :models-backend-purejava:downloadQwen25Coder7BQ40Model
-          --no-daemon
-          --stacktrace
-
-      - name: Run Qwen2.5-Coder 7B slow test
-        working-directory: models
-        run: >
-          ./gradlew
-          :models-backend-purejava:slowTest
-          --tests com.integrallis.models.backend.purejava.Qwen25CoderLargeModelJarsSlowTest
+          ${{ matrix.gradleTask }}
           --no-daemon
           --stacktrace
 
@@ -70,6 +99,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: qwen25-coder-7b-slow-test-reports
+          name: ${{ matrix.reportName }}
           path: models/models-backend-purejava/build/reports/tests/
           retention-days: 30

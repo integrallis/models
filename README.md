@@ -138,8 +138,9 @@ behavior. The backend accepts Llama/Qwen2/Qwen3 metadata prefixes. Projection
 kernels support F32, Q4_0, Q5_0, Q8_0, Q4_K, and Q6_K; embedding rows and small
 tensors also support F16. Other architectures, chat templates, long-context
 quality, and remaining K-quant formats are not yet claimed.
-The larger **Qwen2.5-Coder 7B Q4_0 GGUF** fixture is covered by the strict
-`slowTest` path instead of the default PR integration suite.
+The larger **Qwen2.5-Coder 7B Q4_0 GGUF** and **DeepSeek-Coder 6.7B Q4_K_M
+GGUF** fixtures are covered by dedicated strict slow-test tasks instead of the
+default integration suite.
 
 Resolve, download, and checksum the pinned fixtures through ModelJars:
 ```bash
@@ -147,6 +148,7 @@ Resolve, download, and checksum the pinned fixtures through ModelJars:
 ./gradlew :models-backend-purejava:downloadSmolLm2360MQ80Model
 ./gradlew :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
 ./gradlew :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
+./gradlew :models-backend-purejava:downloadDeepSeekCoder67BQ4KMModel
 ```
 
 ## What's inside
@@ -295,19 +297,22 @@ download missing files, verify size and SHA-256, and then execute the real weigh
 ```
 
 The suite exercises GGUF parsing, tokenization, finite forward-pass outputs,
-sampling, and generation. Qwen2.5-Coder 0.5B Q4_0, Qwen3 0.6B Q4_0, and TinyLlama
-1.1B Q4_0 must also match exact greedy token sequences captured from `llama.cpp`
-b9960.
+sampling, and generation. Qwen2.5-Coder 0.5B Q4_0, Qwen3 0.6B Q4_0, TinyLlama
+1.1B Q4_0, and DeepSeek-Coder 1.3B Q4_K_M must also match exact greedy token
+sequences captured from `llama.cpp` b9960.
 
 The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, SmolLM2 360M, and TinyLlama
-1.1B integration tests are strict:
+1.1B, and DeepSeek-Coder 1.3B integration tests are strict:
 the Gradle `integrationTest` task downloads the model fixtures before the tests
 run, and the tests fail if any real model cannot be loaded. CI runs this path in
 `.github/workflows/model-integration.yml` with the downloaded GGUF cached under
 `~/.jvllm/models`.
-The 7B Q4_0 fixture is strict too, but lives under `slowTest` and
-`.github/workflows/model-large-integration.yml` so the default PR cache does not
-exceed practical GitHub Actions limits.
+Qwen2.5-Coder 7B Q4_0 and DeepSeek-Coder 6.7B Q4_K_M are strict large-model
+fixtures. Each has a dedicated test task that resolves, downloads, checksums,
+and runs only its model. The DeepSeek test also matches a four-token greedy
+`llama.cpp` b9960 reference. CI runs the two tasks as isolated matrix jobs in
+`.github/workflows/model-large-integration.yml` so no runner must cache both
+4 GB files.
 
 The KV cache starts with 16 positions and grows geometrically, so loading a
 long-context model no longer allocates its full advertised cache. The optional
@@ -320,8 +325,9 @@ without changing the model metadata reported to callers.
   --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest \
   --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
 
-./gradlew :models-backend-purejava:slowTest \
-  --tests com.integrallis.models.backend.purejava.Qwen25CoderLargeModelJarsSlowTest
+./gradlew :models-backend-purejava:qwen25Coder7BSlowTest
+./gradlew :models-backend-purejava:deepSeekCoder67BSlowTest
+./gradlew :models-backend-purejava:slowTest # aggregate large-model suite
 ```
 
 ## When to use models (and when not to)
