@@ -103,6 +103,47 @@ class GgufTokenizerTest {
     return new GgufMetadata(entries);
   }
 
+  private GgufMetadata createSentencePieceMetadata() {
+    List<String> tokens =
+        List.of(
+            "<unk>",
+            "<s>",
+            "</s>",
+            "\u2581",
+            "a",
+            "b",
+            "c",
+            "\u2581a",
+            "ab",
+            "bc",
+            "\u2581ab",
+            "<0x21>");
+    List<Float> scores =
+        List.of(0.0f, 0.0f, 0.0f, -1.0f, -1.0f, -1.0f, -1.0f, 10.0f, 1.0f, 9.0f, 0.0f, -1.0f);
+
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(s -> (GgufMetadataValue) new GgufMetadataValue.StringValue(s))
+                .toList()));
+    entries.put(
+        "tokenizer.ggml.scores",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.FLOAT32,
+            scores.stream()
+                .map(f -> (GgufMetadataValue) new GgufMetadataValue.Float32Value(f))
+                .toList()));
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("llama"));
+    entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(1));
+    entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(2));
+    entries.put("tokenizer.ggml.add_bos_token", new GgufMetadataValue.BoolValue(true));
+    entries.put("tokenizer.ggml.add_space_prefix", new GgufMetadataValue.BoolValue(true));
+    return new GgufMetadata(entries);
+  }
+
   @Nested
   class BasicEncoding {
 
@@ -185,6 +226,37 @@ class GgufTokenizerTest {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata());
 
       assertThat(tokenizer.decode(new int[] {-1, 7, 99})).isEqualTo("\u20ac");
+    }
+  }
+
+  @Nested
+  class SentencePiece {
+
+    @Test
+    void appliesScoreOrderedMergesAndConfiguredBos() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSentencePieceMetadata());
+
+      int[] encoded = tokenizer.encode("abc");
+
+      assertThat(encoded).containsExactly(1, 7, 9);
+      assertThat(tokenizer.decode(encoded)).isEqualTo("abc");
+    }
+
+    @Test
+    void addsBosForEmptyInput() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSentencePieceMetadata());
+
+      assertThat(tokenizer.encode("")).containsExactly(1);
+    }
+
+    @Test
+    void roundTripsDummyPrefixAndByteFallback() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSentencePieceMetadata());
+
+      int[] encoded = tokenizer.encode("!");
+
+      assertThat(encoded).containsExactly(1, 3, 11);
+      assertThat(tokenizer.decode(encoded)).isEqualTo("!");
     }
   }
 

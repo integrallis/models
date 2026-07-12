@@ -104,6 +104,14 @@ class PureJavaBackendModelJarsTest {
           .capability("chat")
           .build();
 
+  private static final ModelJarRequirement TINYLLAMA_1_1B_CHAT_V1_0_Q4_0 =
+      ModelJarRequirement.forSource("hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF")
+          .versionRange("[1.0.0,2.0.0)")
+          .variant("q4_0")
+          .backend("pure-java")
+          .capability("chat")
+          .build();
+
   @Test
   void resolvesQwenMarkerJarFromClasspath() {
     ModelJarDescriptor descriptor =
@@ -226,6 +234,20 @@ class PureJavaBackendModelJarsTest {
     assertThat(descriptor.capabilities()).contains("text-generation", "chat");
     assertThat(descriptor.localPath().orElseThrow().toString())
         .endsWith(".jvllm/models/Qwen3-1.7B-Q8_0.gguf");
+  }
+
+  @Test
+  void resolvesTinyLlamaSentencePieceMarkerJarFromClasspath() {
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath().resolve(TINYLLAMA_1_1B_CHAT_V1_0_Q4_0).orElseThrow();
+
+    assertThat(descriptor.markerCoordinate().groupId()).isEqualTo("org.modeljars.huggingface");
+    assertThat(descriptor.format()).isEqualTo("gguf");
+    assertThat(descriptor.architecture()).isEqualTo("llama");
+    assertThat(descriptor.quantization()).isEqualTo("Q4_0");
+    assertThat(descriptor.capabilities()).contains("text-generation", "chat");
+    assertThat(descriptor.localPath().orElseThrow().toString())
+        .endsWith(".jvllm/models/tinyllama-1.1b-chat-v1.0.Q4_0.gguf");
   }
 
   @Test

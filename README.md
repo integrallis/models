@@ -129,12 +129,13 @@ ModelJars descriptors and is the foundation for Spring AI auto-configuration.
 
 The tested real-model fixtures are **Qwen3 0.6B Q4_0 GGUF**,
 **Qwen3 1.7B Q8_0 GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0
-GGUF**, and **SmolLM2 360M Q8_0 GGUF**, resolved through ModelJars marker JARs.
-The 0.5B Qwen2.5 and 0.6B Qwen3 fixtures also have exact greedy-token reference
-checks against pinned `llama.cpp` behavior. The backend accepts Llama/Qwen2/Qwen3
-metadata prefixes. Projection kernels support F32, Q4_0, Q8_0, and Q6_K; embedding
-rows and small tensors also support F16. Other architectures, chat templates,
-long-context quality, and remaining K-quant formats are not yet claimed.
+GGUF**, **SmolLM2 360M Q8_0 GGUF**, and **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
+resolved through ModelJars marker JARs. The 0.5B Qwen2.5, 0.6B Qwen3, and TinyLlama
+fixtures also have exact greedy-token reference checks against pinned `llama.cpp`
+behavior. The backend accepts Llama/Qwen2/Qwen3 metadata prefixes. Projection
+kernels support F32, Q4_0, Q8_0, and Q6_K; embedding rows and small tensors also
+support F16. Other architectures, chat templates, long-context quality, and
+remaining K-quant formats are not yet claimed.
 The larger **Qwen2.5-Coder 7B Q4_0 GGUF** fixture is covered by the strict
 `slowTest` path instead of the default PR integration suite.
 
@@ -142,6 +143,7 @@ Resolve, download, and checksum the pinned fixtures through ModelJars:
 ```bash
 ./gradlew :models-backend-purejava:downloadQwen306BQ40Model
 ./gradlew :models-backend-purejava:downloadSmolLm2360MQ80Model
+./gradlew :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
 ```
 
 ## What's inside
@@ -155,12 +157,14 @@ Zero-copy model loading via `MemorySegment` mmap. Parses headers, metadata, tens
 - Tensor data accessed via zero-copy `MemorySegment` slices
 - Alignment-aware parsing (32-byte default alignment)
 
-### BPE tokenizer (`models-backend-purejava`)
+### GGUF tokenizers (`models-backend-purejava`)
 
-GPT-2-style byte-level BPE tokenizer loaded directly from GGUF metadata:
+GPT-2-style byte-level BPE and Llama SentencePiece tokenizers loaded directly
+from GGUF metadata:
 
 - `bytes_to_unicode` mapping for byte-level BPE vocabularies
 - BPE merge-based encoding with priority queue
+- SentencePiece score-priority merges, dummy-space prefix, BOS/EOS flags, and byte fallback
 - Synthetic byte-level, Unicode, ranked-merge, and fallback regression tests
 - Unicode, multibyte, and code-point aware
 
@@ -288,10 +292,12 @@ download missing files, verify size and SHA-256, and then execute the real weigh
 ```
 
 The suite exercises GGUF parsing, tokenization, finite forward-pass outputs,
-sampling, and generation. Qwen2.5-Coder 0.5B Q4_0 and Qwen3 0.6B Q4_0 must also
-match exact greedy token sequences captured from `llama.cpp` b9960.
+sampling, and generation. Qwen2.5-Coder 0.5B Q4_0, Qwen3 0.6B Q4_0, and TinyLlama
+1.1B Q4_0 must also match exact greedy token sequences captured from `llama.cpp`
+b9960.
 
-The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, and SmolLM2 360M integration tests are strict:
+The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, SmolLM2 360M, and TinyLlama
+1.1B integration tests are strict:
 the Gradle `integrationTest` task downloads the model fixtures before the tests
 run, and the tests fail if any real model cannot be loaded. CI runs this path in
 `.github/workflows/model-integration.yml` with the downloaded GGUF cached under
@@ -308,7 +314,8 @@ without changing the model metadata reported to callers.
 ```bash
 ./gradlew :models-backend-purejava:integrationTest \
   --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest
+  --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest \
+  --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
 
 ./gradlew :models-backend-purejava:slowTest \
   --tests com.integrallis.models.backend.purejava.Qwen25CoderLargeModelJarsSlowTest
@@ -331,14 +338,14 @@ without changing the model metadata reported to callers.
 ### Phase 1 — Core inference pipeline (implemented, validation limited)
 
 - GGUF binary format parser (v2/v3, zero-copy mmap)
-- BPE tokenizer with GPT-2 byte-level encoding
+- GPT-2 byte-level BPE and Llama SentencePiece tokenizers
 - Dequantization kernels (Q4_0, Q8_0, F16)
 - Tensor operations (RMSNorm, matmul, quantized matmul, softmax, RoPE, SwiGLU)
 - KV cache for autoregressive decoding
 - Llama-family forward pass (supports Qwen2/Qwen3/Llama architectures)
 - Sampling strategies (greedy, temperature, top-k, top-p, repetition penalty)
 - Generation loop with streaming
-- Strict integration tests against real Qwen, Qwen-Coder, and SmolLM2 fixtures
+- Strict integration tests against real Qwen, Qwen-Coder, SmolLM2, and TinyLlama fixtures
 
 ### Phase 2 — Framework adapters & production hardening
 
@@ -348,7 +355,7 @@ without changing the model metadata reported to callers.
 - Additional ModelJars catalog entries and repository providers
 - Micrometer metrics (tok/s, latency histograms)
 - JFR events for profiling
-- Q4_K_M and Q6_K quantization support (wider quant format coverage)
+- Q4_K_M and additional K-quant support (wider quant format coverage)
 
 ### Phase 3 — Performance & scale
 

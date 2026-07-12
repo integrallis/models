@@ -85,6 +85,14 @@ val modelFixtures =
             "q8_0",
             "chat",
         ),
+        ModelFixture(
+            "downloadTinyLlama11BChatV10Q40Model",
+            "TinyLlama 1.1B Chat v1.0 Q4_0",
+            "hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
+            "[1.0.0,2.0.0)",
+            "q4_0",
+            "chat",
+        ),
     )
 
 dependencies {

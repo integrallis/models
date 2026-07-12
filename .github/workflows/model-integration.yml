@@ -73,9 +73,10 @@ jobs:
             ~/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf
             ~/.jvllm/models/qwen2.5-coder-3b-instruct-q4_0.gguf
             ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf
-          key: qwen-smollm-purejava-fixtures-v1
+            ~/.jvllm/models/tinyllama-1.1b-chat-v1.0.Q4_0.gguf
+          key: qwen-smollm-tinyllama-purejava-fixtures-v1
 
-      - name: Download Qwen fixtures
+      - name: Download pure-Java model fixtures
         working-directory: models
         run: >
           ./gradlew
@@ -87,10 +88,11 @@ jobs:
           :models-backend-purejava:downloadQwen25Coder15BQ80Model
           :models-backend-purejava:downloadQwen25Coder3BQ40Model
           :models-backend-purejava:downloadSmolLm2360MQ80Model
+          :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
           --no-daemon
           --stacktrace
 
-      - name: Run Qwen integration tests
+      - name: Run pure-Java model integration tests
         working-directory: models
         run: >
           ./gradlew
@@ -98,6 +100,7 @@ jobs:
           --tests com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
           --no-daemon
           --stacktrace
 
@@ -105,6 +108,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: qwen-integration-test-reports
+          name: purejava-model-integration-test-reports
           path: models/models-backend-purejava/build/reports/tests/
           retention-days: 30
