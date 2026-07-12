@@ -30,7 +30,8 @@
 > Apple, ONNX, native, embedding, test, and benchmark modules remain experimental
 > or scaffolded and are not part of release `0.1.x`.
 > Real-model integration tests download and run the configured Qwen,
-> Qwen-Coder, SmolLM2, TinyLlama, and DeepSeek-Coder GGUF fixtures before passing.
+> Qwen-Coder, SmolLM2, TinyLlama, DeepSeek-Coder, and MiniCPM GGUF fixtures before
+> passing.
 
 ## The pitch in 60 seconds
 
@@ -127,22 +128,22 @@ ModelJars descriptors and is the foundation for Spring AI auto-configuration.
 
 ## Supported models
 
-The tested real-model fixtures are **Qwen3 0.6B Q4_0 GGUF**,
-**Qwen3 1.7B Q8_0 GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0
-GGUF**, **SmolLM2 360M Q8_0 GGUF**, **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
-**DeepSeek-Coder 1.3B Instruct Q4_K_M GGUF**, and **MiniCPM5 1B Q4_K_M GGUF**,
-resolved through ModelJars marker JARs. The DeepSeek fixture validates a mixed
-Q4_K/Q5_0/Q8_0/Q6_K tensor file and legacy linear RoPE scaling. MiniCPM5
+The tested real-model fixtures are **Qwen3 0.6B Q4_0, 1.7B Q8_0, and 8B
+Q4_K_M GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0 GGUF**,
+**SmolLM2 360M Q8_0 GGUF**, **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
+**DeepSeek-Coder 1.3B Instruct Q4_K_M GGUF**, and **MiniCPM5 1B Q4_K_M
+GGUF**, resolved through ModelJars marker JARs. The DeepSeek fixture validates a
+mixed Q4_K/Q5_0/Q8_0/Q6_K tensor file and legacy linear RoPE scaling. MiniCPM5
 validates explicit Q/K/V head widths, 131K context metadata, and its Llama-style
-byte BPE. The 0.5B Qwen2.5, 0.6B Qwen3, TinyLlama, DeepSeek, and MiniCPM5
+byte BPE. The 0.5B Qwen2.5, 0.6B/8B Qwen3, TinyLlama, DeepSeek, and MiniCPM5
 fixtures have exact greedy-token reference checks against pinned `llama.cpp`
 behavior. The backend accepts Llama/Qwen2/Qwen3 metadata prefixes. Projection
 kernels support F32, Q4_0, Q5_0, Q8_0, Q4_K, and Q6_K; embedding rows and small
 tensors also support F16. Other architectures, chat templates, long-context
 quality, and remaining K-quant formats are not yet claimed.
-The larger **Qwen2.5-Coder 7B Q4_0 GGUF** and **DeepSeek-Coder 6.7B Q4_K_M
-GGUF** fixtures are covered by dedicated strict slow-test tasks instead of the
-default integration suite.
+The larger **Qwen2.5-Coder 7B Q4_0 GGUF**, **DeepSeek-Coder 6.7B Q4_K_M
+GGUF**, and **Qwen3 8B Q4_K_M GGUF** fixtures are covered by dedicated strict
+slow-test tasks instead of the default integration suite.
 
 Resolve, download, and checksum the pinned fixtures through ModelJars:
 ```bash
@@ -152,6 +153,7 @@ Resolve, download, and checksum the pinned fixtures through ModelJars:
 ./gradlew :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
 ./gradlew :models-backend-purejava:downloadDeepSeekCoder67BQ4KMModel
 ./gradlew :models-backend-purejava:downloadMiniCpm51BQ4KMModel
+./gradlew :models-backend-purejava:downloadQwen38BQ4KMModel
 ```
 
 ## What's inside
@@ -310,12 +312,12 @@ the Gradle `integrationTest` task downloads the model fixtures before the tests
 run, and the tests fail if any real model cannot be loaded. CI runs this path in
 `.github/workflows/model-integration.yml` with the downloaded GGUF cached under
 `~/.jvllm/models`.
-Qwen2.5-Coder 7B Q4_0 and DeepSeek-Coder 6.7B Q4_K_M are strict large-model
-fixtures. Each has a dedicated test task that resolves, downloads, checksums,
-and runs only its model. The DeepSeek test also matches a four-token greedy
-`llama.cpp` b9960 reference. CI runs the two tasks as isolated matrix jobs in
-`.github/workflows/model-large-integration.yml` so no runner must cache both
-4 GB files.
+Qwen2.5-Coder 7B Q4_0, DeepSeek-Coder 6.7B Q4_K_M, and Qwen3 8B Q4_K_M are
+strict large-model fixtures. Each has a dedicated test task that resolves,
+downloads, checksums, and runs only its model. The DeepSeek and Qwen3 tests also
+match four-token greedy `llama.cpp` b9960 references. CI runs the three tasks as
+isolated matrix jobs in `.github/workflows/model-large-integration.yml` so no
+runner must cache multiple 4-5 GB files.
 
 The KV cache starts with 16 positions and grows geometrically, so loading a
 long-context model no longer allocates its full advertised cache. The optional

@@ -54,6 +54,11 @@ jobs:
             cacheKey: deepseek-coder-6.7b-q4_k_m-fixture-v1
             gradleTask: ":models-backend-purejava:deepSeekCoder67BSlowTest"
             reportName: deepseek-coder-6.7b-slow-test-reports
+          - name: Qwen3 8B
+            cachePath: ~/.jvllm/models/Qwen3-8B-Q4_K_M.gguf
+            cacheKey: qwen3-8b-q4_k_m-fixture-v1
+            gradleTask: ":models-backend-purejava:qwen38BSlowTest"
+            reportName: qwen3-8b-slow-test-reports
     steps:
       - name: Checkout models
         uses: actions/checkout@v5
