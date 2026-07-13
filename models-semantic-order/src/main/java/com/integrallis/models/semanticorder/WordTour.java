@@ -16,6 +16,7 @@
 package com.integrallis.models.semanticorder;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -32,6 +33,11 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
+import org.modeljars.ModelJarDescriptor;
+import org.modeljars.ModelJarException;
+import org.modeljars.ModelJarRegistry;
+import org.modeljars.ModelJarRequirement;
+import org.modeljars.ModelJarResourceLoader;
 
 /** Pure-Java runtime for a Word Tour newline-delimited cyclic word order. */
 public final class WordTour implements SemanticOrder {
@@ -57,6 +63,42 @@ public final class WordTour implements SemanticOrder {
     } catch (IOException e) {
       throw new UncheckedIOException("Unable to load Word Tour: " + path, e);
     }
+  }
+
+  /** Resolves and loads a bundled Word Tour from classpath ModelJars metadata. */
+  public static WordTour load(ModelJarRequirement requirement) {
+    Objects.requireNonNull(requirement, "requirement");
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath()
+            .resolve(requirement)
+            .orElseThrow(
+                () -> new ModelJarException("No ModelJars descriptor matched " + requirement));
+    return load(descriptor);
+  }
+
+  /** Loads a bundled Word Tour described by a ModelJars marker. */
+  public static WordTour load(ModelJarDescriptor descriptor) {
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    if (classLoader == null) {
+      classLoader = WordTour.class.getClassLoader();
+    }
+    return load(descriptor, classLoader);
+  }
+
+  /** Loads a bundled Word Tour using an explicit class loader. */
+  public static WordTour load(ModelJarDescriptor descriptor, ClassLoader classLoader) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    Objects.requireNonNull(classLoader, "classLoader");
+    if (!descriptor.supportsBackend("semantic-order")) {
+      throw new ModelJarException(
+          "ModelJars descriptor does not support semantic-order: " + descriptor.alias());
+    }
+    if (!"wordtour-v1".equals(descriptor.format())) {
+      throw new ModelJarException(
+          "WordTour only supports wordtour-v1 ModelJars descriptors: " + descriptor.alias());
+    }
+    byte[] payload = new ModelJarResourceLoader(classLoader).readVerified(descriptor);
+    return load(new ByteArrayInputStream(payload));
   }
 
   /**
