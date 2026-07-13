@@ -25,6 +25,7 @@ includeBuild("../model-jars") {
 // --- Core ---
 include("models-api")
 include("models-runtime")
+include("models-semantic-order")
 
 // --- Backends ---
 include("models-backend-purejava")

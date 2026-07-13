@@ -26,7 +26,8 @@
 ---
 
 > **Project status: pre-alpha.** The first publishable scope is
-> `models-api`, `models-runtime`, and `models-backend-purejava`. Framework,
+> `models-api`, `models-runtime`, `models-semantic-order`, and
+> `models-backend-purejava`. Framework,
 > Apple, ONNX, native, embedding, test, and benchmark modules remain experimental
 > or scaffolded and are not part of release `0.1.x`.
 > Real-model integration tests download and run the configured Qwen,
@@ -50,6 +51,9 @@ The current implementation is a research-grade local runtime:
   remains experimental.
 - **Vectors-backed kernels**: mapped F32 and quantized GEMV use `vectors-core`,
   with Panama Vector API SIMD when available and a scalar fallback.
+- **Compact semantic orders**: WordTour models provide in-process lexical
+  neighbors and sparse blurred bag-of-words without tensor inference or a
+  vectors dependency.
 
 ```
 application
@@ -86,6 +90,7 @@ quality evidence for the use cases below.
 | Structured extraction (JSON) | 1–4B | privacy-sensitive data stays local |
 | Embeddings for RAG | 0.5–1B | avoid embedding API costs at scale |
 | Code completion in IDEs | 1–4B | offline-capable, responsive |
+| Lexical expansion / lightweight classification | <1 MB semantic order | instant startup and bounded memory |
 
 ## Quick start
 
@@ -120,6 +125,29 @@ loop.generate("Once upon a time", options, new TokenStream() {
     @Override public void onError(Throwable t) { t.printStackTrace(); }
 });
 ```
+
+### Load a semantic-order model
+
+The canonical WordTour marker bundles its 318,552-byte payload, so it needs no
+separate model download:
+
+```java
+var requirement = ModelJarRequirement.forSource("github://joisino/wordtour")
+    .versionRange("[1.0.0,2.0.0)")
+    .variant("optimal")
+    .backend("semantic-order")
+    .build();
+
+WordTour tour = WordTour.load(requirement);
+var neighbors = tour.neighbors("concept", 5);
+var document = BlurredBagOfWords.encode(
+    tour,
+    List.of("semantic", "search", "concept"));
+```
+
+WordTour lookup is exact and case-sensitive. Local proximity is meaningful;
+large rank distance must not be interpreted as evidence that two terms are
+unrelated.
 
 ### Framework adapters
 
@@ -164,6 +192,15 @@ Resolve, download, and checksum the pinned fixtures through ModelJars:
 ```
 
 ## What's inside
+
+### Semantic orders (`models-semantic-order`)
+
+- UTF-8 newline-delimited cyclic WordTour loading
+- Compact binary-search rank index without a permanent term-to-rank hash map
+- Deduplicated cyclic neighbor enumeration and shortest cycle distance
+- Sparse Gaussian blurred bag-of-words with L1 normalization and distance
+- Verified loading of compact payloads bundled in ModelJars
+- No dependency on `vectors` or the Java Vector API
 
 ### GGUF parser (`models-backend-purejava`)
 
@@ -231,6 +268,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 |---|---|---|
 | [models-api](models-api/) | experimental | Backend SPI, `Tokenizer`, `SamplingOptions`, `TokenStream`, `ModelMetadata` |
 | [models-runtime](models-runtime/) | experimental | `GenerationLoop` and `Sampler` |
+| [models-semantic-order](models-semantic-order/) | experimental | Pure-Java WordTour lookup and sparse blurred bag-of-words |
 | [models-backend-purejava](models-backend-purejava/) | experimental | GGUF parser, vectors-backed kernels, BPE tokenizer, KV cache, Llama forward pass |
 | [models-backend-apple](models-backend-apple/) | experimental | Optional Apple Foundation Models bridge via Java FFM and a tiny Swift C ABI dylib |
 | [models-backend-onnx](models-backend-onnx/) | planned | ONNX Runtime backend |
@@ -249,6 +287,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 ```
 models-api                          <- foundation, no internal deps
 models-runtime                      <- api
+models-semantic-order               <- ModelJars core; no vectors dependency
 models-backend-purejava             <- api + vectors-core
 models-backend-apple                <- api + optional Apple Foundation Models dylib
 models-backend-onnx                 <- scaffold, no dependencies
@@ -277,8 +316,9 @@ tokenization, transformer semantics, KV cache, and generation stay in `models`.
 | **Embedding & Search** | vectors | Store, index, and search vectors |
 | **Bridge** | models-embedding | Optional embedding storage/search integration; not published in 0.1.x |
 
-`models-backend-purejava` depends on `vectors-core` for dense GEMV kernels. The
-runtime and public API modules remain independent.
+`models-backend-purejava` depends on `vectors-core` for dense GEMV kernels.
+`models-semantic-order` performs rank lookup and sparse scalar operations and
+does not require vectors. The runtime and public API modules remain independent.
 
 ## Requirements
 
