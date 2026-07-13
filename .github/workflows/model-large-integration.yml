@@ -31,6 +31,10 @@ on:
         description: "ModelJars ref to test against"
         required: false
         default: "main"
+      vectors-ref:
+        description: "vectors ref to test against"
+        required: false
+        default: "main"
 
 permissions:
   contents: read
@@ -86,6 +90,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: integrallis/vectors
+          ref: ${{ github.event.inputs['vectors-ref'] || 'main' }}
           path: vectors
 
       - uses: actions/setup-java@v5
