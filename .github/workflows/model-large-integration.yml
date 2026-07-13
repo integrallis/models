@@ -64,6 +64,11 @@ jobs:
             cacheKey: deepseek-r1-distill-qwen-7b-q4_k_m-fixture-v1
             gradleTask: ":models-backend-purejava:deepSeekR1DistillQwen7BSlowTest"
             reportName: deepseek-r1-distill-qwen-7b-slow-test-reports
+          - name: SQLCoder-7B-2
+            cachePath: ~/.jvllm/models/sqlcoder-7b-q5_k_m.gguf
+            cacheKey: sqlcoder-7b-2-q5_k_m-fixture-v1
+            gradleTask: ":models-backend-purejava:sqlCoder7B2SlowTest"
+            reportName: sqlcoder-7b-2-slow-test-reports
     steps:
       - name: Checkout models
         uses: actions/checkout@v5

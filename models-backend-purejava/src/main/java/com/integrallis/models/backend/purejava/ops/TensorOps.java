@@ -55,9 +55,12 @@ public final class TensorOps {
         || type == GgufTensorType.Q5_0
         || type == GgufTensorType.Q8_0
         || type == GgufTensorType.Q4_K
+        || type == GgufTensorType.Q5_K
         || type == GgufTensorType.Q6_K) {
       int activationBlockSize =
-          type == GgufTensorType.Q4_K || type == GgufTensorType.Q6_K ? 256 : 32;
+          type == GgufTensorType.Q4_K || type == GgufTensorType.Q5_K || type == GgufTensorType.Q6_K
+              ? 256
+              : 32;
       ggufMatmul(
           out,
           x,
@@ -94,7 +97,9 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
-        type == GgufTensorType.Q4_K ? new short[(cols + 15) / 16] : null);
+        type == GgufTensorType.Q4_K || type == GgufTensorType.Q5_K
+            ? new short[(cols + 15) / 16]
+            : null);
   }
 
   /** Matrix-vector multiplication with reusable Q8 activation and Q8_K sum scratch. */
@@ -121,6 +126,16 @@ public final class TensorOps {
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
       case Q4_K ->
           VectorUtil.ggufQ4_KQ8_KBatchDotProduct(
+              x,
+              qWeight,
+              rows,
+              cols,
+              out,
+              quantizedActivation,
+              quantizedActivationScales,
+              quantizedActivationSums);
+      case Q5_K ->
+          VectorUtil.ggufQ5_KQ8_KBatchDotProduct(
               x,
               qWeight,
               rows,
