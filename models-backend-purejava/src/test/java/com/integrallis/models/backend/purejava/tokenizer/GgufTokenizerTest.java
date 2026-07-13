@@ -80,6 +80,10 @@ class GgufTokenizerTest {
   }
 
   private GgufMetadata createByteLevelMetadata() {
+    return createByteLevelMetadata(false, false);
+  }
+
+  private GgufMetadata createByteLevelMetadata(boolean addBosToken, boolean addEosToken) {
     List<String> tokens =
         List.of("<unk>", "h", "i", "\u0120", "hi", "hi\u0120", "<0x41>", "\u20ac", "<s>", "</s>");
     Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
@@ -100,6 +104,8 @@ class GgufTokenizerTest {
     entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
     entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(8));
     entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(9));
+    entries.put("tokenizer.ggml.add_bos_token", new GgufMetadataValue.BoolValue(addBosToken));
+    entries.put("tokenizer.ggml.add_eos_token", new GgufMetadataValue.BoolValue(addEosToken));
     return new GgufMetadata(entries);
   }
 
@@ -226,6 +232,16 @@ class GgufTokenizerTest {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata());
 
       assertThat(tokenizer.decode(new int[] {-1, 7, 99})).isEqualTo("\u20ac");
+    }
+
+    @Test
+    void appliesConfiguredBosAndEosTokens() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata(true, true));
+
+      int[] encoded = tokenizer.encode("hi ");
+
+      assertThat(encoded).containsExactly(8, 5, 9);
+      assertThat(tokenizer.decode(encoded)).isEqualTo("hi ");
     }
   }
 

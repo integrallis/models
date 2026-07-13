@@ -204,14 +204,31 @@ public final class GgufTokenizer implements Tokenizer {
     if (useSentencePiece) {
       return encodeSentencePiece(text);
     }
-    if (text.isEmpty()) {
-      return new int[0];
-    }
+    int[] encoded;
     if (useByteLevel) {
-      return encodeByteLevelBpe(text);
+      encoded = text.isEmpty() ? new int[0] : encodeByteLevelBpe(text);
     } else {
-      return encodePlainBpe(text);
+      encoded = text.isEmpty() ? new int[0] : encodePlainBpe(text);
     }
+    return addConfiguredBoundaryTokens(encoded);
+  }
+
+  private int[] addConfiguredBoundaryTokens(int[] encoded) {
+    int prefixLength = addBosToken ? 1 : 0;
+    int suffixLength = addEosToken ? 1 : 0;
+    if (prefixLength == 0 && suffixLength == 0) {
+      return encoded;
+    }
+
+    int[] tokens = new int[prefixLength + encoded.length + suffixLength];
+    if (addBosToken) {
+      tokens[0] = bosTokenId;
+    }
+    System.arraycopy(encoded, 0, tokens, prefixLength, encoded.length);
+    if (addEosToken) {
+      tokens[tokens.length - 1] = eosTokenId;
+    }
+    return tokens;
   }
 
   private int[] encodeSentencePiece(String text) {
@@ -454,7 +471,9 @@ public final class GgufTokenizer implements Tokenizer {
     if (!useByteLevel) {
       StringBuilder sb = new StringBuilder();
       for (int token : tokens) {
-        sb.append(decode(token));
+        if (token != bosTokenId && token != eosTokenId) {
+          sb.append(decode(token));
+        }
       }
       return sb.toString();
     }
@@ -462,7 +481,7 @@ public final class GgufTokenizer implements Tokenizer {
     // For byte-level BPE, we need to collect all bytes first and then decode as UTF-8
     List<Byte> byteList = new ArrayList<>();
     for (int token : tokens) {
-      if (token < 0 || token >= vocab.length) {
+      if (token < 0 || token >= vocab.length || token == bosTokenId || token == eosTokenId) {
         continue;
       }
       String piece = vocab[token];

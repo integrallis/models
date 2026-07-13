@@ -120,6 +120,15 @@ val modelFixtures =
             slow = true,
         ),
         ModelFixture(
+            "downloadDeepSeekR1DistillQwen7BQ4KMModel",
+            "DeepSeek-R1-Distill-Qwen-7B Q4_K_M",
+            "hf://bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+            "[1.0.0,2.0.0)",
+            "q4_k_m",
+            "reasoning",
+            slow = true,
+        ),
+        ModelFixture(
             "downloadMiniCpm51BQ4KMModel",
             "MiniCPM5 1B Q4_K_M",
             "hf://openbmb/MiniCPM5-1B-GGUF",
@@ -207,6 +216,12 @@ listOf(
         "Qwen3 8B",
         "downloadQwen38BQ4KMModel",
         "com.integrallis.models.backend.purejava.Qwen3LargeModelJarsSlowTest",
+    ),
+    LargeModelTest(
+        "deepSeekR1DistillQwen7BSlowTest",
+        "DeepSeek-R1-Distill-Qwen-7B",
+        "downloadDeepSeekR1DistillQwen7BQ4KMModel",
+        "com.integrallis.models.backend.purejava.DeepSeekR1DistillQwenLargeModelJarsSlowTest",
     ),
 ).forEach { largeModelTest ->
     tasks.register<Test>(largeModelTest.taskName) {
