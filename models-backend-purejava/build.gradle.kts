@@ -87,6 +87,14 @@ val modelFixtures =
             slow = true,
         ),
         ModelFixture(
+            "downloadQwen25Math15BQ4KMModel",
+            "Qwen2.5-Math 1.5B Instruct Q4_K_M",
+            "hf://bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF",
+            "[2.5.0,3.0.0)",
+            "q4_k_m",
+            "math",
+        ),
+        ModelFixture(
             "downloadSmolLm2360MQ80Model",
             "SmolLM2 360M Q8_0",
             "hf://HuggingFaceTB/SmolLM2-360M-Instruct-GGUF",
