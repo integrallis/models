@@ -124,8 +124,8 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
   }
 
   @Override
-  public double loadMillis() {
-    return loadMillis;
+  public LoadMeasurement loadMeasurement() {
+    return LoadMeasurement.inProcessInitialization(loadMillis);
   }
 
   @Override

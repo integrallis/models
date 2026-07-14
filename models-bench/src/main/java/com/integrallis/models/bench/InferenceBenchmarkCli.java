@@ -134,7 +134,8 @@ public final class InferenceBenchmarkCli {
             result.decodeTokensPerSecond());
       }
 
-      PerformanceSummary summary = BenchmarkStatistics.summarize(target.loadMillis(), trials);
+      LoadMeasurement load = target.loadMeasurement();
+      PerformanceSummary summary = BenchmarkStatistics.summarize(load.millis(), trials);
       return new BenchmarkReport(
           2,
           Instant.now().toString(),
@@ -144,6 +145,7 @@ public final class InferenceBenchmarkCli {
           artifact.sha256(),
           artifact.sizeBytes(),
           target.identity(),
+          load,
           new BenchmarkRun(
               Hashing.sha256(configuration.prompt()),
               configuration.maxTokens(),
@@ -185,12 +187,13 @@ public final class InferenceBenchmarkCli {
   private static void printSummary(BenchmarkReport report, Path output) {
     PerformanceSummary summary = report.summary();
     System.out.printf(
-        "%s %s: tier=%s load=%.1fms p95-ttft=%.1fms p50-decode=%.2f tok/s "
+        "%s %s: tier=%s load=%.1fms(%s) p95-ttft=%.1fms p50-decode=%.2f tok/s "
             + "p95-tpot=%.1fms peak-rss=%d bytes%nreport: %s%n",
         report.modelId(),
         report.backend(),
         report.performanceTier(),
         summary.loadMillis(),
+        report.load().scope(),
         summary.p95TtftMillis(),
         summary.p50DecodeTokensPerSecond(),
         summary.p95TpotMillis(),

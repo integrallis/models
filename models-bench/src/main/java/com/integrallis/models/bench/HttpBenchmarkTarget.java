@@ -133,8 +133,10 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
   }
 
   @Override
-  public double loadMillis() {
-    return loadMillis;
+  public LoadMeasurement loadMeasurement() {
+    return "ollama".equals(backend)
+        ? LoadMeasurement.backendReported(loadMillis)
+        : LoadMeasurement.notMeasured();
   }
 
   @Override

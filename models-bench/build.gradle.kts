@@ -26,6 +26,7 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    jvmArgs("--add-modules", "jdk.incubator.vector")
 }
 
 application {
@@ -40,6 +41,7 @@ tasks.withType<JavaExec>().configureEach {
 dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":models-backend-purejava"))
+    implementation("com.integrallis:vectors-core:0.1.0-SNAPSHOT")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")

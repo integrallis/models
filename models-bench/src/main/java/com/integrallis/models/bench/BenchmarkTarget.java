@@ -20,7 +20,7 @@ interface BenchmarkTarget extends AutoCloseable {
 
   TrialMeasurement generate(String prompt, int maxTokens);
 
-  double loadMillis();
+  LoadMeasurement loadMeasurement();
 
   BackendIdentity identity();
 

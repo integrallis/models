@@ -15,12 +15,17 @@
  */
 package com.integrallis.models.bench;
 
+import com.integrallis.vectors.core.PanamaConstants;
+import com.integrallis.vectors.core.VectorizationProvider;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /** Hardware, operating system, and JVM identity captured with every report. */
 public record BenchmarkEnvironment(
@@ -33,9 +38,27 @@ public record BenchmarkEnvironment(
     long physicalMemoryBytes,
     String javaVersion,
     String javaVendor,
-    String vmName) {
+    String vmName,
+    String vmVersion,
+    List<String> jvmArguments,
+    String vectorProvider,
+    boolean vectorApiEnabled,
+    int preferredVectorBits,
+    int effectiveVectorBits,
+    Map<String, String> runtimeProperties) {
+
+  private static final List<String> RELEVANT_PROPERTIES =
+      List.of(
+          "models.purejava.maxContextLength",
+          "vectors.forceScalar",
+          "vectors.maxBits",
+          "vectors.useVectorFMA",
+          "vectors.useScalarFMA",
+          "vectors.forceSve",
+          "jdk.incubator.vector.VECTOR_ACCESS_OOB_CHECK");
 
   static BenchmarkEnvironment capture() {
+    boolean vectorApiEnabled = VectorizationProvider.isPanamaEnabled();
     return new BenchmarkEnvironment(
         hostName(),
         System.getProperty("os.name"),
@@ -46,7 +69,22 @@ public record BenchmarkEnvironment(
         physicalMemory(),
         System.getProperty("java.version"),
         System.getProperty("java.vendor"),
-        System.getProperty("java.vm.name"));
+        System.getProperty("java.vm.name"),
+        System.getProperty("java.vm.version"),
+        List.copyOf(ManagementFactory.getRuntimeMXBean().getInputArguments()),
+        VectorizationProvider.getProviderName(),
+        vectorApiEnabled,
+        PanamaConstants.PREFERRED_BITS,
+        vectorApiEnabled ? Math.min(PanamaConstants.PREFERRED_BITS, PanamaConstants.MAX_BITS) : 0,
+        captureRuntimeProperties());
+  }
+
+  private static Map<String, String> captureRuntimeProperties() {
+    Map<String, String> properties = new LinkedHashMap<>();
+    for (String property : RELEVANT_PROPERTIES) {
+      properties.put(property, System.getProperty(property, "<unset>"));
+    }
+    return Map.copyOf(properties);
   }
 
   private static String hostName() {
