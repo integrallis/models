@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="media/icons/logo-200.png" alt="models logo" width="200">
+  <img src="media/icons/android-chrome-512x512.png" alt="models logo" width="200">
 </p>
 
 # models
