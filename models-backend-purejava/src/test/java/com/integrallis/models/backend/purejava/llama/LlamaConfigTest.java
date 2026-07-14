@@ -144,6 +144,25 @@ class LlamaConfigTest {
     }
 
     @Test
+    void selectsSmolLm3LayersThatSkipRope() {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("smollm3"));
+      entries.put("smollm3.embedding_length", new GgufMetadataValue.Uint32Value(2048));
+      entries.put("smollm3.block_count", new GgufMetadataValue.Uint32Value(36));
+      entries.put("smollm3.attention.head_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put("smollm3.attention.head_count_kv", new GgufMetadataValue.Uint32Value(4));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.usesRope(0)).isTrue();
+      assertThat(config.usesRope(1)).isTrue();
+      assertThat(config.usesRope(2)).isTrue();
+      assertThat(config.usesRope(3)).isFalse();
+      assertThat(config.usesRope(7)).isFalse();
+      assertThat(config.usesRope(35)).isFalse();
+    }
+
+    @Test
     void derivesVocabSizeFromTokenizerTokensWhenArchitectureKeyIsMissing() {
       Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
       entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));

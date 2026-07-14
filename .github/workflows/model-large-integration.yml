@@ -73,6 +73,11 @@ jobs:
             cacheKey: sqlcoder-7b-2-q5_k_m-fixture-v1
             gradleTask: ":models-backend-purejava:sqlCoder7B2SlowTest"
             reportName: sqlcoder-7b-2-slow-test-reports
+          - name: SmolLM3 3B
+            cachePath: ~/.jvllm/models/SmolLM3-Q4_K_M.gguf
+            cacheKey: smollm3-3b-q4_k_m-fixture-v1
+            gradleTask: ":models-backend-purejava:smolLm33BSlowTest"
+            reportName: smollm3-3b-slow-test-reports
     steps:
       - name: Checkout models
         uses: actions/checkout@v5

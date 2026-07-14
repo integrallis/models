@@ -150,6 +150,28 @@ class GgufTokenizerTest {
     return new GgufMetadata(entries);
   }
 
+  private GgufMetadata createSmaugByteLevelMetadata() {
+    List<String> tokens = List.of("<unk>", "1", "2", "3", "4", "12", "123", "1234", "\u0120");
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(token -> (GgufMetadataValue) new GgufMetadataValue.StringValue(token))
+                .toList()));
+    entries.put(
+        "tokenizer.ggml.merges",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            List.of("1 2", "12 3", "123 4").stream()
+                .map(merge -> (GgufMetadataValue) new GgufMetadataValue.StringValue(merge))
+                .toList()));
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
+    entries.put("tokenizer.ggml.pre", new GgufMetadataValue.StringValue("smaug-bpe"));
+    return new GgufMetadata(entries);
+  }
+
   @Nested
   class BasicEncoding {
 
@@ -242,6 +264,13 @@ class GgufTokenizerTest {
 
       assertThat(encoded).containsExactly(8, 5, 9);
       assertThat(tokenizer.decode(encoded)).isEqualTo("hi ");
+    }
+
+    @Test
+    void smaugPreTokenizerLimitsNumericPiecesToThreeDigits() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSmaugByteLevelMetadata());
+
+      assertThat(tokenizer.encode("1234")).containsExactly(6, 4);
     }
   }
 
