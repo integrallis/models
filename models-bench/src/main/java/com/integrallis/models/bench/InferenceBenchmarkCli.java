@@ -68,11 +68,16 @@ public final class InferenceBenchmarkCli {
     }
     String model = required(values, "model");
     String modelId = values.getOrDefault("model-id", safeModelId(model));
-    Path artifact =
-        values.containsKey("artifact")
-            ? Path.of(values.get("artifact"))
-            : "pure-java".equals(backend) ? Path.of(model) : null;
-    if (artifact != null && !Files.isRegularFile(artifact)) {
+    Path artifact;
+    if (values.containsKey("artifact")) {
+      artifact = Path.of(values.get("artifact"));
+    } else if ("pure-java".equals(backend)) {
+      artifact = Path.of(model);
+    } else {
+      throw new IllegalArgumentException(
+          "--artifact is required for HTTP backends so identical model bytes can be verified");
+    }
+    if (!Files.isRegularFile(artifact)) {
       throw new IllegalArgumentException("artifact does not exist: " + artifact);
     }
     String prompt =
@@ -107,13 +112,10 @@ public final class InferenceBenchmarkCli {
   }
 
   private static BenchmarkReport run(BenchmarkConfiguration configuration) throws IOException {
-    String artifactSha256 =
-        configuration.artifact() == null ? null : Hashing.sha256(configuration.artifact());
-    long artifactSize =
-        configuration.artifact() == null ? 0 : Files.size(configuration.artifact());
+    BenchmarkArtifact artifact = BenchmarkArtifact.inspect(configuration.artifact());
     List<TrialMeasurement> trials = new ArrayList<>();
 
-    try (BenchmarkTarget target = target(configuration)) {
+    try (BenchmarkTarget target = target(configuration, artifact)) {
       for (int warmup = 0; warmup < configuration.warmups(); warmup++) {
         TrialMeasurement result = target.generate(configuration.prompt(), configuration.maxTokens());
         if (!result.successful()) {
@@ -134,13 +136,14 @@ public final class InferenceBenchmarkCli {
 
       PerformanceSummary summary = BenchmarkStatistics.summarize(target.loadMillis(), trials);
       return new BenchmarkReport(
-          1,
+          2,
           Instant.now().toString(),
           configuration.backend(),
           configuration.modelId(),
           configuration.model(),
-          artifactSha256,
-          artifactSize,
+          artifact.sha256(),
+          artifact.sizeBytes(),
+          target.identity(),
           new BenchmarkRun(
               Hashing.sha256(configuration.prompt()),
               configuration.maxTokens(),
@@ -156,12 +159,17 @@ public final class InferenceBenchmarkCli {
     }
   }
 
-  private static BenchmarkTarget target(BenchmarkConfiguration configuration) {
+  private static BenchmarkTarget target(
+      BenchmarkConfiguration configuration, BenchmarkArtifact artifact) throws IOException {
     if ("pure-java".equals(configuration.backend())) {
-      return PureJavaBenchmarkTarget.load(configuration.artifact(), configuration.contextLength());
+      return PureJavaBenchmarkTarget.load(artifact, configuration.contextLength());
     }
-    return new HttpBenchmarkTarget(
-        configuration.backend(), configuration.model(), configuration.endpoint());
+    return HttpBenchmarkTarget.connect(
+        configuration.backend(),
+        configuration.model(),
+        configuration.endpoint(),
+        artifact,
+        configuration.contextLength());
   }
 
   private static void write(Path output, BenchmarkReport report) throws IOException {

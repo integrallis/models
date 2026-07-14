@@ -55,4 +55,14 @@ class InferenceBenchmarkCliTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("unknown option");
   }
+
+  @Test
+  void requiresTheComparedArtifactForHttpBackends() {
+    assertThatThrownBy(
+            () ->
+                InferenceBenchmarkCli.parse(
+                    new String[] {"--backend", "ollama", "--model", "fixture:latest"}))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("--artifact is required");
+  }
 }

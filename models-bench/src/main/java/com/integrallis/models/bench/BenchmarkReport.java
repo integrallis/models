@@ -26,6 +26,7 @@ public record BenchmarkReport(
     String model,
     String artifactSha256,
     long artifactSizeBytes,
+    BackendIdentity backendIdentity,
     BenchmarkRun run,
     BenchmarkEnvironment environment,
     PerformanceSummary summary,

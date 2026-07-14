@@ -29,19 +29,33 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
   private final TimingBackend backend;
   private final GenerationLoop loop;
   private final double loadMillis;
+  private final BackendIdentity identity;
 
-  private PureJavaBenchmarkTarget(TimingBackend backend, double loadMillis) {
+  private PureJavaBenchmarkTarget(
+      TimingBackend backend, double loadMillis, BackendIdentity identity) {
     this.backend = backend;
     this.loop = new GenerationLoop(backend);
     this.loadMillis = loadMillis;
+    this.identity = identity;
   }
 
-  static PureJavaBenchmarkTarget load(Path model, int contextLength) {
+  static PureJavaBenchmarkTarget load(BenchmarkArtifact artifact, int contextLength) {
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
-    PureJavaBackend loaded = PureJavaBackend.load(model);
+    PureJavaBackend loaded = PureJavaBackend.load(Path.of(artifact.path()));
     double elapsedMillis = nanosToMillis(System.nanoTime() - start);
-    return new PureJavaBenchmarkTarget(new TimingBackend(loaded), elapsedMillis);
+    String version = PureJavaBackend.class.getPackage().getImplementationVersion();
+    BackendIdentity identity =
+        new BackendIdentity(
+            "pure-java",
+            version == null || version.isBlank() ? "development" : version,
+            "JVM " + Runtime.version(),
+            artifact.path(),
+            artifact.path(),
+            artifact.sha256(),
+            true,
+            java.util.Map.of("contextLength", Integer.toString(contextLength)));
+    return new PureJavaBenchmarkTarget(new TimingBackend(loaded), elapsedMillis, identity);
   }
 
   @Override
@@ -112,6 +126,11 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
   @Override
   public double loadMillis() {
     return loadMillis;
+  }
+
+  @Override
+  public BackendIdentity identity() {
+    return identity;
   }
 
   @Override

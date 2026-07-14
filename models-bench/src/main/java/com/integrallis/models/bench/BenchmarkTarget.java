@@ -22,6 +22,8 @@ interface BenchmarkTarget extends AutoCloseable {
 
   double loadMillis();
 
+  BackendIdentity identity();
+
   @Override
   void close();
 }
