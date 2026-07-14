@@ -211,6 +211,26 @@ class TensorOpsTest {
     }
 
     @Test
+    void q5_KMatchesVectorsGgmlQ8_KActivationSemantics() {
+      float[] x = repeatingQuery(256);
+      int[] scales = {1, 2, 3, 4, 5, 6, 7, 8};
+      int[] mins = {8, 7, 6, 5, 4, 3, 2, 1};
+      byte[] row = q5KBlock(0.125f, 0.0625f, i -> (i * 7 + 3) % 32, scales, mins);
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, row);
+
+        VectorUtil.ggufQ5_KQ8_KBatchDotProduct(
+            x, qWeight, 1, 256, expected, new byte[256], new float[1], new short[16]);
+        TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q5_K, 1, 256);
+
+        assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
+      }
+    }
+
+    @Test
     void q5_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
       float[] x = repeatingQuery(32);
       byte[] row = q5Block(0.25f, i -> (i * 7) % 32 - 16);
@@ -316,6 +336,35 @@ class TensorOpsTest {
         highBits |= ((highQuant >>> 4) & 1) << (index + 16);
       }
       buffer.putInt(2, highBits);
+      return block;
+    }
+
+    private static byte[] q5KBlock(
+        float scale, float minScale, IntUnaryOperator quantFactory, int[] scales, int[] mins) {
+      byte[] block = new byte[176];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, Float.floatToFloat16(scale));
+      buffer.putShort(2, Float.floatToFloat16(minScale));
+
+      for (int group = 0; group < 4; group++) {
+        block[4 + group] = (byte) scales[group];
+        block[8 + group] = (byte) mins[group];
+      }
+      for (int group = 4; group < 8; group++) {
+        block[8 + group] = (byte) ((scales[group] & 0x0F) | ((mins[group] & 0x0F) << 4));
+        block[group] |= (byte) ((scales[group] >>> 4) << 6);
+        block[4 + group] |= (byte) ((mins[group] >>> 4) << 6);
+      }
+
+      for (int group = 0; group < 8; group++) {
+        int byteOffset = 48 + (group >>> 1) * 32;
+        int shift = (group & 1) * 4;
+        for (int index = 0; index < 32; index++) {
+          int quant = quantFactory.applyAsInt(group * 32 + index);
+          block[byteOffset + index] |= (byte) ((quant & 0x0F) << shift);
+          block[16 + index] |= (byte) (((quant >>> 4) & 1) << group);
+        }
+      }
       return block;
     }
 

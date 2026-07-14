@@ -137,6 +137,15 @@ val modelFixtures =
             slow = true,
         ),
         ModelFixture(
+            "downloadSqlCoder7B2Q5KMModel",
+            "SQLCoder-7B-2 Q5_K_M",
+            "hf://defog/sqlcoder-7b-2",
+            "[2.0.0,3.0.0)",
+            "q5_k_m",
+            "text-to-sql",
+            slow = true,
+        ),
+        ModelFixture(
             "downloadMiniCpm51BQ4KMModel",
             "MiniCPM5 1B Q4_K_M",
             "hf://openbmb/MiniCPM5-1B-GGUF",
@@ -230,6 +239,12 @@ listOf(
         "DeepSeek-R1-Distill-Qwen-7B",
         "downloadDeepSeekR1DistillQwen7BQ4KMModel",
         "com.integrallis.models.backend.purejava.DeepSeekR1DistillQwenLargeModelJarsSlowTest",
+    ),
+    LargeModelTest(
+        "sqlCoder7B2SlowTest",
+        "SQLCoder-7B-2",
+        "downloadSqlCoder7B2Q5KMModel",
+        "com.integrallis.models.backend.purejava.SqlCoderLargeModelJarsSlowTest",
     ),
 ).forEach { largeModelTest ->
     tasks.register<Test>(largeModelTest.taskName) {

@@ -31,8 +31,8 @@
 > Apple, ONNX, native, embedding, test, and benchmark modules remain experimental
 > or scaffolded and are not part of release `0.1.x`.
 > Real-model integration tests download and run the configured Qwen,
-> Qwen-Coder, SmolLM2, TinyLlama, DeepSeek-Coder, and MiniCPM GGUF fixtures before
-> passing.
+> Qwen-Coder, SQLCoder, SmolLM2, TinyLlama, DeepSeek-Coder, and MiniCPM GGUF
+> fixtures before passing.
 
 ## The pitch in 60 seconds
 
@@ -168,15 +168,15 @@ validates Q6_K token embeddings and a deterministic arithmetic completion. The
 0.5B Qwen2.5, 0.6B/8B Qwen3, TinyLlama, DeepSeek, MiniCPM5, and Qwen2.5-Math
 fixtures have exact greedy-token reference checks against pinned `llama.cpp`
 behavior. The backend accepts Llama/Qwen2/Qwen3 metadata prefixes. Projection
-kernels support F32, Q4_0, Q5_0, Q8_0, Q4_K, and Q6_K; embedding rows also
+kernels support F32, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; embedding rows also
 support F16 across the same applicable quantized formats. Other architectures,
 chat templates, long-context quality, and remaining K-quant formats are not yet
 claimed.
 The larger **Qwen2.5-Coder 7B Q4_0 GGUF**, **DeepSeek-Coder 6.7B Q4_K_M
 GGUF**, **Qwen3 8B Q4_K_M GGUF**, and **DeepSeek-R1-Distill-Qwen-7B Q4_K_M
-GGUF** fixtures are covered by dedicated strict slow-test tasks instead of the
-default integration suite. The DeepSeek R1 fixture also validates configured
-BOS handling for byte-level BPE tokenizers.
+GGUF**, and **SQLCoder-7B-2 Q5_K_M GGUF** fixtures are covered by dedicated
+strict slow-test tasks instead of the default integration suite. The DeepSeek R1
+fixture also validates configured BOS handling for byte-level BPE tokenizers.
 
 Resolve, download, and checksum the pinned fixtures through ModelJars:
 ```bash
@@ -189,6 +189,7 @@ Resolve, download, and checksum the pinned fixtures through ModelJars:
 ./gradlew :models-backend-purejava:downloadQwen38BQ4KMModel
 ./gradlew :models-backend-purejava:downloadDeepSeekR1DistillQwen7BQ4KMModel
 ./gradlew :models-backend-purejava:downloadQwen25Math15BQ4KMModel
+./gradlew :models-backend-purejava:downloadSqlCoder7B2Q5KMModel
 ```
 
 ## What's inside
@@ -360,13 +361,13 @@ strict: the Gradle `integrationTest` task downloads the model fixtures before
 the tests run, and the tests fail if any real model cannot be loaded. CI runs
 this path in `.github/workflows/model-integration.yml` with the downloaded GGUF
 cached under `~/.jvllm/models`.
-Qwen2.5-Coder 7B Q4_0, DeepSeek-Coder 6.7B Q4_K_M, Qwen3 8B Q4_K_M, and
-DeepSeek-R1-Distill-Qwen-7B Q4_K_M are strict large-model fixtures. Each has a
-dedicated test task that resolves, downloads, checksums, and runs only its model.
-The DeepSeek and Qwen3 tests also match four-token greedy `llama.cpp` b9960
-references. CI runs the four tasks as isolated matrix jobs in
-`.github/workflows/model-large-integration.yml` so no runner must cache multiple
-4-5 GB files.
+Qwen2.5-Coder 7B Q4_0, DeepSeek-Coder 6.7B Q4_K_M, Qwen3 8B Q4_K_M,
+DeepSeek-R1-Distill-Qwen-7B Q4_K_M, and SQLCoder-7B-2 Q5_K_M are strict
+large-model fixtures. Each has a dedicated test task that resolves, downloads,
+checksums, and runs only its model. The DeepSeek, Qwen3, and SQLCoder tests also
+match four-token greedy `llama.cpp` b9960 references. CI runs the five tasks as
+isolated matrix jobs in `.github/workflows/model-large-integration.yml` so no
+runner must cache multiple 4-5 GB files.
 
 The KV cache starts with 16 positions and grows geometrically, so loading a
 long-context model no longer allocates its full advertised cache. The optional
@@ -387,6 +388,7 @@ without changing the model metadata reported to callers.
 ./gradlew :models-backend-purejava:deepSeekCoder67BSlowTest
 ./gradlew :models-backend-purejava:qwen38BSlowTest
 ./gradlew :models-backend-purejava:deepSeekR1DistillQwen7BSlowTest
+./gradlew :models-backend-purejava:sqlCoder7B2SlowTest
 ./gradlew :models-backend-purejava:slowTest # aggregate large-model suite
 ```
 
@@ -414,7 +416,8 @@ without changing the model metadata reported to callers.
 - Llama-family forward pass (supports Qwen2/Qwen3/Llama architectures)
 - Sampling strategies (greedy, temperature, top-k, top-p, repetition penalty)
 - Generation loop with streaming
-- Strict integration tests against real Qwen, Qwen-Coder, Qwen-Math, SmolLM2, TinyLlama, DeepSeek-Coder, MiniCPM5, and DeepSeek R1 fixtures
+- Strict integration tests against real Qwen, Qwen-Coder, Qwen-Math, SQLCoder,
+  SmolLM2, TinyLlama, DeepSeek-Coder, MiniCPM5, and DeepSeek R1 fixtures
 
 ### Phase 2 — Framework adapters & production hardening
 
