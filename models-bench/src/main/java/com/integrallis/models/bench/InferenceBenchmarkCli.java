@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,10 @@ public final class InferenceBenchmarkCli {
   private InferenceBenchmarkCli() {}
 
   public static void main(String[] args) throws Exception {
+    if (args.length > 0 && "compare".equals(args[0])) {
+      BenchmarkComparisonCli.main(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);

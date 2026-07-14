@@ -1,0 +1,49 @@
+{
+  "schemaVersion" : 1,
+  "modelId" : "qwen3-0.6b-q4_0",
+  "artifactSha256" : "da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4",
+  "candidateBackend" : "pure-java",
+  "referenceBackend" : "llama.cpp",
+  "comparable" : true,
+  "violations" : [ ],
+  "exactOutputMatch" : true,
+  "decodeThroughputRatio" : 0.07392165430445717,
+  "ttftRatio" : 22.69096228201245,
+  "relativePerformance" : "NEEDS_OPTIMIZATION",
+  "run" : {
+    "promptSha256" : "5cac4f980fedc3d3f1f99b4be3472c9b30d56523e632d151237ec9309048bda9",
+    "maxTokens" : 16,
+    "warmups" : 2,
+    "iterations" : 10,
+    "contextLength" : 256,
+    "threads" : 1,
+    "temperature" : 0.0,
+    "seed" : 42
+  },
+  "candidateSummary" : {
+    "loadMillis" : 273.939405,
+    "p50TtftMillis" : 1952.579065,
+    "p95TtftMillis" : 2174.449534,
+    "p50TpotMillis" : 504.82106418750004,
+    "p95TpotMillis" : 537.6636603125,
+    "p50PrefillTokensPerSecond" : 2.027554415850097,
+    "p50DecodeTokensPerSecond" : 1.978475442527964,
+    "peakRssBytes" : 675196928,
+    "successfulTrials" : 10,
+    "totalTrials" : 10
+  },
+  "referenceSummary" : {
+    "loadMillis" : 0.0,
+    "p50TtftMillis" : 86.050959,
+    "p95TtftMillis" : 86.879385,
+    "p50TpotMillis" : 37.2560625,
+    "p95TpotMillis" : 38.2915625,
+    "p50PrefillTokensPerSecond" : 47.61167914489424,
+    "p50DecodeTokensPerSecond" : 26.76449088083612,
+    "peakRssBytes" : 0,
+    "successfulTrials" : 10,
+    "totalTrials" : 10
+  },
+  "candidateSourceRevision" : "204bb95040634a0568a693afa1615acf52ef69e9",
+  "referenceBuild" : "b9960-a935fbffe"
+}
