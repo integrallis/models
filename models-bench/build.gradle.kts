@@ -2,6 +2,7 @@
 
 plugins {
     java
+    application
     id("me.champeau.jmh") version "0.7.2"
 }
 
@@ -27,7 +28,20 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+application {
+    mainClass = "com.integrallis.models.bench.InferenceBenchmarkCli"
+    applicationDefaultJvmArgs = listOf("--add-modules", "jdk.incubator.vector")
+}
+
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+}
+
 dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":models-backend-purejava"))
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("org.assertj:assertj-core:3.27.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
