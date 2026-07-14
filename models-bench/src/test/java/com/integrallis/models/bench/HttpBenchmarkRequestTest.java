@@ -29,10 +29,11 @@ class HttpBenchmarkRequestTest {
   void makesOllamaUseTheRawPromptAndExplicitDeterministicControls() {
     ObjectNode body =
         HttpBenchmarkTarget.requestBody(
-            mapper, "ollama", "fixture:latest", "same prompt", 64, 2_048);
+            mapper, "ollama", "fixture:latest", "same prompt", 64, 2_048, 3);
 
     assertThat(body.path("raw").asBoolean()).isTrue();
     assertThat(body.path("options").path("num_ctx").asInt()).isEqualTo(2_048);
+    assertThat(body.path("options").path("num_thread").asInt()).isEqualTo(3);
     assertThat(body.path("options").path("repeat_penalty").asDouble()).isEqualTo(1.0);
     assertThat(body.path("options").path("top_k").asInt()).isEqualTo(1);
     assertThat(body.path("options").path("seed").asLong()).isEqualTo(42);
@@ -42,7 +43,7 @@ class HttpBenchmarkRequestTest {
   void disablesLlamaCppPromptCachingAndSamplingVariation() {
     ObjectNode body =
         HttpBenchmarkTarget.requestBody(
-            mapper, "llama.cpp", "fixture", "same prompt", 64, 2_048);
+            mapper, "llama.cpp", "fixture", "same prompt", 64, 2_048, 1);
 
     assertThat(body.path("cache_prompt").asBoolean()).isFalse();
     assertThat(body.path("repeat_penalty").asDouble()).isEqualTo(1.0);

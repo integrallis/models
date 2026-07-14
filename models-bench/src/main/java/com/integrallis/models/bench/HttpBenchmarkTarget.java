@@ -35,6 +35,7 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
   private final HttpClient client;
   private final ObjectMapper mapper;
   private final int contextLength;
+  private final int threads;
   private final BackendIdentity identity;
   private double loadMillis;
 
@@ -45,6 +46,7 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
       HttpClient client,
       ObjectMapper mapper,
       int contextLength,
+      int threads,
       BackendIdentity identity) {
     this.backend = backend;
     this.model = model;
@@ -52,6 +54,7 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
     this.client = client;
     this.mapper = mapper;
     this.contextLength = contextLength;
+    this.threads = threads;
     this.identity = identity;
   }
 
@@ -60,7 +63,8 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
       String model,
       URI endpoint,
       BenchmarkArtifact artifact,
-      int contextLength)
+      int contextLength,
+      int threads)
       throws IOException {
     HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build();
     ObjectMapper mapper = new ObjectMapper();
@@ -70,7 +74,7 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
               ? probeOllama(client, mapper, endpoint, model, artifact)
               : probeLlamaCpp(client, mapper, endpoint, artifact, contextLength);
       return new HttpBenchmarkTarget(
-          backend, model, endpoint, client, mapper, contextLength, identity);
+          backend, model, endpoint, client, mapper, contextLength, threads, identity);
     } catch (InterruptedException interrupted) {
       client.close();
       Thread.currentThread().interrupt();
@@ -85,7 +89,7 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
   public TrialMeasurement generate(String prompt, int maxTokens) {
     try {
       ObjectNode requestBody =
-          requestBody(mapper, backend, model, prompt, maxTokens, contextLength);
+          requestBody(mapper, backend, model, prompt, maxTokens, contextLength, threads);
       HttpRequest request =
           HttpRequest.newBuilder(requestUri())
               .timeout(Duration.ofMinutes(30))
@@ -159,7 +163,8 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
       String model,
       String prompt,
       int maxTokens,
-      int contextLength) {
+      int contextLength,
+      int threads) {
     ObjectNode body = mapper.createObjectNode();
     body.put("prompt", prompt);
     body.put("stream", true);
@@ -174,6 +179,7 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
       options.put("seed", 42);
       options.put("num_predict", maxTokens);
       options.put("num_ctx", contextLength);
+      options.put("num_thread", threads);
       options.put("repeat_penalty", 1);
     } else {
       body.put("n_predict", maxTokens);

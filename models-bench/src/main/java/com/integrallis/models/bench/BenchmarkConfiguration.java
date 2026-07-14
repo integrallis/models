@@ -30,6 +30,7 @@ public record BenchmarkConfiguration(
     int warmups,
     int iterations,
     int contextLength,
+    int threads,
     Path output) {
 
   public BenchmarkConfiguration {
@@ -45,8 +46,13 @@ public record BenchmarkConfiguration(
     if (prompt == null || prompt.isBlank()) {
       throw new IllegalArgumentException("prompt must not be blank");
     }
-    if (maxTokens <= 0 || warmups < 0 || iterations <= 0 || contextLength <= 0) {
-      throw new IllegalArgumentException("token, warmup, iteration, and context values are invalid");
+    if (maxTokens <= 0
+        || warmups < 0
+        || iterations <= 0
+        || contextLength <= 0
+        || threads <= 0) {
+      throw new IllegalArgumentException(
+          "token, warmup, iteration, context, and thread values are invalid");
     }
   }
 }

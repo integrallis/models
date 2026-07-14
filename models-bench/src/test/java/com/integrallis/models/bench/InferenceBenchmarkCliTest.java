@@ -42,6 +42,7 @@ class InferenceBenchmarkCliTest {
     assertThat(configuration.iterations()).isEqualTo(10);
     assertThat(configuration.warmups()).isEqualTo(2);
     assertThat(configuration.maxTokens()).isEqualTo(64);
+    assertThat(configuration.threads()).isEqualTo(1);
   }
 
   @Test
@@ -64,5 +65,24 @@ class InferenceBenchmarkCliTest {
                     new String[] {"--backend", "ollama", "--model", "fixture:latest"}))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("--artifact is required");
+  }
+
+  @Test
+  void rejectsAFalseMultiThreadClaimForTheSingleThreadedPureJavaBackend() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
+
+    assertThatThrownBy(
+            () ->
+                InferenceBenchmarkCli.parse(
+                    new String[] {
+                      "--backend",
+                      "pure-java",
+                      "--model",
+                      model.toString(),
+                      "--threads",
+                      "2"
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("only supports --threads 1");
   }
 }

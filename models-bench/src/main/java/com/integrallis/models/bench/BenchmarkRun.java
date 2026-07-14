@@ -22,5 +22,6 @@ public record BenchmarkRun(
     int warmups,
     int iterations,
     int contextLength,
+    int threads,
     double temperature,
     long seed) {}

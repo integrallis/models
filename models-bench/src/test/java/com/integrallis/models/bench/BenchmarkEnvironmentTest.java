@@ -38,4 +38,30 @@ class BenchmarkEnvironmentTest {
     }
     assertThat(environment.runtimeProperties()).containsKey("models.purejava.maxContextLength");
   }
+
+  @Test
+  void honorsExplicitSourceIdentityFromAReproducibleBuild() {
+    String previousRevision = System.getProperty("models.benchmark.sourceRevision");
+    String previousDirty = System.getProperty("models.benchmark.sourceDirty");
+    try {
+      System.setProperty("models.benchmark.sourceRevision", "abc123");
+      System.setProperty("models.benchmark.sourceDirty", "false");
+
+      BenchmarkEnvironment environment = BenchmarkEnvironment.capture();
+
+      assertThat(environment.sourceRevision()).isEqualTo("abc123");
+      assertThat(environment.sourceDirty()).isFalse();
+    } finally {
+      restore("models.benchmark.sourceRevision", previousRevision);
+      restore("models.benchmark.sourceDirty", previousDirty);
+    }
+  }
+
+  private static void restore(String property, String value) {
+    if (value == null) {
+      System.clearProperty(property);
+    } else {
+      System.setProperty(property, value);
+    }
+  }
 }

@@ -45,6 +45,7 @@ public final class InferenceBenchmarkCli {
           "warmups",
           "iterations",
           "context",
+          "threads",
           "output");
   private static final String DEFAULT_PROMPT =
       "Explain why a reproducible local inference benchmark must use identical model bytes, "
@@ -93,6 +94,11 @@ public final class InferenceBenchmarkCli {
     int warmups = integer(values, "warmups", 2);
     int iterations = integer(values, "iterations", 10);
     int contextLength = integer(values, "context", 2_048);
+    int threads = integer(values, "threads", 1);
+    if ("pure-java".equals(backend) && threads != 1) {
+      throw new IllegalArgumentException(
+          "pure-java currently only supports --threads 1; multi-thread inference is not active");
+    }
     Path output =
         Path.of(
             values.getOrDefault(
@@ -108,6 +114,7 @@ public final class InferenceBenchmarkCli {
         warmups,
         iterations,
         contextLength,
+        threads,
         output);
   }
 
@@ -137,7 +144,7 @@ public final class InferenceBenchmarkCli {
       LoadMeasurement load = target.loadMeasurement();
       PerformanceSummary summary = BenchmarkStatistics.summarize(load.millis(), trials);
       return new BenchmarkReport(
-          2,
+          3,
           Instant.now().toString(),
           configuration.backend(),
           configuration.modelId(),
@@ -152,6 +159,7 @@ public final class InferenceBenchmarkCli {
               configuration.warmups(),
               configuration.iterations(),
               configuration.contextLength(),
+              configuration.threads(),
               0,
               42),
           BenchmarkEnvironment.capture(),
@@ -171,7 +179,8 @@ public final class InferenceBenchmarkCli {
         configuration.model(),
         configuration.endpoint(),
         artifact,
-        configuration.contextLength());
+        configuration.contextLength(),
+        configuration.threads());
   }
 
   private static void write(Path output, BenchmarkReport report) throws IOException {

@@ -26,6 +26,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /** Hardware, operating system, and JVM identity captured with every report. */
 public record BenchmarkEnvironment(
@@ -45,7 +47,10 @@ public record BenchmarkEnvironment(
     boolean vectorApiEnabled,
     int preferredVectorBits,
     int effectiveVectorBits,
-    Map<String, String> runtimeProperties) {
+    Map<String, String> runtimeProperties,
+    String sourceRevision,
+    boolean sourceDirty,
+    boolean sourceDirtyKnown) {
 
   private static final List<String> RELEVANT_PROPERTIES =
       List.of(
@@ -59,6 +64,7 @@ public record BenchmarkEnvironment(
 
   static BenchmarkEnvironment capture() {
     boolean vectorApiEnabled = VectorizationProvider.isPanamaEnabled();
+    SourceState source = sourceState();
     return new BenchmarkEnvironment(
         hostName(),
         System.getProperty("os.name"),
@@ -76,7 +82,10 @@ public record BenchmarkEnvironment(
         vectorApiEnabled,
         PanamaConstants.PREFERRED_BITS,
         vectorApiEnabled ? Math.min(PanamaConstants.PREFERRED_BITS, PanamaConstants.MAX_BITS) : 0,
-        captureRuntimeProperties());
+        captureRuntimeProperties(),
+        source.revision(),
+        source.dirty(),
+        source.dirtyKnown());
   }
 
   private static Map<String, String> captureRuntimeProperties() {
@@ -86,6 +95,54 @@ public record BenchmarkEnvironment(
     }
     return Map.copyOf(properties);
   }
+
+  private static SourceState sourceState() {
+    String explicitRevision = System.getProperty("models.benchmark.sourceRevision");
+    String explicitDirty = System.getProperty("models.benchmark.sourceDirty");
+    if (explicitRevision != null && !explicitRevision.isBlank()) {
+      return new SourceState(
+          explicitRevision,
+          Boolean.parseBoolean(explicitDirty),
+          explicitDirty != null && !explicitDirty.isBlank());
+    }
+    String ciRevision = System.getenv("GITHUB_SHA");
+    if (ciRevision != null && !ciRevision.isBlank()) {
+      return new SourceState(ciRevision, false, false);
+    }
+    Optional<String> revision = command("git", "rev-parse", "HEAD");
+    Optional<String> status = command("git", "status", "--porcelain", "--untracked-files=normal");
+    return new SourceState(
+        revision.orElse("unknown"),
+        status.map(value -> !value.isBlank()).orElse(false),
+        status.isPresent());
+  }
+
+  private static Optional<String> command(String... command) {
+    Process process = null;
+    try {
+      process = new ProcessBuilder(command).redirectErrorStream(true).start();
+      if (!process.waitFor(2, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return Optional.empty();
+      }
+      if (process.exitValue() != 0) {
+        return Optional.empty();
+      }
+      return Optional.of(
+          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim());
+    } catch (IOException ignored) {
+      return Optional.empty();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return Optional.empty();
+    } finally {
+      if (process != null) {
+        process.destroy();
+      }
+    }
+  }
+
+  private record SourceState(String revision, boolean dirty, boolean dirtyKnown) {}
 
   private static String hostName() {
     String host = System.getenv("HOSTNAME");
