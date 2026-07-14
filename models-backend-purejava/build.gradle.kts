@@ -137,6 +137,15 @@ val modelFixtures =
             slow = true,
         ),
         ModelFixture(
+            "downloadHuatuoGptO17BQ4KMModel",
+            "HuatuoGPT-o1-7B Q4_K_M",
+            "hf://bartowski/HuatuoGPT-o1-7B-GGUF",
+            "[1.0.0,2.0.0)",
+            "q4_k_m",
+            "medical-reasoning",
+            slow = true,
+        ),
+        ModelFixture(
             "downloadSqlCoder7B2Q5KMModel",
             "SQLCoder-7B-2 Q5_K_M",
             "hf://defog/sqlcoder-7b-2",
@@ -248,6 +257,12 @@ listOf(
         "DeepSeek-R1-Distill-Qwen-7B",
         "downloadDeepSeekR1DistillQwen7BQ4KMModel",
         "com.integrallis.models.backend.purejava.DeepSeekR1DistillQwenLargeModelJarsSlowTest",
+    ),
+    LargeModelTest(
+        "huatuoGptO17BSlowTest",
+        "HuatuoGPT-o1-7B",
+        "downloadHuatuoGptO17BQ4KMModel",
+        "com.integrallis.models.backend.purejava.HuatuoGptO1LargeModelJarsSlowTest",
     ),
     LargeModelTest(
         "sqlCoder7B2SlowTest",

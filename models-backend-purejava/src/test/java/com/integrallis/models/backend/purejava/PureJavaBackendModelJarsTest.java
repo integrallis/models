@@ -96,6 +96,14 @@ class PureJavaBackendModelJarsTest {
           .capability("code-completion")
           .build();
 
+  private static final ModelJarRequirement HUATUOGPT_O1_7B_Q4_K_M =
+      ModelJarRequirement.forSource("hf://bartowski/HuatuoGPT-o1-7B-GGUF")
+          .versionRange("[1.0.0,2.0.0)")
+          .variant("q4_k_m")
+          .backend("pure-java")
+          .capability("medical-reasoning")
+          .build();
+
   private static final ModelJarRequirement SMOLLM2_360M_Q8_0 =
       ModelJarRequirement.forSource("hf://HuggingFaceTB/SmolLM2-360M-Instruct-GGUF")
           .versionRange("[2.0.0,3.0.0)")
@@ -206,6 +214,20 @@ class PureJavaBackendModelJarsTest {
     assertThat(descriptor.capabilities()).contains("text-generation", "chat", "code-completion");
     assertThat(descriptor.localPath().orElseThrow().toString())
         .endsWith(".jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf");
+  }
+
+  @Test
+  void resolvesHuatuoGptPureJavaMarkerJarFromClasspath() {
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath().resolve(HUATUOGPT_O1_7B_Q4_K_M).orElseThrow();
+
+    assertThat(descriptor.markerCoordinate().groupId()).isEqualTo("org.modeljars.huggingface");
+    assertThat(descriptor.architecture()).isEqualTo("qwen2");
+    assertThat(descriptor.quantization()).isEqualTo("Q4_K_M");
+    assertThat(descriptor.capabilities()).contains("medical-reasoning", "bilingual");
+    assertThat(descriptor.features()).contains("medical-use-warning");
+    assertThat(descriptor.localPath().orElseThrow().toString())
+        .endsWith(".jvllm/models/HuatuoGPT-o1-7B-Q4_K_M.gguf");
   }
 
   @Test
