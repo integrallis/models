@@ -62,4 +62,20 @@ class StreamingResponseParserTest {
     assertThat(parsed.prefillTokensPerSecond()).isEqualTo(40);
     assertThat(parsed.decodeTokensPerSecond()).isEqualTo(20);
   }
+
+  @Test
+  void excludesLlamaCppTerminalEosFromEmittedTokenThroughput() throws Exception {
+    LlamaCppStreamParser parser = new LlamaCppStreamParser(mapper);
+    parser.accept("data: {\"content\":\"Hello\",\"stop\":false}", 80);
+    parser.accept(
+        "data: {\"content\":\"\",\"stop\":true,\"stop_type\":\"eos\","
+            + "\"timings\":{\"prompt_n\":4,\"prompt_ms\":100.0,"
+            + "\"predicted_n\":7,\"predicted_ms\":350.0}}",
+        500);
+
+    ParsedGeneration parsed = parser.result();
+
+    assertThat(parsed.outputTokens()).isEqualTo(6);
+    assertThat(parsed.decodeTokensPerSecond()).isEqualTo(6 * 1_000.0 / 350.0);
+  }
 }

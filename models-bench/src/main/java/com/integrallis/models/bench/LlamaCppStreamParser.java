@@ -56,7 +56,9 @@ final class LlamaCppStreamParser {
     if (event.path("stop").asBoolean(false) && !timings.isMissingNode()) {
       complete = true;
       inputTokens = timings.path("prompt_n").asInt(0);
-      outputTokens = timings.path("predicted_n").asInt(0);
+      int predictedTokens = timings.path("predicted_n").asInt(0);
+      boolean terminalEos = "eos".equals(event.path("stop_type").asText(""));
+      outputTokens = Math.max(0, predictedTokens - (terminalEos ? 1 : 0));
       prefillTokensPerSecond = tokensPerSecond(inputTokens, timings.path("prompt_ms").asDouble(0));
       decodeTokensPerSecond =
           tokensPerSecond(outputTokens, timings.path("predicted_ms").asDouble(0));
