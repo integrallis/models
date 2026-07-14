@@ -31,7 +31,8 @@ public record LlamaConfig(
     float ropeTheta,
     float ropeFrequencyScale,
     float rmsNormEps,
-    boolean archUsesNeoxRope) {
+    boolean archUsesNeoxRope,
+    int noRopeLayerStep) {
 
   public LlamaConfig {
     if (embeddingDim <= 0) throw new IllegalArgumentException("embeddingDim must be > 0");
@@ -47,6 +48,9 @@ public record LlamaConfig(
     if (!(ropeFrequencyScale > 0.0f) || !Float.isFinite(ropeFrequencyScale)) {
       throw new IllegalArgumentException(
           "ropeFrequencyScale must be finite and > 0: " + ropeFrequencyScale);
+    }
+    if (noRopeLayerStep < 0) {
+      throw new IllegalArgumentException("noRopeLayerStep must be >= 0");
     }
   }
 
@@ -86,6 +90,14 @@ public record LlamaConfig(
   /** Qwen-family GGUF models use NeoX split-half rotary layout. */
   public boolean usesNeoxRope() {
     return archUsesNeoxRope;
+  }
+
+  /** Whether the zero-based transformer layer applies rotary position embeddings. */
+  public boolean usesRope(int layer) {
+    if (layer < 0 || layer >= numLayers) {
+      throw new IllegalArgumentException("layer out of range: " + layer);
+    }
+    return noRopeLayerStep == 0 || (layer + 1) % noRopeLayerStep != 0;
   }
 
   /**
@@ -141,7 +153,8 @@ public record LlamaConfig(
         ropeTheta,
         ropeFrequencyScale,
         rmsNormEps,
-        arch.equals("qwen2") || arch.equals("qwen3"));
+        arch.equals("qwen2") || arch.equals("qwen3"),
+        arch.equals("smollm3") ? 4 : 0);
   }
 
   private static float ropeFrequencyScale(GgufMetadata metadata, String arch) {

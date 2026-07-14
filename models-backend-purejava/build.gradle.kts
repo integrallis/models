@@ -146,6 +146,15 @@ val modelFixtures =
             slow = true,
         ),
         ModelFixture(
+            "downloadSmolLm33BQ4KMModel",
+            "SmolLM3 3B Q4_K_M",
+            "hf://ggml-org/SmolLM3-3B-GGUF",
+            "[3.0.0,4.0.0)",
+            "q4_k_m",
+            "text-generation",
+            slow = true,
+        ),
+        ModelFixture(
             "downloadMiniCpm51BQ4KMModel",
             "MiniCPM5 1B Q4_K_M",
             "hf://openbmb/MiniCPM5-1B-GGUF",
@@ -245,6 +254,12 @@ listOf(
         "SQLCoder-7B-2",
         "downloadSqlCoder7B2Q5KMModel",
         "com.integrallis.models.backend.purejava.SqlCoderLargeModelJarsSlowTest",
+    ),
+    LargeModelTest(
+        "smolLm33BSlowTest",
+        "SmolLM3 3B",
+        "downloadSmolLm33BQ4KMModel",
+        "com.integrallis.models.backend.purejava.SmolLm3ModelJarsSlowTest",
     ),
 ).forEach { largeModelTest ->
     tasks.register<Test>(largeModelTest.taskName) {

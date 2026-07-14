@@ -117,12 +117,16 @@ public final class LlamaForwardPass {
       for (int h = 0; h < numHeads; h++) {
         int offset = h * keyLength;
         normalizeHead(q, offset, lw.qNorm(), keyLength);
-        applyRope(q, offset, position, keyLength);
+        if (config.usesRope(layer)) {
+          applyRope(q, offset, position, keyLength);
+        }
       }
       for (int h = 0; h < numKvHeads; h++) {
         int offset = h * keyLength;
         normalizeHead(k, offset, lw.kNorm(), keyLength);
-        applyRope(k, offset, position, keyLength);
+        if (config.usesRope(layer)) {
+          applyRope(k, offset, position, keyLength);
+        }
       }
 
       // Store K,V in cache
