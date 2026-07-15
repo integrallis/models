@@ -154,6 +154,54 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void prefillMatchesTokenAtATimeForwardPass() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13};
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] expected = runSequence(sequential, tokens);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] actual = batched.prefill(tokens, 0);
+
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(17, tokens.length)).hasSize(VOCAB_SIZE);
+    }
+
+    @Test
+    void transientForwardReusesLogitStorageWithoutChangingForwardSnapshots() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass forwardPass =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+
+      float[] snapshot = forwardPass.forward(5, 0);
+      float[] snapshotValues = snapshot.clone();
+      float[] firstTransient = forwardPass.forwardTransient(7, 1);
+      float[] firstTransientValues = firstTransient.clone();
+      float[] secondTransient = forwardPass.forwardTransient(11, 2);
+
+      assertThat(secondTransient).isSameAs(firstTransient);
+      assertThat(secondTransient).isNotSameAs(snapshot);
+      assertThat(firstTransient).isNotEqualTo(firstTransientValues);
+      assertThat(snapshot).containsExactly(snapshotValues);
+    }
+
+    @Test
     void differentPositionsProduceDifferentLogits() {
       GgufFile file = buildNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());

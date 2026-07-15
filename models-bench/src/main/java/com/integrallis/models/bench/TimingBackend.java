@@ -59,11 +59,30 @@ final class TimingBackend implements InferenceBackend {
   public float[] forward(int token, int position) {
     long start = System.nanoTime();
     float[] logits = delegate.forward(token, position);
-    long elapsed = System.nanoTime() - start;
+    recordForward(position, System.nanoTime() - start);
+    return logits;
+  }
+
+  @Override
+  public float[] forwardTransient(int token, int position) {
+    long start = System.nanoTime();
+    float[] logits = delegate.forwardTransient(token, position);
+    recordForward(position, System.nanoTime() - start);
+    return logits;
+  }
+
+  @Override
+  public float[] prefill(int[] tokens, int startPosition) {
+    long start = System.nanoTime();
+    float[] logits = delegate.prefill(tokens, startPosition);
+    prefillNanos += System.nanoTime() - start;
+    return logits;
+  }
+
+  private void recordForward(int position, long elapsed) {
     if (position < inputTokens) {
       prefillNanos += elapsed;
     }
-    return logits;
   }
 
   @Override

@@ -88,14 +88,11 @@ public final class GenerationLoop {
       List<Integer> allTokens = new ArrayList<>();
 
       try {
-        // Prefill: process all prompt tokens
-        int position = 0;
-        float[] logits = null;
+        float[] logits = backend.prefill(promptTokens, 0);
         for (int token : promptTokens) {
-          logits = backend.forward(token, position);
           allTokens.add(token);
-          position++;
         }
+        int position = promptTokens.length;
 
         // Autoregressive decoding
         int generated = 0;
@@ -110,7 +107,7 @@ public final class GenerationLoop {
           stream.onToken(tokenStr);
           allTokens.add(nextToken);
 
-          logits = backend.forward(nextToken, position);
+          logits = backend.forwardTransient(nextToken, position);
           position++;
           generated++;
         }

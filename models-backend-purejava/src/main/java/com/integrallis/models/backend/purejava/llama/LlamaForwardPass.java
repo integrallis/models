@@ -20,6 +20,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
+import java.util.Objects;
 
 /**
  * Single-token forward pass for Llama-family models. Implements the full transformer decoder
@@ -81,6 +82,35 @@ public final class LlamaForwardPass {
 
   /** Runs a single forward pass for the given token at the given position. Returns logits. */
   public float[] forward(int token, int position) {
+    return forwardTransient(token, position).clone();
+  }
+
+  /**
+   * Runs a forward pass and returns backend-owned logits valid until the next logits-producing
+   * call.
+   */
+  public float[] forwardTransient(int token, int position) {
+    return forwardInternal(token, position, true);
+  }
+
+  /** Processes prompt tokens while computing the vocabulary projection only for the final token. */
+  public float[] prefill(int[] tokens, int startPosition) {
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (startPosition < 0) {
+      throw new IllegalArgumentException("startPosition must be >= 0");
+    }
+
+    int finalIndex = tokens.length - 1;
+    for (int index = 0; index < finalIndex; index++) {
+      forwardInternal(tokens[index], Math.addExact(startPosition, index), false);
+    }
+    return forwardInternal(tokens[finalIndex], Math.addExact(startPosition, finalIndex), true);
+  }
+
+  private float[] forwardInternal(int token, int position, boolean computeLogits) {
     if (position != nextPosition) {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + nextPosition + ", got " + position);
@@ -189,15 +219,14 @@ public final class LlamaForwardPass {
       }
     }
 
-    // Final RMSNorm
-    TensorOps.rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
-
-    // Output logits
-    matmulDispatch(
-        logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+    if (computeLogits) {
+      TensorOps.rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
+      matmulDispatch(
+          logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+    }
 
     nextPosition++;
-    return logits.clone();
+    return computeLogits ? logits : null;
   }
 
   /** Clears the autoregressive key-value cache before processing a new sequence. */
