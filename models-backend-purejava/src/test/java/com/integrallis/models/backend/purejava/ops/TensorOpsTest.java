@@ -275,6 +275,116 @@ class TensorOpsTest {
     }
 
     @Test
+    void groupedMatmulSupportIncludesQ4_K() {
+      assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q4_0)).isTrue();
+      assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q4_K)).isTrue();
+      assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q5_K)).isFalse();
+    }
+
+    @Test
+    void groupedTriplePlanRetainsMatchingPairInMixedKQuantLayers() {
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q4_K, GgufTensorType.Q4_K, GgufTensorType.Q4_K))
+          .isEqualTo(TensorOps.GroupedProjectionPlan.ALL);
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q4_K, GgufTensorType.Q4_K, GgufTensorType.Q6_K))
+          .isEqualTo(TensorOps.GroupedProjectionPlan.FIRST_SECOND);
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q4_K, GgufTensorType.Q6_K, GgufTensorType.Q4_K))
+          .isEqualTo(TensorOps.GroupedProjectionPlan.FIRST_THIRD);
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q6_K, GgufTensorType.Q4_K, GgufTensorType.Q4_K))
+          .isEqualTo(TensorOps.GroupedProjectionPlan.SECOND_THIRD);
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q6_K, GgufTensorType.Q6_K, GgufTensorType.Q6_K))
+          .isEqualTo(TensorOps.GroupedProjectionPlan.NONE);
+    }
+
+    @Test
+    void q4_KDualMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 256;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4KBlock(0.125f, 0.0625f, 7));
+        MemorySegment secondWeight = copy(arena, q4KBlock(-0.25f, 0.03125f, 3));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q4_K, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q4_K, 1, cols);
+
+        TensorOps.ggufDualMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_K,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 256],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+    }
+
+    @Test
+    void q4_KTripleMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 256;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] expectedThird = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+      float[] actualThird = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4KBlock(0.125f, 0.0625f, 7));
+        MemorySegment secondWeight = copy(arena, q4KBlock(-0.25f, 0.03125f, 3));
+        MemorySegment thirdWeight = copy(arena, q4KBlock(0.5f, -0.015625f, 11));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q4_K, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q4_K, 1, cols);
+        TensorOps.ggufMatmul(expectedThird, input, thirdWeight, GgufTensorType.Q4_K, 1, cols);
+
+        TensorOps.ggufTripleMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualThird,
+            thirdWeight,
+            GgufTensorType.Q4_K,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 256],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+      assertThat(actualThird).containsExactly(expectedThird);
+    }
+
+    @Test
     void q8_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
       float[] x = repeatingQuery(32);
       byte[] row = q8Block(0.25f);
