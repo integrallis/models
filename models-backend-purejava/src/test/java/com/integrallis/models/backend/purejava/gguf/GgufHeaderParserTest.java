@@ -38,7 +38,7 @@ class GgufHeaderParserTest {
   }
 
   @Nested
-  static class MinimalHeader {
+  class MinimalHeader {
 
     @Test
     void parsesMinimalV3Header() {
@@ -67,7 +67,7 @@ class GgufHeaderParserTest {
   }
 
   @Nested
-  static class MetadataTypes {
+  class MetadataTypes {
 
     @Test
     void parsesStringMetadata() {
@@ -149,7 +149,7 @@ class GgufHeaderParserTest {
   }
 
   @Nested
-  static class ErrorCases {
+  class ErrorCases {
 
     @Test
     void wrongMagicThrows() {
@@ -181,7 +181,7 @@ class GgufHeaderParserTest {
   }
 
   @Nested
-  static class TypedAccessors {
+  class TypedAccessors {
 
     @Test
     void missingKeyReturnsEmpty() {

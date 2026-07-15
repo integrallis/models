@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class TensorOpsTest {
 
   @Nested
-  static class RmsNorm {
+  class RmsNorm {
 
     @Test
     void identityWeightNormalizesCorrectly() {
@@ -66,7 +66,7 @@ class TensorOpsTest {
   }
 
   @Nested
-  static class Matmul {
+  class Matmul {
 
     @Test
     void identityMatrix() {
@@ -136,7 +136,7 @@ class TensorOpsTest {
   }
 
   @Nested
-  static class QuantizedMatmul {
+  class QuantizedMatmul {
 
     @Test
     void q4_0BatchedMatmulMatchesIndependentQueries() {
@@ -732,7 +732,7 @@ class TensorOpsTest {
   }
 
   @Nested
-  static class Softmax {
+  class Softmax {
 
     @Test
     void uniformInputProducesUniform() {
@@ -780,7 +780,7 @@ class TensorOpsTest {
   }
 
   @Nested
-  static class Rope {
+  class Rope {
 
     @Test
     void positionZeroIsIdentity() {
@@ -888,7 +888,7 @@ class TensorOpsTest {
   }
 
   @Nested
-  static class SwiGlu {
+  class SwiGlu {
 
     @Test
     void knownValues() {

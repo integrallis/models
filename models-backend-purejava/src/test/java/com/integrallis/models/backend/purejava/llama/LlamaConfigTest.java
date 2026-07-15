@@ -42,7 +42,7 @@ class LlamaConfigTest {
   }
 
   @Nested
-  static class FromMetadata {
+  class FromMetadata {
 
     @Test
     void extractsFromMetadata() {

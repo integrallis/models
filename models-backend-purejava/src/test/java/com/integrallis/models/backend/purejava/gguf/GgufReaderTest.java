@@ -38,7 +38,7 @@ class GgufReaderTest {
   }
 
   @Nested
-  static class ReadU32 {
+  class ReadU32 {
 
     @Test
     void readsLittleEndianUint32() {
@@ -65,7 +65,7 @@ class GgufReaderTest {
   }
 
   @Nested
-  static class ReadI32 {
+  class ReadI32 {
 
     @Test
     void readsNegativeValue() {
@@ -80,7 +80,7 @@ class GgufReaderTest {
   }
 
   @Nested
-  static class ReadU64 {
+  class ReadU64 {
 
     @Test
     void readsLittleEndianUint64() {
@@ -95,7 +95,7 @@ class GgufReaderTest {
   }
 
   @Nested
-  static class ReadF32 {
+  class ReadF32 {
 
     @Test
     void readsFloat() {
@@ -110,7 +110,7 @@ class GgufReaderTest {
   }
 
   @Nested
-  static class ReadString {
+  class ReadString {
 
     @Test
     void readsAsciiString() {
@@ -156,7 +156,7 @@ class GgufReaderTest {
   }
 
   @Nested
-  static class ReadBool {
+  class ReadBool {
 
     @Test
     void readsTrueFromNonZero() {
@@ -181,7 +181,7 @@ class GgufReaderTest {
   }
 
   @Nested
-  static class SequentialReads {
+  class SequentialReads {
 
     @Test
     void cursorAdvancesCorrectly() {

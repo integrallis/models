@@ -35,7 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
 class GgufParserTest {
 
   @Nested
-  static class SingleTensor {
+  class SingleTensor {
 
     @Test
     void parsesOneF32Tensor() {
@@ -77,7 +77,7 @@ class GgufParserTest {
   }
 
   @Nested
-  static class MultipleTensors {
+  class MultipleTensors {
 
     @Test
     void parsesTwoTensorsOfDifferentTypes() {
@@ -111,7 +111,7 @@ class GgufParserTest {
   }
 
   @Nested
-  static class Alignment {
+  class Alignment {
 
     @Test
     void tensorDataIsAlignedToDefaultAlignment() {
@@ -136,7 +136,7 @@ class GgufParserTest {
   }
 
   @Nested
-  static class FileParsing {
+  class FileParsing {
 
     @Test
     void parsesFromDisk(@TempDir Path tempDir) throws IOException {
@@ -176,7 +176,7 @@ class GgufParserTest {
   }
 
   @Nested
-  static class TensorNotFound {
+  class TensorNotFound {
 
     @Test
     void throwsForNonExistentTensor() {
