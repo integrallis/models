@@ -45,6 +45,16 @@ class LlamaForwardPassTest {
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
 
+  @Test
+  void groupedProjectionToggleDefaultsOnAndRejectsInvalidValues() {
+    assertThat(LlamaForwardPass.groupedProjectionsEnabled(null)).isTrue();
+    assertThat(LlamaForwardPass.groupedProjectionsEnabled("true")).isTrue();
+    assertThat(LlamaForwardPass.groupedProjectionsEnabled("false")).isFalse();
+    assertThatThrownBy(() -> LlamaForwardPass.groupedProjectionsEnabled("sometimes"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.groupedProjections");
+  }
+
   private GgufFile buildNanoModel(Random rng) {
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()

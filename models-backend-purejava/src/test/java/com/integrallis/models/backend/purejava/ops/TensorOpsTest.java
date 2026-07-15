@@ -196,6 +196,85 @@ class TensorOpsTest {
     }
 
     @Test
+    void q4_0DualMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 32;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4Block(0.5f));
+        MemorySegment secondWeight = copy(arena, q4Block(-0.25f));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q4_0, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q4_0, 1, cols);
+
+        TensorOps.ggufDualMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_0,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_0,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 32],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+    }
+
+    @Test
+    void q4_0TripleMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 32;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] expectedThird = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+      float[] actualThird = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4Block(0.5f));
+        MemorySegment secondWeight = copy(arena, q4Block(-0.25f));
+        MemorySegment thirdWeight = copy(arena, q4Block(0.125f));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q4_0, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q4_0, 1, cols);
+        TensorOps.ggufMatmul(expectedThird, input, thirdWeight, GgufTensorType.Q4_0, 1, cols);
+
+        TensorOps.ggufTripleMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_0,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_0,
+            1,
+            actualThird,
+            thirdWeight,
+            GgufTensorType.Q4_0,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 32],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+      assertThat(actualThird).containsExactly(expectedThird);
+    }
+
+    @Test
     void q8_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
       float[] x = repeatingQuery(32);
       byte[] row = q8Block(0.25f);

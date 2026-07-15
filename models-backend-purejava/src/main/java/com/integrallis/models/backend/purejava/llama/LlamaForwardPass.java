@@ -35,7 +35,10 @@ public final class LlamaForwardPass {
   }
 
   private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
+  private static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   private static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
+  private static final boolean GROUPED_PROJECTIONS =
+      groupedProjectionsEnabled(System.getProperty(GROUPED_PROJECTIONS_PROPERTY));
 
   private final LlamaConfig config;
   private final LlamaWeights weights;
@@ -351,9 +354,27 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
 
       // QKV projections
-      matmulDispatch(q, xNorm, lw.wq(), lw.wqType(), config.queryDim(), dim);
-      matmulDispatch(k, xNorm, lw.wk(), lw.wkType(), config.keyDim(), dim);
-      matmulDispatch(v, xNorm, lw.wv(), lw.wvType(), config.valueDim(), dim);
+      if (GROUPED_PROJECTIONS) {
+        tripleMatmulDispatch(
+            q,
+            lw.wq(),
+            lw.wqType(),
+            config.queryDim(),
+            k,
+            lw.wk(),
+            lw.wkType(),
+            config.keyDim(),
+            v,
+            lw.wv(),
+            lw.wvType(),
+            config.valueDim(),
+            xNorm,
+            dim);
+      } else {
+        matmulDispatch(q, xNorm, lw.wq(), lw.wqType(), config.queryDim(), dim);
+        matmulDispatch(k, xNorm, lw.wk(), lw.wkType(), config.keyDim(), dim);
+        matmulDispatch(v, xNorm, lw.wv(), lw.wvType(), config.valueDim(), dim);
+      }
       addOptionalBias(q, lw.qBias());
       addOptionalBias(k, lw.kBias());
       addOptionalBias(v, lw.vBias());
@@ -421,8 +442,22 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
 
       // FFN: SwiGLU
-      matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
-      matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
+      if (GROUPED_PROJECTIONS) {
+        dualMatmulDispatch(
+            ffnGate,
+            lw.ffnGate(),
+            lw.ffnGateType(),
+            config.hiddenDim(),
+            ffnUp,
+            lw.ffnUp(),
+            lw.ffnUpType(),
+            config.hiddenDim(),
+            xNorm,
+            dim);
+      } else {
+        matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
+        matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
+      }
       TensorOps.swiGlu(ffnOut, ffnGate, ffnUp, config.hiddenDim());
 
       // Down projection
@@ -539,6 +574,68 @@ public final class LlamaForwardPass {
         quantizedActivationSums);
   }
 
+  private void dualMatmulDispatch(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] input,
+      int cols) {
+    TensorOps.ggufDualMatmul(
+        firstOut,
+        firstWeight,
+        firstType,
+        firstRows,
+        secondOut,
+        secondWeight,
+        secondType,
+        secondRows,
+        input,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+  }
+
+  private void tripleMatmulDispatch(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] thirdOut,
+      MemorySegment thirdWeight,
+      GgufTensorType thirdType,
+      int thirdRows,
+      float[] input,
+      int cols) {
+    TensorOps.ggufTripleMatmul(
+        firstOut,
+        firstWeight,
+        firstType,
+        firstRows,
+        secondOut,
+        secondWeight,
+        secondType,
+        secondRows,
+        thirdOut,
+        thirdWeight,
+        thirdType,
+        thirdRows,
+        input,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+  }
+
   private void batchedMatmulDispatch(
       float[] out,
       float[] input,
@@ -567,6 +664,17 @@ public final class LlamaForwardPass {
           PREFILL_BATCH_SIZE_PROPERTY + " must be >= 1: " + batchSize);
     }
     return batchSize;
+  }
+
+  static boolean groupedProjectionsEnabled(String configured) {
+    if (configured == null || configured.equalsIgnoreCase("true")) {
+      return true;
+    }
+    if (configured.equalsIgnoreCase("false")) {
+      return false;
+    }
+    throw new IllegalArgumentException(
+        GROUPED_PROJECTIONS_PROPERTY + " must be true or false: " + configured);
   }
 
   private static boolean supportsBatchedPrefill(LlamaConfig config, LlamaWeights weights) {

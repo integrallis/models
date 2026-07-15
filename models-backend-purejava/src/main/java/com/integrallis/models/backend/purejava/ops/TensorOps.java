@@ -151,6 +151,135 @@ public final class TensorOps {
     }
   }
 
+  /**
+   * Multiplies two matrices by one activation, sharing quantization and row dispatch when the
+   * tensor formats support it.
+   */
+  public static void ggufDualMatmul(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] input,
+      int cols,
+      byte[] quantizedActivation,
+      float[] quantizedActivationScales,
+      short[] quantizedActivationSums) {
+    if (firstType == GgufTensorType.Q4_0 && secondType == GgufTensorType.Q4_0) {
+      VectorUtil.ggufQ4_0Q8_0DualBatchDotProduct(
+          input,
+          firstWeight,
+          firstRows,
+          firstOut,
+          secondWeight,
+          secondRows,
+          secondOut,
+          cols,
+          quantizedActivation,
+          quantizedActivationScales);
+      return;
+    }
+
+    ggufMatmul(
+        firstOut,
+        input,
+        firstWeight,
+        firstType,
+        firstRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+    ggufMatmul(
+        secondOut,
+        input,
+        secondWeight,
+        secondType,
+        secondRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+  }
+
+  /**
+   * Multiplies three matrices by one activation, sharing quantization and row dispatch when the
+   * tensor formats support it.
+   */
+  public static void ggufTripleMatmul(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] thirdOut,
+      MemorySegment thirdWeight,
+      GgufTensorType thirdType,
+      int thirdRows,
+      float[] input,
+      int cols,
+      byte[] quantizedActivation,
+      float[] quantizedActivationScales,
+      short[] quantizedActivationSums) {
+    if (firstType == GgufTensorType.Q4_0
+        && secondType == GgufTensorType.Q4_0
+        && thirdType == GgufTensorType.Q4_0) {
+      VectorUtil.ggufQ4_0Q8_0TripleBatchDotProduct(
+          input,
+          firstWeight,
+          firstRows,
+          firstOut,
+          secondWeight,
+          secondRows,
+          secondOut,
+          thirdWeight,
+          thirdRows,
+          thirdOut,
+          cols,
+          quantizedActivation,
+          quantizedActivationScales);
+      return;
+    }
+
+    ggufMatmul(
+        firstOut,
+        input,
+        firstWeight,
+        firstType,
+        firstRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+    ggufMatmul(
+        secondOut,
+        input,
+        secondWeight,
+        secondType,
+        secondRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+    ggufMatmul(
+        thirdOut,
+        input,
+        thirdWeight,
+        thirdType,
+        thirdRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+  }
+
   /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
     return type == GgufTensorType.Q4_0;
