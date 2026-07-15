@@ -75,6 +75,13 @@ class Qwen3BatchedPrefillIntegrationTest {
       float[] actual = new float[batchSize * rows];
       float[] query = new float[cols];
       float[] gemvOut = new float[rows];
+      byte[] gemvQuants = new byte[cols];
+      float[] gemvScales = new float[blocks];
+      byte[] expectedQuants = new byte[batchSize * cols];
+      float[] expectedScales = new float[batchSize * blocks];
+      byte[] batchQuants = new byte[batchSize * cols];
+      float[] batchScales = new float[batchSize * blocks];
+      float[] batchLanes = new float[batchSize * rows * 8];
       RopeTable sequentialRope =
           new RopeTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
       RopeTable batchedRope =
@@ -90,10 +97,12 @@ class Qwen3BatchedPrefillIntegrationTest {
               layer.wkType(),
               rows,
               cols,
-              new byte[cols],
-              new float[blocks],
+              gemvQuants,
+              gemvScales,
               new short[(cols + 15) / 16]);
           int outputOffset = batch * rows;
+          System.arraycopy(gemvQuants, 0, expectedQuants, batch * cols, cols);
+          System.arraycopy(gemvScales, 0, expectedScales, batch * blocks, blocks);
           System.arraycopy(gemvOut, 0, expectedProjection, outputOffset, rows);
           addBias(gemvOut, layer.kBias());
           System.arraycopy(gemvOut, 0, expectedBiased, outputOffset, rows);
@@ -126,9 +135,11 @@ class Qwen3BatchedPrefillIntegrationTest {
             batchSize,
             rows,
             cols,
-            new byte[batchSize * cols],
-            new float[batchSize * blocks],
-            new float[batchSize * rows * 8]);
+            batchQuants,
+            batchScales,
+            batchLanes);
+        assertSameBytes("Q8 activation iteration " + iteration, expectedQuants, batchQuants);
+        assertSameBits("Q8 scale iteration " + iteration, expectedScales, batchScales);
         assertSameBits("layer 0 key projection iteration " + iteration, expectedProjection, actual);
 
         for (int batch = 0; batch < batchSize; batch++) {
@@ -282,6 +293,21 @@ class Qwen3BatchedPrefillIntegrationTest {
                 + actual[index]
                 + ", delta="
                 + (actual[index] - expected[index]));
+      }
+    }
+  }
+
+  private static void assertSameBytes(String label, byte[] expected, byte[] actual) {
+    for (int index = 0; index < expected.length; index++) {
+      if (actual[index] != expected[index]) {
+        throw new AssertionError(
+            label
+                + " diverged at index "
+                + index
+                + ": sequential="
+                + expected[index]
+                + ", batched="
+                + actual[index]);
       }
     }
   }
