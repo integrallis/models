@@ -63,18 +63,21 @@ class Qwen3BatchedPrefillIntegrationTest {
       Map<LayerPosition, float[]> batchedStates = new HashMap<>();
 
       System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "1");
-      LlamaForwardPass sequential = forwardPass(config, weights, sequentialStates);
+      ForwardFixture sequentialFixture = forwardPass(config, weights, sequentialStates);
+      LlamaForwardPass sequential = sequentialFixture.forwardPass();
       float[] sequentialLogits = null;
       for (int position = 0; position < tokens.length; position++) {
         sequentialLogits = sequential.forwardTransient(tokens[position], position);
       }
 
       System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "32");
-      LlamaForwardPass batched = forwardPass(config, weights, batchedStates);
+      ForwardFixture batchedFixture = forwardPass(config, weights, batchedStates);
+      LlamaForwardPass batched = batchedFixture.forwardPass();
       assertThat(batched.usesBatchedPrefill()).isTrue();
       float[] batchedLogits = batched.prefill(tokens, 0);
 
       assertStatesMatch(config, tokens.length, sequentialStates, batchedStates);
+      assertCachesMatch(config, tokens.length, sequentialFixture.cache(), batchedFixture.cache());
       assertSameBits("prompt logits", sequentialLogits, batchedLogits);
 
       for (int generated = 0; generated < 4; generated++) {
@@ -89,6 +92,7 @@ class Qwen3BatchedPrefillIntegrationTest {
         int position = tokens.length + generated;
         sequentialLogits = sequential.forwardTransient(sequentialToken, position);
         batchedLogits = batched.forwardTransient(sequentialToken, position);
+        assertCachesMatch(config, position + 1, sequentialFixture.cache(), batchedFixture.cache());
         for (int layer = 0; layer < config.numLayers(); layer++) {
           LayerPosition key = new LayerPosition(layer, position);
           assertSameBits(key.toString(), sequentialStates.get(key), batchedStates.get(key));
@@ -100,17 +104,35 @@ class Qwen3BatchedPrefillIntegrationTest {
     }
   }
 
-  private static LlamaForwardPass forwardPass(
+  private static ForwardFixture forwardPass(
       LlamaConfig config, LlamaWeights weights, Map<LayerPosition, float[]> states) {
     KvCache cache = new KvCache(config.numLayers(), 128, config.keyDim(), config.valueDim());
-    return new LlamaForwardPass(
-        config,
-        weights,
-        cache,
-        (layer, position, state, offset, length) ->
-            states.put(
-                new LayerPosition(layer, position),
-                Arrays.copyOfRange(state, offset, offset + length)));
+    LlamaForwardPass forwardPass =
+        new LlamaForwardPass(
+            config,
+            weights,
+            cache,
+            (layer, position, state, offset, length) ->
+                states.put(
+                    new LayerPosition(layer, position),
+                    Arrays.copyOfRange(state, offset, offset + length)));
+    return new ForwardFixture(forwardPass, cache);
+  }
+
+  private static void assertCachesMatch(
+      LlamaConfig config, int positions, KvCache expected, KvCache actual) {
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      for (int position = 0; position < positions; position++) {
+        assertSameBits(
+            "key cache at " + new LayerPosition(layer, position),
+            expected.key(layer, position),
+            actual.key(layer, position));
+        assertSameBits(
+            "value cache at " + new LayerPosition(layer, position),
+            expected.value(layer, position),
+            actual.value(layer, position));
+      }
+    }
   }
 
   private static void assertStatesMatch(
@@ -164,4 +186,6 @@ class Qwen3BatchedPrefillIntegrationTest {
   }
 
   private record LayerPosition(int layer, int position) {}
+
+  private record ForwardFixture(LlamaForwardPass forwardPass, KvCache cache) {}
 }
