@@ -151,6 +151,10 @@ class GgufTokenizerTest {
   }
 
   private GgufMetadata createSmaugByteLevelMetadata() {
+    return createLlama3ByteLevelMetadata("smaug-bpe");
+  }
+
+  private GgufMetadata createLlama3ByteLevelMetadata(String preTokenizer) {
     List<String> tokens = List.of("<unk>", "1", "2", "3", "4", "12", "123", "1234", "\u0120");
     Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
     entries.put(
@@ -168,7 +172,7 @@ class GgufTokenizerTest {
                 .map(merge -> (GgufMetadataValue) new GgufMetadataValue.StringValue(merge))
                 .toList()));
     entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
-    entries.put("tokenizer.ggml.pre", new GgufMetadataValue.StringValue("smaug-bpe"));
+    entries.put("tokenizer.ggml.pre", new GgufMetadataValue.StringValue(preTokenizer));
     return new GgufMetadata(entries);
   }
 
@@ -269,6 +273,14 @@ class GgufTokenizerTest {
     @Test
     void smaugPreTokenizerLimitsNumericPiecesToThreeDigits() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSmaugByteLevelMetadata());
+
+      assertThat(tokenizer.encode("1234")).containsExactly(6, 4);
+    }
+
+    @Test
+    void llamaBpePreTokenizerLimitsNumericPiecesToThreeDigits() {
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(createLlama3ByteLevelMetadata("llama-bpe"));
 
       assertThat(tokenizer.encode("1234")).containsExactly(6, 4);
     }

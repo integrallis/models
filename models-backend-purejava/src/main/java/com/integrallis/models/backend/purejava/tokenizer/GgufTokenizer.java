@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +45,18 @@ public final class GgufTokenizer implements Tokenizer {
               + "|\\s*[\\r\\n]+"
               + "|\\s+(?!\\S)"
               + "|\\s+");
+  private static final Set<String> LLAMA3_PRETOKENIZERS =
+      Set.of(
+          "llama3",
+          "llama-v3",
+          "llama-bpe",
+          "falcon3",
+          "falcon-h1",
+          "pixtral",
+          "midm-2.0",
+          "lfm2",
+          "jina-v5-nano",
+          "smaug-bpe");
 
   private final String[] vocab;
   private final float[] scores;
@@ -176,7 +189,7 @@ public final class GgufTokenizer implements Tokenizer {
     boolean addSpacePrefix =
         metadata.getBool("tokenizer.ggml.add_space_prefix").orElse(useSentencePiece);
     String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
-    boolean useLlama3PreTokenizer = "smaug-bpe".equals(preTokenizer);
+    boolean useLlama3PreTokenizer = LLAMA3_PRETOKENIZERS.contains(preTokenizer);
     int unknownTokenId = metadata.getUint32("tokenizer.ggml.unknown_token_id").orElse(0);
 
     return new GgufTokenizer(
