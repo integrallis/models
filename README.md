@@ -34,6 +34,10 @@
 > Qwen-Coder, SQLCoder, SmolLM2, TinyLlama, DeepSeek-Coder, and MiniCPM GGUF
 > fixtures before passing.
 
+The [controlled inference study](INFERENCE_BENCHMARKS.md) compares the same GGUF
+bytes through pure Java, llama.cpp, and Ollama and records the current
+performance gap and optimization results.
+
 ## The pitch in 60 seconds
 
 Most Java AI applications use remote inference services or a separate native
@@ -79,8 +83,9 @@ models-runtime ──► models-api ──► models-backend-purejava
 ### Target use cases
 
 The research hypothesis is that routine, narrow tasks can sometimes be served
-locally by small models. The current project does not yet provide benchmark or
-quality evidence for the use cases below.
+locally by small models. Initial CPU latency evidence is available in the
+[controlled inference study](INFERENCE_BENCHMARKS.md); model quality remains a
+separate, unproven requirement for the use cases below.
 
 | Use case | Model size | Why local? |
 |---|---|---|
