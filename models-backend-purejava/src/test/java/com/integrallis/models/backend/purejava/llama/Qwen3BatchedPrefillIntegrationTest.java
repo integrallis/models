@@ -58,6 +58,7 @@ class Qwen3BatchedPrefillIntegrationTest {
       int batchSize = tokens.length;
       int cols = config.embeddingDim();
       int rows = config.keyDim();
+      int headDim = config.keyLength();
       int blocks = cols / 32;
       float[] inputs = new float[batchSize * cols];
       float[] embedding = new float[cols];
@@ -67,38 +68,103 @@ class Qwen3BatchedPrefillIntegrationTest {
             inputs, batch * cols, embedding, 0, layer.attentionNorm(), cols, config.rmsNormEps());
       }
 
-      float[] expected = new float[batchSize * rows];
+      float[] expectedProjection = new float[batchSize * rows];
+      float[] expectedBiased = new float[batchSize * rows];
+      float[] expectedNormalized = new float[batchSize * rows];
+      float[] expectedRope = new float[batchSize * rows];
       float[] actual = new float[batchSize * rows];
       float[] query = new float[cols];
       float[] gemvOut = new float[rows];
-      for (int batch = 0; batch < batchSize; batch++) {
-        System.arraycopy(inputs, batch * cols, query, 0, cols);
-        TensorOps.ggufMatmul(
-            gemvOut,
-            query,
+      RopeTable sequentialRope =
+          new RopeTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
+      RopeTable batchedRope =
+          new RopeTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
+
+      for (int iteration = 0; iteration < 16; iteration++) {
+        for (int batch = 0; batch < batchSize; batch++) {
+          System.arraycopy(inputs, batch * cols, query, 0, cols);
+          TensorOps.ggufMatmul(
+              gemvOut,
+              query,
+              layer.wk(),
+              layer.wkType(),
+              rows,
+              cols,
+              new byte[cols],
+              new float[blocks],
+              new short[(cols + 15) / 16]);
+          int outputOffset = batch * rows;
+          System.arraycopy(gemvOut, 0, expectedProjection, outputOffset, rows);
+          addBias(gemvOut, layer.kBias());
+          System.arraycopy(gemvOut, 0, expectedBiased, outputOffset, rows);
+          for (int head = 0; head < config.numKvHeads(); head++) {
+            int headOffset = head * headDim;
+            TensorOps.rmsNorm(
+                gemvOut,
+                headOffset,
+                gemvOut,
+                headOffset,
+                layer.kNorm(),
+                headDim,
+                config.rmsNormEps());
+          }
+          System.arraycopy(gemvOut, 0, expectedNormalized, outputOffset, rows);
+          sequentialRope.prepare(batch);
+          if (config.usesRope(0)) {
+            for (int head = 0; head < config.numKvHeads(); head++) {
+              sequentialRope.apply(gemvOut, head * headDim, config.usesNeoxRope());
+            }
+          }
+          System.arraycopy(gemvOut, 0, expectedRope, outputOffset, rows);
+        }
+
+        TensorOps.ggufBatchedMatmul(
+            actual,
+            inputs,
             layer.wk(),
             layer.wkType(),
+            batchSize,
             rows,
             cols,
-            new byte[cols],
-            new float[blocks],
-            new short[(cols + 15) / 16]);
-        System.arraycopy(gemvOut, 0, expected, batch * rows, rows);
+            new byte[batchSize * cols],
+            new float[batchSize * blocks],
+            new float[batchSize * rows * 8]);
+        assertSameBits("layer 0 key projection iteration " + iteration, expectedProjection, actual);
+
+        for (int batch = 0; batch < batchSize; batch++) {
+          int outputOffset = batch * rows;
+          addBias(actual, outputOffset, layer.kBias());
+        }
+        assertSameBits("layer 0 biased key iteration " + iteration, expectedBiased, actual);
+
+        for (int batch = 0; batch < batchSize; batch++) {
+          int outputOffset = batch * rows;
+          for (int head = 0; head < config.numKvHeads(); head++) {
+            int headOffset = outputOffset + head * headDim;
+            TensorOps.rmsNorm(
+                actual,
+                headOffset,
+                actual,
+                headOffset,
+                layer.kNorm(),
+                headDim,
+                config.rmsNormEps());
+          }
+        }
+        assertSameBits("layer 0 normalized key iteration " + iteration, expectedNormalized, actual);
+
+        batchedRope.prepareBatch(0, batchSize);
+        if (config.usesRope(0)) {
+          for (int batch = 0; batch < batchSize; batch++) {
+            int outputOffset = batch * rows;
+            for (int head = 0; head < config.numKvHeads(); head++) {
+              batchedRope.applyBatch(
+                  actual, outputOffset + head * headDim, batch, config.usesNeoxRope());
+            }
+          }
+        }
+        assertSameBits("layer 0 rotary key iteration " + iteration, expectedRope, actual);
       }
-
-      TensorOps.ggufBatchedMatmul(
-          actual,
-          inputs,
-          layer.wk(),
-          layer.wkType(),
-          batchSize,
-          rows,
-          cols,
-          new byte[batchSize * cols],
-          new float[batchSize * blocks],
-          new float[batchSize * rows * 8]);
-
-      assertSameBits("layer 0 key projection", expected, actual);
     }
   }
 
@@ -228,6 +294,16 @@ class Qwen3BatchedPrefillIntegrationTest {
       }
     }
     return best;
+  }
+
+  private static void addBias(float[] vector, float[] bias) {
+    addBias(vector, 0, bias);
+  }
+
+  private static void addBias(float[] vector, int offset, float[] bias) {
+    for (int index = 0; index < bias.length; index++) {
+      vector[offset + index] += bias[index];
+    }
   }
 
   private static void restoreProperty(String previous) {
