@@ -16,16 +16,31 @@ CONTEXT=${BENCH_CONTEXT:-2048}
 MAX_TOKENS=${BENCH_MAX_TOKENS:-64}
 WARMUPS=${BENCH_WARMUPS:-2}
 ITERATIONS=${BENCH_ITERATIONS:-10}
+DROP_CACHES=${BENCH_DROP_CACHES:-0}
 LLAMA_PORT=${LLAMA_PORT:-18080}
 LLAMA_SERVER=${LLAMA_SERVER:-llama-server}
 PROMPT_FILE=${BENCH_PROMPT_FILE:-"$ROOT_DIR/models-bench/prompts/completion.txt"}
 
-for command in curl git nproc ollama realpath sha256sum "$LLAMA_SERVER"; do
+for command in awk curl git java nproc ollama realpath sha256sum sync "$LLAMA_SERVER"; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "required command not found: $command" >&2
     exit 1
   fi
 done
+JAVA_FEATURE=$(java -XshowSettings:properties -version 2>&1 \
+  | awk -F= '/^[[:space:]]*java.specification.version[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); print $2}')
+if [[ "$JAVA_FEATURE" != 25 ]]; then
+  echo "the benchmark CLI requires Java 25; default java is $JAVA_FEATURE" >&2
+  exit 1
+fi
+if [[ "$DROP_CACHES" != 0 && "$DROP_CACHES" != 1 ]]; then
+  echo "BENCH_DROP_CACHES must be 0 or 1" >&2
+  exit 1
+fi
+if [[ "$DROP_CACHES" == 1 && ! -w /proc/sys/vm/drop_caches ]]; then
+  echo "BENCH_DROP_CACHES=1 requires permission to write /proc/sys/vm/drop_caches" >&2
+  exit 1
+fi
 if [[ ! -f "$MODEL_PATH" ]]; then
   echo "model not found: $MODEL_PATH" >&2
   exit 1
@@ -63,7 +78,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$ROOT_DIR/gradlew" -p "$ROOT_DIR" :models-bench:installDist
+drop_file_cache() {
+  if [[ "$DROP_CACHES" == 1 ]]; then
+    sync
+    printf '3\n' >/proc/sys/vm/drop_caches
+  fi
+}
+
+"$ROOT_DIR/gradlew" --no-daemon -p "$ROOT_DIR" :models-bench:installDist
 BENCHMARK_CLI="$ROOT_DIR/models-bench/build/install/models-bench/bin/models-bench"
 MODEL_SHA=$(sha256sum "$MODEL_PATH" | awk '{print $1}')
 SAFE_MODEL_ID=$(printf '%s' "$MODEL_ID" | tr -cs '[:alnum:]._-' '-')
@@ -83,6 +105,7 @@ COMMON_ARGS=(
   --threads "$THREADS"
 )
 
+drop_file_cache
 "$BENCHMARK_CLI" \
   --backend pure-java \
   --model "$MODEL_PATH" \
@@ -119,6 +142,7 @@ printf 'FROM %s\n' "$MODEL_PATH" >"$TEMP_DIR/Modelfile"
 ollama create "$OLLAMA_MODEL" -f "$TEMP_DIR/Modelfile"
 OLLAMA_VERSION=$(ollama --version 2>&1 | head -n 1)
 
+drop_file_cache
 "$BENCHMARK_CLI" \
   --backend ollama \
   --model "$OLLAMA_MODEL" \
@@ -129,6 +153,7 @@ OLLAMA_VERSION=$(ollama --version 2>&1 | head -n 1)
   "${COMMON_ARGS[@]}"
 ollama stop "$OLLAMA_MODEL" >/dev/null
 
+drop_file_cache
 LLAMA_START_NS=$(date +%s%N)
 "$LLAMA_SERVER" \
   --model "$MODEL_PATH" \

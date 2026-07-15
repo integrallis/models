@@ -15,9 +15,28 @@ if [[ $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
   echo "this pinned bootstrap supports Linux x86_64 only" >&2
   exit 1
 fi
-for command in curl sha256sum tar zstd; do
+for command in awk curl sha256sum tar zstd; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "required command not found: $command" >&2
+    exit 1
+  fi
+done
+
+for feature in 21 25; do
+  found=0
+  for java_binary in /usr/lib/jvm/*/bin/java; do
+    [[ -x "$java_binary" && -x "${java_binary%/java}/javac" ]] || continue
+    detected=$(
+      "$java_binary" -XshowSettings:properties -version 2>&1 \
+        | awk -F= '/^[[:space:]]*java.specification.version[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); print $2}'
+    )
+    if [[ "$detected" == "$feature" ]]; then
+      found=1
+      break
+    fi
+  done
+  if [[ $found -ne 1 ]]; then
+    echo "a JDK $feature installation under /usr/lib/jvm is required" >&2
     exit 1
   fi
 done
