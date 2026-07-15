@@ -39,9 +39,11 @@ class BenchmarkComparisonTest {
     assertThat(pureJava.backend()).isEqualTo("pure-java");
     assertThat(pureJava.decodeRatioToLlamaCpp()).isEqualTo(0.5);
     assertThat(pureJava.relativePerformance()).isEqualTo(RelativePerformance.VIABLE);
+    assertThat(pureJava.outputMatchRateToLlamaCpp()).isEqualTo(1.0);
     assertThat(ComparisonMarkdown.render(comparison))
         .contains("| pure-java |")
         .contains("| llama.cpp |")
+        .contains("Output match")
         .contains("50.0%")
         .contains("| VIABLE |");
   }
@@ -54,6 +56,32 @@ class BenchmarkComparisonTest {
                     List.of(report("pure-java", "sha-a", 10), report("llama.cpp", "sha-b", 20))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("artifact SHA-256");
+  }
+
+  @Test
+  void rejectsSummariesThatDoNotContainRawTrialEvidence() {
+    BenchmarkReport report = report("pure-java", "sha", 10);
+    BenchmarkReport withoutTrials =
+        new BenchmarkReport(
+            report.schemaVersion(),
+            report.createdAt(),
+            report.backend(),
+            report.backendVersion(),
+            report.modelId(),
+            report.model(),
+            report.artifactSha256(),
+            report.artifactSizeBytes(),
+            report.run(),
+            report.environment(),
+            report.summary(),
+            report.performanceTier(),
+            List.of());
+
+    assertThatThrownBy(
+            () ->
+                BenchmarkComparison.compare(List.of(withoutTrials, report("llama.cpp", "sha", 20))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("raw measured trials");
   }
 
   @Test
@@ -84,7 +112,9 @@ class BenchmarkComparisonTest {
   }
 
   private static BenchmarkReport report(String backend, String sha, double decodeTokensPerSecond) {
-    BenchmarkRun run = new BenchmarkRun("prompt-sha", 64, 2, 10, 2048, 8, 0, 1, 1, 1, true, 42);
+    BenchmarkRun run =
+        new BenchmarkRun(
+            "prompt-sha", "sha256-nonce-prefix-v1", 64, 2, 10, 2048, 8, 0, 1, 1, 1, true, 42);
     BenchmarkEnvironment environment =
         new BenchmarkEnvironment(
             "bench-host",
@@ -97,10 +127,23 @@ class BenchmarkComparisonTest {
             "25.0.3",
             "Temurin",
             "OpenJDK");
-    PerformanceSummary summary =
-        new PerformanceSummary(100, 200, 250, 50, 60, 100, decodeTokensPerSecond, 1L << 30, 10, 10);
+    List<TrialMeasurement> trials =
+        java.util.stream.IntStream.range(0, 10)
+            .mapToObj(
+                index ->
+                    TrialMeasurement.success(
+                        200,
+                        200 + (63_000 / decodeTokensPerSecond),
+                        100,
+                        40,
+                        64,
+                        1L << 30,
+                        1_000,
+                        "output-" + index))
+            .toList();
+    PerformanceSummary summary = BenchmarkStatistics.summarize(100, trials);
     return new BenchmarkReport(
-        2,
+        3,
         "2026-07-14T00:00:00Z",
         backend,
         "version",
@@ -112,6 +155,6 @@ class BenchmarkComparisonTest {
         environment,
         summary,
         PerformanceTier.RESPONSIVE,
-        List.of());
+        trials);
   }
 }

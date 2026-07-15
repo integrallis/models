@@ -18,7 +18,9 @@ package com.integrallis.models.bench;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 /** Validates and combines benchmark reports that are safe to compare. */
 public final class BenchmarkComparison {
@@ -65,11 +67,12 @@ public final class BenchmarkComparison {
                       summary.p50DecodeTokensPerSecond(),
                       summary.peakRssBytes(),
                       ratio,
+                      outputMatchRate(report, llamaCpp),
                       BenchmarkPolicy.relativeTier(ratio));
                 })
             .toList();
     return new ComparisonReport(
-        1,
+        2,
         Instant.now().toString(),
         reference.modelId(),
         reference.artifactSha256(),
@@ -80,6 +83,10 @@ public final class BenchmarkComparison {
   }
 
   private static void validateComparable(BenchmarkReport reference, BenchmarkReport candidate) {
+    if (candidate.schemaVersion() != BenchmarkReport.CURRENT_SCHEMA_VERSION) {
+      throw new IllegalArgumentException(
+          "unsupported benchmark schema version: " + candidate.schemaVersion());
+    }
     requireEqual("model ID", reference.modelId(), candidate.modelId());
     requireEqual("artifact SHA-256", reference.artifactSha256(), candidate.artifactSha256());
     if (reference.artifactSha256() == null || reference.artifactSha256().isBlank()) {
@@ -90,11 +97,50 @@ public final class BenchmarkComparison {
     }
     requireEqual("benchmark run", reference.run(), candidate.run());
     requireEqual("benchmark environment", reference.environment(), candidate.environment());
+    requireEqual(
+        "input token series",
+        reference.trials().stream().map(TrialMeasurement::inputTokens).toList(),
+        candidate.trials().stream().map(TrialMeasurement::inputTokens).toList());
+    requireEqual(
+        "output token series",
+        reference.trials().stream().map(TrialMeasurement::outputTokens).toList(),
+        candidate.trials().stream().map(TrialMeasurement::outputTokens).toList());
+    List<TrialMeasurement> trials = candidate.trials();
     PerformanceSummary summary = candidate.summary();
-    if (summary.totalTrials() < 10 || summary.successfulTrials() != summary.totalTrials()) {
+    if (trials.size() < 10
+        || trials.size() != candidate.run().iterations()
+        || trials.stream().anyMatch(trial -> !trial.successful())) {
       throw new IllegalArgumentException(
-          "backend does not have ten successful measured trials: " + candidate.backend());
+          "backend does not contain ten raw measured trials: " + candidate.backend());
     }
+    PerformanceSummary recalculated = BenchmarkStatistics.summarize(summary.loadMillis(), trials);
+    requireEqual("performance summary", recalculated, summary);
+    requireEqual(
+        "performance tier", BenchmarkPolicy.classify(recalculated), candidate.performanceTier());
+    if (trials.stream()
+        .anyMatch(
+            trial ->
+                trial.inputTokens() <= 0
+                    || trial.outputTokens() <= 1
+                    || trial.outputSha256() == null
+                    || trial.outputSha256().isBlank())) {
+      throw new IllegalArgumentException(
+          "backend contains incomplete successful trial evidence: " + candidate.backend());
+    }
+  }
+
+  private static double outputMatchRate(BenchmarkReport candidate, BenchmarkReport llamaCpp) {
+    List<TrialMeasurement> candidateTrials = candidate.trials();
+    List<TrialMeasurement> llamaTrials = llamaCpp.trials();
+    long matches =
+        IntStream.range(0, candidateTrials.size())
+            .filter(
+                index ->
+                    Objects.equals(
+                        candidateTrials.get(index).outputSha256(),
+                        llamaTrials.get(index).outputSha256()))
+            .count();
+    return matches / (double) candidateTrials.size();
   }
 
   private static void requireEqual(String field, Object expected, Object actual) {

@@ -26,13 +26,14 @@ public final class ComparisonMarkdown {
     StringBuilder markdown = new StringBuilder();
     markdown
         .append("| Backend | Version | Load ms | p95 TTFT ms | p95 TPOT ms | Prefill tok/s | ")
-        .append("Decode tok/s | Peak RSS GiB | vs llama.cpp | Latency tier | Relative |\n")
-        .append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|\n");
+        .append(
+            "Decode tok/s | Peak RSS GiB | vs llama.cpp | Output match | Latency tier | Relative |\n")
+        .append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|\n");
     for (BackendComparison backend : report.backends()) {
       markdown.append(
           String.format(
               Locale.ROOT,
-              "| %s | %s | %.1f | %.1f | %.1f | %.2f | %.2f | %.2f | %.1f%% | %s | %s |%n",
+              "| %s | %s | %.1f | %.1f | %.1f | %.2f | %.2f | %.2f | %.1f%% | %.1f%% | %s | %s |%n",
               backend.backend(),
               backend.backendVersion(),
               backend.loadMillis(),
@@ -42,6 +43,7 @@ public final class ComparisonMarkdown {
               backend.decodeTokensPerSecond(),
               backend.peakRssBytes() / (double) (1L << 30),
               backend.decodeRatioToLlamaCpp() * 100,
+              backend.outputMatchRateToLlamaCpp() * 100,
               backend.performanceTier(),
               backend.relativePerformance()));
     }

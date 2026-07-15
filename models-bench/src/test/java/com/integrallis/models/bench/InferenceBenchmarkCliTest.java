@@ -105,4 +105,18 @@ class InferenceBenchmarkCliTest {
         .hasMessageContaining("pure-java uses the JVM processor allocation")
         .hasMessageContaining(Integer.toString(Runtime.getRuntime().availableProcessors()));
   }
+
+  @Test
+  void createsADeterministicCacheResistantPromptSeries() {
+    String basePrompt = "fixed benchmark prompt";
+
+    String first = InferenceBenchmarkCli.benchmarkPrompt(basePrompt, "measurement", 0);
+    String repeated = InferenceBenchmarkCli.benchmarkPrompt(basePrompt, "measurement", 0);
+    String second = InferenceBenchmarkCli.benchmarkPrompt(basePrompt, "measurement", 1);
+
+    assertThat(first).isEqualTo(repeated).endsWith("\n" + basePrompt);
+    assertThat(second).endsWith("\n" + basePrompt).isNotEqualTo(first);
+    assertThat(first.substring(0, first.indexOf('\n'))).hasSize(16);
+    assertThat(second.substring(0, second.indexOf('\n'))).hasSize(16);
+  }
 }

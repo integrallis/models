@@ -27,4 +27,5 @@ public record BackendComparison(
     double decodeTokensPerSecond,
     long peakRssBytes,
     double decodeRatioToLlamaCpp,
+    double outputMatchRateToLlamaCpp,
     RelativePerformance relativePerformance) {}

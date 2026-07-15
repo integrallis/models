@@ -33,6 +33,7 @@ import java.util.Set;
 public final class InferenceBenchmarkCli {
 
   private static final Set<String> BACKENDS = Set.of("pure-java", "ollama", "llama.cpp");
+  private static final String PROMPT_STRATEGY = "sha256-nonce-prefix-v1";
   private static final Set<String> OPTIONS =
       Set.of(
           "backend",
@@ -141,14 +142,18 @@ public final class InferenceBenchmarkCli {
     try (BenchmarkTarget target = target(configuration)) {
       for (int warmup = 0; warmup < configuration.warmups(); warmup++) {
         TrialMeasurement result =
-            target.generate(configuration.prompt(), configuration.maxTokens());
+            target.generate(
+                benchmarkPrompt(configuration.prompt(), "warmup", warmup),
+                configuration.maxTokens());
         if (!result.successful()) {
           throw new IllegalStateException("warmup failed: " + result.error());
         }
       }
       for (int iteration = 0; iteration < configuration.iterations(); iteration++) {
         TrialMeasurement result =
-            target.generate(configuration.prompt(), configuration.maxTokens());
+            target.generate(
+                benchmarkPrompt(configuration.prompt(), "measurement", iteration),
+                configuration.maxTokens());
         trials.add(result);
         System.out.printf(
             "trial %d/%d: %s ttft=%.1fms decode=%.2f tok/s%n",
@@ -161,7 +166,7 @@ public final class InferenceBenchmarkCli {
 
       PerformanceSummary summary = BenchmarkStatistics.summarize(target.loadMillis(), trials);
       return new BenchmarkReport(
-          2,
+          BenchmarkReport.CURRENT_SCHEMA_VERSION,
           Instant.now().toString(),
           configuration.backend(),
           configuration.backendVersion(),
@@ -171,6 +176,7 @@ public final class InferenceBenchmarkCli {
           artifactSize,
           new BenchmarkRun(
               Hashing.sha256(configuration.prompt()),
+              PROMPT_STRATEGY,
               configuration.maxTokens(),
               configuration.warmups(),
               configuration.iterations(),
@@ -297,5 +303,18 @@ public final class InferenceBenchmarkCli {
     String source = fileName == null ? modelPath.toString() : fileName.toString();
     String modelId = source.toLowerCase().replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
     return modelId.isBlank() ? "model" : modelId;
+  }
+
+  static String benchmarkPrompt(String basePrompt, String phase, int index) {
+    if (basePrompt == null
+        || basePrompt.isBlank()
+        || phase == null
+        || phase.isBlank()
+        || index < 0) {
+      throw new IllegalArgumentException("benchmark prompt inputs are invalid");
+    }
+    String identity =
+        PROMPT_STRATEGY + '\0' + phase + '\0' + index + '\0' + Hashing.sha256(basePrompt);
+    return Hashing.sha256(identity).substring(0, 16) + '\n' + basePrompt;
   }
 }

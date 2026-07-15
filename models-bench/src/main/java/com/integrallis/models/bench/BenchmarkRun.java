@@ -18,6 +18,7 @@ package com.integrallis.models.bench;
 /** Stable generation controls embedded in a benchmark report. */
 public record BenchmarkRun(
     String promptSha256,
+    String promptStrategy,
     int maxTokens,
     int warmups,
     int iterations,

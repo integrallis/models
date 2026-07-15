@@ -33,6 +33,8 @@ public record BenchmarkReport(
     PerformanceTier performanceTier,
     List<TrialMeasurement> trials) {
 
+  public static final int CURRENT_SCHEMA_VERSION = 3;
+
   public BenchmarkReport {
     trials = List.copyOf(trials);
   }
