@@ -32,6 +32,7 @@ public final class LlamaForwardPass {
   private final LlamaConfig config;
   private final LlamaWeights weights;
   private final KvCache cache;
+  private final RopeTable ropeTable;
 
   // Scratch buffers
   private final float[] x;
@@ -56,6 +57,8 @@ public final class LlamaForwardPass {
     this.config = config;
     this.weights = weights;
     this.cache = cache;
+    this.ropeTable =
+        new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
     int dim = config.embeddingDim();
     int hiddenDim = config.hiddenDim();
@@ -124,6 +127,7 @@ public final class LlamaForwardPass {
     int valueLength = config.valueLength();
     int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads();
+    ropeTable.prepare(position);
 
     // Token embedding (dequantizes only the single row for this token)
     weights.embedToken(token, x);
@@ -148,14 +152,14 @@ public final class LlamaForwardPass {
         int offset = h * keyLength;
         normalizeHead(q, offset, lw.qNorm(), keyLength);
         if (config.usesRope(layer)) {
-          applyRope(q, offset, position, keyLength);
+          applyRope(q, offset);
         }
       }
       for (int h = 0; h < numKvHeads; h++) {
         int offset = h * keyLength;
         normalizeHead(k, offset, lw.kNorm(), keyLength);
         if (config.usesRope(layer)) {
-          applyRope(k, offset, position, keyLength);
+          applyRope(k, offset);
         }
       }
 
@@ -241,14 +245,8 @@ public final class LlamaForwardPass {
     }
   }
 
-  private void applyRope(float[] vector, int offset, int position, int headDim) {
-    if (config.usesNeoxRope()) {
-      TensorOps.ropeNeox(
-          vector, offset, position, headDim, config.ropeTheta(), config.ropeFrequencyScale());
-    } else {
-      TensorOps.rope(
-          vector, offset, position, headDim, config.ropeTheta(), config.ropeFrequencyScale());
-    }
+  private void applyRope(float[] vector, int offset) {
+    ropeTable.apply(vector, offset, config.usesNeoxRope());
   }
 
   private static void addOptionalBias(float[] vector, float[] bias) {

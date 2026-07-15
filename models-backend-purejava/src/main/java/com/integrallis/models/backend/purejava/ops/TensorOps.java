@@ -233,6 +233,13 @@ public final class TensorOps {
     }
   }
 
+  /** Applies standard rotary embedding using caller-precomputed pair factors. */
+  public static void rope(float[] vector, int offset, float[] cosine, float[] sine) {
+    for (int pair = 0; pair < cosine.length; pair++) {
+      rotatePair(vector, offset + pair * 2, cosine[pair], sine[pair]);
+    }
+  }
+
   /** In-place NeoX rotary embedding whose coordinate pairs are separated by half a head. */
   public static void ropeNeox(
       float[] vector, int offset, int position, int headDim, float ropeTheta) {
@@ -256,6 +263,14 @@ public final class TensorOps {
       float sin = (float) Math.sin(angle);
 
       rotateSplitPair(vector, offset + i, offset + half + i, cos, sin);
+    }
+  }
+
+  /** Applies NeoX rotary embedding using caller-precomputed pair factors. */
+  public static void ropeNeox(float[] vector, int offset, float[] cosine, float[] sine) {
+    int half = cosine.length;
+    for (int pair = 0; pair < half; pair++) {
+      rotateSplitPair(vector, offset + pair, offset + half + pair, cosine[pair], sine[pair]);
     }
   }
 
