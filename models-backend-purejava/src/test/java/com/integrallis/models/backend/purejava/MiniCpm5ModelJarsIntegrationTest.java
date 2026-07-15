@@ -62,6 +62,10 @@ class MiniCpm5ModelJarsIntegrationTest {
           .containsExactly(88, 30327, 19282, 2189, 83076);
       assertThat(tokenizer.encode("你好，MiniCPM5！"))
           .containsExactly(75828, 74717, 7053, 7739, 66, 42, 1398);
+      assertThat(tokenizer.encode("1231d29e25650029\nYou"))
+          .containsExactly(5645, 38, 89, 1096, 90, 7373, 3161, 1096, 220, 2311);
+      assertThat(tokenizer.encode("168037df5d951dc1\nYou"))
+          .containsExactly(7018, 15571, 4865, 42, 89, 18491, 13920, 38, 220, 2311);
 
       assertThat(file.tensorInfos()).hasSize(219);
       assertThat(file.tensorInfos())
