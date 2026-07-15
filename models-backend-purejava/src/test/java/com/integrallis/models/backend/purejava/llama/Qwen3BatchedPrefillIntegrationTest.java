@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
@@ -45,13 +46,65 @@ class Qwen3BatchedPrefillIntegrationTest {
           .build();
 
   @Test
+  void batchedLayerZeroKeyProjectionMatchesIndependentGemv() throws Exception {
+    Path model = modelPath();
+
+    try (Arena arena = Arena.ofShared()) {
+      GgufFile file = GgufParser.parse(model, arena);
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaWeights.LayerWeights layer = weights.layer(0);
+      int[] tokens = GgufTokenizer.fromMetadata(file.metadata()).encode("The quick brown fox");
+      int batchSize = tokens.length;
+      int cols = config.embeddingDim();
+      int rows = config.keyDim();
+      int blocks = cols / 32;
+      float[] inputs = new float[batchSize * cols];
+      float[] embedding = new float[cols];
+      for (int batch = 0; batch < batchSize; batch++) {
+        weights.embedToken(tokens[batch], embedding);
+        TensorOps.rmsNorm(
+            inputs, batch * cols, embedding, 0, layer.attentionNorm(), cols, config.rmsNormEps());
+      }
+
+      float[] expected = new float[batchSize * rows];
+      float[] actual = new float[batchSize * rows];
+      float[] query = new float[cols];
+      float[] gemvOut = new float[rows];
+      for (int batch = 0; batch < batchSize; batch++) {
+        System.arraycopy(inputs, batch * cols, query, 0, cols);
+        TensorOps.ggufMatmul(
+            gemvOut,
+            query,
+            layer.wk(),
+            layer.wkType(),
+            rows,
+            cols,
+            new byte[cols],
+            new float[blocks],
+            new short[(cols + 15) / 16]);
+        System.arraycopy(gemvOut, 0, expected, batch * rows, rows);
+      }
+
+      TensorOps.ggufBatchedMatmul(
+          actual,
+          inputs,
+          layer.wk(),
+          layer.wkType(),
+          batchSize,
+          rows,
+          cols,
+          new byte[batchSize * cols],
+          new float[batchSize * blocks],
+          new float[batchSize * rows * 8]);
+
+      assertSameBits("layer 0 key projection", expected, actual);
+    }
+  }
+
+  @Test
   void batchedPrefillMatchesSequentialStateAtEveryLayer() throws Exception {
-    Path model =
-        ModelJarRegistry.fromClasspath()
-            .resolve(QWEN3_0_6B_Q4_0)
-            .orElseThrow()
-            .localPath()
-            .orElseThrow();
+    Path model = modelPath();
     String previous = System.getProperty(PREFILL_BATCH_SIZE_PROPERTY);
 
     try (Arena arena = Arena.ofShared()) {
@@ -183,6 +236,14 @@ class Qwen3BatchedPrefillIntegrationTest {
     } else {
       System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, previous);
     }
+  }
+
+  private static Path modelPath() {
+    return ModelJarRegistry.fromClasspath()
+        .resolve(QWEN3_0_6B_Q4_0)
+        .orElseThrow()
+        .localPath()
+        .orElseThrow();
   }
 
   private record LayerPosition(int layer, int position) {}
