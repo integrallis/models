@@ -204,6 +204,19 @@ public final class TensorOps {
                 quantizedActivation,
                 quantizedActivationScales,
                 quantizedActivationSums);
+        case Q5_K ->
+            VectorUtil.ggufQ5_KQ8_KDualBatchDotProduct(
+                input,
+                firstWeight,
+                firstRows,
+                firstOut,
+                secondWeight,
+                secondRows,
+                secondOut,
+                cols,
+                quantizedActivation,
+                quantizedActivationScales,
+                quantizedActivationSums);
         default -> throw new IllegalStateException("Unsupported grouped matmul type: " + firstType);
       }
       return;
@@ -273,6 +286,22 @@ public final class TensorOps {
                   quantizedActivationScales);
           case Q4_K ->
               VectorUtil.ggufQ4_KQ8_KTripleBatchDotProduct(
+                  input,
+                  firstWeight,
+                  firstRows,
+                  firstOut,
+                  secondWeight,
+                  secondRows,
+                  secondOut,
+                  thirdWeight,
+                  thirdRows,
+                  thirdOut,
+                  cols,
+                  quantizedActivation,
+                  quantizedActivationScales,
+                  quantizedActivationSums);
+          case Q5_K ->
+              VectorUtil.ggufQ5_KQ8_KTripleBatchDotProduct(
                   input,
                   firstWeight,
                   firstRows,
@@ -414,7 +443,9 @@ public final class TensorOps {
    * Returns whether equal-format projections can share activation quantization and row dispatch.
    */
   public static boolean supportsGroupedMatmul(GgufTensorType type) {
-    return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q4_K;
+    return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q4_K
+        || type == GgufTensorType.Q5_K;
   }
 
   static GroupedProjectionPlan groupedProjectionPlan(

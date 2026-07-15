@@ -275,10 +275,10 @@ class TensorOpsTest {
     }
 
     @Test
-    void groupedMatmulSupportIncludesQ4_K() {
+    void groupedMatmulSupportIncludesKQuantProjectionTypes() {
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q4_0)).isTrue();
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q4_K)).isTrue();
-      assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q5_K)).isFalse();
+      assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q5_K)).isTrue();
     }
 
     @Test
@@ -303,6 +303,14 @@ class TensorOpsTest {
               TensorOps.groupedProjectionPlan(
                   GgufTensorType.Q6_K, GgufTensorType.Q6_K, GgufTensorType.Q6_K))
           .isEqualTo(TensorOps.GroupedProjectionPlan.NONE);
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q5_K, GgufTensorType.Q5_K, GgufTensorType.Q5_K))
+          .isEqualTo(TensorOps.GroupedProjectionPlan.ALL);
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q5_K, GgufTensorType.Q5_K, GgufTensorType.Q6_K))
+          .isEqualTo(TensorOps.GroupedProjectionPlan.FIRST_SECOND);
     }
 
     @Test
@@ -371,6 +379,94 @@ class TensorOpsTest {
             actualThird,
             thirdWeight,
             GgufTensorType.Q4_K,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 256],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+      assertThat(actualThird).containsExactly(expectedThird);
+    }
+
+    @Test
+    void q5_KDualMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 256;
+      float[] input = repeatingQuery(cols);
+      int[] scales = {5, 12, 30, 60, 7, 15, 31, 63};
+      int[] mins = {3, 8, 20, 45, 1, 10, 25, 50};
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight =
+            copy(arena, q5KBlock(0.125f, 0.0625f, i -> (i * 7 + 3) % 32, scales, mins));
+        MemorySegment secondWeight =
+            copy(arena, q5KBlock(-0.25f, 0.03125f, i -> 31 - i % 32, scales, mins));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q5_K, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q5_K, 1, cols);
+
+        TensorOps.ggufDualMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q5_K,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q5_K,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 256],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+    }
+
+    @Test
+    void q5_KTripleMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 256;
+      float[] input = repeatingQuery(cols);
+      int[] scales = {5, 12, 30, 60, 7, 15, 31, 63};
+      int[] mins = {3, 8, 20, 45, 1, 10, 25, 50};
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] expectedThird = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+      float[] actualThird = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight =
+            copy(arena, q5KBlock(0.125f, 0.0625f, i -> (i * 7 + 3) % 32, scales, mins));
+        MemorySegment secondWeight =
+            copy(arena, q5KBlock(-0.25f, 0.03125f, i -> 31 - i % 32, scales, mins));
+        MemorySegment thirdWeight =
+            copy(arena, q5KBlock(0.5f, -0.015625f, i -> i * 11 % 32, scales, mins));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q5_K, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q5_K, 1, cols);
+        TensorOps.ggufMatmul(expectedThird, input, thirdWeight, GgufTensorType.Q5_K, 1, cols);
+
+        TensorOps.ggufTripleMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q5_K,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q5_K,
+            1,
+            actualThird,
+            thirdWeight,
+            GgufTensorType.Q5_K,
             1,
             input,
             cols,
