@@ -45,6 +45,16 @@ class LlamaForwardPassTest {
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
 
+  @Test
+  void groupedProjectionToggleDefaultsOnAndRejectsInvalidValues() {
+    assertThat(LlamaForwardPass.groupedProjectionsEnabled(null)).isTrue();
+    assertThat(LlamaForwardPass.groupedProjectionsEnabled("true")).isTrue();
+    assertThat(LlamaForwardPass.groupedProjectionsEnabled("false")).isFalse();
+    assertThatThrownBy(() -> LlamaForwardPass.groupedProjectionsEnabled("sometimes"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.groupedProjections");
+  }
+
   private GgufFile buildNanoModel(Random rng) {
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -120,6 +130,103 @@ class LlamaForwardPassTest {
     return GgufParser.parseSegment(segment);
   }
 
+  private GgufFile buildQ4NanoModel(Random rng) {
+    int dim = 32;
+    int hiddenDim = 64;
+    int headDim = dim / HEADS;
+    SyntheticGgufBuilder builder =
+        new SyntheticGgufBuilder()
+            .addString("general.architecture", "qwen3")
+            .addUint32("llama.embedding_length", dim)
+            .addUint32("llama.block_count", LAYERS)
+            .addUint32("llama.attention.head_count", HEADS)
+            .addUint32("llama.attention.head_count_kv", KV_HEADS)
+            .addUint32("llama.vocab_size", VOCAB_SIZE)
+            .addUint32("llama.context_length", CONTEXT)
+            .addUint32("llama.feed_forward_length", hiddenDim)
+            .addTensor(
+                "token_embd.weight",
+                GgufTensorType.F32,
+                new long[] {dim, VOCAB_SIZE},
+                randomF32(rng, VOCAB_SIZE * dim))
+            .addTensor("output_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
+            .addTensor(
+                "output.weight",
+                GgufTensorType.F32,
+                new long[] {dim, VOCAB_SIZE},
+                randomF32(rng, VOCAB_SIZE * dim));
+
+    for (int layer = 0; layer < LAYERS; layer++) {
+      String prefix = "blk." + layer + ".";
+      builder
+          .addTensor(
+              prefix + "attn_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
+          .addTensor(
+              prefix + "attn_q.weight",
+              GgufTensorType.Q4_0,
+              new long[] {dim, dim},
+              randomQ4(rng, dim * dim))
+          .addTensor(
+              prefix + "attn_q.bias", GgufTensorType.F32, new long[] {dim}, randomF32(rng, dim))
+          .addTensor(
+              prefix + "attn_q_norm.weight",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              onesF32(headDim))
+          .addTensor(
+              prefix + "attn_k.weight",
+              GgufTensorType.Q4_0,
+              new long[] {dim, headDim},
+              randomQ4(rng, headDim * dim))
+          .addTensor(
+              prefix + "attn_k.bias",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              randomF32(rng, headDim))
+          .addTensor(
+              prefix + "attn_k_norm.weight",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              onesF32(headDim))
+          .addTensor(
+              prefix + "attn_v.weight",
+              GgufTensorType.Q4_0,
+              new long[] {dim, headDim},
+              randomQ4(rng, headDim * dim))
+          .addTensor(
+              prefix + "attn_v.bias",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              randomF32(rng, headDim))
+          .addTensor(
+              prefix + "attn_output.weight",
+              GgufTensorType.Q4_0,
+              new long[] {dim, dim},
+              randomQ4(rng, dim * dim))
+          .addTensor(prefix + "ffn_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
+          .addTensor(
+              prefix + "ffn_gate.weight",
+              GgufTensorType.Q4_0,
+              new long[] {dim, hiddenDim},
+              randomQ4(rng, hiddenDim * dim))
+          .addTensor(
+              prefix + "ffn_up.weight",
+              GgufTensorType.Q4_0,
+              new long[] {dim, hiddenDim},
+              randomQ4(rng, hiddenDim * dim))
+          .addTensor(
+              prefix + "ffn_down.weight",
+              GgufTensorType.Q4_0,
+              new long[] {hiddenDim, dim},
+              randomQ4(rng, dim * hiddenDim));
+    }
+
+    byte[] data = builder.build();
+    MemorySegment segment = Arena.ofConfined().allocate(data.length);
+    MemorySegment.copy(data, 0, segment, ValueLayout.JAVA_BYTE, 0, data.length);
+    return GgufParser.parseSegment(segment);
+  }
+
   @Nested
   class NanoModel {
 
@@ -151,6 +258,81 @@ class LlamaForwardPassTest {
       float[] logits2 = pass2.forward(5, 0);
 
       assertThat(logits1).containsExactly(logits2);
+    }
+
+    @Test
+    void prefillMatchesTokenAtATimeForwardPass() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13};
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] expected = runSequence(sequential, tokens);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] actual = batched.prefill(tokens, 0);
+
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(17, tokens.length)).hasSize(VOCAB_SIZE);
+    }
+
+    @Test
+    void q4PrefillUsesBatchedKernelAndPreservesAutoregressiveState() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] expected = runSequence(sequential, tokens);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] actual = batched.prefill(tokens, 0);
+
+      assertThat(batched.usesBatchedPrefill()).isTrue();
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(3, tokens.length))
+          .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void transientForwardReusesLogitStorageWithoutChangingForwardSnapshots() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass forwardPass =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+
+      float[] snapshot = forwardPass.forward(5, 0);
+      float[] snapshotValues = snapshot.clone();
+      float[] firstTransient = forwardPass.forwardTransient(7, 1);
+      float[] firstTransientValues = firstTransient.clone();
+      float[] secondTransient = forwardPass.forwardTransient(11, 2);
+
+      assertThat(secondTransient).isSameAs(firstTransient);
+      assertThat(secondTransient).isNotSameAs(snapshot);
+      assertThat(firstTransient).isNotEqualTo(firstTransientValues);
+      assertThat(snapshot).containsExactly(snapshotValues);
     }
 
     @Test
@@ -224,6 +406,22 @@ class LlamaForwardPassTest {
     ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
     for (int i = 0; i < count; i++) {
       buf.putFloat(i * 4, 1.0f);
+    }
+    return data;
+  }
+
+  private static byte[] randomQ4(Random rng, int valueCount) {
+    if (valueCount % 32 != 0) {
+      throw new IllegalArgumentException("Q4_0 value count must be a multiple of 32");
+    }
+    byte[] data = new byte[(valueCount / 32) * 18];
+    ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+    for (int block = 0; block < valueCount / 32; block++) {
+      int offset = block * 18;
+      buffer.putShort(offset, Float.floatToFloat16(0.01f));
+      for (int packed = 0; packed < 16; packed++) {
+        data[offset + 2 + packed] = (byte) rng.nextInt(256);
+      }
     }
     return data;
   }

@@ -52,6 +52,18 @@ class KvCacheTest {
     }
 
     @Test
+    void storesVectorsFromBatchOffsets() {
+      var cache = new KvCache(1, 10, 2, 3);
+      float[] keys = {99, 1, 2, 98};
+      float[] values = {97, 96, 10, 20, 30, 95};
+
+      cache.store(0, 1, keys, 1, values, 2);
+
+      assertThat(cache.key(0, 1)).containsExactly(1, 2);
+      assertThat(cache.value(0, 1)).containsExactly(10, 20, 30);
+    }
+
+    @Test
     void storesVectorsInContiguousFlatBuffers() {
       var cache = new KvCache(2, 3, 2);
       cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});

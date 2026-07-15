@@ -151,6 +151,167 @@ public final class TensorOps {
     }
   }
 
+  /**
+   * Multiplies two matrices by one activation, sharing quantization and row dispatch when the
+   * tensor formats support it.
+   */
+  public static void ggufDualMatmul(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] input,
+      int cols,
+      byte[] quantizedActivation,
+      float[] quantizedActivationScales,
+      short[] quantizedActivationSums) {
+    if (firstType == GgufTensorType.Q4_0 && secondType == GgufTensorType.Q4_0) {
+      VectorUtil.ggufQ4_0Q8_0DualBatchDotProduct(
+          input,
+          firstWeight,
+          firstRows,
+          firstOut,
+          secondWeight,
+          secondRows,
+          secondOut,
+          cols,
+          quantizedActivation,
+          quantizedActivationScales);
+      return;
+    }
+
+    ggufMatmul(
+        firstOut,
+        input,
+        firstWeight,
+        firstType,
+        firstRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+    ggufMatmul(
+        secondOut,
+        input,
+        secondWeight,
+        secondType,
+        secondRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+  }
+
+  /**
+   * Multiplies three matrices by one activation, sharing quantization and row dispatch when the
+   * tensor formats support it.
+   */
+  public static void ggufTripleMatmul(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] thirdOut,
+      MemorySegment thirdWeight,
+      GgufTensorType thirdType,
+      int thirdRows,
+      float[] input,
+      int cols,
+      byte[] quantizedActivation,
+      float[] quantizedActivationScales,
+      short[] quantizedActivationSums) {
+    if (firstType == GgufTensorType.Q4_0
+        && secondType == GgufTensorType.Q4_0
+        && thirdType == GgufTensorType.Q4_0) {
+      VectorUtil.ggufQ4_0Q8_0TripleBatchDotProduct(
+          input,
+          firstWeight,
+          firstRows,
+          firstOut,
+          secondWeight,
+          secondRows,
+          secondOut,
+          thirdWeight,
+          thirdRows,
+          thirdOut,
+          cols,
+          quantizedActivation,
+          quantizedActivationScales);
+      return;
+    }
+
+    ggufMatmul(
+        firstOut,
+        input,
+        firstWeight,
+        firstType,
+        firstRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+    ggufMatmul(
+        secondOut,
+        input,
+        secondWeight,
+        secondType,
+        secondRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+    ggufMatmul(
+        thirdOut,
+        input,
+        thirdWeight,
+        thirdType,
+        thirdRows,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums);
+  }
+
+  /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
+  public static boolean supportsBatchedMatmul(GgufTensorType type) {
+    return type == GgufTensorType.Q4_0;
+  }
+
+  /** Matrix multiplication over batch-major activations using caller-owned quantization scratch. */
+  public static void ggufBatchedMatmul(
+      float[] out,
+      float[] x,
+      MemorySegment qWeight,
+      GgufTensorType type,
+      int batchSize,
+      int rows,
+      int cols,
+      byte[] quantizedActivations,
+      float[] quantizedActivationScales,
+      float[] q4LaneScratch) {
+    if (!supportsBatchedMatmul(type)) {
+      throw new UnsupportedOperationException("GGUF batched matmul not supported for: " + type);
+    }
+    VectorUtil.ggufQ4_0Q8_0BatchedMatmul(
+        x,
+        qWeight,
+        batchSize,
+        rows,
+        cols,
+        out,
+        quantizedActivations,
+        quantizedActivationScales,
+        q4LaneScratch);
+  }
+
   /** Matrix-vector multiplication with a quantized GGUF weight. */
   public static void quantizedMatmul(
       float[] out, float[] x, MemorySegment qWeight, GgufTensorType type, int rows, int cols) {
@@ -233,6 +394,25 @@ public final class TensorOps {
     }
   }
 
+  /** Applies standard rotary embedding using caller-precomputed pair factors. */
+  public static void rope(float[] vector, int offset, float[] cosine, float[] sine) {
+    rope(vector, offset, cosine, sine, 0, cosine.length);
+  }
+
+  /** Applies standard rotary embedding from an offset in precomputed pair factors. */
+  public static void rope(
+      float[] vector,
+      int vectorOffset,
+      float[] cosine,
+      float[] sine,
+      int factorOffset,
+      int pairCount) {
+    for (int pair = 0; pair < pairCount; pair++) {
+      rotatePair(
+          vector, vectorOffset + pair * 2, cosine[factorOffset + pair], sine[factorOffset + pair]);
+    }
+  }
+
   /** In-place NeoX rotary embedding whose coordinate pairs are separated by half a head. */
   public static void ropeNeox(
       float[] vector, int offset, int position, int headDim, float ropeTheta) {
@@ -259,12 +439,47 @@ public final class TensorOps {
     }
   }
 
+  /** Applies NeoX rotary embedding using caller-precomputed pair factors. */
+  public static void ropeNeox(float[] vector, int offset, float[] cosine, float[] sine) {
+    ropeNeox(vector, offset, cosine, sine, 0, cosine.length);
+  }
+
+  /** Applies NeoX rotary embedding from an offset in precomputed pair factors. */
+  public static void ropeNeox(
+      float[] vector,
+      int vectorOffset,
+      float[] cosine,
+      float[] sine,
+      int factorOffset,
+      int pairCount) {
+    for (int pair = 0; pair < pairCount; pair++) {
+      rotateSplitPair(
+          vector,
+          vectorOffset + pair,
+          vectorOffset + pairCount + pair,
+          cosine[factorOffset + pair],
+          sine[factorOffset + pair]);
+    }
+  }
+
   /** SwiGLU activation: out[i] = silu(gate[i]) * up[i]. */
   public static void swiGlu(float[] out, float[] gate, float[] up, int size) {
+    swiGlu(out, 0, gate, 0, up, 0, size);
+  }
+
+  /** Offset-aware SwiGLU activation over flat batch buffers. */
+  public static void swiGlu(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size) {
     for (int i = 0; i < size; i++) {
-      float x = gate[i];
+      float x = gate[gateOffset + i];
       float silu = x / (1.0f + (float) Math.exp(-x));
-      out[i] = silu * up[i];
+      out[outOffset + i] = silu * up[upOffset + i];
     }
   }
 

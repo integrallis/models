@@ -25,6 +25,7 @@ import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -128,6 +129,57 @@ class GenerationLoopTest {
 
   @Nested
   class BasicGeneration {
+
+    @Test
+    void usesOneBackendPrefillForThePrompt() {
+      AtomicInteger prefillCalls = new AtomicInteger();
+      AtomicInteger forwardCalls = new AtomicInteger();
+      InferenceBackend backend =
+          new InferenceBackend() {
+            @Override
+            public String name() {
+              return "prefill-tracking";
+            }
+
+            @Override
+            public ModelMetadata metadata() {
+              return new ModelMetadata("mock", "MockModel", 64, 6, 16, 1, 1, 1);
+            }
+
+            @Override
+            public Tokenizer tokenizer() {
+              return MOCK_TOKENIZER;
+            }
+
+            @Override
+            public float[] prefill(int[] tokens, int startPosition) {
+              prefillCalls.incrementAndGet();
+              float[] logits = new float[6];
+              logits[5] = 100.0f;
+              return logits;
+            }
+
+            @Override
+            public float[] forward(int token, int position) {
+              forwardCalls.incrementAndGet();
+              float[] logits = new float[6];
+              logits[1] = 100.0f;
+              return logits;
+            }
+
+            @Override
+            public void close() {}
+          };
+
+      String result =
+          new GenerationLoop(backend)
+              .generate(
+                  "hello world", SamplingOptions.builder().temperature(0.0f).maxTokens(2).build());
+
+      assertThat(result).isEqualTo("!");
+      assertThat(prefillCalls).hasValue(1);
+      assertThat(forwardCalls).hasValue(1);
+    }
 
     @Test
     void generatesUntilEos() {

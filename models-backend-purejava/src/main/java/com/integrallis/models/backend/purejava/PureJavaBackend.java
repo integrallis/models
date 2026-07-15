@@ -158,6 +158,16 @@ public final class PureJavaBackend implements InferenceBackend {
   }
 
   @Override
+  public float[] forwardTransient(int token, int position) {
+    return forwardPass.forwardTransient(token, position);
+  }
+
+  @Override
+  public float[] prefill(int[] tokens, int startPosition) {
+    return forwardPass.prefill(tokens, startPosition);
+  }
+
+  @Override
   public void reset() {
     forwardPass.reset();
   }

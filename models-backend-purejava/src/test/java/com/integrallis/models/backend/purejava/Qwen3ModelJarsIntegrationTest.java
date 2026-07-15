@@ -129,11 +129,8 @@ class Qwen3ModelJarsIntegrationTest {
 
   private static int[] greedyTokens(PureJavaBackend backend, int[] promptTokens, int count) {
     backend.reset();
-    float[] logits = null;
-    int position = 0;
-    for (int token : promptTokens) {
-      logits = backend.forward(token, position++);
-    }
+    float[] logits = backend.prefill(promptTokens, 0);
+    int position = promptTokens.length;
 
     int[] generated = new int[count];
     for (int index = 0; index < count; index++) {

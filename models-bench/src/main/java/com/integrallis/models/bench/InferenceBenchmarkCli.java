@@ -60,6 +60,10 @@ public final class InferenceBenchmarkCli {
   private InferenceBenchmarkCli() {}
 
   public static void main(String[] args) throws Exception {
+    if (args.length > 0 && "profile-decode".equals(args[0])) {
+      DecodeProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "compare".equals(args[0])) {
       BenchmarkComparisonCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;

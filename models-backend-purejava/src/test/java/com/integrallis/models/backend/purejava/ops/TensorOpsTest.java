@@ -139,6 +139,45 @@ class TensorOpsTest {
   static class QuantizedMatmul {
 
     @Test
+    void q4_0BatchedMatmulMatchesIndependentQueries() {
+      int batchSize = 3;
+      int cols = 32;
+      float[] queries = new float[batchSize * cols];
+      float[] expected = new float[batchSize];
+      float[] actual = new float[batchSize];
+      for (int batch = 0; batch < batchSize; batch++) {
+        for (int col = 0; col < cols; col++) {
+          queries[batch * cols + col] = ((batch + 1) * (col - 13)) / 17.0f;
+        }
+      }
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, q4Block(0.5f));
+        for (int batch = 0; batch < batchSize; batch++) {
+          float[] query = new float[cols];
+          System.arraycopy(queries, batch * cols, query, 0, cols);
+          float[] result = new float[1];
+          TensorOps.ggufMatmul(result, query, qWeight, GgufTensorType.Q4_0, 1, cols);
+          expected[batch] = result[0];
+        }
+
+        TensorOps.ggufBatchedMatmul(
+            actual,
+            queries,
+            qWeight,
+            GgufTensorType.Q4_0,
+            batchSize,
+            1,
+            cols,
+            new byte[batchSize * cols],
+            new float[batchSize * (cols / 32)],
+            new float[batchSize * 8]);
+      }
+
+      assertThat(actual).containsExactly(expected);
+    }
+
+    @Test
     void q4_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
       float[] x = repeatingQuery(32);
       byte[] row = q4Block(0.5f);
@@ -154,6 +193,85 @@ class TensorOpsTest {
 
         assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
       }
+    }
+
+    @Test
+    void q4_0DualMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 32;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4Block(0.5f));
+        MemorySegment secondWeight = copy(arena, q4Block(-0.25f));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q4_0, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q4_0, 1, cols);
+
+        TensorOps.ggufDualMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_0,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_0,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 32],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+    }
+
+    @Test
+    void q4_0TripleMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 32;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] expectedThird = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+      float[] actualThird = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4Block(0.5f));
+        MemorySegment secondWeight = copy(arena, q4Block(-0.25f));
+        MemorySegment thirdWeight = copy(arena, q4Block(0.125f));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q4_0, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q4_0, 1, cols);
+        TensorOps.ggufMatmul(expectedThird, input, thirdWeight, GgufTensorType.Q4_0, 1, cols);
+
+        TensorOps.ggufTripleMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_0,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_0,
+            1,
+            actualThird,
+            thirdWeight,
+            GgufTensorType.Q4_0,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 32],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+      assertThat(actualThird).containsExactly(expectedThird);
     }
 
     @Test
@@ -588,6 +706,20 @@ class TensorOpsTest {
       TensorOps.swiGlu(out, gate, up, 1);
       // silu(10) ≈ 10, so out ≈ 20
       assertThat(out[0]).isCloseTo(20.0f, within(0.01f));
+    }
+
+    @Test
+    void operatesOnBatchBufferOffsets() {
+      float[] gate = {99.0f, 0.0f, 10.0f, 98.0f};
+      float[] up = {97.0f, 5.0f, 2.0f, 96.0f};
+      float[] out = {95.0f, 0.0f, 0.0f, 94.0f};
+
+      TensorOps.swiGlu(out, 1, gate, 1, up, 1, 2);
+
+      assertThat(out[0]).isEqualTo(95.0f);
+      assertThat(out[1]).isZero();
+      assertThat(out[2]).isCloseTo(20.0f, within(0.01f));
+      assertThat(out[3]).isEqualTo(94.0f);
     }
   }
 }

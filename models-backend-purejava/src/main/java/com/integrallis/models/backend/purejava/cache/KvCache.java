@@ -53,13 +53,21 @@ public final class KvCache {
 
   /** Stores a key and value vector for a given layer and position. */
   public void store(int layer, int position, float[] key, float[] value) {
-    checkBounds(layer, position);
     checkVector("key", key, keyDim);
     checkVector("value", value, valueDim);
+    store(layer, position, key, 0, value, 0);
+  }
+
+  /** Stores key and value vectors from offsets in batch-major buffers. */
+  public void store(
+      int layer, int position, float[] key, int keyOffset, float[] value, int valueOffset) {
+    checkBounds(layer, position);
+    checkVectorRange("key", key, keyOffset, keyDim);
+    checkVectorRange("value", value, valueOffset, valueDim);
     ensureCapacity(position + 1);
     int slot = slotIndex(layer, position);
-    System.arraycopy(key, 0, keys, slot * keyDim, keyDim);
-    System.arraycopy(value, 0, values, slot * valueDim, valueDim);
+    System.arraycopy(key, keyOffset, keys, slot * keyDim, keyDim);
+    System.arraycopy(value, valueOffset, values, slot * valueDim, valueDim);
     populated[slot] = true;
   }
 
@@ -203,6 +211,20 @@ public final class KvCache {
     if (vector.length != dimension) {
       throw new IllegalArgumentException(
           name + ".length must equal " + dimension + ": " + vector.length);
+    }
+  }
+
+  private static void checkVectorRange(String name, float[] vector, int offset, int dimension) {
+    Objects.requireNonNull(vector, name);
+    if (offset < 0 || offset > vector.length - dimension) {
+      throw new IllegalArgumentException(
+          name
+              + " range must fit vector: offset="
+              + offset
+              + ", dimension="
+              + dimension
+              + ", length="
+              + vector.length);
     }
   }
 
