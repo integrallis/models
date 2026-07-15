@@ -35,6 +35,7 @@ import org.modeljars.ModelJarRequirement;
 class Qwen3BatchedPrefillIntegrationTest {
 
   private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
+  private static final int[] LLAMA_CPP_GREEDY_TOKENS = {34208, 916, 279, 15678};
   private static final ModelJarRequirement QWEN3_0_6B_Q4_0 =
       ModelJarRequirement.forSource("hf://ggml-org/Qwen3-0.6B-GGUF")
           .versionRange("[3.0.0,4.0.0)")
@@ -79,6 +80,9 @@ class Qwen3BatchedPrefillIntegrationTest {
       for (int generated = 0; generated < 4; generated++) {
         int sequentialToken = argmax(sequentialLogits);
         int batchedToken = argmax(batchedLogits);
+        assertThat(sequentialToken)
+            .as("sequential generated token %d must match llama.cpp", generated)
+            .isEqualTo(LLAMA_CPP_GREEDY_TOKENS[generated]);
         assertThat(batchedToken)
             .as("generated token %d must match sequential argmax", generated)
             .isEqualTo(sequentialToken);
