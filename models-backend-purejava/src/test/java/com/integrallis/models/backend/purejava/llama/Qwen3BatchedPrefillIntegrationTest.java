@@ -63,20 +63,33 @@ class Qwen3BatchedPrefillIntegrationTest {
 
       System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "1");
       LlamaForwardPass sequential = forwardPass(config, weights, sequentialStates);
+      float[] sequentialLogits = null;
       for (int position = 0; position < tokens.length; position++) {
-        sequential.forwardTransient(tokens[position], position);
+        sequentialLogits = sequential.forwardTransient(tokens[position], position);
       }
 
       System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "32");
       LlamaForwardPass batched = forwardPass(config, weights, batchedStates);
       assertThat(batched.usesBatchedPrefill()).isTrue();
-      batched.prefill(tokens, 0);
+      float[] batchedLogits = batched.prefill(tokens, 0);
 
-      for (int layer = 0; layer < config.numLayers(); layer++) {
-        for (int position = 0; position < tokens.length; position++) {
+      assertStatesMatch(config, tokens.length, sequentialStates, batchedStates);
+      assertSameBits("prompt logits", sequentialLogits, batchedLogits);
+
+      for (int generated = 0; generated < 4; generated++) {
+        int sequentialToken = argmax(sequentialLogits);
+        int batchedToken = argmax(batchedLogits);
+        assertThat(batchedToken)
+            .as("generated token %d must match sequential argmax", generated)
+            .isEqualTo(sequentialToken);
+        int position = tokens.length + generated;
+        sequentialLogits = sequential.forwardTransient(sequentialToken, position);
+        batchedLogits = batched.forwardTransient(sequentialToken, position);
+        for (int layer = 0; layer < config.numLayers(); layer++) {
           LayerPosition key = new LayerPosition(layer, position);
-          assertSameBits(key, sequentialStates.get(key), batchedStates.get(key));
+          assertSameBits(key.toString(), sequentialStates.get(key), batchedStates.get(key));
         }
+        assertSameBits("decode logits at position " + position, sequentialLogits, batchedLogits);
       }
     } finally {
       restoreProperty(previous);
@@ -96,13 +109,26 @@ class Qwen3BatchedPrefillIntegrationTest {
                 Arrays.copyOfRange(state, offset, offset + length)));
   }
 
-  private static void assertSameBits(LayerPosition key, float[] expected, float[] actual) {
-    assertThat(actual).as("missing batched state for %s", key).isNotNull();
-    assertThat(expected).as("missing sequential state for %s", key).isNotNull();
+  private static void assertStatesMatch(
+      LlamaConfig config,
+      int positions,
+      Map<LayerPosition, float[]> expected,
+      Map<LayerPosition, float[]> actual) {
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      for (int position = 0; position < positions; position++) {
+        LayerPosition key = new LayerPosition(layer, position);
+        assertSameBits(key.toString(), expected.get(key), actual.get(key));
+      }
+    }
+  }
+
+  private static void assertSameBits(String label, float[] expected, float[] actual) {
+    assertThat(actual).as("missing batched state for %s", label).isNotNull();
+    assertThat(expected).as("missing sequential state for %s", label).isNotNull();
     for (int index = 0; index < expected.length; index++) {
       if (Float.floatToRawIntBits(actual[index]) != Float.floatToRawIntBits(expected[index])) {
         throw new AssertionError(
-            key
+            label
                 + " diverged at index "
                 + index
                 + ": sequential="
@@ -113,6 +139,16 @@ class Qwen3BatchedPrefillIntegrationTest {
                 + (actual[index] - expected[index]));
       }
     }
+  }
+
+  private static int argmax(float[] values) {
+    int best = 0;
+    for (int index = 1; index < values.length; index++) {
+      if (values[index] > values[best]) {
+        best = index;
+      }
+    }
+    return best;
   }
 
   private static void restoreProperty(String previous) {
