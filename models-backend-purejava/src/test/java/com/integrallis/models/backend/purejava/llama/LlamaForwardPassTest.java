@@ -17,7 +17,6 @@ package com.integrallis.models.backend.purejava.llama;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
@@ -127,6 +126,7 @@ class LlamaForwardPassTest {
     int headDim = dim / HEADS;
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
+            .addString("general.architecture", "qwen3")
             .addUint32("llama.embedding_length", dim)
             .addUint32("llama.block_count", LAYERS)
             .addUint32("llama.attention.head_count", HEADS)
@@ -157,15 +157,37 @@ class LlamaForwardPassTest {
               new long[] {dim, dim},
               randomQ4(rng, dim * dim))
           .addTensor(
+              prefix + "attn_q.bias", GgufTensorType.F32, new long[] {dim}, randomF32(rng, dim))
+          .addTensor(
+              prefix + "attn_q_norm.weight",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              onesF32(headDim))
+          .addTensor(
               prefix + "attn_k.weight",
               GgufTensorType.Q4_0,
               new long[] {dim, headDim},
               randomQ4(rng, headDim * dim))
           .addTensor(
+              prefix + "attn_k.bias",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              randomF32(rng, headDim))
+          .addTensor(
+              prefix + "attn_k_norm.weight",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              onesF32(headDim))
+          .addTensor(
               prefix + "attn_v.weight",
               GgufTensorType.Q4_0,
               new long[] {dim, headDim},
               randomQ4(rng, headDim * dim))
+          .addTensor(
+              prefix + "attn_v.bias",
+              GgufTensorType.F32,
+              new long[] {headDim},
+              randomF32(rng, headDim))
           .addTensor(
               prefix + "attn_output.weight",
               GgufTensorType.Q4_0,
@@ -275,8 +297,9 @@ class LlamaForwardPassTest {
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
-      assertClose(actual, expected, 1e-4f);
-      assertClose(batched.forward(3, tokens.length), sequential.forward(3, tokens.length), 1e-4f);
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(3, tokens.length))
+          .containsExactly(sequential.forward(3, tokens.length));
     }
 
     @Test
@@ -391,12 +414,5 @@ class LlamaForwardPassTest {
       }
     }
     return data;
-  }
-
-  private static void assertClose(float[] actual, float[] expected, float tolerance) {
-    assertThat(actual).hasSameSizeAs(expected);
-    for (int index = 0; index < actual.length; index++) {
-      assertThat(actual[index]).isCloseTo(expected[index], within(tolerance));
-    }
   }
 }

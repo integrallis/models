@@ -228,6 +228,9 @@ tasks.register<Test>("qwen306BQ40IntegrationTest") {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest.*Q40*",
         )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.llama.Qwen3BatchedPrefillIntegrationTest",
+        )
     }
     dependsOn(tasks.named("downloadQwen306BQ40Model"))
     outputs.upToDateWhen { false }

@@ -29,6 +29,11 @@ import java.util.Objects;
  */
 public final class LlamaForwardPass {
 
+  @FunctionalInterface
+  interface LayerObserver {
+    void onLayerComplete(int layer, int position, float[] state, int offset, int length);
+  }
+
   private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
   private static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
 
@@ -36,6 +41,7 @@ public final class LlamaForwardPass {
   private final LlamaWeights weights;
   private final KvCache cache;
   private final RopeTable ropeTable;
+  private final LayerObserver layerObserver;
   private final boolean batchedPrefill;
   private final int prefillBatchCapacity;
 
@@ -73,9 +79,15 @@ public final class LlamaForwardPass {
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
+    this(config, weights, cache, null);
+  }
+
+  LlamaForwardPass(
+      LlamaConfig config, LlamaWeights weights, KvCache cache, LayerObserver layerObserver) {
     this.config = config;
     this.weights = weights;
     this.cache = cache;
+    this.layerObserver = layerObserver;
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -296,6 +308,11 @@ public final class LlamaForwardPass {
           dim,
           hiddenDim);
       addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
+      if (layerObserver != null) {
+        for (int batch = 0; batch < batchSize; batch++) {
+          layerObserver.onLayerComplete(layer, startPosition + batch, batchX, batch * dim, dim);
+        }
+      }
     }
 
     if (computeLogits) {
@@ -414,6 +431,9 @@ public final class LlamaForwardPass {
       // Residual connection
       for (int i = 0; i < dim; i++) {
         x[i] += ffnProjected[i];
+      }
+      if (layerObserver != null) {
+        layerObserver.onLayerComplete(layer, position, x, 0, dim);
       }
     }
 
