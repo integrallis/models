@@ -22,6 +22,14 @@ import java.lang.foreign.MemorySegment;
 /** Core tensor operations for transformer inference. */
 public final class TensorOps {
 
+  enum GroupedProjectionPlan {
+    NONE,
+    ALL,
+    FIRST_SECOND,
+    FIRST_THIRD,
+    SECOND_THIRD
+  }
+
   private TensorOps() {}
 
   /** RMS normalization: out[i] = x[i] / rms(x) * weight[i]. */
@@ -169,18 +177,35 @@ public final class TensorOps {
       byte[] quantizedActivation,
       float[] quantizedActivationScales,
       short[] quantizedActivationSums) {
-    if (firstType == GgufTensorType.Q4_0 && secondType == GgufTensorType.Q4_0) {
-      VectorUtil.ggufQ4_0Q8_0DualBatchDotProduct(
-          input,
-          firstWeight,
-          firstRows,
-          firstOut,
-          secondWeight,
-          secondRows,
-          secondOut,
-          cols,
-          quantizedActivation,
-          quantizedActivationScales);
+    if (firstType == secondType && supportsGroupedMatmul(firstType)) {
+      switch (firstType) {
+        case Q4_0 ->
+            VectorUtil.ggufQ4_0Q8_0DualBatchDotProduct(
+                input,
+                firstWeight,
+                firstRows,
+                firstOut,
+                secondWeight,
+                secondRows,
+                secondOut,
+                cols,
+                quantizedActivation,
+                quantizedActivationScales);
+        case Q4_K ->
+            VectorUtil.ggufQ4_KQ8_KDualBatchDotProduct(
+                input,
+                firstWeight,
+                firstRows,
+                firstOut,
+                secondWeight,
+                secondRows,
+                secondOut,
+                cols,
+                quantizedActivation,
+                quantizedActivationScales,
+                quantizedActivationSums);
+        default -> throw new IllegalStateException("Unsupported grouped matmul type: " + firstType);
+      }
       return;
     }
 
@@ -228,24 +253,129 @@ public final class TensorOps {
       byte[] quantizedActivation,
       float[] quantizedActivationScales,
       short[] quantizedActivationSums) {
-    if (firstType == GgufTensorType.Q4_0
-        && secondType == GgufTensorType.Q4_0
-        && thirdType == GgufTensorType.Q4_0) {
-      VectorUtil.ggufQ4_0Q8_0TripleBatchDotProduct(
-          input,
-          firstWeight,
-          firstRows,
-          firstOut,
-          secondWeight,
-          secondRows,
-          secondOut,
-          thirdWeight,
-          thirdRows,
-          thirdOut,
-          cols,
-          quantizedActivation,
-          quantizedActivationScales);
-      return;
+    switch (groupedProjectionPlan(firstType, secondType, thirdType)) {
+      case ALL -> {
+        switch (firstType) {
+          case Q4_0 ->
+              VectorUtil.ggufQ4_0Q8_0TripleBatchDotProduct(
+                  input,
+                  firstWeight,
+                  firstRows,
+                  firstOut,
+                  secondWeight,
+                  secondRows,
+                  secondOut,
+                  thirdWeight,
+                  thirdRows,
+                  thirdOut,
+                  cols,
+                  quantizedActivation,
+                  quantizedActivationScales);
+          case Q4_K ->
+              VectorUtil.ggufQ4_KQ8_KTripleBatchDotProduct(
+                  input,
+                  firstWeight,
+                  firstRows,
+                  firstOut,
+                  secondWeight,
+                  secondRows,
+                  secondOut,
+                  thirdWeight,
+                  thirdRows,
+                  thirdOut,
+                  cols,
+                  quantizedActivation,
+                  quantizedActivationScales,
+                  quantizedActivationSums);
+          default ->
+              throw new IllegalStateException("Unsupported grouped matmul type: " + firstType);
+        }
+        return;
+      }
+      case FIRST_SECOND -> {
+        ggufDualMatmul(
+            firstOut,
+            firstWeight,
+            firstType,
+            firstRows,
+            secondOut,
+            secondWeight,
+            secondType,
+            secondRows,
+            input,
+            cols,
+            quantizedActivation,
+            quantizedActivationScales,
+            quantizedActivationSums);
+        ggufMatmul(
+            thirdOut,
+            input,
+            thirdWeight,
+            thirdType,
+            thirdRows,
+            cols,
+            quantizedActivation,
+            quantizedActivationScales,
+            quantizedActivationSums);
+        return;
+      }
+      case FIRST_THIRD -> {
+        ggufDualMatmul(
+            firstOut,
+            firstWeight,
+            firstType,
+            firstRows,
+            thirdOut,
+            thirdWeight,
+            thirdType,
+            thirdRows,
+            input,
+            cols,
+            quantizedActivation,
+            quantizedActivationScales,
+            quantizedActivationSums);
+        ggufMatmul(
+            secondOut,
+            input,
+            secondWeight,
+            secondType,
+            secondRows,
+            cols,
+            quantizedActivation,
+            quantizedActivationScales,
+            quantizedActivationSums);
+        return;
+      }
+      case SECOND_THIRD -> {
+        ggufDualMatmul(
+            secondOut,
+            secondWeight,
+            secondType,
+            secondRows,
+            thirdOut,
+            thirdWeight,
+            thirdType,
+            thirdRows,
+            input,
+            cols,
+            quantizedActivation,
+            quantizedActivationScales,
+            quantizedActivationSums);
+        ggufMatmul(
+            firstOut,
+            input,
+            firstWeight,
+            firstType,
+            firstRows,
+            cols,
+            quantizedActivation,
+            quantizedActivationScales,
+            quantizedActivationSums);
+        return;
+      }
+      case NONE -> {
+        // Fall through to independent format-specific projections.
+      }
     }
 
     ggufMatmul(
@@ -278,6 +408,32 @@ public final class TensorOps {
         quantizedActivation,
         quantizedActivationScales,
         quantizedActivationSums);
+  }
+
+  /**
+   * Returns whether equal-format projections can share activation quantization and row dispatch.
+   */
+  public static boolean supportsGroupedMatmul(GgufTensorType type) {
+    return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q4_K;
+  }
+
+  static GroupedProjectionPlan groupedProjectionPlan(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    if (supportsGroupedMatmul(firstType)) {
+      if (firstType == secondType && firstType == thirdType) {
+        return GroupedProjectionPlan.ALL;
+      }
+      if (firstType == secondType) {
+        return GroupedProjectionPlan.FIRST_SECOND;
+      }
+      if (firstType == thirdType) {
+        return GroupedProjectionPlan.FIRST_THIRD;
+      }
+    }
+    if (secondType == thirdType && supportsGroupedMatmul(secondType)) {
+      return GroupedProjectionPlan.SECOND_THIRD;
+    }
+    return GroupedProjectionPlan.NONE;
   }
 
   /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
