@@ -76,8 +76,8 @@ class Qwen3BatchedPrefillIntegrationTest {
       assertThat(batched.usesBatchedPrefill()).isTrue();
       float[] batchedLogits = batched.prefill(tokens, 0);
 
-      assertStatesMatch(config, tokens.length, sequentialStates, batchedStates);
       assertCachesMatch(config, tokens.length, sequentialFixture.cache(), batchedFixture.cache());
+      assertStatesMatch(config, tokens.length, sequentialStates, batchedStates);
       assertSameBits("prompt logits", sequentialLogits, batchedLogits);
 
       for (int generated = 0; generated < 4; generated++) {
