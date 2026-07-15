@@ -18,8 +18,10 @@ package com.integrallis.models.backend.purejava.llama;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("unit")
 class RopeTableTest {
 
   @Test
@@ -52,5 +54,24 @@ class RopeTableTest {
 
     assertThat(standard).containsExactly(expectedStandard);
     assertThat(neox).containsExactly(expectedNeox);
+  }
+
+  @Test
+  void batchFactorsArePreparedOnceAndAddressedByToken() {
+    RopeTable table = new RopeTable(4, 10_000.0f, 0.25f);
+    float[] first = {1.0f, 2.0f, 3.0f, 4.0f};
+    float[] second = {5.0f, 6.0f, 7.0f, 8.0f};
+    float[] expectedFirst = first.clone();
+    float[] expectedSecond = second.clone();
+    TensorOps.rope(expectedFirst, 0, 9, 4, 10_000.0f, 0.25f);
+    TensorOps.rope(expectedSecond, 0, 10, 4, 10_000.0f, 0.25f);
+
+    table.prepareBatch(9, 2);
+    table.applyBatch(first, 0, 0, false);
+    table.applyBatch(second, 0, 1, false);
+
+    assertThat(first).containsExactly(expectedFirst);
+    assertThat(second).containsExactly(expectedSecond);
+    assertThat(table.preparationCount()).isEqualTo(2);
   }
 }

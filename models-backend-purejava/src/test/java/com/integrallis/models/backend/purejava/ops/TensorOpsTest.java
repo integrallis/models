@@ -139,6 +139,44 @@ class TensorOpsTest {
   static class QuantizedMatmul {
 
     @Test
+    void q4_0BatchedMatmulMatchesIndependentQueries() {
+      int batchSize = 3;
+      int cols = 32;
+      float[] queries = new float[batchSize * cols];
+      float[] expected = new float[batchSize];
+      float[] actual = new float[batchSize];
+      for (int batch = 0; batch < batchSize; batch++) {
+        for (int col = 0; col < cols; col++) {
+          queries[batch * cols + col] = ((batch + 1) * (col - 13)) / 17.0f;
+        }
+      }
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, q4Block(0.5f));
+        for (int batch = 0; batch < batchSize; batch++) {
+          float[] query = new float[cols];
+          System.arraycopy(queries, batch * cols, query, 0, cols);
+          float[] result = new float[1];
+          TensorOps.ggufMatmul(result, query, qWeight, GgufTensorType.Q4_0, 1, cols);
+          expected[batch] = result[0];
+        }
+
+        TensorOps.ggufBatchedMatmul(
+            actual,
+            queries,
+            qWeight,
+            GgufTensorType.Q4_0,
+            batchSize,
+            1,
+            cols,
+            new byte[batchSize * cols],
+            new float[batchSize * (cols / 32)]);
+      }
+
+      assertThat(actual).containsExactly(expected);
+    }
+
+    @Test
     void q4_0MatchesVectorsGgmlQ8_0ActivationSemantics() {
       float[] x = repeatingQuery(32);
       byte[] row = q4Block(0.5f);
@@ -588,6 +626,20 @@ class TensorOpsTest {
       TensorOps.swiGlu(out, gate, up, 1);
       // silu(10) ≈ 10, so out ≈ 20
       assertThat(out[0]).isCloseTo(20.0f, within(0.01f));
+    }
+
+    @Test
+    void operatesOnBatchBufferOffsets() {
+      float[] gate = {99.0f, 0.0f, 10.0f, 98.0f};
+      float[] up = {97.0f, 5.0f, 2.0f, 96.0f};
+      float[] out = {95.0f, 0.0f, 0.0f, 94.0f};
+
+      TensorOps.swiGlu(out, 1, gate, 1, up, 1, 2);
+
+      assertThat(out[0]).isEqualTo(95.0f);
+      assertThat(out[1]).isZero();
+      assertThat(out[2]).isCloseTo(20.0f, within(0.01f));
+      assertThat(out[3]).isEqualTo(94.0f);
     }
   }
 }
