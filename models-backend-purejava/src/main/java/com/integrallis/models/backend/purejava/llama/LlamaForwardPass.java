@@ -69,6 +69,7 @@ public final class LlamaForwardPass {
   private final float[] batchFfnProjected;
   private final byte[] batchQuantizedActivation;
   private final float[] batchQuantizedActivationScales;
+  private final float[] batchQ4LaneScratch;
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
@@ -120,6 +121,13 @@ public final class LlamaForwardPass {
         new byte[Math.multiplyExact(prefillBatchCapacity, maxProjectionInput)];
     this.batchQuantizedActivationScales =
         new float[Math.multiplyExact(prefillBatchCapacity, (maxProjectionInput + 31) / 32)];
+    int maxProjectionOutput =
+        Math.max(
+            Math.max(dim, hiddenDim),
+            Math.max(config.queryDim(), Math.max(config.keyDim(), config.valueDim())));
+    this.batchQ4LaneScratch =
+        new float
+            [Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, maxProjectionOutput), 8)];
   }
 
   /** Runs a single forward pass for the given token at the given position. Returns logits. */
@@ -528,7 +536,8 @@ public final class LlamaForwardPass {
         rows,
         cols,
         batchQuantizedActivation,
-        batchQuantizedActivationScales);
+        batchQuantizedActivationScales,
+        batchQ4LaneScratch);
   }
 
   private static int configuredPrefillBatchSize() {

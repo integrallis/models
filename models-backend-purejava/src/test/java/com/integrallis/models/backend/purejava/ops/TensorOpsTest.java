@@ -170,7 +170,8 @@ class TensorOpsTest {
             1,
             cols,
             new byte[batchSize * cols],
-            new float[batchSize * (cols / 32)]);
+            new float[batchSize * (cols / 32)],
+            new float[batchSize * 8]);
       }
 
       assertThat(actual).containsExactly(expected);

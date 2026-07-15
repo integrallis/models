@@ -166,12 +166,21 @@ public final class TensorOps {
       int rows,
       int cols,
       byte[] quantizedActivations,
-      float[] quantizedActivationScales) {
+      float[] quantizedActivationScales,
+      float[] q4LaneScratch) {
     if (!supportsBatchedMatmul(type)) {
       throw new UnsupportedOperationException("GGUF batched matmul not supported for: " + type);
     }
     VectorUtil.ggufQ4_0Q8_0BatchedMatmul(
-        x, qWeight, batchSize, rows, cols, out, quantizedActivations, quantizedActivationScales);
+        x,
+        qWeight,
+        batchSize,
+        rows,
+        cols,
+        out,
+        quantizedActivations,
+        quantizedActivationScales,
+        q4LaneScratch);
   }
 
   /** Matrix-vector multiplication with a quantized GGUF weight. */
