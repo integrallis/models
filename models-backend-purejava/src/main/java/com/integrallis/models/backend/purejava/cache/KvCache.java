@@ -134,6 +134,21 @@ public final class KvCache {
     Arrays.fill(populated, false);
   }
 
+  /** Discards cached keys and values at and after a speculative sequence position. */
+  public void discardFrom(int position) {
+    if (position < 0 || position > maxSeqLen) {
+      throw new IllegalArgumentException("position out of range: " + position);
+    }
+    if (position >= allocatedSequenceCapacity) {
+      return;
+    }
+    for (int layer = 0; layer < numLayers; layer++) {
+      int fromIndex = layer * allocatedSequenceCapacity + position;
+      int toIndex = (layer + 1) * allocatedSequenceCapacity;
+      Arrays.fill(populated, fromIndex, toIndex, false);
+    }
+  }
+
   /** Returns the number of sequence positions currently backed by physical storage. */
   public int allocatedSequenceCapacity() {
     return allocatedSequenceCapacity;

@@ -141,6 +141,28 @@ class KvCacheTest {
       assertThat(cache.key(0, 0)).containsExactly(5, 6);
       assertThat(cache.value(0, 0)).containsExactly(7, 8);
     }
+
+    @Test
+    void discardFromPreservesAcceptedPrefixAndClearsSpeculativeTail() {
+      var cache = new KvCache(2, 10, 2);
+      for (int layer = 0; layer < 2; layer++) {
+        for (int position = 0; position < 4; position++) {
+          float marker = layer * 10 + position;
+          cache.store(
+              layer,
+              position,
+              new float[] {marker, marker + 0.25f},
+              new float[] {marker + 0.5f, marker + 0.75f});
+        }
+      }
+
+      cache.discardFrom(2);
+
+      assertThat(cache.key(0, 1)).isNotNull();
+      assertThat(cache.value(1, 1)).isNotNull();
+      assertThat(cache.key(0, 2)).isNull();
+      assertThat(cache.value(1, 3)).isNull();
+    }
   }
 
   @Nested
