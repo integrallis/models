@@ -80,6 +80,7 @@ public final class LlamaForwardPass {
   private final byte[] batchQuantizedActivation;
   private final float[] batchQuantizedActivationScales;
   private final float[] batchQ4LaneScratch;
+  private float[] verificationLogits = new float[0];
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
@@ -502,6 +503,13 @@ public final class LlamaForwardPass {
 
   /** Verifies a contiguous speculative continuation and returns logits for every consumed token. */
   public LogitBatch verify(int[] tokens, int startPosition) {
+    return verifyTransient(tokens, startPosition).snapshot();
+  }
+
+  /**
+   * Verifies a contiguous speculative continuation using logits storage reused by the next call.
+   */
+  public LogitBatch verifyTransient(int[] tokens, int startPosition) {
     Objects.requireNonNull(tokens, "tokens");
     if (tokens.length == 0) {
       throw new IllegalArgumentException("tokens must not be empty");
@@ -516,7 +524,10 @@ public final class LlamaForwardPass {
     }
 
     int vocabSize = config.vocabSize();
-    float[] result = new float[Math.multiplyExact(tokens.length, vocabSize)];
+    int resultLength = Math.multiplyExact(tokens.length, vocabSize);
+    if (verificationLogits.length < resultLength) {
+      verificationLogits = new float[resultLength];
+    }
     int tokenOffset = 0;
     while (tokenOffset < tokens.length) {
       int batchSize =
@@ -524,7 +535,7 @@ public final class LlamaForwardPass {
       if (batchSize == 1) {
         float[] row =
             forwardInternal(tokens[tokenOffset], Math.addExact(startPosition, tokenOffset), true);
-        System.arraycopy(row, 0, result, tokenOffset * vocabSize, vocabSize);
+        System.arraycopy(row, 0, verificationLogits, tokenOffset * vocabSize, vocabSize);
       } else {
         prefillBatch(
             tokens,
@@ -532,13 +543,13 @@ public final class LlamaForwardPass {
             batchSize,
             Math.addExact(startPosition, tokenOffset),
             false,
-            result,
+            verificationLogits,
             tokenOffset * vocabSize);
         nextPosition += batchSize;
       }
       tokenOffset += batchSize;
     }
-    return new LogitBatch(tokens.length, vocabSize, result);
+    return new LogitBatch(tokens.length, vocabSize, verificationLogits);
   }
 
   /** Returns the next sequence position for speculative rollback. */

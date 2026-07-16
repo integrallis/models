@@ -50,4 +50,16 @@ class LogitBatchTest {
     assertThatThrownBy(() -> batch.logit(1, 0)).isInstanceOf(IndexOutOfBoundsException.class);
     assertThatThrownBy(() -> batch.logit(0, 2)).isInstanceOf(IndexOutOfBoundsException.class);
   }
+
+  @Test
+  void snapshotCopiesActiveRowsFromReusableBackingStorage() {
+    float[] reusable = {1.0f, 2.0f, 99.0f, 98.0f};
+    var transientBatch = new LogitBatch(1, 2, reusable);
+
+    LogitBatch snapshot = transientBatch.snapshot();
+    reusable[0] = 7.0f;
+
+    assertThat(snapshot.copyRow(0)).containsExactly(1.0f, 2.0f);
+    assertThat(transientBatch.copyRow(0)).containsExactly(7.0f, 2.0f);
+  }
 }

@@ -21,8 +21,9 @@ import java.util.Objects;
 /**
  * Logits for a contiguous token batch in token-major order.
  *
- * <p>The constructor takes ownership of {@code values}; callers must not modify that array after
- * construction.
+ * <p>The constructor takes ownership of the active prefix of {@code values}; callers must not
+ * modify that array after construction unless the containing backend documents the result as
+ * transient.
  */
 public final class LogitBatch {
 
@@ -39,9 +40,9 @@ public final class LogitBatch {
     }
     this.values = Objects.requireNonNull(values, "values");
     int expectedLength = Math.multiplyExact(tokenCount, vocabularySize);
-    if (values.length != expectedLength) {
+    if (values.length < expectedLength) {
       throw new IllegalArgumentException(
-          "values.length must equal "
+          "values.length must be at least "
               + expectedLength
               + " for "
               + tokenCount
@@ -91,6 +92,12 @@ public final class LogitBatch {
     checkTokenIndex(tokenIndex);
     int offset = tokenIndex * vocabularySize;
     return Arrays.copyOfRange(values, offset, offset + vocabularySize);
+  }
+
+  /** Returns a stable copy of all active rows. */
+  public LogitBatch snapshot() {
+    return new LogitBatch(
+        tokenCount, vocabularySize, Arrays.copyOf(values, tokenCount * vocabularySize));
   }
 
   private void checkTokenIndex(int tokenIndex) {

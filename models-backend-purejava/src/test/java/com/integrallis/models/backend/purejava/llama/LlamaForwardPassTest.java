@@ -379,6 +379,26 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void stableVerificationSnapshotSurvivesLaterTransientVerification() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass forwardPass =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      forwardPass.prefill(new int[] {5, 7}, 0);
+
+      LogitBatch stable = forwardPass.verify(new int[] {11, 13}, 2);
+      float[] expectedStableRow = stable.copyRow(0);
+      forwardPass.rewind(2);
+      forwardPass.verifyTransient(new int[] {17, 19}, 2);
+
+      assertThat(stable.copyRow(0)).containsExactly(expectedStableRow);
+    }
+
+    @Test
     void transientForwardReusesLogitStorageWithoutChangingForwardSnapshots() {
       GgufFile file = buildNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());

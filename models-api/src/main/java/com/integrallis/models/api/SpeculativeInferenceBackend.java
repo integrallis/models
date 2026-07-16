@@ -34,6 +34,15 @@ public interface SpeculativeInferenceBackend extends InferenceBackend {
    */
   LogitBatch verify(int[] tokens, int startPosition);
 
+  /**
+   * Consumes proposed tokens and may return storage reused by the next backend call.
+   *
+   * <p>The default preserves the stable snapshot returned by {@link #verify(int[], int)}.
+   */
+  default LogitBatch verifyTransient(int[] tokens, int startPosition) {
+    return verify(tokens, startPosition);
+  }
+
   /** Discards cached sequence state at and after {@code checkpoint}. */
   void rewind(int checkpoint);
 }

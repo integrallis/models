@@ -179,6 +179,11 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   }
 
   @Override
+  public LogitBatch verifyTransient(int[] tokens, int startPosition) {
+    return forwardPass.verifyTransient(tokens, startPosition);
+  }
+
+  @Override
   public void rewind(int checkpoint) {
     forwardPass.rewind(checkpoint);
   }
