@@ -17,6 +17,12 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.llama.LlamaConfig;
+import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.ops.TensorOps;
+import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -39,15 +45,7 @@ class SmolLm2ModelJarsIntegrationTest {
 
   @Test
   void loadsSmolLm2360MQ80ThroughModelJars() {
-    ModelJarDescriptor descriptor =
-        ModelJarRegistry.fromClasspath().resolve(SMOLLM2_360M_Q8_0).orElseThrow();
-
-    assertThat(Files.exists(descriptor.localPath().orElseThrow()))
-        .as(
-            "%s must be present. Run :models-backend-purejava:integrationTest or the"
-                + " fixture download task before running this test.",
-            descriptor.localPath().orElseThrow())
-        .isTrue();
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
 
     String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
     System.setProperty(
@@ -69,6 +67,69 @@ class SmolLm2ModelJarsIntegrationTest {
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
     }
+  }
+
+  @Test
+  void groupedQ8GateUpProjectionsMatchSeparateLayerMatmulsExactly() throws Exception {
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
+
+    try (Arena arena = Arena.ofShared()) {
+      var file = GgufParser.parse(descriptor.localPath().orElseThrow(), arena);
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaWeights.LayerWeights layer = weights.layer(0);
+
+      assertThat(layer.wqType()).isEqualTo(GgufTensorType.Q8_0);
+      assertThat(layer.wkType()).isEqualTo(GgufTensorType.Q8_0);
+      assertThat(layer.wvType()).isEqualTo(GgufTensorType.Q8_0);
+      assertThat(layer.ffnGateType()).isEqualTo(GgufTensorType.Q8_0);
+      assertThat(layer.ffnUpType()).isEqualTo(GgufTensorType.Q8_0);
+
+      int cols = config.embeddingDim();
+      int rows = config.hiddenDim();
+      float[] input = new float[cols];
+      float[] normalized = new float[cols];
+      weights.embedToken(1, input);
+      TensorOps.rmsNorm(normalized, input, layer.ffnNorm(), cols, config.rmsNormEps());
+
+      float[] expectedGate = new float[rows];
+      float[] expectedUp = new float[rows];
+      float[] actualGate = new float[rows];
+      float[] actualUp = new float[rows];
+      TensorOps.ggufMatmul(
+          expectedGate, normalized, layer.ffnGate(), layer.ffnGateType(), rows, cols);
+      TensorOps.ggufMatmul(expectedUp, normalized, layer.ffnUp(), layer.ffnUpType(), rows, cols);
+
+      TensorOps.ggufDualMatmul(
+          actualGate,
+          layer.ffnGate(),
+          layer.ffnGateType(),
+          rows,
+          actualUp,
+          layer.ffnUp(),
+          layer.ffnUpType(),
+          rows,
+          normalized,
+          cols,
+          new byte[cols],
+          new float[cols / 32],
+          new short[cols / 16]);
+
+      assertThat(actualGate).containsExactly(expectedGate);
+      assertThat(actualUp).containsExactly(expectedUp);
+    }
+  }
+
+  private static ModelJarDescriptor descriptorWithInstalledArtifact() {
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath().resolve(SMOLLM2_360M_Q8_0).orElseThrow();
+    assertThat(Files.exists(descriptor.localPath().orElseThrow()))
+        .as(
+            "%s must be present. Run :models-backend-purejava:integrationTest or the"
+                + " fixture download task before running this test.",
+            descriptor.localPath().orElseThrow())
+        .isTrue();
+    return descriptor;
   }
 
   private static void restoreSystemProperty(String name, String previous) {
