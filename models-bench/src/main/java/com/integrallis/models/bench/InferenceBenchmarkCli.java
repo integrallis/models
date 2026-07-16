@@ -68,6 +68,10 @@ public final class InferenceBenchmarkCli {
       BenchmarkComparisonCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "determinism".equals(args[0])) {
+      DeterminismAuditCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);
