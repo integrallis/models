@@ -49,28 +49,29 @@ The comparison rejected the evidence because Java reported a different input
 token series. Exact llama.cpp token fixtures were added before correcting the
 pre-tokenizer mapping; only the corrected rerun appears in the results table.
 
-### Directional Q8 grouped-projection result
+### Controlled Q8 grouped-projection result
 
 A later test-first optimization groups SmolLM2's equal-format Q8_0 gate/up
 projections so they share one activation quantization and one row dispatch. Q8_0
 Q/K/V remains independent because the grouped narrow-KV microbenchmark regressed
 by 5.9% on the development host.
 
-Ten local trials per mode on the 2019 Intel Mac, OpenJDK 25.0.3, used the same
-SmolLM2 Q8_0 bytes, prompt strategy, 128-token context, two warmups, and 24
-generated tokens:
+Ten trials per mode on the controlled eight-vCPU AMD EPYC host, OpenJDK 25.0.3,
+used Vectors commit `2a3466e`, Models commit `51f287d`, the same SmolLM2 Q8_0
+bytes, prompt strategy, 128-token context, two warmups, and 24 generated tokens:
 
 | Metric | Independent | Grouped gate/up | Change |
 | --- | ---: | ---: | ---: |
-| p95 TTFT | 2,503.4 ms | 1,768.3 ms | -29.4% |
-| p95 TPOT | 149.55 ms | 99.66 ms | -33.4% |
-| p50 prefill | 8.19 tok/s | 12.53 tok/s | +52.9% |
-| p50 decode | 7.49 tok/s | 11.55 tok/s | +54.2% |
+| p95 TTFT | 1,080.8 ms | 713.1 ms | -34.0% |
+| p95 TPOT | 65.82 ms | 44.56 ms | -32.3% |
+| p50 prefill | 16.65 tok/s | 25.28 tok/s | +51.8% |
+| p50 decode | 15.24 tok/s | 22.65 tok/s | +48.6% |
 
 All ten corresponding output SHA-256 values matched. Each independent 2,560x960
 gate/up matrix is below the Q8 parallel threshold; the combined row range crosses
-it and uses the persistent workers. This local A/B is directional and does not
-replace the controlled-host table above.
+it and uses the persistent workers. The benchmark policy changed from `USABLE`
+to `RESPONSIVE`. This focused A/B does not replace the cross-backend table above,
+which uses a different prompt workload and must be rerun as a complete matrix.
 
 ## Latency policy
 
