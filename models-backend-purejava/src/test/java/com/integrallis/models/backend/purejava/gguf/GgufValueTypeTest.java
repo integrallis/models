@@ -28,7 +28,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 class GgufValueTypeTest {
 
   @Nested
-  static class FromId {
+  class FromId {
 
     @ParameterizedTest
     @CsvSource({
@@ -64,7 +64,7 @@ class GgufValueTypeTest {
   }
 
   @Nested
-  static class RoundTrip {
+  class RoundTrip {
 
     @Test
     void allEnumValuesRoundTrip() {

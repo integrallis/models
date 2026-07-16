@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 class GgufConstantsTest {
 
   @Nested
-  static class Magic {
+  class Magic {
 
     @Test
     void magicSpellsGgufInLittleEndian() {
@@ -44,7 +44,7 @@ class GgufConstantsTest {
   }
 
   @Nested
-  static class Versions {
+  class Versions {
 
     @Test
     void supportsVersionTwo() {
@@ -68,7 +68,7 @@ class GgufConstantsTest {
   }
 
   @Nested
-  static class Alignment {
+  class Alignment {
 
     @Test
     void defaultAlignmentIsThirtyTwo() {

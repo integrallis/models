@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class Float16Test {
 
   @Nested
-  static class ToFloat {
+  class ToFloat {
 
     @Test
     void zeroIsZero() {
@@ -74,7 +74,7 @@ class Float16Test {
   }
 
   @Nested
-  static class RoundTrip {
+  class RoundTrip {
 
     @Test
     void roundTripsCommonValues() {

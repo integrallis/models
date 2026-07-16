@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 class DequantizerTest {
 
   @Nested
-  static class Q4_0 {
+  class Q4_0 {
 
     @Test
     void allZeroBlockProducesNegativeEights() {
@@ -93,7 +93,7 @@ class DequantizerTest {
   }
 
   @Nested
-  static class Q8_0 {
+  class Q8_0 {
 
     @Test
     void knownScaleAndQuants() {
@@ -132,7 +132,7 @@ class DequantizerTest {
   }
 
   @Nested
-  static class F16 {
+  class F16 {
 
     @Test
     void dequantizesKnownValues() {

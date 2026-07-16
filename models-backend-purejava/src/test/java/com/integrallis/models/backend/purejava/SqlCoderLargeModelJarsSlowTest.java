@@ -19,6 +19,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.llama.LlamaConfig;
+import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.ops.TensorOps;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
@@ -57,11 +60,42 @@ class SqlCoderLargeModelJarsSlowTest {
       assertThat(file.getTensor("token_embd.weight").type()).isEqualTo(GgufTensorType.Q5_K);
       assertThat(file.getTensor("output.weight").type()).isEqualTo(GgufTensorType.Q6_K);
       assertThat(file.getTensor("blk.0.attn_q.weight").type()).isEqualTo(GgufTensorType.Q5_K);
+      assertThat(file.getTensor("blk.0.attn_k.weight").type()).isEqualTo(GgufTensorType.Q5_K);
       assertThat(file.getTensor("blk.0.attn_v.weight").type()).isEqualTo(GgufTensorType.Q6_K);
+      assertThat(file.getTensor("blk.0.ffn_gate.weight").type()).isEqualTo(GgufTensorType.Q5_K);
+      assertThat(file.getTensor("blk.0.ffn_up.weight").type()).isEqualTo(GgufTensorType.Q5_K);
       assertThat(file.getTensor("blk.0.ffn_down.weight").type()).isEqualTo(GgufTensorType.Q6_K);
       assertThat(file.tensorInfos())
           .extracting(tensor -> tensor.type())
           .contains(GgufTensorType.F32, GgufTensorType.Q5_K, GgufTensorType.Q6_K);
+    }
+  }
+
+  @Test
+  void groupedQ5KProjectionsMatchSeparateLayerMatmulsExactly() throws Exception {
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
+
+    try (Arena arena = Arena.ofShared()) {
+      var file = GgufParser.parse(descriptor.localPath().orElseThrow(), arena);
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaWeights.LayerWeights layer = weights.layer(0);
+
+      assertThat(layer.wqType()).isEqualTo(GgufTensorType.Q5_K);
+      assertThat(layer.wkType()).isEqualTo(GgufTensorType.Q5_K);
+      assertThat(layer.wvType()).isEqualTo(GgufTensorType.Q6_K);
+      assertThat(layer.ffnGateType()).isEqualTo(GgufTensorType.Q5_K);
+      assertThat(layer.ffnUpType()).isEqualTo(GgufTensorType.Q5_K);
+
+      int cols = config.embeddingDim();
+      float[] input = new float[cols];
+      float[] normalized = new float[cols];
+      weights.embedToken(3758, input);
+      TensorOps.rmsNorm(normalized, input, layer.attentionNorm(), cols, config.rmsNormEps());
+
+      assertTripleProjectionMatchesSeparate(
+          normalized, cols, layer, config.queryDim(), config.keyDim(), config.valueDim());
+      assertDualProjectionMatchesSeparate(normalized, cols, layer, config.hiddenDim());
     }
   }
 
@@ -114,6 +148,76 @@ class SqlCoderLargeModelJarsSlowTest {
       }
     }
     return generated;
+  }
+
+  private static void assertTripleProjectionMatchesSeparate(
+      float[] input,
+      int cols,
+      LlamaWeights.LayerWeights layer,
+      int queryRows,
+      int keyRows,
+      int valueRows) {
+    float[] expectedQuery = new float[queryRows];
+    float[] expectedKey = new float[keyRows];
+    float[] expectedValue = new float[valueRows];
+    float[] actualQuery = new float[queryRows];
+    float[] actualKey = new float[keyRows];
+    float[] actualValue = new float[valueRows];
+    TensorOps.ggufMatmul(expectedQuery, input, layer.wq(), layer.wqType(), queryRows, cols);
+    TensorOps.ggufMatmul(expectedKey, input, layer.wk(), layer.wkType(), keyRows, cols);
+    TensorOps.ggufMatmul(expectedValue, input, layer.wv(), layer.wvType(), valueRows, cols);
+
+    TensorOps.ggufTripleMatmul(
+        actualQuery,
+        layer.wq(),
+        layer.wqType(),
+        queryRows,
+        actualKey,
+        layer.wk(),
+        layer.wkType(),
+        keyRows,
+        actualValue,
+        layer.wv(),
+        layer.wvType(),
+        valueRows,
+        input,
+        cols,
+        new byte[cols],
+        new float[cols / 256],
+        new short[cols / 16]);
+
+    assertThat(actualQuery).containsExactly(expectedQuery);
+    assertThat(actualKey).containsExactly(expectedKey);
+    assertThat(actualValue).containsExactly(expectedValue);
+  }
+
+  private static void assertDualProjectionMatchesSeparate(
+      float[] input, int cols, LlamaWeights.LayerWeights layer, int hiddenRows) {
+    float[] expectedGate = new float[hiddenRows];
+    float[] expectedUp = new float[hiddenRows];
+    float[] actualGate = new float[hiddenRows];
+    float[] actualUp = new float[hiddenRows];
+    TensorOps.ggufMatmul(
+        expectedGate, input, layer.ffnGate(), layer.ffnGateType(), hiddenRows, cols);
+    TensorOps.ggufMatmul(expectedUp, input, layer.ffnUp(), layer.ffnUpType(), hiddenRows, cols);
+
+    TensorOps.ggufDualMatmul(
+        actualGate,
+        layer.ffnGate(),
+        layer.ffnGateType(),
+        hiddenRows,
+        actualUp,
+        layer.ffnUp(),
+        layer.ffnUpType(),
+        hiddenRows,
+        input,
+        cols,
+        new byte[cols],
+        new float[cols / 256],
+        new short[cols / 16]);
+
+    assertThat(actualGate).containsExactly(expectedGate);
+    assertThat(actualUp).containsExactly(expectedUp);
   }
 
   private static int argmax(float[] values) {

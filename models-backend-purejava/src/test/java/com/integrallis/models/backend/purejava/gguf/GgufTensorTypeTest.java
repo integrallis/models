@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class GgufTensorTypeTest {
 
   @Nested
-  static class Properties {
+  class Properties {
 
     @Test
     void f32HasCorrectProperties() {
@@ -65,7 +65,7 @@ class GgufTensorTypeTest {
   }
 
   @Nested
-  static class FromId {
+  class FromId {
 
     @Test
     void roundTripsAllTypes() {

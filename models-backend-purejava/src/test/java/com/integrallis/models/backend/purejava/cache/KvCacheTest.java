@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class KvCacheTest {
 
   @Nested
-  static class StoreAndRetrieve {
+  class StoreAndRetrieve {
 
     @Test
     void storeAndRetrieveSinglePosition() {
@@ -93,7 +93,7 @@ class KvCacheTest {
   }
 
   @Nested
-  static class Slicing {
+  class Slicing {
 
     @Test
     void sliceCorrectRange() {
@@ -111,7 +111,7 @@ class KvCacheTest {
   }
 
   @Nested
-  static class MultipleLayer {
+  class MultipleLayer {
 
     @Test
     void layersAreIndependent() {
@@ -125,7 +125,7 @@ class KvCacheTest {
   }
 
   @Nested
-  static class Clear {
+  class Clear {
 
     @Test
     void clearResetsAllEntries() {
@@ -144,7 +144,7 @@ class KvCacheTest {
   }
 
   @Nested
-  static class Growth {
+  class Growth {
 
     @Test
     void largeLogicalContextStartsWithSmallPhysicalCapacity() {
@@ -173,7 +173,7 @@ class KvCacheTest {
   }
 
   @Nested
-  static class BoundsChecking {
+  class BoundsChecking {
 
     @Test
     void positionBeyondMaxThrows() {
