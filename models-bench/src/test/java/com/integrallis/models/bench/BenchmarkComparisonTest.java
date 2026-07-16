@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -73,6 +74,7 @@ class BenchmarkComparisonTest {
             report.artifactSizeBytes(),
             report.run(),
             report.environment(),
+            report.speculativeOptions(),
             report.summary(),
             report.performanceTier(),
             List.of());
@@ -143,7 +145,7 @@ class BenchmarkComparisonTest {
             .toList();
     PerformanceSummary summary = BenchmarkStatistics.summarize(100, trials);
     return new BenchmarkReport(
-        3,
+        BenchmarkReport.CURRENT_SCHEMA_VERSION,
         "2026-07-14T00:00:00Z",
         backend,
         "version",
@@ -153,6 +155,7 @@ class BenchmarkComparisonTest {
         1024,
         run,
         environment,
+        SpeculativeGenerationOptions.disabled(),
         summary,
         PerformanceTier.RESPONSIVE,
         trials);

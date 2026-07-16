@@ -42,6 +42,43 @@ class InferenceBenchmarkCliTest {
     assertThat(configuration.iterations()).isEqualTo(10);
     assertThat(configuration.warmups()).isEqualTo(2);
     assertThat(configuration.maxTokens()).isEqualTo(64);
+    assertThat(configuration.speculativeOptions().enabled()).isFalse();
+  }
+
+  @Test
+  void resolvesExplicitNgramSpeculationControlsForPureJava() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
+
+    BenchmarkConfiguration configuration =
+        InferenceBenchmarkCli.parse(
+            new String[] {
+              "--backend",
+              "pure-java",
+              "--model",
+              model.toString(),
+              "--speculation",
+              "ngram",
+              "--ngram-size",
+              "6",
+              "--draft-min",
+              "3",
+              "--draft-max",
+              "7",
+              "--speculation-window",
+              "4",
+              "--speculation-min-acceptance",
+              "0.85",
+              "--speculation-cooldown",
+              "24"
+            });
+
+    assertThat(configuration.speculativeOptions().enabled()).isTrue();
+    assertThat(configuration.speculativeOptions().ngramSize()).isEqualTo(6);
+    assertThat(configuration.speculativeOptions().minimumDraftTokens()).isEqualTo(3);
+    assertThat(configuration.speculativeOptions().maximumDraftTokens()).isEqualTo(7);
+    assertThat(configuration.speculativeOptions().adaptationWindow()).isEqualTo(4);
+    assertThat(configuration.speculativeOptions().minimumAcceptanceRate()).isEqualTo(0.85f);
+    assertThat(configuration.speculativeOptions().cooldownTokens()).isEqualTo(24);
   }
 
   @Test

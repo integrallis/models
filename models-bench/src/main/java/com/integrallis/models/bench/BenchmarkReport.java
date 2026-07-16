@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.bench;
 
+import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.util.List;
 
 /** Versioned, machine-readable benchmark evidence. */
@@ -29,13 +30,17 @@ public record BenchmarkReport(
     long artifactSizeBytes,
     BenchmarkRun run,
     BenchmarkEnvironment environment,
+    SpeculativeGenerationOptions speculativeOptions,
     PerformanceSummary summary,
     PerformanceTier performanceTier,
     List<TrialMeasurement> trials) {
 
-  public static final int CURRENT_SCHEMA_VERSION = 3;
+  public static final int CURRENT_SCHEMA_VERSION = 4;
 
   public BenchmarkReport {
+    if (speculativeOptions == null) {
+      speculativeOptions = SpeculativeGenerationOptions.disabled();
+    }
     trials = List.copyOf(trials);
   }
 

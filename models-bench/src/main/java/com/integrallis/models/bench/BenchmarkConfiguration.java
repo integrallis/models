@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.bench;
 
+import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.net.URI;
 import java.nio.file.Path;
 
@@ -34,6 +35,7 @@ public record BenchmarkConfiguration(
     int threads,
     long backendPid,
     double loadMillis,
+    SpeculativeGenerationOptions speculativeOptions,
     Path output) {
 
   public BenchmarkConfiguration {
@@ -51,6 +53,9 @@ public record BenchmarkConfiguration(
     }
     if (backendVersion == null || backendVersion.isBlank()) {
       throw new IllegalArgumentException("backendVersion must not be blank");
+    }
+    if (speculativeOptions == null) {
+      throw new IllegalArgumentException("speculativeOptions must not be null");
     }
     if (maxTokens <= 0
         || warmups < 0

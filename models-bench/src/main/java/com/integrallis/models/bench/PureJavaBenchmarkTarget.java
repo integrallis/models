@@ -19,6 +19,8 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.SpeculativeGenerationMetrics;
+import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,18 +32,25 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
   private final GenerationLoop loop;
   private final double loadMillis;
 
-  private PureJavaBenchmarkTarget(TimingBackend backend, double loadMillis) {
+  private PureJavaBenchmarkTarget(
+      TimingBackend backend, double loadMillis, SpeculativeGenerationOptions speculativeOptions) {
     this.backend = backend;
-    this.loop = new GenerationLoop(backend);
+    this.loop = new GenerationLoop(backend, speculativeOptions);
     this.loadMillis = loadMillis;
   }
 
   static PureJavaBenchmarkTarget load(Path model, int contextLength) {
+    return load(model, contextLength, SpeculativeGenerationOptions.disabled());
+  }
+
+  static PureJavaBenchmarkTarget load(
+      Path model, int contextLength, SpeculativeGenerationOptions speculativeOptions) {
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
     PureJavaBackend loaded = PureJavaBackend.load(model);
     double elapsedMillis = nanosToMillis(System.nanoTime() - start);
-    return new PureJavaBenchmarkTarget(new TimingBackend(loaded), elapsedMillis);
+    return new PureJavaBenchmarkTarget(
+        new TimingBackend(loaded), elapsedMillis, speculativeOptions);
   }
 
   @Override
@@ -97,6 +106,7 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
       return TrialMeasurement.failure("generation completed without an output token");
     }
 
+    SpeculativeGenerationMetrics speculativeMetrics = loop.lastSpeculativeMetrics();
     return TrialMeasurement.success(
         nanosToMillis(firstTokenNanos[0] - start),
         nanosToMillis(end - start),
@@ -105,7 +115,8 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
         outputTokens[0],
         ProcessMemory.highWaterBytes(),
         nanosToMillis(cpuDuration().minus(cpuBefore).toNanos()),
-        Hashing.sha256(output.toString()));
+        Hashing.sha256(output.toString()),
+        speculativeMetrics);
   }
 
   @Override

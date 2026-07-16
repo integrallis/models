@@ -17,6 +17,7 @@ package com.integrallis.models.bench;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -51,6 +52,14 @@ public final class InferenceBenchmarkCli {
           "threads",
           "pid",
           "load-ms",
+          "speculation",
+          "ngram-size",
+          "draft-min",
+          "draft-max",
+          "speculation-history",
+          "speculation-window",
+          "speculation-min-acceptance",
+          "speculation-cooldown",
           "output");
   private static final String DEFAULT_PROMPT =
       "Explain why a reproducible local inference benchmark must use identical model bytes, "
@@ -119,10 +128,13 @@ public final class InferenceBenchmarkCli {
     }
     long backendPid = longValue(values, "pid", 0);
     double loadMillis = doubleValue(values, "load-ms", 0);
+    SpeculativeGenerationOptions speculativeOptions = speculativeOptions(values, backend);
+    String outputSuffix = speculativeOptions.enabled() ? "-ngram" : "";
     Path output =
         Path.of(
             values.getOrDefault(
-                "output", "build/reports/inference/" + modelId + "-" + backend + ".json"));
+                "output",
+                "build/reports/inference/" + modelId + "-" + backend + outputSuffix + ".json"));
     return new BenchmarkConfiguration(
         backend,
         modelId,
@@ -138,6 +150,7 @@ public final class InferenceBenchmarkCli {
         threads,
         backendPid,
         loadMillis,
+        speculativeOptions,
         output);
   }
 
@@ -163,13 +176,7 @@ public final class InferenceBenchmarkCli {
                 benchmarkPrompt(configuration.prompt(), "measurement", iteration),
                 configuration.maxTokens());
         trials.add(result);
-        System.out.printf(
-            "trial %d/%d: %s ttft=%.1fms decode=%.2f tok/s%n",
-            iteration + 1,
-            configuration.iterations(),
-            result.successful() ? "ok" : "failed",
-            result.ttftMillis(),
-            result.decodeTokensPerSecond());
+        printTrial(iteration, configuration.iterations(), result);
       }
 
       PerformanceSummary summary = BenchmarkStatistics.summarize(target.loadMillis(), trials);
@@ -197,6 +204,7 @@ public final class InferenceBenchmarkCli {
               true,
               42),
           BenchmarkEnvironment.capture(),
+          configuration.speculativeOptions(),
           summary,
           BenchmarkPolicy.classify(summary),
           List.copyOf(trials));
@@ -205,7 +213,10 @@ public final class InferenceBenchmarkCli {
 
   private static BenchmarkTarget target(BenchmarkConfiguration configuration) {
     if ("pure-java".equals(configuration.backend())) {
-      return PureJavaBenchmarkTarget.load(configuration.artifact(), configuration.contextLength());
+      return PureJavaBenchmarkTarget.load(
+          configuration.artifact(),
+          configuration.contextLength(),
+          configuration.speculativeOptions());
     }
     return new HttpBenchmarkTarget(
         configuration.backend(),
@@ -241,6 +252,25 @@ public final class InferenceBenchmarkCli {
         summary.p95TpotMillis(),
         summary.peakRssBytes(),
         output.toAbsolutePath());
+  }
+
+  private static void printTrial(int iteration, int iterations, TrialMeasurement result) {
+    System.out.printf(
+        "trial %d/%d: %s ttft=%.1fms decode=%.2f tok/s",
+        iteration + 1,
+        iterations,
+        result.successful() ? "ok" : "failed",
+        result.ttftMillis(),
+        result.decodeTokensPerSecond());
+    if (result.speculation() != null && result.speculation().active()) {
+      System.out.printf(
+          " drafts=%d/%d accepted=%.1f%% verify=%.1fms",
+          result.speculation().acceptedTokens(),
+          result.speculation().proposedTokens(),
+          result.speculation().acceptanceRate() * 100.0,
+          result.speculation().verificationNanos() / 1_000_000.0);
+    }
+    System.out.println();
   }
 
   private static Map<String, String> parseOptions(String[] args) {
@@ -295,6 +325,33 @@ public final class InferenceBenchmarkCli {
     } catch (NumberFormatException failure) {
       throw new IllegalArgumentException("--" + name + " must be a number: " + value, failure);
     }
+  }
+
+  private static SpeculativeGenerationOptions speculativeOptions(
+      Map<String, String> values, String backend) {
+    String mode = values.getOrDefault("speculation", "none");
+    if ("none".equals(mode)) {
+      return SpeculativeGenerationOptions.disabled();
+    }
+    if (!"ngram".equals(mode)) {
+      throw new IllegalArgumentException("--speculation must be none or ngram: " + mode);
+    }
+    if (!"pure-java".equals(backend)) {
+      throw new IllegalArgumentException("--speculation ngram is currently supported by pure-java");
+    }
+
+    SpeculativeGenerationOptions defaults = SpeculativeGenerationOptions.builder().build();
+    return SpeculativeGenerationOptions.builder()
+        .ngramSize(integer(values, "ngram-size", defaults.ngramSize()))
+        .minimumDraftTokens(integer(values, "draft-min", defaults.minimumDraftTokens()))
+        .maximumDraftTokens(integer(values, "draft-max", defaults.maximumDraftTokens()))
+        .historyWindow(integer(values, "speculation-history", defaults.historyWindow()))
+        .adaptationWindow(integer(values, "speculation-window", defaults.adaptationWindow()))
+        .minimumAcceptanceRate(
+            (float)
+                doubleValue(values, "speculation-min-acceptance", defaults.minimumAcceptanceRate()))
+        .cooldownTokens(integer(values, "speculation-cooldown", defaults.cooldownTokens()))
+        .build();
   }
 
   private static String required(Map<String, String> values, String name) {
