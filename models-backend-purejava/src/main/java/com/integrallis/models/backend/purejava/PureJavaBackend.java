@@ -15,8 +15,9 @@
  */
 package com.integrallis.models.backend.purejava;
 
-import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
@@ -39,7 +40,7 @@ import org.modeljars.ModelJarRequirement;
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
  * any native dependencies.
  */
-public final class PureJavaBackend implements InferenceBackend {
+public final class PureJavaBackend implements SpeculativeInferenceBackend {
 
   static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
@@ -165,6 +166,26 @@ public final class PureJavaBackend implements InferenceBackend {
   @Override
   public float[] prefill(int[] tokens, int startPosition) {
     return forwardPass.prefill(tokens, startPosition);
+  }
+
+  @Override
+  public int checkpoint() {
+    return forwardPass.checkpoint();
+  }
+
+  @Override
+  public LogitBatch verify(int[] tokens, int startPosition) {
+    return forwardPass.verify(tokens, startPosition);
+  }
+
+  @Override
+  public LogitBatch verifyTransient(int[] tokens, int startPosition) {
+    return forwardPass.verifyTransient(tokens, startPosition);
+  }
+
+  @Override
+  public void rewind(int checkpoint) {
+    forwardPass.rewind(checkpoint);
   }
 
   @Override

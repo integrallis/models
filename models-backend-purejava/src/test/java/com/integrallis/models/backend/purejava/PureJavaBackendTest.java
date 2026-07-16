@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
 import java.io.IOException;
@@ -150,6 +151,27 @@ class PureJavaBackendTest {
 
         float[] logits = backend.forward(5, 0);
         assertThat(logits).hasSize(VOCAB_SIZE);
+      }
+    }
+
+    @Test
+    void exposesSpeculativeVerificationAndRollback(@TempDir Path dir) throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(42));
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertThat(backend).isInstanceOf(SpeculativeInferenceBackend.class);
+        backend.prefill(new int[] {5, 7}, 0);
+        int checkpoint = backend.checkpoint();
+
+        var verification = backend.verify(new int[] {11, 13}, checkpoint);
+
+        assertThat(verification.tokenCount()).isEqualTo(2);
+        assertThat(verification.vocabularySize()).isEqualTo(VOCAB_SIZE);
+        assertThat(backend.checkpoint()).isEqualTo(checkpoint + 2);
+
+        backend.rewind(checkpoint + 1);
+        assertThat(backend.checkpoint()).isEqualTo(checkpoint + 1);
+        assertThat(backend.forward(17, checkpoint + 1)).hasSize(VOCAB_SIZE);
       }
     }
 

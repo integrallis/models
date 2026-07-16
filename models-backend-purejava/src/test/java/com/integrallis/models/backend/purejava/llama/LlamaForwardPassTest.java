@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.llama;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
@@ -310,6 +311,91 @@ class LlamaForwardPassTest {
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void q4VerificationReturnsEverySequentialLogitRow() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] prefix = {5, 7};
+      int[] proposed = {11, 13, 17, 19};
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      sequential.prefill(prefix, 0);
+      float[][] expected = new float[proposed.length][];
+      for (int index = 0; index < proposed.length; index++) {
+        expected[index] = sequential.forward(proposed[index], prefix.length + index);
+      }
+
+      LlamaForwardPass verifying =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      verifying.prefill(prefix, 0);
+      LogitBatch actual = verifying.verify(proposed, prefix.length);
+
+      assertThat(verifying.usesBatchedPrefill()).isTrue();
+      assertThat(actual.tokenCount()).isEqualTo(proposed.length);
+      for (int index = 0; index < proposed.length; index++) {
+        assertThat(actual.copyRow(index)).containsExactly(expected[index]);
+      }
+    }
+
+    @Test
+    void rewindPreservesAcceptedPrefixAndReplacesRejectedTail() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] prefix = {5, 7};
+
+      LlamaForwardPass expected =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      expected.prefill(prefix, 0);
+      expected.forward(11, 2);
+      float[] expectedReplacement = expected.forward(23, 3);
+
+      LlamaForwardPass actual =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      actual.prefill(prefix, 0);
+      int checkpoint = actual.checkpoint();
+      actual.verify(new int[] {11, 13, 17}, checkpoint);
+      actual.rewind(checkpoint + 1);
+      float[] actualReplacement = actual.forward(23, checkpoint + 1);
+
+      assertThat(checkpoint).isEqualTo(prefix.length);
+      assertThat(actualReplacement).containsExactly(expectedReplacement);
+    }
+
+    @Test
+    void stableVerificationSnapshotSurvivesLaterTransientVerification() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass forwardPass =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      forwardPass.prefill(new int[] {5, 7}, 0);
+
+      LogitBatch stable = forwardPass.verify(new int[] {11, 13}, 2);
+      float[] expectedStableRow = stable.copyRow(0);
+      forwardPass.rewind(2);
+      forwardPass.verifyTransient(new int[] {17, 19}, 2);
+
+      assertThat(stable.copyRow(0)).containsExactly(expectedStableRow);
     }
 
     @Test

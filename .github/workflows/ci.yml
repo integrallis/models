@@ -25,12 +25,14 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: integrallis/vectors
+          ref: main
           path: vectors
 
       - name: Checkout ModelJars
         uses: actions/checkout@v5
         with:
           repository: ModelJars/modeljars
+          ref: main
           path: model-jars
 
       - uses: actions/setup-java@v5

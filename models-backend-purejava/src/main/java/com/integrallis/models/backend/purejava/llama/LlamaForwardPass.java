@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.llama;
 
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
@@ -79,6 +80,7 @@ public final class LlamaForwardPass {
   private final byte[] batchQuantizedActivation;
   private final float[] batchQuantizedActivationScales;
   private final float[] batchQ4LaneScratch;
+  private float[] verificationLogits = new float[0];
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
@@ -196,7 +198,8 @@ public final class LlamaForwardPass {
       if (batchSize == 1) {
         return forwardInternal(tokens[tokenOffset], startPosition + tokenOffset, true);
       }
-      prefillBatch(tokens, tokenOffset, batchSize, startPosition + tokenOffset, finalBatch);
+      prefillBatch(
+          tokens, tokenOffset, batchSize, startPosition + tokenOffset, finalBatch, null, 0);
       nextPosition += batchSize;
       tokenOffset += batchSize;
     }
@@ -204,7 +207,13 @@ public final class LlamaForwardPass {
   }
 
   private void prefillBatch(
-      int[] tokens, int tokenOffset, int batchSize, int startPosition, boolean computeLogits) {
+      int[] tokens,
+      int tokenOffset,
+      int batchSize,
+      int startPosition,
+      boolean computeFinalLogits,
+      float[] batchLogits,
+      int batchLogitsOffset) {
     int dim = config.embeddingDim();
     int queryDim = config.queryDim();
     int keyDim = config.keyDim();
@@ -318,7 +327,17 @@ public final class LlamaForwardPass {
       }
     }
 
-    if (computeLogits) {
+    if (batchLogits != null) {
+      int vocabSize = config.vocabSize();
+      for (int batch = 0; batch < batchSize; batch++) {
+        int stateOffset = batch * dim;
+        TensorOps.rmsNorm(
+            xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
+        matmulDispatch(
+            logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+        System.arraycopy(logits, 0, batchLogits, batchLogitsOffset + batch * vocabSize, vocabSize);
+      }
+    } else if (computeFinalLogits) {
       int finalOffset = (batchSize - 1) * dim;
       TensorOps.rmsNorm(
           xNorm, 0, batchX, finalOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
@@ -480,6 +499,72 @@ public final class LlamaForwardPass {
 
     nextPosition++;
     return computeLogits ? logits : null;
+  }
+
+  /** Verifies a contiguous speculative continuation and returns logits for every consumed token. */
+  public LogitBatch verify(int[] tokens, int startPosition) {
+    return verifyTransient(tokens, startPosition).snapshot();
+  }
+
+  /**
+   * Verifies a contiguous speculative continuation using logits storage reused by the next call.
+   */
+  public LogitBatch verifyTransient(int[] tokens, int startPosition) {
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (startPosition != nextPosition) {
+      throw new IllegalArgumentException(
+          "position must be sequential: expected " + nextPosition + ", got " + startPosition);
+    }
+    if (tokens.length > cache.maxSeqLen() - startPosition) {
+      throw new IllegalArgumentException(
+          "tokens exceed context length: " + (startPosition + (long) tokens.length));
+    }
+
+    int vocabSize = config.vocabSize();
+    int resultLength = Math.multiplyExact(tokens.length, vocabSize);
+    if (verificationLogits.length < resultLength) {
+      verificationLogits = new float[resultLength];
+    }
+    int tokenOffset = 0;
+    while (tokenOffset < tokens.length) {
+      int batchSize =
+          batchedPrefill ? Math.min(prefillBatchCapacity, tokens.length - tokenOffset) : 1;
+      if (batchSize == 1) {
+        float[] row =
+            forwardInternal(tokens[tokenOffset], Math.addExact(startPosition, tokenOffset), true);
+        System.arraycopy(row, 0, verificationLogits, tokenOffset * vocabSize, vocabSize);
+      } else {
+        prefillBatch(
+            tokens,
+            tokenOffset,
+            batchSize,
+            Math.addExact(startPosition, tokenOffset),
+            false,
+            verificationLogits,
+            tokenOffset * vocabSize);
+        nextPosition += batchSize;
+      }
+      tokenOffset += batchSize;
+    }
+    return new LogitBatch(tokens.length, vocabSize, verificationLogits);
+  }
+
+  /** Returns the next sequence position for speculative rollback. */
+  public int checkpoint() {
+    return nextPosition;
+  }
+
+  /** Discards speculative cache entries at and after {@code checkpoint}. */
+  public void rewind(int checkpoint) {
+    if (checkpoint < 0 || checkpoint > nextPosition) {
+      throw new IllegalArgumentException(
+          "checkpoint must be between 0 and " + nextPosition + ": " + checkpoint);
+    }
+    cache.discardFrom(checkpoint);
+    nextPosition = checkpoint;
   }
 
   /** Clears the autoregressive key-value cache before processing a new sequence. */

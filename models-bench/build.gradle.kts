@@ -61,3 +61,33 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
+
+jmh {
+    jvmArgs.addAll(listOf(
+        "--add-modules", "jdk.incubator.vector",
+        "-Xms2g", "-Xmx8g",
+        "-XX:+UseG1GC"
+    ))
+
+    (project.findProperty("bench.model") as String?)?.let {
+        jvmArgs.add("-Dmodels.bench.model=$it")
+    }
+    (project.findProperty("jmh.includes") as String?)?.let {
+        includes.set(listOf(it))
+    }
+    (project.findProperty("jmh.fork") as String?)?.let {
+        fork.set(it.toInt())
+    }
+    (project.findProperty("jmh.warmup") as String?)?.let {
+        warmupIterations.set(it.toInt())
+    }
+    (project.findProperty("jmh.iterations") as String?)?.let {
+        iterations.set(it.toInt())
+    }
+    (project.findProperty("jmh.timeOnIteration") as String?)?.let {
+        timeOnIteration.set(it)
+    }
+    resultFormat.set(project.findProperty("jmh.resultFormat") as String? ?: "JSON")
+    val resultExtension = (resultFormat.get() as String).lowercase()
+    resultsFile.set(project.file("build/results/jmh/results.$resultExtension"))
+}
