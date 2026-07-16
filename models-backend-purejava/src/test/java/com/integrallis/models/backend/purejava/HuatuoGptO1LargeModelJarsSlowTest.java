@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
+import com.integrallis.vectors.core.VectorizationProvider;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
@@ -85,6 +86,13 @@ class HuatuoGptO1LargeModelJarsSlowTest {
     String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
     System.setProperty(
         PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+
+    assertThat(VectorizationProvider.isPanamaEnabled())
+        .as(
+            "large-model token oracle requires Panama SIMD; provider=%s, panamaFailure=%s",
+            VectorizationProvider.getProviderName(),
+            VectorizationProvider.getPanamaFailure().map(Throwable::toString).orElse("none"))
+        .isTrue();
 
     try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
       assertThat(backend.metadata().modelFamily()).isEqualTo("qwen2");

@@ -1,0 +1,87 @@
+name: Pure-Java Determinism
+
+on:
+  workflow_dispatch:
+    inputs:
+      modeljars-ref:
+        description: "ModelJars ref to test against"
+        required: false
+        default: "main"
+      vectors-ref:
+        description: "vectors ref to test against"
+        required: false
+        default: "main"
+  schedule:
+    - cron: "37 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  huatuo-determinism:
+    name: HuatuoGPT-o1-7B exact determinism
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          ref: ${{ github.event.inputs['modeljars-ref'] || 'main' }}
+          path: model-jars
+
+      - name: Checkout vectors
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          ref: ${{ github.event.inputs['vectors-ref'] || 'main' }}
+          path: vectors
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache HuatuoGPT fixture
+        uses: actions/cache@v5
+        with:
+          path: ~/.jvllm/models/HuatuoGPT-o1-7B-Q4_K_M.gguf
+          key: huatuogpt-o1-7b-q4_k_m-fixture-v1
+
+      - name: Resolve pinned HuatuoGPT fixture
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-backend-purejava:downloadHuatuoGptO17BQ4KMModel
+          --no-daemon
+          --stacktrace
+
+      - name: Run fresh-JVM determinism matrix
+        working-directory: models
+        env:
+          AUDIT_PROMPT: |-
+            Question: Which organ pumps blood through the human body?
+            Answer:
+          AUDIT_TOKENS: 4
+          AUDIT_ITERATIONS: 3
+          AUDIT_CONTEXT: 128
+        run: >
+          scripts/run-purejava-determinism-matrix.sh
+          "$HOME/.jvllm/models/HuatuoGPT-o1-7B-Q4_K_M.gguf"
+          huatuogpt-o1-7b-q4_k_m
+
+      - name: Upload determinism evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: huatuogpt-o1-7b-determinism
+          path: models/build/reports/determinism/
+          retention-days: 30

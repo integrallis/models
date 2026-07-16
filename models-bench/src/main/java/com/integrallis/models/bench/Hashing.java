@@ -45,6 +45,20 @@ final class Hashing {
     return HexFormat.of().formatHex(digest().digest(value.getBytes(StandardCharsets.UTF_8)));
   }
 
+  static String sha256(float[] values) {
+    MessageDigest digest = digest();
+    byte[] bytes = new byte[Float.BYTES];
+    for (float value : values) {
+      int bits = Float.floatToRawIntBits(value);
+      bytes[0] = (byte) (bits >>> 24);
+      bytes[1] = (byte) (bits >>> 16);
+      bytes[2] = (byte) (bits >>> 8);
+      bytes[3] = (byte) bits;
+      digest.update(bytes);
+    }
+    return HexFormat.of().formatHex(digest.digest());
+  }
+
   private static MessageDigest digest() {
     try {
       return MessageDigest.getInstance("SHA-256");
