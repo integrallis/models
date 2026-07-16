@@ -191,6 +191,18 @@ public final class TensorOps {
                 cols,
                 quantizedActivation,
                 quantizedActivationScales);
+        case Q8_0 ->
+            VectorUtil.ggufQ8_0Q8_0DualBatchDotProduct(
+                input,
+                firstWeight,
+                firstRows,
+                firstOut,
+                secondWeight,
+                secondRows,
+                secondOut,
+                cols,
+                quantizedActivation,
+                quantizedActivationScales);
         case Q4_K ->
             VectorUtil.ggufQ4_KQ8_KDualBatchDotProduct(
                 input,
@@ -444,13 +456,20 @@ public final class TensorOps {
    */
   public static boolean supportsGroupedMatmul(GgufTensorType type) {
     return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q8_0
+        || type == GgufTensorType.Q4_K
+        || type == GgufTensorType.Q5_K;
+  }
+
+  private static boolean supportsGroupedTripleMatmul(GgufTensorType type) {
+    return type == GgufTensorType.Q4_0
         || type == GgufTensorType.Q4_K
         || type == GgufTensorType.Q5_K;
   }
 
   static GroupedProjectionPlan groupedProjectionPlan(
       GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
-    if (supportsGroupedMatmul(firstType)) {
+    if (supportsGroupedTripleMatmul(firstType)) {
       if (firstType == secondType && firstType == thirdType) {
         return GroupedProjectionPlan.ALL;
       }
@@ -461,7 +480,7 @@ public final class TensorOps {
         return GroupedProjectionPlan.FIRST_THIRD;
       }
     }
-    if (secondType == thirdType && supportsGroupedMatmul(secondType)) {
+    if (secondType == thirdType && supportsGroupedTripleMatmul(secondType)) {
       return GroupedProjectionPlan.SECOND_THIRD;
     }
     return GroupedProjectionPlan.NONE;

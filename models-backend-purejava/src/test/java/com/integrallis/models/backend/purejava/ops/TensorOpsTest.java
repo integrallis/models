@@ -277,6 +277,7 @@ class TensorOpsTest {
     @Test
     void groupedMatmulSupportIncludesKQuantProjectionTypes() {
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q4_0)).isTrue();
+      assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q8_0)).isTrue();
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q4_K)).isTrue();
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q5_K)).isTrue();
     }
@@ -311,6 +312,11 @@ class TensorOpsTest {
               TensorOps.groupedProjectionPlan(
                   GgufTensorType.Q5_K, GgufTensorType.Q5_K, GgufTensorType.Q6_K))
           .isEqualTo(TensorOps.GroupedProjectionPlan.FIRST_SECOND);
+      assertThat(
+              TensorOps.groupedProjectionPlan(
+                  GgufTensorType.Q8_0, GgufTensorType.Q8_0, GgufTensorType.Q8_0))
+          .as("Q8 triple grouping must remain disabled until its measured regression is resolved")
+          .isEqualTo(TensorOps.GroupedProjectionPlan.NONE);
     }
 
     @Test
@@ -496,6 +502,41 @@ class TensorOpsTest {
 
         assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
       }
+    }
+
+    @Test
+    void q8_0DualMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 32;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q8Block(0.25f));
+        MemorySegment secondWeight = copy(arena, q8Block(-0.125f));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q8_0, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q8_0, 1, cols);
+
+        TensorOps.ggufDualMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q8_0,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q8_0,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 32],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
     }
 
     @Test
