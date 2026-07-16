@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.runtime;
 
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.SamplingOptions;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,9 +35,25 @@ public final class Sampler {
 
   /** Samples the next token ID from the given logits array. */
   public int sample(float[] logits, List<Integer> previousTokens) {
+    if (options.temperature() == 0.0f && options.repetitionPenalty() == 1.0f) {
+      return argmax(logits);
+    }
     float[] adjusted = logits.clone();
+    applyRepetitionPenalty(adjusted, previousTokens);
+    return sampleAdjusted(adjusted);
+  }
 
-    // Apply repetition penalty
+  /** Samples one row without copying transient logits for unpenalized greedy generation. */
+  public int sample(LogitBatch logits, int tokenIndex, List<Integer> previousTokens) {
+    if (options.temperature() == 0.0f && options.repetitionPenalty() == 1.0f) {
+      return logits.argmax(tokenIndex);
+    }
+    float[] adjusted = logits.copyRow(tokenIndex);
+    applyRepetitionPenalty(adjusted, previousTokens);
+    return sampleAdjusted(adjusted);
+  }
+
+  private void applyRepetitionPenalty(float[] adjusted, List<Integer> previousTokens) {
     if (options.repetitionPenalty() > 1.0f && previousTokens != null) {
       for (int tokenId : previousTokens) {
         if (tokenId >= 0 && tokenId < adjusted.length) {
@@ -48,7 +65,9 @@ public final class Sampler {
         }
       }
     }
+  }
 
+  private int sampleAdjusted(float[] adjusted) {
     // Greedy (temperature = 0)
     if (options.temperature() == 0.0f) {
       return argmax(adjusted);
