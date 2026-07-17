@@ -35,6 +35,7 @@ import org.modeljars.ModelJarRequirement;
 class MiniCpm5ModelJarsIntegrationTest {
 
   private static final int INTEGRATION_CONTEXT_LENGTH = 128;
+  private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
 
   private static final ModelJarRequirement MINICPM5_1B_Q4_K_M =
       ModelJarRequirement.forSource("hf://openbmb/MiniCPM5-1B-GGUF")
@@ -130,6 +131,44 @@ class MiniCpm5ModelJarsIntegrationTest {
           .containsExactly(5028, 6706, 5018, 1735);
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
+  }
+
+  @Test
+  void batchedPrefillMatchesSequentialInferenceExactly() {
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
+    String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    String previousBatchSize = System.getProperty(PREFILL_BATCH_SIZE_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+    System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "1");
+
+    try (PureJavaBackend sequential = PureJavaBackend.load(descriptor)) {
+      System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "32");
+      try (PureJavaBackend batched = PureJavaBackend.load(descriptor)) {
+        int[] promptTokens =
+            sequential.tokenizer().encode("public static void main(String[] args) {");
+        float[] expected = null;
+        for (int position = 0; position < promptTokens.length; position++) {
+          expected = sequential.forward(promptTokens[position], position);
+        }
+
+        float[] actual = batched.prefill(promptTokens, 0);
+        assertThat(actual).containsExactly(expected);
+
+        for (int generated = 0; generated < 2; generated++) {
+          int token = argmax(expected);
+          int position = promptTokens.length + generated;
+          expected = sequential.forward(token, position);
+          actual = batched.forward(token, position);
+          assertThat(actual)
+              .as("decode logits at position %d after batched prefill", position)
+              .containsExactly(expected);
+        }
+      }
+    } finally {
+      restoreSystemProperty(PREFILL_BATCH_SIZE_PROPERTY, previousBatchSize);
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
     }
   }
 

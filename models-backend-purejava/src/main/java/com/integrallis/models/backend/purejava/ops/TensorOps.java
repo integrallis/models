@@ -488,7 +488,9 @@ public final class TensorOps {
 
   /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
-    return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q4_K;
+    return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q4_K
+        || type == GgufTensorType.Q6_K;
   }
 
   /** Matrix multiplication over batch-major activations using caller-owned quantization scratch. */
@@ -530,6 +532,16 @@ public final class TensorOps {
               quantizedActivations,
               quantizedActivationScales,
               quantizedActivationSums);
+      case Q6_K ->
+          VectorUtil.ggufQ6_KQ8_KBatchedMatmul(
+              x,
+              qWeight,
+              batchSize,
+              rows,
+              cols,
+              out,
+              quantizedActivations,
+              quantizedActivationScales);
       default -> throw new AssertionError("unhandled batched matmul type: " + type);
     }
   }
