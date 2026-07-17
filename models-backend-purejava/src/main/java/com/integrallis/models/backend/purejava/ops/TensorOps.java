@@ -488,7 +488,7 @@ public final class TensorOps {
 
   /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
-    return type == GgufTensorType.Q4_0;
+    return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q4_K;
   }
 
   /** Matrix multiplication over batch-major activations using caller-owned quantization scratch. */
@@ -502,20 +502,36 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivations,
       float[] quantizedActivationScales,
+      short[] quantizedActivationSums,
       float[] q4LaneScratch) {
     if (!supportsBatchedMatmul(type)) {
       throw new UnsupportedOperationException("GGUF batched matmul not supported for: " + type);
     }
-    VectorUtil.ggufQ4_0Q8_0BatchedMatmul(
-        x,
-        qWeight,
-        batchSize,
-        rows,
-        cols,
-        out,
-        quantizedActivations,
-        quantizedActivationScales,
-        q4LaneScratch);
+    switch (type) {
+      case Q4_0 ->
+          VectorUtil.ggufQ4_0Q8_0BatchedMatmul(
+              x,
+              qWeight,
+              batchSize,
+              rows,
+              cols,
+              out,
+              quantizedActivations,
+              quantizedActivationScales,
+              q4LaneScratch);
+      case Q4_K ->
+          VectorUtil.ggufQ4_KQ8_KBatchedMatmul(
+              x,
+              qWeight,
+              batchSize,
+              rows,
+              cols,
+              out,
+              quantizedActivations,
+              quantizedActivationScales,
+              quantizedActivationSums);
+      default -> throw new AssertionError("unhandled batched matmul type: " + type);
+    }
   }
 
   /** Matrix-vector multiplication with a quantized GGUF weight. */
