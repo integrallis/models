@@ -490,6 +490,7 @@ public final class TensorOps {
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
     return type == GgufTensorType.Q4_0
         || type == GgufTensorType.Q4_K
+        || type == GgufTensorType.Q5_K
         || type == GgufTensorType.Q6_K;
   }
 
@@ -523,6 +524,17 @@ public final class TensorOps {
               q4LaneScratch);
       case Q4_K ->
           VectorUtil.ggufQ4_KQ8_KBatchedMatmul(
+              x,
+              qWeight,
+              batchSize,
+              rows,
+              cols,
+              out,
+              quantizedActivations,
+              quantizedActivationScales,
+              quantizedActivationSums);
+      case Q5_K ->
+          VectorUtil.ggufQ5_KQ8_KBatchedMatmul(
               x,
               qWeight,
               batchSize,

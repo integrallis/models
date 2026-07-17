@@ -34,6 +34,7 @@ import org.modeljars.ModelJarRequirement;
 class SqlCoderLargeModelJarsSlowTest {
 
   private static final int INTEGRATION_CONTEXT_LENGTH = 128;
+  private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
   private static final String SQL_PROMPT = "SQL:";
 
   private static final ModelJarRequirement SQLCODER_7B_2_Q5_K_M =
@@ -117,6 +118,40 @@ class SqlCoderLargeModelJarsSlowTest {
           .containsExactly(13, 917, 29901, 274);
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
+  }
+
+  @Test
+  void q5KBatchedPrefillMatchesSequentialInferenceExactly() {
+    assertThat(TensorOps.supportsBatchedMatmul(GgufTensorType.Q5_K)).isTrue();
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
+    String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    String previousBatchSize = System.getProperty(PREFILL_BATCH_SIZE_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+    System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "1");
+
+    try (PureJavaBackend sequential = PureJavaBackend.load(descriptor)) {
+      System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "32");
+      try (PureJavaBackend batched = PureJavaBackend.load(descriptor)) {
+        int[] promptTokens = sequential.tokenizer().encode(SQL_PROMPT);
+        float[] expected = null;
+        for (int position = 0; position < promptTokens.length; position++) {
+          expected = sequential.forward(promptTokens[position], position);
+        }
+
+        float[] actual = batched.prefill(promptTokens, 0);
+        assertThat(actual).containsExactly(expected);
+
+        int token = argmax(expected);
+        int position = promptTokens.length;
+        assertThat(batched.forward(token, position))
+            .as("decode logits after Q5_K batched prefill")
+            .containsExactly(sequential.forward(token, position));
+      }
+    } finally {
+      restoreSystemProperty(PREFILL_BATCH_SIZE_PROPERTY, previousBatchSize);
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
     }
   }
 

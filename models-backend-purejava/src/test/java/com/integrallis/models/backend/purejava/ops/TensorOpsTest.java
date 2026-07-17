@@ -221,6 +221,51 @@ class TensorOpsTest {
     }
 
     @Test
+    void q5_KBatchedMatmulMatchesIndependentQueries() {
+      int batchSize = 3;
+      int cols = 256;
+      float[] queries = new float[batchSize * cols];
+      float[] expected = new float[batchSize];
+      float[] actual = new float[batchSize];
+      for (int batch = 0; batch < batchSize; batch++) {
+        for (int col = 0; col < cols; col++) {
+          queries[batch * cols + col] =
+              (float) Math.sin((batch + 0.75) * (col + 0.25)) * (batch + 0.5f);
+        }
+      }
+      int[] scales = {5, 12, 30, 60, 7, 15, 31, 63};
+      int[] mins = {3, 8, 20, 45, 1, 10, 25, 50};
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight =
+            copy(arena, q5KBlock(0.125f, 0.0625f, i -> (i * 7 + 3) % 32, scales, mins));
+        for (int batch = 0; batch < batchSize; batch++) {
+          float[] query = new float[cols];
+          System.arraycopy(queries, batch * cols, query, 0, cols);
+          float[] result = new float[1];
+          TensorOps.ggufMatmul(result, query, qWeight, GgufTensorType.Q5_K, 1, cols);
+          expected[batch] = result[0];
+        }
+
+        TensorOps.ggufBatchedMatmul(
+            actual,
+            queries,
+            qWeight,
+            GgufTensorType.Q5_K,
+            batchSize,
+            1,
+            cols,
+            new byte[batchSize * cols],
+            new float[batchSize * (cols / 256)],
+            new short[batchSize * (cols / 16)],
+            new float[0]);
+      }
+
+      assertThat(TensorOps.supportsBatchedMatmul(GgufTensorType.Q5_K)).isTrue();
+      assertThat(actual).containsExactly(expected);
+    }
+
+    @Test
     void q6_KBatchedMatmulMatchesIndependentQueries() {
       int batchSize = 3;
       int cols = 256;
