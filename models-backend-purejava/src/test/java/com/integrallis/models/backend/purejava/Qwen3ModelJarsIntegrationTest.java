@@ -17,6 +17,9 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -62,6 +65,34 @@ class Qwen3ModelJarsIntegrationTest {
         "The quick brown fox",
         new int[] {785, 3974, 13876, 38835},
         new int[] {34208, 916, 279, 15678});
+  }
+
+  @Test
+  void ngramSpeculationMatchesSequentialQwen306BQ40Generation() {
+    ModelJarDescriptor descriptor =
+        ModelJarRegistry.fromClasspath().resolve(QWEN3_0_6B_Q4_0).orElseThrow();
+    String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+
+    try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
+      SamplingOptions sampling =
+          SamplingOptions.builder().temperature(0.0f).repetitionPenalty(1.0f).maxTokens(16).build();
+      String prompt =
+          "Continue_only_the_exact_sequence_without_explanation:"
+              + "_1_2_3_4_1_2_3_4_1_2_3_4_1_2_3_4_";
+      String sequential = new GenerationLoop(backend).generate(prompt, sampling);
+      GenerationLoop speculative =
+          new GenerationLoop(backend, SpeculativeGenerationOptions.builder().build());
+
+      String accelerated = speculative.generate(prompt, sampling);
+
+      assertThat(accelerated).isEqualTo(sequential);
+      assertThat(speculative.lastSpeculativeMetrics().active()).isTrue();
+      assertThat(speculative.lastSpeculativeMetrics().acceptedTokens()).isPositive();
+    } finally {
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
   }
 
   private static void assertLoadsQwen3(ModelJarRequirement requirement) {
