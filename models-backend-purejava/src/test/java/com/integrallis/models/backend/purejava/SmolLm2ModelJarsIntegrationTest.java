@@ -34,6 +34,7 @@ import org.modeljars.ModelJarRequirement;
 class SmolLm2ModelJarsIntegrationTest {
 
   private static final int INTEGRATION_CONTEXT_LENGTH = 128;
+  private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
 
   private static final ModelJarRequirement SMOLLM2_360M_Q8_0 =
       ModelJarRequirement.forSource("hf://HuggingFaceTB/SmolLM2-360M-Instruct-GGUF")
@@ -117,6 +118,41 @@ class SmolLm2ModelJarsIntegrationTest {
 
       assertThat(actualGate).containsExactly(expectedGate);
       assertThat(actualUp).containsExactly(expectedUp);
+    }
+  }
+
+  @Test
+  void q8PrefillBatchMatchesSequentialExecutionAndPreservesDecodeState() {
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
+    String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    String previousBatchSize = System.getProperty(PREFILL_BATCH_SIZE_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+
+    try {
+      int[] tokens;
+      float[] expectedPrefill;
+      float[] expectedDecode;
+      System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "1");
+      try (PureJavaBackend sequential = PureJavaBackend.load(descriptor)) {
+        tokens =
+            sequential
+                .tokenizer()
+                .encode("Explain why Java runs anywhere in one concise sentence.");
+        assertThat(tokens.length).isGreaterThan(1);
+        expectedPrefill = sequential.prefill(tokens, 0).clone();
+        expectedDecode = sequential.forward(tokens[0], tokens.length);
+      }
+
+      System.setProperty(PREFILL_BATCH_SIZE_PROPERTY, "32");
+      try (PureJavaBackend batched = PureJavaBackend.load(descriptor)) {
+        assertThat(TensorOps.supportsBatchedMatmul(GgufTensorType.Q8_0)).isTrue();
+        assertThat(batched.prefill(tokens, 0)).containsExactly(expectedPrefill);
+        assertThat(batched.forward(tokens[0], tokens.length)).containsExactly(expectedDecode);
+      }
+    } finally {
+      restoreSystemProperty(PREFILL_BATCH_SIZE_PROPERTY, previousBatchSize);
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
     }
   }
 
