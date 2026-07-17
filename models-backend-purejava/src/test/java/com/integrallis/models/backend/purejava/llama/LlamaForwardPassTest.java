@@ -153,6 +153,17 @@ class LlamaForwardPassTest {
         valueCount -> randomQ6K(rng, valueCount));
   }
 
+  private GgufFile buildMixedQ5KQ6KNanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng,
+        GgufTensorType.Q5_K,
+        256,
+        256,
+        valueCount -> randomQ5K(rng, valueCount),
+        GgufTensorType.Q6_K,
+        valueCount -> randomQ6K(rng, valueCount));
+  }
+
   private GgufFile buildQuantizedNanoModel(
       Random rng,
       GgufTensorType quantizedType,
@@ -410,6 +421,38 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void mixedQ5KQ6KPrefillUsesBatchedKernelsAndPreservesAutoregressiveState() {
+      GgufFile file = buildMixedQ5KQ6KNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+
+      assertThat(weights.layer(0).wqType()).isEqualTo(GgufTensorType.Q5_K);
+      assertThat(weights.layer(0).wvType()).isEqualTo(GgufTensorType.Q6_K);
+      assertThat(weights.layer(0).woType()).isEqualTo(GgufTensorType.Q6_K);
+      assertThat(weights.layer(0).ffnDownType()).isEqualTo(GgufTensorType.Q6_K);
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] expected = runSequence(sequential, tokens);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] actual = batched.prefill(tokens, 0);
+
+      assertThat(batched.usesBatchedPrefill()).isTrue();
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(3, tokens.length))
+          .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
     void q4VerificationReturnsEverySequentialLogitRow() {
       GgufFile file = buildQ4NanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
@@ -617,6 +660,21 @@ class LlamaForwardPassTest {
     ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
     for (int block = 0; block < valueCount / 256; block++) {
       int offset = block * 144;
+      buffer.putShort(offset, Float.floatToFloat16(0.01f));
+      buffer.putShort(offset + Short.BYTES, Float.floatToFloat16(0.005f));
+    }
+    return data;
+  }
+
+  private static byte[] randomQ5K(Random rng, int valueCount) {
+    if (valueCount % 256 != 0) {
+      throw new IllegalArgumentException("Q5_K value count must be a multiple of 256");
+    }
+    byte[] data = new byte[(valueCount / 256) * 176];
+    rng.nextBytes(data);
+    ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+    for (int block = 0; block < valueCount / 256; block++) {
+      int offset = block * 176;
       buffer.putShort(offset, Float.floatToFloat16(0.01f));
       buffer.putShort(offset + Short.BYTES, Float.floatToFloat16(0.005f));
     }
