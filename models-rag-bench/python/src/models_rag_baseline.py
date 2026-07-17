@@ -13,7 +13,7 @@ import socket
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable, Protocol
+from typing import Any, Callable, Iterable, Protocol, TypeVar
 
 import bm25s
 import httpx
@@ -31,6 +31,7 @@ INSTRUCTIONS = (
     "- Do not use prior knowledge.\n\n"
 )
 CITATION = re.compile(r"\[([a-z0-9][a-z0-9-]*)]", re.IGNORECASE)
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,16 @@ class GenerationClient(Protocol):
     def generate(self, prompt: str, max_tokens: int) -> GenerationResult: ...
 
     def close(self) -> None: ...
+
+
+def with_single_transport_retry(operation: Callable[[], T]) -> T:
+    try:
+        return operation()
+    except httpx.TransportError as first_failure:
+        try:
+            return operation()
+        except httpx.TransportError as retry_failure:
+            raise retry_failure from first_failure
 
 
 def load_corpus(corpus_dir: Path) -> RagCorpus:
@@ -324,7 +335,12 @@ class LlamaServerGenerationClient:
             "repeat_penalty": 1,
             "cache_prompt": False,
         }
-        with self._client.stream("POST", "/completion", json=body) as response:
+        response = with_single_transport_retry(
+            lambda: self._client.send(
+                self._client.build_request("POST", "/completion", json=body), stream=True
+            )
+        )
+        try:
             response.raise_for_status()
             for line in response.iter_lines():
                 payload = line.removeprefix("data:").strip()
@@ -337,6 +353,8 @@ class LlamaServerGenerationClient:
                 text.append(content)
                 if event.get("stop") and event.get("timings"):
                     final = event
+        finally:
+            response.close()
         end = time.perf_counter_ns()
         if final is None or first_token == 0:
             raise RuntimeError("llama.cpp stream did not produce final timings")

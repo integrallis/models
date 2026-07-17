@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 
+import httpx
 import models_rag_baseline as rag
 
 
@@ -70,3 +71,17 @@ def test_prompt_and_deterministic_quality_match_java_contract():
 def test_linear_percentiles_match_java_report_math():
     assert rag.percentile([1250.0, 1500.0], 0.50) == 1375.0
     assert rag.percentile([1250.0, 1500.0], 0.95) == 1487.5
+
+
+def test_transport_retry_only_retries_once_before_headers():
+    attempts = 0
+
+    def operation():
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise httpx.RemoteProtocolError("stale pooled connection")
+        return "response"
+
+    assert rag.with_single_transport_retry(operation) == "response"
+    assert attempts == 2
