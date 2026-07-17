@@ -30,6 +30,7 @@ import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Random;
+import java.util.function.IntFunction;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -132,8 +133,21 @@ class LlamaForwardPassTest {
   }
 
   private GgufFile buildQ4NanoModel(Random rng) {
-    int dim = 32;
-    int hiddenDim = 64;
+    return buildQuantizedNanoModel(
+        rng, GgufTensorType.Q4_0, 32, 64, valueCount -> randomQ4(rng, valueCount));
+  }
+
+  private GgufFile buildQ4KNanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng, GgufTensorType.Q4_K, 256, 256, valueCount -> randomQ4K(rng, valueCount));
+  }
+
+  private GgufFile buildQuantizedNanoModel(
+      Random rng,
+      GgufTensorType quantizedType,
+      int dim,
+      int hiddenDim,
+      IntFunction<byte[]> quantizedData) {
     int headDim = dim / HEADS;
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -164,9 +178,9 @@ class LlamaForwardPassTest {
               prefix + "attn_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
           .addTensor(
               prefix + "attn_q.weight",
-              GgufTensorType.Q4_0,
+              quantizedType,
               new long[] {dim, dim},
-              randomQ4(rng, dim * dim))
+              quantizedData.apply(dim * dim))
           .addTensor(
               prefix + "attn_q.bias", GgufTensorType.F32, new long[] {dim}, randomF32(rng, dim))
           .addTensor(
@@ -176,9 +190,9 @@ class LlamaForwardPassTest {
               onesF32(headDim))
           .addTensor(
               prefix + "attn_k.weight",
-              GgufTensorType.Q4_0,
+              quantizedType,
               new long[] {dim, headDim},
-              randomQ4(rng, headDim * dim))
+              quantizedData.apply(headDim * dim))
           .addTensor(
               prefix + "attn_k.bias",
               GgufTensorType.F32,
@@ -191,9 +205,9 @@ class LlamaForwardPassTest {
               onesF32(headDim))
           .addTensor(
               prefix + "attn_v.weight",
-              GgufTensorType.Q4_0,
+              quantizedType,
               new long[] {dim, headDim},
-              randomQ4(rng, headDim * dim))
+              quantizedData.apply(headDim * dim))
           .addTensor(
               prefix + "attn_v.bias",
               GgufTensorType.F32,
@@ -201,25 +215,25 @@ class LlamaForwardPassTest {
               randomF32(rng, headDim))
           .addTensor(
               prefix + "attn_output.weight",
-              GgufTensorType.Q4_0,
+              quantizedType,
               new long[] {dim, dim},
-              randomQ4(rng, dim * dim))
+              quantizedData.apply(dim * dim))
           .addTensor(prefix + "ffn_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
           .addTensor(
               prefix + "ffn_gate.weight",
-              GgufTensorType.Q4_0,
+              quantizedType,
               new long[] {dim, hiddenDim},
-              randomQ4(rng, hiddenDim * dim))
+              quantizedData.apply(hiddenDim * dim))
           .addTensor(
               prefix + "ffn_up.weight",
-              GgufTensorType.Q4_0,
+              quantizedType,
               new long[] {dim, hiddenDim},
-              randomQ4(rng, hiddenDim * dim))
+              quantizedData.apply(hiddenDim * dim))
           .addTensor(
               prefix + "ffn_down.weight",
-              GgufTensorType.Q4_0,
+              quantizedType,
               new long[] {hiddenDim, dim},
-              randomQ4(rng, dim * hiddenDim));
+              quantizedData.apply(dim * hiddenDim));
     }
 
     byte[] data = builder.build();
@@ -289,6 +303,33 @@ class LlamaForwardPassTest {
     @Test
     void q4PrefillUsesBatchedKernelAndPreservesAutoregressiveState() {
       GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] expected = runSequence(sequential, tokens);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] actual = batched.prefill(tokens, 0);
+
+      assertThat(batched.usesBatchedPrefill()).isTrue();
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(3, tokens.length))
+          .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void q4KPrefillUsesBatchedKernelAndPreservesAutoregressiveState() {
+      GgufFile file = buildQ4KNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
@@ -508,6 +549,21 @@ class LlamaForwardPassTest {
       for (int packed = 0; packed < 16; packed++) {
         data[offset + 2 + packed] = (byte) rng.nextInt(256);
       }
+    }
+    return data;
+  }
+
+  private static byte[] randomQ4K(Random rng, int valueCount) {
+    if (valueCount % 256 != 0) {
+      throw new IllegalArgumentException("Q4_K value count must be a multiple of 256");
+    }
+    byte[] data = new byte[(valueCount / 256) * 144];
+    rng.nextBytes(data);
+    ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+    for (int block = 0; block < valueCount / 256; block++) {
+      int offset = block * 144;
+      buffer.putShort(offset, Float.floatToFloat16(0.01f));
+      buffer.putShort(offset + Short.BYTES, Float.floatToFloat16(0.005f));
     }
     return data;
   }

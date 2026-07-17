@@ -79,6 +79,7 @@ public final class LlamaForwardPass {
   private final float[] batchFfnProjected;
   private final byte[] batchQuantizedActivation;
   private final float[] batchQuantizedActivationScales;
+  private final short[] batchQuantizedActivationSums;
   private final float[] batchQ4LaneScratch;
   private float[] verificationLogits = new float[0];
   private int nextPosition;
@@ -138,13 +139,18 @@ public final class LlamaForwardPass {
         new byte[Math.multiplyExact(prefillBatchCapacity, maxProjectionInput)];
     this.batchQuantizedActivationScales =
         new float[Math.multiplyExact(prefillBatchCapacity, (maxProjectionInput + 31) / 32)];
+    this.batchQuantizedActivationSums =
+        new short[Math.multiplyExact(prefillBatchCapacity, (maxProjectionInput + 15) / 16)];
     int maxProjectionOutput =
         Math.max(
             Math.max(dim, hiddenDim),
             Math.max(config.queryDim(), Math.max(config.keyDim(), config.valueDim())));
     this.batchQ4LaneScratch =
-        new float
-            [Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, maxProjectionOutput), 8)];
+        usesProjectionType(config, weights, GgufTensorType.Q4_0)
+            ? new float
+                [Math.multiplyExact(
+                    Math.multiplyExact(prefillBatchCapacity, maxProjectionOutput), 8)]
+            : new float[0];
   }
 
   /** Runs a single forward pass for the given token at the given position. Returns logits. */
@@ -739,6 +745,7 @@ public final class LlamaForwardPass {
         cols,
         batchQuantizedActivation,
         batchQuantizedActivationScales,
+        batchQuantizedActivationSums,
         batchQ4LaneScratch);
   }
 
@@ -776,6 +783,23 @@ public final class LlamaForwardPass {
       }
     }
     return true;
+  }
+
+  private static boolean usesProjectionType(
+      LlamaConfig config, LlamaWeights weights, GgufTensorType type) {
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      LlamaWeights.LayerWeights layerWeights = weights.layer(layer);
+      if (layerWeights.wqType() == type
+          || layerWeights.wkType() == type
+          || layerWeights.wvType() == type
+          || layerWeights.woType() == type
+          || layerWeights.ffnGateType() == type
+          || layerWeights.ffnUpType() == type
+          || layerWeights.ffnDownType() == type) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static float[] batchBuffer(int batchCapacity, int width) {

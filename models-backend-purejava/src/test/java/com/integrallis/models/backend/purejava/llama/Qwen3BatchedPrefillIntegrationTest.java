@@ -137,6 +137,7 @@ class Qwen3BatchedPrefillIntegrationTest {
             cols,
             batchQuants,
             batchScales,
+            new short[batchSize * ((cols + 15) / 16)],
             batchLanes);
         assertSameBytes("Q8 activation iteration " + iteration, expectedQuants, batchQuants);
         assertSameBits("Q8 scale iteration " + iteration, expectedScales, batchScales);
