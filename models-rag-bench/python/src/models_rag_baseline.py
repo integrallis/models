@@ -20,6 +20,7 @@ import httpx
 import ollama
 
 
+REPORT_SCHEMA_VERSION = 2
 INSTRUCTIONS = (
     "You answer questions using only the supplied context.\n"
     "Rules:\n"
@@ -512,7 +513,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     total_attempts = len(selected) * args.iterations
     summary = _summary(runs, selected, total_attempts)
     return {
-        "schemaVersion": 1,
+        "schemaVersion": REPORT_SCHEMA_VERSION,
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "framework": "python",
         "backend": client.backend,

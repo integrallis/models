@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import models_rag_baseline as rag
@@ -85,3 +86,51 @@ def test_transport_retry_only_retries_once_before_headers():
 
     assert rag.with_single_transport_retry(operation) == "response"
     assert attempts == 2
+
+
+def test_report_schema_matches_java_prompt_template_contract(monkeypatch):
+    class StubGenerationClient:
+        backend = "stub"
+        model = "stub-model"
+
+        def generate(self, prompt, max_tokens):
+            return rag.GenerationResult(
+                "The deadline is 30 calendar days and the deductible is 75 dollars "
+                "[claims-auto-glass].",
+                100,
+                16,
+                10.0,
+                25.0,
+                1_000.0,
+                0.0,
+                0,
+                1.0,
+            )
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(rag, "_client", lambda args: StubGenerationClient())
+    args = SimpleNamespace(
+        artifact=None,
+        backend="ollama",
+        backend_version="test",
+        case=["auto-glass-deadline"],
+        context=2_048,
+        corpus_dir=CORPUS_DIR,
+        endpoint="http://127.0.0.1:11434",
+        iterations=1,
+        max_tokens=64,
+        model="stub-model",
+        model_id="stub-model",
+        pid=0,
+        prompt_template="raw",
+        threads=1,
+        top_k=1,
+        warmups=0,
+    )
+
+    report = rag._run(args)
+
+    assert report["schemaVersion"] == 2
+    assert report["settings"]["promptTemplate"] == "raw"
