@@ -120,9 +120,30 @@ class SpeculativeGenerationLoopTest {
     assertThat(speculativeLoop.lastSpeculativeMetrics().draftAttempts()).isPositive();
   }
 
+  @Test
+  void doesNotForwardTheFinalTokenWhenNoDraftIsAvailableAtTheLimit() {
+    int[] promptTokens = {2, 3};
+    SequenceBackend backend = new SequenceBackend(promptTokens, new int[] {5, 5, 5, 1});
+    GenerationLoop loop = new GenerationLoop(backend, threeTokenDraftOptions());
+
+    String result =
+        loop.generate(
+            "prompt",
+            SamplingOptions.builder()
+                .temperature(0.0f)
+                .repetitionPenalty(1.0f)
+                .maxTokens(3)
+                .build());
+
+    assertThat(result).isEqualTo("[5][5][5]");
+    assertThat(backend.verifiedBatches).isEmpty();
+    assertThat(backend.forwardTokens).containsExactly(5, 5);
+  }
+
   private static SpeculativeGenerationOptions threeTokenDraftOptions() {
     return SpeculativeGenerationOptions.builder()
         .ngramSize(4)
+        .confidenceProbeTokens(3)
         .minimumDraftTokens(3)
         .maximumDraftTokens(3)
         .build();

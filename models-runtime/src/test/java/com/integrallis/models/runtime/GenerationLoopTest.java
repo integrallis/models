@@ -204,6 +204,55 @@ class GenerationLoopTest {
 
       assertThat(result).isEqualTo("!!!");
     }
+
+    @Test
+    void doesNotForwardTheFinalTokenWhenTheLimitIsReached() {
+      AtomicInteger forwardCalls = new AtomicInteger();
+      InferenceBackend backend =
+          new InferenceBackend() {
+            @Override
+            public String name() {
+              return "limit-tracking";
+            }
+
+            @Override
+            public ModelMetadata metadata() {
+              return new ModelMetadata("mock", "MockModel", 64, 6, 16, 1, 1, 1);
+            }
+
+            @Override
+            public Tokenizer tokenizer() {
+              return MOCK_TOKENIZER;
+            }
+
+            @Override
+            public float[] prefill(int[] tokens, int startPosition) {
+              return exclamationLogits();
+            }
+
+            @Override
+            public float[] forward(int token, int position) {
+              forwardCalls.incrementAndGet();
+              return exclamationLogits();
+            }
+
+            @Override
+            public void close() {}
+
+            private float[] exclamationLogits() {
+              float[] logits = new float[6];
+              logits[5] = 100.0f;
+              return logits;
+            }
+          };
+
+      String result =
+          new GenerationLoop(backend)
+              .generate("hello", SamplingOptions.builder().temperature(0.0f).maxTokens(3).build());
+
+      assertThat(result).isEqualTo("!!!");
+      assertThat(forwardCalls).hasValue(2);
+    }
   }
 
   @Nested

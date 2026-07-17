@@ -60,6 +60,8 @@ class InferenceBenchmarkCliTest {
               "ngram",
               "--ngram-size",
               "6",
+              "--draft-probe",
+              "2",
               "--draft-min",
               "3",
               "--draft-max",
@@ -74,6 +76,7 @@ class InferenceBenchmarkCliTest {
 
     assertThat(configuration.speculativeOptions().enabled()).isTrue();
     assertThat(configuration.speculativeOptions().ngramSize()).isEqualTo(6);
+    assertThat(configuration.speculativeOptions().confidenceProbeTokens()).isEqualTo(2);
     assertThat(configuration.speculativeOptions().minimumDraftTokens()).isEqualTo(3);
     assertThat(configuration.speculativeOptions().maximumDraftTokens()).isEqualTo(7);
     assertThat(configuration.speculativeOptions().adaptationWindow()).isEqualTo(4);

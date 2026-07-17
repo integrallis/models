@@ -19,6 +19,7 @@ package com.integrallis.models.runtime;
 public record SpeculativeGenerationOptions(
     boolean enabled,
     int ngramSize,
+    int confidenceProbeTokens,
     int minimumDraftTokens,
     int maximumDraftTokens,
     int historyWindow,
@@ -32,6 +33,10 @@ public record SpeculativeGenerationOptions(
     }
     if (minimumDraftTokens < 1) {
       throw new IllegalArgumentException("minimumDraftTokens must be >= 1: " + minimumDraftTokens);
+    }
+    if (confidenceProbeTokens < 1 || confidenceProbeTokens > minimumDraftTokens) {
+      throw new IllegalArgumentException(
+          "confidenceProbeTokens must be in [1, minimumDraftTokens]: " + confidenceProbeTokens);
     }
     if (maximumDraftTokens < minimumDraftTokens) {
       throw new IllegalArgumentException(
@@ -70,6 +75,7 @@ public record SpeculativeGenerationOptions(
   public static final class Builder {
     private boolean enabled = true;
     private int ngramSize = 4;
+    private int confidenceProbeTokens = 1;
     private int minimumDraftTokens = 3;
     private int maximumDraftTokens = 7;
     private int historyWindow = 2048;
@@ -86,6 +92,11 @@ public record SpeculativeGenerationOptions(
 
     public Builder ngramSize(int ngramSize) {
       this.ngramSize = ngramSize;
+      return this;
+    }
+
+    public Builder confidenceProbeTokens(int confidenceProbeTokens) {
+      this.confidenceProbeTokens = confidenceProbeTokens;
       return this;
     }
 
@@ -123,6 +134,7 @@ public record SpeculativeGenerationOptions(
       return new SpeculativeGenerationOptions(
           enabled,
           ngramSize,
+          confidenceProbeTokens,
           minimumDraftTokens,
           maximumDraftTokens,
           historyWindow,

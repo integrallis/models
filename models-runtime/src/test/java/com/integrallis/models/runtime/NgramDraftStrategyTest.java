@@ -28,6 +28,7 @@ class NgramDraftStrategyTest {
   void usesARequestScaleCooldownAfterOneWeakVerificationWindow() {
     SpeculativeGenerationOptions options = SpeculativeGenerationOptions.builder().build();
 
+    assertThat(options.confidenceProbeTokens()).isEqualTo(1);
     assertThat(options.adaptationWindow()).isEqualTo(1);
     assertThat(options.cooldownTokens()).isEqualTo(256);
   }
@@ -38,6 +39,7 @@ class NgramDraftStrategyTest {
         new NgramDraftStrategy(
             SpeculativeGenerationOptions.builder()
                 .ngramSize(4)
+                .confidenceProbeTokens(3)
                 .minimumDraftTokens(3)
                 .maximumDraftTokens(3)
                 .build());
@@ -48,7 +50,7 @@ class NgramDraftStrategyTest {
   }
 
   @Test
-  void expandsPastTheMinimumDraftOnlyAfterAFullConfidenceProbe() {
+  void expandsDraftsThroughOneTokenAndMinimumLengthConfidenceProbes() {
     NgramDraftStrategy strategy =
         new NgramDraftStrategy(
             SpeculativeGenerationOptions.builder()
@@ -58,11 +60,14 @@ class NgramDraftStrategyTest {
                 .build());
     List<Integer> history = List.of(2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4);
 
-    int[] probe = strategy.propose(history, 5, 7);
-    strategy.recordVerification(probe.length, probe.length, 1);
+    int[] initialProbe = strategy.propose(history, 5, 7);
+    strategy.recordVerification(initialProbe.length, initialProbe.length, 1);
+    int[] minimumProbe = strategy.propose(history, 5, 7);
+    strategy.recordVerification(minimumProbe.length, minimumProbe.length, 2);
     int[] trusted = strategy.propose(history, 5, 7);
 
-    assertThat(probe).containsExactly(6, 7, 8);
+    assertThat(initialProbe).containsExactly(6);
+    assertThat(minimumProbe).containsExactly(6, 7, 8);
     assertThat(trusted).containsExactly(6, 7, 8, 9, 2, 3, 4);
   }
 

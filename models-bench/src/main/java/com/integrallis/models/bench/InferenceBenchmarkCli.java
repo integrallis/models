@@ -54,6 +54,7 @@ public final class InferenceBenchmarkCli {
           "load-ms",
           "speculation",
           "ngram-size",
+          "draft-probe",
           "draft-min",
           "draft-max",
           "speculation-history",
@@ -343,6 +344,7 @@ public final class InferenceBenchmarkCli {
     SpeculativeGenerationOptions defaults = SpeculativeGenerationOptions.builder().build();
     return SpeculativeGenerationOptions.builder()
         .ngramSize(integer(values, "ngram-size", defaults.ngramSize()))
+        .confidenceProbeTokens(integer(values, "draft-probe", defaults.confidenceProbeTokens()))
         .minimumDraftTokens(integer(values, "draft-min", defaults.minimumDraftTokens()))
         .maximumDraftTokens(integer(values, "draft-max", defaults.maximumDraftTokens()))
         .historyWindow(integer(values, "speculation-history", defaults.historyWindow()))

@@ -163,6 +163,9 @@ public final class GenerationLoop {
         return;
       }
       emit(tokenizer, stream, allTokens, nextToken);
+      if (generated + 1 == maxTokens) {
+        return;
+      }
       logits = backend.forwardTransient(nextToken, position);
       position++;
     }
@@ -216,6 +219,9 @@ public final class GenerationLoop {
 
       emit(tokenizer, stream, allTokens, nextToken);
       generated++;
+      if (generated == maxTokens) {
+        return;
+      }
 
       if (draft.length == 0) {
         long forwardStart = System.nanoTime();
