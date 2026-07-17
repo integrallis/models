@@ -1,0 +1,19 @@
+### Task
+Generate a SQL query to answer [QUESTION]Which five customers spent the most in 2025?[/QUESTION]
+
+### Database Schema
+The query will run on a database with the following schema:
+CREATE TABLE customers (
+  customer_id BIGINT PRIMARY KEY,
+  customer_name TEXT NOT NULL
+);
+CREATE TABLE orders (
+  order_id BIGINT PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES customers(customer_id),
+  ordered_at TIMESTAMP NOT NULL,
+  total_amount DECIMAL(12, 2) NOT NULL
+);
+
+### Answer
+Given the database schema, here is the SQL query that answers [QUESTION]Which five customers spent the most in 2025?[/QUESTION]
+[SQL]
