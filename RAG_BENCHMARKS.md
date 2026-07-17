@@ -96,15 +96,16 @@ than punctuation-sensitive control text.
 | Models revision used for measurements | `f657a51` |
 | Vectors revision | `8721107` |
 | llama.cpp | `b10012`, commit `c71854292` |
+| llama-cpp-python | `0.3.34` bundled native revision |
 | Ollama | `0.32.0` |
 | Main qualified artifact | Qwen3 1.7B Q8_0, 1,834,426,016 bytes |
 | Artifact SHA-256 | `061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a` |
 | Context / threads / output cap | 2,048 / 8 / 64 tokens |
 
-The full Java and Python llama.cpp rows use one warmup and three measured
-iterations, or 27 requests. Framework and Ollama rows use one warmup and one
-measured iteration, or nine requests. They are sufficient to find gross gaps,
-not to claim tail latency under production concurrency.
+The full Java and Python llama.cpp server rows use one warmup and three measured
+iterations, or 27 requests. Framework, direct-binding, and Ollama rows use one
+warmup and one measured iteration, or nine requests. They are sufficient to
+find gross gaps, not to claim tail latency under production concurrency.
 
 ## Client And Framework Parity
 
@@ -115,16 +116,25 @@ decode throughput; latencies are p95.
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Plain Java | llama.cpp | 27 | 5.1 ms | 1.4 ms | 1,294.6 ms | 40.4 ms | 3,756.5 ms | 25.46 tok/s | 77.8% |
 | Python | llama.cpp | 27 | 0.3 ms | 0.4 ms | 1,322.1 ms | 41.0 ms | 3,789.6 ms | 25.53 tok/s | 77.8% |
+| Python direct binding | llama.cpp 0.3.34 bundle | 9 | 0.3 ms | 1.3 ms | 1,306.8 ms | 45.6 ms | 3,624.0 ms | 24.99 tok/s | 77.8% |
 | LangChain4j | llama.cpp | 9 | 3.7 ms | 2.7 ms | 1,258.1 ms | 39.8 ms | 3,712.2 ms | 25.56 tok/s | 77.8% |
 | Spring AI | llama.cpp | 9 | 2.8 ms | 5.9 ms | 1,249.2 ms | 39.4 ms | 3,677.3 ms | 25.54 tok/s | 77.8% |
 | Plain Java | Ollama | 9 | 2.0 ms | 1.0 ms | 676.1 ms | 66.2 ms | 3,873.4 ms | 18.40 tok/s | 77.8% |
 | Python | Ollama | 9 | 0.3 ms | 0.3 ms | 686.1 ms | 65.5 ms | 4,018.6 ms | 18.11 tok/s | 77.8% |
 
-The Java and Python llama.cpp decode results differ by 0.3%. Their p95 TTFT
-differs by 2.1%. Java and Python Ollama results are similarly close. The
-LangChain4j and Spring AI advisor layers add single-digit milliseconds, which
-is immaterial beside model inference. A Java application calling local Ollama
-experiences Ollama's engine speed, not the pure-Java backend's speed.
+The Java and Python llama.cpp server decode results differ by 0.3%. Their p95
+TTFT differs by 2.1%. The direct Python binding is also close, although its
+package bundles a different native revision. Java and Python Ollama results are
+similarly close. The LangChain4j and Spring AI advisor layers add single-digit
+milliseconds, which is immaterial beside model inference. A Java application
+calling local Ollama experiences Ollama's engine speed, not the pure-Java
+backend's speed.
+
+The direct binding must call `Llama.reset()` before every measured request.
+Without that reset, `llama-cpp-python` reuses the warmup prompt's KV prefix even
+when its optional cache object is disabled; the benchmark initially observed an
+invalid 42 ms TTFT. A regression test now enforces reset-before-generation. The
+corrected result is 1,306.8 ms, which agrees with the server path.
 
 On this host and model, Ollama cuts p95 TTFT roughly in half compared with the
 pinned llama.cpp server but decodes 28% fewer tokens per second. Both remain
@@ -155,7 +165,7 @@ this CPU host.
 | SmolLM2 360M Q8_0 | Full suite plus engine diagnostics | Native diagnostic reaches 96.45 tok/s; pure Java reaches 21.52 tok/s | Full-suite exact quality is 25% native and 33.3% pure Java. Too small to follow the citation/abstention contract reliably. |
 | Qwen3 0.6B Q4_0 | Engine and prompt diagnostics | llama.cpp reaches about 100 tok/s with ChatML-no-think | It extracts facts but repeatedly omits required citations. Not quality-qualified. |
 | MiniCPM5 1B Q4_K_M | Prompt diagnostics | llama.cpp reaches about 70 tok/s | Raw prompts emit placeholder citations; ChatML spends the output budget in reasoning; the no-think prefix terminates immediately. Its template profile is unresolved. |
-| Qwen3 1.7B Q8_0 | Full suite across six application paths | Native paths satisfy the latency gate at concurrency one | Exact quality is 77.8%; semantically tolerant quality is 88.9%. Pure Java is too slow. |
+| Qwen3 1.7B Q8_0 | Full suite across seven application paths | Native paths satisfy the latency gate at concurrency one | Exact quality is 77.8%; semantically tolerant quality is 88.9%. Pure Java is too slow. |
 
 Retrieval is perfect in every full run. The failed answerable case is therefore
 generation, not search: Qwen3 1.7B says the context does not state whether a
