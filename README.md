@@ -166,6 +166,8 @@ LangChain4j, and Spring AI entry points plus revision-matched Python/Ollama and
 Python/llama.cpp baselines. It enforces the same corpus, retrieval result,
 prompt hash, sampling controls, and deterministic quality checks across the
 implementations. See [models-rag-bench/README.md](models-rag-bench/README.md).
+The controlled production findings and acceptance criteria are recorded in
+[RAG_BENCHMARKS.md](RAG_BENCHMARKS.md).
 
 ## Supported models
 

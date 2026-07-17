@@ -141,6 +141,6 @@ p95 TPOT at or below 100 ms, and p95 end-to-end latency at or below 5 seconds.
 relaxing quality.
 
 These are ModelJars project SLOs, not universal industry thresholds. They are
-documented and justified in `RAG_BENCHMARKS.md` together with controlled
-results. Release qualification should use more iterations and realistic
-concurrency than the short diagnostic commands above.
+documented and justified in [RAG_BENCHMARKS.md](../RAG_BENCHMARKS.md) together
+with controlled results. Release qualification should use more iterations and
+realistic concurrency than the short diagnostic commands above.
