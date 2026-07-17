@@ -16,8 +16,11 @@
 package com.integrallis.models.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.net.URI;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class HttpGenerationClientTest {
@@ -50,5 +53,37 @@ class HttpGenerationClientTest {
       assertThat(body.path("seed").asInt()).isEqualTo(42);
       assertThat(body.path("n_predict").asInt()).isEqualTo(32);
     }
+  }
+
+  @Test
+  void retriesOneTransportFailureBeforeResponseHeaders() throws Exception {
+    AtomicInteger attempts = new AtomicInteger();
+
+    String result =
+        HttpGenerationClient.withSingleTransportRetry(
+            () -> {
+              if (attempts.incrementAndGet() == 1) {
+                throw new IOException("stale pooled connection");
+              }
+              return "response";
+            });
+
+    assertThat(result).isEqualTo("response");
+    assertThat(attempts).hasValue(2);
+  }
+
+  @Test
+  void exposesBothFailuresWhenTheTransportRetryFails() {
+    AtomicInteger attempts = new AtomicInteger();
+
+    assertThatThrownBy(
+            () ->
+                HttpGenerationClient.withSingleTransportRetry(
+                    () -> {
+                      throw new IOException("attempt-" + attempts.incrementAndGet());
+                    }))
+        .isInstanceOf(IOException.class)
+        .hasMessage("attempt-2")
+        .satisfies(failure -> assertThat(failure.getSuppressed()).hasSize(1));
   }
 }

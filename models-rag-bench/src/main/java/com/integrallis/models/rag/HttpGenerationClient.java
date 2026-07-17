@@ -84,7 +84,8 @@ public final class HttpGenerationClient implements GenerationClient {
               .build();
       long start = System.nanoTime();
       HttpResponse<Stream<String>> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofLines());
+          withSingleTransportRetry(
+              () -> httpClient.send(request, HttpResponse.BodyHandlers.ofLines()));
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
         throw new IllegalStateException("HTTP " + response.statusCode() + " from " + requestUri());
       }
@@ -184,5 +185,24 @@ public final class HttpGenerationClient implements GenerationClient {
 
   private static double nanosToMillis(long nanos) {
     return nanos / 1_000_000.0;
+  }
+
+  static <T> T withSingleTransportRetry(TransportOperation<T> operation)
+      throws IOException, InterruptedException {
+    try {
+      return operation.execute();
+    } catch (IOException firstFailure) {
+      try {
+        return operation.execute();
+      } catch (IOException | InterruptedException retryFailure) {
+        retryFailure.addSuppressed(firstFailure);
+        throw retryFailure;
+      }
+    }
+  }
+
+  @FunctionalInterface
+  interface TransportOperation<T> {
+    T execute() throws IOException, InterruptedException;
   }
 }
