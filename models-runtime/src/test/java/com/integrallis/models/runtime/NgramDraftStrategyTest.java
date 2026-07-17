@@ -25,6 +25,14 @@ import org.junit.jupiter.api.Test;
 class NgramDraftStrategyTest {
 
   @Test
+  void usesARequestScaleCooldownAfterOneWeakVerificationWindow() {
+    SpeculativeGenerationOptions options = SpeculativeGenerationOptions.builder().build();
+
+    assertThat(options.adaptationWindow()).isEqualTo(1);
+    assertThat(options.cooldownTokens()).isEqualTo(256);
+  }
+
+  @Test
   void draftsTheContinuationOfTheMostRecentPriorSuffix() {
     NgramDraftStrategy strategy =
         new NgramDraftStrategy(
@@ -37,6 +45,25 @@ class NgramDraftStrategyTest {
     int[] draft = strategy.propose(List.of(2, 3, 4, 5, 2, 3, 4), 5, 3);
 
     assertThat(draft).containsExactly(2, 3, 4);
+  }
+
+  @Test
+  void expandsPastTheMinimumDraftOnlyAfterAFullConfidenceProbe() {
+    NgramDraftStrategy strategy =
+        new NgramDraftStrategy(
+            SpeculativeGenerationOptions.builder()
+                .ngramSize(4)
+                .minimumDraftTokens(3)
+                .maximumDraftTokens(7)
+                .build());
+    List<Integer> history = List.of(2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4);
+
+    int[] probe = strategy.propose(history, 5, 7);
+    strategy.recordVerification(probe.length, probe.length, 1);
+    int[] trusted = strategy.propose(history, 5, 7);
+
+    assertThat(probe).containsExactly(6, 7, 8);
+    assertThat(trusted).containsExactly(6, 7, 8, 9, 2, 3, 4);
   }
 
   @Test

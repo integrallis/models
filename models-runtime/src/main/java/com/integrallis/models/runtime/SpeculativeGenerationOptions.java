@@ -73,9 +73,9 @@ public record SpeculativeGenerationOptions(
     private int minimumDraftTokens = 3;
     private int maximumDraftTokens = 7;
     private int historyWindow = 2048;
-    private int adaptationWindow = 2;
+    private int adaptationWindow = 1;
     private float minimumAcceptanceRate = 0.8f;
-    private int cooldownTokens = 32;
+    private int cooldownTokens = 256;
 
     private Builder() {}
 

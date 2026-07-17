@@ -27,6 +27,7 @@ final class NgramDraftStrategy {
   private int windowProposed;
   private int windowAccepted;
   private int suppressedUntilGenerated;
+  private boolean fullDraftTrusted;
 
   NgramDraftStrategy(SpeculativeGenerationOptions options) {
     this.options = options;
@@ -37,7 +38,9 @@ final class NgramDraftStrategy {
   }
 
   int[] propose(List<Integer> history, int sampledToken, int remainingTokens) {
-    int draftLimit = Math.min(options.maximumDraftTokens(), remainingTokens);
+    int confidenceLimit =
+        fullDraftTrusted ? options.maximumDraftTokens() : options.minimumDraftTokens();
+    int draftLimit = Math.min(confidenceLimit, remainingTokens);
     if (draftLimit < options.minimumDraftTokens()) {
       return NO_DRAFT;
     }
@@ -71,6 +74,7 @@ final class NgramDraftStrategy {
   }
 
   void recordVerification(int proposed, int accepted, int generatedTokens) {
+    fullDraftTrusted = proposed == accepted;
     windowAttempts++;
     windowProposed += proposed;
     windowAccepted += accepted;
