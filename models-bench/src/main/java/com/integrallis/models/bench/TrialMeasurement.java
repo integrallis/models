@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.bench;
 
+import com.integrallis.models.runtime.SpeculativeGenerationMetrics;
+
 /** One measured generation request, including failures instead of discarding them. */
 public record TrialMeasurement(
     boolean successful,
@@ -27,6 +29,7 @@ public record TrialMeasurement(
     long peakRssBytes,
     double cpuMillis,
     String outputSha256,
+    SpeculativeGenerationMetrics speculation,
     String error) {
 
   public static TrialMeasurement success(
@@ -38,6 +41,28 @@ public record TrialMeasurement(
       long peakRssBytes,
       double cpuMillis,
       String outputSha256) {
+    return success(
+        ttftMillis,
+        totalMillis,
+        prefillTokensPerSecond,
+        inputTokens,
+        outputTokens,
+        peakRssBytes,
+        cpuMillis,
+        outputSha256,
+        SpeculativeGenerationMetrics.inactive());
+  }
+
+  public static TrialMeasurement success(
+      double ttftMillis,
+      double totalMillis,
+      double prefillTokensPerSecond,
+      int inputTokens,
+      int outputTokens,
+      long peakRssBytes,
+      double cpuMillis,
+      String outputSha256,
+      SpeculativeGenerationMetrics speculation) {
     double postFirstTokenMillis = totalMillis - ttftMillis;
     double decodeTokensPerSecond =
         outputTokens > 1 && postFirstTokenMillis > 0
@@ -54,12 +79,24 @@ public record TrialMeasurement(
         peakRssBytes,
         cpuMillis,
         outputSha256,
+        speculation,
         null);
   }
 
   public static TrialMeasurement failure(String error) {
     return new TrialMeasurement(
-        false, 0, 0, 0, 0, 0, 0, 0, 0, null, error == null ? "unknown failure" : error);
+        false,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        null,
+        SpeculativeGenerationMetrics.inactive(),
+        error == null ? "unknown failure" : error);
   }
 
   public double tpotMillis() {

@@ -16,12 +16,14 @@
 package com.integrallis.models.bench;
 
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import java.util.Objects;
 
 /** Separates prompt forward-pass time from autoregressive decode time without changing runtime. */
-final class TimingBackend implements InferenceBackend {
+final class TimingBackend implements SpeculativeInferenceBackend {
 
   private final InferenceBackend delegate;
   private int inputTokens;
@@ -79,10 +81,38 @@ final class TimingBackend implements InferenceBackend {
     return logits;
   }
 
+  @Override
+  public int checkpoint() {
+    return speculativeDelegate().checkpoint();
+  }
+
+  @Override
+  public LogitBatch verify(int[] tokens, int startPosition) {
+    return speculativeDelegate().verify(tokens, startPosition);
+  }
+
+  @Override
+  public LogitBatch verifyTransient(int[] tokens, int startPosition) {
+    return speculativeDelegate().verifyTransient(tokens, startPosition);
+  }
+
+  @Override
+  public void rewind(int checkpoint) {
+    speculativeDelegate().rewind(checkpoint);
+  }
+
   private void recordForward(int position, long elapsed) {
     if (position < inputTokens) {
       prefillNanos += elapsed;
     }
+  }
+
+  private SpeculativeInferenceBackend speculativeDelegate() {
+    if (delegate instanceof SpeculativeInferenceBackend speculative) {
+      return speculative;
+    }
+    throw new UnsupportedOperationException(
+        "delegate does not support speculative verification: " + delegate.name());
   }
 
   @Override
