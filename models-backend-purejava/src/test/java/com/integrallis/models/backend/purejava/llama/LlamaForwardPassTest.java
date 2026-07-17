@@ -142,12 +142,35 @@ class LlamaForwardPassTest {
         rng, GgufTensorType.Q4_K, 256, 256, valueCount -> randomQ4K(rng, valueCount));
   }
 
+  private GgufFile buildMixedQ4KQ6KNanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng,
+        GgufTensorType.Q4_K,
+        256,
+        256,
+        valueCount -> randomQ4K(rng, valueCount),
+        GgufTensorType.Q6_K,
+        valueCount -> randomQ6K(rng, valueCount));
+  }
+
   private GgufFile buildQuantizedNanoModel(
       Random rng,
       GgufTensorType quantizedType,
       int dim,
       int hiddenDim,
       IntFunction<byte[]> quantizedData) {
+    return buildQuantizedNanoModel(
+        rng, quantizedType, dim, hiddenDim, quantizedData, quantizedType, quantizedData);
+  }
+
+  private GgufFile buildQuantizedNanoModel(
+      Random rng,
+      GgufTensorType quantizedType,
+      int dim,
+      int hiddenDim,
+      IntFunction<byte[]> quantizedData,
+      GgufTensorType secondaryType,
+      IntFunction<byte[]> secondaryData) {
     int headDim = dim / HEADS;
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -205,9 +228,9 @@ class LlamaForwardPassTest {
               onesF32(headDim))
           .addTensor(
               prefix + "attn_v.weight",
-              quantizedType,
+              secondaryType,
               new long[] {dim, headDim},
-              quantizedData.apply(headDim * dim))
+              secondaryData.apply(headDim * dim))
           .addTensor(
               prefix + "attn_v.bias",
               GgufTensorType.F32,
@@ -215,9 +238,9 @@ class LlamaForwardPassTest {
               randomF32(rng, headDim))
           .addTensor(
               prefix + "attn_output.weight",
-              quantizedType,
+              secondaryType,
               new long[] {dim, dim},
-              quantizedData.apply(dim * dim))
+              secondaryData.apply(dim * dim))
           .addTensor(prefix + "ffn_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
           .addTensor(
               prefix + "ffn_gate.weight",
@@ -231,9 +254,9 @@ class LlamaForwardPassTest {
               quantizedData.apply(hiddenDim * dim))
           .addTensor(
               prefix + "ffn_down.weight",
-              quantizedType,
+              secondaryType,
               new long[] {hiddenDim, dim},
-              quantizedData.apply(dim * hiddenDim));
+              secondaryData.apply(dim * hiddenDim));
     }
 
     byte[] data = builder.build();
@@ -333,6 +356,38 @@ class LlamaForwardPassTest {
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] expected = runSequence(sequential, tokens);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] actual = batched.prefill(tokens, 0);
+
+      assertThat(batched.usesBatchedPrefill()).isTrue();
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(3, tokens.length))
+          .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void mixedQ4KQ6KPrefillUsesBatchedKernelsAndPreservesAutoregressiveState() {
+      GgufFile file = buildMixedQ4KQ6KNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+
+      assertThat(weights.layer(0).wqType()).isEqualTo(GgufTensorType.Q4_K);
+      assertThat(weights.layer(0).wvType()).isEqualTo(GgufTensorType.Q6_K);
+      assertThat(weights.layer(0).woType()).isEqualTo(GgufTensorType.Q6_K);
+      assertThat(weights.layer(0).ffnDownType()).isEqualTo(GgufTensorType.Q6_K);
 
       LlamaForwardPass sequential =
           new LlamaForwardPass(
@@ -564,6 +619,19 @@ class LlamaForwardPassTest {
       int offset = block * 144;
       buffer.putShort(offset, Float.floatToFloat16(0.01f));
       buffer.putShort(offset + Short.BYTES, Float.floatToFloat16(0.005f));
+    }
+    return data;
+  }
+
+  private static byte[] randomQ6K(Random rng, int valueCount) {
+    if (valueCount % 256 != 0) {
+      throw new IllegalArgumentException("Q6_K value count must be a multiple of 256");
+    }
+    byte[] data = new byte[(valueCount / 256) * 210];
+    rng.nextBytes(data);
+    ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+    for (int block = 0; block < valueCount / 256; block++) {
+      buffer.putShort(block * 210 + 208, Float.floatToFloat16(0.01f));
     }
     return data;
   }
