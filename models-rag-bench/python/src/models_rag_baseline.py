@@ -173,6 +173,11 @@ def render_prompt(
         return canonical
     if prompt_template == "chatml":
         return f"<|im_start|>user\n{canonical}<|im_end|>\n<|im_start|>assistant\n"
+    if prompt_template == "chatml-no-think":
+        return (
+            f"<|im_start|>user\n{canonical}<|im_end|>\n<|im_start|>assistant\n"
+            "<think>\n\n</think>\n\n"
+        )
     raise ValueError(f"unsupported prompt template: {prompt_template}")
 
 
@@ -711,7 +716,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--context", type=int, default=2048)
     parser.add_argument("--threads", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--pid", type=int, default=0)
-    parser.add_argument("--prompt-template", choices=("raw", "chatml"), default="raw")
+    parser.add_argument(
+        "--prompt-template", choices=("raw", "chatml", "chatml-no-think"), default="raw"
+    )
     parser.add_argument("--top-k", type=int, default=1)
     parser.add_argument("--max-tokens", type=int, default=64)
     parser.add_argument("--warmups", type=int, default=1)

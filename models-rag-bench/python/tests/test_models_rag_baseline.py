@@ -56,6 +56,11 @@ def test_prompt_and_deterministic_quality_match_java_contract():
         "784dbdeaf36d19f1deee2f860779e65385ae9d0d681e8a72699639c62b15c74d"
     )
 
+    no_think_prompt = rag.render_prompt(case.question, hits, "chatml-no-think")
+    assert no_think_prompt.endswith(
+        "ANSWER\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
+
 
 def test_linear_percentiles_match_java_report_math():
     assert rag.percentile([1250.0, 1500.0], 0.50) == 1375.0

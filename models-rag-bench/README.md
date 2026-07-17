@@ -27,7 +27,10 @@ Use `--prompt-template chatml` for ChatML-family instruction models such as
 Qwen3, SmolLM2, and MiniCPM5. The benchmark applies the envelope itself and
 sends raw requests to native servers, ensuring every backend receives the same
 model-facing bytes. `--prompt-template raw` remains available for base models
-and is the default so template selection is never hidden.
+and is the default so template selection is never hidden. Use
+`--prompt-template chatml-no-think` for reasoning models whose GGUF template
+supports `enable_thinking=false`; it prefills the template's empty reasoning
+block so the measured output budget contains the answer.
 
 The report records:
 

@@ -53,4 +53,18 @@ class RagPromptRendererTest {
         .contains("[source-1] Policy")
         .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n");
   }
+
+  @Test
+  void chatmlNoThinkProfilePrefillsAnEmptyReasoningBlock() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.CHATML_NO_THINK);
+
+    assertThat(prompt)
+        .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n");
+  }
 }
