@@ -46,6 +46,15 @@ jobs:
       - name: Build + Test
         run: ./gradlew spotlessCheck build
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Test Python RAG baseline
+        run: |
+          uv sync --project models-rag-bench/python --frozen --extra test
+          uv run --project models-rag-bench/python --frozen pytest -q \
+            models-rag-bench/python/tests
+
       - name: Generate SBOM
         run: ./gradlew cyclonedxDirectBom
 

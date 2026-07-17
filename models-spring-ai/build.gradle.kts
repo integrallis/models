@@ -1,2 +1,8 @@
 // models-spring-ai — Spring AI ChatModel + StreamingChatModel adapter
-// Placeholder: no implementation or dependencies yet
+
+dependencies {
+    api(project(":models-api"))
+    api("org.springframework.ai:spring-ai-model:2.0.0")
+
+    implementation(project(":models-runtime"))
+}

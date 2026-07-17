@@ -1,0 +1,107 @@
+/*
+ * Copyright 2025-2026 Integrallis Software, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.integrallis.models.rag;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class RagFrameworkParityTest {
+
+  @Test
+  void plainJavaLangChain4jAndSpringAiUseIdenticalRetrievalAndPrompt() throws Exception {
+    RagCorpus corpus = RagCorpus.loadDefault();
+    RagCase testCase = corpus.cases().getFirst();
+    List<RagRun> runs = new ArrayList<>();
+    List<RecordingGenerationClient> clients = new ArrayList<>();
+
+    for (String framework : List.of("plain-java", "langchain4j", "spring-ai")) {
+      RecordingGenerationClient client = new RecordingGenerationClient();
+      clients.add(client);
+      try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
+        RagApplication application = application(framework, retriever, client);
+        runs.add(application.run(testCase, 32));
+      }
+    }
+
+    assertThat(runs)
+        .extracting(RagRun::framework)
+        .containsExactly("plain-java", "langchain4j", "spring-ai");
+    assertThat(runs).extracting(RagRun::promptSha256).containsOnly(runs.getFirst().promptSha256());
+    assertThat(runs.getFirst().promptSha256())
+        .isEqualTo("8d208e5e0aa69d04a866624e5959a2d98af237b9d5d05fb40ad5146b42ccb2e7");
+    assertThat(runs)
+        .allSatisfy(
+            run ->
+                assertThat(run.retrieved())
+                    .extracting(hit -> hit.document().id())
+                    .containsExactlyElementsOf(
+                        runs.getFirst().retrieved().stream()
+                            .map(hit -> hit.document().id())
+                            .toList()));
+    assertThat(clients)
+        .extracting(RecordingGenerationClient::lastPrompt)
+        .containsOnly(clients.getFirst().lastPrompt());
+    assertThat(runs).allSatisfy(run -> assertThat(run.evaluation().correct()).isTrue());
+  }
+
+  private static RagApplication application(
+      String framework, RagRetriever retriever, GenerationClient client) {
+    return switch (framework) {
+      case "plain-java" -> new PlainJavaRagApplication(retriever, client, 1);
+      case "langchain4j" -> new LangChain4jRagApplication(retriever, client, 1);
+      case "spring-ai" -> new SpringAiRagApplication(retriever, client, 1);
+      default -> throw new IllegalArgumentException(framework);
+    };
+  }
+
+  private static final class RecordingGenerationClient implements GenerationClient {
+    private String lastPrompt;
+
+    @Override
+    public String backend() {
+      return "recording";
+    }
+
+    @Override
+    public String model() {
+      return "recording-model";
+    }
+
+    @Override
+    public GenerationResult generate(String prompt, int maxTokens) {
+      lastPrompt = prompt;
+      return new GenerationResult(
+          "The report deadline is 30 calendar days and the deductible is 75 dollars "
+              + "[claims-auto-glass].",
+          100,
+          18,
+          5,
+          25,
+          1_000,
+          0);
+    }
+
+    @Override
+    public void close() {}
+
+    String lastPrompt() {
+      return lastPrompt;
+    }
+  }
+}

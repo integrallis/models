@@ -13,6 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+import java.util.List;
+
+/** One end-to-end measured RAG case. */
+public record RagRun(
+    String framework,
+    String backend,
+    String model,
+    String caseId,
+    List<RetrievedDocument> retrieved,
+    String promptSha256,
+    double retrievalMillis,
+    double frameworkOverheadMillis,
+    double endToEndMillis,
+    GenerationResult generation,
+    RagEvaluation evaluation) {
+  public RagRun {
+    retrieved = List.copyOf(retrieved);
+  }
+}

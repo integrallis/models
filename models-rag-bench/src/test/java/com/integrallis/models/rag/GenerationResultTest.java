@@ -13,6 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
+
+class GenerationResultTest {
+
+  @Test
+  void derivesInterTokenLatencyAndDecodeThroughput() {
+    GenerationResult result = new GenerationResult("answer", 100, 11, 250, 1_250, 400, 50);
+
+    assertThat(result.tpotMillis()).isEqualTo(100);
+    assertThat(result.decodeTokensPerSecond()).isEqualTo(10);
+  }
+}

@@ -46,6 +46,7 @@ include("models-embedding")
 // --- Testing & benchmarks ---
 include("models-test")
 include("models-bench")
+include("models-rag-bench")
 
 // Enable build cache
 buildCache {

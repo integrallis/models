@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+/** A measured trial that failed before a valid answer was produced. */
+public record RagBenchmarkFailure(int iteration, String caseId, String error) {}

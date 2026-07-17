@@ -13,6 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+/** Deterministic quality measurements for one RAG answer. */
+public record RagEvaluation(
+    double retrievalRecall,
+    double reciprocalRank,
+    double factCoverage,
+    double citationRecall,
+    double citationPrecision,
+    boolean abstained,
+    boolean correct) {}

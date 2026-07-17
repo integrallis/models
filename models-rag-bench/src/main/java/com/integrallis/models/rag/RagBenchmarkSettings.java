@@ -13,6 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+import java.util.List;
+
+/** Workload and deterministic generation controls embedded in every report. */
+public record RagBenchmarkSettings(
+    String corpusSha256,
+    List<String> caseIds,
+    int retrievalTopK,
+    int maxOutputTokens,
+    int warmups,
+    int iterations,
+    int contextLength,
+    int threads,
+    double temperature,
+    int samplingTopK,
+    double topP,
+    double repetitionPenalty,
+    long seed,
+    boolean promptCacheEnabled) {
+  public RagBenchmarkSettings {
+    caseIds = List.copyOf(caseIds);
+  }
+}

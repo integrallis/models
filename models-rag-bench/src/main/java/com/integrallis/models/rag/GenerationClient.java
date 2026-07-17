@@ -13,6 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+/** Measured text-generation boundary for in-process and server backends. */
+public interface GenerationClient extends AutoCloseable {
+  String backend();
+
+  String model();
+
+  GenerationResult generate(String prompt, int maxTokens);
+
+  @Override
+  void close();
+}

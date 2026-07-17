@@ -13,6 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+import java.io.IOException;
+import java.util.List;
+
+/** Retrieval boundary shared by the plain Java and framework runners. */
+@FunctionalInterface
+public interface RagRetriever {
+  List<RetrievedDocument> retrieve(String question, int topK) throws IOException;
+}

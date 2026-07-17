@@ -156,8 +156,16 @@ unrelated.
 
 ### Framework adapters
 
-`models-langchain4j` provides `ModelsChatModel`. The Spring Boot starter resolves
-ModelJars descriptors and is the foundation for Spring AI auto-configuration.
+`models-langchain4j` provides `ModelsChatModel`, and `models-spring-ai` provides
+blocking and streaming `ModelsSpringAiChatModel` adapters. The Spring Boot
+starter resolves ModelJars descriptors and is the foundation for Spring AI
+auto-configuration.
+
+`models-rag-bench` is a controlled, executable RAG application with plain Java,
+LangChain4j, and Spring AI entry points plus revision-matched Python/Ollama and
+Python/llama.cpp baselines. It enforces the same corpus, retrieval result,
+prompt hash, sampling controls, and deterministic quality checks across the
+implementations. See [models-rag-bench/README.md](models-rag-bench/README.md).
 
 ## Supported models
 

@@ -13,6 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+/** Project-defined RAG service tier. */
+public enum RagPerformanceTier {
+  PRODUCTION_READY,
+  USABLE,
+  OFFLINE,
+  FAILED_QUALITY,
+  FAILED_RUNTIME
+}

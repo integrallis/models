@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+/** Controlled RAG applications and production benchmark tooling. */
+package com.integrallis.models.rag;

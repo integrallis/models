@@ -13,6 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+import java.util.Objects;
+
+/** A ranked retrieval result. */
+public record RetrievedDocument(RagDocument document, float score, int rank) {
+  public RetrievedDocument {
+    document = Objects.requireNonNull(document, "document");
+    if (!Float.isFinite(score)) {
+      throw new IllegalArgumentException("score must be finite");
+    }
+    if (rank < 1) {
+      throw new IllegalArgumentException("rank must be positive");
+    }
+  }
+}

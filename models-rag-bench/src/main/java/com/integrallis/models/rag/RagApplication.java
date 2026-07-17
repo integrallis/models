@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+/** One plain Java or framework-specific RAG application. */
+@FunctionalInterface
+public interface RagApplication {
+  RagRun run(RagCase testCase, int maxTokens) throws Exception;
+}

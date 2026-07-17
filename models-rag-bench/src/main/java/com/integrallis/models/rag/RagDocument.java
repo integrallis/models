@@ -13,6 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.rag;
 
-/** Spring AI chat model adapters backed by the Models runtime. */
-package com.integrallis.models.spring.ai;
+import java.util.Objects;
+
+/** One immutable source document in the controlled RAG corpus. */
+public record RagDocument(String id, String title, String text) {
+  public RagDocument {
+    id = requireText(id, "id");
+    title = requireText(title, "title");
+    text = requireText(text, "text");
+  }
+
+  private static String requireText(String value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value.isBlank()) {
+      throw new IllegalArgumentException(name + " must not be blank");
+    }
+    return value;
+  }
+}
