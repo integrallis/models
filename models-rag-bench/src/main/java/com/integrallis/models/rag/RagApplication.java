@@ -17,6 +17,9 @@ package com.integrallis.models.rag;
 
 /** One plain Java or framework-specific RAG application. */
 @FunctionalInterface
-public interface RagApplication {
+public interface RagApplication extends AutoCloseable {
   RagRun run(RagCase testCase, int maxTokens) throws Exception;
+
+  @Override
+  default void close() {}
 }

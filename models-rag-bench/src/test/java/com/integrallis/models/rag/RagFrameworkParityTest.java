@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 class RagFrameworkParityTest {
@@ -33,8 +35,8 @@ class RagFrameworkParityTest {
     for (String framework : List.of("plain-java", "langchain4j", "spring-ai")) {
       RecordingGenerationClient client = new RecordingGenerationClient();
       clients.add(client);
-      try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
-        RagApplication application = application(framework, retriever, client);
+      try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents());
+          RagApplication application = application(framework, retriever, client)) {
         runs.add(application.run(testCase, 32));
       }
     }
@@ -70,9 +72,10 @@ class RagFrameworkParityTest {
     for (String framework : List.of("plain-java", "langchain4j", "spring-ai")) {
       RecordingGenerationClient client = new RecordingGenerationClient();
       clients.add(client);
-      try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
-        runs.add(
-            application(framework, retriever, client, RagPromptTemplate.CHATML).run(testCase, 32));
+      try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents());
+          RagApplication application =
+              application(framework, retriever, client, RagPromptTemplate.CHATML)) {
+        runs.add(application.run(testCase, 32));
       }
     }
 
@@ -86,6 +89,22 @@ class RagFrameworkParityTest {
                 assertThat(prompt)
                     .startsWith("<|im_start|>user\n")
                     .endsWith("<|im_end|>\n<|im_start|>assistant\n"));
+  }
+
+  @Test
+  void springAiApplicationClosesItsAdvisorExecutor() throws Exception {
+    RagCorpus corpus = RagCorpus.loadDefault();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
+      SpringAiRagApplication application =
+          new SpringAiRagApplication(
+              retriever, new RecordingGenerationClient(), 1, RagPromptTemplate.RAW, executor);
+
+      application.close();
+    }
+
+    assertThat(executor.isShutdown()).isTrue();
   }
 
   private static RagApplication application(

@@ -143,14 +143,14 @@ public final class RagBenchmarkCli {
     List<RagBenchmarkFailure> failures = new ArrayList<>();
 
     try (GenerationClient generation = generationClient(configuration);
-        LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
-      RagApplication application =
-          application(
-              configuration.framework(),
-              retriever,
-              generation,
-              configuration.topK(),
-              configuration.promptTemplate());
+        LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents());
+        RagApplication application =
+            application(
+                configuration.framework(),
+                retriever,
+                generation,
+                configuration.topK(),
+                configuration.promptTemplate())) {
       for (int warmup = 0; warmup < configuration.warmups(); warmup++) {
         for (RagCase testCase : cases) {
           application.run(testCase, configuration.maxTokens());

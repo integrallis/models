@@ -18,6 +18,8 @@ package com.integrallis.models.rag;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -36,6 +38,7 @@ public final class SpringAiRagApplication implements RagApplication {
   private final GenerationSession generation;
   private final RetrievalTrace retrieval;
   private final ChatClient chatClient;
+  private final ExecutorService advisorExecutor;
 
   public SpringAiRagApplication(RagRetriever retriever, GenerationClient client, int topK) {
     this(retriever, client, topK, RagPromptTemplate.RAW);
@@ -43,9 +46,19 @@ public final class SpringAiRagApplication implements RagApplication {
 
   public SpringAiRagApplication(
       RagRetriever retriever, GenerationClient client, int topK, RagPromptTemplate promptTemplate) {
+    this(retriever, client, topK, promptTemplate, Executors.newVirtualThreadPerTaskExecutor());
+  }
+
+  SpringAiRagApplication(
+      RagRetriever retriever,
+      GenerationClient client,
+      int topK,
+      RagPromptTemplate promptTemplate,
+      ExecutorService advisorExecutor) {
     this.client = Objects.requireNonNull(client, "client");
     this.generation = new GenerationSession(client);
     this.retrieval = new RetrievalTrace(Objects.requireNonNull(retriever, "retriever"), topK);
+    this.advisorExecutor = Objects.requireNonNull(advisorExecutor, "advisorExecutor");
 
     DocumentRetriever documentRetriever =
         query ->
@@ -62,6 +75,7 @@ public final class SpringAiRagApplication implements RagApplication {
         RetrievalAugmentationAdvisor.builder()
             .documentRetriever(documentRetriever)
             .queryAugmenter(queryAugmenter)
+            .taskExecutor(advisorExecutor::execute)
             .build();
     this.chatClient =
         ChatClient.builder(new MeasuredChatModel(generation)).defaultAdvisors(advisor).build();
@@ -87,6 +101,11 @@ public final class SpringAiRagApplication implements RagApplication {
         retrieval.elapsedMillis(),
         endToEndMillis,
         result);
+  }
+
+  @Override
+  public void close() {
+    advisorExecutor.close();
   }
 
   private static Document toDocument(RetrievedDocument hit) {
