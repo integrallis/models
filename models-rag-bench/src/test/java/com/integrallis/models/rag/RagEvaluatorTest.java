@@ -55,4 +55,25 @@ class RagEvaluatorTest {
     assertThat(RagEvaluator.evaluate(testCase, List.of(), "I think it is 50 dollars.").correct())
         .isFalse();
   }
+
+  @Test
+  void normalizesCurrencySymbolsAndPluralDollars() {
+    RagDocument expected = new RagDocument("policy-a", "Policy A", "irrelevant");
+    RagCase testCase =
+        new RagCase(
+            "currency",
+            "question",
+            List.of("policy-a"),
+            List.of("75 dollar", "3,500 dollar"),
+            true);
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(expected, 1.0f, 1)),
+            "The deductible is $75 and the limit is $3,500 [policy-a].");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
 }

@@ -22,7 +22,7 @@ def test_bm25_ranks_every_answerable_source_first():
         for case in corpus.cases
     )
     assert hashlib.sha256(prompt_hashes.encode()).hexdigest() == (
-        "21da412524218914dc0ac680a8d92ee16c77d4254e2a18cd372f5134c6ab4709"
+        "112000a6017861f70087349571fc5ec400f11499e1b6d9c96676f327558e357d"
     )
 
 
@@ -35,30 +35,35 @@ def test_prompt_and_deterministic_quality_match_java_contract():
     evaluation = rag.evaluate(
         case,
         hits,
-        "The deadline is 30 calendar days and the deductible is 75 dollars "
+        "The deadline is 30 calendar days and the deductible is $75 "
         "[claims-auto-glass].",
     )
 
     assert "reply exactly INSUFFICIENT_CONTEXT" in prompt
+    assert "Copy each supporting source ID exactly" in prompt
+    assert "[source-id]" not in prompt
     assert "[claims-auto-glass] Auto glass claims" in prompt
     assert evaluation.correct
     assert evaluation.fact_coverage == 1.0
     assert evaluation.citation_recall == 1.0
     assert corpus.fingerprint() == "6eeb61d5a4b48addb298889a2357cfbcbe7339c044308ba8cd23dcb27c603cb2"
     assert hashlib.sha256(prompt.encode()).hexdigest() == (
-        "8d208e5e0aa69d04a866624e5959a2d98af237b9d5d05fb40ad5146b42ccb2e7"
+        "26fccba3e100ea107b382b25a9404ba8fb68bf9bd8c2003878ad6b6cefd87841"
     )
 
     chatml_prompt = rag.render_prompt(case.question, hits, "chatml")
     assert chatml_prompt.startswith("<|im_start|>user\nYou answer questions")
     assert chatml_prompt.endswith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n")
     assert hashlib.sha256(chatml_prompt.encode()).hexdigest() == (
-        "784dbdeaf36d19f1deee2f860779e65385ae9d0d681e8a72699639c62b15c74d"
+        "adeb518c096c5bbe124b3c8d60ab2001e6754d192938465f6bedea5ca5a62bad"
     )
 
     no_think_prompt = rag.render_prompt(case.question, hits, "chatml-no-think")
     assert no_think_prompt.endswith(
         "ANSWER\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
+    assert hashlib.sha256(no_think_prompt.encode()).hexdigest() == (
+        "959555745e05099d76fd4af53d470399d4cabdaf0ed86bb9b7505b0d08c1cc4a"
     )
 
 

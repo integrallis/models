@@ -44,7 +44,7 @@ class RagFrameworkParityTest {
         .containsExactly("plain-java", "langchain4j", "spring-ai");
     assertThat(runs).extracting(RagRun::promptSha256).containsOnly(runs.getFirst().promptSha256());
     assertThat(runs.getFirst().promptSha256())
-        .isEqualTo("8d208e5e0aa69d04a866624e5959a2d98af237b9d5d05fb40ad5146b42ccb2e7");
+        .isEqualTo("26fccba3e100ea107b382b25a9404ba8fb68bf9bd8c2003878ad6b6cefd87841");
     assertThat(runs)
         .allSatisfy(
             run ->
@@ -78,7 +78,7 @@ class RagFrameworkParityTest {
 
     assertThat(runs)
         .extracting(RagRun::promptSha256)
-        .containsOnly("784dbdeaf36d19f1deee2f860779e65385ae9d0d681e8a72699639c62b15c74d");
+        .containsOnly("adeb518c096c5bbe124b3c8d60ab2001e6754d192938465f6bedea5ca5a62bad");
     assertThat(clients)
         .extracting(RecordingGenerationClient::lastPrompt)
         .allSatisfy(

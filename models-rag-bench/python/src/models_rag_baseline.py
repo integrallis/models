@@ -24,8 +24,10 @@ INSTRUCTIONS = (
     "You answer questions using only the supplied context.\n"
     "Rules:\n"
     "- If the context does not contain the answer, reply exactly INSUFFICIENT_CONTEXT.\n"
-    "- Otherwise answer in one short sentence and cite every supporting source as "
-    "[source-id].\n"
+    "- Otherwise answer in one short sentence.\n"
+    "- Copy each supporting source ID exactly from the square brackets at the start of "
+    "its CONTEXT entry, and put those citations at the end of the sentence.\n"
+    "- Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\n"
     "- Do not use prior knowledge.\n\n"
 )
 CITATION = re.compile(r"\[([a-z0-9][a-z0-9-]*)]", re.IGNORECASE)
@@ -658,7 +660,10 @@ def _evaluation_dict(evaluation: RagEvaluation) -> dict[str, Any]:
 
 
 def _normalize_text(value: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", value.lower().replace(",", ""))).strip()
+    normalized = value.lower().replace(",", "")
+    normalized = re.sub(r"\$(\d+(?:\.\d+)?)", r"\1 dollar", normalized)
+    normalized = re.sub(r"\b(\d+(?:\.\d+)?)\s+dollars\b", r"\1 dollar", normalized)
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", normalized)).strip()
 
 
 def _fraction_present(required: set[str], actual: set[str]) -> float:

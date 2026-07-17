@@ -27,6 +27,9 @@ public final class RagEvaluator {
   private static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   private static final Pattern CITATION =
       Pattern.compile("\\[([a-z0-9][a-z0-9-]*)]", Pattern.CASE_INSENSITIVE);
+  private static final Pattern CURRENCY_SYMBOL = Pattern.compile("\\$(\\d+(?:\\.\\d+)?)");
+  private static final Pattern PLURAL_DOLLARS =
+      Pattern.compile("\\b(\\d+(?:\\.\\d+)?)\\s+dollars\\b");
 
   private RagEvaluator() {}
 
@@ -110,11 +113,9 @@ public final class RagEvaluator {
   }
 
   private static String normalizeText(String value) {
-    return value
-        .toLowerCase(Locale.ROOT)
-        .replace(",", "")
-        .replaceAll("[^a-z0-9]+", " ")
-        .trim()
-        .replaceAll("\\s+", " ");
+    String normalized = value.toLowerCase(Locale.ROOT).replace(",", "");
+    normalized = CURRENCY_SYMBOL.matcher(normalized).replaceAll("$1 dollar");
+    normalized = PLURAL_DOLLARS.matcher(normalized).replaceAll("$1 dollar");
+    return normalized.replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
   }
 }

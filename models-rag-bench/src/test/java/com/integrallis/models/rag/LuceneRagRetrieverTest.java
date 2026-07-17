@@ -62,7 +62,7 @@ class LuceneRagRetrieverTest {
                   .toList());
 
       assertThat(sha256(promptHashes))
-          .isEqualTo("21da412524218914dc0ac680a8d92ee16c77d4254e2a18cd372f5134c6ab4709");
+          .isEqualTo("112000a6017861f70087349571fc5ec400f11499e1b6d9c96676f327558e357d");
     }
   }
 

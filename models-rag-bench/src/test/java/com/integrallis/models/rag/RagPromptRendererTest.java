@@ -32,9 +32,11 @@ class RagPromptRendererTest {
 
     assertThat(prompt)
         .contains("reply exactly INSUFFICIENT_CONTEXT")
+        .contains("Copy each supporting source ID exactly")
         .contains("[source-1] Policy")
         .contains("The answer is quartz.")
         .contains("QUESTION\nWhat is the answer?\n\nANSWER\n")
+        .doesNotContain("[source-id]")
         .doesNotContain("null");
   }
 

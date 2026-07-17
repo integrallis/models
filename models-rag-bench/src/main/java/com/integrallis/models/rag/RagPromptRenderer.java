@@ -24,8 +24,10 @@ public final class RagPromptRenderer {
       "You answer questions using only the supplied context.\n"
           + "Rules:\n"
           + "- If the context does not contain the answer, reply exactly INSUFFICIENT_CONTEXT.\n"
-          + "- Otherwise answer in one short sentence and cite every supporting source as "
-          + "[source-id].\n"
+          + "- Otherwise answer in one short sentence.\n"
+          + "- Copy each supporting source ID exactly from the square brackets at the start of "
+          + "its CONTEXT entry, and put those citations at the end of the sentence.\n"
+          + "- Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\n"
           + "- Do not use prior knowledge.\n\n";
 
   private RagPromptRenderer() {}
