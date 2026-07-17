@@ -401,6 +401,7 @@ class LlamaCppPythonGenerationClient:
     def generate(self, prompt: str, max_tokens: int) -> GenerationResult:
         start_cpu = time.process_time_ns()
         start = time.perf_counter_ns()
+        self._llm.reset()
         first_token = 0
         text: list[str] = []
         for event in self._llm.create_completion(

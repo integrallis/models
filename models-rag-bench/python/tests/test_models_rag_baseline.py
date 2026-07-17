@@ -134,3 +134,29 @@ def test_report_schema_matches_java_prompt_template_contract(monkeypatch):
 
     assert report["schemaVersion"] == 2
     assert report["settings"]["promptTemplate"] == "raw"
+
+
+def test_direct_binding_resets_kv_state_before_generation():
+    class RecordingLlama:
+        def __init__(self):
+            self.reset_called = False
+
+        def reset(self):
+            self.reset_called = True
+
+        def create_completion(self, *args, **kwargs):
+            assert self.reset_called
+            return iter(({"choices": [{"text": "answer"}]},))
+
+        def tokenize(self, value, add_bos):
+            return [1, 2]
+
+    binding = object.__new__(rag.LlamaCppPythonGenerationClient)
+    binding._llm = RecordingLlama()
+    binding._load_millis = 1.0
+    binding.model = "test.gguf"
+
+    result = binding.generate("prompt", 8)
+
+    assert result.text == "answer"
+    assert binding._llm.reset_called
