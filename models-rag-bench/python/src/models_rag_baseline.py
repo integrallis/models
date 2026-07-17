@@ -161,12 +161,19 @@ class Bm25Retriever:
         ]
 
 
-def render_prompt(question: str, hits: Iterable[RetrievedDocument]) -> str:
+def render_prompt(
+    question: str, hits: Iterable[RetrievedDocument], prompt_template: str = "raw"
+) -> str:
     context = "".join(
         f"[{hit.document.id}] {hit.document.title}\n{hit.document.text}\n\n"
         for hit in hits
     )
-    return f"{INSTRUCTIONS}CONTEXT\n{context}QUESTION\n{question}\n\nANSWER\n"
+    canonical = f"{INSTRUCTIONS}CONTEXT\n{context}QUESTION\n{question}\n\nANSWER\n"
+    if prompt_template == "raw":
+        return canonical
+    if prompt_template == "chatml":
+        return f"<|im_start|>user\n{canonical}<|im_end|>\n<|im_start|>assistant\n"
+    raise ValueError(f"unsupported prompt template: {prompt_template}")
 
 
 def evaluate(case: RagCase, hits: list[RetrievedDocument], answer: str) -> RagEvaluation:
@@ -435,7 +442,9 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         for _ in range(args.warmups):
             for case in selected:
                 hits = retriever.retrieve(case.question, args.top_k)
-                client.generate(render_prompt(case.question, hits), args.max_tokens)
+                client.generate(
+                    render_prompt(case.question, hits, args.prompt_template), args.max_tokens
+                )
         for iteration in range(args.iterations):
             for case in selected:
                 try:
@@ -443,7 +452,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
                     retrieval_start = time.perf_counter_ns()
                     hits = retriever.retrieve(case.question, args.top_k)
                     retrieval_ms = (time.perf_counter_ns() - retrieval_start) / 1_000_000
-                    prompt = render_prompt(case.question, hits)
+                    prompt = render_prompt(case.question, hits, args.prompt_template)
                     generation = client.generate(prompt, args.max_tokens)
                     end_to_end_ms = (time.perf_counter_ns() - total_start) / 1_000_000
                     evaluation = evaluate(case, hits, generation.text)
@@ -490,6 +499,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         "settings": {
             "corpusSha256": corpus.fingerprint(),
             "caseIds": [case.id for case in selected],
+            "promptTemplate": args.prompt_template,
             "retrievalTopK": args.top_k,
             "maxOutputTokens": args.max_tokens,
             "warmups": args.warmups,
@@ -701,6 +711,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--context", type=int, default=2048)
     parser.add_argument("--threads", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--pid", type=int, default=0)
+    parser.add_argument("--prompt-template", choices=("raw", "chatml"), default="raw")
     parser.add_argument("--top-k", type=int, default=1)
     parser.add_argument("--max-tokens", type=int, default=64)
     parser.add_argument("--warmups", type=int, default=1)

@@ -34,7 +34,7 @@ public record RagBenchmarkReport(
     RagPerformanceTier performanceTier,
     List<RagRun> runs,
     List<RagBenchmarkFailure> failures) {
-  public static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 2;
 
   public RagBenchmarkReport {
     runs = List.copyOf(runs);

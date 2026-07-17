@@ -48,6 +48,7 @@ public final class RagBenchmarkCli {
           "model-id",
           "artifact",
           "endpoint",
+          "prompt-template",
           "context",
           "threads",
           "pid",
@@ -91,6 +92,8 @@ public final class RagBenchmarkCli {
             values.getOrDefault(
                 "endpoint",
                 "ollama".equals(backend) ? "http://127.0.0.1:11434" : "http://127.0.0.1:8080"));
+    RagPromptTemplate promptTemplate =
+        RagPromptTemplate.parse(values.getOrDefault("prompt-template", "raw"));
     int context = positiveInteger(values, "context", 2_048);
     int threads = positiveInteger(values, "threads", Runtime.getRuntime().availableProcessors());
     long backendPid = nonNegativeLong(values, "pid", 0);
@@ -119,6 +122,7 @@ public final class RagBenchmarkCli {
         model,
         artifact,
         endpoint,
+        promptTemplate,
         context,
         threads,
         backendPid,
@@ -141,7 +145,12 @@ public final class RagBenchmarkCli {
     try (GenerationClient generation = generationClient(configuration);
         LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
       RagApplication application =
-          application(configuration.framework(), retriever, generation, configuration.topK());
+          application(
+              configuration.framework(),
+              retriever,
+              generation,
+              configuration.topK(),
+              configuration.promptTemplate());
       for (int warmup = 0; warmup < configuration.warmups(); warmup++) {
         for (RagCase testCase : cases) {
           application.run(testCase, configuration.maxTokens());
@@ -179,6 +188,7 @@ public final class RagBenchmarkCli {
         new RagBenchmarkSettings(
             corpus.fingerprint(),
             cases.stream().map(RagCase::id).toList(),
+            configuration.promptTemplate().id(),
             configuration.topK(),
             configuration.maxTokens(),
             configuration.warmups(),
@@ -212,11 +222,15 @@ public final class RagBenchmarkCli {
   }
 
   private static RagApplication application(
-      String framework, RagRetriever retriever, GenerationClient client, int topK) {
+      String framework,
+      RagRetriever retriever,
+      GenerationClient client,
+      int topK,
+      RagPromptTemplate promptTemplate) {
     return switch (framework) {
-      case "plain-java" -> new PlainJavaRagApplication(retriever, client, topK);
-      case "langchain4j" -> new LangChain4jRagApplication(retriever, client, topK);
-      case "spring-ai" -> new SpringAiRagApplication(retriever, client, topK);
+      case "plain-java" -> new PlainJavaRagApplication(retriever, client, topK, promptTemplate);
+      case "langchain4j" -> new LangChain4jRagApplication(retriever, client, topK, promptTemplate);
+      case "spring-ai" -> new SpringAiRagApplication(retriever, client, topK, promptTemplate);
       default -> throw new IllegalArgumentException("unknown framework: " + framework);
     };
   }

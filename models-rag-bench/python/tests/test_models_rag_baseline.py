@@ -49,6 +49,13 @@ def test_prompt_and_deterministic_quality_match_java_contract():
         "8d208e5e0aa69d04a866624e5959a2d98af237b9d5d05fb40ad5146b42ccb2e7"
     )
 
+    chatml_prompt = rag.render_prompt(case.question, hits, "chatml")
+    assert chatml_prompt.startswith("<|im_start|>user\nYou answer questions")
+    assert chatml_prompt.endswith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n")
+    assert hashlib.sha256(chatml_prompt.encode()).hexdigest() == (
+        "784dbdeaf36d19f1deee2f860779e65385ae9d0d681e8a72699639c62b15c74d"
+    )
+
 
 def test_linear_percentiles_match_java_report_math():
     assert rag.percentile([1250.0, 1500.0], 0.50) == 1375.0

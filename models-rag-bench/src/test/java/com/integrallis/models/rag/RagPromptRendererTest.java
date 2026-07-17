@@ -37,4 +37,20 @@ class RagPromptRendererTest {
         .contains("QUESTION\nWhat is the answer?\n\nANSWER\n")
         .doesNotContain("null");
   }
+
+  @Test
+  void chatmlProfileWrapsTheCanonicalPromptAsAUserTurn() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.CHATML);
+
+    assertThat(prompt)
+        .startsWith("<|im_start|>user\nYou answer questions")
+        .contains("[source-1] Policy")
+        .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n");
+  }
 }

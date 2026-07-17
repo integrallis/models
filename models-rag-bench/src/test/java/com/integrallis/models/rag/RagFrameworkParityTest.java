@@ -60,12 +60,48 @@ class RagFrameworkParityTest {
     assertThat(runs).allSatisfy(run -> assertThat(run.evaluation().correct()).isTrue());
   }
 
+  @Test
+  void frameworksUseTheSameChatmlEnvelope() throws Exception {
+    RagCorpus corpus = RagCorpus.loadDefault();
+    RagCase testCase = corpus.cases().getFirst();
+    List<RagRun> runs = new ArrayList<>();
+    List<RecordingGenerationClient> clients = new ArrayList<>();
+
+    for (String framework : List.of("plain-java", "langchain4j", "spring-ai")) {
+      RecordingGenerationClient client = new RecordingGenerationClient();
+      clients.add(client);
+      try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
+        runs.add(
+            application(framework, retriever, client, RagPromptTemplate.CHATML).run(testCase, 32));
+      }
+    }
+
+    assertThat(runs)
+        .extracting(RagRun::promptSha256)
+        .containsOnly("784dbdeaf36d19f1deee2f860779e65385ae9d0d681e8a72699639c62b15c74d");
+    assertThat(clients)
+        .extracting(RecordingGenerationClient::lastPrompt)
+        .allSatisfy(
+            prompt ->
+                assertThat(prompt)
+                    .startsWith("<|im_start|>user\n")
+                    .endsWith("<|im_end|>\n<|im_start|>assistant\n"));
+  }
+
   private static RagApplication application(
       String framework, RagRetriever retriever, GenerationClient client) {
+    return application(framework, retriever, client, RagPromptTemplate.RAW);
+  }
+
+  private static RagApplication application(
+      String framework,
+      RagRetriever retriever,
+      GenerationClient client,
+      RagPromptTemplate promptTemplate) {
     return switch (framework) {
-      case "plain-java" -> new PlainJavaRagApplication(retriever, client, 1);
-      case "langchain4j" -> new LangChain4jRagApplication(retriever, client, 1);
-      case "spring-ai" -> new SpringAiRagApplication(retriever, client, 1);
+      case "plain-java" -> new PlainJavaRagApplication(retriever, client, 1, promptTemplate);
+      case "langchain4j" -> new LangChain4jRagApplication(retriever, client, 1, promptTemplate);
+      case "spring-ai" -> new SpringAiRagApplication(retriever, client, 1, promptTemplate);
       default -> throw new IllegalArgumentException(framework);
     };
   }

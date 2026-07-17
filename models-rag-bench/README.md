@@ -23,6 +23,12 @@ relevant source. Lucene and BM25S agree on every top result and all nine
 rendered prompt hashes. Higher `--top-k` values are supported for experiments,
 but reports with different prompt hashes are not directly comparable.
 
+Use `--prompt-template chatml` for ChatML-family instruction models such as
+Qwen3, SmolLM2, and MiniCPM5. The benchmark applies the envelope itself and
+sends raw requests to native servers, ensuring every backend receives the same
+model-facing bytes. `--prompt-template raw` remains available for base models
+and is the default so template selection is never hidden.
+
 The report records:
 
 - artifact and corpus SHA-256
@@ -50,6 +56,7 @@ for framework in plain-java langchain4j spring-ai; do
     --backend pure-java \
     --model ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
     --model-id qwen3-0.6b-q4_0 \
+    --prompt-template chatml \
     --context 2048 \
     --threads 8 \
     --max-tokens 64 \
@@ -68,6 +75,7 @@ models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
   --backend-version b10012-c71854292 \
   --model ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   --artifact ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
+  --prompt-template chatml \
   --endpoint http://127.0.0.1:8080 \
   --pid "$(pgrep -n llama-server)" \
   --threads 8
@@ -94,6 +102,7 @@ uv run models-rag-python \
   --backend ollama \
   --model qwen3:0.6b \
   --endpoint http://127.0.0.1:11434 \
+  --prompt-template chatml \
   --threads 8 \
   --iterations 3
 
@@ -102,6 +111,7 @@ uv run models-rag-python \
   --model Qwen3-0.6B-Q4_0.gguf \
   --artifact ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   --endpoint http://127.0.0.1:8080 \
+  --prompt-template chatml \
   --threads 8 \
   --iterations 3
 ```
@@ -114,7 +124,8 @@ uv sync --frozen --extra llama
 uv run models-rag-python \
   --backend llama.cpp-python \
   --model Qwen3-0.6B-Q4_0.gguf \
-  --artifact ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf
+  --artifact ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
+  --prompt-template chatml
 ```
 
 ## Project gates

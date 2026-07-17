@@ -23,10 +23,17 @@ public final class PlainJavaRagApplication implements RagApplication {
   private final RagRetriever retriever;
   private final GenerationClient client;
   private final int topK;
+  private final RagPromptTemplate promptTemplate;
 
   public PlainJavaRagApplication(RagRetriever retriever, GenerationClient client, int topK) {
+    this(retriever, client, topK, RagPromptTemplate.RAW);
+  }
+
+  public PlainJavaRagApplication(
+      RagRetriever retriever, GenerationClient client, int topK, RagPromptTemplate promptTemplate) {
     this.retriever = Objects.requireNonNull(retriever, "retriever");
     this.client = Objects.requireNonNull(client, "client");
+    this.promptTemplate = Objects.requireNonNull(promptTemplate, "promptTemplate");
     if (topK < 1) {
       throw new IllegalArgumentException("topK must be positive");
     }
@@ -39,7 +46,7 @@ public final class PlainJavaRagApplication implements RagApplication {
     long retrievalStart = System.nanoTime();
     List<RetrievedDocument> hits = retriever.retrieve(testCase.question(), topK);
     double retrievalMillis = elapsedMillis(retrievalStart);
-    String prompt = RagPromptRenderer.render(testCase.question(), hits);
+    String prompt = RagPromptRenderer.render(testCase.question(), hits, promptTemplate);
     GenerationResult generated = client.generate(prompt, maxTokens);
     double endToEndMillis = elapsedMillis(totalStart);
     return RagRunFactory.create(

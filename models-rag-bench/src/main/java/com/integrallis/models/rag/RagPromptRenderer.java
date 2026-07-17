@@ -31,8 +31,14 @@ public final class RagPromptRenderer {
   private RagPromptRenderer() {}
 
   public static String render(String question, List<RetrievedDocument> retrieved) {
+    return render(question, retrieved, RagPromptTemplate.RAW);
+  }
+
+  public static String render(
+      String question, List<RetrievedDocument> retrieved, RagPromptTemplate template) {
     Objects.requireNonNull(question, "question");
     Objects.requireNonNull(retrieved, "retrieved");
+    Objects.requireNonNull(template, "template");
     if (question.isBlank()) {
       throw new IllegalArgumentException("question must not be blank");
     }
@@ -49,6 +55,8 @@ public final class RagPromptRenderer {
           .append(document.text())
           .append("\n\n");
     }
-    return prompt.append("QUESTION\n").append(question).append("\n\nANSWER\n").toString();
+    String canonical =
+        prompt.append("QUESTION\n").append(question).append("\n\nANSWER\n").toString();
+    return template.apply(canonical);
   }
 }

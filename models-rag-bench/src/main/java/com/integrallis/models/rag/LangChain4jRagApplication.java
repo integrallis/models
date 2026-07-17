@@ -39,6 +39,11 @@ public final class LangChain4jRagApplication implements RagApplication {
   private final Assistant assistant;
 
   public LangChain4jRagApplication(RagRetriever retriever, GenerationClient client, int topK) {
+    this(retriever, client, topK, RagPromptTemplate.RAW);
+  }
+
+  public LangChain4jRagApplication(
+      RagRetriever retriever, GenerationClient client, int topK, RagPromptTemplate promptTemplate) {
     this.client = Objects.requireNonNull(client, "client");
     this.generation = new GenerationSession(client);
     this.retrieval = new RetrievalTrace(Objects.requireNonNull(retriever, "retriever"), topK);
@@ -50,7 +55,8 @@ public final class LangChain4jRagApplication implements RagApplication {
                 .toList();
     ContentInjector contentInjector =
         (contents, chatMessage) ->
-            UserMessage.from(RagPromptRenderer.render(question(chatMessage), retrieval.hits()));
+            UserMessage.from(
+                RagPromptRenderer.render(question(chatMessage), retrieval.hits(), promptTemplate));
     RetrievalAugmentor augmentor =
         DefaultRetrievalAugmentor.builder()
             .contentRetriever(contentRetriever)

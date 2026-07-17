@@ -38,6 +38,11 @@ public final class SpringAiRagApplication implements RagApplication {
   private final ChatClient chatClient;
 
   public SpringAiRagApplication(RagRetriever retriever, GenerationClient client, int topK) {
+    this(retriever, client, topK, RagPromptTemplate.RAW);
+  }
+
+  public SpringAiRagApplication(
+      RagRetriever retriever, GenerationClient client, int topK, RagPromptTemplate promptTemplate) {
     this.client = Objects.requireNonNull(client, "client");
     this.generation = new GenerationSession(client);
     this.retrieval = new RetrievalTrace(Objects.requireNonNull(retriever, "retriever"), topK);
@@ -50,7 +55,7 @@ public final class SpringAiRagApplication implements RagApplication {
     QueryAugmenter queryAugmenter =
         (query, documents) ->
             new Query(
-                RagPromptRenderer.render(query.text(), retrieval.hits()),
+                RagPromptRenderer.render(query.text(), retrieval.hits(), promptTemplate),
                 query.history(),
                 query.context());
     RetrievalAugmentationAdvisor advisor =

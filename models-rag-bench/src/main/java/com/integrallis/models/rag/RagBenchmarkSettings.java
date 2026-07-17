@@ -21,6 +21,7 @@ import java.util.List;
 public record RagBenchmarkSettings(
     String corpusSha256,
     List<String> caseIds,
+    String promptTemplate,
     int retrievalTopK,
     int maxOutputTokens,
     int warmups,

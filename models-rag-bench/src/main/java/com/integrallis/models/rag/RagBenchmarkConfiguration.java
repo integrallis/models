@@ -28,6 +28,7 @@ public record RagBenchmarkConfiguration(
     String model,
     Path artifact,
     URI endpoint,
+    RagPromptTemplate promptTemplate,
     int contextLength,
     int threads,
     long backendPid,

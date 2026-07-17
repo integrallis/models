@@ -38,6 +38,7 @@ class RagBenchmarkCliTest {
               "--backend", "pure-java",
               "--model", model.toString(),
               "--model-id", "fixture-q4",
+              "--prompt-template", "chatml",
               "--case", "auto-glass-deadline,idempotency",
               "--max-tokens", "48",
               "--iterations", "2"
@@ -46,6 +47,7 @@ class RagBenchmarkCliTest {
     assertThat(configuration.framework()).isEqualTo("spring-ai");
     assertThat(configuration.artifact()).isEqualTo(model);
     assertThat(configuration.modelId()).isEqualTo("fixture-q4");
+    assertThat(configuration.promptTemplate()).isEqualTo(RagPromptTemplate.CHATML);
     assertThat(configuration.caseIds()).containsExactly("auto-glass-deadline", "idempotency");
     assertThat(configuration.maxTokens()).isEqualTo(48);
     assertThat(configuration.iterations()).isEqualTo(2);
