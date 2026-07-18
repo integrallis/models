@@ -26,6 +26,11 @@ public interface InferenceBackend extends AutoCloseable {
   /** Returns metadata about the loaded model. */
   ModelMetadata metadata();
 
+  /** Returns the deterministic runtime decisions exposed by this backend. */
+  default BackendDiagnostics diagnostics() {
+    return BackendDiagnostics.unavailable(name());
+  }
+
   /** Returns the tokenizer for this model. */
   Tokenizer tokenizer();
 
