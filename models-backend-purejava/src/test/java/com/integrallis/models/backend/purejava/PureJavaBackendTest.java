@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
@@ -148,6 +149,10 @@ class PureJavaBackendTest {
         assertThat(backend.metadata().modelName()).isEqualTo("NanoTest");
         assertThat(backend.metadata().modelFamily()).isEqualTo("llama");
         assertThat(backend.tokenizer().vocabSize()).isEqualTo(VOCAB_SIZE);
+        assertThat(backend.diagnostics().backend()).isEqualTo("pure-java");
+        assertThat(backend.diagnostics().optimization("mapped-model-weights"))
+            .hasValueSatisfying(
+                decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
 
         float[] logits = backend.forward(5, 0);
         assertThat(logits).hasSize(VOCAB_SIZE);
