@@ -21,7 +21,6 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.Tokenizer;
-import dev.langchain4j.model.chat.ChatModel;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
@@ -35,12 +34,14 @@ class ModelsChatModelTest {
 
   @Test
   void langChain4jChatModelUsesModelsRuntime() {
-    ChatModel model =
+    ModelsChatModel model =
         new ModelsChatModel(
             backendGenerating(new int[] {3, 4, 1}),
             SamplingOptions.builder().temperature(0.0f).maxTokens(10).build());
 
     assertThat(model.chat("hello")).isEqualTo(" world");
+    assertThat(model.diagnostics().backend()).isEqualTo("test");
+    assertThat(model.diagnostics().planVersion()).isEqualTo("unavailable");
   }
 
   @Test

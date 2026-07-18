@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.langchain4j;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.runtime.GenerationLoop;
@@ -39,6 +40,11 @@ public final class ModelsChatModel implements ChatModel {
   public ModelsChatModel(InferenceBackend backend, SamplingOptions defaults) {
     this.backend = Objects.requireNonNull(backend, "backend");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
+  }
+
+  /** Returns the execution decisions selected by the wrapped backend. */
+  public BackendDiagnostics diagnostics() {
+    return backend.diagnostics();
   }
 
   @Override
