@@ -157,7 +157,31 @@ unrelated.
 ### Framework adapters
 
 `models-langchain4j` provides `ModelsChatModel`. The Spring Boot starter resolves
-ModelJars descriptors and is the foundation for Spring AI auto-configuration.
+ModelJars descriptors and performance profiles and is the foundation for Spring
+AI auto-configuration. `ModelsChatModel.diagnostics()` returns the same backend
+plan used by plain Java generation; framework adapters do not select a separate
+kernel path.
+
+### Execution planning
+
+`PureJavaBackend` builds one immutable execution plan when the GGUF is loaded.
+The planner combines the tensors actually present in every layer, the structured
+Vectors runtime capabilities, JVM/compiler identity, and explicit deployment
+overrides. Grouped projections and batched prefill are consumed from this plan
+instead of being re-decided in the forward loop.
+
+```java
+try (PureJavaBackend backend = PureJavaBackend.load(model)) {
+    BackendDiagnostics diagnostics = backend.diagnostics();
+    diagnostics.optimizations().forEach(System.out::println);
+}
+```
+
+Diagnostics identify enabled, disabled, and unsupported choices, including the
+resolved tensor grouping, prefill batch size, mapped weights, Vector FMA policy,
+and persistent row executor. `models.purejava.groupedProjections` and
+`models.purejava.prefillBatchSize` are parsed once per load; malformed explicit
+values fail rather than silently reverting to defaults.
 
 ## Supported models
 

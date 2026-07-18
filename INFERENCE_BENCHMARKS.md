@@ -44,6 +44,31 @@ still 4.0x to 5.4x slower than llama.cpp and 1.8x to 2.8x slower than Ollama.
 Output parity is prompt-sensitive and must improve before performance alone can
 qualify a model.
 
+### Controlled JVM compiler matrix
+
+The unchanged backend was then run under GraalVM Community
+`25.2.4-dev-20260717_0119` on the same idle host, model bytes, prompt, context,
+thread count, warmups, and ten-trial protocol. This is a JVM deployment choice,
+not a kernel rewrite:
+
+| Model | HotSpot decode | Graal decode | Decode change | HotSpot p95 TTFT | Graal p95 TTFT | RSS change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen3 0.6B Q4_0 | 25.86 tok/s | 19.65 tok/s | -24.0% | 3,145.6 ms | 5,900.3 ms | +58.5% |
+| SmolLM2 360M Q8_0 | 21.23 tok/s | 44.70 tok/s | +110.6% | 2,643.7 ms | 1,299.1 ms | +13.8% |
+| MiniCPM5 1B Q4_K_M | 13.19 tok/s | 15.34 tok/s | +16.3% | 8,527.9 ms | 7,377.2 ms | +8.4% |
+
+Every corresponding Java output SHA-256 matched across the two compilers. A
+separate Qwen control with six warmups still decoded at 19.75 tok/s, so its
+regression is not explained by the standard two-warmup protocol.
+
+Choosing the best measured compiler per model raises summed pure-Java decode to
+30.9% of llama.cpp and 67.1% of Ollama, versus the HotSpot-only 21.7% and 47.1%.
+Individually, the selected paths reach 25.0%/54.6% for Qwen, 43.4%/103.5% for
+SmolLM2, and 21.4%/41.0% for MiniCPM against llama.cpp/Ollama. This is evidence
+for model-, quantization-, topology-, and host-specific planning; Graal is not a
+global default. The exact-SHA-bound recommendations and evidence are published
+through ModelJars performance profile schema v1.
+
 ## Optimization evidence
 
 The benchmark found scalar work in the Q8_0 and Q4_K fused matvec kernels. Both
