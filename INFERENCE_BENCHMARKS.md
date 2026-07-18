@@ -13,28 +13,36 @@ outputs whose SHA-256 equals llama.cpp for the same per-trial prompt.
 
 | Model | Backend | Load ms | TTFT ms | TPOT ms | Prefill tok/s | Decode tok/s | Peak RSS GiB | vs llama.cpp | Match |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Qwen3 0.6B Q4_0 | pure Java | 175.1 | 5,423.9 | 39.5 | 49.79 | 25.46 | 0.98 | 24.8% | 20% |
-| Qwen3 0.6B Q4_0 | llama.cpp | 1,123.0 | 374.1 | 10.3 | 456.11 | 102.59 | 1.19 | 100% | 100% |
-| Qwen3 0.6B Q4_0 | Ollama | 1,470.8 | 512.3 | 24.2 | 458.40 | 51.65 | 1.01 | 50.3% | 100% |
-| SmolLM2 360M Q8_0 | pure Java | 138.8 | 6,509.8 | 46.8 | 24.19 | 21.42 | 0.76 | 20.9% | 50% |
-| SmolLM2 360M Q8_0 | llama.cpp | 585.0 | 293.7 | 10.6 | 586.20 | 102.38 | 0.58 | 100% | 100% |
-| SmolLM2 360M Q8_0 | Ollama | 833.2 | 327.7 | 25.6 | 586.25 | 50.38 | 0.62 | 49.2% | 100% |
-| MiniCPM5 1B Q4_K_M | pure Java | 174.2 | 11,537.1 | 103.5 | 13.18 | 9.67 | 2.77 | 13.3% | 30% |
-| MiniCPM5 1B Q4_K_M | llama.cpp | 1,126.0 | 518.9 | 14.6 | 303.05 | 72.47 | 1.12 | 100% | 100% |
-| MiniCPM5 1B Q4_K_M | Ollama | 1,453.9 | 638.0 | 28.4 | 306.11 | 39.18 | 0.86 | 54.1% | 100% |
+| Qwen3 0.6B Q4_0 | pure Java | 194.1 | 3,145.6 | 39.0 | 49.54 | 25.86 | 1.04 | 25.0% | 20% |
+| Qwen3 0.6B Q4_0 | llama.cpp | 1,118.0 | 364.6 | 10.5 | 457.13 | 103.51 | 1.19 | 100% | 100% |
+| Qwen3 0.6B Q4_0 | Ollama | 1,475.7 | 515.7 | 25.5 | 460.93 | 47.39 | 1.01 | 45.8% | 100% |
+| SmolLM2 360M Q8_0 | pure Java | 131.2 | 2,643.7 | 47.4 | 60.16 | 21.23 | 0.69 | 20.6% | 50% |
+| SmolLM2 360M Q8_0 | llama.cpp | 471.0 | 298.7 | 10.6 | 575.14 | 103.13 | 0.58 | 100% | 100% |
+| SmolLM2 360M Q8_0 | Ollama | 830.9 | 336.5 | 26.2 | 587.08 | 43.18 | 0.63 | 41.9% | 100% |
+| MiniCPM5 1B Q4_K_M | pure Java | 172.9 | 8,527.9 | 76.3 | 17.82 | 13.19 | 0.88 | 18.4% | 10% |
+| MiniCPM5 1B Q4_K_M | llama.cpp | 1,244.0 | 513.1 | 14.3 | 306.88 | 71.74 | 1.12 | 100% | 100% |
+| MiniCPM5 1B Q4_K_M | Ollama | 1,450.9 | 630.0 | 29.9 | 307.44 | 37.42 | 0.87 | 52.2% | 100% |
 
 Across these three formats, the arithmetic mean of the per-model pure-Java
-decode ratios is 19.7% of llama.cpp and 38.8% of Ollama. Dividing the summed
-throughput gives similar values, 20.4% and 40.0%. Qwen is currently strongest
-at 24.8% of llama.cpp and 49.3% of Ollama; MiniCPM is weakest at 13.3% and
-24.7%.
+decode ratios is 21.3% of llama.cpp and 46.3% of Ollama. Dividing summed
+throughput gives 21.7% and 47.1%. Qwen is currently strongest at 25.0% of
+llama.cpp and 54.6% of Ollama; MiniCPM remains weakest at 18.4% and 35.2%.
 
-In-process model mapping remains fast and memory use is bounded, but the
-complete pure-Java requests remain `OFFLINE` on this workload because prompt
-processing averages only 6.5% of both native backends. Decode has improved
-materially but remains 4.0x to 7.5x slower than llama.cpp and 2.0x to 4.1x
-slower than Ollama. Output parity is prompt-sensitive and must improve before
-performance alone can qualify a model.
+Relative to the preceding matrix, summed pure-Java decode increased 6.6%:
+MiniCPM improved 36.4%, Qwen improved 1.6%, and SmolLM2 changed -0.9%. Summed
+llama.cpp throughput changed +0.3%, while Ollama changed -9.4%. The arithmetic
+mean therefore moved +1.6 percentage points against llama.cpp and +7.5 points
+against Ollama, but most of the latter movement is native-run variance rather
+than a Java speedup.
+
+Prompt processing moved further. Summed pure-Java prefill increased 46.3%, its
+ratio to llama.cpp rose from 6.5% to 9.5%, and mean p95 TTFT fell 39.0%.
+SmolLM2's retained Q8_0 batching accounts for the largest gain. In-process
+model mapping remains fast and memory use is bounded, but all three complete
+pure-Java requests remain `OFFLINE` on this long-prompt workload. Decode is
+still 4.0x to 5.4x slower than llama.cpp and 1.8x to 2.8x slower than Ollama.
+Output parity is prompt-sensitive and must improve before performance alone can
+qualify a model.
 
 ## Optimization evidence
 
@@ -76,8 +84,9 @@ bytes, prompt strategy, 128-token context, two warmups, and 24 generated tokens:
 All ten corresponding output SHA-256 values matched. Each independent 2,560x960
 gate/up matrix is below the Q8 parallel threshold; the combined row range crosses
 it and uses the persistent workers. The benchmark policy changed from `USABLE`
-to `RESPONSIVE`. This focused A/B does not replace the cross-backend table above,
-which uses a different prompt workload and must be rerun as a complete matrix.
+to `RESPONSIVE`. This focused A/B isolates grouping; the refreshed cross-backend
+table above uses a different prompt workload and includes the later Q8_0 prefill
+path.
 
 ## Latency policy
 
@@ -116,7 +125,7 @@ match. It recalculates summaries from raw trials before producing a comparison.
 - Host: Hetzner dedicated-vCPU VM, AMD EPYC Milan, 8 vCPU, 30.6 GiB RAM
 - OS: Ubuntu 24.04, Linux 6.8.0-124, no swap
 - JVM: Eclipse Temurin 25.0.3, `jdk.incubator.vector`, 256-bit vector cap
-- Pure Java: Models `03889f5`, Vectors `2a3466e`
+- Pure Java: Models `a1f0919`, Vectors `4144202`
 - Native references: llama.cpp b10012 (`c71854292`), Ollama 0.32.0
 - Workload: one request at a time, 8 backend threads, 2 warmups, 10 trials
 - Prompt: fixed 723-byte production-review prompt plus a deterministic,
