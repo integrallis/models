@@ -19,6 +19,7 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.ParseException;
@@ -55,12 +56,14 @@ final class DecodeProfileCli {
       Result result = profile(backend, configuration, recording);
       System.out.printf(
           "decode profile: prompt=%d warmup=%d measured=%d decode=%.2f tok/s "
-              + "checksum=%.9g%nrecording: %s%n",
+              + "checksum=%.9g gc=%d gcPause=%d ms%nrecording: %s%n",
           result.promptTokens(),
           result.warmupTokens(),
           result.measuredTokens(),
           result.tokensPerSecond(),
           result.logitChecksum(),
+          result.gcCollections(),
+          result.gcPauseMillis(),
           configuration.output().toAbsolutePath());
     }
   }
@@ -89,9 +92,19 @@ final class DecodeProfileCli {
   static Result profile(
       InferenceBackend backend, Configuration configuration, ProfileRecording recording)
       throws IOException {
+    return profile(backend, configuration, recording, DecodeProfileCli::gcMetrics);
+  }
+
+  static Result profile(
+      InferenceBackend backend,
+      Configuration configuration,
+      ProfileRecording recording,
+      GcMetricsSource gcMetricsSource)
+      throws IOException {
     Objects.requireNonNull(backend, "backend");
     Objects.requireNonNull(configuration, "configuration");
     Objects.requireNonNull(recording, "recording");
+    Objects.requireNonNull(gcMetricsSource, "gcMetricsSource");
 
     backend.reset();
     Tokenizer tokenizer = backend.tokenizer();
@@ -127,15 +140,18 @@ final class DecodeProfileCli {
     }
 
     recording.start();
+    GcMetrics gcBefore = gcMetricsSource.snapshot();
     long start = System.nanoTime();
     long elapsedNanos;
     double checksum = 0.0;
+    GcMetrics gcAfter;
     try {
       for (int index = 0; index < configuration.measuredTokens(); index++) {
         float[] logits = backend.forwardTransient(token, position++);
         checksum += logits[index % logits.length];
       }
       elapsedNanos = System.nanoTime() - start;
+      gcAfter = gcMetricsSource.snapshot();
     } finally {
       recording.stop();
     }
@@ -145,7 +161,23 @@ final class DecodeProfileCli {
         configuration.warmupTokens(),
         configuration.measuredTokens(),
         elapsedNanos,
-        checksum);
+        checksum,
+        Math.max(0, gcAfter.collections() - gcBefore.collections()),
+        Math.max(0, gcAfter.pauseMillis() - gcBefore.pauseMillis()));
+  }
+
+  private static GcMetrics gcMetrics() {
+    long collections = 0;
+    long pauseMillis = 0;
+    for (var collector : ManagementFactory.getGarbageCollectorMXBeans()) {
+      if (collector.getCollectionCount() >= 0) {
+        collections += collector.getCollectionCount();
+      }
+      if (collector.getCollectionTime() >= 0) {
+        pauseMillis += collector.getCollectionTime();
+      }
+    }
+    return new GcMetrics(collections, pauseMillis);
   }
 
   private static Map<String, String> parseOptions(String[] args) {
@@ -216,11 +248,20 @@ final class DecodeProfileCli {
       int warmupTokens,
       int measuredTokens,
       long elapsedNanos,
-      double logitChecksum) {
+      double logitChecksum,
+      long gcCollections,
+      long gcPauseMillis) {
 
     double tokensPerSecond() {
       return measuredTokens * 1_000_000_000.0 / elapsedNanos;
     }
+  }
+
+  record GcMetrics(long collections, long pauseMillis) {}
+
+  @FunctionalInterface
+  interface GcMetricsSource {
+    GcMetrics snapshot();
   }
 
   interface ProfileRecording extends AutoCloseable {

@@ -36,7 +36,14 @@ class DecodeProfileCliTest {
             Path.of("unused.gguf"), "profile prompt", 128, 7, 2, 3, Path.of("decode.jfr"));
 
     DecodeProfileCli.Result result =
-        DecodeProfileCli.profile(backend, configuration, new FakeRecording(events));
+        DecodeProfileCli.profile(
+            backend,
+            configuration,
+            new FakeRecording(events),
+            new FakeGcMetrics(
+                events,
+                new DecodeProfileCli.GcMetrics(12, 400),
+                new DecodeProfileCli.GcMetrics(15, 407)));
 
     assertThat(events)
         .containsExactly(
@@ -46,15 +53,36 @@ class DecodeProfileCliTest {
             "forward:7@2",
             "forward:7@3",
             "record:start",
+            "gc:snapshot",
             "forward:7@4",
             "forward:7@5",
             "forward:7@6",
+            "gc:snapshot",
             "record:stop",
             "record:dump:decode.jfr");
     assertThat(result.promptTokens()).isEqualTo(2);
     assertThat(result.warmupTokens()).isEqualTo(2);
     assertThat(result.measuredTokens()).isEqualTo(3);
     assertThat(result.logitChecksum()).isEqualTo(15.0);
+    assertThat(result.gcCollections()).isEqualTo(3);
+    assertThat(result.gcPauseMillis()).isEqualTo(7);
+  }
+
+  private static final class FakeGcMetrics implements DecodeProfileCli.GcMetricsSource {
+    private final List<String> events;
+    private final List<DecodeProfileCli.GcMetrics> metrics;
+    private int index;
+
+    private FakeGcMetrics(List<String> events, DecodeProfileCli.GcMetrics... metrics) {
+      this.events = events;
+      this.metrics = List.of(metrics);
+    }
+
+    @Override
+    public DecodeProfileCli.GcMetrics snapshot() {
+      events.add("gc:snapshot");
+      return metrics.get(index++);
+    }
   }
 
   private static final class FakeRecording implements DecodeProfileCli.ProfileRecording {
