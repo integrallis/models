@@ -68,7 +68,7 @@ class ExecutionPlannerTest {
   }
 
   @Test
-  void retainsTheGroupableQ4KPairInMixedKQuantLayers() {
+  void plansTheMixedKQuantProjectionKernelOnlyForEligibleLayers() {
     ModelTopology.LayerTopology layer =
         new ModelTopology.LayerTopology(
             GgufTensorType.Q4_K,
@@ -85,17 +85,50 @@ class ExecutionPlannerTest {
             runtime("hotspot-c2"), topology, PureJavaPlanConfiguration.defaults());
 
     assertThat(plan.groupedProjections()).isTrue();
+    assertThat(plan.mixedKProjections()).isTrue();
     assertThat(plan.diagnostics().optimization("grouped-projections"))
         .hasValueSatisfying(
             decision ->
                 assertThat(decision.settings())
-                    .containsEntry("qkv", "partial")
+                    .containsEntry("qkv", "grouped")
                     .containsEntry("gate-up", "grouped"));
+    assertThat(plan.diagnostics().optimization("mixed-k-projections"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(decision.settings())
+                  .containsEntry("eligible-layers", "1")
+                  .containsEntry("formats", "Q4_K,Q4_K,Q6_K");
+            });
+  }
+
+  @Test
+  void explicitOverrideDisablesOnlyTheMixedKQuantProjectionKernel() {
+    ModelTopology.LayerTopology layer =
+        new ModelTopology.LayerTopology(
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q6_K,
+            GgufTensorType.Q6_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q6_K);
+    ModelTopology topology = new ModelTopology("minicpm", 1024, 256, 256, List.of(layer));
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"), topology, new PureJavaPlanConfiguration(true, false, 32));
+
+    assertThat(plan.groupedProjections()).isTrue();
+    assertThat(plan.mixedKProjections()).isFalse();
+    assertThat(plan.diagnostics().optimization("mixed-k-projections"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
   }
 
   @Test
   void explicitOverridesDisableOtherwiseEligibleOptimizations() {
-    PureJavaPlanConfiguration configuration = new PureJavaPlanConfiguration(false, 1);
+    PureJavaPlanConfiguration configuration = new PureJavaPlanConfiguration(false, true, 1);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -152,12 +185,17 @@ class ExecutionPlannerTest {
 
   @Test
   void invalidConfigurationIsRejectedWithoutAStartupProbe() {
-    assertThatThrownBy(() -> new PureJavaPlanConfiguration(true, 0))
+    assertThatThrownBy(() -> new PureJavaPlanConfiguration(true, true, 0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThatThrownBy(() -> PureJavaPlanConfiguration.groupedProjections("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.groupedProjections");
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.mixedKProjections("sometimes"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.mixedKProjections");
+    assertThat(PureJavaPlanConfiguration.mixedKProjections(null)).isTrue();
+    assertThat(PureJavaPlanConfiguration.mixedKProjections("false")).isFalse();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.prefillBatchSize("many"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
@@ -186,7 +224,9 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(runtime, unsupported, PureJavaPlanConfiguration.defaults());
 
     assertThatThrownBy(
-            () -> new PureJavaExecutionPlan(runtime, unsupported, true, 32, valid.diagnostics()))
+            () ->
+                new PureJavaExecutionPlan(
+                    runtime, unsupported, true, false, 32, valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("topology");
   }

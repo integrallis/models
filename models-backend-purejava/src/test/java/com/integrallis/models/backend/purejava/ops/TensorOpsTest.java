@@ -464,7 +464,7 @@ class TensorOpsTest {
       assertThat(
               TensorOps.groupedProjectionPlan(
                   GgufTensorType.Q4_K, GgufTensorType.Q4_K, GgufTensorType.Q6_K))
-          .isEqualTo(TensorOps.GroupedProjectionPlan.FIRST_SECOND);
+          .isEqualTo(TensorOps.GroupedProjectionPlan.MIXED_Q4_K_Q4_K_Q6_K);
       assertThat(
               TensorOps.groupedProjectionPlan(
                   GgufTensorType.Q4_K, GgufTensorType.Q6_K, GgufTensorType.Q4_K))
@@ -558,6 +558,51 @@ class TensorOpsTest {
             actualThird,
             thirdWeight,
             GgufTensorType.Q4_K,
+            1,
+            input,
+            cols,
+            new byte[cols],
+            new float[cols / 256],
+            new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+      assertThat(actualThird).containsExactly(expectedThird);
+    }
+
+    @Test
+    void mixedQ4_KQ6_KTripleMatmulMatchesSeparateProjectionsExactly() {
+      int cols = 256;
+      float[] input = repeatingQuery(cols);
+      float[] expectedFirst = new float[1];
+      float[] expectedSecond = new float[1];
+      float[] expectedThird = new float[1];
+      float[] actualFirst = new float[1];
+      float[] actualSecond = new float[1];
+      float[] actualThird = new float[1];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4KBlock(0.125f, 0.0625f, 7));
+        MemorySegment secondWeight = copy(arena, q4KBlock(-0.25f, 0.03125f, 3));
+        MemorySegment thirdWeight =
+            copy(arena, q6KBlock(0.25f, i -> (i * 11) % 64 - 32, i -> (i % 9) - 4));
+        TensorOps.ggufMatmul(expectedFirst, input, firstWeight, GgufTensorType.Q4_K, 1, cols);
+        TensorOps.ggufMatmul(expectedSecond, input, secondWeight, GgufTensorType.Q4_K, 1, cols);
+        TensorOps.ggufMatmul(expectedThird, input, thirdWeight, GgufTensorType.Q6_K, 1, cols);
+
+        TensorOps.ggufTripleMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualThird,
+            thirdWeight,
+            GgufTensorType.Q6_K,
             1,
             input,
             cols,

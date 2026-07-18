@@ -61,8 +61,14 @@ public record ModelTopology(
       return gate == up && TensorOps.supportsGroupedMatmul(gate);
     }
 
+    boolean groupsMixedKQkv() {
+      return query == GgufTensorType.Q4_K
+          && key == GgufTensorType.Q4_K
+          && value == GgufTensorType.Q6_K;
+    }
+
     String qkvMode() {
-      if (query == key && query == value && TensorOps.supportsGroupedTripleMatmul(query)) {
+      if (TensorOps.supportsGroupedTripleMatmul(query, key, value)) {
         return "grouped";
       }
       if ((query == key && TensorOps.supportsGroupedTripleMatmul(query))
@@ -114,6 +120,10 @@ public record ModelTopology(
   boolean hasGroupedProjection() {
     return layers.stream()
         .anyMatch(layer -> layer.groupsGateUp() || !"independent".equals(layer.qkvMode()));
+  }
+
+  int mixedKProjectionLayers() {
+    return Math.toIntExact(layers.stream().filter(LayerTopology::groupsMixedKQkv).count());
   }
 
   String qkvMode() {
