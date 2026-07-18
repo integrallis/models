@@ -23,6 +23,7 @@ import org.modeljars.ModelJarDescriptor;
 import org.modeljars.ModelJarLocator;
 import org.modeljars.ModelJarRegistry;
 import org.modeljars.ModelJarRequirement;
+import org.modeljars.ModelPerformanceProfileRegistry;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -44,6 +45,7 @@ class ModelJarsSpringBootSmokeTest {
                 "models.modeljars.capability=text-generation")
             .run()) {
       assertThat(context.getBean(ModelJarRegistry.class).descriptors()).isNotEmpty();
+      assertThat(context.getBean(ModelPerformanceProfileRegistry.class).profiles()).hasSize(3);
       assertThat(context.getBean(ModelJarLocator.class)).isNotNull();
       assertThat(context.getBean(ModelJarRequirement.class).source())
           .isEqualTo("hf://ggml-org/Qwen3-0.6B-GGUF");

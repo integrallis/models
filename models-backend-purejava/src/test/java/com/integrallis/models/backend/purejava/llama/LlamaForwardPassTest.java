@@ -24,6 +24,10 @@ import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
+import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
+import com.integrallis.models.backend.purejava.plan.ModelTopology;
+import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
+import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -46,16 +50,6 @@ class LlamaForwardPassTest {
   private static final int VOCAB_SIZE = 32;
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
-
-  @Test
-  void groupedProjectionToggleDefaultsOnAndRejectsInvalidValues() {
-    assertThat(LlamaForwardPass.groupedProjectionsEnabled(null)).isTrue();
-    assertThat(LlamaForwardPass.groupedProjectionsEnabled("true")).isTrue();
-    assertThat(LlamaForwardPass.groupedProjectionsEnabled("false")).isFalse();
-    assertThatThrownBy(() -> LlamaForwardPass.groupedProjectionsEnabled("sometimes"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("models.purejava.groupedProjections");
-  }
 
   private GgufFile buildNanoModel(Random rng) {
     SyntheticGgufBuilder builder =
@@ -283,6 +277,42 @@ class LlamaForwardPassTest {
 
   @Nested
   class NanoModel {
+
+    @Test
+    void rejectsAnExecutionPlanForDifferentWeights() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      ModelTopology.LayerTopology q4Layer =
+          new ModelTopology.LayerTopology(
+              GgufTensorType.Q4_0,
+              GgufTensorType.Q4_0,
+              GgufTensorType.Q4_0,
+              GgufTensorType.Q4_0,
+              GgufTensorType.Q4_0,
+              GgufTensorType.Q4_0,
+              GgufTensorType.Q4_0);
+      var mismatchedPlan =
+          ExecutionPlanner.plan(
+              RuntimeFingerprint.capture(),
+              new ModelTopology(
+                  "llama",
+                  config.queryDim(),
+                  config.keyDim(),
+                  config.valueDim(),
+                  java.util.Collections.nCopies(config.numLayers(), q4Layer)),
+              PureJavaPlanConfiguration.defaults());
+
+      assertThatThrownBy(
+              () ->
+                  new LlamaForwardPass(
+                      config,
+                      weights,
+                      new KvCache(config.numLayers(), config.contextLength(), config.kvDim()),
+                      mismatchedPlan))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("execution plan topology");
+    }
 
     @Test
     void producesLogitsOfVocabSize() {

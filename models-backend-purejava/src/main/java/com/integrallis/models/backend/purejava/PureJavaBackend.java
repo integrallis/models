@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -25,6 +26,11 @@ import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
+import com.integrallis.models.backend.purejava.plan.ModelTopology;
+import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
+import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
+import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -49,18 +55,21 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   private final GgufTokenizer tokenizer;
   private final LlamaForwardPass forwardPass;
   private final ModelMetadata modelMetadata;
+  private final PureJavaExecutionPlan executionPlan;
 
   private PureJavaBackend(
       Arena arena,
       LlamaConfig config,
       GgufTokenizer tokenizer,
       LlamaForwardPass forwardPass,
-      ModelMetadata modelMetadata) {
+      ModelMetadata modelMetadata,
+      PureJavaExecutionPlan executionPlan) {
     this.arena = arena;
     this.config = config;
     this.tokenizer = tokenizer;
     this.forwardPass = forwardPass;
     this.modelMetadata = modelMetadata;
+    this.executionPlan = executionPlan;
   }
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
@@ -76,15 +85,19 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
+      String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
+      PureJavaExecutionPlan executionPlan =
+          ExecutionPlanner.plan(
+              RuntimeFingerprint.capture(),
+              ModelTopology.from(modelFamily, config, weights),
+              PureJavaPlanConfiguration.fromSystemProperties());
       KvCache cache =
           new KvCache(
               config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());
-      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
+      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache, executionPlan);
 
       String modelName =
           file.metadata().getString("general.name").orElse(modelPath.getFileName().toString());
-      String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
-
       ModelMetadata metadata =
           new ModelMetadata(
               modelFamily,
@@ -96,7 +109,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
               config.numHeads(),
               config.numKvHeads());
 
-      return new PureJavaBackend(arena, config, tokenizer, forwardPass, metadata);
+      return new PureJavaBackend(arena, config, tokenizer, forwardPass, metadata, executionPlan);
     } catch (IOException e) {
       closeAfterFailure(arena, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
@@ -146,6 +159,16 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   @Override
   public ModelMetadata metadata() {
     return modelMetadata;
+  }
+
+  /** Returns the immutable execution plan selected while loading this model. */
+  public PureJavaExecutionPlan executionPlan() {
+    return executionPlan;
+  }
+
+  @Override
+  public BackendDiagnostics diagnostics() {
+    return executionPlan.diagnostics();
   }
 
   @Override

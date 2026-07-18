@@ -19,6 +19,11 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
+import com.integrallis.models.backend.purejava.plan.ModelTopology;
+import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
+import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
+import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.util.Objects;
@@ -35,17 +40,12 @@ public final class LlamaForwardPass {
     void onLayerComplete(int layer, int position, float[] state, int offset, int length);
   }
 
-  private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
-  private static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
-  private static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
-  private static final boolean GROUPED_PROJECTIONS =
-      groupedProjectionsEnabled(System.getProperty(GROUPED_PROJECTIONS_PROPERTY));
-
   private final LlamaConfig config;
   private final LlamaWeights weights;
   private final KvCache cache;
   private final RopeTable ropeTable;
   private final LayerObserver layerObserver;
+  private final boolean groupedProjections;
   private final boolean batchedPrefill;
   private final int prefillBatchCapacity;
 
@@ -85,15 +85,39 @@ public final class LlamaForwardPass {
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
-    this(config, weights, cache, null);
+    this(config, weights, cache, null, defaultPlan(config, weights));
+  }
+
+  public LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      PureJavaExecutionPlan executionPlan) {
+    this(config, weights, cache, null, executionPlan);
   }
 
   LlamaForwardPass(
       LlamaConfig config, LlamaWeights weights, KvCache cache, LayerObserver layerObserver) {
+    this(config, weights, cache, layerObserver, defaultPlan(config, weights));
+  }
+
+  LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      LayerObserver layerObserver,
+      PureJavaExecutionPlan executionPlan) {
     this.config = config;
     this.weights = weights;
     this.cache = cache;
     this.layerObserver = layerObserver;
+    Objects.requireNonNull(executionPlan, "executionPlan");
+    ModelTopology actualTopology =
+        ModelTopology.from(executionPlan.topology().architecture(), config, weights);
+    if (!executionPlan.topology().equals(actualTopology)) {
+      throw new IllegalArgumentException("execution plan topology does not match loaded weights");
+    }
+    this.groupedProjections = executionPlan.groupedProjections();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -119,9 +143,8 @@ public final class LlamaForwardPass {
     this.quantizedActivationScales = new float[(maxProjectionInput + 31) / 32];
     this.quantizedActivationSums = new short[(maxProjectionInput + 15) / 16];
 
-    int requestedBatchSize = configuredPrefillBatchSize();
-    boolean compatible = supportsBatchedPrefill(config, weights);
-    int capacity = compatible ? Math.min(requestedBatchSize, cache.maxSeqLen()) : 0;
+    int requestedBatchSize = executionPlan.prefillBatchSize();
+    int capacity = Math.min(requestedBatchSize, cache.maxSeqLen());
     this.batchedPrefill = capacity > 1;
     this.prefillBatchCapacity = batchedPrefill ? capacity : 0;
     this.batchX = batchBuffer(prefillBatchCapacity, dim);
@@ -379,7 +402,7 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
 
       // QKV projections
-      if (GROUPED_PROJECTIONS) {
+      if (groupedProjections) {
         tripleMatmulDispatch(
             q,
             lw.wq(),
@@ -467,7 +490,7 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
 
       // FFN: SwiGLU
-      if (GROUPED_PROJECTIONS) {
+      if (groupedProjections) {
         dualMatmulDispatch(
             ffnGate,
             lw.ffnGate(),
@@ -749,42 +772,6 @@ public final class LlamaForwardPass {
         batchQ4LaneScratch);
   }
 
-  private static int configuredPrefillBatchSize() {
-    int batchSize = Integer.getInteger(PREFILL_BATCH_SIZE_PROPERTY, DEFAULT_PREFILL_BATCH_SIZE);
-    if (batchSize < 1) {
-      throw new IllegalArgumentException(
-          PREFILL_BATCH_SIZE_PROPERTY + " must be >= 1: " + batchSize);
-    }
-    return batchSize;
-  }
-
-  static boolean groupedProjectionsEnabled(String configured) {
-    if (configured == null || configured.equalsIgnoreCase("true")) {
-      return true;
-    }
-    if (configured.equalsIgnoreCase("false")) {
-      return false;
-    }
-    throw new IllegalArgumentException(
-        GROUPED_PROJECTIONS_PROPERTY + " must be true or false: " + configured);
-  }
-
-  private static boolean supportsBatchedPrefill(LlamaConfig config, LlamaWeights weights) {
-    for (int layer = 0; layer < config.numLayers(); layer++) {
-      LlamaWeights.LayerWeights layerWeights = weights.layer(layer);
-      if (!TensorOps.supportsBatchedMatmul(layerWeights.wqType())
-          || !TensorOps.supportsBatchedMatmul(layerWeights.wkType())
-          || !TensorOps.supportsBatchedMatmul(layerWeights.wvType())
-          || !TensorOps.supportsBatchedMatmul(layerWeights.woType())
-          || !TensorOps.supportsBatchedMatmul(layerWeights.ffnGateType())
-          || !TensorOps.supportsBatchedMatmul(layerWeights.ffnUpType())
-          || !TensorOps.supportsBatchedMatmul(layerWeights.ffnDownType())) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   private static boolean usesProjectionType(
       LlamaConfig config, LlamaWeights weights, GgufTensorType type) {
     for (int layer = 0; layer < config.numLayers(); layer++) {
@@ -804,5 +791,12 @@ public final class LlamaForwardPass {
 
   private static float[] batchBuffer(int batchCapacity, int width) {
     return new float[Math.multiplyExact(batchCapacity, width)];
+  }
+
+  private static PureJavaExecutionPlan defaultPlan(LlamaConfig config, LlamaWeights weights) {
+    return ExecutionPlanner.plan(
+        RuntimeFingerprint.capture(),
+        ModelTopology.from("llama", config, weights),
+        PureJavaPlanConfiguration.fromSystemProperties());
   }
 }

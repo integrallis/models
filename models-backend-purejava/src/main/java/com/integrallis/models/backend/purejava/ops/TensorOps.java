@@ -461,7 +461,8 @@ public final class TensorOps {
         || type == GgufTensorType.Q5_K;
   }
 
-  private static boolean supportsGroupedTripleMatmul(GgufTensorType type) {
+  /** Returns whether three equal-format projections can share one row dispatch. */
+  public static boolean supportsGroupedTripleMatmul(GgufTensorType type) {
     return type == GgufTensorType.Q4_0
         || type == GgufTensorType.Q4_K
         || type == GgufTensorType.Q5_K;
