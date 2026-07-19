@@ -175,11 +175,11 @@ public final class LlamaForwardPass {
         Math.max(
             Math.max(dim, hiddenDim),
             Math.max(config.queryDim(), Math.max(config.keyDim(), config.valueDim())));
+    int q4LaneRows =
+        groupedBatchedPrefill ? maxGroupedQ4ProjectionRows(config, weights) : maxProjectionOutput;
     this.batchQ4LaneScratch =
         usesProjectionType(config, weights, GgufTensorType.Q4_0)
-            ? new float
-                [Math.multiplyExact(
-                    Math.multiplyExact(prefillBatchCapacity, maxProjectionOutput), 8)]
+            ? new float[Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, q4LaneRows), 8)]
             : new float[0];
   }
 
@@ -928,6 +928,38 @@ public final class LlamaForwardPass {
       }
     }
     return false;
+  }
+
+  private static int maxGroupedQ4ProjectionRows(LlamaConfig config, LlamaWeights weights) {
+    int maxRows = 0;
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      LlamaWeights.LayerWeights layerWeights = weights.layer(layer);
+      int qkvRows = 0;
+      if (layerWeights.wqType() == GgufTensorType.Q4_0) {
+        qkvRows = Math.addExact(qkvRows, config.queryDim());
+      }
+      if (layerWeights.wkType() == GgufTensorType.Q4_0) {
+        qkvRows = Math.addExact(qkvRows, config.keyDim());
+      }
+      if (layerWeights.wvType() == GgufTensorType.Q4_0) {
+        qkvRows = Math.addExact(qkvRows, config.valueDim());
+      }
+      maxRows = Math.max(maxRows, qkvRows);
+
+      int gateUpRows = 0;
+      if (layerWeights.ffnGateType() == GgufTensorType.Q4_0) {
+        gateUpRows = Math.addExact(gateUpRows, config.hiddenDim());
+      }
+      if (layerWeights.ffnUpType() == GgufTensorType.Q4_0) {
+        gateUpRows = Math.addExact(gateUpRows, config.hiddenDim());
+      }
+      maxRows = Math.max(maxRows, gateUpRows);
+      if (layerWeights.woType() == GgufTensorType.Q4_0
+          || layerWeights.ffnDownType() == GgufTensorType.Q4_0) {
+        maxRows = Math.max(maxRows, config.embeddingDim());
+      }
+    }
+    return maxRows;
   }
 
   private static float[] batchBuffer(int batchCapacity, int width) {
