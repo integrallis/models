@@ -535,21 +535,44 @@ public final class TensorOps {
       float[] quantizedActivationScales,
       short[] quantizedActivationSums,
       float[] q4LaneScratch) {
-    if (firstType == GgufTensorType.Q4_K && secondType == GgufTensorType.Q4_K) {
-      VectorUtil.ggufQ4_KQ8_KDualBatchedMatmul(
-          input,
-          firstWeight,
-          firstRows,
-          firstOut,
-          secondWeight,
-          secondRows,
-          secondOut,
-          batchSize,
-          cols,
-          quantizedActivations,
-          quantizedActivationScales,
-          quantizedActivationSums);
-      return;
+    if (firstType == secondType) {
+      switch (firstType) {
+        case Q4_0 -> {
+          VectorUtil.ggufQ4_0Q8_0DualBatchedMatmul(
+              input,
+              firstWeight,
+              firstRows,
+              firstOut,
+              secondWeight,
+              secondRows,
+              secondOut,
+              batchSize,
+              cols,
+              quantizedActivations,
+              quantizedActivationScales,
+              q4LaneScratch);
+          return;
+        }
+        case Q4_K -> {
+          VectorUtil.ggufQ4_KQ8_KDualBatchedMatmul(
+              input,
+              firstWeight,
+              firstRows,
+              firstOut,
+              secondWeight,
+              secondRows,
+              secondOut,
+              batchSize,
+              cols,
+              quantizedActivations,
+              quantizedActivationScales,
+              quantizedActivationSums);
+          return;
+        }
+        default -> {
+          // Fall through to independent batched projections.
+        }
+      }
     }
 
     ggufBatchedMatmul(
@@ -628,7 +651,57 @@ public final class TensorOps {
     }
 
     switch (projectionPlan) {
-      case ALL, FIRST_SECOND -> {
+      case ALL -> {
+        if (firstType == GgufTensorType.Q4_0) {
+          VectorUtil.ggufQ4_0Q8_0TripleBatchedMatmul(
+              input,
+              firstWeight,
+              firstRows,
+              firstOut,
+              secondWeight,
+              secondRows,
+              secondOut,
+              thirdWeight,
+              thirdRows,
+              thirdOut,
+              batchSize,
+              cols,
+              quantizedActivations,
+              quantizedActivationScales,
+              q4LaneScratch);
+          return;
+        }
+        ggufDualBatchedMatmul(
+            firstOut,
+            firstWeight,
+            firstType,
+            firstRows,
+            secondOut,
+            secondWeight,
+            secondType,
+            secondRows,
+            input,
+            batchSize,
+            cols,
+            quantizedActivations,
+            quantizedActivationScales,
+            quantizedActivationSums,
+            q4LaneScratch);
+        ggufBatchedMatmul(
+            thirdOut,
+            input,
+            thirdWeight,
+            thirdType,
+            batchSize,
+            thirdRows,
+            cols,
+            quantizedActivations,
+            quantizedActivationScales,
+            quantizedActivationSums,
+            q4LaneScratch);
+        return;
+      }
+      case FIRST_SECOND -> {
         ggufDualBatchedMatmul(
             firstOut,
             firstWeight,
@@ -777,7 +850,7 @@ public final class TensorOps {
 
   /** Returns whether the format has a retained multi-projection batched prefill kernel. */
   public static boolean supportsGroupedBatchedMatmul(GgufTensorType type) {
-    return type == GgufTensorType.Q4_K;
+    return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q4_K;
   }
 
   /** Returns whether three equal-format projections can share one row dispatch. */

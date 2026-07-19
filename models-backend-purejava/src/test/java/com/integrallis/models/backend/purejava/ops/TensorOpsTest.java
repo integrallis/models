@@ -453,6 +453,9 @@ class TensorOpsTest {
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q8_0)).isTrue();
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q4_K)).isTrue();
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q5_K)).isTrue();
+      assertThat(TensorOps.supportsGroupedBatchedMatmul(GgufTensorType.Q4_0)).isTrue();
+      assertThat(TensorOps.supportsGroupedBatchedMatmul(GgufTensorType.Q4_K)).isTrue();
+      assertThat(TensorOps.supportsGroupedBatchedMatmul(GgufTensorType.Q8_0)).isFalse();
     }
 
     @Test

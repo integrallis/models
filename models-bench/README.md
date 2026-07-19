@@ -19,6 +19,21 @@ Use `-Dmodels.purejava.groupedProjections=false` for the controlled baseline or 
 does not justify a global batch-size increase: Q4_0 and Q8_0 models plateaued near batches 32-64,
 while MiniCPM's ungrouped mixed K-quant path was fastest at batch one.
 
+## Retained grouped Q4_0 prefill gate
+
+Qwen3 0.6B Q4_0 was measured independently on the same Java 25 EPYC-Milan host, with prefill batch
+32, the committed completion prompt, and six counterbalanced process pairs. Across 18 trials per
+mode, grouped Q/K/V and gate/up projection dispatch improved median TTFT from 3127.92 to 3096.45 ms
+and median prefill throughput from 49.59 to 50.19 tok/s. Every paired trial had identical input and
+output token counts and an identical output SHA-256.
+
+An allocation-enabled JFR follow-up used a fixed 2 GiB heap, five warmups, and five measurements.
+Grouped median TTFT was 3076.4 ms versus 3124.0 ms, while total recorded TLAB plus outside-TLAB
+allocation differed by 9.99 MB over the complete ten-prompt process. Peak RSS differed by 8.28 MB.
+The much larger delta seen with only one warmup was transient JIT scalar-replacement behavior, not
+steady per-prefill allocation. The same `models.purejava.groupedProjections` property controls this
+path and provides its rollback gate.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
