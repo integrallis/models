@@ -34,6 +34,17 @@ The much larger delta seen with only one warmup was transient JIT scalar-replace
 steady per-prefill allocation. The same `models.purejava.groupedProjections` property controls this
 path and provides its rollback gate.
 
+## Retained grouped Q8_0 gate/up prefill gate
+
+SmolLM2 360M Q8_0 was measured with the same Java 25 host, batch 32, completion prompt, and six
+counterbalanced process pairs. Across 18 trials per mode, grouping only the batched gate/up
+projection improved median TTFT from 2612.09 to 2581.73 ms and median prefill throughput from 60.22
+to 61.01 tok/s. Mean process CPU time fell from 18,875 to 18,698 ms, median RSS did not increase,
+and every pair had identical input/output token counts and output SHA-256 values.
+
+Q8_0 Q/K/V remains independent in this retained baseline. Its triple batched route requires a
+separate gate because the corresponding single-activation Q8_0 triple kernel previously regressed.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:

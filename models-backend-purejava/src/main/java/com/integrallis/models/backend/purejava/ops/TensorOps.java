@@ -569,6 +569,21 @@ public final class TensorOps {
               quantizedActivationSums);
           return;
         }
+        case Q8_0 -> {
+          VectorUtil.ggufQ8_0Q8_0DualBatchedMatmul(
+              input,
+              firstWeight,
+              firstRows,
+              firstOut,
+              secondWeight,
+              secondRows,
+              secondOut,
+              batchSize,
+              cols,
+              quantizedActivations,
+              quantizedActivationScales);
+          return;
+        }
         default -> {
           // Fall through to independent batched projections.
         }
@@ -850,7 +865,9 @@ public final class TensorOps {
 
   /** Returns whether the format has a retained multi-projection batched prefill kernel. */
   public static boolean supportsGroupedBatchedMatmul(GgufTensorType type) {
-    return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q4_K;
+    return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q8_0
+        || type == GgufTensorType.Q4_K;
   }
 
   /** Returns whether three equal-format projections can share one row dispatch. */
