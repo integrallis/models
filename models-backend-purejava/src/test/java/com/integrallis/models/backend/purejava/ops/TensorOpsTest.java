@@ -528,6 +528,69 @@ class TensorOpsTest {
     }
 
     @Test
+    void q4_KDualBatchedMatmulMatchesSeparateBatchedProjectionsExactly() {
+      int batchSize = 3;
+      int cols = 256;
+      float[] input = repeatingQueries(batchSize, cols);
+      float[] expectedFirst = new float[batchSize];
+      float[] expectedSecond = new float[batchSize];
+      float[] actualFirst = new float[batchSize];
+      float[] actualSecond = new float[batchSize];
+      byte[] quants = new byte[batchSize * cols];
+      float[] scales = new float[batchSize * (cols / 256)];
+      short[] sums = new short[batchSize * (cols / 16)];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4KBlock(0.125f, 0.0625f, 7));
+        MemorySegment secondWeight = copy(arena, q4KBlock(-0.25f, 0.03125f, 3));
+        TensorOps.ggufBatchedMatmul(
+            expectedFirst,
+            input,
+            firstWeight,
+            GgufTensorType.Q4_K,
+            batchSize,
+            1,
+            cols,
+            quants,
+            scales,
+            sums,
+            new float[0]);
+        TensorOps.ggufBatchedMatmul(
+            expectedSecond,
+            input,
+            secondWeight,
+            GgufTensorType.Q4_K,
+            batchSize,
+            1,
+            cols,
+            quants,
+            scales,
+            sums,
+            new float[0]);
+
+        TensorOps.ggufDualBatchedMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_K,
+            1,
+            input,
+            batchSize,
+            cols,
+            quants,
+            scales,
+            sums,
+            new float[0]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+    }
+
+    @Test
     void q4_KTripleMatmulMatchesSeparateProjectionsExactly() {
       int cols = 256;
       float[] input = repeatingQuery(cols);
@@ -609,6 +672,91 @@ class TensorOpsTest {
             new byte[cols],
             new float[cols / 256],
             new short[cols / 16]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+      assertThat(actualThird).containsExactly(expectedThird);
+    }
+
+    @Test
+    void mixedQ4_KQ6_KTripleBatchedMatmulMatchesSeparateBatchedProjectionsExactly() {
+      int batchSize = 3;
+      int cols = 256;
+      float[] input = repeatingQueries(batchSize, cols);
+      float[] expectedFirst = new float[batchSize];
+      float[] expectedSecond = new float[batchSize];
+      float[] expectedThird = new float[batchSize];
+      float[] actualFirst = new float[batchSize];
+      float[] actualSecond = new float[batchSize];
+      float[] actualThird = new float[batchSize];
+      byte[] quants = new byte[batchSize * cols];
+      float[] scales = new float[batchSize * (cols / 256)];
+      short[] sums = new short[batchSize * (cols / 16)];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q4KBlock(0.125f, 0.0625f, 7));
+        MemorySegment secondWeight = copy(arena, q4KBlock(-0.25f, 0.03125f, 3));
+        MemorySegment thirdWeight =
+            copy(arena, q6KBlock(0.25f, i -> (i * 11) % 64 - 32, i -> (i % 9) - 4));
+        TensorOps.ggufBatchedMatmul(
+            expectedFirst,
+            input,
+            firstWeight,
+            GgufTensorType.Q4_K,
+            batchSize,
+            1,
+            cols,
+            quants,
+            scales,
+            sums,
+            new float[0]);
+        TensorOps.ggufBatchedMatmul(
+            expectedSecond,
+            input,
+            secondWeight,
+            GgufTensorType.Q4_K,
+            batchSize,
+            1,
+            cols,
+            quants,
+            scales,
+            sums,
+            new float[0]);
+        TensorOps.ggufBatchedMatmul(
+            expectedThird,
+            input,
+            thirdWeight,
+            GgufTensorType.Q6_K,
+            batchSize,
+            1,
+            cols,
+            quants,
+            scales,
+            sums,
+            new float[0]);
+
+        TensorOps.ggufTripleBatchedMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q4_K,
+            1,
+            actualThird,
+            thirdWeight,
+            GgufTensorType.Q6_K,
+            1,
+            input,
+            batchSize,
+            cols,
+            quants,
+            scales,
+            sums,
+            new float[0],
+            true);
       }
 
       assertThat(actualFirst).containsExactly(expectedFirst);
@@ -863,6 +1011,16 @@ class TensorOpsTest {
       float[] out = new float[length];
       for (int i = 0; i < length; i++) {
         out[i] = (i % 7) - 3.0f;
+      }
+      return out;
+    }
+
+    private static float[] repeatingQueries(int batchSize, int cols) {
+      float[] out = new float[batchSize * cols];
+      for (int batch = 0; batch < batchSize; batch++) {
+        for (int col = 0; col < cols; col++) {
+          out[batch * cols + col] = ((batch + 1) * (col % 7)) - 3.0f;
+        }
       }
       return out;
     }

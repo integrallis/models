@@ -3,6 +3,22 @@
 `models-bench` contains the controlled comparison harness and a decode-only JFR profiler for the
 pure-Java backend.
 
+## Retained grouped K-quant prefill gate
+
+The mixed Q4_K/Q4_K/Q6_K grouped batched path was retained on the controlled eight-vCPU AMD
+EPYC-Milan host with Java 25. Using `prompts/completion.txt`, MiniCPM5 1B Q4_K_M, prefill batch 32,
+one warmup, and 12 counterbalanced measurements per mode produced:
+
+| Mode | Median TTFT | Median prefill | Output hash |
+| --- | ---: | ---: | --- |
+| Independent batched projections | 8330.16 ms | 17.95 tok/s | `01ba4719...546b` |
+| Grouped batched projections | 7948.31 ms | 18.78 tok/s | `01ba4719...546b` |
+
+This is a 4.58% TTFT reduction and a 4.61% prefill-throughput increase with bit-identical output.
+Use `-Dmodels.purejava.groupedProjections=false` for the controlled baseline or rollback. This gate
+does not justify a global batch-size increase: Q4_0 and Q8_0 models plateaued near batches 32-64,
+while MiniCPM's ungrouped mixed K-quant path was fastest at batch one.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
