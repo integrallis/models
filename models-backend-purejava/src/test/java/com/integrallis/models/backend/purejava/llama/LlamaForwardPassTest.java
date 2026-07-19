@@ -477,6 +477,7 @@ class LlamaForwardPassTest {
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
+      assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));

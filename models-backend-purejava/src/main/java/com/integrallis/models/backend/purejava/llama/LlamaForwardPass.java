@@ -48,6 +48,7 @@ public final class LlamaForwardPass {
   private final boolean groupedProjections;
   private final boolean mixedKProjections;
   private final boolean batchedPrefill;
+  private final boolean groupedBatchedPrefill;
   private final int prefillBatchCapacity;
 
   // Scratch buffers
@@ -148,6 +149,10 @@ public final class LlamaForwardPass {
     int requestedBatchSize = executionPlan.prefillBatchSize();
     int capacity = Math.min(requestedBatchSize, cache.maxSeqLen());
     this.batchedPrefill = capacity > 1;
+    this.groupedBatchedPrefill =
+        batchedPrefill
+            && groupedProjections
+            && usesGroupedBatchedProjection(config, weights, mixedKProjections);
     this.prefillBatchCapacity = batchedPrefill ? capacity : 0;
     this.batchX = batchBuffer(prefillBatchCapacity, dim);
     this.batchXNorm = batchBuffer(prefillBatchCapacity, dim);
@@ -269,9 +274,28 @@ public final class LlamaForwardPass {
             batchXNorm, xOffset, batchX, xOffset, lw.attentionNorm(), dim, config.rmsNormEps());
       }
 
-      batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
-      batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
-      batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
+      if (groupedBatchedPrefill) {
+        tripleBatchedMatmulDispatch(
+            batchQ,
+            lw.wq(),
+            lw.wqType(),
+            queryDim,
+            batchK,
+            lw.wk(),
+            lw.wkType(),
+            keyDim,
+            batchV,
+            lw.wv(),
+            lw.wvType(),
+            valueDim,
+            batchXNorm,
+            batchSize,
+            dim);
+      } else {
+        batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
+        batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
+        batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
+      }
 
       for (int batch = 0; batch < batchSize; batch++) {
         int qBase = batch * queryDim;
@@ -327,10 +351,25 @@ public final class LlamaForwardPass {
         TensorOps.rmsNorm(
             batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
       }
-      batchedMatmulDispatch(
-          batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
-      batchedMatmulDispatch(
-          batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
+      if (groupedBatchedPrefill) {
+        dualBatchedMatmulDispatch(
+            batchFfnGate,
+            lw.ffnGate(),
+            lw.ffnGateType(),
+            hiddenDim,
+            batchFfnUp,
+            lw.ffnUp(),
+            lw.ffnUpType(),
+            hiddenDim,
+            batchXNorm,
+            batchSize,
+            dim);
+      } else {
+        batchedMatmulDispatch(
+            batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
+        batchedMatmulDispatch(
+            batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
+      }
       for (int batch = 0; batch < batchSize; batch++) {
         int hiddenOffset = batch * hiddenDim;
         TensorOps.swiGlu(
@@ -608,6 +647,10 @@ public final class LlamaForwardPass {
     return batchedPrefill;
   }
 
+  boolean usesGroupedBatchedPrefill() {
+    return groupedBatchedPrefill;
+  }
+
   private void groupedQueryAttention(
       float[] query,
       int queryOffset,
@@ -753,6 +796,75 @@ public final class LlamaForwardPass {
         mixedKProjections);
   }
 
+  private void dualBatchedMatmulDispatch(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] input,
+      int batchSize,
+      int cols) {
+    TensorOps.ggufDualBatchedMatmul(
+        firstOut,
+        firstWeight,
+        firstType,
+        firstRows,
+        secondOut,
+        secondWeight,
+        secondType,
+        secondRows,
+        input,
+        batchSize,
+        cols,
+        batchQuantizedActivation,
+        batchQuantizedActivationScales,
+        batchQuantizedActivationSums,
+        batchQ4LaneScratch);
+  }
+
+  private void tripleBatchedMatmulDispatch(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] thirdOut,
+      MemorySegment thirdWeight,
+      GgufTensorType thirdType,
+      int thirdRows,
+      float[] input,
+      int batchSize,
+      int cols) {
+    TensorOps.ggufTripleBatchedMatmul(
+        firstOut,
+        firstWeight,
+        firstType,
+        firstRows,
+        secondOut,
+        secondWeight,
+        secondType,
+        secondRows,
+        thirdOut,
+        thirdWeight,
+        thirdType,
+        thirdRows,
+        input,
+        batchSize,
+        cols,
+        batchQuantizedActivation,
+        batchQuantizedActivationScales,
+        batchQuantizedActivationSums,
+        batchQ4LaneScratch,
+        mixedKProjections);
+  }
+
   private void batchedMatmulDispatch(
       float[] out,
       float[] input,
@@ -786,6 +898,32 @@ public final class LlamaForwardPass {
           || layerWeights.ffnGateType() == type
           || layerWeights.ffnUpType() == type
           || layerWeights.ffnDownType() == type) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean usesGroupedBatchedProjection(
+      LlamaConfig config, LlamaWeights weights, boolean mixedKProjections) {
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      LlamaWeights.LayerWeights layerWeights = weights.layer(layer);
+      if (layerWeights.ffnGateType() == layerWeights.ffnUpType()
+          && TensorOps.supportsGroupedBatchedMatmul(layerWeights.ffnGateType())) {
+        return true;
+      }
+      if (mixedKProjections
+          && layerWeights.wqType() == GgufTensorType.Q4_K
+          && layerWeights.wkType() == GgufTensorType.Q4_K
+          && layerWeights.wvType() == GgufTensorType.Q6_K) {
+        return true;
+      }
+      if ((layerWeights.wqType() == layerWeights.wkType()
+              && TensorOps.supportsGroupedBatchedMatmul(layerWeights.wqType()))
+          || (layerWeights.wqType() == layerWeights.wvType()
+              && TensorOps.supportsGroupedBatchedMatmul(layerWeights.wqType()))
+          || (layerWeights.wkType() == layerWeights.wvType()
+              && TensorOps.supportsGroupedBatchedMatmul(layerWeights.wkType()))) {
         return true;
       }
     }
