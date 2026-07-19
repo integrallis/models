@@ -23,6 +23,7 @@ public record PureJavaExecutionPlan(
     RuntimeFingerprint runtime,
     ModelTopology topology,
     boolean groupedProjections,
+    boolean mixedKProjections,
     int prefillBatchSize,
     BackendDiagnostics diagnostics) {
 
@@ -35,6 +36,10 @@ public record PureJavaExecutionPlan(
     if (groupedProjections && !topology.hasGroupedProjection()) {
       throw new IllegalArgumentException(
           "grouped projections contradict the execution plan topology");
+    }
+    if (mixedKProjections && (!groupedProjections || topology.mixedKProjectionLayers() == 0)) {
+      throw new IllegalArgumentException(
+          "mixed K-quant projections contradict the execution plan topology");
     }
     if (prefillBatchSize > 1 && !topology.supportsBatchedPrefill()) {
       throw new IllegalArgumentException("batched prefill contradicts the execution plan topology");

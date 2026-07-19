@@ -16,9 +16,11 @@
 package com.integrallis.models.backend.purejava.plan;
 
 /** Explicit deployment overrides consumed once when a backend is loaded. */
-public record PureJavaPlanConfiguration(boolean groupedProjections, int prefillBatchSize) {
+public record PureJavaPlanConfiguration(
+    boolean groupedProjections, boolean mixedKProjections, int prefillBatchSize) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
+  public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
   public static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
 
@@ -31,25 +33,33 @@ public record PureJavaPlanConfiguration(boolean groupedProjections, int prefillB
 
   /** Returns the stable default policy. */
   public static PureJavaPlanConfiguration defaults() {
-    return new PureJavaPlanConfiguration(true, DEFAULT_PREFILL_BATCH_SIZE);
+    return new PureJavaPlanConfiguration(true, true, DEFAULT_PREFILL_BATCH_SIZE);
   }
 
   /** Reads deployment overrides without running a performance probe. */
   public static PureJavaPlanConfiguration fromSystemProperties() {
     return new PureJavaPlanConfiguration(
         groupedProjections(System.getProperty(GROUPED_PROJECTIONS_PROPERTY)),
+        mixedKProjections(System.getProperty(MIXED_K_PROJECTIONS_PROPERTY)),
         prefillBatchSize(System.getProperty(PREFILL_BATCH_SIZE_PROPERTY)));
   }
 
   static boolean groupedProjections(String configured) {
+    return booleanProperty(GROUPED_PROJECTIONS_PROPERTY, configured);
+  }
+
+  static boolean mixedKProjections(String configured) {
+    return booleanProperty(MIXED_K_PROJECTIONS_PROPERTY, configured);
+  }
+
+  private static boolean booleanProperty(String property, String configured) {
     if (configured == null || configured.equalsIgnoreCase("true")) {
       return true;
     }
     if (configured.equalsIgnoreCase("false")) {
       return false;
     }
-    throw new IllegalArgumentException(
-        GROUPED_PROJECTIONS_PROPERTY + " must be true or false: " + configured);
+    throw new IllegalArgumentException(property + " must be true or false: " + configured);
   }
 
   static int prefillBatchSize(String configured) {

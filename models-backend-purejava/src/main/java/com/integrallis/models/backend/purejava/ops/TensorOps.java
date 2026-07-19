@@ -25,6 +25,7 @@ public final class TensorOps {
   enum GroupedProjectionPlan {
     NONE,
     ALL,
+    MIXED_Q4_K_Q4_K_Q6_K,
     FIRST_SECOND,
     FIRST_THIRD,
     SECOND_THIRD
@@ -278,7 +279,70 @@ public final class TensorOps {
       byte[] quantizedActivation,
       float[] quantizedActivationScales,
       short[] quantizedActivationSums) {
-    switch (groupedProjectionPlan(firstType, secondType, thirdType)) {
+    ggufTripleMatmul(
+        firstOut,
+        firstWeight,
+        firstType,
+        firstRows,
+        secondOut,
+        secondWeight,
+        secondType,
+        secondRows,
+        thirdOut,
+        thirdWeight,
+        thirdType,
+        thirdRows,
+        input,
+        cols,
+        quantizedActivation,
+        quantizedActivationScales,
+        quantizedActivationSums,
+        true);
+  }
+
+  /** Executes a triple projection with load-time control over heterogeneous K-quant grouping. */
+  public static void ggufTripleMatmul(
+      float[] firstOut,
+      MemorySegment firstWeight,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOut,
+      MemorySegment secondWeight,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] thirdOut,
+      MemorySegment thirdWeight,
+      GgufTensorType thirdType,
+      int thirdRows,
+      float[] input,
+      int cols,
+      byte[] quantizedActivation,
+      float[] quantizedActivationScales,
+      short[] quantizedActivationSums,
+      boolean mixedKProjections) {
+    GroupedProjectionPlan projectionPlan = groupedProjectionPlan(firstType, secondType, thirdType);
+    if (!mixedKProjections && projectionPlan == GroupedProjectionPlan.MIXED_Q4_K_Q4_K_Q6_K) {
+      projectionPlan = GroupedProjectionPlan.FIRST_SECOND;
+    }
+    switch (projectionPlan) {
+      case MIXED_Q4_K_Q4_K_Q6_K -> {
+        VectorUtil.ggufQ4_KQ4_KQ6_KQ8_KTripleBatchDotProduct(
+            input,
+            firstWeight,
+            firstRows,
+            firstOut,
+            secondWeight,
+            secondRows,
+            secondOut,
+            thirdWeight,
+            thirdRows,
+            thirdOut,
+            cols,
+            quantizedActivation,
+            quantizedActivationScales,
+            quantizedActivationSums);
+        return;
+      }
       case ALL -> {
         switch (firstType) {
           case Q4_0 ->
@@ -468,8 +532,24 @@ public final class TensorOps {
         || type == GgufTensorType.Q5_K;
   }
 
+  /** Returns whether three projection formats can share one activation and row dispatch. */
+  public static boolean supportsGroupedTripleMatmul(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return (firstType == secondType
+            && firstType == thirdType
+            && supportsGroupedTripleMatmul(firstType))
+        || (firstType == GgufTensorType.Q4_K
+            && secondType == GgufTensorType.Q4_K
+            && thirdType == GgufTensorType.Q6_K);
+  }
+
   static GroupedProjectionPlan groupedProjectionPlan(
       GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    if (firstType == GgufTensorType.Q4_K
+        && secondType == GgufTensorType.Q4_K
+        && thirdType == GgufTensorType.Q6_K) {
+      return GroupedProjectionPlan.MIXED_Q4_K_Q4_K_Q6_K;
+    }
     if (supportsGroupedTripleMatmul(firstType)) {
       if (firstType == secondType && firstType == thirdType) {
         return GroupedProjectionPlan.ALL;

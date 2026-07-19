@@ -69,6 +69,42 @@ for model-, quantization-, topology-, and host-specific planning; Graal is not a
 global default. The exact-SHA-bound recommendations and evidence are published
 through ModelJars performance profile schema v1.
 
+### Controlled mixed K-quant projection result
+
+MiniCPM5 stores query and key projections as Q4_K and the narrower value
+projection as Q6_K. The retained path quantizes the shared attention activation
+once and publishes all three row ranges through one persistent-worker dispatch.
+The immutable execution plan enables this only for the exact
+Q4_K/Q4_K/Q6_K topology; `models.purejava.mixedKProjections=false` is the
+explicit control.
+
+Two warmups and ten 64-token trials were run in each order on the controlled
+eight-vCPU AMD EPYC Milan host. The table combines control-first and
+candidate-first runs, so each cell covers 20 measured generations. Decode and
+TTFT values are arithmetic means over those trials.
+
+| JVM | Independent decode | Mixed decode | Decode change | Independent TTFT | Mixed TTFT | TTFT change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| OpenJDK 25.0.3 HotSpot | 13.05 tok/s | 13.37 tok/s | +2.52% | 8,425.9 ms | 8,427.2 ms | +0.02% |
+| GraalVM CE 25.2.4-dev | 15.28 tok/s | 15.47 tok/s | +1.31% | 7,320.3 ms | 7,316.1 ms | -0.06% |
+
+All 40 paired output SHA-256 values matched. Both process orders improved on
+each JVM; HotSpot's 20 paired decode deltas ranged from +1.32% to +4.26%.
+Graal's combined result remained positive despite one -0.08% trial-level delta.
+The retained Vectors implementation deliberately leaves the existing standalone
+Q4_K and Q6_K hot-loop source shapes unchanged. An initial helper extraction
+coincided with a severe Graal slowdown, but an untouched baseline reproduced the
+slowdown while the host was contended, so no compiler regression is attributed
+to that refactor. Preserving the established source shape removes that risk from
+the retained change.
+
+The evidence is pinned to Models `00de3059`, Vectors `e957a50e`, model SHA-256
+`81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa`,
+2,048-token context capacity, eight inference threads, and the same deterministic
+nonce-prefix prompt strategy used by the compiler matrix. Reports are retained
+under `/opt/inference-mixed-20260718/results-{hotspot,graal}-final*` on the
+controlled host.
+
 ## Optimization evidence
 
 The benchmark found scalar work in the Q8_0 and Q4_K fused matvec kernels. Both

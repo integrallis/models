@@ -46,6 +46,7 @@ public final class LlamaForwardPass {
   private final RopeTable ropeTable;
   private final LayerObserver layerObserver;
   private final boolean groupedProjections;
+  private final boolean mixedKProjections;
   private final boolean batchedPrefill;
   private final int prefillBatchCapacity;
 
@@ -118,6 +119,7 @@ public final class LlamaForwardPass {
       throw new IllegalArgumentException("execution plan topology does not match loaded weights");
     }
     this.groupedProjections = executionPlan.groupedProjections();
+    this.mixedKProjections = executionPlan.mixedKProjections();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -747,7 +749,8 @@ public final class LlamaForwardPass {
         cols,
         quantizedActivation,
         quantizedActivationScales,
-        quantizedActivationSums);
+        quantizedActivationSums,
+        mixedKProjections);
   }
 
   private void batchedMatmulDispatch(

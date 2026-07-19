@@ -27,7 +27,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v1";
+  public static final String PLAN_VERSION = "pure-java-v2";
 
   private ExecutionPlanner() {}
 
@@ -39,6 +39,7 @@ public final class ExecutionPlanner {
 
     List<OptimizationDecision> decisions = new ArrayList<>();
     boolean grouped = groupedProjections(topology, configuration, decisions);
+    boolean mixedK = mixedKProjections(topology, configuration, grouped, decisions);
     int prefillBatchSize = batchedPrefill(topology, configuration, decisions);
     decisions.add(
         new OptimizationDecision(
@@ -54,7 +55,8 @@ public final class ExecutionPlanner {
     environment.put("projection-layers", Integer.toString(topology.layers().size()));
     BackendDiagnostics diagnostics =
         new BackendDiagnostics("pure-java", PLAN_VERSION, environment, decisions);
-    return new PureJavaExecutionPlan(runtime, topology, grouped, prefillBatchSize, diagnostics);
+    return new PureJavaExecutionPlan(
+        runtime, topology, grouped, mixedK, prefillBatchSize, diagnostics);
   }
 
   private static boolean groupedProjections(
@@ -119,6 +121,43 @@ public final class ExecutionPlanner {
             "all loaded projection tensors have retained batched kernels",
             Map.of("batch-size", Integer.toString(configuration.prefillBatchSize()))));
     return configuration.prefillBatchSize();
+  }
+
+  private static boolean mixedKProjections(
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      boolean groupedProjections,
+      List<OptimizationDecision> decisions) {
+    int eligibleLayers = topology.mixedKProjectionLayers();
+    Map<String, String> settings =
+        Map.of("eligible-layers", Integer.toString(eligibleLayers), "formats", "Q4_K,Q4_K,Q6_K");
+    if (eligibleLayers == 0) {
+      decisions.add(
+          new OptimizationDecision(
+              "mixed-k-projections",
+              OptimizationStatus.UNSUPPORTED,
+              "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+              settings));
+      return false;
+    }
+    if (!groupedProjections || !configuration.mixedKProjections()) {
+      decisions.add(
+          new OptimizationDecision(
+              "mixed-k-projections",
+              OptimizationStatus.DISABLED,
+              !groupedProjections
+                  ? "grouped projections are disabled"
+                  : "disabled by models.purejava.mixedKProjections",
+              settings));
+      return false;
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "mixed-k-projections",
+            OptimizationStatus.ENABLED,
+            "eligible projections share one Q8_K quantization and row dispatch",
+            settings));
+    return true;
   }
 
   private static OptimizationDecision vectorFma(RuntimeFingerprint runtime) {

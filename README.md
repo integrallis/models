@@ -178,10 +178,13 @@ try (PureJavaBackend backend = PureJavaBackend.load(model)) {
 ```
 
 Diagnostics identify enabled, disabled, and unsupported choices, including the
-resolved tensor grouping, prefill batch size, mapped weights, Vector FMA policy,
-and persistent row executor. `models.purejava.groupedProjections` and
+resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, prefill
+batch size, mapped weights, Vector FMA policy, and persistent row executor.
+`models.purejava.groupedProjections`, `models.purejava.mixedKProjections`, and
 `models.purejava.prefillBatchSize` are parsed once per load; malformed explicit
-values fail rather than silently reverting to defaults.
+values fail rather than silently reverting to defaults. Eligible mixed-K Q/K/V
+projections share one Q8_K activation quantization and one row dispatch. The
+mixed path remains inactive for every other tensor layout.
 
 ## Supported models
 
