@@ -42,8 +42,10 @@ projection improved median TTFT from 2612.09 to 2581.73 ms and median prefill th
 to 61.01 tok/s. Mean process CPU time fell from 18,875 to 18,698 ms, median RSS did not increase,
 and every pair had identical input/output token counts and output SHA-256 values.
 
-Q8_0 Q/K/V remains independent in this retained baseline. Its triple batched route requires a
-separate gate because the corresponding single-activation Q8_0 triple kernel previously regressed.
+Q8_0 Q/K/V remains independent. A direct follow-up against the retained dual-only baseline measured
+2584.27 versus 2580.77 ms median TTFT and 61.01 versus 61.04 tok/s for dual-only versus dual plus
+triple Q/K/V. Three of six pairs were faster and three were slower, while median RSS increased by
+6.68 MB. The route was rejected as noise despite exact outputs; no runtime flag exposes it.
 
 ## Exact determinism audit
 
