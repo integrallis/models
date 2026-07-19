@@ -221,6 +221,68 @@ class TensorOpsTest {
     }
 
     @Test
+    void q8_0DualBatchedMatmulMatchesSeparateBatchedProjectionsExactly() {
+      int batchSize = 3;
+      int cols = 32;
+      float[] input = repeatingQueries(batchSize, cols);
+      float[] expectedFirst = new float[batchSize];
+      float[] expectedSecond = new float[batchSize];
+      float[] actualFirst = new float[batchSize];
+      float[] actualSecond = new float[batchSize];
+      byte[] quants = new byte[batchSize * cols];
+      float[] scales = new float[batchSize * (cols / 32)];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment firstWeight = copy(arena, q8Block(0.125f));
+        MemorySegment secondWeight = copy(arena, q8Block(-0.25f));
+        TensorOps.ggufBatchedMatmul(
+            expectedFirst,
+            input,
+            firstWeight,
+            GgufTensorType.Q8_0,
+            batchSize,
+            1,
+            cols,
+            quants,
+            scales,
+            new short[0],
+            new float[0]);
+        TensorOps.ggufBatchedMatmul(
+            expectedSecond,
+            input,
+            secondWeight,
+            GgufTensorType.Q8_0,
+            batchSize,
+            1,
+            cols,
+            quants,
+            scales,
+            new short[0],
+            new float[0]);
+
+        TensorOps.ggufDualBatchedMatmul(
+            actualFirst,
+            firstWeight,
+            GgufTensorType.Q8_0,
+            1,
+            actualSecond,
+            secondWeight,
+            GgufTensorType.Q8_0,
+            1,
+            input,
+            batchSize,
+            cols,
+            quants,
+            scales,
+            new short[0],
+            new float[0]);
+      }
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+    }
+
+    @Test
     void q4_KBatchedMatmulMatchesIndependentQueries() {
       int batchSize = 3;
       int cols = 256;
@@ -455,7 +517,7 @@ class TensorOpsTest {
       assertThat(TensorOps.supportsGroupedMatmul(GgufTensorType.Q5_K)).isTrue();
       assertThat(TensorOps.supportsGroupedBatchedMatmul(GgufTensorType.Q4_0)).isTrue();
       assertThat(TensorOps.supportsGroupedBatchedMatmul(GgufTensorType.Q4_K)).isTrue();
-      assertThat(TensorOps.supportsGroupedBatchedMatmul(GgufTensorType.Q8_0)).isFalse();
+      assertThat(TensorOps.supportsGroupedBatchedMatmul(GgufTensorType.Q8_0)).isTrue();
     }
 
     @Test
