@@ -35,12 +35,15 @@ import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 import org.modeljars.ModelJarDescriptor;
 import org.modeljars.ModelJarException;
 import org.modeljars.ModelJarRegistry;
 import org.modeljars.ModelJarRequirement;
+import org.modeljars.ModelPerformanceProfileRegistry;
 
 /**
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
@@ -56,6 +59,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   private final LlamaForwardPass forwardPass;
   private final ModelMetadata modelMetadata;
   private final PureJavaExecutionPlan executionPlan;
+  private final BackendDiagnostics diagnostics;
 
   private PureJavaBackend(
       Arena arena,
@@ -63,13 +67,15 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
       GgufTokenizer tokenizer,
       LlamaForwardPass forwardPass,
       ModelMetadata modelMetadata,
-      PureJavaExecutionPlan executionPlan) {
+      PureJavaExecutionPlan executionPlan,
+      BackendDiagnostics diagnostics) {
     this.arena = arena;
     this.config = config;
     this.tokenizer = tokenizer;
     this.forwardPass = forwardPass;
     this.modelMetadata = modelMetadata;
     this.executionPlan = executionPlan;
+    this.diagnostics = diagnostics;
   }
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
@@ -78,7 +84,13 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   }
 
   static PureJavaBackend load(Path modelPath, Arena arena) {
+    return load(modelPath, arena, Optional.empty());
+  }
+
+  private static PureJavaBackend load(
+      Path modelPath, Arena arena, Optional<ModelJarDescriptor> descriptor) {
     Objects.requireNonNull(arena, "arena");
+    Objects.requireNonNull(descriptor, "descriptor");
     try {
       Objects.requireNonNull(modelPath, "modelPath");
       GgufFile file = GgufParser.parse(modelPath, arena);
@@ -109,7 +121,20 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
               config.numHeads(),
               config.numKvHeads());
 
-      return new PureJavaBackend(arena, config, tokenizer, forwardPass, metadata, executionPlan);
+      BackendDiagnostics diagnostics =
+          descriptor
+              .map(
+                  value ->
+                      ModelJarLaunchDiagnostics.enrich(
+                          executionPlan.diagnostics(),
+                          value,
+                          ModelPerformanceProfileRegistry.fromClasspath(),
+                          executionPlan.runtime().asEnvironment(),
+                          ManagementFactory.getRuntimeMXBean().getInputArguments()))
+              .orElseGet(executionPlan::diagnostics);
+
+      return new PureJavaBackend(
+          arena, config, tokenizer, forwardPass, metadata, executionPlan, diagnostics);
     } catch (IOException e) {
       closeAfterFailure(arena, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
@@ -148,7 +173,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
                 () ->
                     new ModelJarException(
                         "ModelJars descriptor has no local path: " + descriptor.alias()));
-    return load(modelPath);
+    return load(modelPath, Arena.ofShared(), Optional.of(descriptor));
   }
 
   @Override
@@ -168,7 +193,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
 
   @Override
   public BackendDiagnostics diagnostics() {
-    return executionPlan.diagnostics();
+    return diagnostics;
   }
 
   @Override

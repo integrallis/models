@@ -306,14 +306,20 @@ class ExecutionPlannerTest {
                 "java.vm.version", "25.0.3+9-jvmci-25.1-b19",
                 "java.runtime.name", "OpenJDK Runtime Environment GraalVM CE",
                 "os.name", "Linux",
-                "os.arch", "amd64"),
+                "os.arch", "amd64",
+                "models.runtime.cpuModel", "AMD EPYC-Milan Processor"),
             256,
             8);
 
     assertThat(graal.compiler()).isEqualTo("graal-jvmci");
     assertThat(graal.vectorBits()).isEqualTo(256);
     assertThat(graal.processors()).isEqualTo(8);
-    assertThat(graal.asEnvironment()).containsEntry("architecture", "amd64");
+    assertThat(graal.asEnvironment())
+        .containsEntry("architecture", "amd64")
+        .containsEntry("java-feature", "25")
+        .containsEntry("compiler", "graal-jvmci")
+        .containsEntry("cpu-model", "AMD EPYC-Milan Processor")
+        .containsEntry("vm-version", "25.0.3+9-jvmci-25.1-b19");
   }
 
   @Test

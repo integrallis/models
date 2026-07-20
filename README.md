@@ -181,6 +181,12 @@ Diagnostics identify enabled, disabled, and unsupported choices, including the
 resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, prefill
 batch size, final-layer output-row policy, mapped weights, Vector FMA policy,
 final-layer K/V-only policy, and persistent row executor.
+When the backend is loaded from a `ModelJarDescriptor`, diagnostics also retain
+the exact marker coordinate and SHA and assess every measured Java launch
+profile against the current JVM, processor topology, vector width, and startup
+arguments. A missing compiler flag or system property is reported as requiring
+a process restart; Models never pretends to apply JVM startup options after
+model loading.
 `models.purejava.groupedProjections`, `models.purejava.mixedKProjections`,
 `models.purejava.prefillBatchSize`, and
 `models.purejava.finalLayerPrefillPruning`, and
