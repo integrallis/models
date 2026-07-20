@@ -68,6 +68,20 @@ class ExecutionPlannerTest {
   }
 
   @Test
+  void plansQ5_0BatchedPrefillFromTopology() {
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"),
+            uniformTopology(GgufTensorType.Q5_0),
+            PureJavaPlanConfiguration.defaults());
+
+    assertThat(plan.prefillBatchSize()).isEqualTo(32);
+    assertThat(plan.diagnostics().optimization("batched-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+  }
+
+  @Test
   void plansTheMixedKQuantProjectionKernelOnlyForEligibleLayers() {
     ModelTopology.LayerTopology layer =
         new ModelTopology.LayerTopology(

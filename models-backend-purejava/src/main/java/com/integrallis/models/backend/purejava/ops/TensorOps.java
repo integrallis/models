@@ -915,6 +915,7 @@ public final class TensorOps {
   /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
     return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q5_0
         || type == GgufTensorType.Q8_0
         || type == GgufTensorType.Q4_K
         || type == GgufTensorType.Q5_K
@@ -949,6 +950,16 @@ public final class TensorOps {
               quantizedActivations,
               quantizedActivationScales,
               q4LaneScratch);
+      case Q5_0 ->
+          VectorUtil.ggufQ5_0Q8_0BatchedMatmul(
+              x,
+              qWeight,
+              batchSize,
+              rows,
+              cols,
+              out,
+              quantizedActivations,
+              quantizedActivationScales);
       case Q8_0 ->
           VectorUtil.ggufQ8_0Q8_0BatchedMatmul(
               x,

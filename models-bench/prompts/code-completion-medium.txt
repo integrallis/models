@@ -1,0 +1,23 @@
+from dataclasses import dataclass
+from typing import Iterable
+
+
+@dataclass(frozen=True)
+class Measurement:
+    name: str
+    elapsed_ms: float
+    successful: bool
+
+
+def successful(values: Iterable[Measurement]) -> list[Measurement]:
+    return [value for value in values if value.successful]
+
+
+def mean(values: Iterable[Measurement]) -> float:
+    samples = [value.elapsed_ms for value in successful(values)]
+    if not samples:
+        raise ValueError("at least one successful measurement is required")
+    return sum(samples) / len(samples)
+
+
+def fibonacci(n: int) -> int:

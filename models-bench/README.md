@@ -47,6 +47,33 @@ Q8_0 Q/K/V remains independent. A direct follow-up against the retained dual-onl
 triple Q/K/V. Three of six pairs were faster and three were slower, while median RSS increased by
 6.68 MB. The route was rejected as noise despite exact outputs; no runtime flag exposes it.
 
+## Retained Q5_0 batched prefill gate
+
+DeepSeek-Coder 1.3B Q4_K_M contains Q5_0 tensors, so the missing Q5_0 batched operation forced its
+entire prefill plan to batch one. The retained route was measured on the same Java 25 EPYC-Milan
+host with the pinned 873,582,624-byte GGUF, a fixed 2 GiB heap, eight inference threads, one warmup,
+three trials per process, and six counterbalanced batch-one/batch-32 process pairs. The committed
+`prompts/code-completion-medium.txt` produced 193-196 tokens after the per-trial nonce.
+
+The first process, batch one, had a 33.40-second median while every later batch-one process measured
+16.81-16.90 seconds. That global-order cold-start outlier cannot be separated from mode, so the
+steady aggregate uses the remaining five pairs (15 trials per mode):
+
+| Metric | Batch 1 | Batch 32 | Change |
+| --- | ---: | ---: | ---: |
+| Median TTFT | 16,837.21 ms | 16,181.43 ms | -3.90% |
+| Median prefill | 11.524 tok/s | 12.110 tok/s | +5.09% |
+| Mean trial CPU | 127,165 ms | 123,253 ms | -3.08% |
+| Median peak RSS, all six processes | 1,493,338,112 B | 1,590,452,224 B | +97,114,112 B |
+
+All six paired medians favored batch 32. Corresponding input-token sequences and output hashes were
+identical; the sole output hash was
+`1a0f564ddc6039457b2fb26b3d6a316c15eba20a886449847c3210c35821a693`. A separate six-pair
+23-24-token gate measured a smaller 1.80% TTFT reduction, while a single 421-token corroborating
+trial measured 7.13%; those results show the expected prompt-length scaling but do not replace the
+steady medium-prompt gate. Set `-Dmodels.purejava.prefillBatchSize=1` when memory capacity is more
+important than prompt latency.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
