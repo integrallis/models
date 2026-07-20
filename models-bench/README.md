@@ -104,6 +104,35 @@ implementation adds no retained buffers; these overlapping process-level observa
 without claiming a memory improvement. Use
 `-Dmodels.purejava.finalLayerPrefillPruning=false` for rollback or reproduction.
 
+## Retained final-layer K/V-only prefill gate
+
+The next graph stage moves the final-layer output-row boundary ahead of Q projection. Every prompt
+row still runs attention normalization and K/V projection, normalization, RoPE, and cache storage.
+Only the requested final row runs Q projection, attention, output projection, and FFN. The stage is
+enabled only when all final-layer attention and FFN projections use the same validated Q4_0 or Q8_0
+format; the retained FFN-only route remains the fallback.
+
+The incremental baseline kept final-layer FFN pruning enabled and disabled only K/V-only prefill.
+The candidate used the same Java 25 EPYC-Milan host, batch 32, committed completion prompt, fixed
+heaps, one warmup, three measured trials per process, and six counterbalanced process pairs:
+
+| Model | Metric | FFN-only baseline | K/V-only prompt rows | Change |
+| --- | --- | ---: | ---: | ---: |
+| Qwen3 0.6B Q4_0 | Mean trial TTFT | 3039.72 ms | 3023.80 ms | -0.52% |
+| Qwen3 0.6B Q4_0 | Mean prefill | 51.024 tok/s | 51.341 tok/s | +0.62% |
+| Qwen3 0.6B Q4_0 | Mean trial CPU | 21,989 ms | 21,858 ms | -0.60% |
+| SmolLM2 360M Q8_0 | Mean trial TTFT | 2532.43 ms | 2515.50 ms | -0.67% |
+| SmolLM2 360M Q8_0 | Mean prefill | 62.203 tok/s | 62.623 tok/s | +0.68% |
+| SmolLM2 360M Q8_0 | Mean trial CPU | 18,298 ms | 18,207 ms | -0.50% |
+
+All six paired medians improved for both models, and all 36 corresponding trials matched input
+count, output count, and output SHA-256. Median process peak RSS changed from 1,200,603,136 to
+1,203,666,944 bytes for Qwen and from 708,460,544 to 694,071,296 bytes for SmolLM2. Synthetic Q4_0
+and Q8_0 tests additionally require bit-identical complete K/V buffers and next-token state for
+batch one and batch 32. The default-on Qwen path passed its pinned llama.cpp greedy reference and
+every-layer state test. Use `-Dmodels.purejava.finalLayerKvOnlyPrefill=false` to return to the
+retained FFN-only baseline.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:

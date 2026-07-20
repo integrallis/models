@@ -167,7 +167,7 @@ kernel path.
 `PureJavaBackend` builds one immutable execution plan when the GGUF is loaded.
 The planner combines the tensors actually present in every layer, the structured
 Vectors runtime capabilities, JVM/compiler identity, and explicit deployment
-overrides. Grouped projections, batched prefill, and final-layer prompt pruning
+overrides. Grouped projections, batched prefill, and final-layer prompt pruning stages
 are consumed from this plan instead of being re-decided in the forward loop.
 
 ```java
@@ -180,10 +180,11 @@ try (PureJavaBackend backend = PureJavaBackend.load(model)) {
 Diagnostics identify enabled, disabled, and unsupported choices, including the
 resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, prefill
 batch size, final-layer output-row policy, mapped weights, Vector FMA policy,
-and persistent row executor.
+final-layer K/V-only policy, and persistent row executor.
 `models.purejava.groupedProjections`, `models.purejava.mixedKProjections`,
 `models.purejava.prefillBatchSize`, and
-`models.purejava.finalLayerPrefillPruning` are parsed once per load. Malformed
+`models.purejava.finalLayerPrefillPruning`, and
+`models.purejava.finalLayerKvOnlyPrefill` are parsed once per load. Malformed
 explicit values fail rather than silently reverting to defaults. Eligible
 mixed-K Q/K/V projections share one Q8_K activation quantization and one row
 dispatch. The mixed path remains inactive for every other tensor layout.
@@ -192,13 +193,15 @@ Q5_0 route allows mixed DeepSeek-Coder files to retain batching instead of
 degrading the complete prefill plan to one token at a time.
 
 Ordinary prefill requests logits only for the final prompt token. For validated
-homogeneous Q4_0 and Q8_0 final-layer FFNs, the default plan therefore runs the
-FFN only for that output row while still producing every final-layer K/V cache
-entry. Other tensor layouts remain on the exact full-row path until they pass
-their own controlled gate. Speculative verification and observer-backed
-diagnostics request all rows and retain the complete path. Set
-`-Dmodels.purejava.finalLayerPrefillPruning=false` for rollback or controlled
-A/B measurement.
+final layers whose attention and FFN projections are uniformly Q4_0 or uniformly
+Q8_0, the default plan produces every K/V cache row but runs Q, attention, output
+projection, and FFN only for the requested output row. Layouts that qualify only
+for FFN pruning keep the narrower exact path. Other tensor layouts remain on the
+full-row path until they pass their own controlled gate. Speculative verification
+and observer-backed diagnostics request all rows and retain the complete path. Set
+`-Dmodels.purejava.finalLayerKvOnlyPrefill=false` to retain only FFN pruning, or
+`-Dmodels.purejava.finalLayerPrefillPruning=false` to disable both stages for
+rollback or controlled A/B measurement.
 
 ## Supported models
 
