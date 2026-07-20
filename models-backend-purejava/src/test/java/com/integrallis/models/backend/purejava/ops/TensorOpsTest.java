@@ -221,6 +221,42 @@ class TensorOpsTest {
     }
 
     @Test
+    void q5_0BatchedMatmulMatchesIndependentQueries() {
+      int batchSize = 3;
+      int cols = 32;
+      float[] queries = repeatingQueries(batchSize, cols);
+      float[] expected = new float[batchSize];
+      float[] actual = new float[batchSize];
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, q5Block(0.25f, i -> (i * 7) % 32 - 16));
+        for (int batch = 0; batch < batchSize; batch++) {
+          float[] query = new float[cols];
+          System.arraycopy(queries, batch * cols, query, 0, cols);
+          float[] result = new float[1];
+          TensorOps.ggufMatmul(result, query, qWeight, GgufTensorType.Q5_0, 1, cols);
+          expected[batch] = result[0];
+        }
+
+        TensorOps.ggufBatchedMatmul(
+            actual,
+            queries,
+            qWeight,
+            GgufTensorType.Q5_0,
+            batchSize,
+            1,
+            cols,
+            new byte[batchSize * cols],
+            new float[batchSize * (cols / 32)],
+            new short[0],
+            new float[0]);
+      }
+
+      assertThat(TensorOps.supportsBatchedMatmul(GgufTensorType.Q5_0)).isTrue();
+      assertThat(actual).containsExactly(expected);
+    }
+
+    @Test
     void q8_0DualBatchedMatmulMatchesSeparateBatchedProjectionsExactly() {
       int batchSize = 3;
       int cols = 32;

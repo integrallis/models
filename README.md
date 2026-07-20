@@ -184,7 +184,10 @@ batch size, mapped weights, Vector FMA policy, and persistent row executor.
 `models.purejava.prefillBatchSize` are parsed once per load; malformed explicit
 values fail rather than silently reverting to defaults. Eligible mixed-K Q/K/V
 projections share one Q8_K activation quantization and one row dispatch. The
-mixed path remains inactive for every other tensor layout.
+mixed path remains inactive for every other tensor layout. Batch-major prefill
+kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the Q5_0 route allows
+mixed DeepSeek-Coder files to retain batching instead of degrading the complete
+prefill plan to one token at a time.
 
 ## Supported models
 

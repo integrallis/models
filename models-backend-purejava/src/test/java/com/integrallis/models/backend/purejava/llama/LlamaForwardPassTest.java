@@ -136,6 +136,11 @@ class LlamaForwardPassTest {
         rng, GgufTensorType.Q8_0, 32, 64, valueCount -> randomQ8(rng, valueCount));
   }
 
+  private GgufFile buildQ5NanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng, GgufTensorType.Q5_0, 32, 64, valueCount -> randomQ5(rng, valueCount));
+  }
+
   private GgufFile buildQ4KNanoModel(Random rng) {
     return buildQuantizedNanoModel(
         rng, GgufTensorType.Q4_K, 256, 256, valueCount -> randomQ4K(rng, valueCount));
@@ -420,6 +425,34 @@ class LlamaForwardPassTest {
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
+      assertThat(actual).containsExactly(expected);
+      assertThat(batched.forward(3, tokens.length))
+          .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void q5PrefillUsesBatchedKernelAndPreservesAutoregressiveState() {
+      GgufFile file = buildQ5NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+
+      LlamaForwardPass sequential =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] expected = runSequence(sequential, tokens);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+      float[] actual = batched.prefill(tokens, 0);
+
+      assertThat(batched.usesBatchedPrefill()).isTrue();
+      assertThat(batched.usesGroupedBatchedPrefill()).isFalse();
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
@@ -725,6 +758,19 @@ class LlamaForwardPassTest {
     ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
     for (int block = 0; block < valueCount / 32; block++) {
       buffer.putShort(block * 34, Float.floatToFloat16(0.01f));
+    }
+    return data;
+  }
+
+  private static byte[] randomQ5(Random rng, int valueCount) {
+    if (valueCount % 32 != 0) {
+      throw new IllegalArgumentException("Q5_0 value count must be a multiple of 32");
+    }
+    byte[] data = new byte[(valueCount / 32) * 22];
+    rng.nextBytes(data);
+    ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+    for (int block = 0; block < valueCount / 32; block++) {
+      buffer.putShort(block * 22, Float.floatToFloat16(0.01f));
     }
     return data;
   }
