@@ -78,8 +78,10 @@ important than prompt latency.
 
 Ordinary prefill returns logits only for the final prompt token. After the final layer has written
 every K/V cache row and completed attention, FFN results for earlier prompt rows cannot affect
-future decoding. The retained plan skips those FFN rows while speculative verification and
-observer-backed diagnostics continue to compute every requested output row.
+future decoding. The retained plan skips those FFN rows for the measured homogeneous Q4_0 and Q8_0
+layouts, while speculative verification and observer-backed diagnostics continue to compute every
+requested output row. Other tensor layouts remain on their exact full-row path pending a separate
+gate.
 
 Two quantization families were measured on the same Java 25 EPYC-Milan host with prefill batch 32,
 the committed completion prompt, fixed heaps, one warmup, and six counterbalanced process pairs.

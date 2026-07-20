@@ -41,7 +41,7 @@ public final class ExecutionPlanner {
     boolean grouped = groupedProjections(topology, configuration, decisions);
     boolean mixedK = mixedKProjections(topology, configuration, grouped, decisions);
     int prefillBatchSize = batchedPrefill(topology, configuration, decisions);
-    boolean finalLayerPrefillPruning = finalLayerPrefillPruning(configuration, decisions);
+    boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -67,7 +67,9 @@ public final class ExecutionPlanner {
   }
 
   private static boolean finalLayerPrefillPruning(
-      PureJavaPlanConfiguration configuration, List<OptimizationDecision> decisions) {
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      List<OptimizationDecision> decisions) {
     if (!configuration.finalLayerPrefillPruning()) {
       decisions.add(
           new OptimizationDecision(
@@ -77,12 +79,21 @@ public final class ExecutionPlanner {
               Map.of("output-rows", "all")));
       return false;
     }
+    if (!topology.supportsFinalLayerPrefillPruning()) {
+      decisions.add(
+          new OptimizationDecision(
+              "final-layer-prefill-pruning",
+              OptimizationStatus.UNSUPPORTED,
+              "the final-layer FFN layout has no controlled exactness and performance gate",
+              Map.of("output-rows", "all", "formats", topology.finalLayerFfnFormats())));
+      return false;
+    }
     decisions.add(
         new OptimizationDecision(
             "final-layer-prefill-pruning",
             OptimizationStatus.ENABLED,
-            "the final FFN runs only for requested prompt output rows",
-            Map.of("output-rows", "requested")));
+            "the validated final FFN runs only for requested prompt output rows",
+            Map.of("output-rows", "requested", "formats", topology.finalLayerFfnFormats())));
     return true;
   }
 

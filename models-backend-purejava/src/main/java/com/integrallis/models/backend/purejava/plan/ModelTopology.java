@@ -126,6 +126,19 @@ public record ModelTopology(
     return Math.toIntExact(layers.stream().filter(LayerTopology::groupsMixedKQkv).count());
   }
 
+  boolean supportsFinalLayerPrefillPruning() {
+    LayerTopology finalLayer = layers.getLast();
+    GgufTensorType type = finalLayer.gate();
+    return type == finalLayer.up()
+        && type == finalLayer.down()
+        && (type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0);
+  }
+
+  String finalLayerFfnFormats() {
+    LayerTopology finalLayer = layers.getLast();
+    return finalLayer.gate() + "," + finalLayer.up() + "," + finalLayer.down();
+  }
+
   String qkvMode() {
     boolean anyGrouped = layers.stream().anyMatch(layer -> !"independent".equals(layer.qkvMode()));
     boolean allGrouped = layers.stream().allMatch(layer -> "grouped".equals(layer.qkvMode()));

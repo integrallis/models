@@ -80,9 +80,13 @@ class ExecutionPlannerTest {
             PureJavaPlanConfiguration.defaults());
 
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
+    assertThat(plan.finalLayerPrefillPruning()).isFalse();
     assertThat(plan.diagnostics().optimization("batched-prefill"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
 
   @Test
@@ -104,6 +108,7 @@ class ExecutionPlannerTest {
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isTrue();
+    assertThat(plan.finalLayerPrefillPruning()).isFalse();
     assertThat(plan.diagnostics().optimization("grouped-projections"))
         .hasValueSatisfying(
             decision ->
@@ -118,6 +123,9 @@ class ExecutionPlannerTest {
                   .containsEntry("eligible-layers", "1")
                   .containsEntry("formats", "Q4_K,Q4_K,Q6_K");
             });
+    assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
 
   @Test

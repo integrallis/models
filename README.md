@@ -191,10 +191,12 @@ Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the
 Q5_0 route allows mixed DeepSeek-Coder files to retain batching instead of
 degrading the complete prefill plan to one token at a time.
 
-Ordinary prefill requests logits only for the final prompt token. The default
-plan therefore runs the final-layer FFN only for that output row while still
-producing every final-layer K/V cache entry. Speculative verification and
-observer-backed diagnostics request all rows and retain the complete path. Set
+Ordinary prefill requests logits only for the final prompt token. For validated
+homogeneous Q4_0 and Q8_0 final-layer FFNs, the default plan therefore runs the
+FFN only for that output row while still producing every final-layer K/V cache
+entry. Other tensor layouts remain on the exact full-row path until they pass
+their own controlled gate. Speculative verification and observer-backed
+diagnostics request all rows and retain the complete path. Set
 `-Dmodels.purejava.finalLayerPrefillPruning=false` for rollback or controlled
 A/B measurement.
 
