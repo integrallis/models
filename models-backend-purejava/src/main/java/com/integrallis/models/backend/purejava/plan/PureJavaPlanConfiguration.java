@@ -17,11 +17,16 @@ package com.integrallis.models.backend.purejava.plan;
 
 /** Explicit deployment overrides consumed once when a backend is loaded. */
 public record PureJavaPlanConfiguration(
-    boolean groupedProjections, boolean mixedKProjections, int prefillBatchSize) {
+    boolean groupedProjections,
+    boolean mixedKProjections,
+    int prefillBatchSize,
+    boolean finalLayerPrefillPruning) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
   public static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
+  public static final String FINAL_LAYER_PREFILL_PRUNING_PROPERTY =
+      "models.purejava.finalLayerPrefillPruning";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
 
   public PureJavaPlanConfiguration {
@@ -33,7 +38,7 @@ public record PureJavaPlanConfiguration(
 
   /** Returns the stable default policy. */
   public static PureJavaPlanConfiguration defaults() {
-    return new PureJavaPlanConfiguration(true, true, DEFAULT_PREFILL_BATCH_SIZE);
+    return new PureJavaPlanConfiguration(true, true, DEFAULT_PREFILL_BATCH_SIZE, true);
   }
 
   /** Reads deployment overrides without running a performance probe. */
@@ -41,7 +46,8 @@ public record PureJavaPlanConfiguration(
     return new PureJavaPlanConfiguration(
         groupedProjections(System.getProperty(GROUPED_PROJECTIONS_PROPERTY)),
         mixedKProjections(System.getProperty(MIXED_K_PROJECTIONS_PROPERTY)),
-        prefillBatchSize(System.getProperty(PREFILL_BATCH_SIZE_PROPERTY)));
+        prefillBatchSize(System.getProperty(PREFILL_BATCH_SIZE_PROPERTY)),
+        finalLayerPrefillPruning(System.getProperty(FINAL_LAYER_PREFILL_PRUNING_PROPERTY)));
   }
 
   static boolean groupedProjections(String configured) {
@@ -50,6 +56,10 @@ public record PureJavaPlanConfiguration(
 
   static boolean mixedKProjections(String configured) {
     return booleanProperty(MIXED_K_PROJECTIONS_PROPERTY, configured);
+  }
+
+  static boolean finalLayerPrefillPruning(String configured) {
+    return booleanProperty(FINAL_LAYER_PREFILL_PRUNING_PROPERTY, configured);
   }
 
   private static boolean booleanProperty(String property, String configured) {

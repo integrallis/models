@@ -38,6 +38,7 @@ class ExecutionPlannerTest {
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
+    assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.diagnostics().environment()).containsEntry("compiler", "hotspot-c2");
     assertThat(plan.diagnostics().environment())
         .containsEntry("vector-provider", "test-vector")
@@ -57,6 +58,9 @@ class ExecutionPlannerTest {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
               assertThat(decision.settings()).containsEntry("batch-size", "32");
             });
+    assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(plan.diagnostics().optimization("persistent-row-executor"))
         .hasValueSatisfying(
             decision -> {
@@ -131,7 +135,7 @@ class ExecutionPlannerTest {
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
-            runtime("hotspot-c2"), topology, new PureJavaPlanConfiguration(true, false, 32));
+            runtime("hotspot-c2"), topology, new PureJavaPlanConfiguration(true, false, 32, true));
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isFalse();
@@ -142,7 +146,7 @@ class ExecutionPlannerTest {
 
   @Test
   void explicitOverridesDisableOtherwiseEligibleOptimizations() {
-    PureJavaPlanConfiguration configuration = new PureJavaPlanConfiguration(false, true, 1);
+    PureJavaPlanConfiguration configuration = new PureJavaPlanConfiguration(false, true, 1, false);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -150,10 +154,14 @@ class ExecutionPlannerTest {
 
     assertThat(plan.groupedProjections()).isFalse();
     assertThat(plan.prefillBatchSize()).isEqualTo(1);
+    assertThat(plan.finalLayerPrefillPruning()).isFalse();
     assertThat(plan.diagnostics().optimization("grouped-projections"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
     assertThat(plan.diagnostics().optimization("batched-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
+    assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
   }
@@ -199,7 +207,7 @@ class ExecutionPlannerTest {
 
   @Test
   void invalidConfigurationIsRejectedWithoutAStartupProbe() {
-    assertThatThrownBy(() -> new PureJavaPlanConfiguration(true, true, 0))
+    assertThatThrownBy(() -> new PureJavaPlanConfiguration(true, true, 0, true))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThatThrownBy(() -> PureJavaPlanConfiguration.groupedProjections("sometimes"))
@@ -218,6 +226,11 @@ class ExecutionPlannerTest {
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThat(PureJavaPlanConfiguration.prefillBatchSize(null)).isEqualTo(32);
     assertThat(PureJavaPlanConfiguration.prefillBatchSize("16")).isEqualTo(16);
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.finalLayerPrefillPruning("sometimes"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.finalLayerPrefillPruning");
+    assertThat(PureJavaPlanConfiguration.finalLayerPrefillPruning(null)).isTrue();
+    assertThat(PureJavaPlanConfiguration.finalLayerPrefillPruning("false")).isFalse();
   }
 
   @Test
@@ -240,7 +253,7 @@ class ExecutionPlannerTest {
     assertThatThrownBy(
             () ->
                 new PureJavaExecutionPlan(
-                    runtime, unsupported, true, false, 32, valid.diagnostics()))
+                    runtime, unsupported, true, false, 32, true, valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("topology");
   }

@@ -25,6 +25,7 @@ public record PureJavaExecutionPlan(
     boolean groupedProjections,
     boolean mixedKProjections,
     int prefillBatchSize,
+    boolean finalLayerPrefillPruning,
     BackendDiagnostics diagnostics) {
 
   public PureJavaExecutionPlan {
