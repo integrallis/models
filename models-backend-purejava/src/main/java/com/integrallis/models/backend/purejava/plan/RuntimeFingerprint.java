@@ -17,6 +17,9 @@ package com.integrallis.models.backend.purejava.plan;
 
 import com.integrallis.vectors.core.VectorRuntimeCapabilities;
 import com.integrallis.vectors.core.VectorUtil;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -31,6 +34,7 @@ public record RuntimeFingerprint(
     String compiler,
     String osName,
     String architecture,
+    String cpuModel,
     String vectorProvider,
     boolean vectorApi,
     int preferredVectorBits,
@@ -51,6 +55,7 @@ public record RuntimeFingerprint(
     compiler = requireText(compiler, "compiler");
     osName = requireText(osName, "osName");
     architecture = requireText(architecture, "architecture");
+    cpuModel = requireText(cpuModel, "cpuModel");
     vectorProvider = requireText(vectorProvider, "vectorProvider");
     if (preferredVectorBits <= 0) {
       throw new IllegalArgumentException("preferredVectorBits must be > 0");
@@ -88,6 +93,40 @@ public record RuntimeFingerprint(
         compiler,
         osName,
         architecture,
+        "unknown",
+        vectorBits > 0 ? "test-vector" : "test-scalar",
+        vectorBits > 0,
+        Math.max(64, vectorBits),
+        vectorBits,
+        false,
+        false,
+        false,
+        "persistent",
+        processors,
+        2,
+        processors);
+  }
+
+  RuntimeFingerprint(
+      String javaVersion,
+      String vmName,
+      String vmVendor,
+      String vmVersion,
+      String compiler,
+      String osName,
+      String architecture,
+      String cpuModel,
+      int vectorBits,
+      int processors) {
+    this(
+        javaVersion,
+        vmName,
+        vmVendor,
+        vmVersion,
+        compiler,
+        osName,
+        architecture,
+        cpuModel,
         vectorBits > 0 ? "test-vector" : "test-scalar",
         vectorBits > 0,
         Math.max(64, vectorBits),
@@ -126,6 +165,7 @@ public record RuntimeFingerprint(
         compiler,
         property(properties, "os.name"),
         property(properties, "os.arch"),
+        cpuModel(properties),
         vectorBits,
         processors);
   }
@@ -146,6 +186,7 @@ public record RuntimeFingerprint(
         compiler(vmName, vmVendor, vmVersion, runtimeName),
         property(properties, "os.name"),
         property(properties, "os.arch"),
+        cpuModel(properties),
         vectors.providerName(),
         vectors.vectorApi(),
         vectors.preferredVectorBits(),
@@ -163,12 +204,14 @@ public record RuntimeFingerprint(
   public Map<String, String> asEnvironment() {
     Map<String, String> environment = new LinkedHashMap<>();
     environment.put("java-version", javaVersion);
+    environment.put("java-feature", Integer.toString(Runtime.Version.parse(javaVersion).feature()));
     environment.put("vm-name", vmName);
     environment.put("vm-vendor", vmVendor);
     environment.put("vm-version", vmVersion);
     environment.put("compiler", compiler);
     environment.put("os", osName);
     environment.put("architecture", architecture);
+    environment.put("cpu-model", cpuModel);
     environment.put("vector-provider", vectorProvider);
     environment.put("vector-api", Boolean.toString(vectorApi));
     environment.put("preferred-vector-bits", Integer.toString(preferredVectorBits));
@@ -198,6 +241,27 @@ public record RuntimeFingerprint(
 
   private static String property(Map<String, String> properties, String name) {
     return requireText(properties.get(name), name);
+  }
+
+  private static String cpuModel(Map<String, String> properties) {
+    String configured = properties.get("models.runtime.cpuModel");
+    if (configured != null && !configured.isBlank()) {
+      return configured.trim();
+    }
+    if (!"linux".equalsIgnoreCase(properties.get("os.name"))) {
+      return "unknown";
+    }
+    try (var lines = Files.lines(Path.of("/proc/cpuinfo"))) {
+      return lines
+          .filter(line -> line.regionMatches(true, 0, "model name", 0, "model name".length()))
+          .map(line -> line.split(":", 2))
+          .filter(parts -> parts.length == 2 && !parts[1].isBlank())
+          .map(parts -> parts[1].trim())
+          .findFirst()
+          .orElse("unknown");
+    } catch (IOException | SecurityException ignored) {
+      return "unknown";
+    }
   }
 
   private static String requireText(String value, String name) {

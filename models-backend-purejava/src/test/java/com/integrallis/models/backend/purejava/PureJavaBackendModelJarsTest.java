@@ -280,6 +280,9 @@ class PureJavaBackendModelJarsTest {
     try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
       assertThat(backend.name()).isEqualTo("pure-java");
       assertThat(backend.metadata().modelName()).isEqualTo("NanoTest");
+      assertThat(backend.diagnostics().environment())
+          .containsEntry("modeljar-alias", "nano")
+          .containsEntry("modeljar-coordinate", "org.modeljars.local:nano:0.1.0");
       assertThat(backend.forward(5, 0)).hasSize(32);
     }
   }
