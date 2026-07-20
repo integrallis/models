@@ -49,6 +49,7 @@ public final class LlamaForwardPass {
   private final boolean mixedKProjections;
   private final boolean batchedPrefill;
   private final boolean groupedBatchedPrefill;
+  private final boolean finalLayerPrefillPruning;
   private final int prefillBatchCapacity;
 
   // Scratch buffers
@@ -121,6 +122,7 @@ public final class LlamaForwardPass {
     }
     this.groupedProjections = executionPlan.groupedProjections();
     this.mixedKProjections = executionPlan.mixedKProjections();
+    this.finalLayerPrefillPruning = executionPlan.finalLayerPrefillPruning();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -346,6 +348,18 @@ public final class LlamaForwardPass {
           attentionOutputDim);
       addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
 
+      boolean pruneFinalLayer =
+          finalLayerPrefillPruning
+              && batchLogits == null
+              && layerObserver == null
+              && layer == config.numLayers() - 1;
+      if (pruneFinalLayer) {
+        if (computeFinalLogits) {
+          finishFinalLayerFfnRow(lw, (batchSize - 1) * dim, dim, hiddenDim);
+        }
+        break;
+      }
+
       for (int batch = 0; batch < batchSize; batch++) {
         int xOffset = batch * dim;
         TensorOps.rmsNorm(
@@ -527,6 +541,14 @@ public final class LlamaForwardPass {
         x[i] += attnProjected[i];
       }
 
+      if (finalLayerPrefillPruning
+          && !computeLogits
+          && layerObserver == null
+          && layer == config.numLayers() - 1) {
+        nextPosition++;
+        return null;
+      }
+
       // FFN norm
       TensorOps.rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
 
@@ -649,6 +671,36 @@ public final class LlamaForwardPass {
 
   boolean usesGroupedBatchedPrefill() {
     return groupedBatchedPrefill;
+  }
+
+  boolean usesFinalLayerPrefillPruning() {
+    return finalLayerPrefillPruning;
+  }
+
+  private void finishFinalLayerFfnRow(
+      LlamaWeights.LayerWeights layer, int stateOffset, int dim, int hiddenDim) {
+    TensorOps.rmsNorm(xNorm, 0, batchX, stateOffset, layer.ffnNorm(), dim, config.rmsNormEps());
+    if (groupedProjections) {
+      dualMatmulDispatch(
+          ffnGate,
+          layer.ffnGate(),
+          layer.ffnGateType(),
+          hiddenDim,
+          ffnUp,
+          layer.ffnUp(),
+          layer.ffnUpType(),
+          hiddenDim,
+          xNorm,
+          dim);
+    } else {
+      matmulDispatch(ffnGate, xNorm, layer.ffnGate(), layer.ffnGateType(), hiddenDim, dim);
+      matmulDispatch(ffnUp, xNorm, layer.ffnUp(), layer.ffnUpType(), hiddenDim, dim);
+    }
+    TensorOps.swiGlu(ffnOut, ffnGate, ffnUp, hiddenDim);
+    matmulDispatch(ffnProjected, ffnOut, layer.ffnDown(), layer.ffnDownType(), dim, hiddenDim);
+    for (int index = 0; index < dim; index++) {
+      batchX[stateOffset + index] += ffnProjected[index];
+    }
   }
 
   private void groupedQueryAttention(

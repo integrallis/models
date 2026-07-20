@@ -27,7 +27,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v2";
+  public static final String PLAN_VERSION = "pure-java-v3";
 
   private ExecutionPlanner() {}
 
@@ -41,6 +41,7 @@ public final class ExecutionPlanner {
     boolean grouped = groupedProjections(topology, configuration, decisions);
     boolean mixedK = mixedKProjections(topology, configuration, grouped, decisions);
     int prefillBatchSize = batchedPrefill(topology, configuration, decisions);
+    boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -56,7 +57,44 @@ public final class ExecutionPlanner {
     BackendDiagnostics diagnostics =
         new BackendDiagnostics("pure-java", PLAN_VERSION, environment, decisions);
     return new PureJavaExecutionPlan(
-        runtime, topology, grouped, mixedK, prefillBatchSize, diagnostics);
+        runtime,
+        topology,
+        grouped,
+        mixedK,
+        prefillBatchSize,
+        finalLayerPrefillPruning,
+        diagnostics);
+  }
+
+  private static boolean finalLayerPrefillPruning(
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      List<OptimizationDecision> decisions) {
+    if (!configuration.finalLayerPrefillPruning()) {
+      decisions.add(
+          new OptimizationDecision(
+              "final-layer-prefill-pruning",
+              OptimizationStatus.DISABLED,
+              "disabled by models.purejava.finalLayerPrefillPruning",
+              Map.of("output-rows", "all")));
+      return false;
+    }
+    if (!topology.supportsFinalLayerPrefillPruning()) {
+      decisions.add(
+          new OptimizationDecision(
+              "final-layer-prefill-pruning",
+              OptimizationStatus.UNSUPPORTED,
+              "the final-layer FFN layout has no controlled exactness and performance gate",
+              Map.of("output-rows", "all", "formats", topology.finalLayerFfnFormats())));
+      return false;
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "final-layer-prefill-pruning",
+            OptimizationStatus.ENABLED,
+            "the validated final FFN runs only for requested prompt output rows",
+            Map.of("output-rows", "requested", "formats", topology.finalLayerFfnFormats())));
+    return true;
   }
 
   private static boolean groupedProjections(

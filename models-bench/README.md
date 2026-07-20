@@ -74,6 +74,36 @@ trial measured 7.13%; those results show the expected prompt-length scaling but 
 steady medium-prompt gate. Set `-Dmodels.purejava.prefillBatchSize=1` when memory capacity is more
 important than prompt latency.
 
+## Retained final-layer prefill FFN pruning gate
+
+Ordinary prefill returns logits only for the final prompt token. After the final layer has written
+every K/V cache row and completed attention, FFN results for earlier prompt rows cannot affect
+future decoding. The retained plan skips those FFN rows for the measured homogeneous Q4_0 and Q8_0
+layouts, while speculative verification and observer-backed diagnostics continue to compute every
+requested output row. Other tensor layouts remain on their exact full-row path pending a separate
+gate.
+
+Two quantization families were measured on the same Java 25 EPYC-Milan host with prefill batch 32,
+the committed completion prompt, fixed heaps, one warmup, and six counterbalanced process pairs.
+Each mode contains 18 measured trials:
+
+| Model | Metric | Full final FFN | Pruned final FFN | Change |
+| --- | --- | ---: | ---: | ---: |
+| Qwen3 0.6B Q4_0 | Median TTFT | 3103.87 ms | 3037.63 ms | -2.13% |
+| Qwen3 0.6B Q4_0 | Median prefill | 50.021 tok/s | 51.167 tok/s | +2.29% |
+| Qwen3 0.6B Q4_0 | Mean trial CPU | 22,455 ms | 21,942 ms | -2.29% |
+| SmolLM2 360M Q8_0 | Median TTFT | 2580.03 ms | 2528.12 ms | -2.01% |
+| SmolLM2 360M Q8_0 | Median prefill | 61.097 tok/s | 62.381 tok/s | +2.10% |
+| SmolLM2 360M Q8_0 | Mean trial CPU | 18,696 ms | 18,289 ms | -2.17% |
+
+All six pair medians improved for both models. Corresponding input counts, output counts, and output
+SHA-256 values matched in all 36 paired trials. The default-on Qwen path also passed its pinned
+llama.cpp greedy-token reference. Median process peak RSS changed from 1,192,462,336 to
+1,221,462,016 bytes for Qwen and from 688,959,488 to 705,396,736 bytes for SmolLM2. The
+implementation adds no retained buffers; these overlapping process-level observations are recorded
+without claiming a memory improvement. Use
+`-Dmodels.purejava.finalLayerPrefillPruning=false` for rollback or reproduction.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:

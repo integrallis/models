@@ -26,6 +26,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
+import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import java.lang.foreign.Arena;
@@ -403,6 +404,77 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void finalLayerPrefillPruningPreservesLogitsKvCacheAndAutoregressiveState() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = new int[40];
+      for (int index = 0; index < tokens.length; index++) {
+        tokens[index] = (index * 7 + 5) % VOCAB_SIZE;
+      }
+
+      KvCache baselineCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config, weights, baselineCache, executionPlan(config, weights, 32, false));
+      float[] expected = baseline.prefill(tokens, 0).clone();
+      float[] expectedKeys = baselineCache.keyBuffer().clone();
+      float[] expectedValues = baselineCache.valueBuffer().clone();
+      int nextToken = argmax(expected);
+      float[] expectedNext = baseline.forward(nextToken, tokens.length);
+
+      KvCache prunedCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass pruned =
+          new LlamaForwardPass(
+              config, weights, prunedCache, executionPlan(config, weights, 32, true));
+      float[] actual = pruned.prefill(tokens, 0);
+
+      assertThat(pruned.usesFinalLayerPrefillPruning()).isTrue();
+      assertThat(actual).containsExactly(expected);
+      assertThat(prunedCache.keyBuffer()).containsExactly(expectedKeys);
+      assertThat(prunedCache.valueBuffer()).containsExactly(expectedValues);
+      assertThat(pruned.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+    }
+
+    @Test
+    void sequentialFinalLayerPrefillPruningPreservesStateExactly() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+
+      KvCache baselineCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config, weights, baselineCache, executionPlan(config, weights, 1, false));
+      float[] expected = baseline.prefill(tokens, 0).clone();
+      float[] expectedKeys = baselineCache.keyBuffer().clone();
+      float[] expectedValues = baselineCache.valueBuffer().clone();
+      int nextToken = argmax(expected);
+      float[] expectedNext = baseline.forward(nextToken, tokens.length);
+
+      KvCache prunedCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass pruned =
+          new LlamaForwardPass(
+              config, weights, prunedCache, executionPlan(config, weights, 1, true));
+      float[] actual = pruned.prefill(tokens, 0);
+
+      assertThat(pruned.usesBatchedPrefill()).isFalse();
+      assertThat(actual).containsExactly(expected);
+      assertThat(prunedCache.keyBuffer()).containsExactly(expectedKeys);
+      assertThat(prunedCache.valueBuffer()).containsExactly(expectedValues);
+      assertThat(pruned.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+    }
+
+    @Test
     void q8PrefillUsesBatchedKernelAndPreservesAutoregressiveState() {
       GgufFile file = buildQ8NanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
@@ -513,6 +585,7 @@ class LlamaForwardPassTest {
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
+      assertThat(batched.usesFinalLayerPrefillPruning()).isFalse();
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
@@ -713,6 +786,27 @@ class LlamaForwardPassTest {
       logits = forwardPass.forward(tokens[position], position);
     }
     return logits;
+  }
+
+  private static PureJavaExecutionPlan executionPlan(
+      LlamaConfig config,
+      LlamaWeights weights,
+      int prefillBatchSize,
+      boolean finalLayerPrefillPruning) {
+    return ExecutionPlanner.plan(
+        RuntimeFingerprint.capture(),
+        ModelTopology.from("llama", config, weights),
+        new PureJavaPlanConfiguration(true, true, prefillBatchSize, finalLayerPrefillPruning));
+  }
+
+  private static int argmax(float[] values) {
+    int best = 0;
+    for (int index = 1; index < values.length; index++) {
+      if (values[index] > values[best]) {
+        best = index;
+      }
+    }
+    return best;
   }
 
   private static byte[] randomF32(Random rng, int count) {
