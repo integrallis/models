@@ -27,7 +27,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v3";
+  public static final String PLAN_VERSION = "pure-java-v4";
 
   private ExecutionPlanner() {}
 
@@ -42,6 +42,8 @@ public final class ExecutionPlanner {
     boolean mixedK = mixedKProjections(topology, configuration, grouped, decisions);
     int prefillBatchSize = batchedPrefill(topology, configuration, decisions);
     boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
+    boolean finalLayerKvOnlyPrefill =
+        finalLayerKvOnlyPrefill(topology, configuration, finalLayerPrefillPruning, decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -63,7 +65,51 @@ public final class ExecutionPlanner {
         mixedK,
         prefillBatchSize,
         finalLayerPrefillPruning,
+        finalLayerKvOnlyPrefill,
         diagnostics);
+  }
+
+  private static boolean finalLayerKvOnlyPrefill(
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      boolean finalLayerPrefillPruning,
+      List<OptimizationDecision> decisions) {
+    Map<String, String> settings =
+        Map.of("unused-rows", "full-attention", "formats", topology.finalLayerAttentionFormats());
+    if (!topology.supportsFinalLayerKvOnlyPrefill()) {
+      decisions.add(
+          new OptimizationDecision(
+              "final-layer-kv-only-prefill",
+              OptimizationStatus.UNSUPPORTED,
+              "the final-layer attention layout has no controlled exactness and performance gate",
+              settings));
+      return false;
+    }
+    if (!configuration.finalLayerKvOnlyPrefill()) {
+      decisions.add(
+          new OptimizationDecision(
+              "final-layer-kv-only-prefill",
+              OptimizationStatus.DISABLED,
+              "disabled by models.purejava.finalLayerKvOnlyPrefill",
+              settings));
+      return false;
+    }
+    if (!finalLayerPrefillPruning) {
+      decisions.add(
+          new OptimizationDecision(
+              "final-layer-kv-only-prefill",
+              OptimizationStatus.DISABLED,
+              "final-layer prefill pruning is disabled",
+              settings));
+      return false;
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "final-layer-kv-only-prefill",
+            OptimizationStatus.ENABLED,
+            "unused final-layer prompt rows compute only the persistent K/V state",
+            Map.of("unused-rows", "kv-only", "formats", topology.finalLayerAttentionFormats())));
+    return true;
   }
 
   private static boolean finalLayerPrefillPruning(

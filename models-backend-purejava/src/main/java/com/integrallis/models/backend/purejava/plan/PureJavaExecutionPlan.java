@@ -26,6 +26,7 @@ public record PureJavaExecutionPlan(
     boolean mixedKProjections,
     int prefillBatchSize,
     boolean finalLayerPrefillPruning,
+    boolean finalLayerKvOnlyPrefill,
     BackendDiagnostics diagnostics) {
 
   public PureJavaExecutionPlan {
@@ -44,6 +45,15 @@ public record PureJavaExecutionPlan(
     }
     if (prefillBatchSize > 1 && !topology.supportsBatchedPrefill()) {
       throw new IllegalArgumentException("batched prefill contradicts the execution plan topology");
+    }
+    if (finalLayerPrefillPruning && !topology.supportsFinalLayerPrefillPruning()) {
+      throw new IllegalArgumentException(
+          "final-layer prefill pruning contradicts the execution plan topology");
+    }
+    if (finalLayerKvOnlyPrefill
+        && (!finalLayerPrefillPruning || !topology.supportsFinalLayerKvOnlyPrefill())) {
+      throw new IllegalArgumentException(
+          "final-layer K/V-only prefill contradicts the execution plan topology");
     }
     diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
   }

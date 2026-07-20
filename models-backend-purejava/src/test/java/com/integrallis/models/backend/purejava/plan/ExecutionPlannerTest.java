@@ -39,6 +39,7 @@ class ExecutionPlannerTest {
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isTrue();
     assertThat(plan.diagnostics().environment()).containsEntry("compiler", "hotspot-c2");
     assertThat(plan.diagnostics().environment())
         .containsEntry("vector-provider", "test-vector")
@@ -61,6 +62,9 @@ class ExecutionPlannerTest {
     assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(plan.diagnostics().optimization("persistent-row-executor"))
         .hasValueSatisfying(
             decision -> {
@@ -81,10 +85,14 @@ class ExecutionPlannerTest {
 
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
     assertThat(plan.diagnostics().optimization("batched-prefill"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
@@ -109,6 +117,7 @@ class ExecutionPlannerTest {
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isTrue();
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
     assertThat(plan.diagnostics().optimization("grouped-projections"))
         .hasValueSatisfying(
             decision ->
@@ -124,6 +133,9 @@ class ExecutionPlannerTest {
                   .containsEntry("formats", "Q4_K,Q4_K,Q6_K");
             });
     assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
@@ -143,7 +155,9 @@ class ExecutionPlannerTest {
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
-            runtime("hotspot-c2"), topology, new PureJavaPlanConfiguration(true, false, 32, true));
+            runtime("hotspot-c2"),
+            topology,
+            new PureJavaPlanConfiguration(true, false, 32, true, true));
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isFalse();
@@ -154,7 +168,8 @@ class ExecutionPlannerTest {
 
   @Test
   void explicitOverridesDisableOtherwiseEligibleOptimizations() {
-    PureJavaPlanConfiguration configuration = new PureJavaPlanConfiguration(false, true, 1, false);
+    PureJavaPlanConfiguration configuration =
+        new PureJavaPlanConfiguration(false, true, 1, false, false);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -163,6 +178,7 @@ class ExecutionPlannerTest {
     assertThat(plan.groupedProjections()).isFalse();
     assertThat(plan.prefillBatchSize()).isEqualTo(1);
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
     assertThat(plan.diagnostics().optimization("grouped-projections"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
@@ -172,6 +188,93 @@ class ExecutionPlannerTest {
     assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
+  }
+
+  @Test
+  void explicitOverrideKeepsFinalFfnPruningWhileDisablingKvOnlyPrefill() {
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"),
+            uniformTopology(GgufTensorType.Q4_0),
+            new PureJavaPlanConfiguration(true, true, 32, true, false));
+
+    assertThat(plan.finalLayerPrefillPruning()).isTrue();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
+    assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
+  }
+
+  @Test
+  void kvOnlyPrefillRequiresFinalFfnPruning() {
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"),
+            uniformTopology(GgufTensorType.Q4_0),
+            new PureJavaPlanConfiguration(true, true, 32, false, true));
+
+    assertThat(plan.finalLayerPrefillPruning()).isFalse();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
+  }
+
+  @Test
+  void kvOnlyPrefillRejectsAnUngatedFinalAttentionLayout() {
+    ModelTopology.LayerTopology layer =
+        new ModelTopology.LayerTopology(
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0);
+    ModelTopology topology = new ModelTopology("llama", 1024, 128, 128, List.of(layer));
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"), topology, PureJavaPlanConfiguration.defaults());
+
+    assertThat(plan.finalLayerPrefillPruning()).isTrue();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED);
+              assertThat(decision.settings()).containsEntry("formats", "Q4_0,Q4_0,Q4_0,Q8_0");
+            });
+  }
+
+  @Test
+  void kvOnlyPrefillRejectsAnUngatedCrossFormatFinalLayer() {
+    ModelTopology.LayerTopology layer =
+        new ModelTopology.LayerTopology(
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q8_0);
+    ModelTopology topology = new ModelTopology("llama", 1024, 128, 128, List.of(layer));
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"), topology, PureJavaPlanConfiguration.defaults());
+
+    assertThat(plan.finalLayerPrefillPruning()).isTrue();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
 
   @Test
@@ -215,7 +318,7 @@ class ExecutionPlannerTest {
 
   @Test
   void invalidConfigurationIsRejectedWithoutAStartupProbe() {
-    assertThatThrownBy(() -> new PureJavaPlanConfiguration(true, true, 0, true))
+    assertThatThrownBy(() -> new PureJavaPlanConfiguration(true, true, 0, true, true))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThatThrownBy(() -> PureJavaPlanConfiguration.groupedProjections("sometimes"))
@@ -239,6 +342,11 @@ class ExecutionPlannerTest {
         .hasMessageContaining("models.purejava.finalLayerPrefillPruning");
     assertThat(PureJavaPlanConfiguration.finalLayerPrefillPruning(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.finalLayerPrefillPruning("false")).isFalse();
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.finalLayerKvOnlyPrefill("sometimes"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.finalLayerKvOnlyPrefill");
+    assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill(null)).isTrue();
+    assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill("false")).isFalse();
   }
 
   @Test
@@ -261,9 +369,24 @@ class ExecutionPlannerTest {
     assertThatThrownBy(
             () ->
                 new PureJavaExecutionPlan(
-                    runtime, unsupported, true, false, 32, true, valid.diagnostics()))
+                    runtime, unsupported, true, false, 32, true, true, valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("topology");
+  }
+
+  @Test
+  void rejectsKvOnlyPrefillWithoutFinalFfnPruning() {
+    RuntimeFingerprint runtime = runtime("hotspot-c2");
+    ModelTopology topology = uniformTopology(GgufTensorType.Q4_0);
+    PureJavaExecutionPlan valid =
+        ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
+
+    assertThatThrownBy(
+            () ->
+                new PureJavaExecutionPlan(
+                    runtime, topology, true, false, 32, false, true, valid.diagnostics()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("K/V-only");
   }
 
   private static RuntimeFingerprint runtime(String compiler) {
