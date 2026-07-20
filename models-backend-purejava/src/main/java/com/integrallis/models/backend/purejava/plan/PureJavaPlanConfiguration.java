@@ -20,13 +20,16 @@ public record PureJavaPlanConfiguration(
     boolean groupedProjections,
     boolean mixedKProjections,
     int prefillBatchSize,
-    boolean finalLayerPrefillPruning) {
+    boolean finalLayerPrefillPruning,
+    boolean finalLayerKvOnlyPrefill) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
   public static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
   public static final String FINAL_LAYER_PREFILL_PRUNING_PROPERTY =
       "models.purejava.finalLayerPrefillPruning";
+  public static final String FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY =
+      "models.purejava.finalLayerKvOnlyPrefill";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
 
   public PureJavaPlanConfiguration {
@@ -38,7 +41,7 @@ public record PureJavaPlanConfiguration(
 
   /** Returns the stable default policy. */
   public static PureJavaPlanConfiguration defaults() {
-    return new PureJavaPlanConfiguration(true, true, DEFAULT_PREFILL_BATCH_SIZE, true);
+    return new PureJavaPlanConfiguration(true, true, DEFAULT_PREFILL_BATCH_SIZE, true, true);
   }
 
   /** Reads deployment overrides without running a performance probe. */
@@ -47,7 +50,8 @@ public record PureJavaPlanConfiguration(
         groupedProjections(System.getProperty(GROUPED_PROJECTIONS_PROPERTY)),
         mixedKProjections(System.getProperty(MIXED_K_PROJECTIONS_PROPERTY)),
         prefillBatchSize(System.getProperty(PREFILL_BATCH_SIZE_PROPERTY)),
-        finalLayerPrefillPruning(System.getProperty(FINAL_LAYER_PREFILL_PRUNING_PROPERTY)));
+        finalLayerPrefillPruning(System.getProperty(FINAL_LAYER_PREFILL_PRUNING_PROPERTY)),
+        finalLayerKvOnlyPrefill(System.getProperty(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY)));
   }
 
   static boolean groupedProjections(String configured) {
@@ -60,6 +64,10 @@ public record PureJavaPlanConfiguration(
 
   static boolean finalLayerPrefillPruning(String configured) {
     return booleanProperty(FINAL_LAYER_PREFILL_PRUNING_PROPERTY, configured);
+  }
+
+  static boolean finalLayerKvOnlyPrefill(String configured) {
+    return booleanProperty(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, configured);
   }
 
   private static boolean booleanProperty(String property, String configured) {

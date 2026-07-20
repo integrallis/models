@@ -134,9 +134,31 @@ public record ModelTopology(
         && (type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0);
   }
 
+  boolean supportsFinalLayerKvOnlyPrefill() {
+    LayerTopology finalLayer = layers.getLast();
+    GgufTensorType type = finalLayer.query();
+    return supportsFinalLayerPrefillPruning()
+        && type == finalLayer.gate()
+        && type == finalLayer.key()
+        && type == finalLayer.value()
+        && type == finalLayer.attentionOutput()
+        && (type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0);
+  }
+
   String finalLayerFfnFormats() {
     LayerTopology finalLayer = layers.getLast();
     return finalLayer.gate() + "," + finalLayer.up() + "," + finalLayer.down();
+  }
+
+  String finalLayerAttentionFormats() {
+    LayerTopology finalLayer = layers.getLast();
+    return finalLayer.query()
+        + ","
+        + finalLayer.key()
+        + ","
+        + finalLayer.value()
+        + ","
+        + finalLayer.attentionOutput();
   }
 
   String qkvMode() {

@@ -50,6 +50,7 @@ public final class LlamaForwardPass {
   private final boolean batchedPrefill;
   private final boolean groupedBatchedPrefill;
   private final boolean finalLayerPrefillPruning;
+  private final boolean finalLayerKvOnlyPrefill;
   private final int prefillBatchCapacity;
 
   // Scratch buffers
@@ -123,6 +124,7 @@ public final class LlamaForwardPass {
     this.groupedProjections = executionPlan.groupedProjections();
     this.mixedKProjections = executionPlan.mixedKProjections();
     this.finalLayerPrefillPruning = executionPlan.finalLayerPrefillPruning();
+    this.finalLayerKvOnlyPrefill = executionPlan.finalLayerKvOnlyPrefill();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -274,6 +276,16 @@ public final class LlamaForwardPass {
         int xOffset = batch * dim;
         TensorOps.rmsNorm(
             batchXNorm, xOffset, batchX, xOffset, lw.attentionNorm(), dim, config.rmsNormEps());
+      }
+
+      boolean useFinalLayerKvOnlyPrefill =
+          finalLayerKvOnlyPrefill
+              && batchLogits == null
+              && layerObserver == null
+              && layer == config.numLayers() - 1;
+      if (useFinalLayerKvOnlyPrefill) {
+        finishFinalLayerKvOnlyBatch(lw, layer, batchSize, startPosition, computeFinalLogits);
+        break;
       }
 
       if (groupedBatchedPrefill) {
@@ -455,6 +467,15 @@ public final class LlamaForwardPass {
 
       // Attention norm
       TensorOps.rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
+
+      if (finalLayerKvOnlyPrefill
+          && !computeLogits
+          && layerObserver == null
+          && layer == config.numLayers() - 1) {
+        finishFinalLayerKvOnlyToken(lw, layer, position, keyLength, numKvHeads);
+        nextPosition++;
+        return null;
+      }
 
       // QKV projections
       if (groupedProjections) {
@@ -675,6 +696,127 @@ public final class LlamaForwardPass {
 
   boolean usesFinalLayerPrefillPruning() {
     return finalLayerPrefillPruning;
+  }
+
+  boolean usesFinalLayerKvOnlyPrefill() {
+    return finalLayerKvOnlyPrefill;
+  }
+
+  private void finishFinalLayerKvOnlyBatch(
+      LlamaWeights.LayerWeights layer,
+      int layerIndex,
+      int batchSize,
+      int startPosition,
+      boolean computeFinalLogits) {
+    int dim = config.embeddingDim();
+    int queryDim = config.queryDim();
+    int keyDim = config.keyDim();
+    int valueDim = config.valueDim();
+    int keyLength = config.keyLength();
+    int numHeads = config.numHeads();
+    int numKvHeads = config.numKvHeads();
+
+    if (groupedBatchedPrefill) {
+      dualBatchedMatmulDispatch(
+          batchK,
+          layer.wk(),
+          layer.wkType(),
+          keyDim,
+          batchV,
+          layer.wv(),
+          layer.wvType(),
+          valueDim,
+          batchXNorm,
+          batchSize,
+          dim);
+    } else {
+      batchedMatmulDispatch(batchK, batchXNorm, batchSize, layer.wk(), layer.wkType(), keyDim, dim);
+      batchedMatmulDispatch(
+          batchV, batchXNorm, batchSize, layer.wv(), layer.wvType(), valueDim, dim);
+    }
+
+    for (int batch = 0; batch < batchSize; batch++) {
+      int keyOffset = batch * keyDim;
+      int valueOffset = batch * valueDim;
+      addOptionalBias(batchK, keyOffset, layer.kBias());
+      addOptionalBias(batchV, valueOffset, layer.vBias());
+      for (int head = 0; head < numKvHeads; head++) {
+        int offset = keyOffset + head * keyLength;
+        normalizeHead(batchK, offset, layer.kNorm(), keyLength);
+        if (config.usesRope(layerIndex)) {
+          ropeTable.applyBatch(batchK, offset, batch, config.usesNeoxRope());
+        }
+      }
+      cache.store(layerIndex, startPosition + batch, batchK, keyOffset, batchV, valueOffset);
+    }
+
+    if (!computeFinalLogits) {
+      return;
+    }
+
+    int finalBatch = batchSize - 1;
+    int stateOffset = finalBatch * dim;
+    System.arraycopy(batchXNorm, stateOffset, xNorm, 0, dim);
+    matmulDispatch(q, xNorm, layer.wq(), layer.wqType(), queryDim, dim);
+    addOptionalBias(q, layer.qBias());
+    for (int head = 0; head < numHeads; head++) {
+      int offset = head * keyLength;
+      normalizeHead(q, offset, layer.qNorm(), keyLength);
+      if (config.usesRope(layerIndex)) {
+        ropeTable.applyBatch(q, offset, finalBatch, config.usesNeoxRope());
+      }
+    }
+
+    groupedQueryAttention(
+        q,
+        0,
+        attnOut,
+        0,
+        layerIndex,
+        startPosition + finalBatch,
+        cache.keyBuffer(),
+        cache.valueBuffer());
+    matmulDispatch(
+        attnProjected, attnOut, layer.wo(), layer.woType(), dim, config.attentionOutputDim());
+    for (int index = 0; index < dim; index++) {
+      batchX[stateOffset + index] += attnProjected[index];
+    }
+    finishFinalLayerFfnRow(layer, stateOffset, dim, config.hiddenDim());
+  }
+
+  private void finishFinalLayerKvOnlyToken(
+      LlamaWeights.LayerWeights layer,
+      int layerIndex,
+      int position,
+      int keyLength,
+      int numKvHeads) {
+    if (groupedProjections) {
+      dualMatmulDispatch(
+          k,
+          layer.wk(),
+          layer.wkType(),
+          config.keyDim(),
+          v,
+          layer.wv(),
+          layer.wvType(),
+          config.valueDim(),
+          xNorm,
+          config.embeddingDim());
+    } else {
+      matmulDispatch(k, xNorm, layer.wk(), layer.wkType(), config.keyDim(), config.embeddingDim());
+      matmulDispatch(
+          v, xNorm, layer.wv(), layer.wvType(), config.valueDim(), config.embeddingDim());
+    }
+    addOptionalBias(k, layer.kBias());
+    addOptionalBias(v, layer.vBias());
+    for (int head = 0; head < numKvHeads; head++) {
+      int offset = head * keyLength;
+      normalizeHead(k, offset, layer.kNorm(), keyLength);
+      if (config.usesRope(layerIndex)) {
+        applyRope(k, offset);
+      }
+    }
+    cache.store(layerIndex, position, k, v);
   }
 
   private void finishFinalLayerFfnRow(
