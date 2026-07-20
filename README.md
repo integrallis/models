@@ -167,8 +167,8 @@ kernel path.
 `PureJavaBackend` builds one immutable execution plan when the GGUF is loaded.
 The planner combines the tensors actually present in every layer, the structured
 Vectors runtime capabilities, JVM/compiler identity, and explicit deployment
-overrides. Grouped projections and batched prefill are consumed from this plan
-instead of being re-decided in the forward loop.
+overrides. Grouped projections, batched prefill, and final-layer prompt pruning
+are consumed from this plan instead of being re-decided in the forward loop.
 
 ```java
 try (PureJavaBackend backend = PureJavaBackend.load(model)) {
@@ -179,15 +179,24 @@ try (PureJavaBackend backend = PureJavaBackend.load(model)) {
 
 Diagnostics identify enabled, disabled, and unsupported choices, including the
 resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, prefill
-batch size, mapped weights, Vector FMA policy, and persistent row executor.
-`models.purejava.groupedProjections`, `models.purejava.mixedKProjections`, and
-`models.purejava.prefillBatchSize` are parsed once per load; malformed explicit
-values fail rather than silently reverting to defaults. Eligible mixed-K Q/K/V
-projections share one Q8_K activation quantization and one row dispatch. The
-mixed path remains inactive for every other tensor layout. Batch-major prefill
-kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the Q5_0 route allows
-mixed DeepSeek-Coder files to retain batching instead of degrading the complete
-prefill plan to one token at a time.
+batch size, final-layer output-row policy, mapped weights, Vector FMA policy,
+and persistent row executor.
+`models.purejava.groupedProjections`, `models.purejava.mixedKProjections`,
+`models.purejava.prefillBatchSize`, and
+`models.purejava.finalLayerPrefillPruning` are parsed once per load. Malformed
+explicit values fail rather than silently reverting to defaults. Eligible
+mixed-K Q/K/V projections share one Q8_K activation quantization and one row
+dispatch. The mixed path remains inactive for every other tensor layout.
+Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the
+Q5_0 route allows mixed DeepSeek-Coder files to retain batching instead of
+degrading the complete prefill plan to one token at a time.
+
+Ordinary prefill requests logits only for the final prompt token. The default
+plan therefore runs the final-layer FFN only for that output row while still
+producing every final-layer K/V cache entry. Speculative verification and
+observer-backed diagnostics request all rows and retain the complete path. Set
+`-Dmodels.purejava.finalLayerPrefillPruning=false` for rollback or controlled
+A/B measurement.
 
 ## Supported models
 
