@@ -15,8 +15,10 @@
  */
 package com.integrallis.models.bench;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.util.List;
+import java.util.Objects;
 
 /** Versioned, machine-readable benchmark evidence. */
 public record BenchmarkReport(
@@ -30,14 +32,16 @@ public record BenchmarkReport(
     long artifactSizeBytes,
     BenchmarkRun run,
     BenchmarkEnvironment environment,
+    BackendDiagnostics backendDiagnostics,
     SpeculativeGenerationOptions speculativeOptions,
     PerformanceSummary summary,
     PerformanceTier performanceTier,
     List<TrialMeasurement> trials) {
 
-  public static final int CURRENT_SCHEMA_VERSION = 4;
+  public static final int CURRENT_SCHEMA_VERSION = 5;
 
   public BenchmarkReport {
+    backendDiagnostics = Objects.requireNonNull(backendDiagnostics, "backendDiagnostics");
     if (speculativeOptions == null) {
       speculativeOptions = SpeculativeGenerationOptions.disabled();
     }

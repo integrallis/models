@@ -17,6 +17,7 @@ package com.integrallis.models.bench;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.vectors.core.PanamaConstants;
@@ -32,17 +33,19 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.modeljars.ModelJarRegistry;
 
 /** Audits exact greedy-logit repeatability for one pure-Java model and JVM configuration. */
 final class DeterminismAuditCli {
 
-  private static final int SCHEMA_VERSION = 1;
+  private static final int SCHEMA_VERSION = 2;
   private static final String CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
   private static final String DEFAULT_PROMPT =
       "Question: Which organ pumps blood through the human body?\nAnswer:";
   private static final Set<String> OPTIONS =
       Set.of(
           "model",
+          "modeljar",
           "model-id",
           "prompt",
           "prompt-file",
@@ -58,11 +61,9 @@ final class DeterminismAuditCli {
     Configuration configuration = parse(args);
     System.setProperty(CONTEXT_LENGTH_PROPERTY, Integer.toString(configuration.contextLength()));
 
-    String artifactSha256 = Hashing.sha256(configuration.model());
-    long artifactSize = Files.size(configuration.model());
     long loadStart = System.nanoTime();
     Report report;
-    try (PureJavaBackend backend = PureJavaBackend.load(configuration.model())) {
+    try (PureJavaBackend backend = configuration.model().load()) {
       double loadMillis = (System.nanoTime() - loadStart) / 1_000_000.0;
       AuditResult audit =
           audit(
@@ -71,26 +72,7 @@ final class DeterminismAuditCli {
               configuration.generatedTokens(),
               configuration.iterations(),
               configuration.promptMode());
-      report =
-          new Report(
-              SCHEMA_VERSION,
-              Instant.now().toString(),
-              configuration.modelId(),
-              configuration.model().toAbsolutePath().toString(),
-              artifactSha256,
-              artifactSize,
-              loadMillis,
-              Hashing.sha256(configuration.prompt()),
-              configuration.prompt(),
-              configuration.generatedTokens(),
-              configuration.iterations(),
-              configuration.contextLength(),
-              configuration.promptMode(),
-              BenchmarkEnvironment.capture(),
-              ExecutionConfiguration.capture(),
-              audit.deterministic(),
-              audit.promptTokens(),
-              audit.trials());
+      report = buildReport(configuration, loadMillis, audit, backend.diagnostics());
     }
 
     write(configuration.output(), report);
@@ -102,12 +84,14 @@ final class DeterminismAuditCli {
   }
 
   static Configuration parse(String[] args) throws IOException {
+    return parse(args, ModelJarRegistry.fromClasspath());
+  }
+
+  static Configuration parse(String[] args, ModelJarRegistry modelJarRegistry) throws IOException {
     Map<String, String> values = parseOptions(args);
-    Path model = Path.of(required(values, "model"));
-    if (!Files.isRegularFile(model)) {
-      throw new IllegalArgumentException("model does not exist: " + model);
-    }
-    String modelId = values.getOrDefault("model-id", safeModelId(model));
+    PureJavaModelSource model =
+        PureJavaModelSource.resolve(values.get("model"), values.get("modeljar"), modelJarRegistry);
+    String modelId = values.getOrDefault("model-id", safeModelId(model.identity()));
     String prompt =
         values.containsKey("prompt-file")
             ? Files.readString(Path.of(values.get("prompt-file")))
@@ -173,6 +157,35 @@ final class DeterminismAuditCli {
     boolean deterministic =
         trials.stream().allMatch(trial -> reference.equals(trial.sequenceSha256()));
     return new AuditResult(promptTokens.clone(), deterministic, List.copyOf(trials));
+  }
+
+  static Report buildReport(
+      Configuration configuration,
+      double loadMillis,
+      AuditResult audit,
+      BackendDiagnostics backendDiagnostics)
+      throws IOException {
+    Path artifact = configuration.model().artifact();
+    return new Report(
+        SCHEMA_VERSION,
+        Instant.now().toString(),
+        configuration.modelId(),
+        artifact.toAbsolutePath().toString(),
+        Hashing.sha256(artifact),
+        Files.size(artifact),
+        loadMillis,
+        Hashing.sha256(configuration.prompt()),
+        configuration.prompt(),
+        configuration.generatedTokens(),
+        configuration.iterations(),
+        configuration.contextLength(),
+        configuration.promptMode(),
+        BenchmarkEnvironment.capture(),
+        ExecutionConfiguration.capture(),
+        backendDiagnostics,
+        audit.deterministic(),
+        audit.promptTokens(),
+        audit.trials());
   }
 
   private static float[] prompt(
@@ -291,17 +304,10 @@ final class DeterminismAuditCli {
     }
   }
 
-  private static String required(Map<String, String> values, String name) {
-    String value = values.get(name);
-    if (value == null || value.isBlank()) {
-      throw new IllegalArgumentException("--" + name + " is required");
-    }
-    return value;
-  }
-
-  private static String safeModelId(Path model) {
-    Path fileName = model.getFileName();
-    String source = fileName == null ? model.toString() : fileName.toString();
+  private static String safeModelId(String model) {
+    Path path = Path.of(model);
+    Path fileName = path.getFileName();
+    String source = fileName == null ? model : fileName.toString();
     String modelId = source.toLowerCase().replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
     return modelId.isBlank() ? "model" : modelId;
   }
@@ -321,7 +327,7 @@ final class DeterminismAuditCli {
   }
 
   record Configuration(
-      Path model,
+      PureJavaModelSource model,
       String modelId,
       String prompt,
       int generatedTokens,
@@ -421,6 +427,7 @@ final class DeterminismAuditCli {
       PromptMode promptMode,
       BenchmarkEnvironment environment,
       ExecutionConfiguration execution,
+      BackendDiagnostics backendDiagnostics,
       boolean deterministic,
       int[] promptTokens,
       List<Trial> trials) {}
