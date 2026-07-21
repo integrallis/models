@@ -20,20 +20,46 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.Tokenizer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.modeljars.ModelJarRegistry;
 
 class DecodeProfileCliTest {
 
+  @TempDir Path directory;
+
+  @Test
+  void resolvesModelJarAliasWithoutDiscardingItsDescriptor() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
+    var descriptor = ModelJarTestFixtures.descriptor("fixture", model);
+
+    DecodeProfileCli.Configuration configuration =
+        DecodeProfileCli.parse(
+            new String[] {"--modeljar", "fixture"}, ModelJarRegistry.of(List.of(descriptor)));
+
+    assertThat(configuration.model().artifact()).isEqualTo(model);
+    assertThat(configuration.model().descriptor()).contains(descriptor);
+  }
+
   @Test
   void recordsOnlyDecodeCallsAfterPromptAndWarmup() throws Exception {
+    Path model = Files.write(directory.resolve("unused.gguf"), new byte[] {1});
     List<String> events = new ArrayList<>();
     FakeBackend backend = new FakeBackend(events);
     DecodeProfileCli.Configuration configuration =
         new DecodeProfileCli.Configuration(
-            Path.of("unused.gguf"), "profile prompt", 128, 7, 2, 3, Path.of("decode.jfr"));
+            new PureJavaModelSource(model.toString(), model, Optional.empty()),
+            "profile prompt",
+            128,
+            7,
+            2,
+            3,
+            Path.of("decode.jfr"));
 
     DecodeProfileCli.Result result =
         DecodeProfileCli.profile(

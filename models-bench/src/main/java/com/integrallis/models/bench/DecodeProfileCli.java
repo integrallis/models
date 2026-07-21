@@ -17,7 +17,6 @@ package com.integrallis.models.bench;
 
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.Tokenizer;
-import com.integrallis.models.backend.purejava.PureJavaBackend;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
@@ -28,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import jdk.jfr.Recording;
+import org.modeljars.ModelJarRegistry;
 
 /** Captures a JFR recording containing warmed-up autoregressive decode and no prompt prefill. */
 final class DecodeProfileCli {
@@ -35,6 +35,7 @@ final class DecodeProfileCli {
   private static final Set<String> OPTIONS =
       Set.of(
           "model",
+          "modeljar",
           "prompt",
           "prompt-file",
           "context",
@@ -51,7 +52,7 @@ final class DecodeProfileCli {
     Configuration configuration = parse(args);
     System.setProperty(
         "models.purejava.maxContextLength", Integer.toString(configuration.contextLength()));
-    try (InferenceBackend backend = PureJavaBackend.load(configuration.model());
+    try (InferenceBackend backend = configuration.model().load();
         ProfileRecording recording = new JfrProfileRecording()) {
       Result result = profile(backend, configuration, recording);
       System.out.printf(
@@ -69,12 +70,13 @@ final class DecodeProfileCli {
   }
 
   static Configuration parse(String[] args) throws IOException {
+    return parse(args, ModelJarRegistry.fromClasspath());
+  }
+
+  static Configuration parse(String[] args, ModelJarRegistry modelJarRegistry) throws IOException {
     Map<String, String> values = parseOptions(args);
-    String modelValue = required(values, "model");
-    Path model = Path.of(modelValue);
-    if (!Files.isRegularFile(model)) {
-      throw new IllegalArgumentException("model does not exist: " + model);
-    }
+    PureJavaModelSource model =
+        PureJavaModelSource.resolve(values.get("model"), values.get("modeljar"), modelJarRegistry);
     String prompt =
         values.containsKey("prompt-file")
             ? Files.readString(Path.of(values.get("prompt-file")))
@@ -201,14 +203,6 @@ final class DecodeProfileCli {
     return values;
   }
 
-  private static String required(Map<String, String> values, String name) {
-    String value = values.get(name);
-    if (value == null || value.isBlank()) {
-      throw new IllegalArgumentException("missing required option --" + name);
-    }
-    return value;
-  }
-
   private static int integer(Map<String, String> values, String name, int defaultValue) {
     String value = values.get(name);
     if (value == null) {
@@ -222,7 +216,7 @@ final class DecodeProfileCli {
   }
 
   record Configuration(
-      Path model,
+      PureJavaModelSource model,
       String prompt,
       int contextLength,
       int tokenId,

@@ -140,18 +140,22 @@ Audit the raw float bits of every generated logit vector across repeated greedy 
 ```shell
 ./gradlew :models-bench:installDist
 models-bench/build/install/models-bench/bin/models-bench determinism \
-  --model /path/to/model.gguf \
-  --model-id model-id \
+  --modeljar qwen3_0_6b_q4_0 \
   --prompt-file models-bench/prompts/completion.txt \
   --tokens 4 \
   --iterations 3 \
   --context 128 \
-  --output build/reports/determinism/model-id.json
+  --output build/reports/determinism/qwen3_0_6b_q4_0.json
 ```
 
-The report records the artifact hash, prompt tokens, winning and runner-up logits, winner margins,
-raw-bit logit hashes, JVM and host details, and the complete vectors execution configuration. The
-command exits non-zero when any trial differs.
+The schema-2 report records the artifact hash, prompt tokens, winning and runner-up logits, winner
+margins, raw-bit logit hashes, JVM and host details, the complete vectors execution configuration,
+and the selected backend plan and ModelJar profile decisions. The command exits non-zero when any
+trial differs.
+
+Use exactly one model source. `--modeljar <alias>` resolves the descriptor from the aggregate
+catalog on the application runtime classpath and preserves its model-scoped performance profile
+when loading the backend. `--model /path/to/model.gguf` loads unregistered bytes without a profile.
 
 Use `scripts/run-purejava-determinism-matrix.sh` for fresh-JVM coverage of the default Panama path,
 serial execution, FMA-disabled execution, 128-bit vectors, and the scalar reference. Provider
@@ -165,7 +169,7 @@ loop:
 
 ```shell
 ./gradlew :models-bench:run --args='profile-decode \
-  --model /path/to/model.gguf \
+  --modeljar qwen3_0_6b_q4_0 \
   --prompt "Explain vectorized inference." \
   --context 2048 \
   --warmup-tokens 64 \
@@ -178,5 +182,28 @@ logit checksum. The recording excludes model loading, prompt prefill, and decode
 attribution describes steady autoregressive decode. Use `--prompt-file` for a file-backed prompt and
 `--token-id` to select the repeated token explicitly.
 
-The requested context must hold the prompt, warmup, and measured tokens. The model path is validated
-before loading, and the command rejects token IDs outside the model vocabulary.
+The requested context must hold the prompt, warmup, and measured tokens. The resolved artifact is
+validated before loading, and the command rejects token IDs outside the model vocabulary. As with
+the determinism command, `--model /path/to/model.gguf` is the explicit unregistered alternative.
+
+## ModelJar-backed comparison run
+
+Use a catalog alias for pure-Java measurements that must apply and record an exact model-scoped
+execution plan:
+
+```shell
+./gradlew :models-bench:installDist
+models-bench/build/install/models-bench/bin/models-bench \
+  --backend pure-java \
+  --modeljar qwen3_0_6b_q4_0 \
+  --prompt-file models-bench/prompts/completion.txt \
+  --max-tokens 64 \
+  --warmups 2 \
+  --iterations 10 \
+  --context 2048 \
+  --output build/reports/inference/qwen3_0_6b_q4_0-pure-java.json
+```
+
+Benchmark schema 5 records `backendDiagnostics`, including the pure-Java plan version, runtime
+fingerprint, optimization decisions, and any enabled ModelJar performance profile. External
+Ollama and llama.cpp reports record explicit `unavailable` diagnostics.

@@ -17,13 +17,17 @@ package com.integrallis.models.bench;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.Tokenizer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.modeljars.ModelJarRegistry;
 
 class DeterminismAuditCliTest {
 
@@ -36,11 +40,49 @@ class DeterminismAuditCliTest {
     DeterminismAuditCli.Configuration configuration =
         DeterminismAuditCli.parse(new String[] {"--model", model.toString()});
 
-    assertThat(configuration.model()).isEqualTo(model);
+    assertThat(configuration.model().artifact()).isEqualTo(model);
+    assertThat(configuration.model().descriptor()).isEmpty();
     assertThat(configuration.generatedTokens()).isEqualTo(4);
     assertThat(configuration.iterations()).isEqualTo(3);
     assertThat(configuration.contextLength()).isEqualTo(128);
     assertThat(configuration.promptMode()).isEqualTo(DeterminismAuditCli.PromptMode.SEQUENTIAL);
+  }
+
+  @Test
+  void resolvesModelJarAliasWithoutDiscardingItsDescriptor() throws Exception {
+    Path model = Files.write(directory.resolve("modeljar.gguf"), new byte[] {1, 2, 3});
+    var descriptor = ModelJarTestFixtures.descriptor("fixture", model);
+
+    DeterminismAuditCli.Configuration configuration =
+        DeterminismAuditCli.parse(
+            new String[] {"--modeljar", "fixture"}, ModelJarRegistry.of(List.of(descriptor)));
+
+    assertThat(configuration.model().identity()).isEqualTo("fixture");
+    assertThat(configuration.model().artifact()).isEqualTo(model);
+    assertThat(configuration.model().descriptor()).contains(descriptor);
+    assertThat(configuration.modelId()).isEqualTo("fixture");
+  }
+
+  @Test
+  void recordsTheSelectedBackendPlanInDeterminismEvidence() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
+    DeterminismAuditCli.Configuration configuration =
+        DeterminismAuditCli.parse(new String[] {"--model", model.toString()});
+    DeterminismAuditCli.AuditResult audit =
+        DeterminismAuditCli.audit(
+            new DeterministicBackend(),
+            configuration.prompt(),
+            configuration.generatedTokens(),
+            configuration.iterations(),
+            configuration.promptMode());
+    BackendDiagnostics diagnostics =
+        new BackendDiagnostics("pure-java", "fixture-plan", Map.of(), List.of());
+
+    DeterminismAuditCli.Report report =
+        DeterminismAuditCli.buildReport(configuration, 1.25, audit, diagnostics);
+
+    assertThat(report.schemaVersion()).isEqualTo(2);
+    assertThat(report.backendDiagnostics()).isEqualTo(diagnostics);
   }
 
   @Test

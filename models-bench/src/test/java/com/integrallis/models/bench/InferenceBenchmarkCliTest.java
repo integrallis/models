@@ -20,8 +20,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.modeljars.ModelJarRegistry;
 
 class InferenceBenchmarkCliTest {
 
@@ -43,6 +45,23 @@ class InferenceBenchmarkCliTest {
     assertThat(configuration.warmups()).isEqualTo(2);
     assertThat(configuration.maxTokens()).isEqualTo(64);
     assertThat(configuration.speculativeOptions().enabled()).isFalse();
+    assertThat(configuration.modelJarDescriptor()).isEmpty();
+  }
+
+  @Test
+  void resolvesPureJavaModelJarWithoutDiscardingItsDescriptor() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
+    var descriptor = ModelJarTestFixtures.descriptor("fixture", model);
+
+    BenchmarkConfiguration configuration =
+        InferenceBenchmarkCli.parse(
+            new String[] {"--backend", "pure-java", "--modeljar", "fixture"},
+            ModelJarRegistry.of(List.of(descriptor)));
+
+    assertThat(configuration.model()).isEqualTo("fixture");
+    assertThat(configuration.modelId()).isEqualTo("fixture");
+    assertThat(configuration.artifact()).isEqualTo(model);
+    assertThat(configuration.modelJarDescriptor()).contains(descriptor);
   }
 
   @Test

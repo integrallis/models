@@ -15,12 +15,16 @@
  */
 package com.integrallis.models.bench;
 
+import com.integrallis.models.api.BackendDiagnostics;
+
 /** One loaded inference implementation used by the common benchmark runner. */
 interface BenchmarkTarget extends AutoCloseable {
 
   TrialMeasurement generate(String prompt, int maxTokens);
 
   double loadMillis();
+
+  BackendDiagnostics diagnostics();
 
   @Override
   void close();
