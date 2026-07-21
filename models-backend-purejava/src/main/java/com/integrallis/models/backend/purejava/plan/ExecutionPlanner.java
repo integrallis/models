@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v6";
+  public static final String PLAN_VERSION = "pure-java-v7";
 
   private ExecutionPlanner() {}
 
@@ -47,6 +47,7 @@ public final class ExecutionPlanner {
     boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
     boolean finalLayerKvOnlyPrefill =
         finalLayerKvOnlyPrefill(topology, configuration, finalLayerPrefillPruning, decisions);
+    boolean batchedAttentionScores = batchedAttentionScores(configuration, decisions);
     boolean batchedAttentionValues = batchedAttentionValues(configuration, decisions);
     decisions.add(
         new OptimizationDecision(
@@ -71,8 +72,23 @@ public final class ExecutionPlanner {
         prefillBatchSize,
         finalLayerPrefillPruning,
         finalLayerKvOnlyPrefill,
+        batchedAttentionScores,
         batchedAttentionValues,
         diagnostics);
+  }
+
+  private static boolean batchedAttentionScores(
+      PureJavaPlanConfiguration configuration, List<OptimizationDecision> decisions) {
+    boolean enabled = configuration.batchedAttentionScores();
+    decisions.add(
+        new OptimizationDecision(
+            "batched-attention-scores",
+            enabled ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            enabled
+                ? "the model profile selected exact two-row key scoring"
+                : "disabled by models.purejava.batchedAttentionScores",
+            Map.of("rows-per-group", enabled ? "2" : "1")));
+    return enabled;
   }
 
   private static boolean batchedAttentionValues(

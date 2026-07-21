@@ -30,6 +30,7 @@ public record PureJavaExecutionPlan(
     int prefillBatchSize,
     boolean finalLayerPrefillPruning,
     boolean finalLayerKvOnlyPrefill,
+    boolean batchedAttentionScores,
     boolean batchedAttentionValues,
     BackendDiagnostics diagnostics) {
 
