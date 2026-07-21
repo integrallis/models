@@ -126,6 +126,20 @@ public record ModelTopology(
     return Math.toIntExact(layers.stream().filter(LayerTopology::groupsMixedKQkv).count());
   }
 
+  boolean uses(GgufTensorType type) {
+    Objects.requireNonNull(type, "type");
+    return layers.stream()
+        .anyMatch(
+            layer ->
+                layer.query() == type
+                    || layer.key() == type
+                    || layer.value() == type
+                    || layer.attentionOutput() == type
+                    || layer.gate() == type
+                    || layer.up() == type
+                    || layer.down() == type);
+  }
+
   boolean supportsFinalLayerPrefillPruning() {
     LayerTopology finalLayer = layers.getLast();
     GgufTensorType type = finalLayer.gate();

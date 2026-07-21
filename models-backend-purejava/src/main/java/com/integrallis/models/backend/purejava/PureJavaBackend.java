@@ -98,11 +98,23 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
       String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
+      RuntimeFingerprint runtime = RuntimeFingerprint.capture();
+      ModelJarPerformanceSelection performanceSelection =
+          descriptor
+              .map(
+                  value ->
+                      ModelJarPerformanceSelection.evaluate(
+                          value,
+                          ModelPerformanceProfileRegistry.fromClasspath(),
+                          runtime.asEnvironment(),
+                          ManagementFactory.getRuntimeMXBean().getInputArguments()))
+              .orElseGet(ModelJarPerformanceSelection::none);
       PureJavaExecutionPlan executionPlan =
           ExecutionPlanner.plan(
-              RuntimeFingerprint.capture(),
+              runtime,
               ModelTopology.from(modelFamily, config, weights),
-              PureJavaPlanConfiguration.fromSystemProperties());
+              PureJavaPlanConfiguration.fromSystemProperties(
+                  performanceSelection.recommendations()));
       KvCache cache =
           new KvCache(
               config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());
@@ -121,17 +133,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
               config.numHeads(),
               config.numKvHeads());
 
-      BackendDiagnostics diagnostics =
-          descriptor
-              .map(
-                  value ->
-                      ModelJarLaunchDiagnostics.enrich(
-                          executionPlan.diagnostics(),
-                          value,
-                          ModelPerformanceProfileRegistry.fromClasspath(),
-                          executionPlan.runtime().asEnvironment(),
-                          ManagementFactory.getRuntimeMXBean().getInputArguments()))
-              .orElseGet(executionPlan::diagnostics);
+      BackendDiagnostics diagnostics = performanceSelection.enrich(executionPlan.diagnostics());
 
       return new PureJavaBackend(
           arena, config, tokenizer, forwardPass, metadata, executionPlan, diagnostics);

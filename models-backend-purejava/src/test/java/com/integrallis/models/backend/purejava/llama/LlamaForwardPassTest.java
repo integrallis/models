@@ -29,6 +29,7 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -855,7 +856,12 @@ class LlamaForwardPassTest {
         RuntimeFingerprint.capture(),
         ModelTopology.from("llama", config, weights),
         new PureJavaPlanConfiguration(
-            true, true, prefillBatchSize, finalLayerPrefillPruning, finalLayerKvOnlyPrefill));
+            true,
+            true,
+            GgufQ4Kernel.WIDENED,
+            prefillBatchSize,
+            finalLayerPrefillPruning,
+            finalLayerKvOnlyPrefill));
   }
 
   private static int argmax(float[] values) {

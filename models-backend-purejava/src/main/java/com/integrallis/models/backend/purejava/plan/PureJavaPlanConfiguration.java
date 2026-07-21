@@ -15,24 +15,44 @@
  */
 package com.integrallis.models.backend.purejava.plan;
 
-/** Explicit deployment overrides consumed once when a backend is loaded. */
+import com.integrallis.vectors.core.GgufQ4Kernel;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
+import java.util.Set;
+
+/** Validated load-time settings selected from deployment overrides and measured recommendations. */
 public record PureJavaPlanConfiguration(
     boolean groupedProjections,
     boolean mixedKProjections,
+    GgufQ4Kernel q4Kernel,
     int prefillBatchSize,
     boolean finalLayerPrefillPruning,
     boolean finalLayerKvOnlyPrefill) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
+  public static final String Q4_KERNEL_PROPERTY = "models.purejava.q4Kernel";
   public static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
   public static final String FINAL_LAYER_PREFILL_PRUNING_PROPERTY =
       "models.purejava.finalLayerPrefillPruning";
   public static final String FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY =
       "models.purejava.finalLayerKvOnlyPrefill";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
+  private static final String PROPERTY_PREFIX = "models.purejava.";
+  private static final Set<String> SUPPORTED_SETTINGS =
+      Set.of(
+          GROUPED_PROJECTIONS_PROPERTY,
+          MIXED_K_PROJECTIONS_PROPERTY,
+          Q4_KERNEL_PROPERTY,
+          PREFILL_BATCH_SIZE_PROPERTY,
+          FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
+          FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY);
 
   public PureJavaPlanConfiguration {
+    q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException(
           PREFILL_BATCH_SIZE_PROPERTY + " must be >= 1: " + prefillBatchSize);
@@ -41,17 +61,61 @@ public record PureJavaPlanConfiguration(
 
   /** Returns the stable default policy. */
   public static PureJavaPlanConfiguration defaults() {
-    return new PureJavaPlanConfiguration(true, true, DEFAULT_PREFILL_BATCH_SIZE, true, true);
+    return new PureJavaPlanConfiguration(
+        true, true, GgufQ4Kernel.WIDENED, DEFAULT_PREFILL_BATCH_SIZE, true, true);
   }
 
   /** Reads deployment overrides without running a performance probe. */
-  public static PureJavaPlanConfiguration fromSystemProperties() {
+  public static PureJavaPlanConfiguration fromSystemProperties(
+      Map<String, String> recommendations) {
+    Properties systemProperties = System.getProperties();
+    Map<String, String> deployment = new LinkedHashMap<>();
+    synchronized (systemProperties) {
+      SUPPORTED_SETTINGS.stream()
+          .sorted()
+          .forEach(
+              property -> {
+                String value = systemProperties.getProperty(property);
+                if (value != null) {
+                  deployment.put(property, value);
+                }
+              });
+    }
+    return from(Map.copyOf(deployment), recommendations);
+  }
+
+  static PureJavaPlanConfiguration from(
+      Map<String, String> deployment, Map<String, String> recommendations) {
+    Objects.requireNonNull(deployment, "deployment");
+    Objects.requireNonNull(recommendations, "recommendations");
+    validateSettings(deployment, "deployment setting");
+    validateSettings(recommendations, "recommendation");
     return new PureJavaPlanConfiguration(
-        groupedProjections(System.getProperty(GROUPED_PROJECTIONS_PROPERTY)),
-        mixedKProjections(System.getProperty(MIXED_K_PROJECTIONS_PROPERTY)),
-        prefillBatchSize(System.getProperty(PREFILL_BATCH_SIZE_PROPERTY)),
-        finalLayerPrefillPruning(System.getProperty(FINAL_LAYER_PREFILL_PRUNING_PROPERTY)),
-        finalLayerKvOnlyPrefill(System.getProperty(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY)));
+        groupedProjections(configured(GROUPED_PROJECTIONS_PROPERTY, deployment, recommendations)),
+        mixedKProjections(configured(MIXED_K_PROJECTIONS_PROPERTY, deployment, recommendations)),
+        q4Kernel(configured(Q4_KERNEL_PROPERTY, deployment, recommendations)),
+        prefillBatchSize(configured(PREFILL_BATCH_SIZE_PROPERTY, deployment, recommendations)),
+        finalLayerPrefillPruning(
+            configured(FINAL_LAYER_PREFILL_PRUNING_PROPERTY, deployment, recommendations)),
+        finalLayerKvOnlyPrefill(
+            configured(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, deployment, recommendations)));
+  }
+
+  private static void validateSettings(Map<String, String> settings, String source) {
+    settings.keySet().stream()
+        .filter(key -> key.startsWith(PROPERTY_PREFIX))
+        .filter(key -> !SUPPORTED_SETTINGS.contains(key))
+        .findFirst()
+        .ifPresent(
+            key -> {
+              throw new IllegalArgumentException("Unsupported pure-Java " + source + ": " + key);
+            });
+  }
+
+  private static String configured(
+      String property, Map<String, String> deployment, Map<String, String> recommendations) {
+    String configured = deployment.get(property);
+    return configured != null ? configured : recommendations.get(property);
   }
 
   static boolean groupedProjections(String configured) {
@@ -60,6 +124,19 @@ public record PureJavaPlanConfiguration(
 
   static boolean mixedKProjections(String configured) {
     return booleanProperty(MIXED_K_PROJECTIONS_PROPERTY, configured);
+  }
+
+  static GgufQ4Kernel q4Kernel(String configured) {
+    if (configured == null) {
+      return GgufQ4Kernel.WIDENED;
+    }
+    return switch (configured.trim().toLowerCase(Locale.ROOT)) {
+      case "widened" -> GgufQ4Kernel.WIDENED;
+      case "short-pairwise" -> GgufQ4Kernel.SHORT_PAIRWISE;
+      default ->
+          throw new IllegalArgumentException(
+              Q4_KERNEL_PROPERTY + " must be widened or short-pairwise: " + configured);
+    };
   }
 
   static boolean finalLayerPrefillPruning(String configured) {
