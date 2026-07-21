@@ -497,6 +497,19 @@ class LlamaForwardPassTest {
 
     @Test
     void batchedAttentionValueAccumulationPreservesCompleteAutoregressiveState() {
+      assertAttentionBatchingIsExact(false, false, false, true);
+    }
+
+    @Test
+    void batchedAttentionScoresPreserveCompleteAutoregressiveState() {
+      assertAttentionBatchingIsExact(false, true, true, true);
+    }
+
+    private void assertAttentionBatchingIsExact(
+        boolean baselineScores,
+        boolean baselineValues,
+        boolean candidateScores,
+        boolean candidateValues) {
       GgufFile file = buildQ4NanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
@@ -514,7 +527,8 @@ class LlamaForwardPassTest {
                 config,
                 weights,
                 baselineCache,
-                executionPlan(config, weights, batchSize, true, true, false));
+                executionPlan(
+                    config, weights, batchSize, true, true, baselineScores, baselineValues));
         float[] expected = baseline.prefill(tokens, 0).clone();
         float[] expectedKeys = baselineCache.keyBuffer().clone();
         float[] expectedValues = baselineCache.valueBuffer().clone();
@@ -529,10 +543,12 @@ class LlamaForwardPassTest {
                 config,
                 weights,
                 batchedCache,
-                executionPlan(config, weights, batchSize, true, true, true));
+                executionPlan(
+                    config, weights, batchSize, true, true, candidateScores, candidateValues));
         float[] actual = batched.prefill(tokens, 0);
 
-        assertThat(batched.usesBatchedAttentionValues()).isTrue();
+        assertThat(batched.usesBatchedAttentionScores()).isEqualTo(candidateScores);
+        assertThat(batched.usesBatchedAttentionValues()).isEqualTo(candidateValues);
         assertThat(actual).containsExactly(expected);
         assertThat(batchedCache.keyBuffer()).containsExactly(expectedKeys);
         assertThat(batchedCache.valueBuffer()).containsExactly(expectedValues);
@@ -939,6 +955,7 @@ class LlamaForwardPassTest {
         prefillBatchSize,
         finalLayerPrefillPruning,
         finalLayerKvOnlyPrefill,
+        false,
         false);
   }
 
@@ -948,6 +965,24 @@ class LlamaForwardPassTest {
       int prefillBatchSize,
       boolean finalLayerPrefillPruning,
       boolean finalLayerKvOnlyPrefill,
+      boolean batchedAttentionValues) {
+    return executionPlan(
+        config,
+        weights,
+        prefillBatchSize,
+        finalLayerPrefillPruning,
+        finalLayerKvOnlyPrefill,
+        false,
+        batchedAttentionValues);
+  }
+
+  private static PureJavaExecutionPlan executionPlan(
+      LlamaConfig config,
+      LlamaWeights weights,
+      int prefillBatchSize,
+      boolean finalLayerPrefillPruning,
+      boolean finalLayerKvOnlyPrefill,
+      boolean batchedAttentionScores,
       boolean batchedAttentionValues) {
     return ExecutionPlanner.plan(
         RuntimeFingerprint.capture(),
@@ -959,6 +994,7 @@ class LlamaForwardPassTest {
             prefillBatchSize,
             finalLayerPrefillPruning,
             finalLayerKvOnlyPrefill,
+            batchedAttentionScores,
             batchedAttentionValues));
   }
 

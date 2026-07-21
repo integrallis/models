@@ -54,6 +54,7 @@ public final class LlamaForwardPass {
   private final boolean groupedBatchedPrefill;
   private final boolean finalLayerPrefillPruning;
   private final boolean finalLayerKvOnlyPrefill;
+  private final boolean batchedAttentionScores;
   private final boolean batchedAttentionValues;
   private final int prefillBatchCapacity;
 
@@ -130,6 +131,7 @@ public final class LlamaForwardPass {
     this.q4Kernel = executionPlan.q4Kernel();
     this.finalLayerPrefillPruning = executionPlan.finalLayerPrefillPruning();
     this.finalLayerKvOnlyPrefill = executionPlan.finalLayerKvOnlyPrefill();
+    this.batchedAttentionScores = executionPlan.batchedAttentionScores();
     this.batchedAttentionValues = executionPlan.batchedAttentionValues();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
@@ -540,12 +542,7 @@ public final class LlamaForwardPass {
         int qOff = h * keyLength;
         int outputOffset = h * valueLength;
 
-        // Compute attention scores over all cached positions
-        for (int p = 0; p <= position; p++) {
-          int cacheOffset = cache.keyOffset(layer, p) + kvHead * keyLength;
-          float dot = VectorUtil.dotProduct(q, qOff, keyCache, cacheOffset, keyLength);
-          attentionScores[p] = dot * scale;
-        }
+        computeAttentionScores(q, qOff, layer, position, kvHead, keyCache, keyLength, scale);
 
         // Softmax over scores
         TensorOps.softmax(attentionScores, 0, position + 1);
@@ -705,6 +702,10 @@ public final class LlamaForwardPass {
 
   boolean usesBatchedAttentionValues() {
     return batchedAttentionValues;
+  }
+
+  boolean usesBatchedAttentionScores() {
+    return batchedAttentionScores;
   }
 
   private void finishFinalLayerKvOnlyBatch(
@@ -870,15 +871,44 @@ public final class LlamaForwardPass {
       int kvHead = head / groupSize;
       int qOffset = queryOffset + head * keyLength;
       int headOutputOffset = outputOffset + head * valueLength;
-      for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
-        int cacheOffset = cache.keyOffset(layer, cachedPosition) + kvHead * keyLength;
-        float dot = VectorUtil.dotProduct(query, qOffset, keyCache, cacheOffset, keyLength);
-        attentionScores[cachedPosition] = dot * scale;
-      }
+      computeAttentionScores(query, qOffset, layer, position, kvHead, keyCache, keyLength, scale);
 
       TensorOps.softmax(attentionScores, 0, position + 1);
       accumulateAttentionValues(
           output, headOutputOffset, layer, position, kvHead, valueCache, valueLength);
+    }
+  }
+
+  private void computeAttentionScores(
+      float[] query,
+      int queryOffset,
+      int layer,
+      int position,
+      int kvHead,
+      float[] keyCache,
+      int keyLength,
+      float scale) {
+    int firstKeyOffset = cache.keyOffset(layer, 0) + kvHead * keyLength;
+    if (batchedAttentionScores) {
+      VectorUtil.batchDotProductExact(
+          query,
+          queryOffset,
+          keyCache,
+          firstKeyOffset,
+          cache.keyDim(),
+          position + 1,
+          keyLength,
+          attentionScores,
+          0);
+      for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
+        attentionScores[cachedPosition] *= scale;
+      }
+      return;
+    }
+    for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
+      int cacheOffset = firstKeyOffset + cachedPosition * cache.keyDim();
+      float dot = VectorUtil.dotProduct(query, queryOffset, keyCache, cacheOffset, keyLength);
+      attentionScores[cachedPosition] = dot * scale;
     }
   }
 

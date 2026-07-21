@@ -31,6 +31,7 @@ public record PureJavaPlanConfiguration(
     int prefillBatchSize,
     boolean finalLayerPrefillPruning,
     boolean finalLayerKvOnlyPrefill,
+    boolean batchedAttentionScores,
     boolean batchedAttentionValues) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
@@ -41,6 +42,8 @@ public record PureJavaPlanConfiguration(
       "models.purejava.finalLayerPrefillPruning";
   public static final String FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY =
       "models.purejava.finalLayerKvOnlyPrefill";
+  public static final String BATCHED_ATTENTION_SCORES_PROPERTY =
+      "models.purejava.batchedAttentionScores";
   public static final String BATCHED_ATTENTION_VALUES_PROPERTY =
       "models.purejava.batchedAttentionValues";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
@@ -53,6 +56,7 @@ public record PureJavaPlanConfiguration(
           PREFILL_BATCH_SIZE_PROPERTY,
           FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
           FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
+          BATCHED_ATTENTION_SCORES_PROPERTY,
           BATCHED_ATTENTION_VALUES_PROPERTY);
 
   public PureJavaPlanConfiguration {
@@ -66,7 +70,7 @@ public record PureJavaPlanConfiguration(
   /** Returns the stable default policy. */
   public static PureJavaPlanConfiguration defaults() {
     return new PureJavaPlanConfiguration(
-        true, true, GgufQ4Kernel.WIDENED, DEFAULT_PREFILL_BATCH_SIZE, true, true, false);
+        true, true, GgufQ4Kernel.WIDENED, DEFAULT_PREFILL_BATCH_SIZE, true, true, false, false);
   }
 
   /** Reads deployment overrides without running a performance probe. */
@@ -103,6 +107,8 @@ public record PureJavaPlanConfiguration(
             configured(FINAL_LAYER_PREFILL_PRUNING_PROPERTY, deployment, recommendations)),
         finalLayerKvOnlyPrefill(
             configured(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, deployment, recommendations)),
+        batchedAttentionScores(
+            configured(BATCHED_ATTENTION_SCORES_PROPERTY, deployment, recommendations)),
         batchedAttentionValues(
             configured(BATCHED_ATTENTION_VALUES_PROPERTY, deployment, recommendations)));
   }
@@ -151,6 +157,10 @@ public record PureJavaPlanConfiguration(
 
   static boolean finalLayerKvOnlyPrefill(String configured) {
     return booleanProperty(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, configured);
+  }
+
+  static boolean batchedAttentionScores(String configured) {
+    return configured != null && booleanProperty(BATCHED_ATTENTION_SCORES_PROPERTY, configured);
   }
 
   static boolean batchedAttentionValues(String configured) {
