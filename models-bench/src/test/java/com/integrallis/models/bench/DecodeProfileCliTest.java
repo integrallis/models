@@ -55,7 +55,7 @@ class DecodeProfileCliTest {
         new DecodeProfileCli.Configuration(
             new PureJavaModelSource(model.toString(), model, Optional.empty()),
             "profile prompt",
-            128,
+            5,
             7,
             2,
             3,
@@ -78,18 +78,20 @@ class DecodeProfileCliTest {
             "prefill:1,2@0",
             "forward:7@2",
             "forward:7@3",
+            "reset",
+            "prefill:1,2@0",
             "record:start",
             "gc:snapshot",
+            "forward:7@2",
+            "forward:7@3",
             "forward:7@4",
-            "forward:7@5",
-            "forward:7@6",
             "gc:snapshot",
             "record:stop",
             "record:dump:decode.jfr");
     assertThat(result.promptTokens()).isEqualTo(2);
     assertThat(result.warmupTokens()).isEqualTo(2);
     assertThat(result.measuredTokens()).isEqualTo(3);
-    assertThat(result.logitChecksum()).isEqualTo(15.0);
+    assertThat(result.logitChecksum()).isEqualTo(9.0);
     assertThat(result.gcCollections()).isEqualTo(3);
     assertThat(result.gcPauseMillis()).isEqualTo(7);
   }
