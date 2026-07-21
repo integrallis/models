@@ -18,6 +18,8 @@ package com.integrallis.models.backend.purejava.plan;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v4";
+  public static final String PLAN_VERSION = "pure-java-v5";
 
   private ExecutionPlanner() {}
 
@@ -40,6 +42,7 @@ public final class ExecutionPlanner {
     List<OptimizationDecision> decisions = new ArrayList<>();
     boolean grouped = groupedProjections(topology, configuration, decisions);
     boolean mixedK = mixedKProjections(topology, configuration, grouped, decisions);
+    GgufQ4Kernel q4Kernel = q4Kernel(runtime, topology, configuration, decisions);
     int prefillBatchSize = batchedPrefill(topology, configuration, decisions);
     boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
     boolean finalLayerKvOnlyPrefill =
@@ -63,10 +66,65 @@ public final class ExecutionPlanner {
         topology,
         grouped,
         mixedK,
+        q4Kernel,
         prefillBatchSize,
         finalLayerPrefillPruning,
         finalLayerKvOnlyPrefill,
         diagnostics);
+  }
+
+  private static GgufQ4Kernel q4Kernel(
+      RuntimeFingerprint runtime,
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      List<OptimizationDecision> decisions) {
+    GgufQ4Kernel requested = configuration.q4Kernel();
+    Map<String, String> settings =
+        Map.of(
+            "requested",
+            kernelName(requested),
+            "active-vector-bits",
+            Integer.toString(runtime.vectorBits()),
+            "supported",
+            Boolean.toString(runtime.q4ShortPairwiseSupported()));
+    if (!topology.uses(GgufTensorType.Q4_0)) {
+      decisions.add(
+          new OptimizationDecision(
+              "q4-short-pairwise",
+              OptimizationStatus.UNSUPPORTED,
+              "the loaded model has no Q4_0 projection tensors",
+              settings));
+      return GgufQ4Kernel.WIDENED;
+    }
+    if (requested == GgufQ4Kernel.WIDENED) {
+      decisions.add(
+          new OptimizationDecision(
+              "q4-short-pairwise",
+              OptimizationStatus.DISABLED,
+              "the stable widened Q4 kernel was selected",
+              settings));
+      return requested;
+    }
+    if (!runtime.q4ShortPairwiseSupported()) {
+      decisions.add(
+          new OptimizationDecision(
+              "q4-short-pairwise",
+              OptimizationStatus.UNSUPPORTED,
+              "the active Vector API shape cannot execute the measured pairwise kernel",
+              settings));
+      return GgufQ4Kernel.WIDENED;
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "q4-short-pairwise",
+            OptimizationStatus.ENABLED,
+            "the model-scoped execution plan selected the measured pairwise Q4 kernel",
+            settings));
+    return requested;
+  }
+
+  private static String kernelName(GgufQ4Kernel kernel) {
+    return kernel.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
   }
 
   private static boolean finalLayerKvOnlyPrefill(

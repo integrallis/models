@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
@@ -37,6 +38,7 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
     assertThat(plan.groupedProjections()).isTrue();
+    assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isTrue();
@@ -93,6 +95,46 @@ class ExecutionPlannerTest {
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
     assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+  }
+
+  @Test
+  void selectsShortPairwiseOnlyForEligibleQ4ModelsAndRuntimes() {
+    PureJavaPlanConfiguration configuration =
+        new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.SHORT_PAIRWISE, 32, true, true);
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), configuration);
+
+    assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
+    assertThat(plan.diagnostics().optimization("q4-short-pairwise"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+  }
+
+  @Test
+  void fallsBackToWidenedWhenTheRuntimeCannotExecuteShortPairwise() {
+    RuntimeFingerprint runtime =
+        new RuntimeFingerprint(
+            "25.0.3",
+            "OpenJDK 64-Bit Server VM",
+            "Eclipse Adoptium",
+            "25.0.3+9",
+            "hotspot-c2",
+            "Linux",
+            "amd64",
+            128,
+            8);
+    PureJavaPlanConfiguration configuration =
+        new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.SHORT_PAIRWISE, 32, true, true);
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(runtime, uniformTopology(GgufTensorType.Q4_0), configuration);
+
+    assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
+    assertThat(plan.diagnostics().optimization("q4-short-pairwise"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
@@ -157,7 +199,7 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("hotspot-c2"),
             topology,
-            new PureJavaPlanConfiguration(true, false, 32, true, true));
+            new PureJavaPlanConfiguration(true, false, GgufQ4Kernel.WIDENED, 32, true, true));
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isFalse();
@@ -169,7 +211,7 @@ class ExecutionPlannerTest {
   @Test
   void explicitOverridesDisableOtherwiseEligibleOptimizations() {
     PureJavaPlanConfiguration configuration =
-        new PureJavaPlanConfiguration(false, true, 1, false, false);
+        new PureJavaPlanConfiguration(false, true, GgufQ4Kernel.WIDENED, 1, false, false);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -199,7 +241,7 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("hotspot-c2"),
             uniformTopology(GgufTensorType.Q4_0),
-            new PureJavaPlanConfiguration(true, true, 32, true, false));
+            new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.WIDENED, 32, true, false));
 
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -217,7 +259,7 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("hotspot-c2"),
             uniformTopology(GgufTensorType.Q4_0),
-            new PureJavaPlanConfiguration(true, true, 32, false, true));
+            new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.WIDENED, 32, false, true));
 
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -324,7 +366,8 @@ class ExecutionPlannerTest {
 
   @Test
   void invalidConfigurationIsRejectedWithoutAStartupProbe() {
-    assertThatThrownBy(() -> new PureJavaPlanConfiguration(true, true, 0, true, true))
+    assertThatThrownBy(
+            () -> new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.WIDENED, 0, true, true))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThatThrownBy(() -> PureJavaPlanConfiguration.groupedProjections("sometimes"))
@@ -353,6 +396,68 @@ class ExecutionPlannerTest {
         .hasMessageContaining("models.purejava.finalLayerKvOnlyPrefill");
     assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill("false")).isFalse();
+    assertThat(PureJavaPlanConfiguration.q4Kernel(null)).isEqualTo(GgufQ4Kernel.WIDENED);
+    assertThat(PureJavaPlanConfiguration.q4Kernel("short-pairwise"))
+        .isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
+    assertThat(PureJavaPlanConfiguration.q4Kernel("widened")).isEqualTo(GgufQ4Kernel.WIDENED);
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.q4Kernel("fastest"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.q4Kernel");
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.q4Kernel(" "))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.q4Kernel");
+  }
+
+  @Test
+  void modelRecommendationsConfigureThePlanAndDeploymentSettingsTakePrecedence() {
+    Map<String, String> recommendations =
+        Map.of(
+            PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY,
+            "false",
+            PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
+            "false",
+            PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY,
+            "short-pairwise",
+            PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY,
+            "16",
+            PureJavaPlanConfiguration.FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
+            "false",
+            PureJavaPlanConfiguration.FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
+            "false");
+
+    PureJavaPlanConfiguration recommended =
+        PureJavaPlanConfiguration.from(Map.of(), recommendations);
+
+    assertThat(recommended.groupedProjections()).isFalse();
+    assertThat(recommended.mixedKProjections()).isFalse();
+    assertThat(recommended.q4Kernel()).isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
+    assertThat(recommended.prefillBatchSize()).isEqualTo(16);
+    assertThat(recommended.finalLayerPrefillPruning()).isFalse();
+    assertThat(recommended.finalLayerKvOnlyPrefill()).isFalse();
+
+    PureJavaPlanConfiguration overridden =
+        PureJavaPlanConfiguration.from(
+            Map.of(
+                PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY,
+                "widened"),
+            recommendations);
+
+    assertThat(overridden.mixedKProjections()).isTrue();
+    assertThat(overridden.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
+    assertThatThrownBy(
+            () ->
+                PureJavaPlanConfiguration.from(
+                    Map.of(), Map.of("models.purejava.unrecognized", "true")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Unsupported pure-Java recommendation");
+    assertThatThrownBy(
+            () ->
+                PureJavaPlanConfiguration.from(
+                    Map.of("models.purejava.misspelled", "true"), Map.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Unsupported pure-Java deployment setting");
   }
 
   @Test
@@ -375,7 +480,15 @@ class ExecutionPlannerTest {
     assertThatThrownBy(
             () ->
                 new PureJavaExecutionPlan(
-                    runtime, unsupported, true, false, 32, true, true, valid.diagnostics()))
+                    runtime,
+                    unsupported,
+                    true,
+                    false,
+                    GgufQ4Kernel.WIDENED,
+                    32,
+                    true,
+                    true,
+                    valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("topology");
   }
@@ -390,7 +503,15 @@ class ExecutionPlannerTest {
     assertThatThrownBy(
             () ->
                 new PureJavaExecutionPlan(
-                    runtime, topology, true, false, 32, false, true, valid.diagnostics()))
+                    runtime,
+                    topology,
+                    true,
+                    false,
+                    GgufQ4Kernel.WIDENED,
+                    32,
+                    false,
+                    true,
+                    valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("K/V-only");
   }

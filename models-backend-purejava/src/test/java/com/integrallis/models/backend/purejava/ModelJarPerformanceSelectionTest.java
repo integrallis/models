@@ -32,24 +32,25 @@ import org.modeljars.ModelPerformanceProfile;
 import org.modeljars.ModelPerformanceProfileRegistry;
 
 @Tag("unit")
-class ModelJarLaunchDiagnosticsTest {
+class ModelJarPerformanceSelectionTest {
 
+  private static final String Q4_KERNEL = "models.purejava.q4Kernel";
   private static final String DECISION_ID = "modeljars.profile.qwen3.0.6b.q4.0.epyc.milan.jdk25";
 
   @Test
-  void enablesOnlyAnExactRuntimeWithEveryStartupArgument() {
+  void appliesRecommendationsOnlyForAnExactRuntimeWithEveryStartupArgument() {
     Fixture fixture = fixture();
     List<String> inputArguments = fixture.profile().javaLaunch().orElseThrow().jvmArguments();
 
-    BackendDiagnostics diagnostics =
-        ModelJarLaunchDiagnostics.enrich(
-            base(),
+    ModelJarPerformanceSelection selection =
+        ModelJarPerformanceSelection.evaluate(
             fixture.descriptor(),
             fixture.registry(),
             fixture.profile().runtimeSelector(),
             inputArguments);
 
-    assertThat(diagnostics.optimization(DECISION_ID))
+    assertThat(selection.recommendations()).containsExactly(Map.entry(Q4_KERNEL, "short-pairwise"));
+    assertThat(selection.enrich(base()).optimization(DECISION_ID))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
@@ -61,39 +62,39 @@ class ModelJarLaunchDiagnosticsTest {
   }
 
   @Test
-  void reportsArgumentsThatRequireAProcessRestart() {
+  void withholdsRecommendationsWhenARequiredArgumentNeedsARestart() {
     Fixture fixture = fixture();
-    List<String> required = fixture.profile().javaLaunch().orElseThrow().jvmArguments();
 
-    BackendDiagnostics diagnostics =
-        ModelJarLaunchDiagnostics.enrich(
-            base(),
+    ModelJarPerformanceSelection selection =
+        ModelJarPerformanceSelection.evaluate(
             fixture.descriptor(),
             fixture.registry(),
             fixture.profile().runtimeSelector(),
-            List.of(required.getFirst()));
+            List.of());
 
-    assertThat(diagnostics.optimization(DECISION_ID))
+    assertThat(selection.recommendations()).isEmpty();
+    assertThat(selection.enrich(base()).optimization(DECISION_ID))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
               assertThat(decision.reason()).contains("restart");
               assertThat(decision.settings().get("missing-jvm-arguments"))
-                  .isEqualTo("-Dvectors.gguf.q4ShortPairwise=true");
+                  .isEqualTo("-Djdk.graal.MaximumInliningSize=10000");
             });
   }
 
   @Test
-  void doesNotRecommendAProfileMeasuredForAnotherPlatform() {
+  void withholdsRecommendationsMeasuredForAnotherPlatform() {
     Fixture fixture = fixture();
     Map<String, String> runtime = new HashMap<>(fixture.profile().runtimeSelector());
     runtime.put("os", "macOS");
 
-    BackendDiagnostics diagnostics =
-        ModelJarLaunchDiagnostics.enrich(
-            base(), fixture.descriptor(), fixture.registry(), runtime, List.of());
+    ModelJarPerformanceSelection selection =
+        ModelJarPerformanceSelection.evaluate(
+            fixture.descriptor(), fixture.registry(), runtime, List.of());
 
-    assertThat(diagnostics.optimization(DECISION_ID))
+    assertThat(selection.recommendations()).isEmpty();
+    assertThat(selection.enrich(base()).optimization(DECISION_ID))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED);

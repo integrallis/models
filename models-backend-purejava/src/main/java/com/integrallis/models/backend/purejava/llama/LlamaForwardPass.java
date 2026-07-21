@@ -24,8 +24,10 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -47,6 +49,7 @@ public final class LlamaForwardPass {
   private final LayerObserver layerObserver;
   private final boolean groupedProjections;
   private final boolean mixedKProjections;
+  private final GgufQ4Kernel q4Kernel;
   private final boolean batchedPrefill;
   private final boolean groupedBatchedPrefill;
   private final boolean finalLayerPrefillPruning;
@@ -123,6 +126,7 @@ public final class LlamaForwardPass {
     }
     this.groupedProjections = executionPlan.groupedProjections();
     this.mixedKProjections = executionPlan.mixedKProjections();
+    this.q4Kernel = executionPlan.q4Kernel();
     this.finalLayerPrefillPruning = executionPlan.finalLayerPrefillPruning();
     this.finalLayerKvOnlyPrefill = executionPlan.finalLayerKvOnlyPrefill();
     this.ropeTable =
@@ -924,7 +928,8 @@ public final class LlamaForwardPass {
         cols,
         quantizedActivation,
         quantizedActivationScales,
-        quantizedActivationSums);
+        quantizedActivationSums,
+        q4Kernel);
   }
 
   private void dualMatmulDispatch(
@@ -951,7 +956,8 @@ public final class LlamaForwardPass {
         cols,
         quantizedActivation,
         quantizedActivationScales,
-        quantizedActivationSums);
+        quantizedActivationSums,
+        q4Kernel);
   }
 
   private void tripleMatmulDispatch(
@@ -987,6 +993,7 @@ public final class LlamaForwardPass {
         quantizedActivation,
         quantizedActivationScales,
         quantizedActivationSums,
+        q4Kernel,
         mixedKProjections);
   }
 
@@ -1017,7 +1024,8 @@ public final class LlamaForwardPass {
         batchQuantizedActivation,
         batchQuantizedActivationScales,
         batchQuantizedActivationSums,
-        batchQ4LaneScratch);
+        batchQ4LaneScratch,
+        q4Kernel);
   }
 
   private void tripleBatchedMatmulDispatch(
@@ -1056,6 +1064,7 @@ public final class LlamaForwardPass {
         batchQuantizedActivationScales,
         batchQuantizedActivationSums,
         batchQ4LaneScratch,
+        q4Kernel,
         mixedKProjections);
   }
 
@@ -1078,7 +1087,8 @@ public final class LlamaForwardPass {
         batchQuantizedActivation,
         batchQuantizedActivationScales,
         batchQuantizedActivationSums,
-        batchQ4LaneScratch);
+        batchQ4LaneScratch,
+        q4Kernel);
   }
 
   private static boolean usesProjectionType(
@@ -1164,6 +1174,6 @@ public final class LlamaForwardPass {
     return ExecutionPlanner.plan(
         RuntimeFingerprint.capture(),
         ModelTopology.from("llama", config, weights),
-        PureJavaPlanConfiguration.fromSystemProperties());
+        PureJavaPlanConfiguration.fromSystemProperties(Map.of()));
   }
 }

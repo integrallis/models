@@ -178,20 +178,24 @@ try (PureJavaBackend backend = PureJavaBackend.load(model)) {
 ```
 
 Diagnostics identify enabled, disabled, and unsupported choices, including the
-resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, prefill
-batch size, final-layer output-row policy, mapped weights, Vector FMA policy,
-final-layer K/V-only policy, and persistent row executor.
+resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, Q4_0
+arithmetic kernel, prefill batch size, final-layer output-row policy, mapped
+weights, Vector FMA policy, final-layer K/V-only policy, and persistent row
+executor.
 When the backend is loaded from a `ModelJarDescriptor`, diagnostics also retain
-the exact marker coordinate and SHA and assess every measured Java launch
+the exact marker coordinate and SHA and assess every measured performance
 profile against the current JVM, processor topology, vector width, and startup
-arguments. A missing compiler flag or system property is reported as requiring
-a process restart; Models never pretends to apply JVM startup options after
-model loading.
+arguments. Model-scoped recommendations are applied only when the artifact SHA,
+complete runtime selector, deterministic-output evidence, and required launch
+arguments all match. A missing compiler flag is reported as requiring a process
+restart; Models never pretends to apply JVM startup options after model loading.
 `models.purejava.groupedProjections`, `models.purejava.mixedKProjections`,
-`models.purejava.prefillBatchSize`, and
+`models.purejava.q4Kernel`, `models.purejava.prefillBatchSize`,
 `models.purejava.finalLayerPrefillPruning`, and
 `models.purejava.finalLayerKvOnlyPrefill` are parsed once per load. Malformed
-explicit values fail rather than silently reverting to defaults. Eligible
+explicit values fail rather than silently reverting to defaults, and explicit
+deployment values override ModelJars recommendations. The Q4 kernel accepts
+`widened` or `short-pairwise`; ordinary loads use `widened`. Eligible
 mixed-K Q/K/V projections share one Q8_K activation quantization and one row
 dispatch. The mixed path remains inactive for every other tensor layout.
 Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the

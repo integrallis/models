@@ -16,6 +16,8 @@
 package com.integrallis.models.backend.purejava.plan;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.util.Objects;
 
 /** Immutable execution choices selected for one loaded pure-Java model. */
@@ -24,6 +26,7 @@ public record PureJavaExecutionPlan(
     ModelTopology topology,
     boolean groupedProjections,
     boolean mixedKProjections,
+    GgufQ4Kernel q4Kernel,
     int prefillBatchSize,
     boolean finalLayerPrefillPruning,
     boolean finalLayerKvOnlyPrefill,
@@ -32,6 +35,7 @@ public record PureJavaExecutionPlan(
   public PureJavaExecutionPlan {
     runtime = Objects.requireNonNull(runtime, "runtime");
     topology = Objects.requireNonNull(topology, "topology");
+    q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException("prefillBatchSize must be >= 1");
     }
@@ -42,6 +46,11 @@ public record PureJavaExecutionPlan(
     if (mixedKProjections && (!groupedProjections || topology.mixedKProjectionLayers() == 0)) {
       throw new IllegalArgumentException(
           "mixed K-quant projections contradict the execution plan topology");
+    }
+    if (q4Kernel == GgufQ4Kernel.SHORT_PAIRWISE
+        && (!runtime.q4ShortPairwiseSupported() || !topology.uses(GgufTensorType.Q4_0))) {
+      throw new IllegalArgumentException(
+          "short-pairwise Q4 kernel contradicts the execution plan runtime or topology");
     }
     if (prefillBatchSize > 1 && !topology.supportsBatchedPrefill()) {
       throw new IllegalArgumentException("batched prefill contradicts the execution plan topology");
