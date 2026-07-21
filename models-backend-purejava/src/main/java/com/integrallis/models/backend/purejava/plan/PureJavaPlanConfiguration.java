@@ -145,9 +145,12 @@ public record PureJavaPlanConfiguration(
     return switch (configured.trim().toLowerCase(Locale.ROOT)) {
       case "widened" -> GgufQ4Kernel.WIDENED;
       case "short-pairwise" -> GgufQ4Kernel.SHORT_PAIRWISE;
+      case "unsigned-pairwise" -> GgufQ4Kernel.UNSIGNED_PAIRWISE;
       default ->
           throw new IllegalArgumentException(
-              Q4_KERNEL_PROPERTY + " must be widened or short-pairwise: " + configured);
+              Q4_KERNEL_PROPERTY
+                  + " must be widened, short-pairwise, or unsigned-pairwise: "
+                  + configured);
     };
   }
 

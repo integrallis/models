@@ -220,6 +220,7 @@ class SqlCoderLargeModelJarsSlowTest {
         cols,
         new byte[cols],
         new float[cols / 256],
+        new int[(cols + 3) / 4],
         new short[cols / 16],
         GgufQ4Kernel.WIDENED);
 
@@ -251,6 +252,7 @@ class SqlCoderLargeModelJarsSlowTest {
         cols,
         new byte[cols],
         new float[cols / 256],
+        new int[(cols + 3) / 4],
         new short[cols / 16],
         GgufQ4Kernel.WIDENED);
 

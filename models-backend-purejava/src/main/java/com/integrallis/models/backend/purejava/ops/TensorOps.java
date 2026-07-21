@@ -81,11 +81,12 @@ public final class TensorOps {
           cols,
           new byte[cols],
           new float[cols / activationBlockSize],
+          new int[(cols + 3) / 4],
           new short[(cols + 15) / 16],
           GgufQ4Kernel.WIDENED);
       return;
     }
-    ggufMatmul(out, x, qWeight, type, rows, cols, null, null, null, GgufQ4Kernel.WIDENED);
+    ggufMatmul(out, x, qWeight, type, rows, cols, null, null, null, null, GgufQ4Kernel.WIDENED);
   }
 
   /**
@@ -109,6 +110,7 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        new int[(cols + 3) / 4],
         type == GgufTensorType.Q4_K || type == GgufTensorType.Q5_K
             ? new short[(cols + 15) / 16]
             : null,
@@ -125,6 +127,7 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivation,
       float[] quantizedActivationScales,
+      int[] quantizedActivationZeroPointCorrections,
       short[] quantizedActivationSums,
       GgufQ4Kernel q4Kernel) {
     Objects.requireNonNull(q4Kernel, "q4Kernel");
@@ -139,6 +142,7 @@ public final class TensorOps {
               out,
               quantizedActivation,
               quantizedActivationScales,
+              quantizedActivationZeroPointCorrections,
               q4Kernel);
       case Q5_0 ->
           VectorUtil.ggufQ5_0Q8_0BatchDotProduct(
@@ -187,6 +191,7 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivation,
       float[] quantizedActivationScales,
+      int[] quantizedActivationZeroPointCorrections,
       short[] quantizedActivationSums,
       GgufQ4Kernel q4Kernel) {
     Objects.requireNonNull(q4Kernel, "q4Kernel");
@@ -204,6 +209,7 @@ public final class TensorOps {
                 cols,
                 quantizedActivation,
                 quantizedActivationScales,
+                quantizedActivationZeroPointCorrections,
                 q4Kernel);
         case Q8_0 ->
             VectorUtil.ggufQ8_0Q8_0DualBatchDotProduct(
@@ -257,6 +263,7 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel);
     ggufMatmul(
@@ -268,6 +275,7 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel);
   }
@@ -290,6 +298,7 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivation,
       float[] quantizedActivationScales,
+      int[] quantizedActivationZeroPointCorrections,
       short[] quantizedActivationSums,
       GgufQ4Kernel q4Kernel) {
     ggufTripleMatmul(
@@ -309,6 +318,7 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel,
         true);
@@ -332,6 +342,7 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivation,
       float[] quantizedActivationScales,
+      int[] quantizedActivationZeroPointCorrections,
       short[] quantizedActivationSums,
       GgufQ4Kernel q4Kernel,
       boolean mixedKProjections) {
@@ -376,6 +387,7 @@ public final class TensorOps {
                   cols,
                   quantizedActivation,
                   quantizedActivationScales,
+                  quantizedActivationZeroPointCorrections,
                   q4Kernel);
           case Q4_K ->
               VectorUtil.ggufQ4_KQ8_KTripleBatchDotProduct(
@@ -428,6 +440,7 @@ public final class TensorOps {
             cols,
             quantizedActivation,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4Kernel);
         ggufMatmul(
@@ -439,6 +452,7 @@ public final class TensorOps {
             cols,
             quantizedActivation,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4Kernel);
         return;
@@ -457,6 +471,7 @@ public final class TensorOps {
             cols,
             quantizedActivation,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4Kernel);
         ggufMatmul(
@@ -468,6 +483,7 @@ public final class TensorOps {
             cols,
             quantizedActivation,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4Kernel);
         return;
@@ -486,6 +502,7 @@ public final class TensorOps {
             cols,
             quantizedActivation,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4Kernel);
         ggufMatmul(
@@ -497,6 +514,7 @@ public final class TensorOps {
             cols,
             quantizedActivation,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4Kernel);
         return;
@@ -515,6 +533,7 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel);
     ggufMatmul(
@@ -526,6 +545,7 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel);
     ggufMatmul(
@@ -537,6 +557,7 @@ public final class TensorOps {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel);
   }
@@ -556,6 +577,7 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivations,
       float[] quantizedActivationScales,
+      int[] quantizedActivationZeroPointCorrections,
       short[] quantizedActivationSums,
       float[] q4LaneScratch,
       GgufQ4Kernel q4Kernel) {
@@ -575,6 +597,7 @@ public final class TensorOps {
               cols,
               quantizedActivations,
               quantizedActivationScales,
+              quantizedActivationZeroPointCorrections,
               q4LaneScratch,
               q4Kernel);
           return;
@@ -626,6 +649,7 @@ public final class TensorOps {
         cols,
         quantizedActivations,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4LaneScratch,
         q4Kernel);
@@ -639,6 +663,7 @@ public final class TensorOps {
         cols,
         quantizedActivations,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4LaneScratch,
         q4Kernel);
@@ -663,6 +688,7 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivations,
       float[] quantizedActivationScales,
+      int[] quantizedActivationZeroPointCorrections,
       short[] quantizedActivationSums,
       float[] q4LaneScratch,
       GgufQ4Kernel q4Kernel,
@@ -710,6 +736,7 @@ public final class TensorOps {
               cols,
               quantizedActivations,
               quantizedActivationScales,
+              quantizedActivationZeroPointCorrections,
               q4LaneScratch,
               q4Kernel);
           return;
@@ -728,6 +755,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -741,6 +769,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -761,6 +790,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -774,6 +804,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -794,6 +825,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -807,6 +839,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -827,6 +860,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -840,6 +874,7 @@ public final class TensorOps {
             cols,
             quantizedActivations,
             quantizedActivationScales,
+            quantizedActivationZeroPointCorrections,
             quantizedActivationSums,
             q4LaneScratch,
             q4Kernel);
@@ -861,6 +896,7 @@ public final class TensorOps {
         cols,
         quantizedActivations,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4LaneScratch,
         q4Kernel);
@@ -874,6 +910,7 @@ public final class TensorOps {
         cols,
         quantizedActivations,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4LaneScratch,
         q4Kernel);
@@ -887,6 +924,7 @@ public final class TensorOps {
         cols,
         quantizedActivations,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4LaneScratch,
         q4Kernel);
@@ -972,6 +1010,7 @@ public final class TensorOps {
       int cols,
       byte[] quantizedActivations,
       float[] quantizedActivationScales,
+      int[] quantizedActivationZeroPointCorrections,
       short[] quantizedActivationSums,
       float[] q4LaneScratch,
       GgufQ4Kernel q4Kernel) {
@@ -990,6 +1029,7 @@ public final class TensorOps {
               out,
               quantizedActivations,
               quantizedActivationScales,
+              quantizedActivationZeroPointCorrections,
               q4LaneScratch,
               q4Kernel);
       case Q5_0 ->

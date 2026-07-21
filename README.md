@@ -197,7 +197,9 @@ restart; Models never pretends to apply JVM startup options after model loading.
 `models.purejava.batchedAttentionValues` are parsed once per load. Malformed
 explicit values fail rather than silently reverting to defaults, and explicit
 deployment values override ModelJars recommendations. The Q4 kernel accepts
-`widened` or `short-pairwise`; ordinary loads use `widened`. Eligible
+`widened`, `short-pairwise`, or `unsigned-pairwise`; ordinary loads use
+`widened`. Optimized kernels require the corresponding Vectors runtime capability, while automatic
+selection remains scoped to an exact measured ModelJars profile. Eligible
 mixed-K Q/K/V projections share one Q8_K activation quantization and one row
 dispatch. The mixed path remains inactive for every other tensor layout.
 Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the

@@ -43,6 +43,7 @@ public record RuntimeFingerprint(
     boolean fastScalarFma,
     boolean sve,
     boolean q4ShortPairwiseSupported,
+    boolean q4UnsignedPairwiseSupported,
     String ggufExecutor,
     int ggufThreads,
     int ggufChunksPerThread,
@@ -103,6 +104,7 @@ public record RuntimeFingerprint(
         false,
         false,
         vectorBits >= 256,
+        vectorBits >= 256,
         "persistent",
         processors,
         2,
@@ -136,6 +138,7 @@ public record RuntimeFingerprint(
         false,
         false,
         false,
+        vectorBits >= 256,
         vectorBits >= 256,
         "persistent",
         processors,
@@ -198,6 +201,7 @@ public record RuntimeFingerprint(
         vectors.fastScalarFma(),
         vectors.sve(),
         vectors.q4ShortPairwiseSupported(),
+        vectors.q4UnsignedPairwiseSupported(),
         vectors.ggufExecutor(),
         vectors.ggufThreads(),
         vectors.ggufChunksPerThread(),
@@ -223,6 +227,8 @@ public record RuntimeFingerprint(
     environment.put("fast-vector-fma", Boolean.toString(fastVectorFma));
     environment.put("fast-scalar-fma", Boolean.toString(fastScalarFma));
     environment.put("q4-short-pairwise-supported", Boolean.toString(q4ShortPairwiseSupported));
+    environment.put(
+        "q4-unsigned-pairwise-supported", Boolean.toString(q4UnsignedPairwiseSupported));
     environment.put("sve", Boolean.toString(sve));
     environment.put("gguf-executor", ggufExecutor);
     environment.put("gguf-threads", Integer.toString(ggufThreads));

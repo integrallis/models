@@ -115,6 +115,7 @@ class SmolLm2ModelJarsIntegrationTest {
           cols,
           new byte[cols],
           new float[cols / 32],
+          new int[(cols + 3) / 4],
           new short[cols / 16],
           GgufQ4Kernel.WIDENED);
 
