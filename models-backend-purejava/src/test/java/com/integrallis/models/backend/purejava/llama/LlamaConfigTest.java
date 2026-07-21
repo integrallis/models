@@ -31,6 +31,12 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class LlamaConfigTest {
 
+  @Test
+  void doesNotExposeEqualWidthKvCompatibilityAccessor() {
+    assertThatThrownBy(() -> LlamaConfig.class.getDeclaredMethod("kvDim"))
+        .isInstanceOf(NoSuchMethodException.class);
+  }
+
   private GgufMetadata createLlamaMetadata(
       int embeddingDim, int blockCount, int headCount, int headCountKv) {
     Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
@@ -68,7 +74,8 @@ class LlamaConfigTest {
       assertThat(config.hiddenDim()).isEqualTo(5504);
       assertThat(config.ropeTheta()).isEqualTo(500000.0f);
       assertThat(config.headDim()).isEqualTo(64); // 2048/32
-      assertThat(config.kvDim()).isEqualTo(512); // 64*8
+      assertThat(config.keyDim()).isEqualTo(512); // 64*8
+      assertThat(config.valueDim()).isEqualTo(512); // 64*8
     }
 
     @Test
