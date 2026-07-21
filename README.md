@@ -191,8 +191,9 @@ arguments all match. A missing compiler flag is reported as requiring a process
 restart; Models never pretends to apply JVM startup options after model loading.
 `models.purejava.groupedProjections`, `models.purejava.mixedKProjections`,
 `models.purejava.q4Kernel`, `models.purejava.prefillBatchSize`,
-`models.purejava.finalLayerPrefillPruning`, and
-`models.purejava.finalLayerKvOnlyPrefill`, and
+`models.purejava.finalLayerPrefillPruning`,
+`models.purejava.finalLayerKvOnlyPrefill`,
+`models.purejava.batchedAttentionScores`, and
 `models.purejava.batchedAttentionValues` are parsed once per load. Malformed
 explicit values fail rather than silently reverting to defaults, and explicit
 deployment values override ModelJars recommendations. The Q4 kernel accepts
@@ -210,6 +211,13 @@ or a deployment can select it explicitly with
 value rows through the generic Vectors weighted-row primitive, preserves the
 existing summation order, and is reported as `batched-attention-values` in
 backend diagnostics.
+
+Exact attention-score batching is also disabled for ordinary loads and selected
+only by a matching profile or
+`-Dmodels.purejava.batchedAttentionScores=true`. It shares each query-vector
+load across two strided key-cache rows through Vectors while preserving the
+active provider's independent dot-product result bit for bit. Diagnostics
+report the route as `batched-attention-scores`.
 
 Ordinary prefill requests logits only for the final prompt token. For validated
 final layers whose attention and FFN projections are uniformly Q4_0 or uniformly

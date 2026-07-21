@@ -133,6 +133,37 @@ batch one and batch 32. The default-on Qwen path passed its pinned llama.cpp gre
 every-layer state test. Use `-Dmodels.purejava.finalLayerKvOnlyPrefill=false` to return to the
 retained FFN-only baseline.
 
+## Retained exact attention row gates
+
+Qwen3 0.6B Q4_0 was used to gate two independent attention optimizations on the same Java 25
+EPYC-Milan host. The value baseline used ordinary row-at-a-time accumulation; the candidate used
+the generic Vectors four-row weighted accumulation primitive. Six counterbalanced process pairs,
+with three trials per process, produced:
+
+| Metric | Independent values | Four-row values | Change |
+| --- | ---: | ---: | ---: |
+| Median decode | 35.389 tok/s | 36.367 tok/s | +2.76% |
+| Median TPOT | 28.259 ms | 27.497 ms | -2.70% |
+| Median TTFT | 1787.03 ms | 1761.08 ms | -1.45% |
+| Median prefill | 87.640 tok/s | 89.112 tok/s | +1.68% |
+| Mean trial CPU | 23,290 ms | 23,159 ms | -0.56% |
+
+The score gate then compared independent key-cache dots with exact two-row batching while retaining
+the value candidate in both modes. A three-fork Vectors JMH gate at 128 columns improved 64, 192,
+and 512 rows by 12.5%, 14.4%, and 12.6%. The whole-model Graal run again used six counterbalanced
+process pairs and 18 trials per mode. Raw aggregate medians moved from 37.747 to 37.834 decode tok/s,
+26.502 to 26.431 ms TPOT, and 1761.98 to 1740.81 ms TTFT. Paired analysis is more sensitive to the
+small kernel effect: median paired decode improved 1.89%, 16 of 18 decode trials won, and five of
+six process-pair medians won.
+
+A fixed-position follow-up used 64 warmup and 256 measured decode tokens per process. All three
+counterbalanced pairs improved: 35.30 to 36.56, 35.03 to 36.38, and 35.74 to 36.48 tok/s. Every
+recording reported zero GC and the identical checksum `514.657357`. The full benchmark additionally
+matched input count, output count, and output SHA-256 in all 18 corresponding trial pairs. Synthetic
+tests require bit-identical logits, complete K/V buffers, and the next autoregressive step for both
+batch one and batch 32. The model-scoped controls are
+`models.purejava.batchedAttentionValues` and `models.purejava.batchedAttentionScores`.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
