@@ -154,6 +154,7 @@ class TensorOpsTest {
       }
       float[] widened = new float[rows];
       float[] pairwise = new float[rows];
+      float[] unsignedPairwise = new float[rows];
       MemorySegment qWeight = MemorySegment.ofArray(weights);
 
       TensorOps.ggufMatmul(
@@ -165,6 +166,7 @@ class TensorOpsTest {
           cols,
           new byte[cols],
           new float[cols / 32],
+          q4Corrections(cols),
           new short[cols / 16],
           GgufQ4Kernel.WIDENED);
       TensorOps.ggufMatmul(
@@ -176,10 +178,24 @@ class TensorOpsTest {
           cols,
           new byte[cols],
           new float[cols / 32],
+          q4Corrections(cols),
           new short[cols / 16],
           GgufQ4Kernel.SHORT_PAIRWISE);
+      TensorOps.ggufMatmul(
+          unsignedPairwise,
+          query,
+          qWeight,
+          GgufTensorType.Q4_0,
+          rows,
+          cols,
+          new byte[cols],
+          new float[cols / 32],
+          q4Corrections(cols),
+          new short[cols / 16],
+          GgufQ4Kernel.UNSIGNED_PAIRWISE);
 
       assertThat(pairwise).containsExactly(widened);
+      assertThat(unsignedPairwise).containsExactly(widened);
     }
 
     @Test
@@ -215,6 +231,7 @@ class TensorOpsTest {
             cols,
             new byte[batchSize * cols],
             new float[batchSize * (cols / 32)],
+            q4Corrections(batchSize * cols),
             new short[batchSize * (cols / 16)],
             new float[batchSize * 8],
             GgufQ4Kernel.WIDENED);
@@ -257,6 +274,7 @@ class TensorOpsTest {
             cols,
             new byte[batchSize * cols],
             new float[batchSize * (cols / 32)],
+            q4Corrections(batchSize * cols),
             new short[0],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -294,6 +312,7 @@ class TensorOpsTest {
             cols,
             new byte[batchSize * cols],
             new float[batchSize * (cols / 32)],
+            q4Corrections(batchSize * cols),
             new short[0],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -328,6 +347,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             new short[0],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -341,6 +361,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             new short[0],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -359,6 +380,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             new short[0],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -402,6 +424,7 @@ class TensorOpsTest {
             cols,
             new byte[batchSize * cols],
             new float[batchSize * (cols / 256)],
+            q4Corrections(batchSize * cols),
             new short[batchSize * (cols / 16)],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -448,6 +471,7 @@ class TensorOpsTest {
             cols,
             new byte[batchSize * cols],
             new float[batchSize * (cols / 256)],
+            q4Corrections(batchSize * cols),
             new short[batchSize * (cols / 16)],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -492,6 +516,7 @@ class TensorOpsTest {
             cols,
             new byte[batchSize * cols],
             new float[batchSize * (cols / 256)],
+            q4Corrections(batchSize * cols),
             new short[0],
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -512,7 +537,7 @@ class TensorOpsTest {
         MemorySegment qWeight = copy(arena, row);
 
         VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
-            x, qWeight, 1, 32, expected, new byte[32], new float[1]);
+            x, qWeight, 1, 32, expected, new byte[32], new float[1], q4Corrections(32));
         TensorOps.quantizedMatmul(actual, x, qWeight, GgufTensorType.Q4_0, 1, 32);
 
         assertThat(actual[0]).isCloseTo(expected[0], within(1e-5f));
@@ -547,6 +572,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 32],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -591,6 +617,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 32],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -676,6 +703,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 256],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -710,6 +738,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -723,6 +752,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -741,6 +771,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -786,6 +817,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 256],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -832,6 +864,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 256],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -871,6 +904,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -884,6 +918,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -897,6 +932,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED);
@@ -919,6 +955,7 @@ class TensorOpsTest {
             cols,
             quants,
             scales,
+            q4Corrections(batchSize * cols),
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED,
@@ -962,6 +999,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 256],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -1011,6 +1049,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 256],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -1066,6 +1105,7 @@ class TensorOpsTest {
             cols,
             new byte[cols],
             new float[cols / 32],
+            q4Corrections(cols),
             new short[cols / 16],
             GgufQ4Kernel.WIDENED);
       }
@@ -1182,6 +1222,10 @@ class TensorOpsTest {
         out[i] = (i % 7) - 3.0f;
       }
       return out;
+    }
+
+    private static int[] q4Corrections(int activationEntries) {
+      return new int[(activationEntries + 3) / 4];
     }
 
     private static float[] repeatingQueries(int batchSize, int cols) {

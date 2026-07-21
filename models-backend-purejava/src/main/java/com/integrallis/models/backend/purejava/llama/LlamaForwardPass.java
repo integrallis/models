@@ -74,6 +74,7 @@ public final class LlamaForwardPass {
   private final float[] logits;
   private final byte[] quantizedActivation;
   private final float[] quantizedActivationScales;
+  private final int[] quantizedActivationZeroPointCorrections;
   private final short[] quantizedActivationSums;
   private final float[] batchX;
   private final float[] batchXNorm;
@@ -88,6 +89,7 @@ public final class LlamaForwardPass {
   private final float[] batchFfnProjected;
   private final byte[] batchQuantizedActivation;
   private final float[] batchQuantizedActivationScales;
+  private final int[] batchQuantizedActivationZeroPointCorrections;
   private final short[] batchQuantizedActivationSums;
   private final float[] batchQ4LaneScratch;
   private float[] verificationLogits = new float[0];
@@ -156,6 +158,7 @@ public final class LlamaForwardPass {
     int maxProjectionInput = Math.max(Math.max(dim, hiddenDim), config.attentionOutputDim());
     this.quantizedActivation = new byte[maxProjectionInput];
     this.quantizedActivationScales = new float[(maxProjectionInput + 31) / 32];
+    this.quantizedActivationZeroPointCorrections = new int[(maxProjectionInput + 3) / 4];
     this.quantizedActivationSums = new short[(maxProjectionInput + 15) / 16];
 
     int requestedBatchSize = executionPlan.prefillBatchSize();
@@ -181,6 +184,8 @@ public final class LlamaForwardPass {
         new byte[Math.multiplyExact(prefillBatchCapacity, maxProjectionInput)];
     this.batchQuantizedActivationScales =
         new float[Math.multiplyExact(prefillBatchCapacity, (maxProjectionInput + 31) / 32)];
+    this.batchQuantizedActivationZeroPointCorrections =
+        new int[Math.multiplyExact(prefillBatchCapacity, (maxProjectionInput + 3) / 4)];
     this.batchQuantizedActivationSums =
         new short[Math.multiplyExact(prefillBatchCapacity, (maxProjectionInput + 15) / 16)];
     int maxProjectionOutput =
@@ -985,6 +990,7 @@ public final class LlamaForwardPass {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel);
   }
@@ -1013,6 +1019,7 @@ public final class LlamaForwardPass {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel);
   }
@@ -1049,6 +1056,7 @@ public final class LlamaForwardPass {
         cols,
         quantizedActivation,
         quantizedActivationScales,
+        quantizedActivationZeroPointCorrections,
         quantizedActivationSums,
         q4Kernel,
         mixedKProjections);
@@ -1080,6 +1088,7 @@ public final class LlamaForwardPass {
         cols,
         batchQuantizedActivation,
         batchQuantizedActivationScales,
+        batchQuantizedActivationZeroPointCorrections,
         batchQuantizedActivationSums,
         batchQ4LaneScratch,
         q4Kernel);
@@ -1119,6 +1128,7 @@ public final class LlamaForwardPass {
         cols,
         batchQuantizedActivation,
         batchQuantizedActivationScales,
+        batchQuantizedActivationZeroPointCorrections,
         batchQuantizedActivationSums,
         batchQ4LaneScratch,
         q4Kernel,
@@ -1143,6 +1153,7 @@ public final class LlamaForwardPass {
         cols,
         batchQuantizedActivation,
         batchQuantizedActivationScales,
+        batchQuantizedActivationZeroPointCorrections,
         batchQuantizedActivationSums,
         batchQ4LaneScratch,
         q4Kernel);

@@ -78,10 +78,12 @@ class Qwen3BatchedPrefillIntegrationTest {
       float[] gemvOut = new float[rows];
       byte[] gemvQuants = new byte[cols];
       float[] gemvScales = new float[blocks];
+      int[] gemvCorrections = new int[(cols + 3) / 4];
       byte[] expectedQuants = new byte[batchSize * cols];
       float[] expectedScales = new float[batchSize * blocks];
       byte[] batchQuants = new byte[batchSize * cols];
       float[] batchScales = new float[batchSize * blocks];
+      int[] batchCorrections = new int[batchSize * ((cols + 3) / 4)];
       float[] batchLanes = new float[batchSize * rows * 8];
       RopeTable sequentialRope =
           new RopeTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
@@ -100,6 +102,7 @@ class Qwen3BatchedPrefillIntegrationTest {
               cols,
               gemvQuants,
               gemvScales,
+              gemvCorrections,
               new short[(cols + 15) / 16],
               GgufQ4Kernel.WIDENED);
           int outputOffset = batch * rows;
@@ -139,6 +142,7 @@ class Qwen3BatchedPrefillIntegrationTest {
             cols,
             batchQuants,
             batchScales,
+            batchCorrections,
             new short[batchSize * ((cols + 15) / 16)],
             batchLanes,
             GgufQ4Kernel.WIDENED);

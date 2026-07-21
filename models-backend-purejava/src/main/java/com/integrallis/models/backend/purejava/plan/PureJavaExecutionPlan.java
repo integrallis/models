@@ -49,10 +49,17 @@ public record PureJavaExecutionPlan(
       throw new IllegalArgumentException(
           "mixed K-quant projections contradict the execution plan topology");
     }
-    if (q4Kernel == GgufQ4Kernel.SHORT_PAIRWISE
-        && (!runtime.q4ShortPairwiseSupported() || !topology.uses(GgufTensorType.Q4_0))) {
+    if (q4Kernel != GgufQ4Kernel.WIDENED && !topology.uses(GgufTensorType.Q4_0)) {
       throw new IllegalArgumentException(
-          "short-pairwise Q4 kernel contradicts the execution plan runtime or topology");
+          "optimized Q4 kernel contradicts the execution plan topology");
+    }
+    if (q4Kernel == GgufQ4Kernel.SHORT_PAIRWISE && !runtime.q4ShortPairwiseSupported()) {
+      throw new IllegalArgumentException(
+          "short-pairwise Q4 kernel contradicts the execution plan runtime");
+    }
+    if (q4Kernel == GgufQ4Kernel.UNSIGNED_PAIRWISE && !runtime.q4UnsignedPairwiseSupported()) {
+      throw new IllegalArgumentException(
+          "unsigned-pairwise Q4 kernel contradicts the execution plan runtime");
     }
     if (prefillBatchSize > 1 && !topology.supportsBatchedPrefill()) {
       throw new IllegalArgumentException("batched prefill contradicts the execution plan topology");

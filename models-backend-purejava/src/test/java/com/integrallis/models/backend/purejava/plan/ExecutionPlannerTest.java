@@ -48,6 +48,7 @@ class ExecutionPlannerTest {
     assertThat(plan.diagnostics().environment())
         .containsEntry("vector-provider", "test-vector")
         .containsEntry("active-vector-bits", "256")
+        .containsEntry("q4-unsigned-pairwise-supported", "true")
         .containsEntry("gguf-executor", "persistent");
     assertThat(plan.diagnostics().optimization("grouped-projections"))
         .hasValueSatisfying(
@@ -118,9 +119,82 @@ class ExecutionPlannerTest {
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), configuration);
 
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
-    assertThat(plan.diagnostics().optimization("q4-short-pairwise"))
+    assertThat(plan.diagnostics().optimization("q4-kernel"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+  }
+
+  @Test
+  void selectsUnsignedPairwiseForCapableGraalRuntime() {
+    PureJavaPlanConfiguration configuration =
+        new PureJavaPlanConfiguration(
+            true, true, GgufQ4Kernel.UNSIGNED_PAIRWISE, 32, true, true, false, false);
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), configuration);
+
+    assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.UNSIGNED_PAIRWISE);
+    assertThat(plan.diagnostics().optimization("q4-kernel"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(decision.settings())
+                  .containsEntry("requested", "unsigned-pairwise")
+                  .containsEntry("compiler", "graal-jvmci")
+                  .containsEntry("java-feature", "25");
+            });
+  }
+
+  @Test
+  void selectsUnsignedPairwiseForAnyRuntimeWithTheRequiredVectorCapability() {
+    PureJavaPlanConfiguration configuration =
+        new PureJavaPlanConfiguration(
+            true, true, GgufQ4Kernel.UNSIGNED_PAIRWISE, 32, true, true, false, false);
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"), uniformTopology(GgufTensorType.Q4_0), configuration);
+
+    assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.UNSIGNED_PAIRWISE);
+    assertThat(plan.diagnostics().optimization("q4-kernel"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+  }
+
+  @Test
+  void rejectsManuallyConstructedUnsignedPairwisePlanWithoutVectorCapability() {
+    RuntimeFingerprint runtime =
+        new RuntimeFingerprint(
+            "25.0.3",
+            "OpenJDK 64-Bit Server VM",
+            "Eclipse Adoptium",
+            "25.0.3+9",
+            "hotspot-c2",
+            "Linux",
+            "amd64",
+            128,
+            8);
+    ModelTopology topology = uniformTopology(GgufTensorType.Q4_0);
+    PureJavaExecutionPlan valid =
+        ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
+
+    assertThatThrownBy(
+            () ->
+                new PureJavaExecutionPlan(
+                    runtime,
+                    topology,
+                    valid.groupedProjections(),
+                    valid.mixedKProjections(),
+                    GgufQ4Kernel.UNSIGNED_PAIRWISE,
+                    valid.prefillBatchSize(),
+                    valid.finalLayerPrefillPruning(),
+                    valid.finalLayerKvOnlyPrefill(),
+                    valid.batchedAttentionScores(),
+                    valid.batchedAttentionValues(),
+                    valid.diagnostics()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("execution plan runtime");
   }
 
   @Test
@@ -144,7 +218,7 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(runtime, uniformTopology(GgufTensorType.Q4_0), configuration);
 
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
-    assertThat(plan.diagnostics().optimization("q4-short-pairwise"))
+    assertThat(plan.diagnostics().optimization("q4-kernel"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
@@ -425,6 +499,8 @@ class ExecutionPlannerTest {
     assertThat(PureJavaPlanConfiguration.q4Kernel(null)).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(PureJavaPlanConfiguration.q4Kernel("short-pairwise"))
         .isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
+    assertThat(PureJavaPlanConfiguration.q4Kernel("unsigned-pairwise"))
+        .isEqualTo(GgufQ4Kernel.UNSIGNED_PAIRWISE);
     assertThat(PureJavaPlanConfiguration.q4Kernel("widened")).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThatThrownBy(() -> PureJavaPlanConfiguration.q4Kernel("fastest"))
         .isInstanceOf(IllegalArgumentException.class)

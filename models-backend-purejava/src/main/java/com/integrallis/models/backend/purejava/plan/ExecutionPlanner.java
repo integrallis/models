@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v7";
+  public static final String PLAN_VERSION = "pure-java-v8";
 
   private ExecutionPlanner() {}
 
@@ -117,12 +117,22 @@ public final class ExecutionPlanner {
             kernelName(requested),
             "active-vector-bits",
             Integer.toString(runtime.vectorBits()),
-            "supported",
-            Boolean.toString(runtime.q4ShortPairwiseSupported()));
+            "short-supported",
+            Boolean.toString(runtime.q4ShortPairwiseSupported()),
+            "unsigned-supported",
+            Boolean.toString(runtime.q4UnsignedPairwiseSupported()),
+            "compiler",
+            runtime.compiler(),
+            "java-feature",
+            Integer.toString(Runtime.Version.parse(runtime.javaVersion()).feature()),
+            "os",
+            runtime.osName(),
+            "architecture",
+            runtime.architecture());
     if (!topology.uses(GgufTensorType.Q4_0)) {
       decisions.add(
           new OptimizationDecision(
-              "q4-short-pairwise",
+              "q4-kernel",
               OptimizationStatus.UNSUPPORTED,
               "the loaded model has no Q4_0 projection tensors",
               settings));
@@ -131,24 +141,33 @@ public final class ExecutionPlanner {
     if (requested == GgufQ4Kernel.WIDENED) {
       decisions.add(
           new OptimizationDecision(
-              "q4-short-pairwise",
+              "q4-kernel",
               OptimizationStatus.DISABLED,
               "the stable widened Q4 kernel was selected",
               settings));
       return requested;
     }
-    if (!runtime.q4ShortPairwiseSupported()) {
+    if (requested == GgufQ4Kernel.SHORT_PAIRWISE && !runtime.q4ShortPairwiseSupported()) {
       decisions.add(
           new OptimizationDecision(
-              "q4-short-pairwise",
+              "q4-kernel",
               OptimizationStatus.UNSUPPORTED,
               "the active Vector API shape cannot execute the measured pairwise kernel",
               settings));
       return GgufQ4Kernel.WIDENED;
     }
+    if (requested == GgufQ4Kernel.UNSIGNED_PAIRWISE && !runtime.q4UnsignedPairwiseSupported()) {
+      decisions.add(
+          new OptimizationDecision(
+              "q4-kernel",
+              OptimizationStatus.UNSUPPORTED,
+              "the active Vector API shape cannot execute the unsigned pairwise kernel",
+              settings));
+      return GgufQ4Kernel.WIDENED;
+    }
     decisions.add(
         new OptimizationDecision(
-            "q4-short-pairwise",
+            "q4-kernel",
             OptimizationStatus.ENABLED,
             "the model-scoped execution plan selected the measured pairwise Q4 kernel",
             settings));
