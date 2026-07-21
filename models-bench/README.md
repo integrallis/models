@@ -164,8 +164,8 @@ JVM.
 
 ## Decode-only profile
 
-Run prompt prefill and warmup before starting JFR, then record a fixed-token autoregressive decode
-loop:
+Run prompt prefill and warmup, reset and replay the prompt outside JFR, then record a fixed-token
+autoregressive decode loop at the same positions as the production generation window:
 
 ```shell
 ./gradlew :models-bench:run --args='profile-decode \
@@ -178,13 +178,14 @@ loop:
 ```
 
 The command reports prompt, warmup, and measured token counts, decode throughput, and a deterministic
-logit checksum. The recording excludes model loading, prompt prefill, and decode warmup so CPU
-attribution describes steady autoregressive decode. Use `--prompt-file` for a file-backed prompt and
-`--token-id` to select the repeated token explicitly.
+logit checksum. The recording excludes model loading, both prompt prefill passes, and decode warmup
+so CPU attribution describes steady autoregressive decode without measuring a later context window.
+Use `--prompt-file` for a file-backed prompt and `--token-id` to select the repeated token explicitly.
 
-The requested context must hold the prompt, warmup, and measured tokens. The resolved artifact is
-validated before loading, and the command rejects token IDs outside the model vocabulary. As with
-the determinism command, `--model /path/to/model.gguf` is the explicit unregistered alternative.
+The requested context must hold the prompt plus the larger of the warmup and measured token counts.
+The resolved artifact is validated before loading, and the command rejects token IDs outside the
+model vocabulary. As with the determinism command, `--model /path/to/model.gguf` is the explicit
+unregistered alternative.
 
 ## ModelJar-backed comparison run
 

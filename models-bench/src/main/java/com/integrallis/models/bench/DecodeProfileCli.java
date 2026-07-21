@@ -29,7 +29,7 @@ import java.util.Set;
 import jdk.jfr.Recording;
 import org.modeljars.ModelJarRegistry;
 
-/** Captures a JFR recording containing warmed-up autoregressive decode and no prompt prefill. */
+/** Captures warmed-up autoregressive decode at production sequence positions. */
 final class DecodeProfileCli {
 
   private static final Set<String> OPTIONS =
@@ -117,7 +117,7 @@ final class DecodeProfileCli {
     int requiredContext =
         Math.addExact(
             promptTokens.length,
-            Math.addExact(configuration.warmupTokens(), configuration.measuredTokens()));
+            Math.max(configuration.warmupTokens(), configuration.measuredTokens()));
     if (requiredContext > configuration.contextLength()) {
       throw new IllegalArgumentException(
           "context length "
@@ -140,6 +140,10 @@ final class DecodeProfileCli {
     for (int index = 0; index < configuration.warmupTokens(); index++) {
       backend.forwardTransient(token, position++);
     }
+
+    backend.reset();
+    backend.prefill(promptTokens, 0);
+    position = promptTokens.length;
 
     recording.start();
     GcMetrics gcBefore = gcMetricsSource.snapshot();
