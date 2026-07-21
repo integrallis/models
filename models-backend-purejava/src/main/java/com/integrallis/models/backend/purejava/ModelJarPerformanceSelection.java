@@ -55,6 +55,16 @@ record ModelJarPerformanceSelection(
       List<String> inputArguments) {
     Objects.requireNonNull(descriptor, "descriptor");
     Objects.requireNonNull(registry, "registry");
+    return evaluate(descriptor, registry.profilesFor(descriptor), runtime, inputArguments);
+  }
+
+  static ModelJarPerformanceSelection evaluate(
+      ModelJarDescriptor descriptor,
+      List<ModelPerformanceProfile> profiles,
+      Map<String, String> runtime,
+      List<String> inputArguments) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    Objects.requireNonNull(profiles, "profiles");
     Objects.requireNonNull(runtime, "runtime");
     Objects.requireNonNull(inputArguments, "inputArguments");
 
@@ -65,7 +75,7 @@ record ModelJarPerformanceSelection(
 
     Map<String, String> recommendations = new LinkedHashMap<>();
     List<OptimizationDecision> decisions = new ArrayList<>();
-    registry.profilesFor(descriptor).stream()
+    profiles.stream()
         .filter(profile -> "pure-java".equals(profile.backend()))
         .forEach(
             profile -> {

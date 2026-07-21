@@ -192,7 +192,8 @@ restart; Models never pretends to apply JVM startup options after model loading.
 `models.purejava.groupedProjections`, `models.purejava.mixedKProjections`,
 `models.purejava.q4Kernel`, `models.purejava.prefillBatchSize`,
 `models.purejava.finalLayerPrefillPruning`, and
-`models.purejava.finalLayerKvOnlyPrefill` are parsed once per load. Malformed
+`models.purejava.finalLayerKvOnlyPrefill`, and
+`models.purejava.batchedAttentionValues` are parsed once per load. Malformed
 explicit values fail rather than silently reverting to defaults, and explicit
 deployment values override ModelJars recommendations. The Q4 kernel accepts
 `widened` or `short-pairwise`; ordinary loads use `widened`. Eligible
@@ -201,6 +202,14 @@ dispatch. The mixed path remains inactive for every other tensor layout.
 Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the
 Q5_0 route allows mixed DeepSeek-Coder files to retain batching instead of
 degrading the complete prefill plan to one token at a time.
+
+Batched attention-value accumulation is disabled for ordinary loads. An exact
+ModelJar performance profile can enable it for a measured artifact and runtime,
+or a deployment can select it explicitly with
+`-Dmodels.purejava.batchedAttentionValues=true`. The route accumulates cached
+value rows through the generic Vectors weighted-row primitive, preserves the
+existing summation order, and is reported as `batched-attention-values` in
+backend diagnostics.
 
 Ordinary prefill requests logits only for the final prompt token. For validated
 final layers whose attention and FFN projections are uniformly Q4_0 or uniformly

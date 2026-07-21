@@ -54,6 +54,7 @@ public final class LlamaForwardPass {
   private final boolean groupedBatchedPrefill;
   private final boolean finalLayerPrefillPruning;
   private final boolean finalLayerKvOnlyPrefill;
+  private final boolean batchedAttentionValues;
   private final int prefillBatchCapacity;
 
   // Scratch buffers
@@ -129,6 +130,7 @@ public final class LlamaForwardPass {
     this.q4Kernel = executionPlan.q4Kernel();
     this.finalLayerPrefillPruning = executionPlan.finalLayerPrefillPruning();
     this.finalLayerKvOnlyPrefill = executionPlan.finalLayerKvOnlyPrefill();
+    this.batchedAttentionValues = executionPlan.batchedAttentionValues();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -548,13 +550,8 @@ public final class LlamaForwardPass {
         // Softmax over scores
         TensorOps.softmax(attentionScores, 0, position + 1);
 
-        // Weighted sum of values
-        for (int p = 0; p <= position; p++) {
-          int cacheOffset = cache.valueOffset(layer, p) + kvHead * valueLength;
-          float weight = attentionScores[p];
-          VectorUtil.addScaledInPlace(
-              attnOut, outputOffset, valueCache, cacheOffset, valueLength, weight);
-        }
+        accumulateAttentionValues(
+            attnOut, outputOffset, layer, position, kvHead, valueCache, valueLength);
       }
 
       // Output projection
@@ -704,6 +701,10 @@ public final class LlamaForwardPass {
 
   boolean usesFinalLayerKvOnlyPrefill() {
     return finalLayerKvOnlyPrefill;
+  }
+
+  boolean usesBatchedAttentionValues() {
+    return batchedAttentionValues;
   }
 
   private void finishFinalLayerKvOnlyBatch(
@@ -876,16 +877,42 @@ public final class LlamaForwardPass {
       }
 
       TensorOps.softmax(attentionScores, 0, position + 1);
-      for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
-        int cacheOffset = cache.valueOffset(layer, cachedPosition) + kvHead * valueLength;
-        VectorUtil.addScaledInPlace(
-            output,
-            headOutputOffset,
-            valueCache,
-            cacheOffset,
-            valueLength,
-            attentionScores[cachedPosition]);
-      }
+      accumulateAttentionValues(
+          output, headOutputOffset, layer, position, kvHead, valueCache, valueLength);
+    }
+  }
+
+  private void accumulateAttentionValues(
+      float[] output,
+      int outputOffset,
+      int layer,
+      int position,
+      int kvHead,
+      float[] valueCache,
+      int valueLength) {
+    if (batchedAttentionValues) {
+      int firstValueOffset = cache.valueOffset(layer, 0) + kvHead * valueLength;
+      VectorUtil.addWeightedRowsInPlace(
+          output,
+          outputOffset,
+          valueCache,
+          firstValueOffset,
+          cache.valueDim(),
+          attentionScores,
+          0,
+          position + 1,
+          valueLength);
+      return;
+    }
+    for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
+      int cacheOffset = cache.valueOffset(layer, cachedPosition) + kvHead * valueLength;
+      VectorUtil.addScaledInPlace(
+          output,
+          outputOffset,
+          valueCache,
+          cacheOffset,
+          valueLength,
+          attentionScores[cachedPosition]);
     }
   }
 
