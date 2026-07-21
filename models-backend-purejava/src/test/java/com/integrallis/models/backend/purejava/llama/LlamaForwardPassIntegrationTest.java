@@ -107,7 +107,9 @@ class LlamaForwardPassIntegrationTest {
 
     @Test
     void producesNonZeroLogits() {
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       // Encode a simple token (BOS token)
@@ -128,7 +130,9 @@ class LlamaForwardPassIntegrationTest {
 
     @Test
     void logitsAreFinite() {
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       float[] logits = forwardPass.forward(tokenizer.bosToken(), 0);
@@ -140,7 +144,9 @@ class LlamaForwardPassIntegrationTest {
 
     @Test
     void argmaxIsWithinVocabRange() {
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       float[] logits = forwardPass.forward(tokenizer.bosToken(), 0);
@@ -162,7 +168,9 @@ class LlamaForwardPassIntegrationTest {
 
     @Test
     void consecutiveForwardPassesProduceDifferentLogits() {
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       // Encode "Hello" and run forward on each token
@@ -184,14 +192,18 @@ class LlamaForwardPassIntegrationTest {
       int[] tokens = tokenizer.encode("Hello");
       assumeThat(tokens.length).isGreaterThan(0);
 
-      KvCache cache1 = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache1 =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass pass1 = new LlamaForwardPass(config, weights, cache1);
       float[] lastLogits1 = null;
       for (int i = 0; i < tokens.length; i++) {
         lastLogits1 = pass1.forward(tokens[i], i);
       }
 
-      KvCache cache2 = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache2 =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass pass2 = new LlamaForwardPass(config, weights, cache2);
       float[] lastLogits2 = null;
       for (int i = 0; i < tokens.length; i++) {

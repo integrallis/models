@@ -79,14 +79,6 @@ public record LlamaConfig(
     return valueLength * numHeads;
   }
 
-  /** Legacy key/value dimension accessor for architectures whose K and V widths match. */
-  public int kvDim() {
-    if (keyDim() != valueDim()) {
-      throw new IllegalStateException("key and value dimensions differ");
-    }
-    return keyDim();
-  }
-
   /** Qwen-family GGUF models use NeoX split-half rotary layout. */
   public boolean usesNeoxRope() {
     return archUsesNeoxRope;

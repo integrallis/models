@@ -315,7 +315,11 @@ class LlamaForwardPassTest {
                   new LlamaForwardPass(
                       config,
                       weights,
-                      new KvCache(config.numLayers(), config.contextLength(), config.kvDim()),
+                      new KvCache(
+                          config.numLayers(),
+                          config.contextLength(),
+                          config.keyDim(),
+                          config.valueDim()),
                       mismatchedPlan))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("execution plan topology");
@@ -326,7 +330,9 @@ class LlamaForwardPassTest {
       GgufFile file = buildNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       float[] logits = forwardPass.forward(1, 0);
@@ -340,11 +346,15 @@ class LlamaForwardPassTest {
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
 
-      KvCache cache1 = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache1 =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass pass1 = new LlamaForwardPass(config, weights, cache1);
       float[] logits1 = pass1.forward(5, 0);
 
-      KvCache cache2 = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache2 =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass pass2 = new LlamaForwardPass(config, weights, cache2);
       float[] logits2 = pass2.forward(5, 0);
 
@@ -362,14 +372,16 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] expected = runSequence(sequential, tokens);
 
       LlamaForwardPass batched =
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(actual).containsExactly(expected);
@@ -387,14 +399,16 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] expected = runSequence(sequential, tokens);
 
       LlamaForwardPass batched =
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -535,14 +549,16 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] expected = runSequence(sequential, tokens);
 
       LlamaForwardPass batched =
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -563,14 +579,16 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] expected = runSequence(sequential, tokens);
 
       LlamaForwardPass batched =
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -591,14 +609,16 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] expected = runSequence(sequential, tokens);
 
       LlamaForwardPass batched =
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -623,14 +643,16 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] expected = runSequence(sequential, tokens);
 
       LlamaForwardPass batched =
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -657,14 +679,16 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] expected = runSequence(sequential, tokens);
 
       LlamaForwardPass batched =
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -685,7 +709,8 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       sequential.prefill(prefix, 0);
       float[][] expected = new float[proposed.length][];
       for (int index = 0; index < proposed.length; index++) {
@@ -696,7 +721,8 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       verifying.prefill(prefix, 0);
       LogitBatch actual = verifying.verify(proposed, prefix.length);
 
@@ -718,7 +744,8 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       expected.prefill(prefix, 0);
       expected.forward(11, 2);
       float[] expectedReplacement = expected.forward(23, 3);
@@ -727,7 +754,8 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       actual.prefill(prefix, 0);
       int checkpoint = actual.checkpoint();
       actual.verify(new int[] {11, 13, 17}, checkpoint);
@@ -747,7 +775,8 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       forwardPass.prefill(new int[] {5, 7}, 0);
 
       LogitBatch stable = forwardPass.verify(new int[] {11, 13}, 2);
@@ -767,7 +796,8 @@ class LlamaForwardPassTest {
           new LlamaForwardPass(
               config,
               weights,
-              new KvCache(config.numLayers(), config.contextLength(), config.kvDim()));
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
 
       float[] snapshot = forwardPass.forward(5, 0);
       float[] snapshotValues = snapshot.clone();
@@ -786,7 +816,9 @@ class LlamaForwardPassTest {
       GgufFile file = buildNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       float[] logits0 = forwardPass.forward(5, 0);
@@ -800,7 +832,9 @@ class LlamaForwardPassTest {
       GgufFile file = buildNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
       assertThatThrownBy(() -> forwardPass.forward(5, 1))
@@ -813,7 +847,9 @@ class LlamaForwardPassTest {
       GgufFile file = buildNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
-      KvCache cache = new KvCache(config.numLayers(), config.contextLength(), config.kvDim());
+      KvCache cache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
       int[] tokens = new int[20];
       for (int i = 0; i < tokens.length; i++) {
