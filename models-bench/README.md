@@ -193,6 +193,24 @@ serial execution, FMA-disabled execution, 128-bit vectors, and the scalar refere
 selection and vector constants are fixed at class initialization, so these modes must not share a
 JVM.
 
+## Prefill-only profile
+
+Warm up complete prompt passes, then reset the backend and record exactly one measured prefill. The
+recording excludes model loading, warmup, reset, checksum calculation, and autoregressive decode:
+
+```shell
+./gradlew :models-bench:run --args='profile-prefill \
+  --modeljar qwen3_0_6b_q4_0 \
+  --prompt-file models-bench/prompts/completion.txt \
+  --context 2048 \
+  --warmups 2 \
+  --output build/reports/inference/prefill-profile.jfr'
+```
+
+The command reports prompt tokens, warmup passes, prefill throughput, a deterministic final-logit
+checksum, and GC deltas. Use a representative prompt long enough to produce useful execution
+samples. `--model /path/to/model.gguf` remains the explicit unregistered alternative.
+
 ## Decode-only profile
 
 Run prompt prefill and warmup, reset and replay the prompt outside JFR, then record a fixed-token
