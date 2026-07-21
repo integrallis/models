@@ -42,6 +42,7 @@ class ExecutionPlannerTest {
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isTrue();
+    assertThat(plan.batchedAttentionValues()).isFalse();
     assertThat(plan.diagnostics().environment()).containsEntry("compiler", "hotspot-c2");
     assertThat(plan.diagnostics().environment())
         .containsEntry("vector-provider", "test-vector")
@@ -61,6 +62,9 @@ class ExecutionPlannerTest {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
               assertThat(decision.settings()).containsEntry("batch-size", "32");
             });
+    assertThat(plan.diagnostics().optimization("batched-attention-values"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
     assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
@@ -102,7 +106,8 @@ class ExecutionPlannerTest {
   @Test
   void selectsShortPairwiseOnlyForEligibleQ4ModelsAndRuntimes() {
     PureJavaPlanConfiguration configuration =
-        new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.SHORT_PAIRWISE, 32, true, true);
+        new PureJavaPlanConfiguration(
+            true, true, GgufQ4Kernel.SHORT_PAIRWISE, 32, true, true, false);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -128,7 +133,8 @@ class ExecutionPlannerTest {
             128,
             8);
     PureJavaPlanConfiguration configuration =
-        new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.SHORT_PAIRWISE, 32, true, true);
+        new PureJavaPlanConfiguration(
+            true, true, GgufQ4Kernel.SHORT_PAIRWISE, 32, true, true, false);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, uniformTopology(GgufTensorType.Q4_0), configuration);
@@ -199,7 +205,8 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("hotspot-c2"),
             topology,
-            new PureJavaPlanConfiguration(true, false, GgufQ4Kernel.WIDENED, 32, true, true));
+            new PureJavaPlanConfiguration(
+                true, false, GgufQ4Kernel.WIDENED, 32, true, true, false));
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isFalse();
@@ -211,7 +218,7 @@ class ExecutionPlannerTest {
   @Test
   void explicitOverridesDisableOtherwiseEligibleOptimizations() {
     PureJavaPlanConfiguration configuration =
-        new PureJavaPlanConfiguration(false, true, GgufQ4Kernel.WIDENED, 1, false, false);
+        new PureJavaPlanConfiguration(false, true, GgufQ4Kernel.WIDENED, 1, false, false, false);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -241,7 +248,8 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("hotspot-c2"),
             uniformTopology(GgufTensorType.Q4_0),
-            new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.WIDENED, 32, true, false));
+            new PureJavaPlanConfiguration(
+                true, true, GgufQ4Kernel.WIDENED, 32, true, false, false));
 
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -259,7 +267,8 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("hotspot-c2"),
             uniformTopology(GgufTensorType.Q4_0),
-            new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.WIDENED, 32, false, true));
+            new PureJavaPlanConfiguration(
+                true, true, GgufQ4Kernel.WIDENED, 32, false, true, false));
 
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -367,7 +376,9 @@ class ExecutionPlannerTest {
   @Test
   void invalidConfigurationIsRejectedWithoutAStartupProbe() {
     assertThatThrownBy(
-            () -> new PureJavaPlanConfiguration(true, true, GgufQ4Kernel.WIDENED, 0, true, true))
+            () ->
+                new PureJavaPlanConfiguration(
+                    true, true, GgufQ4Kernel.WIDENED, 0, true, true, false))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThatThrownBy(() -> PureJavaPlanConfiguration.groupedProjections("sometimes"))
@@ -396,6 +407,11 @@ class ExecutionPlannerTest {
         .hasMessageContaining("models.purejava.finalLayerKvOnlyPrefill");
     assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill("false")).isFalse();
+    assertThat(PureJavaPlanConfiguration.batchedAttentionValues(null)).isFalse();
+    assertThat(PureJavaPlanConfiguration.batchedAttentionValues("true")).isTrue();
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.batchedAttentionValues("sometimes"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.batchedAttentionValues");
     assertThat(PureJavaPlanConfiguration.q4Kernel(null)).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(PureJavaPlanConfiguration.q4Kernel("short-pairwise"))
         .isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
@@ -423,7 +439,9 @@ class ExecutionPlannerTest {
             PureJavaPlanConfiguration.FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
             "false",
             PureJavaPlanConfiguration.FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
-            "false");
+            "false",
+            PureJavaPlanConfiguration.BATCHED_ATTENTION_VALUES_PROPERTY,
+            "true");
 
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(Map.of(), recommendations);
@@ -434,6 +452,7 @@ class ExecutionPlannerTest {
     assertThat(recommended.prefillBatchSize()).isEqualTo(16);
     assertThat(recommended.finalLayerPrefillPruning()).isFalse();
     assertThat(recommended.finalLayerKvOnlyPrefill()).isFalse();
+    assertThat(recommended.batchedAttentionValues()).isTrue();
 
     PureJavaPlanConfiguration overridden =
         PureJavaPlanConfiguration.from(
@@ -441,11 +460,14 @@ class ExecutionPlannerTest {
                 PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
                 "true",
                 PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY,
-                "widened"),
+                "widened",
+                PureJavaPlanConfiguration.BATCHED_ATTENTION_VALUES_PROPERTY,
+                "false"),
             recommendations);
 
     assertThat(overridden.mixedKProjections()).isTrue();
     assertThat(overridden.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
+    assertThat(overridden.batchedAttentionValues()).isFalse();
     assertThatThrownBy(
             () ->
                 PureJavaPlanConfiguration.from(
@@ -488,6 +510,7 @@ class ExecutionPlannerTest {
                     32,
                     true,
                     true,
+                    false,
                     valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("topology");
@@ -511,6 +534,7 @@ class ExecutionPlannerTest {
                     32,
                     false,
                     true,
+                    false,
                     valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("K/V-only");

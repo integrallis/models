@@ -495,6 +495,51 @@ class LlamaForwardPassTest {
       assertFinalLayerKvOnlyPrefillIsExact(buildQ8NanoModel(new Random(42)));
     }
 
+    @Test
+    void batchedAttentionValueAccumulationPreservesCompleteAutoregressiveState() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = new int[40];
+      for (int index = 0; index < tokens.length; index++) {
+        tokens[index] = (index * 7 + 5) % VOCAB_SIZE;
+      }
+
+      for (int batchSize : new int[] {1, 32}) {
+        KvCache baselineCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass baseline =
+            new LlamaForwardPass(
+                config,
+                weights,
+                baselineCache,
+                executionPlan(config, weights, batchSize, true, true, false));
+        float[] expected = baseline.prefill(tokens, 0).clone();
+        float[] expectedKeys = baselineCache.keyBuffer().clone();
+        float[] expectedValues = baselineCache.valueBuffer().clone();
+        int nextToken = argmax(expected);
+        float[] expectedNext = baseline.forward(nextToken, tokens.length);
+
+        KvCache batchedCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass batched =
+            new LlamaForwardPass(
+                config,
+                weights,
+                batchedCache,
+                executionPlan(config, weights, batchSize, true, true, true));
+        float[] actual = batched.prefill(tokens, 0);
+
+        assertThat(batched.usesBatchedAttentionValues()).isTrue();
+        assertThat(actual).containsExactly(expected);
+        assertThat(batchedCache.keyBuffer()).containsExactly(expectedKeys);
+        assertThat(batchedCache.valueBuffer()).containsExactly(expectedValues);
+        assertThat(batched.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+      }
+    }
+
     private void assertFinalLayerKvOnlyPrefillIsExact(GgufFile file) {
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
@@ -888,6 +933,22 @@ class LlamaForwardPassTest {
       int prefillBatchSize,
       boolean finalLayerPrefillPruning,
       boolean finalLayerKvOnlyPrefill) {
+    return executionPlan(
+        config,
+        weights,
+        prefillBatchSize,
+        finalLayerPrefillPruning,
+        finalLayerKvOnlyPrefill,
+        false);
+  }
+
+  private static PureJavaExecutionPlan executionPlan(
+      LlamaConfig config,
+      LlamaWeights weights,
+      int prefillBatchSize,
+      boolean finalLayerPrefillPruning,
+      boolean finalLayerKvOnlyPrefill,
+      boolean batchedAttentionValues) {
     return ExecutionPlanner.plan(
         RuntimeFingerprint.capture(),
         ModelTopology.from("llama", config, weights),
@@ -897,7 +958,8 @@ class LlamaForwardPassTest {
             GgufQ4Kernel.WIDENED,
             prefillBatchSize,
             finalLayerPrefillPruning,
-            finalLayerKvOnlyPrefill));
+            finalLayerKvOnlyPrefill,
+            batchedAttentionValues));
   }
 
   private static int argmax(float[] values) {

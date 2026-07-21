@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.OptimizationStatus;
@@ -26,6 +27,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.modeljars.ModelJarDescriptor;
+import org.modeljars.ModelJarException;
 import org.modeljars.ModelJarRegistry;
 import org.modeljars.ModelJarRequirement;
 import org.modeljars.ModelPerformanceProfile;
@@ -35,6 +37,7 @@ import org.modeljars.ModelPerformanceProfileRegistry;
 class ModelJarPerformanceSelectionTest {
 
   private static final String Q4_KERNEL = "models.purejava.q4Kernel";
+  private static final String BATCHED_ATTENTION_VALUES = "models.purejava.batchedAttentionValues";
   private static final String DECISION_ID = "modeljars.profile.qwen3.0.6b.q4.0.epyc.milan.jdk25";
 
   @Test
@@ -45,7 +48,7 @@ class ModelJarPerformanceSelectionTest {
     ModelJarPerformanceSelection selection =
         ModelJarPerformanceSelection.evaluate(
             fixture.descriptor(),
-            fixture.registry(),
+            List.of(fixture.profile()),
             fixture.profile().runtimeSelector(),
             inputArguments);
 
@@ -62,13 +65,69 @@ class ModelJarPerformanceSelectionTest {
   }
 
   @Test
+  void mergesNonConflictingRecommendationsFromMatchingProfiles() {
+    Fixture fixture = fixture();
+    ModelPerformanceProfile q4Profile = fixture.profile();
+    ModelPerformanceProfile batchedValuesProfile =
+        new ModelPerformanceProfile(
+            "qwen3_0_6b_q4_0_epyc_milan_jdk25_batched_values",
+            q4Profile.modelAlias(),
+            q4Profile.markerCoordinate(),
+            q4Profile.artifactSha256(),
+            q4Profile.backend(),
+            q4Profile.runtimeSelector(),
+            Map.of(BATCHED_ATTENTION_VALUES, "true"),
+            q4Profile.javaLaunch(),
+            q4Profile.evidence());
+
+    ModelJarPerformanceSelection selection =
+        ModelJarPerformanceSelection.evaluate(
+            fixture.descriptor(),
+            List.of(q4Profile, batchedValuesProfile),
+            q4Profile.runtimeSelector(),
+            q4Profile.javaLaunch().orElseThrow().jvmArguments());
+
+    assertThat(selection.recommendations())
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of(Q4_KERNEL, "short-pairwise", BATCHED_ATTENTION_VALUES, "true"));
+  }
+
+  @Test
+  void rejectsConflictingRecommendationsFromMatchingProfiles() {
+    Fixture fixture = fixture();
+    ModelPerformanceProfile q4Profile = fixture.profile();
+    ModelPerformanceProfile conflictingProfile =
+        new ModelPerformanceProfile(
+            "qwen3_0_6b_q4_0_epyc_milan_jdk25_conflict",
+            q4Profile.modelAlias(),
+            q4Profile.markerCoordinate(),
+            q4Profile.artifactSha256(),
+            q4Profile.backend(),
+            q4Profile.runtimeSelector(),
+            Map.of(Q4_KERNEL, "widened"),
+            q4Profile.javaLaunch(),
+            q4Profile.evidence());
+
+    assertThatThrownBy(
+            () ->
+                ModelJarPerformanceSelection.evaluate(
+                    fixture.descriptor(),
+                    List.of(q4Profile, conflictingProfile),
+                    q4Profile.runtimeSelector(),
+                    q4Profile.javaLaunch().orElseThrow().jvmArguments()))
+        .isInstanceOf(ModelJarException.class)
+        .hasMessageContaining("Conflicting performance recommendations")
+        .hasMessageContaining(Q4_KERNEL);
+  }
+
+  @Test
   void withholdsRecommendationsWhenARequiredArgumentNeedsARestart() {
     Fixture fixture = fixture();
 
     ModelJarPerformanceSelection selection =
         ModelJarPerformanceSelection.evaluate(
             fixture.descriptor(),
-            fixture.registry(),
+            List.of(fixture.profile()),
             fixture.profile().runtimeSelector(),
             List.of());
 
@@ -91,7 +150,7 @@ class ModelJarPerformanceSelectionTest {
 
     ModelJarPerformanceSelection selection =
         ModelJarPerformanceSelection.evaluate(
-            fixture.descriptor(), fixture.registry(), runtime, List.of());
+            fixture.descriptor(), List.of(fixture.profile()), runtime, List.of());
 
     assertThat(selection.recommendations()).isEmpty();
     assertThat(selection.enrich(base()).optimization(DECISION_ID))
@@ -118,14 +177,11 @@ class ModelJarPerformanceSelectionTest {
     ModelPerformanceProfileRegistry registry = ModelPerformanceProfileRegistry.fromClasspath();
     ModelPerformanceProfile profile =
         registry.profilesFor(descriptor).stream()
-            .filter(value -> value.javaLaunch().isPresent())
+            .filter(value -> value.id().equals("qwen3_0_6b_q4_0_epyc_milan_jdk25"))
             .findFirst()
             .orElseThrow();
-    return new Fixture(descriptor, registry, profile);
+    return new Fixture(descriptor, profile);
   }
 
-  private record Fixture(
-      ModelJarDescriptor descriptor,
-      ModelPerformanceProfileRegistry registry,
-      ModelPerformanceProfile profile) {}
+  private record Fixture(ModelJarDescriptor descriptor, ModelPerformanceProfile profile) {}
 }

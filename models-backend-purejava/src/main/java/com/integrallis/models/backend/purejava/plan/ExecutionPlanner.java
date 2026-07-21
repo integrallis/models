@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v5";
+  public static final String PLAN_VERSION = "pure-java-v6";
 
   private ExecutionPlanner() {}
 
@@ -47,6 +47,7 @@ public final class ExecutionPlanner {
     boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
     boolean finalLayerKvOnlyPrefill =
         finalLayerKvOnlyPrefill(topology, configuration, finalLayerPrefillPruning, decisions);
+    boolean batchedAttentionValues = batchedAttentionValues(configuration, decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -70,7 +71,22 @@ public final class ExecutionPlanner {
         prefillBatchSize,
         finalLayerPrefillPruning,
         finalLayerKvOnlyPrefill,
+        batchedAttentionValues,
         diagnostics);
+  }
+
+  private static boolean batchedAttentionValues(
+      PureJavaPlanConfiguration configuration, List<OptimizationDecision> decisions) {
+    boolean enabled = configuration.batchedAttentionValues();
+    decisions.add(
+        new OptimizationDecision(
+            "batched-attention-values",
+            enabled ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            enabled
+                ? "the model profile selected four-row value accumulation"
+                : "disabled by models.purejava.batchedAttentionValues",
+            Map.of("rows-per-group", enabled ? "4" : "1")));
+    return enabled;
   }
 
   private static GgufQ4Kernel q4Kernel(
