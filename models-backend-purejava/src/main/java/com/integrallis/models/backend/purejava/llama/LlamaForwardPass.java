@@ -58,7 +58,6 @@ public final class LlamaForwardPass {
   private final boolean batchedAttentionValues;
   private final boolean stagedQ4Ffn;
   private final boolean stagedQ4Layer;
-  private final boolean parallelQ4FfnPreparation;
   private final Q4BatchedLayerPlan stagedQ4Plan;
   private final int prefillBatchCapacity;
 
@@ -142,7 +141,6 @@ public final class LlamaForwardPass {
     this.batchedAttentionValues = executionPlan.batchedAttentionValues();
     this.stagedQ4Ffn = executionPlan.stagedQ4Ffn();
     this.stagedQ4Layer = executionPlan.stagedQ4Layer();
-    this.parallelQ4FfnPreparation = executionPlan.parallelQ4FfnPreparation();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -226,7 +224,6 @@ public final class LlamaForwardPass {
                 batchFfnOut,
                 batchFfnProjected,
                 batchQ4LaneScratch,
-                parallelQ4FfnPreparation,
                 this::prepareBatchedAttention,
                 this::computeBatchedAttention)
             : null;
@@ -740,10 +737,6 @@ public final class LlamaForwardPass {
 
   boolean usesStagedQ4Layer() {
     return stagedQ4Layer && stagedQ4Plan != null;
-  }
-
-  boolean usesParallelQ4FfnPreparation() {
-    return parallelQ4FfnPreparation && usesStagedQ4Layer();
   }
 
   int stagedQ4LayerStageCount() {
