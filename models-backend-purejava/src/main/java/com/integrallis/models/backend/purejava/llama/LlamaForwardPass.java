@@ -84,6 +84,7 @@ public final class LlamaForwardPass {
   private final float[] batchQ;
   private final float[] batchK;
   private final float[] batchV;
+  private final float[] batchAttentionScores;
   private final float[] batchAttnOut;
   private final float[] batchAttnProjected;
   private final float[] batchFfnGate;
@@ -179,6 +180,8 @@ public final class LlamaForwardPass {
     this.batchQ = batchBuffer(prefillBatchCapacity, config.queryDim());
     this.batchK = batchBuffer(prefillBatchCapacity, config.keyDim());
     this.batchV = batchBuffer(prefillBatchCapacity, config.valueDim());
+    this.batchAttentionScores =
+        stagedQ4Layer ? batchBuffer(prefillBatchCapacity, cache.maxSeqLen()) : new float[0];
     this.batchAttnOut = batchBuffer(prefillBatchCapacity, config.attentionOutputDim());
     this.batchAttnProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchFfnGate = batchBuffer(prefillBatchCapacity, hiddenDim);
@@ -220,7 +223,9 @@ public final class LlamaForwardPass {
                 batchFfnUp,
                 batchFfnOut,
                 batchFfnProjected,
-                batchQ4LaneScratch)
+                batchQ4LaneScratch,
+                this::prepareBatchedAttention,
+                this::computeBatchedAttention)
             : null;
   }
 
@@ -297,9 +302,6 @@ public final class LlamaForwardPass {
     int valueDim = config.valueDim();
     int attentionOutputDim = config.attentionOutputDim();
     int hiddenDim = config.hiddenDim();
-    int keyLength = config.keyLength();
-    int numHeads = config.numHeads();
-    int numKvHeads = config.numKvHeads();
     ropeTable.prepareBatch(startPosition, batchSize);
 
     for (int batch = 0; batch < batchSize; batch++) {
@@ -348,45 +350,6 @@ public final class LlamaForwardPass {
         batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
       }
 
-      for (int batch = 0; batch < batchSize; batch++) {
-        int qBase = batch * queryDim;
-        int kBase = batch * keyDim;
-        int vBase = batch * valueDim;
-        addOptionalBias(batchQ, qBase, lw.qBias());
-        addOptionalBias(batchK, kBase, lw.kBias());
-        addOptionalBias(batchV, vBase, lw.vBias());
-
-        for (int head = 0; head < numHeads; head++) {
-          int offset = qBase + head * keyLength;
-          normalizeHead(batchQ, offset, lw.qNorm(), keyLength);
-          if (config.usesRope(layer)) {
-            ropeTable.applyBatch(batchQ, offset, batch, config.usesNeoxRope());
-          }
-        }
-        for (int head = 0; head < numKvHeads; head++) {
-          int offset = kBase + head * keyLength;
-          normalizeHead(batchK, offset, lw.kNorm(), keyLength);
-          if (config.usesRope(layer)) {
-            ropeTable.applyBatch(batchK, offset, batch, config.usesNeoxRope());
-          }
-        }
-        cache.store(layer, startPosition + batch, batchK, kBase, batchV, vBase);
-      }
-
-      float[] keyCache = cache.keyBuffer();
-      float[] valueCache = cache.valueBuffer();
-      for (int batch = 0; batch < batchSize; batch++) {
-        groupedQueryAttention(
-            batchQ,
-            batch * queryDim,
-            batchAttnOut,
-            batch * attentionOutputDim,
-            layer,
-            startPosition + batch,
-            keyCache,
-            valueCache);
-      }
-
       boolean pruneFinalLayer =
           finalLayerPrefillPruning
               && batchLogits == null
@@ -398,8 +361,11 @@ public final class LlamaForwardPass {
               && stagedQ4Plan != null
               && stagedQ4Plan.supportsLayer(lw);
       if (useStagedQ4Layer) {
-        stagedQ4Plan.executeLayer(lw, batchSize);
+        cache.reserveSequenceCapacity(startPosition + batchSize);
+        stagedQ4Plan.executeLayer(lw, layer, startPosition, batchSize);
       } else {
+        prepareBatchedAttention(lw, layer, startPosition, 0, batchSize);
+        computeBatchedAttention(lw, layer, startPosition, 0, batchSize);
         batchedMatmulDispatch(
             batchAttnProjected,
             batchAttnOut,
@@ -590,13 +556,22 @@ public final class LlamaForwardPass {
         int qOff = h * keyLength;
         int outputOffset = h * valueLength;
 
-        computeAttentionScores(q, qOff, layer, position, kvHead, keyCache, keyLength, scale);
+        computeAttentionScores(
+            q, qOff, layer, position, kvHead, keyCache, keyLength, scale, attentionScores, 0);
 
         // Softmax over scores
         TensorOps.softmax(attentionScores, 0, position + 1);
 
         accumulateAttentionValues(
-            attnOut, outputOffset, layer, position, kvHead, valueCache, valueLength);
+            attnOut,
+            outputOffset,
+            layer,
+            position,
+            kvHead,
+            valueCache,
+            valueLength,
+            attentionScores,
+            0);
       }
 
       // Output projection
@@ -764,6 +739,10 @@ public final class LlamaForwardPass {
     return stagedQ4Layer && stagedQ4Plan != null;
   }
 
+  int stagedQ4LayerStageCount() {
+    return usesStagedQ4Layer() ? stagedQ4Plan.layerStageCount() : 0;
+  }
+
   private void finishFinalLayerKvOnlyBatch(
       LlamaWeights.LayerWeights layer,
       int layerIndex,
@@ -837,7 +816,9 @@ public final class LlamaForwardPass {
         layerIndex,
         startPosition + finalBatch,
         cache.keyBuffer(),
-        cache.valueBuffer());
+        cache.valueBuffer(),
+        attentionScores,
+        0);
     matmulDispatch(
         attnProjected, attnOut, layer.wo(), layer.woType(), dim, config.attentionOutputDim());
     for (int index = 0; index < dim; index++) {
@@ -907,6 +888,69 @@ public final class LlamaForwardPass {
     }
   }
 
+  private void prepareBatchedAttention(
+      LlamaWeights.LayerWeights layer,
+      int layerIndex,
+      int startPosition,
+      int fromBatch,
+      int toBatch) {
+    int queryDim = config.queryDim();
+    int keyDim = config.keyDim();
+    int valueDim = config.valueDim();
+    int keyLength = config.keyLength();
+    for (int batch = fromBatch; batch < toBatch; batch++) {
+      int qBase = batch * queryDim;
+      int kBase = batch * keyDim;
+      int vBase = batch * valueDim;
+      addOptionalBias(batchQ, qBase, layer.qBias());
+      addOptionalBias(batchK, kBase, layer.kBias());
+      addOptionalBias(batchV, vBase, layer.vBias());
+
+      for (int head = 0; head < config.numHeads(); head++) {
+        int offset = qBase + head * keyLength;
+        normalizeHead(batchQ, offset, layer.qNorm(), keyLength);
+        if (config.usesRope(layerIndex)) {
+          ropeTable.applyBatch(batchQ, offset, batch, config.usesNeoxRope());
+        }
+      }
+      for (int head = 0; head < config.numKvHeads(); head++) {
+        int offset = kBase + head * keyLength;
+        normalizeHead(batchK, offset, layer.kNorm(), keyLength);
+        if (config.usesRope(layerIndex)) {
+          ropeTable.applyBatch(batchK, offset, batch, config.usesNeoxRope());
+        }
+      }
+      cache.store(layerIndex, startPosition + batch, batchK, kBase, batchV, vBase);
+    }
+  }
+
+  private void computeBatchedAttention(
+      LlamaWeights.LayerWeights ignoredLayer,
+      int layerIndex,
+      int startPosition,
+      int fromBatch,
+      int toBatch) {
+    float[] keyCache = cache.keyBuffer();
+    float[] valueCache = cache.valueBuffer();
+    boolean separateScores = batchAttentionScores.length != 0;
+    int scoreStride = cache.maxSeqLen();
+    for (int batch = fromBatch; batch < toBatch; batch++) {
+      float[] scores = separateScores ? batchAttentionScores : attentionScores;
+      int scoreOffset = separateScores ? batch * scoreStride : 0;
+      groupedQueryAttention(
+          batchQ,
+          batch * config.queryDim(),
+          batchAttnOut,
+          batch * config.attentionOutputDim(),
+          layerIndex,
+          startPosition + batch,
+          keyCache,
+          valueCache,
+          scores,
+          scoreOffset);
+    }
+  }
+
   private void groupedQueryAttention(
       float[] query,
       int queryOffset,
@@ -915,7 +959,9 @@ public final class LlamaForwardPass {
       int layer,
       int position,
       float[] keyCache,
-      float[] valueCache) {
+      float[] valueCache,
+      float[] scores,
+      int scoresOffset) {
     int keyLength = config.keyLength();
     int valueLength = config.valueLength();
     int numHeads = config.numHeads();
@@ -927,11 +973,29 @@ public final class LlamaForwardPass {
       int kvHead = head / groupSize;
       int qOffset = queryOffset + head * keyLength;
       int headOutputOffset = outputOffset + head * valueLength;
-      computeAttentionScores(query, qOffset, layer, position, kvHead, keyCache, keyLength, scale);
+      computeAttentionScores(
+          query,
+          qOffset,
+          layer,
+          position,
+          kvHead,
+          keyCache,
+          keyLength,
+          scale,
+          scores,
+          scoresOffset);
 
-      TensorOps.softmax(attentionScores, 0, position + 1);
+      TensorOps.softmax(scores, scoresOffset, position + 1);
       accumulateAttentionValues(
-          output, headOutputOffset, layer, position, kvHead, valueCache, valueLength);
+          output,
+          headOutputOffset,
+          layer,
+          position,
+          kvHead,
+          valueCache,
+          valueLength,
+          scores,
+          scoresOffset);
     }
   }
 
@@ -943,7 +1007,9 @@ public final class LlamaForwardPass {
       int kvHead,
       float[] keyCache,
       int keyLength,
-      float scale) {
+      float scale,
+      float[] scores,
+      int scoresOffset) {
     int firstKeyOffset = cache.keyOffset(layer, 0) + kvHead * keyLength;
     if (batchedAttentionScores) {
       VectorUtil.batchDotProductExact(
@@ -954,17 +1020,17 @@ public final class LlamaForwardPass {
           cache.keyDim(),
           position + 1,
           keyLength,
-          attentionScores,
-          0);
+          scores,
+          scoresOffset);
       for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
-        attentionScores[cachedPosition] *= scale;
+        scores[scoresOffset + cachedPosition] *= scale;
       }
       return;
     }
     for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
       int cacheOffset = firstKeyOffset + cachedPosition * cache.keyDim();
       float dot = VectorUtil.dotProduct(query, queryOffset, keyCache, cacheOffset, keyLength);
-      attentionScores[cachedPosition] = dot * scale;
+      scores[scoresOffset + cachedPosition] = dot * scale;
     }
   }
 
@@ -975,7 +1041,9 @@ public final class LlamaForwardPass {
       int position,
       int kvHead,
       float[] valueCache,
-      int valueLength) {
+      int valueLength,
+      float[] scores,
+      int scoresOffset) {
     if (batchedAttentionValues) {
       int firstValueOffset = cache.valueOffset(layer, 0) + kvHead * valueLength;
       VectorUtil.addWeightedRowsInPlace(
@@ -984,8 +1052,8 @@ public final class LlamaForwardPass {
           valueCache,
           firstValueOffset,
           cache.valueDim(),
-          attentionScores,
-          0,
+          scores,
+          scoresOffset,
           position + 1,
           valueLength);
       return;
@@ -998,7 +1066,7 @@ public final class LlamaForwardPass {
           valueCache,
           cacheOffset,
           valueLength,
-          attentionScores[cachedPosition]);
+          scores[scoresOffset + cachedPosition]);
     }
   }
 

@@ -527,6 +527,7 @@ class LlamaForwardPassTest {
         assertThat(baseline.usesStagedQ4Ffn()).isTrue();
         assertThat(baseline.usesStagedQ4Layer()).isFalse();
         assertThat(staged.usesStagedQ4Layer()).isTrue();
+        assertThat(staged.stagedQ4LayerStageCount()).isEqualTo(7);
         assertThat(actual).containsExactly(expected);
         assertThat(stagedCache.keyBuffer()).containsExactly(expectedKeys);
         assertThat(stagedCache.valueBuffer()).containsExactly(expectedValues);
