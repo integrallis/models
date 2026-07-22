@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.modeljars.ModelJarRegistry;
 
-class DecodeProfileCliTest {
+class PrefillProfileCliTest {
 
   @TempDir Path directory;
 
@@ -38,8 +38,8 @@ class DecodeProfileCliTest {
     Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
     var descriptor = ModelJarTestFixtures.descriptor("fixture", model);
 
-    DecodeProfileCli.Configuration configuration =
-        DecodeProfileCli.parse(
+    PrefillProfileCli.Configuration configuration =
+        PrefillProfileCli.parse(
             new String[] {"--modeljar", "fixture"}, ModelJarRegistry.of(List.of(descriptor)));
 
     assertThat(configuration.model().artifact()).isEqualTo(model);
@@ -47,22 +47,20 @@ class DecodeProfileCliTest {
   }
 
   @Test
-  void recordsOnlyDecodeCallsAfterPromptAndWarmup() throws Exception {
+  void recordsOnlyTheMeasuredPrefillAfterWarmup() throws Exception {
     Path model = Files.write(directory.resolve("unused.gguf"), new byte[] {1});
     List<String> events = new ArrayList<>();
     FakeBackend backend = new FakeBackend(events);
-    DecodeProfileCli.Configuration configuration =
-        new DecodeProfileCli.Configuration(
+    PrefillProfileCli.Configuration configuration =
+        new PrefillProfileCli.Configuration(
             new PureJavaModelSource(model.toString(), model, Optional.empty()),
             "profile prompt",
-            5,
-            7,
+            8,
             2,
-            3,
-            Path.of("decode.jfr"));
+            Path.of("prefill.jfr"));
 
-    DecodeProfileCli.Result result =
-        DecodeProfileCli.profile(
+    PrefillProfileCli.Result result =
+        PrefillProfileCli.profile(
             backend,
             configuration,
             new FakeRecording(events),
@@ -73,25 +71,21 @@ class DecodeProfileCliTest {
 
     assertThat(events)
         .containsExactly(
-            "reset",
             "encode:profile prompt",
-            "prefill:1,2@0",
-            "forward:7@2",
-            "forward:7@3",
             "reset",
             "prefill:1,2@0",
+            "reset",
+            "prefill:1,2@0",
+            "reset",
             "record:start",
             "gc:snapshot",
-            "forward:7@2",
-            "forward:7@3",
-            "forward:7@4",
+            "prefill:1,2@0",
             "gc:snapshot",
             "record:stop",
-            "record:dump:decode.jfr");
+            "record:dump:prefill.jfr");
     assertThat(result.promptTokens()).isEqualTo(2);
-    assertThat(result.warmupTokens()).isEqualTo(2);
-    assertThat(result.measuredTokens()).isEqualTo(3);
-    assertThat(result.logitChecksum()).isEqualTo(9.0);
+    assertThat(result.warmups()).isEqualTo(2);
+    assertThat(result.logitChecksum()).isEqualTo(2.0);
     assertThat(result.gcCollections()).isEqualTo(3);
     assertThat(result.gcPauseMillis()).isEqualTo(7);
   }
