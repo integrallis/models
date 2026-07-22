@@ -56,6 +56,7 @@ public final class LlamaForwardPass {
   private final boolean finalLayerKvOnlyPrefill;
   private final boolean batchedAttentionScores;
   private final boolean batchedAttentionValues;
+  private final Q4BatchedFfnPlan stagedQ4FfnPlan;
   private final int prefillBatchCapacity;
 
   // Scratch buffers
@@ -198,6 +199,19 @@ public final class LlamaForwardPass {
         usesProjectionType(config, weights, GgufTensorType.Q4_0)
             ? new float[Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, q4LaneRows), 8)]
             : new float[0];
+    this.stagedQ4FfnPlan =
+        executionPlan.stagedQ4Ffn() && batchedPrefill
+            ? new Q4BatchedFfnPlan(
+                prefillBatchCapacity,
+                dim,
+                hiddenDim,
+                q4Kernel,
+                batchFfnGate,
+                batchFfnUp,
+                batchFfnOut,
+                batchFfnProjected,
+                batchQ4LaneScratch)
+            : null;
   }
 
   /** Runs a single forward pass for the given token at the given position. Returns logits. */
@@ -390,44 +404,48 @@ public final class LlamaForwardPass {
         TensorOps.rmsNorm(
             batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
       }
-      if (groupedBatchedPrefill) {
-        dualBatchedMatmulDispatch(
-            batchFfnGate,
-            lw.ffnGate(),
-            lw.ffnGateType(),
-            hiddenDim,
-            batchFfnUp,
-            lw.ffnUp(),
-            lw.ffnUpType(),
-            hiddenDim,
-            batchXNorm,
-            batchSize,
-            dim);
+      if (stagedQ4FfnPlan != null && stagedQ4FfnPlan.supports(lw)) {
+        stagedQ4FfnPlan.execute(lw, batchXNorm, batchSize);
       } else {
+        if (groupedBatchedPrefill) {
+          dualBatchedMatmulDispatch(
+              batchFfnGate,
+              lw.ffnGate(),
+              lw.ffnGateType(),
+              hiddenDim,
+              batchFfnUp,
+              lw.ffnUp(),
+              lw.ffnUpType(),
+              hiddenDim,
+              batchXNorm,
+              batchSize,
+              dim);
+        } else {
+          batchedMatmulDispatch(
+              batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
+          batchedMatmulDispatch(
+              batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
+        }
+        for (int batch = 0; batch < batchSize; batch++) {
+          int hiddenOffset = batch * hiddenDim;
+          TensorOps.swiGlu(
+              batchFfnOut,
+              hiddenOffset,
+              batchFfnGate,
+              hiddenOffset,
+              batchFfnUp,
+              hiddenOffset,
+              hiddenDim);
+        }
         batchedMatmulDispatch(
-            batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
-        batchedMatmulDispatch(
-            batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
-      }
-      for (int batch = 0; batch < batchSize; batch++) {
-        int hiddenOffset = batch * hiddenDim;
-        TensorOps.swiGlu(
+            batchFfnProjected,
             batchFfnOut,
-            hiddenOffset,
-            batchFfnGate,
-            hiddenOffset,
-            batchFfnUp,
-            hiddenOffset,
+            batchSize,
+            lw.ffnDown(),
+            lw.ffnDownType(),
+            dim,
             hiddenDim);
       }
-      batchedMatmulDispatch(
-          batchFfnProjected,
-          batchFfnOut,
-          batchSize,
-          lw.ffnDown(),
-          lw.ffnDownType(),
-          dim,
-          hiddenDim);
       addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
       if (layerObserver != null) {
         for (int batch = 0; batch < batchSize; batch++) {
@@ -711,6 +729,10 @@ public final class LlamaForwardPass {
 
   boolean usesBatchedAttentionScores() {
     return batchedAttentionScores;
+  }
+
+  boolean usesStagedQ4Ffn() {
+    return stagedQ4FfnPlan != null;
   }
 
   private void finishFinalLayerKvOnlyBatch(

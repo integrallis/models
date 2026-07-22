@@ -19,13 +19,21 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /** Tensor topology relevant to deterministic execution planning. */
 public record ModelTopology(
-    String architecture, int queryRows, int keyRows, int valueRows, List<LayerTopology> layers) {
+    String architecture,
+    int queryRows,
+    int keyRows,
+    int valueRows,
+    List<LayerTopology> layers,
+    boolean threadShareableFfnWeights) {
+
+  private static final Thread ACCESS_PROBE = Thread.ofPlatform().unstarted(() -> {});
 
   /** Projection tensor types for one transformer layer. */
   public record LayerTopology(
@@ -65,6 +73,12 @@ public record ModelTopology(
       return query == GgufTensorType.Q4_K
           && key == GgufTensorType.Q4_K
           && value == GgufTensorType.Q6_K;
+    }
+
+    boolean supportsStagedQ4Ffn() {
+      return gate == GgufTensorType.Q4_0
+          && up == GgufTensorType.Q4_0
+          && down == GgufTensorType.Q4_0;
     }
 
     String qkvMode() {
@@ -110,7 +124,12 @@ public record ModelTopology(
               value.ffnDownType()));
     }
     return new ModelTopology(
-        architecture, config.queryDim(), config.keyDim(), config.valueDim(), layers);
+        architecture,
+        config.queryDim(),
+        config.keyDim(),
+        config.valueDim(),
+        layers,
+        threadShareableFfnWeights(config, weights));
   }
 
   boolean supportsBatchedPrefill() {
@@ -124,6 +143,32 @@ public record ModelTopology(
 
   int mixedKProjectionLayers() {
     return Math.toIntExact(layers.stream().filter(LayerTopology::groupsMixedKQkv).count());
+  }
+
+  int stagedQ4FfnLayers() {
+    if (!threadShareableFfnWeights) {
+      return 0;
+    }
+    return Math.toIntExact(layers.stream().filter(LayerTopology::supportsStagedQ4Ffn).count());
+  }
+
+  private static boolean threadShareableFfnWeights(LlamaConfig config, LlamaWeights weights) {
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      LlamaWeights.LayerWeights value = weights.layer(layer);
+      if (!threadShareable(value.ffnGate(), value.ffnUp(), value.ffnDown())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean threadShareable(MemorySegment... segments) {
+    for (MemorySegment segment : segments) {
+      if (!segment.isAccessibleBy(ACCESS_PROBE)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   boolean uses(GgufTensorType type) {
