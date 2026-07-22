@@ -102,7 +102,7 @@ public final class ExecutionPlanner {
     String reason;
     if (enabled) {
       status = OptimizationStatus.ENABLED;
-      reason = "eligible Q4_0 output and FFN projections share one retained four-stage publication";
+      reason = "eligible Q4_0 attention and FFN work shares one retained seven-stage publication";
     } else if (eligibleLayers == 0) {
       status = OptimizationStatus.UNSUPPORTED;
       reason = "loaded tensor topology has no all-Q4_0 output-and-FFN layer";
@@ -135,7 +135,7 @@ public final class ExecutionPlanner {
                 "parallel",
                 Boolean.toString(runtime.ggufParallel()),
                 "stages",
-                "4")));
+                "7")));
     return enabled;
   }
 

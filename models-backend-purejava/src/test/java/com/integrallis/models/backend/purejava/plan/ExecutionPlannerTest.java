@@ -474,7 +474,7 @@ class ExecutionPlannerTest {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
               assertThat(decision.settings())
                   .containsEntry("eligible-layers", "1")
-                  .containsEntry("stages", "4");
+                  .containsEntry("stages", "7");
             });
 
     PureJavaExecutionPlan unsupported =
