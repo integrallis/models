@@ -164,6 +164,33 @@ tests require bit-identical logits, complete K/V buffers, and the next autoregre
 batch one and batch 32. The model-scoped controls are
 `models.purejava.batchedAttentionValues` and `models.purejava.batchedAttentionScores`.
 
+## Retained Q4_0 output-and-FFN stage plan
+
+The Q4_0 FFN schedule originally required a separate persistent-worker publication for attention
+output projection. The wider Models-owned schedule now keeps output projection, residual/FFN-input
+preparation, gate/up plus exact SwiGLU, and down projection inside one four-stage Vectors plan. It
+does not change Vectors APIs or expose transformer policy there. The established two-stage FFN
+route remains the fallback when a layer's output projection is not Q4_0.
+
+The controlled gate used Qwen3 0.6B Q4_0, GraalVM Java 25.0.3, batch 24, fixed 2 GiB heap, eight
+processors and workers, the required `MaximumInliningSize=10000` argument, unsigned-pairwise Q4,
+and every previously retained Qwen prefill option. Ten warmups and five trials per fresh process
+across six counterbalanced pairs produced 30 trials per mode:
+
+| Metric | Staged FFN baseline | Four-stage layer plan | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 1,283.533 ms | 1,208.101 ms | -5.88%; -3.05% paired median |
+| p95 TTFT | 1,354.849 ms | 1,291.279 ms | -4.69% |
+| p50 prefill | 121.449 tok/s | 129.200 tok/s | +6.38%; +3.53% paired median |
+| p50 CPU | 8,755 ms | 8,165 ms | -6.74%; -3.88% paired median |
+
+The candidate won 24 of 30 paired TTFT/prefill trials and five of six process-pair medians. Every
+corresponding input count, output count, and output SHA-256 matched. Median process RSS was
+1,145,901,056 bytes for the baseline and 1,214,373,888 bytes for the candidate; compiler lifetime
+and process variance prevent a causal memory claim. Reports remain on the controlled host under
+`/opt/modeljars-bench/q4-layer-candidate/reports/full/`. Select the route with
+`-Dmodels.purejava.stagedQ4Layer=true`; exact ModelJars profiles supply it only for measured tuples.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:

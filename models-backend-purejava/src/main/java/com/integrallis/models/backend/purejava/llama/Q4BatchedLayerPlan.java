@@ -23,32 +23,46 @@ import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Objects;
 
-/** Reusable two-stage Q4_0 batched FFN schedule owned by the transformer backend. */
-final class Q4BatchedFfnPlan {
+/** Reusable retained Q4_0 batched schedules owned by the transformer backend. */
+final class Q4BatchedLayerPlan {
 
   private static final int Q8_BLOCK_SIZE = 32;
 
   private final int batchCapacity;
   private final int embeddingDim;
+  private final int attentionOutputDim;
   private final int hiddenDim;
+  private final float rmsNormEps;
   private final GgufQ4Kernel q4Kernel;
+  private final float[] residual;
+  private final float[] normalizedInput;
+  private final float[] attentionOutput;
+  private final float[] attentionProjected;
   private final float[] gate;
   private final float[] up;
   private final float[] activated;
   private final float[] projected;
   private final float[] laneScratch;
+  private final GgufQ8_0Batch attentionActivation;
   private final GgufQ8_0Batch inputActivation;
   private final GgufQ8_0Batch outputActivation;
-  private final GgufStagePlan stagePlan;
+  private final GgufStagePlan ffnStagePlan;
+  private final GgufStagePlan layerStagePlan;
 
   private LlamaWeights.LayerWeights activeLayer;
   private int activeBatchSize;
 
-  Q4BatchedFfnPlan(
+  Q4BatchedLayerPlan(
       int batchCapacity,
       int embeddingDim,
+      int attentionOutputDim,
       int hiddenDim,
+      float rmsNormEps,
       GgufQ4Kernel q4Kernel,
+      float[] residual,
+      float[] normalizedInput,
+      float[] attentionOutput,
+      float[] attentionProjected,
       float[] gate,
       float[] up,
       float[] activated,
@@ -57,51 +71,118 @@ final class Q4BatchedFfnPlan {
     if (batchCapacity < 2) {
       throw new IllegalArgumentException("batchCapacity must be at least two");
     }
-    if (embeddingDim % Q8_BLOCK_SIZE != 0 || hiddenDim % Q8_BLOCK_SIZE != 0) {
-      throw new IllegalArgumentException("Q4 FFN dimensions must be multiples of 32");
+    if (embeddingDim % Q8_BLOCK_SIZE != 0
+        || attentionOutputDim % Q8_BLOCK_SIZE != 0
+        || hiddenDim % Q8_BLOCK_SIZE != 0) {
+      throw new IllegalArgumentException("Q4 layer dimensions must be multiples of 32");
     }
     this.batchCapacity = batchCapacity;
     this.embeddingDim = embeddingDim;
+    this.attentionOutputDim = attentionOutputDim;
     this.hiddenDim = hiddenDim;
+    this.rmsNormEps = rmsNormEps;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
+    this.residual = Objects.requireNonNull(residual, "residual");
+    this.normalizedInput = Objects.requireNonNull(normalizedInput, "normalizedInput");
+    this.attentionOutput = Objects.requireNonNull(attentionOutput, "attentionOutput");
+    this.attentionProjected = Objects.requireNonNull(attentionProjected, "attentionProjected");
     this.gate = Objects.requireNonNull(gate, "gate");
     this.up = Objects.requireNonNull(up, "up");
     this.activated = Objects.requireNonNull(activated, "activated");
     this.projected = Objects.requireNonNull(projected, "projected");
     this.laneScratch = Objects.requireNonNull(laneScratch, "laneScratch");
+    this.attentionActivation = GgufQ8_0Batch.allocate(batchCapacity, attentionOutputDim);
     this.inputActivation = GgufQ8_0Batch.allocate(batchCapacity, embeddingDim);
     this.outputActivation = GgufQ8_0Batch.allocate(batchCapacity, hiddenDim);
-    this.stagePlan =
+    this.ffnStagePlan =
         GgufStagePlan.of(
+            GgufStagePlan.stage(hiddenDim / Q8_BLOCK_SIZE, this::projectGateUpAndActivate),
+            GgufStagePlan.stage(embeddingDim, this::projectDown));
+    this.layerStagePlan =
+        GgufStagePlan.of(
+            GgufStagePlan.stage(embeddingDim, this::projectAttentionOutput),
+            GgufStagePlan.stage(1, this::prepareFfnInput),
             GgufStagePlan.stage(hiddenDim / Q8_BLOCK_SIZE, this::projectGateUpAndActivate),
             GgufStagePlan.stage(embeddingDim, this::projectDown));
   }
 
-  boolean supports(LlamaWeights.LayerWeights layer) {
+  boolean supportsFfn(LlamaWeights.LayerWeights layer) {
     Objects.requireNonNull(layer, "layer");
     return layer.ffnGateType() == GgufTensorType.Q4_0
         && layer.ffnUpType() == GgufTensorType.Q4_0
         && layer.ffnDownType() == GgufTensorType.Q4_0;
   }
 
-  void execute(LlamaWeights.LayerWeights layer, float[] normalizedInput, int batchSize) {
+  boolean supportsLayer(LlamaWeights.LayerWeights layer) {
+    return supportsFfn(layer) && layer.woType() == GgufTensorType.Q4_0;
+  }
+
+  void executeFfn(LlamaWeights.LayerWeights layer, int batchSize) {
     Objects.requireNonNull(layer, "layer");
-    if (!supports(layer)) {
+    if (!supportsFfn(layer)) {
       throw new IllegalArgumentException("staged Q4 FFN requires Q4_0 gate, up, and down weights");
     }
+    validateBatchSize(batchSize);
+    inputActivation.quantizeForQ4(normalizedInput, batchSize, q4Kernel);
+    execute(layer, batchSize, ffnStagePlan);
+  }
+
+  void executeLayer(LlamaWeights.LayerWeights layer, int batchSize) {
+    Objects.requireNonNull(layer, "layer");
+    if (!supportsLayer(layer)) {
+      throw new IllegalArgumentException(
+          "staged Q4 layer requires Q4_0 output, gate, up, and down weights");
+    }
+    validateBatchSize(batchSize);
+    attentionActivation.quantizeForQ4(attentionOutput, batchSize, q4Kernel);
+    execute(layer, batchSize, layerStagePlan);
+  }
+
+  private void validateBatchSize(int batchSize) {
     if (batchSize < 2 || batchSize > batchCapacity) {
       throw new IllegalArgumentException(
           "batchSize must be between 2 and " + batchCapacity + ": " + batchSize);
     }
-    inputActivation.quantizeForQ4(normalizedInput, batchSize, q4Kernel);
+  }
+
+  private void execute(
+      LlamaWeights.LayerWeights layer, int batchSize, GgufStagePlan selectedStagePlan) {
     activeLayer = layer;
     activeBatchSize = batchSize;
     try {
-      stagePlan.execute();
+      selectedStagePlan.execute();
     } finally {
       activeLayer = null;
       activeBatchSize = 0;
     }
+  }
+
+  private void projectAttentionOutput(int fromRow, int toRow) {
+    VectorUtil.ggufQ4_0Q8_0BatchedMatmulRows(
+        activeLayer.wo(),
+        activeBatchSize,
+        embeddingDim,
+        attentionOutputDim,
+        fromRow,
+        toRow,
+        attentionProjected,
+        attentionActivation,
+        laneScratch,
+        q4Kernel);
+  }
+
+  private void prepareFfnInput(int ignoredFrom, int ignoredTo) {
+    int activeLength = activeBatchSize * embeddingDim;
+    for (int index = 0; index < activeLength; index++) {
+      residual[index] += attentionProjected[index];
+    }
+    float[] ffnNorm = activeLayer.ffnNorm();
+    for (int batch = 0; batch < activeBatchSize; batch++) {
+      int offset = batch * embeddingDim;
+      TensorOps.rmsNorm(
+          normalizedInput, offset, residual, offset, ffnNorm, embeddingDim, rmsNormEps);
+    }
+    inputActivation.quantizeForQ4(normalizedInput, activeBatchSize, q4Kernel);
   }
 
   private void projectGateUpAndActivate(int fromBlock, int toBlock) {

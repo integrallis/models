@@ -33,7 +33,8 @@ public record PureJavaPlanConfiguration(
     boolean finalLayerKvOnlyPrefill,
     boolean batchedAttentionScores,
     boolean batchedAttentionValues,
-    boolean stagedQ4Ffn) {
+    boolean stagedQ4Ffn,
+    boolean stagedQ4Layer) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
@@ -48,6 +49,7 @@ public record PureJavaPlanConfiguration(
   public static final String BATCHED_ATTENTION_VALUES_PROPERTY =
       "models.purejava.batchedAttentionValues";
   public static final String STAGED_Q4_FFN_PROPERTY = "models.purejava.stagedQ4Ffn";
+  public static final String STAGED_Q4_LAYER_PROPERTY = "models.purejava.stagedQ4Layer";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
   private static final String PROPERTY_PREFIX = "models.purejava.";
   private static final Set<String> SUPPORTED_SETTINGS =
@@ -60,7 +62,8 @@ public record PureJavaPlanConfiguration(
           FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
           BATCHED_ATTENTION_SCORES_PROPERTY,
           BATCHED_ATTENTION_VALUES_PROPERTY,
-          STAGED_Q4_FFN_PROPERTY);
+          STAGED_Q4_FFN_PROPERTY,
+          STAGED_Q4_LAYER_PROPERTY);
 
   public PureJavaPlanConfiguration {
     q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
@@ -79,6 +82,7 @@ public record PureJavaPlanConfiguration(
         DEFAULT_PREFILL_BATCH_SIZE,
         true,
         true,
+        false,
         false,
         false,
         false);
@@ -122,7 +126,8 @@ public record PureJavaPlanConfiguration(
             configured(BATCHED_ATTENTION_SCORES_PROPERTY, deployment, recommendations)),
         batchedAttentionValues(
             configured(BATCHED_ATTENTION_VALUES_PROPERTY, deployment, recommendations)),
-        stagedQ4Ffn(configured(STAGED_Q4_FFN_PROPERTY, deployment, recommendations)));
+        stagedQ4Ffn(configured(STAGED_Q4_FFN_PROPERTY, deployment, recommendations)),
+        stagedQ4Layer(configured(STAGED_Q4_LAYER_PROPERTY, deployment, recommendations)));
   }
 
   private static void validateSettings(Map<String, String> settings, String source) {
@@ -184,6 +189,10 @@ public record PureJavaPlanConfiguration(
 
   static boolean stagedQ4Ffn(String configured) {
     return configured != null && booleanProperty(STAGED_Q4_FFN_PROPERTY, configured);
+  }
+
+  static boolean stagedQ4Layer(String configured) {
+    return configured != null && booleanProperty(STAGED_Q4_LAYER_PROPERTY, configured);
   }
 
   private static boolean booleanProperty(String property, String configured) {

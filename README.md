@@ -194,8 +194,8 @@ restart; Models never pretends to apply JVM startup options after model loading.
 `models.purejava.finalLayerPrefillPruning`,
 `models.purejava.finalLayerKvOnlyPrefill`,
 `models.purejava.batchedAttentionScores`,
-`models.purejava.batchedAttentionValues`, and
-`models.purejava.stagedQ4Ffn` are parsed once per load. Malformed
+`models.purejava.batchedAttentionValues`, `models.purejava.stagedQ4Ffn`, and
+`models.purejava.stagedQ4Layer` are parsed once per load. Malformed
 explicit values fail rather than silently reverting to defaults, and explicit
 deployment values override ModelJars recommendations. The Q4 kernel accepts
 `widened`, `short-pairwise`, or `unsigned-pairwise`; ordinary loads use
@@ -229,6 +229,15 @@ thread-shareable Q4_0 gate, up, and down weights, parallel GGUF execution, and t
 persistent Vectors row executor. The first stage runs gate/up projection, exact
 SwiGLU, and Q8_0 preparation before the down-projection stage; diagnostics
 report it as `staged-q4-ffn`. Ineligible runtimes keep the established path.
+
+Retained Q4_0 layer execution is independently disabled for ordinary loads and
+selected only by a matching profile or
+`-Dmodels.purejava.stagedQ4Layer=true`. When the attention output, gate, up, and
+down projections are all Q4_0, one four-stage Vectors publication spans output
+projection; residual addition, FFN normalization, and Q8_0 preparation;
+gate/up projection plus exact SwiGLU; and down projection. The FFN-only schedule
+remains available for layers whose attention output uses another format.
+Diagnostics report the wider route as `staged-q4-layer`.
 
 Ordinary prefill requests logits only for the final prompt token. For validated
 final layers whose attention and FFN projections are uniformly Q4_0 or uniformly
