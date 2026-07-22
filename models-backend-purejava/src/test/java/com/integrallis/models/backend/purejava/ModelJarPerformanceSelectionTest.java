@@ -52,7 +52,8 @@ class ModelJarPerformanceSelectionTest {
             fixture.profile().runtimeSelector(),
             inputArguments);
 
-    assertThat(selection.recommendations()).containsExactly(Map.entry(Q4_KERNEL, "short-pairwise"));
+    assertThat(selection.recommendations())
+        .containsExactly(Map.entry(Q4_KERNEL, "unsigned-pairwise"));
     assertThat(selection.enrich(base()).optimization(DECISION_ID))
         .hasValueSatisfying(
             decision -> {
@@ -89,7 +90,7 @@ class ModelJarPerformanceSelectionTest {
 
     assertThat(selection.recommendations())
         .containsExactlyInAnyOrderEntriesOf(
-            Map.of(Q4_KERNEL, "short-pairwise", BATCHED_ATTENTION_VALUES, "true"));
+            Map.of(Q4_KERNEL, "unsigned-pairwise", BATCHED_ATTENTION_VALUES, "true"));
   }
 
   @Test
