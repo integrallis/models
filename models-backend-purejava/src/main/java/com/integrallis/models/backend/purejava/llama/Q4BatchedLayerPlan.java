@@ -53,6 +53,7 @@ final class Q4BatchedLayerPlan {
   private final float[] activated;
   private final float[] projected;
   private final float[] laneScratch;
+  private final boolean parallelFfnPreparation;
   private final AttentionStage attentionPreparation;
   private final AttentionStage attentionComputation;
   private final GgufQ8_0Batch attentionActivation;
@@ -82,6 +83,7 @@ final class Q4BatchedLayerPlan {
       float[] activated,
       float[] projected,
       float[] laneScratch,
+      boolean parallelFfnPreparation,
       AttentionStage attentionPreparation,
       AttentionStage attentionComputation) {
     if (batchCapacity < 2) {
@@ -107,6 +109,7 @@ final class Q4BatchedLayerPlan {
     this.activated = Objects.requireNonNull(activated, "activated");
     this.projected = Objects.requireNonNull(projected, "projected");
     this.laneScratch = Objects.requireNonNull(laneScratch, "laneScratch");
+    this.parallelFfnPreparation = parallelFfnPreparation;
     this.attentionPreparation =
         Objects.requireNonNull(attentionPreparation, "attentionPreparation");
     this.attentionComputation =
@@ -124,7 +127,7 @@ final class Q4BatchedLayerPlan {
             GgufStagePlan.stage(batchCapacity, this::computeAttention),
             GgufStagePlan.stage(attentionOutputDim / Q8_BLOCK_SIZE, this::quantizeAttentionOutput),
             GgufStagePlan.stage(embeddingDim, this::projectAttentionOutput),
-            GgufStagePlan.stage(1, this::prepareFfnInput),
+            GgufStagePlan.stage(parallelFfnPreparation ? batchCapacity : 1, this::prepareFfnInput),
             GgufStagePlan.stage(hiddenDim / Q8_BLOCK_SIZE, this::projectGateUpAndActivate),
             GgufStagePlan.stage(embeddingDim, this::projectDown));
   }
@@ -232,7 +235,11 @@ final class Q4BatchedLayerPlan {
         attentionOutput, activeBatchSize, fromBlock, toBlock, q4Kernel);
   }
 
-  private void prepareFfnInput(int ignoredFrom, int ignoredTo) {
+  private void prepareFfnInput(int fromWorkItem, int toWorkItem) {
+    if (parallelFfnPreparation) {
+      prepareFfnInputBatchRange(fromWorkItem, Math.min(toWorkItem, activeBatchSize));
+      return;
+    }
     int activeLength = activeBatchSize * embeddingDim;
     for (int index = 0; index < activeLength; index++) {
       residual[index] += attentionProjected[index];
@@ -244,6 +251,24 @@ final class Q4BatchedLayerPlan {
           normalizedInput, offset, residual, offset, ffnNorm, embeddingDim, rmsNormEps);
     }
     inputActivation.quantizeForQ4(normalizedInput, activeBatchSize, q4Kernel);
+  }
+
+  private void prepareFfnInputBatchRange(int fromBatch, int toBatch) {
+    if (fromBatch >= toBatch) {
+      return;
+    }
+    float[] ffnNorm = activeLayer.ffnNorm();
+    for (int batch = fromBatch; batch < toBatch; batch++) {
+      int offset = batch * embeddingDim;
+      int end = offset + embeddingDim;
+      for (int index = offset; index < end; index++) {
+        residual[index] += attentionProjected[index];
+      }
+      TensorOps.rmsNorm(
+          normalizedInput, offset, residual, offset, ffnNorm, embeddingDim, rmsNormEps);
+    }
+    inputActivation.quantizeBatchRangeForQ4(
+        normalizedInput, activeBatchSize, fromBatch, toBatch, q4Kernel);
   }
 
   private void projectGateUpAndActivate(int fromBlock, int toBlock) {

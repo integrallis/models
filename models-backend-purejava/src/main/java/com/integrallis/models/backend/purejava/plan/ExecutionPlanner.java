@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v11";
+  public static final String PLAN_VERSION = "pure-java-v12";
 
   private ExecutionPlanner() {}
 
@@ -53,6 +53,8 @@ public final class ExecutionPlanner {
         stagedQ4Ffn(runtime, topology, configuration, prefillBatchSize, decisions);
     boolean stagedQ4Layer =
         stagedQ4Layer(runtime, topology, configuration, prefillBatchSize, decisions);
+    boolean parallelQ4FfnPreparation =
+        parallelQ4FfnPreparation(topology, configuration, stagedQ4Layer, decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -80,7 +82,44 @@ public final class ExecutionPlanner {
         batchedAttentionValues,
         stagedQ4Ffn,
         stagedQ4Layer,
+        parallelQ4FfnPreparation,
         diagnostics);
+  }
+
+  private static boolean parallelQ4FfnPreparation(
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      boolean stagedQ4Layer,
+      List<OptimizationDecision> decisions) {
+    int eligibleLayers = topology.stagedQ4LayerLayers();
+    boolean requested = configuration.parallelQ4FfnPreparation();
+    boolean enabled = requested && stagedQ4Layer;
+    OptimizationStatus status;
+    String reason;
+    if (enabled) {
+      status = OptimizationStatus.ENABLED;
+      reason = "eligible Q4_0 FFN input preparation is partitioned by active batch row";
+    } else if (eligibleLayers == 0) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "loaded tensor topology has no staged all-Q4_0 layer";
+    } else if (!requested) {
+      status = OptimizationStatus.DISABLED;
+      reason = "disabled by models.purejava.parallelQ4FfnPreparation";
+    } else {
+      status = OptimizationStatus.DISABLED;
+      reason = "parallel Q4 FFN preparation requires the staged Q4 layer plan";
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "parallel-q4-ffn-preparation",
+            status,
+            reason,
+            Map.of(
+                "eligible-layers",
+                Integer.toString(eligibleLayers),
+                "partition",
+                enabled ? "batch-rows" : "single-work-item")));
+    return enabled;
   }
 
   private static boolean stagedQ4Layer(
@@ -102,8 +141,7 @@ public final class ExecutionPlanner {
     String reason;
     if (enabled) {
       status = OptimizationStatus.ENABLED;
-      reason =
-          "eligible Q4_0 attention and FFN work shares one retained seven-stage publication";
+      reason = "eligible Q4_0 attention and FFN work shares one retained seven-stage publication";
     } else if (eligibleLayers == 0) {
       status = OptimizationStatus.UNSUPPORTED;
       reason = "loaded tensor topology has no all-Q4_0 output-and-FFN layer";

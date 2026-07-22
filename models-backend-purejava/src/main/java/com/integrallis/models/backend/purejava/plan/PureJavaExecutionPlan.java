@@ -34,6 +34,7 @@ public record PureJavaExecutionPlan(
     boolean batchedAttentionValues,
     boolean stagedQ4Ffn,
     boolean stagedQ4Layer,
+    boolean parallelQ4FfnPreparation,
     BackendDiagnostics diagnostics) {
 
   public PureJavaExecutionPlan {
@@ -82,6 +83,10 @@ public record PureJavaExecutionPlan(
             || topology.stagedQ4LayerLayers() == 0)) {
       throw new IllegalArgumentException(
           "staged Q4 layer contradicts the execution plan topology or runtime");
+    }
+    if (parallelQ4FfnPreparation && !stagedQ4Layer) {
+      throw new IllegalArgumentException(
+          "parallel Q4 FFN preparation requires the staged Q4 layer plan");
     }
     if (finalLayerPrefillPruning && !topology.supportsFinalLayerPrefillPruning()) {
       throw new IllegalArgumentException(
