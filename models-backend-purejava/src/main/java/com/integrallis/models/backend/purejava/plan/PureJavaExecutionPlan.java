@@ -32,6 +32,7 @@ public record PureJavaExecutionPlan(
     boolean finalLayerKvOnlyPrefill,
     boolean batchedAttentionScores,
     boolean batchedAttentionValues,
+    boolean stagedQ4Ffn,
     BackendDiagnostics diagnostics) {
 
   public PureJavaExecutionPlan {
@@ -63,6 +64,14 @@ public record PureJavaExecutionPlan(
     }
     if (prefillBatchSize > 1 && !topology.supportsBatchedPrefill()) {
       throw new IllegalArgumentException("batched prefill contradicts the execution plan topology");
+    }
+    if (stagedQ4Ffn
+        && (prefillBatchSize < 2
+            || runtime.processors() < 2
+            || !"persistent".equals(runtime.ggufExecutor())
+            || topology.stagedQ4FfnLayers() == 0)) {
+      throw new IllegalArgumentException(
+          "staged Q4 FFN contradicts the execution plan topology or runtime");
     }
     if (finalLayerPrefillPruning && !topology.supportsFinalLayerPrefillPruning()) {
       throw new IllegalArgumentException(

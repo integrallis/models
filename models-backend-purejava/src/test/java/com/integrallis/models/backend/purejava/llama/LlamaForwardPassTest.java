@@ -133,6 +133,12 @@ class LlamaForwardPassTest {
         rng, GgufTensorType.Q4_0, 32, 64, valueCount -> randomQ4(rng, valueCount));
   }
 
+  private static GgufFile copyToSharedArena(GgufFile source, Arena arena) {
+    MemorySegment segment = arena.allocate(source.fileSegment().byteSize());
+    segment.copyFrom(source.fileSegment());
+    return GgufParser.parseSegment(segment);
+  }
+
   private GgufFile buildQ8NanoModel(Random rng) {
     return buildQuantizedNanoModel(
         rng, GgufTensorType.Q8_0, 32, 64, valueCount -> randomQ8(rng, valueCount));
@@ -307,7 +313,8 @@ class LlamaForwardPassTest {
                   config.queryDim(),
                   config.keyDim(),
                   config.valueDim(),
-                  java.util.Collections.nCopies(config.numLayers(), q4Layer)),
+                  java.util.Collections.nCopies(config.numLayers(), q4Layer),
+                  false),
               PureJavaPlanConfiguration.defaults());
 
       assertThatThrownBy(
@@ -416,6 +423,55 @@ class LlamaForwardPassTest {
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void stagedQ4FfnPreservesPrefillCacheAndAutoregressiveStateExactly() {
+      try (Arena arena = Arena.ofShared()) {
+        GgufFile file = copyToSharedArena(buildQ4NanoModel(new Random(42)), arena);
+        LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+        LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+        int[] tokens = new int[40];
+        for (int index = 0; index < tokens.length; index++) {
+          tokens[index] = (index * 7 + 5) % VOCAB_SIZE;
+        }
+
+        KvCache baselineCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass baseline =
+            new LlamaForwardPass(
+                config, weights, baselineCache, executionPlan(config, weights, 32, true, true));
+        float[] expected = baseline.prefill(tokens, 0).clone();
+        float[] expectedKeys = baselineCache.keyBuffer().clone();
+        float[] expectedValues = baselineCache.valueBuffer().clone();
+        int nextToken = argmax(expected);
+        float[] expectedNext = baseline.forward(nextToken, tokens.length);
+
+        PureJavaPlanConfiguration configuration =
+            new PureJavaPlanConfiguration(
+                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true);
+        KvCache stagedCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass staged =
+            new LlamaForwardPass(
+                config,
+                weights,
+                stagedCache,
+                ExecutionPlanner.plan(
+                    RuntimeFingerprint.capture(),
+                    ModelTopology.from("llama", config, weights),
+                    configuration));
+
+        float[] actual = staged.prefill(tokens, 0);
+
+        assertThat(staged.usesStagedQ4Ffn()).isTrue();
+        assertThat(actual).containsExactly(expected);
+        assertThat(stagedCache.keyBuffer()).containsExactly(expectedKeys);
+        assertThat(stagedCache.valueBuffer()).containsExactly(expectedValues);
+        assertThat(staged.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+      }
     }
 
     @Test
@@ -995,7 +1051,8 @@ class LlamaForwardPassTest {
             finalLayerPrefillPruning,
             finalLayerKvOnlyPrefill,
             batchedAttentionScores,
-            batchedAttentionValues));
+            batchedAttentionValues,
+            false));
   }
 
   private static int argmax(float[] values) {
