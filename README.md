@@ -233,11 +233,14 @@ report it as `staged-q4-ffn`. Ineligible runtimes keep the established path.
 Retained Q4_0 layer execution is independently disabled for ordinary loads and
 selected only by a matching profile or
 `-Dmodels.purejava.stagedQ4Layer=true`. When the attention output, gate, up, and
-down projections are all Q4_0, one four-stage Vectors publication spans output
-projection; residual addition, FFN normalization, and Q8_0 preparation;
-gate/up projection plus exact SwiGLU; and down projection. The FFN-only schedule
-remains available for layers whose attention output uses another format.
-Diagnostics report the wider route as `staged-q4-layer`.
+down projections are all Q4_0, one seven-stage Vectors publication spans Q/K/V
+normalization, RoPE, and cache writes; exact grouped-query attention; Q8_0
+attention preparation; output projection; residual addition, FFN normalization,
+and Q8_0 input preparation; gate/up projection plus exact SwiGLU; and down
+projection. Cache storage is reserved before worker publication and each batch
+row owns separate attention-score scratch. The FFN-only schedule remains
+available for layers whose attention output uses another format. Diagnostics
+report the wider route as `staged-q4-layer`.
 
 Ordinary prefill requests logits only for the final prompt token. For validated
 final layers whose attention and FFN projections are uniformly Q4_0 or uniformly
