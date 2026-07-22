@@ -21,7 +21,6 @@ import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ8_0Batch;
 import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
-import java.lang.foreign.MemorySegment;
 import java.util.Objects;
 
 /** Reusable retained Q4_0 batched schedules owned by the transformer backend. */
@@ -285,36 +284,22 @@ final class Q4BatchedLayerPlan {
   }
 
   private void projectQkv(int fromRow, int toRow) {
-    int keyOffset = queryDim;
-    int valueOffset = Math.addExact(queryDim, keyDim);
-    projectQkvRange(activeLayer.wq(), queryDim, query, 0, fromRow, toRow);
-    projectQkvRange(activeLayer.wk(), keyDim, key, keyOffset, fromRow, toRow);
-    projectQkvRange(activeLayer.wv(), valueDim, value, valueOffset, fromRow, toRow);
-  }
-
-  private void projectQkvRange(
-      MemorySegment weight,
-      int rows,
-      float[] output,
-      int rowOffset,
-      int fromCombinedRow,
-      int toCombinedRow) {
-    int fromRow = Math.max(fromCombinedRow, rowOffset) - rowOffset;
-    int toRow = Math.min(toCombinedRow, rowOffset + rows) - rowOffset;
-    if (fromRow >= toRow) {
-      return;
-    }
-    VectorUtil.ggufQ4_0Q8_0BatchedMatmulRows(
-        weight,
+    VectorUtil.ggufQ4_0Q8_0TripleBatchedMatmulRows(
+        activeLayer.wq(),
+        queryDim,
+        query,
+        activeLayer.wk(),
+        keyDim,
+        key,
+        activeLayer.wv(),
+        valueDim,
+        value,
         activeBatchSize,
-        rows,
         embeddingDim,
         fromRow,
         toRow,
-        output,
         inputActivation,
         laneScratch,
-        rowOffset,
         q4Kernel);
   }
 
