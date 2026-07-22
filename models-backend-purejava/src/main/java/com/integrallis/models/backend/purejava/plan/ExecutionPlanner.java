@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v9";
+  public static final String PLAN_VERSION = "pure-java-v10";
 
   private ExecutionPlanner() {}
 
@@ -51,6 +51,8 @@ public final class ExecutionPlanner {
     boolean batchedAttentionValues = batchedAttentionValues(configuration, decisions);
     boolean stagedQ4Ffn =
         stagedQ4Ffn(runtime, topology, configuration, prefillBatchSize, decisions);
+    boolean stagedQ4Layer =
+        stagedQ4Layer(runtime, topology, configuration, prefillBatchSize, decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -77,7 +79,64 @@ public final class ExecutionPlanner {
         batchedAttentionScores,
         batchedAttentionValues,
         stagedQ4Ffn,
+        stagedQ4Layer,
         diagnostics);
+  }
+
+  private static boolean stagedQ4Layer(
+      RuntimeFingerprint runtime,
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      int prefillBatchSize,
+      List<OptimizationDecision> decisions) {
+    int eligibleLayers = topology.stagedQ4LayerLayers();
+    boolean requested = configuration.stagedQ4Layer();
+    boolean enabled =
+        requested
+            && eligibleLayers > 0
+            && prefillBatchSize > 1
+            && runtime.processors() > 1
+            && runtime.ggufParallel()
+            && "persistent".equals(runtime.ggufExecutor());
+    OptimizationStatus status;
+    String reason;
+    if (enabled) {
+      status = OptimizationStatus.ENABLED;
+      reason = "eligible Q4_0 output and FFN projections share one retained four-stage publication";
+    } else if (eligibleLayers == 0) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "loaded tensor topology has no all-Q4_0 output-and-FFN layer";
+    } else if (!requested) {
+      status = OptimizationStatus.DISABLED;
+      reason = "disabled by models.purejava.stagedQ4Layer";
+    } else if (prefillBatchSize == 1) {
+      status = OptimizationStatus.DISABLED;
+      reason = "staged Q4 layer requires batched prefill";
+    } else if (!runtime.ggufParallel()) {
+      status = OptimizationStatus.DISABLED;
+      reason = "staged Q4 layer requires parallel GGUF execution";
+    } else if (!"persistent".equals(runtime.ggufExecutor())) {
+      status = OptimizationStatus.DISABLED;
+      reason = "staged Q4 layer requires the persistent GGUF executor";
+    } else {
+      status = OptimizationStatus.DISABLED;
+      reason = "staged Q4 layer requires more than one processor";
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "staged-q4-layer",
+            status,
+            reason,
+            Map.of(
+                "eligible-layers",
+                Integer.toString(eligibleLayers),
+                "executor",
+                runtime.ggufExecutor(),
+                "parallel",
+                Boolean.toString(runtime.ggufParallel()),
+                "stages",
+                "4")));
+    return enabled;
   }
 
   private static boolean stagedQ4Ffn(

@@ -56,7 +56,9 @@ public final class LlamaForwardPass {
   private final boolean finalLayerKvOnlyPrefill;
   private final boolean batchedAttentionScores;
   private final boolean batchedAttentionValues;
-  private final Q4BatchedFfnPlan stagedQ4FfnPlan;
+  private final boolean stagedQ4Ffn;
+  private final boolean stagedQ4Layer;
+  private final Q4BatchedLayerPlan stagedQ4Plan;
   private final int prefillBatchCapacity;
 
   // Scratch buffers
@@ -136,6 +138,8 @@ public final class LlamaForwardPass {
     this.finalLayerKvOnlyPrefill = executionPlan.finalLayerKvOnlyPrefill();
     this.batchedAttentionScores = executionPlan.batchedAttentionScores();
     this.batchedAttentionValues = executionPlan.batchedAttentionValues();
+    this.stagedQ4Ffn = executionPlan.stagedQ4Ffn();
+    this.stagedQ4Layer = executionPlan.stagedQ4Layer();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -199,13 +203,19 @@ public final class LlamaForwardPass {
         usesProjectionType(config, weights, GgufTensorType.Q4_0)
             ? new float[Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, q4LaneRows), 8)]
             : new float[0];
-    this.stagedQ4FfnPlan =
-        executionPlan.stagedQ4Ffn() && batchedPrefill
-            ? new Q4BatchedFfnPlan(
+    this.stagedQ4Plan =
+        (stagedQ4Ffn || stagedQ4Layer) && batchedPrefill
+            ? new Q4BatchedLayerPlan(
                 prefillBatchCapacity,
                 dim,
+                config.attentionOutputDim(),
                 hiddenDim,
+                config.rmsNormEps(),
                 q4Kernel,
+                batchX,
+                batchXNorm,
+                batchAttnOut,
+                batchAttnProjected,
                 batchFfnGate,
                 batchFfnUp,
                 batchFfnOut,
@@ -377,74 +387,89 @@ public final class LlamaForwardPass {
             valueCache);
       }
 
-      batchedMatmulDispatch(
-          batchAttnProjected,
-          batchAttnOut,
-          batchSize,
-          lw.wo(),
-          lw.woType(),
-          dim,
-          attentionOutputDim);
-      addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
-
       boolean pruneFinalLayer =
           finalLayerPrefillPruning
               && batchLogits == null
               && layerObserver == null
               && layer == config.numLayers() - 1;
-      if (pruneFinalLayer) {
-        if (computeFinalLogits) {
-          finishFinalLayerFfnRow(lw, (batchSize - 1) * dim, dim, hiddenDim);
-        }
-        break;
-      }
-
-      for (int batch = 0; batch < batchSize; batch++) {
-        int xOffset = batch * dim;
-        TensorOps.rmsNorm(
-            batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
-      }
-      if (stagedQ4FfnPlan != null && stagedQ4FfnPlan.supports(lw)) {
-        stagedQ4FfnPlan.execute(lw, batchXNorm, batchSize);
+      boolean useStagedQ4Layer =
+          !pruneFinalLayer
+              && stagedQ4Layer
+              && stagedQ4Plan != null
+              && stagedQ4Plan.supportsLayer(lw);
+      if (useStagedQ4Layer) {
+        stagedQ4Plan.executeLayer(lw, batchSize);
       } else {
-        if (groupedBatchedPrefill) {
-          dualBatchedMatmulDispatch(
-              batchFfnGate,
-              lw.ffnGate(),
-              lw.ffnGateType(),
-              hiddenDim,
-              batchFfnUp,
-              lw.ffnUp(),
-              lw.ffnUpType(),
-              hiddenDim,
-              batchXNorm,
-              batchSize,
-              dim);
-        } else {
-          batchedMatmulDispatch(
-              batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
-          batchedMatmulDispatch(
-              batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
+        batchedMatmulDispatch(
+            batchAttnProjected,
+            batchAttnOut,
+            batchSize,
+            lw.wo(),
+            lw.woType(),
+            dim,
+            attentionOutputDim);
+        addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
+
+        if (pruneFinalLayer) {
+          if (computeFinalLogits) {
+            finishFinalLayerFfnRow(lw, (batchSize - 1) * dim, dim, hiddenDim);
+          }
+          break;
         }
+
         for (int batch = 0; batch < batchSize; batch++) {
-          int hiddenOffset = batch * hiddenDim;
-          TensorOps.swiGlu(
+          int xOffset = batch * dim;
+          TensorOps.rmsNorm(
+              batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
+        }
+        if (stagedQ4Ffn && stagedQ4Plan != null && stagedQ4Plan.supportsFfn(lw)) {
+          stagedQ4Plan.executeFfn(lw, batchSize);
+        } else {
+          if (groupedBatchedPrefill) {
+            dualBatchedMatmulDispatch(
+                batchFfnGate,
+                lw.ffnGate(),
+                lw.ffnGateType(),
+                hiddenDim,
+                batchFfnUp,
+                lw.ffnUp(),
+                lw.ffnUpType(),
+                hiddenDim,
+                batchXNorm,
+                batchSize,
+                dim);
+          } else {
+            batchedMatmulDispatch(
+                batchFfnGate,
+                batchXNorm,
+                batchSize,
+                lw.ffnGate(),
+                lw.ffnGateType(),
+                hiddenDim,
+                dim);
+            batchedMatmulDispatch(
+                batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
+          }
+          for (int batch = 0; batch < batchSize; batch++) {
+            int hiddenOffset = batch * hiddenDim;
+            TensorOps.swiGlu(
+                batchFfnOut,
+                hiddenOffset,
+                batchFfnGate,
+                hiddenOffset,
+                batchFfnUp,
+                hiddenOffset,
+                hiddenDim);
+          }
+          batchedMatmulDispatch(
+              batchFfnProjected,
               batchFfnOut,
-              hiddenOffset,
-              batchFfnGate,
-              hiddenOffset,
-              batchFfnUp,
-              hiddenOffset,
+              batchSize,
+              lw.ffnDown(),
+              lw.ffnDownType(),
+              dim,
               hiddenDim);
         }
-        batchedMatmulDispatch(
-            batchFfnProjected,
-            batchFfnOut,
-            batchSize,
-            lw.ffnDown(),
-            lw.ffnDownType(),
-            dim,
-            hiddenDim);
       }
       addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
       if (layerObserver != null) {
@@ -732,7 +757,11 @@ public final class LlamaForwardPass {
   }
 
   boolean usesStagedQ4Ffn() {
-    return stagedQ4FfnPlan != null;
+    return stagedQ4Ffn && stagedQ4Plan != null;
+  }
+
+  boolean usesStagedQ4Layer() {
+    return stagedQ4Layer && stagedQ4Plan != null;
   }
 
   private void finishFinalLayerKvOnlyBatch(

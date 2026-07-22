@@ -31,7 +31,7 @@ public record ModelTopology(
     int keyRows,
     int valueRows,
     List<LayerTopology> layers,
-    boolean threadShareableFfnWeights) {
+    boolean threadShareableProjectionWeights) {
 
   private static final Thread ACCESS_PROBE = Thread.ofPlatform().unstarted(() -> {});
 
@@ -79,6 +79,10 @@ public record ModelTopology(
       return gate == GgufTensorType.Q4_0
           && up == GgufTensorType.Q4_0
           && down == GgufTensorType.Q4_0;
+    }
+
+    boolean supportsStagedQ4Layer() {
+      return attentionOutput == GgufTensorType.Q4_0 && supportsStagedQ4Ffn();
     }
 
     String qkvMode() {
@@ -129,7 +133,7 @@ public record ModelTopology(
         config.keyDim(),
         config.valueDim(),
         layers,
-        threadShareableFfnWeights(config, weights));
+        threadShareableProjectionWeights(config, weights));
   }
 
   boolean supportsBatchedPrefill() {
@@ -146,16 +150,24 @@ public record ModelTopology(
   }
 
   int stagedQ4FfnLayers() {
-    if (!threadShareableFfnWeights) {
+    if (!threadShareableProjectionWeights) {
       return 0;
     }
     return Math.toIntExact(layers.stream().filter(LayerTopology::supportsStagedQ4Ffn).count());
   }
 
-  private static boolean threadShareableFfnWeights(LlamaConfig config, LlamaWeights weights) {
+  int stagedQ4LayerLayers() {
+    if (!threadShareableProjectionWeights) {
+      return 0;
+    }
+    return Math.toIntExact(layers.stream().filter(LayerTopology::supportsStagedQ4Layer).count());
+  }
+
+  private static boolean threadShareableProjectionWeights(
+      LlamaConfig config, LlamaWeights weights) {
     for (int layer = 0; layer < config.numLayers(); layer++) {
       LlamaWeights.LayerWeights value = weights.layer(layer);
-      if (!threadShareable(value.ffnGate(), value.ffnUp(), value.ffnDown())) {
+      if (!threadShareable(value.wo(), value.ffnGate(), value.ffnUp(), value.ffnDown())) {
         return false;
       }
     }
