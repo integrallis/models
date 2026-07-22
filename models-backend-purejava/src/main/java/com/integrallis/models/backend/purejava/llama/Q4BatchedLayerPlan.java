@@ -40,18 +40,12 @@ final class Q4BatchedLayerPlan {
 
   private final int batchCapacity;
   private final int embeddingDim;
-  private final int queryDim;
-  private final int keyDim;
-  private final int valueDim;
   private final int attentionOutputDim;
   private final int hiddenDim;
   private final float rmsNormEps;
   private final GgufQ4Kernel q4Kernel;
   private final float[] residual;
   private final float[] normalizedInput;
-  private final float[] query;
-  private final float[] key;
-  private final float[] value;
   private final float[] attentionOutput;
   private final float[] attentionProjected;
   private final float[] gate;
@@ -66,7 +60,6 @@ final class Q4BatchedLayerPlan {
   private final GgufQ8_0Batch outputActivation;
   private final GgufStagePlan ffnStagePlan;
   private final GgufStagePlan layerStagePlan;
-  private final GgufStagePlan qkvLayerStagePlan;
 
   private LlamaWeights.LayerWeights activeLayer;
   private int activeLayerIndex;
@@ -76,18 +69,12 @@ final class Q4BatchedLayerPlan {
   Q4BatchedLayerPlan(
       int batchCapacity,
       int embeddingDim,
-      int queryDim,
-      int keyDim,
-      int valueDim,
       int attentionOutputDim,
       int hiddenDim,
       float rmsNormEps,
       GgufQ4Kernel q4Kernel,
       float[] residual,
       float[] normalizedInput,
-      float[] query,
-      float[] key,
-      float[] value,
       float[] attentionOutput,
       float[] attentionProjected,
       float[] gate,
@@ -105,23 +92,14 @@ final class Q4BatchedLayerPlan {
         || hiddenDim % Q8_BLOCK_SIZE != 0) {
       throw new IllegalArgumentException("Q4 layer dimensions must be multiples of 32");
     }
-    if (queryDim < 1 || keyDim < 1 || valueDim < 1) {
-      throw new IllegalArgumentException("QKV dimensions must be positive");
-    }
     this.batchCapacity = batchCapacity;
     this.embeddingDim = embeddingDim;
-    this.queryDim = queryDim;
-    this.keyDim = keyDim;
-    this.valueDim = valueDim;
     this.attentionOutputDim = attentionOutputDim;
     this.hiddenDim = hiddenDim;
     this.rmsNormEps = rmsNormEps;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.residual = Objects.requireNonNull(residual, "residual");
     this.normalizedInput = Objects.requireNonNull(normalizedInput, "normalizedInput");
-    this.query = Objects.requireNonNull(query, "query");
-    this.key = Objects.requireNonNull(key, "key");
-    this.value = Objects.requireNonNull(value, "value");
     this.attentionOutput = Objects.requireNonNull(attentionOutput, "attentionOutput");
     this.attentionProjected = Objects.requireNonNull(attentionProjected, "attentionProjected");
     this.gate = Objects.requireNonNull(gate, "gate");
@@ -149,18 +127,6 @@ final class Q4BatchedLayerPlan {
             GgufStagePlan.stage(1, this::prepareFfnInput),
             GgufStagePlan.stage(hiddenDim / Q8_BLOCK_SIZE, this::projectGateUpAndActivate),
             GgufStagePlan.stage(embeddingDim, this::projectDown));
-    this.qkvLayerStagePlan =
-        GgufStagePlan.of(
-            GgufStagePlan.stage(embeddingDim / Q8_BLOCK_SIZE, this::quantizeAttentionInput),
-            GgufStagePlan.stage(
-                Math.addExact(Math.addExact(queryDim, keyDim), valueDim), this::projectQkv),
-            GgufStagePlan.stage(batchCapacity, this::prepareAttention),
-            GgufStagePlan.stage(batchCapacity, this::computeAttention),
-            GgufStagePlan.stage(attentionOutputDim / Q8_BLOCK_SIZE, this::quantizeAttentionOutput),
-            GgufStagePlan.stage(embeddingDim, this::projectAttentionOutput),
-            GgufStagePlan.stage(1, this::prepareFfnInput),
-            GgufStagePlan.stage(hiddenDim / Q8_BLOCK_SIZE, this::projectGateUpAndActivate),
-            GgufStagePlan.stage(embeddingDim, this::projectDown));
   }
 
   boolean supportsFfn(LlamaWeights.LayerWeights layer) {
@@ -172,13 +138,6 @@ final class Q4BatchedLayerPlan {
 
   boolean supportsLayer(LlamaWeights.LayerWeights layer) {
     return supportsFfn(layer) && layer.woType() == GgufTensorType.Q4_0;
-  }
-
-  boolean supportsQkvLayer(LlamaWeights.LayerWeights layer) {
-    return supportsLayer(layer)
-        && layer.wqType() == GgufTensorType.Q4_0
-        && layer.wkType() == GgufTensorType.Q4_0
-        && layer.wvType() == GgufTensorType.Q4_0;
   }
 
   void executeFfn(LlamaWeights.LayerWeights layer, int batchSize) {
@@ -198,7 +157,13 @@ final class Q4BatchedLayerPlan {
       throw new IllegalArgumentException(
           "staged Q4 layer requires Q4_0 output, gate, up, and down weights");
     }
-    validateLayerExecution(layerIndex, startPosition, batchSize);
+    validateBatchSize(batchSize);
+    if (layerIndex < 0) {
+      throw new IllegalArgumentException("layerIndex must be non-negative: " + layerIndex);
+    }
+    if (startPosition < 0) {
+      throw new IllegalArgumentException("startPosition must be non-negative: " + startPosition);
+    }
     activeLayerIndex = layerIndex;
     activeStartPosition = startPosition;
     try {
@@ -209,46 +174,14 @@ final class Q4BatchedLayerPlan {
     }
   }
 
-  void executeQkvLayer(
-      LlamaWeights.LayerWeights layer, int layerIndex, int startPosition, int batchSize) {
-    Objects.requireNonNull(layer, "layer");
-    if (!supportsQkvLayer(layer)) {
-      throw new IllegalArgumentException(
-          "staged Q4 QKV layer requires Q4_0 query, key, value, output, gate, up, and down weights");
-    }
-    validateLayerExecution(layerIndex, startPosition, batchSize);
-    activeLayerIndex = layerIndex;
-    activeStartPosition = startPosition;
-    try {
-      execute(layer, batchSize, qkvLayerStagePlan);
-    } finally {
-      activeLayerIndex = 0;
-      activeStartPosition = 0;
-    }
-  }
-
   int layerStageCount() {
     return layerStagePlan.stageCount();
-  }
-
-  int qkvLayerStageCount() {
-    return qkvLayerStagePlan.stageCount();
   }
 
   private void validateBatchSize(int batchSize) {
     if (batchSize < 2 || batchSize > batchCapacity) {
       throw new IllegalArgumentException(
           "batchSize must be between 2 and " + batchCapacity + ": " + batchSize);
-    }
-  }
-
-  private void validateLayerExecution(int layerIndex, int startPosition, int batchSize) {
-    validateBatchSize(batchSize);
-    if (layerIndex < 0) {
-      throw new IllegalArgumentException("layerIndex must be non-negative: " + layerIndex);
-    }
-    if (startPosition < 0) {
-      throw new IllegalArgumentException("startPosition must be non-negative: " + startPosition);
     }
   }
 
@@ -274,31 +207,6 @@ final class Q4BatchedLayerPlan {
         toRow,
         attentionProjected,
         attentionActivation,
-        laneScratch,
-        q4Kernel);
-  }
-
-  private void quantizeAttentionInput(int fromBlock, int toBlock) {
-    inputActivation.quantizeBlockRangeForQ4(
-        normalizedInput, activeBatchSize, fromBlock, toBlock, q4Kernel);
-  }
-
-  private void projectQkv(int fromRow, int toRow) {
-    VectorUtil.ggufQ4_0Q8_0TripleBatchedMatmulRows(
-        activeLayer.wq(),
-        queryDim,
-        query,
-        activeLayer.wk(),
-        keyDim,
-        key,
-        activeLayer.wv(),
-        valueDim,
-        value,
-        activeBatchSize,
-        embeddingDim,
-        fromRow,
-        toRow,
-        inputActivation,
         laneScratch,
         q4Kernel);
   }

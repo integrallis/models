@@ -58,7 +58,6 @@ public final class LlamaForwardPass {
   private final boolean batchedAttentionValues;
   private final boolean stagedQ4Ffn;
   private final boolean stagedQ4Layer;
-  private final boolean stagedQ4Qkv;
   private final Q4BatchedLayerPlan stagedQ4Plan;
   private final int prefillBatchCapacity;
 
@@ -142,7 +141,6 @@ public final class LlamaForwardPass {
     this.batchedAttentionValues = executionPlan.batchedAttentionValues();
     this.stagedQ4Ffn = executionPlan.stagedQ4Ffn();
     this.stagedQ4Layer = executionPlan.stagedQ4Layer();
-    this.stagedQ4Qkv = executionPlan.stagedQ4Qkv();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -203,9 +201,7 @@ public final class LlamaForwardPass {
             Math.max(dim, hiddenDim),
             Math.max(config.queryDim(), Math.max(config.keyDim(), config.valueDim())));
     int q4LaneRows =
-        groupedBatchedPrefill || stagedQ4Qkv
-            ? maxGroupedQ4ProjectionRows(config, weights)
-            : maxProjectionOutput;
+        groupedBatchedPrefill ? maxGroupedQ4ProjectionRows(config, weights) : maxProjectionOutput;
     this.batchQ4LaneScratch =
         usesProjectionType(config, weights, GgufTensorType.Q4_0)
             ? new float[Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, q4LaneRows), 8)]
@@ -215,18 +211,12 @@ public final class LlamaForwardPass {
             ? new Q4BatchedLayerPlan(
                 prefillBatchCapacity,
                 dim,
-                config.queryDim(),
-                config.keyDim(),
-                config.valueDim(),
                 config.attentionOutputDim(),
                 hiddenDim,
                 config.rmsNormEps(),
                 q4Kernel,
                 batchX,
                 batchXNorm,
-                batchQ,
-                batchK,
-                batchV,
                 batchAttnOut,
                 batchAttnProjected,
                 batchFfnGate,
@@ -337,6 +327,29 @@ public final class LlamaForwardPass {
         break;
       }
 
+      if (groupedBatchedPrefill) {
+        tripleBatchedMatmulDispatch(
+            batchQ,
+            lw.wq(),
+            lw.wqType(),
+            queryDim,
+            batchK,
+            lw.wk(),
+            lw.wkType(),
+            keyDim,
+            batchV,
+            lw.wv(),
+            lw.wvType(),
+            valueDim,
+            batchXNorm,
+            batchSize,
+            dim);
+      } else {
+        batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
+        batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
+        batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
+      }
+
       boolean pruneFinalLayer =
           finalLayerPrefillPruning
               && batchLogits == null
@@ -347,36 +360,7 @@ public final class LlamaForwardPass {
               && stagedQ4Layer
               && stagedQ4Plan != null
               && stagedQ4Plan.supportsLayer(lw);
-      boolean useStagedQ4Qkv = useStagedQ4Layer && stagedQ4Qkv && stagedQ4Plan.supportsQkvLayer(lw);
-      if (!useStagedQ4Qkv) {
-        if (groupedBatchedPrefill) {
-          tripleBatchedMatmulDispatch(
-              batchQ,
-              lw.wq(),
-              lw.wqType(),
-              queryDim,
-              batchK,
-              lw.wk(),
-              lw.wkType(),
-              keyDim,
-              batchV,
-              lw.wv(),
-              lw.wvType(),
-              valueDim,
-              batchXNorm,
-              batchSize,
-              dim);
-        } else {
-          batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
-          batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
-          batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
-        }
-      }
-
-      if (useStagedQ4Qkv) {
-        cache.reserveSequenceCapacity(startPosition + batchSize);
-        stagedQ4Plan.executeQkvLayer(lw, layer, startPosition, batchSize);
-      } else if (useStagedQ4Layer) {
+      if (useStagedQ4Layer) {
         cache.reserveSequenceCapacity(startPosition + batchSize);
         stagedQ4Plan.executeLayer(lw, layer, startPosition, batchSize);
       } else {
@@ -755,16 +739,8 @@ public final class LlamaForwardPass {
     return stagedQ4Layer && stagedQ4Plan != null;
   }
 
-  boolean usesStagedQ4Qkv() {
-    return stagedQ4Qkv && stagedQ4Plan != null;
-  }
-
   int stagedQ4LayerStageCount() {
     return usesStagedQ4Layer() ? stagedQ4Plan.layerStageCount() : 0;
-  }
-
-  int stagedQ4QkvStageCount() {
-    return usesStagedQ4Qkv() ? stagedQ4Plan.qkvLayerStageCount() : 0;
   }
 
   private void finishFinalLayerKvOnlyBatch(

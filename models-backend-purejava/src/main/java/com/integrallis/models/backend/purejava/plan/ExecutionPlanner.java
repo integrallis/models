@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v12";
+  public static final String PLAN_VERSION = "pure-java-v11";
 
   private ExecutionPlanner() {}
 
@@ -53,7 +53,6 @@ public final class ExecutionPlanner {
         stagedQ4Ffn(runtime, topology, configuration, prefillBatchSize, decisions);
     boolean stagedQ4Layer =
         stagedQ4Layer(runtime, topology, configuration, prefillBatchSize, decisions);
-    boolean stagedQ4Qkv = stagedQ4Qkv(topology, configuration, stagedQ4Layer, decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -81,40 +80,7 @@ public final class ExecutionPlanner {
         batchedAttentionValues,
         stagedQ4Ffn,
         stagedQ4Layer,
-        stagedQ4Qkv,
         diagnostics);
-  }
-
-  private static boolean stagedQ4Qkv(
-      ModelTopology topology,
-      PureJavaPlanConfiguration configuration,
-      boolean stagedQ4Layer,
-      List<OptimizationDecision> decisions) {
-    int eligibleLayers = topology.stagedQ4QkvLayers();
-    boolean requested = configuration.stagedQ4Qkv();
-    boolean enabled = requested && stagedQ4Layer && eligibleLayers > 0;
-    OptimizationStatus status;
-    String reason;
-    if (enabled) {
-      status = OptimizationStatus.ENABLED;
-      reason = "eligible Q4_0 QKV projections join the retained layer publication";
-    } else if (eligibleLayers == 0) {
-      status = OptimizationStatus.UNSUPPORTED;
-      reason = "loaded tensor topology has no all-Q4_0 QKV and retained layer";
-    } else if (!requested) {
-      status = OptimizationStatus.DISABLED;
-      reason = "disabled by models.purejava.stagedQ4Qkv";
-    } else {
-      status = OptimizationStatus.DISABLED;
-      reason = "staged Q4 QKV requires the staged Q4 layer schedule";
-    }
-    decisions.add(
-        new OptimizationDecision(
-            "staged-q4-qkv",
-            status,
-            reason,
-            Map.of("eligible-layers", Integer.toString(eligibleLayers), "stages", "9")));
-    return enabled;
   }
 
   private static boolean stagedQ4Layer(
@@ -136,8 +102,7 @@ public final class ExecutionPlanner {
     String reason;
     if (enabled) {
       status = OptimizationStatus.ENABLED;
-      reason =
-          "eligible Q4_0 attention and FFN projections share one retained seven-stage publication";
+      reason = "eligible Q4_0 output and FFN projections share one retained four-stage publication";
     } else if (eligibleLayers == 0) {
       status = OptimizationStatus.UNSUPPORTED;
       reason = "loaded tensor topology has no all-Q4_0 output-and-FFN layer";
@@ -170,7 +135,7 @@ public final class ExecutionPlanner {
                 "parallel",
                 Boolean.toString(runtime.ggufParallel()),
                 "stages",
-                "7")));
+                "4")));
     return enabled;
   }
 
