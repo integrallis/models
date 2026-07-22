@@ -34,6 +34,7 @@ public record PureJavaExecutionPlan(
     boolean batchedAttentionValues,
     boolean stagedQ4Ffn,
     boolean stagedQ4Layer,
+    boolean stagedQ4Qkv,
     BackendDiagnostics diagnostics) {
 
   public PureJavaExecutionPlan {
@@ -82,6 +83,10 @@ public record PureJavaExecutionPlan(
             || topology.stagedQ4LayerLayers() == 0)) {
       throw new IllegalArgumentException(
           "staged Q4 layer contradicts the execution plan topology or runtime");
+    }
+    if (stagedQ4Qkv && (!stagedQ4Layer || topology.stagedQ4QkvLayers() == 0)) {
+      throw new IllegalArgumentException(
+          "staged Q4 QKV contradicts the execution plan topology or layer schedule");
     }
     if (finalLayerPrefillPruning && !topology.supportsFinalLayerPrefillPruning()) {
       throw new IllegalArgumentException(

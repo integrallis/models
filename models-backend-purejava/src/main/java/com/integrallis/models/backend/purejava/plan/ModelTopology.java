@@ -31,7 +31,8 @@ public record ModelTopology(
     int keyRows,
     int valueRows,
     List<LayerTopology> layers,
-    boolean threadShareableProjectionWeights) {
+    boolean threadShareableProjectionWeights,
+    boolean threadShareableQkvWeights) {
 
   private static final Thread ACCESS_PROBE = Thread.ofPlatform().unstarted(() -> {});
 
@@ -85,6 +86,13 @@ public record ModelTopology(
       return attentionOutput == GgufTensorType.Q4_0 && supportsStagedQ4Ffn();
     }
 
+    boolean supportsStagedQ4Qkv() {
+      return query == GgufTensorType.Q4_0
+          && key == GgufTensorType.Q4_0
+          && value == GgufTensorType.Q4_0
+          && supportsStagedQ4Layer();
+    }
+
     String qkvMode() {
       if (TensorOps.supportsGroupedTripleMatmul(query, key, value)) {
         return "grouped";
@@ -133,7 +141,8 @@ public record ModelTopology(
         config.keyDim(),
         config.valueDim(),
         layers,
-        threadShareableProjectionWeights(config, weights));
+        threadShareableProjectionWeights(config, weights),
+        threadShareableQkvWeights(config, weights));
   }
 
   boolean supportsBatchedPrefill() {
@@ -163,11 +172,28 @@ public record ModelTopology(
     return Math.toIntExact(layers.stream().filter(LayerTopology::supportsStagedQ4Layer).count());
   }
 
+  int stagedQ4QkvLayers() {
+    if (!threadShareableProjectionWeights || !threadShareableQkvWeights) {
+      return 0;
+    }
+    return Math.toIntExact(layers.stream().filter(LayerTopology::supportsStagedQ4Qkv).count());
+  }
+
   private static boolean threadShareableProjectionWeights(
       LlamaConfig config, LlamaWeights weights) {
     for (int layer = 0; layer < config.numLayers(); layer++) {
       LlamaWeights.LayerWeights value = weights.layer(layer);
       if (!threadShareable(value.wo(), value.ffnGate(), value.ffnUp(), value.ffnDown())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean threadShareableQkvWeights(LlamaConfig config, LlamaWeights weights) {
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      LlamaWeights.LayerWeights value = weights.layer(layer);
+      if (!threadShareable(value.wq(), value.wk(), value.wv())) {
         return false;
       }
     }
