@@ -161,6 +161,18 @@ public final class KvCache {
     return numLayers;
   }
 
+  /** Ensures physical storage exists for the requested number of sequence positions. */
+  public void reserveSequenceCapacity(int requiredSequenceCapacity) {
+    if (requiredSequenceCapacity < 0 || requiredSequenceCapacity > maxSeqLen) {
+      throw new IllegalArgumentException(
+          "requiredSequenceCapacity must be between 0 and "
+              + maxSeqLen
+              + ": "
+              + requiredSequenceCapacity);
+    }
+    ensureCapacity(requiredSequenceCapacity);
+  }
+
   private float[] slice(float[] store, int dimension, int layer, int fromPos, int toPos) {
     if (layer < 0 || layer >= numLayers) {
       throw new IllegalArgumentException("layer out of range: " + layer);

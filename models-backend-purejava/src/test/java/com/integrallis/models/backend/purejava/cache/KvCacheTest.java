@@ -205,6 +205,17 @@ class KvCacheTest {
       assertThat(cache.keyOffset(1, 0)).isEqualTo(32 * 2);
       assertThat(cache.valueOffset(1, 0)).isEqualTo(32 * 3);
     }
+
+    @Test
+    void reservationGrowsStorageBeforeDisjointBatchWrites() {
+      var cache = new KvCache(2, 40, 2, 3);
+
+      cache.reserveSequenceCapacity(24);
+
+      assertThat(cache.allocatedSequenceCapacity()).isEqualTo(32);
+      cache.store(0, 23, new float[] {1, 2}, new float[] {3, 4, 5});
+      assertThat(cache.key(0, 23)).containsExactly(1, 2);
+    }
   }
 
   @Nested
@@ -216,6 +227,15 @@ class KvCacheTest {
       assertThatThrownBy(() -> cache.store(0, 5, new float[] {1, 2}, new float[] {3, 4}))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("position");
+    }
+
+    @Test
+    void reservationBeyondMaxThrows() {
+      var cache = new KvCache(1, 5, 2, 2);
+
+      assertThatThrownBy(() -> cache.reserveSequenceCapacity(6))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("requiredSequenceCapacity");
     }
 
     @Test

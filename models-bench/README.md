@@ -164,18 +164,14 @@ tests require bit-identical logits, complete K/V buffers, and the next autoregre
 batch one and batch 32. The model-scoped controls are
 `models.purejava.batchedAttentionValues` and `models.purejava.batchedAttentionScores`.
 
-## Retained Q4_0 output-and-FFN stage plan
+## Retained Q4_0 attention-and-FFN stage plan
 
-The Q4_0 FFN schedule originally required a separate persistent-worker publication for attention
-output projection. The wider Models-owned schedule now keeps output projection, residual/FFN-input
-preparation, gate/up plus exact SwiGLU, and down projection inside one four-stage Vectors plan. It
-does not change Vectors APIs or expose transformer policy there. The established two-stage FFN
-route remains the fallback when a layer's output projection is not Q4_0.
-
-The controlled gate used Qwen3 0.6B Q4_0, GraalVM Java 25.0.3, batch 24, fixed 2 GiB heap, eight
-processors and workers, the required `MaximumInliningSize=10000` argument, unsigned-pairwise Q4,
-and every previously retained Qwen prefill option. Ten warmups and five trials per fresh process
-across six counterbalanced pairs produced 30 trials per mode:
+The first retained widening kept output projection, residual/FFN-input preparation, gate/up plus
+exact SwiGLU, and down projection inside one four-stage Vectors plan. Its controlled gate used
+Qwen3 0.6B Q4_0, GraalVM Java 25.0.3, batch 24, fixed 2 GiB heap, eight processors and workers, the
+required `MaximumInliningSize=10000` argument, unsigned-pairwise Q4, and every previously retained
+Qwen prefill option. Ten warmups and five trials per fresh process across six counterbalanced pairs
+produced 30 trials per mode:
 
 | Metric | Staged FFN baseline | Four-stage layer plan | Change |
 | --- | ---: | ---: | ---: |
@@ -184,11 +180,36 @@ across six counterbalanced pairs produced 30 trials per mode:
 | p50 prefill | 121.449 tok/s | 129.200 tok/s | +6.38%; +3.53% paired median |
 | p50 CPU | 8,755 ms | 8,165 ms | -6.74%; -3.88% paired median |
 
-The candidate won 24 of 30 paired TTFT/prefill trials and five of six process-pair medians. Every
+That candidate won 24 of 30 paired TTFT/prefill trials and five of six process-pair medians. Every
 corresponding input count, output count, and output SHA-256 matched. Median process RSS was
 1,145,901,056 bytes for the baseline and 1,214,373,888 bytes for the candidate; compiler lifetime
 and process variance prevent a causal memory claim. Reports remain on the controlled host under
-`/opt/modeljars-bench/q4-layer-candidate/reports/full/`. Select the route with
+`/opt/modeljars-bench/q4-layer-candidate/reports/full/`.
+
+The current Models-owned schedule extends the same publication across Q/K/V bias, normalization,
+RoPE, and cache writes; exact grouped-query attention; and Q8_0 attention preparation. Those three
+stages precede the retained output-and-FFN stages, producing one seven-stage plan. Cache storage is
+reserved before worker publication, the first stage writes disjoint positions, and each batch row
+has independent score scratch. The QKV matrix projection remains the preceding boundary. No
+Vectors source or API change was needed, and the established two-stage FFN route remains the
+fallback when a layer's output projection is not Q4_0.
+
+The incremental gate used Models candidate `18552bc` and otherwise repeated the controls above.
+It differed only by `models.purejava.stagedQ4Layer=false/true` within one candidate distribution:
+
+| Metric | Staged FFN baseline | Seven-stage layer plan | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 1,274.479 ms | 1,139.435 ms | -10.60%; -12.43% paired median |
+| p95 TTFT | 1,372.869 ms | 1,166.341 ms | -15.04% |
+| p50 prefill | 122.122 tok/s | 136.974 tok/s | +12.16%; +15.02% paired median |
+| p50 CPU | 8,490 ms | 8,625 ms | +1.59%; +0.65% paired median |
+
+The seven-stage candidate won all 30 paired TTFT and prefill trials and all six process-pair
+medians. Every corresponding input count, output count, and output SHA-256 matched. Median process
+RSS was 1,140,885,504 bytes for the baseline and 1,179,170,816 bytes for the candidate; neither RSS
+nor the small CPU change supports an efficiency claim. Reports remain on the controlled host under
+`/opt/modeljars-bench/q4-layer-candidate/reports/attention-full/` and were copied to
+`/private/tmp/q4-attention-full/`. Select the route with
 `-Dmodels.purejava.stagedQ4Layer=true`; exact ModelJars profiles supply it only for measured tuples.
 
 ## Exact determinism audit
