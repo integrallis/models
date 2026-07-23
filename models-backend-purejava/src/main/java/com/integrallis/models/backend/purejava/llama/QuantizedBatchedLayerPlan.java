@@ -21,10 +21,11 @@ import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ8_0Batch;
 import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
+import java.lang.foreign.MemorySegment;
 import java.util.Objects;
 
-/** Reusable retained Q4_0 batched schedules owned by the transformer backend. */
-final class Q4BatchedLayerPlan {
+/** Reusable retained Q4_0 and Q8_0 batched schedules owned by the transformer backend. */
+final class QuantizedBatchedLayerPlan {
 
   @FunctionalInterface
   interface AttentionStage {
@@ -66,7 +67,7 @@ final class Q4BatchedLayerPlan {
   private int activeStartPosition;
   private int activeBatchSize;
 
-  Q4BatchedLayerPlan(
+  QuantizedBatchedLayerPlan(
       int batchCapacity,
       int embeddingDim,
       int attentionOutputDim,
@@ -90,7 +91,7 @@ final class Q4BatchedLayerPlan {
     if (embeddingDim % Q8_BLOCK_SIZE != 0
         || attentionOutputDim % Q8_BLOCK_SIZE != 0
         || hiddenDim % Q8_BLOCK_SIZE != 0) {
-      throw new IllegalArgumentException("Q4 layer dimensions must be multiples of 32");
+      throw new IllegalArgumentException("quantized layer dimensions must be multiples of 32");
     }
     this.batchCapacity = batchCapacity;
     this.embeddingDim = embeddingDim;
@@ -131,22 +132,23 @@ final class Q4BatchedLayerPlan {
 
   boolean supportsFfn(LlamaWeights.LayerWeights layer) {
     Objects.requireNonNull(layer, "layer");
-    return layer.ffnGateType() == GgufTensorType.Q4_0
-        && layer.ffnUpType() == GgufTensorType.Q4_0
-        && layer.ffnDownType() == GgufTensorType.Q4_0;
+    return supportsProjection(layer.ffnGateType())
+        && supportsProjection(layer.ffnUpType())
+        && supportsProjection(layer.ffnDownType());
   }
 
   boolean supportsLayer(LlamaWeights.LayerWeights layer) {
-    return supportsFfn(layer) && layer.woType() == GgufTensorType.Q4_0;
+    return supportsFfn(layer) && supportsProjection(layer.woType());
   }
 
   void executeFfn(LlamaWeights.LayerWeights layer, int batchSize) {
     Objects.requireNonNull(layer, "layer");
     if (!supportsFfn(layer)) {
-      throw new IllegalArgumentException("staged Q4 FFN requires Q4_0 gate, up, and down weights");
+      throw new IllegalArgumentException(
+          "staged quantized FFN requires Q4_0 or Q8_0 gate, up, and down weights");
     }
     validateBatchSize(batchSize);
-    inputActivation.quantizeForQ4(normalizedInput, batchSize, q4Kernel);
+    quantize(inputActivation, normalizedInput, batchSize, layer.ffnGateType(), layer.ffnUpType());
     execute(layer, batchSize, ffnStagePlan);
   }
 
@@ -155,7 +157,7 @@ final class Q4BatchedLayerPlan {
     Objects.requireNonNull(layer, "layer");
     if (!supportsLayer(layer)) {
       throw new IllegalArgumentException(
-          "staged Q4 layer requires Q4_0 output, gate, up, and down weights");
+          "staged quantized layer requires Q4_0 or Q8_0 output, gate, up, and down weights");
     }
     validateBatchSize(batchSize);
     if (layerIndex < 0) {
@@ -198,17 +200,16 @@ final class Q4BatchedLayerPlan {
   }
 
   private void projectAttentionOutput(int fromRow, int toRow) {
-    VectorUtil.ggufQ4_0Q8_0BatchedMatmulRows(
+    batchedMatmulRows(
         activeLayer.wo(),
+        activeLayer.woType(),
         activeBatchSize,
         embeddingDim,
         attentionOutputDim,
         fromRow,
         toRow,
         attentionProjected,
-        attentionActivation,
-        laneScratch,
-        q4Kernel);
+        attentionActivation);
   }
 
   private void prepareAttention(int fromBatch, int toBatch) {
@@ -228,8 +229,13 @@ final class Q4BatchedLayerPlan {
   }
 
   private void quantizeAttentionOutput(int fromBlock, int toBlock) {
-    attentionActivation.quantizeBlockRangeForQ4(
-        attentionOutput, activeBatchSize, fromBlock, toBlock, q4Kernel);
+    quantizeBlockRange(
+        attentionActivation,
+        attentionOutput,
+        activeBatchSize,
+        fromBlock,
+        toBlock,
+        activeLayer.woType());
   }
 
   private void prepareFfnInput(int ignoredFrom, int ignoredTo) {
@@ -243,56 +249,124 @@ final class Q4BatchedLayerPlan {
       TensorOps.rmsNorm(
           normalizedInput, offset, residual, offset, ffnNorm, embeddingDim, rmsNormEps);
     }
-    inputActivation.quantizeForQ4(normalizedInput, activeBatchSize, q4Kernel);
+    quantize(
+        inputActivation,
+        normalizedInput,
+        activeBatchSize,
+        activeLayer.ffnGateType(),
+        activeLayer.ffnUpType());
   }
 
   private void projectGateUpAndActivate(int fromBlock, int toBlock) {
     int fromRow = fromBlock * Q8_BLOCK_SIZE;
     int toRow = toBlock * Q8_BLOCK_SIZE;
     LlamaWeights.LayerWeights layer = activeLayer;
-    VectorUtil.ggufQ4_0Q8_0BatchedMatmulRows(
+    batchedMatmulRows(
         layer.ffnGate(),
+        layer.ffnGateType(),
         activeBatchSize,
         hiddenDim,
         embeddingDim,
         fromRow,
         toRow,
         gate,
-        inputActivation,
-        laneScratch,
-        q4Kernel);
-    VectorUtil.ggufQ4_0Q8_0BatchedMatmulRows(
+        inputActivation);
+    batchedMatmulRows(
         layer.ffnUp(),
+        layer.ffnUpType(),
         activeBatchSize,
         hiddenDim,
         embeddingDim,
         fromRow,
         toRow,
         up,
-        inputActivation,
-        laneScratch,
-        q4Kernel);
+        inputActivation);
 
     int length = toRow - fromRow;
     for (int batch = 0; batch < activeBatchSize; batch++) {
       int rowOffset = batch * hiddenDim + fromRow;
       TensorOps.swiGlu(activated, rowOffset, gate, rowOffset, up, rowOffset, length);
     }
-    outputActivation.quantizeBlockRangeForQ4(
-        activated, activeBatchSize, fromBlock, toBlock, q4Kernel);
+    quantizeBlockRange(
+        outputActivation,
+        activated,
+        activeBatchSize,
+        fromBlock,
+        toBlock,
+        activeLayer.ffnDownType());
   }
 
   private void projectDown(int fromRow, int toRow) {
-    VectorUtil.ggufQ4_0Q8_0BatchedMatmulRows(
+    batchedMatmulRows(
         activeLayer.ffnDown(),
+        activeLayer.ffnDownType(),
         activeBatchSize,
         embeddingDim,
         hiddenDim,
         fromRow,
         toRow,
         projected,
-        outputActivation,
-        laneScratch,
-        q4Kernel);
+        outputActivation);
+  }
+
+  private void batchedMatmulRows(
+      MemorySegment weight,
+      GgufTensorType type,
+      int batchSize,
+      int rows,
+      int cols,
+      int fromRow,
+      int toRow,
+      float[] out,
+      GgufQ8_0Batch activation) {
+    switch (type) {
+      case Q4_0 ->
+          VectorUtil.ggufQ4_0Q8_0BatchedMatmulRows(
+              weight,
+              batchSize,
+              rows,
+              cols,
+              fromRow,
+              toRow,
+              out,
+              activation,
+              laneScratch,
+              q4Kernel);
+      case Q8_0 ->
+          VectorUtil.ggufQ8_0Q8_0BatchedMatmulRows(
+              weight, batchSize, rows, cols, fromRow, toRow, out, activation);
+      default -> throw new IllegalArgumentException("unsupported staged weight type: " + type);
+    }
+  }
+
+  private void quantize(
+      GgufQ8_0Batch activation,
+      float[] values,
+      int batchSize,
+      GgufTensorType firstConsumerType,
+      GgufTensorType secondConsumerType) {
+    if (firstConsumerType == GgufTensorType.Q4_0 || secondConsumerType == GgufTensorType.Q4_0) {
+      activation.quantizeForQ4(values, batchSize, q4Kernel);
+    } else {
+      activation.quantize(values, batchSize);
+    }
+  }
+
+  private void quantizeBlockRange(
+      GgufQ8_0Batch activation,
+      float[] values,
+      int batchSize,
+      int fromBlock,
+      int toBlock,
+      GgufTensorType consumerType) {
+    if (consumerType == GgufTensorType.Q4_0) {
+      activation.quantizeBlockRangeForQ4(values, batchSize, fromBlock, toBlock, q4Kernel);
+    } else {
+      activation.quantizeBlockRange(values, batchSize, fromBlock, toBlock);
+    }
+  }
+
+  private static boolean supportsProjection(GgufTensorType type) {
+    return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0;
   }
 }

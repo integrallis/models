@@ -466,7 +466,7 @@ class LlamaForwardPassTest {
 
         float[] actual = staged.prefill(tokens, 0);
 
-        assertThat(staged.usesStagedQ4Ffn()).isTrue();
+        assertThat(staged.usesStagedQuantizedFfn()).isTrue();
         assertThat(actual).containsExactly(expected);
         assertThat(stagedCache.keyBuffer()).containsExactly(expectedKeys);
         assertThat(stagedCache.valueBuffer()).containsExactly(expectedValues);
@@ -524,10 +524,10 @@ class LlamaForwardPassTest {
 
         float[] actual = staged.prefill(tokens, 0);
 
-        assertThat(baseline.usesStagedQ4Ffn()).isTrue();
-        assertThat(baseline.usesStagedQ4Layer()).isFalse();
-        assertThat(staged.usesStagedQ4Layer()).isTrue();
-        assertThat(staged.stagedQ4LayerStageCount()).isEqualTo(7);
+        assertThat(baseline.usesStagedQuantizedFfn()).isTrue();
+        assertThat(baseline.usesStagedQuantizedLayer()).isFalse();
+        assertThat(staged.usesStagedQuantizedLayer()).isTrue();
+        assertThat(staged.stagedQuantizedLayerStageCount()).isEqualTo(7);
         assertThat(actual).containsExactly(expected);
         assertThat(stagedCache.keyBuffer()).containsExactly(expectedKeys);
         assertThat(stagedCache.valueBuffer()).containsExactly(expectedValues);
@@ -744,6 +744,65 @@ class LlamaForwardPassTest {
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void stagedQ8LayerPreservesPrefillCacheAndAutoregressiveStateExactly() {
+      try (Arena arena = Arena.ofShared()) {
+        GgufFile file = copyToSharedArena(buildQ8NanoModel(new Random(42)), arena);
+        LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+        LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+        int[] tokens = new int[40];
+        for (int index = 0; index < tokens.length; index++) {
+          tokens[index] = (index * 7 + 5) % VOCAB_SIZE;
+        }
+
+        PureJavaPlanConfiguration baselineConfiguration =
+            new PureJavaPlanConfiguration(
+                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, false, false);
+        KvCache baselineCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass baseline =
+            new LlamaForwardPass(
+                config,
+                weights,
+                baselineCache,
+                ExecutionPlanner.plan(
+                    RuntimeFingerprint.capture(),
+                    ModelTopology.from("llama", config, weights),
+                    baselineConfiguration));
+        float[] expected = baseline.prefill(tokens, 0).clone();
+        float[] expectedKeys = baselineCache.keyBuffer().clone();
+        float[] expectedValues = baselineCache.valueBuffer().clone();
+        int nextToken = argmax(expected);
+        float[] expectedNext = baseline.forward(nextToken, tokens.length);
+
+        PureJavaPlanConfiguration stagedConfiguration =
+            new PureJavaPlanConfiguration(
+                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, true);
+        KvCache stagedCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass staged =
+            new LlamaForwardPass(
+                config,
+                weights,
+                stagedCache,
+                ExecutionPlanner.plan(
+                    RuntimeFingerprint.capture(),
+                    ModelTopology.from("llama", config, weights),
+                    stagedConfiguration));
+
+        float[] actual = staged.prefill(tokens, 0);
+
+        assertThat(staged.usesStagedQuantizedLayer()).isTrue();
+        assertThat(staged.stagedQuantizedLayerStageCount()).isEqualTo(7);
+        assertThat(actual).containsExactly(expected);
+        assertThat(stagedCache.keyBuffer()).containsExactly(expectedKeys);
+        assertThat(stagedCache.valueBuffer()).containsExactly(expectedValues);
+        assertThat(staged.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+      }
     }
 
     @Test
