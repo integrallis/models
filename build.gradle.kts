@@ -19,6 +19,7 @@ allprojects {
 
 // Library subprojects (excludes benchmarks)
 val libraryProjects = subprojects.filter { it.name != "models-bench" }
+val benchmarkProjects = subprojects.filter { it.name == "models-bench" }
 val libraryModuleNames = libraryProjects.map { it.name }.toSet()
 val publishedModuleNames =
     setOf("models-api", "models-runtime", "models-semantic-order", "models-backend-purejava")
@@ -244,6 +245,21 @@ configure(libraryProjects) {
         testImplementation("org.mockito:mockito-core:5.15.2")
         testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
         testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
+    }
+}
+
+// Runnable benchmark projects use the same formatting and license policy as library sources.
+configure(benchmarkProjects) {
+    apply(plugin = "com.diffplug.spotless")
+
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+        java {
+            googleJavaFormat("1.35.0")
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+            licenseHeader(apacheLicenseHeader)
+        }
     }
 }
 
