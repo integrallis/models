@@ -25,6 +25,7 @@ import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.util.Map;
@@ -59,6 +60,7 @@ public final class LlamaForwardPass {
   private final boolean stagedQuantizedFfn;
   private final boolean stagedQuantizedLayer;
   private final boolean blockMajorQ8Activations;
+  private final GgufQ8BlockMajorKernel q8BlockMajorKernel;
   private final boolean parallelQ8FfnPreparation;
   private final QuantizedBatchedLayerPlan stagedQuantizedPlan;
   private final int prefillBatchCapacity;
@@ -144,6 +146,7 @@ public final class LlamaForwardPass {
     this.stagedQuantizedFfn = executionPlan.stagedQuantizedFfn();
     this.stagedQuantizedLayer = executionPlan.stagedQuantizedLayer();
     this.blockMajorQ8Activations = executionPlan.blockMajorQ8Activations();
+    this.q8BlockMajorKernel = executionPlan.q8BlockMajorKernel();
     this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
@@ -220,6 +223,7 @@ public final class LlamaForwardPass {
                 config.rmsNormEps(),
                 q4Kernel,
                 blockMajorQ8Activations,
+                q8BlockMajorKernel,
                 parallelQ8FfnPreparation,
                 executionPlan.runtime().ggufThreads(),
                 batchX,

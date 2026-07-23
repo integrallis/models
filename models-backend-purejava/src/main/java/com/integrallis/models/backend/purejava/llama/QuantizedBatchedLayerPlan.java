@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ8ActivationLayout;
+import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import com.integrallis.vectors.core.GgufQ8_0Batch;
 import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
@@ -47,6 +48,7 @@ final class QuantizedBatchedLayerPlan {
   private final float rmsNormEps;
   private final GgufQ4Kernel q4Kernel;
   private final boolean blockMajorQ8Activations;
+  private final GgufQ8BlockMajorKernel q8BlockMajorKernel;
   private final boolean parallelQ8FfnPreparation;
   private final int ffnPreparationPartitions;
   private final float[] residual;
@@ -79,6 +81,7 @@ final class QuantizedBatchedLayerPlan {
       float rmsNormEps,
       GgufQ4Kernel q4Kernel,
       boolean blockMajorQ8Activations,
+      GgufQ8BlockMajorKernel q8BlockMajorKernel,
       boolean parallelQ8FfnPreparation,
       int ffnPreparationParallelism,
       float[] residual,
@@ -107,6 +110,11 @@ final class QuantizedBatchedLayerPlan {
     this.rmsNormEps = rmsNormEps;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.blockMajorQ8Activations = blockMajorQ8Activations;
+    this.q8BlockMajorKernel = Objects.requireNonNull(q8BlockMajorKernel, "q8BlockMajorKernel");
+    if (!blockMajorQ8Activations && q8BlockMajorKernel != GgufQ8BlockMajorKernel.SCATTERED) {
+      throw new IllegalArgumentException(
+          "specialized Q8 kernel requires block-major Q8 activations");
+    }
     if (parallelQ8FfnPreparation && !blockMajorQ8Activations) {
       throw new IllegalArgumentException(
           "parallel Q8 FFN preparation requires block-major Q8 activations");
@@ -382,7 +390,7 @@ final class QuantizedBatchedLayerPlan {
       case Q8_0 -> {
         if (blockMajorQ8Activations) {
           VectorUtil.ggufQ8_0Q8_0BlockMajorBatchedMatmulRows(
-              weight, batchSize, rows, cols, fromRow, toRow, out, activation);
+              weight, batchSize, rows, cols, fromRow, toRow, out, activation, q8BlockMajorKernel);
         } else {
           VectorUtil.ggufQ8_0Q8_0BatchedMatmulRows(
               weight, batchSize, rows, cols, fromRow, toRow, out, activation);

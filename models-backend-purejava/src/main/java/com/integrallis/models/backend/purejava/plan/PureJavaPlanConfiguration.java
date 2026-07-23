@@ -36,6 +36,7 @@ public record PureJavaPlanConfiguration(
     boolean stagedQuantizedFfn,
     boolean stagedQuantizedLayer,
     boolean blockMajorQ8Activations,
+    boolean q8BlockMajorRowAccumulator,
     boolean parallelQ8FfnPreparation) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
@@ -55,6 +56,8 @@ public record PureJavaPlanConfiguration(
       "models.purejava.stagedQuantizedLayer";
   public static final String BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY =
       "models.purejava.blockMajorQ8Activations";
+  public static final String Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY =
+      "models.purejava.q8BlockMajorRowAccumulator";
   public static final String PARALLEL_Q8_FFN_PREPARATION_PROPERTY =
       "models.purejava.parallelQ8FfnPreparation";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
@@ -72,6 +75,7 @@ public record PureJavaPlanConfiguration(
           STAGED_QUANTIZED_FFN_PROPERTY,
           STAGED_QUANTIZED_LAYER_PROPERTY,
           BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
+          Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY,
           PARALLEL_Q8_FFN_PREPARATION_PROPERTY);
 
   public PureJavaPlanConfiguration {
@@ -91,6 +95,7 @@ public record PureJavaPlanConfiguration(
         DEFAULT_PREFILL_BATCH_SIZE,
         true,
         true,
+        false,
         false,
         false,
         false,
@@ -142,6 +147,8 @@ public record PureJavaPlanConfiguration(
             configured(STAGED_QUANTIZED_LAYER_PROPERTY, deployment, recommendations)),
         blockMajorQ8Activations(
             configured(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, deployment, recommendations)),
+        q8BlockMajorRowAccumulator(
+            configured(Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY, deployment, recommendations)),
         parallelQ8FfnPreparation(
             configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, deployment, recommendations)));
   }
@@ -213,6 +220,11 @@ public record PureJavaPlanConfiguration(
 
   static boolean blockMajorQ8Activations(String configured) {
     return configured != null && booleanProperty(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, configured);
+  }
+
+  static boolean q8BlockMajorRowAccumulator(String configured) {
+    return configured != null
+        && booleanProperty(Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY, configured);
   }
 
   static boolean parallelQ8FfnPreparation(String configured) {
