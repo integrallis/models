@@ -272,6 +272,44 @@ throughput (-0.54%, treated as neutral variance); every process reported checksu
 zero collections, and zero GC pause. Reports remain under
 `/opt/modeljars-bench/q8-weight-reuse-reports/`.
 
+## Retained Q8_0 block-major activation gate
+
+After weight conversion was hoisted, activation-batch locality became the next Q8_0 row-kernel
+target. A pre-widened `int[]` layout was implemented test first and rejected: at 1024x2048,
+batch 32, it improved local AVX2 from 19.013 to 15.432 ms/op (-18.8%) but was neutral on
+controlled EPYC/GraalVM (21.812 versus 21.828 ms/op). The authoritative host did not validate the
+extra representation; its integer copy quadrupled the activation payload and did not remove the
+observed cache-locality boundary after roughly 16 rows.
+
+The retained layout instead preserves the canonical batch-major Q8 bytes and creates one additional
+block-major byte copy during activation quantization. The explicit Vectors primitive reuses the
+existing exact batched accumulator with a 32-byte activation stride. Exact tests cover whole and
+split quantization, scalar and Panama row ranges, provider ownership, final logits, complete K/V
+buffers, and the next autoregressive state. The default packed API and batch-one path are unchanged.
+
+On local Temurin 25 AVX2, the 1024x2048 prequantized JMH gate was neutral at batch one, improved
+4.8% at batch four, 2.9% at batch eight, and 11.5% at batch 32. On controlled EPYC/GraalVM it was
+neutral through batch eight and improved batch 32 from 21.318 to 20.347 ms/op (-4.6%). The
+authoritative full-model gate held Vectors `d295f32`, Models `29b5169`, SmolLM2 model bytes,
+GraalVM Java 25, fixed 1 GiB heap, eight processors/workers, batch 32, all staged settings, and
+`MaximumInliningSize=10000` constant. Only
+`models.purejava.blockMajorQ8Activations=false/true` changed across six counterbalanced process
+pairs, each with five warmups and five measured one-token requests:
+
+| Metric | Packed activation bytes | Block-major activation bytes | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 939.347 ms | 925.622 ms | -1.46%; -1.69% paired-process median |
+| p95 TTFT | 965.011 ms | 943.771 ms | -2.20% |
+| p50 prefill | 167.890 tok/s | 170.006 tok/s | +1.26% |
+| p50 process CPU | 7,040 ms | 6,920 ms | -1.70% |
+| median process RSS | 1,020,530,688 B | 1,018,851,328 B | no regression observed |
+
+Five of six process medians favored the candidate, all 60 trials succeeded, and every corresponding
+input count, output count, and output SHA-256 matched. Reports remain under
+`/opt/modeljars-bench/q8-block-major-reports/`. The planner keeps the feature default-off and reports
+it through plan schema `pure-java-v13`; exact ModelJars profiles opt in with
+`-Dmodels.purejava.blockMajorQ8Activations=true` only for measured Q8_0 tuples.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
