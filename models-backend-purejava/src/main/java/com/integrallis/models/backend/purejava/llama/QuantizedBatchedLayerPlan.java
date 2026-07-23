@@ -47,6 +47,8 @@ final class QuantizedBatchedLayerPlan {
   private final float rmsNormEps;
   private final GgufQ4Kernel q4Kernel;
   private final boolean blockMajorQ8Activations;
+  private final boolean parallelQ8FfnPreparation;
+  private final int ffnPreparationPartitions;
   private final float[] residual;
   private final float[] normalizedInput;
   private final float[] attentionOutput;
@@ -77,6 +79,8 @@ final class QuantizedBatchedLayerPlan {
       float rmsNormEps,
       GgufQ4Kernel q4Kernel,
       boolean blockMajorQ8Activations,
+      boolean parallelQ8FfnPreparation,
+      int ffnPreparationParallelism,
       float[] residual,
       float[] normalizedInput,
       float[] attentionOutput,
@@ -103,6 +107,17 @@ final class QuantizedBatchedLayerPlan {
     this.rmsNormEps = rmsNormEps;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.blockMajorQ8Activations = blockMajorQ8Activations;
+    if (parallelQ8FfnPreparation && !blockMajorQ8Activations) {
+      throw new IllegalArgumentException(
+          "parallel Q8 FFN preparation requires block-major Q8 activations");
+    }
+    this.parallelQ8FfnPreparation = parallelQ8FfnPreparation;
+    if (parallelQ8FfnPreparation && ffnPreparationParallelism < 2) {
+      throw new IllegalArgumentException(
+          "parallel Q8 FFN preparation requires at least two participants");
+    }
+    this.ffnPreparationPartitions =
+        parallelQ8FfnPreparation ? Math.min(batchCapacity, ffnPreparationParallelism) : 1;
     this.residual = Objects.requireNonNull(residual, "residual");
     this.normalizedInput = Objects.requireNonNull(normalizedInput, "normalizedInput");
     this.attentionOutput = Objects.requireNonNull(attentionOutput, "attentionOutput");
@@ -134,7 +149,7 @@ final class QuantizedBatchedLayerPlan {
             GgufStagePlan.stage(batchCapacity, this::computeAttention),
             GgufStagePlan.stage(attentionOutputDim / Q8_BLOCK_SIZE, this::quantizeAttentionOutput),
             GgufStagePlan.stage(embeddingDim, this::projectAttentionOutput),
-            GgufStagePlan.stage(1, this::prepareFfnInput),
+            GgufStagePlan.stage(ffnPreparationPartitions, this::prepareFfnInput),
             GgufStagePlan.stage(hiddenDim / Q8_BLOCK_SIZE, this::projectGateUpAndActivate),
             GgufStagePlan.stage(embeddingDim, this::projectDown));
   }
@@ -247,7 +262,13 @@ final class QuantizedBatchedLayerPlan {
         activeLayer.woType());
   }
 
-  private void prepareFfnInput(int ignoredFrom, int ignoredTo) {
+  private void prepareFfnInput(int fromWorkItem, int toWorkItem) {
+    if (parallelQ8FfnPreparation) {
+      int fromBatch = (int) ((long) fromWorkItem * activeBatchSize / ffnPreparationPartitions);
+      int toBatch = (int) ((long) toWorkItem * activeBatchSize / ffnPreparationPartitions);
+      prepareFfnInputBatchRange(fromBatch, toBatch);
+      return;
+    }
     int activeLength = activeBatchSize * embeddingDim;
     for (int index = 0; index < activeLength; index++) {
       residual[index] += attentionProjected[index];
@@ -264,6 +285,23 @@ final class QuantizedBatchedLayerPlan {
         activeBatchSize,
         activeLayer.ffnGateType(),
         activeLayer.ffnUpType());
+  }
+
+  private void prepareFfnInputBatchRange(int fromBatch, int toBatch) {
+    if (fromBatch >= toBatch) {
+      return;
+    }
+    float[] ffnNorm = activeLayer.ffnNorm();
+    for (int batch = fromBatch; batch < toBatch; batch++) {
+      int offset = batch * embeddingDim;
+      int end = offset + embeddingDim;
+      for (int index = offset; index < end; index++) {
+        residual[index] += attentionProjected[index];
+      }
+      TensorOps.rmsNorm(
+          normalizedInput, offset, residual, offset, ffnNorm, embeddingDim, rmsNormEps);
+    }
+    inputActivation.quantizeBatchRange(normalizedInput, activeBatchSize, fromBatch, toBatch);
   }
 
   private void projectGateUpAndActivate(int fromBlock, int toBlock) {

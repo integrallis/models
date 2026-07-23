@@ -85,6 +85,12 @@ public record ModelTopology(
       return supportsStagedProjection(attentionOutput) && supportsStagedQuantizedFfn();
     }
 
+    boolean supportsParallelQ8FfnPreparation() {
+      return supportsStagedQuantizedLayer()
+          && gate == GgufTensorType.Q8_0
+          && up == GgufTensorType.Q8_0;
+    }
+
     private static boolean supportsStagedProjection(GgufTensorType type) {
       return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0;
     }
@@ -167,6 +173,19 @@ public record ModelTopology(
     }
     return Math.toIntExact(
         layers.stream().filter(LayerTopology::supportsStagedQuantizedLayer).count());
+  }
+
+  int parallelQ8FfnPreparationLayers() {
+    if (!threadShareableProjectionWeights) {
+      return 0;
+    }
+    return Math.toIntExact(
+        layers.stream().filter(LayerTopology::supportsParallelQ8FfnPreparation).count());
+  }
+
+  boolean supportsParallelQ8FfnPreparation() {
+    int stagedLayers = stagedQuantizedLayerLayers();
+    return stagedLayers > 0 && parallelQ8FfnPreparationLayers() == stagedLayers;
   }
 
   boolean hasStagedQ8Projection(boolean includeAttentionOutput) {

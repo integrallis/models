@@ -35,6 +35,7 @@ public record PureJavaExecutionPlan(
     boolean stagedQuantizedFfn,
     boolean stagedQuantizedLayer,
     boolean blockMajorQ8Activations,
+    boolean parallelQ8FfnPreparation,
     BackendDiagnostics diagnostics) {
 
   public PureJavaExecutionPlan {
@@ -90,6 +91,13 @@ public record PureJavaExecutionPlan(
             || !topology.hasStagedQ8Projection(stagedQuantizedLayer))) {
       throw new IllegalArgumentException(
           "block-major Q8 activations contradict the execution plan topology");
+    }
+    if (parallelQ8FfnPreparation
+        && (!stagedQuantizedLayer
+            || !blockMajorQ8Activations
+            || !topology.supportsParallelQ8FfnPreparation())) {
+      throw new IllegalArgumentException(
+          "parallel Q8 FFN preparation contradicts the execution plan topology");
     }
     if (finalLayerPrefillPruning && !topology.supportsFinalLayerPrefillPruning()) {
       throw new IllegalArgumentException(
