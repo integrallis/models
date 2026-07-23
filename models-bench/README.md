@@ -310,6 +310,39 @@ input count, output count, and output SHA-256 matched. Reports remain under
 it through plan schema `pure-java-v13`; exact ModelJars profiles opt in with
 `-Dmodels.purejava.blockMajorQ8Activations=true` only for measured Q8_0 tuples.
 
+## Retained parallel Q8_0 FFN preparation gate
+
+The post-layout JFR profile showed stage-completion skew while one participant performed residual
+addition, RMS normalization, and Q8 activation preparation for the whole prompt batch. The retained
+candidate partitions those independent operations by active batch row while preserving the same
+seven-stage plan. Vectors exposes exact disjoint Q8 batch-range quantization; Models owns the
+all-Q8 topology gate and transformer scheduling. Mixed gate/up formats, packed activations,
+single-participant runtimes, and batch-one decoding remain on the serial path.
+
+The authoritative full-model gate held Vectors candidate `4dcf935` (merged as `523f3aa`), Models
+`4887cde`, ModelJars `6db5163`,
+SmolLM2 SHA-256 `48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201`,
+prompt SHA-256 `2db2d875631cc7e3af3f6e4471ae4c9b2b7dfdb31ab561a41ef78182a31532e6`,
+GraalVM Java 25, a fixed 1 GiB heap, eight processors/workers, batch 32, block-major activations,
+all staged settings, and `MaximumInliningSize=10000` constant. Only
+`models.purejava.parallelQ8FfnPreparation=false/true` changed. Five warmups and five measured
+one-token requests in each of six counterbalanced fresh-process pairs produced 30 trials per mode:
+
+| Metric | Serial FFN preparation | Batch-row preparation | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 913.102 ms | 899.064 ms | -1.54%; -1.68% paired-process median |
+| p95 TTFT | 930.788 ms | 914.340 ms | -1.77% |
+| p50 prefill | 172.543 tok/s | 175.592 tok/s | +1.77% |
+| p50 process CPU | 6,860 ms | 6,840 ms | -0.29% |
+| median process RSS | 1,015,816,192 B | 1,013,358,592 B | -0.24% |
+
+All six process-pair medians and 28 of 30 corresponding trials favored the candidate for TTFT and
+prefill. All 60 trials succeeded, and every corresponding input count, output count, and output
+SHA-256 matched. Maximum observed RSS changed by +0.76%, with no median-memory regression. Reports
+remain under `/opt/modeljars-bench/q8-ffn-preparation-reports/` and local copies under
+`/private/tmp/q8-ffn-preparation-reports/`. The option remains default-off in plan schema
+`pure-java-v14` pending an exact ModelJars performance profile.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
