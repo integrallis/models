@@ -37,7 +37,7 @@ class ExecutionPlannerTest {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
-    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v13");
+    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v14");
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
@@ -123,6 +123,7 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
+            false,
             false);
 
     PureJavaExecutionPlan plan =
@@ -145,6 +146,7 @@ class ExecutionPlannerTest {
             32,
             true,
             true,
+            false,
             false,
             false,
             false,
@@ -177,6 +179,7 @@ class ExecutionPlannerTest {
             32,
             true,
             true,
+            false,
             false,
             false,
             false,
@@ -226,6 +229,7 @@ class ExecutionPlannerTest {
                     valid.stagedQuantizedFfn(),
                     valid.stagedQuantizedLayer(),
                     valid.blockMajorQ8Activations(),
+                    valid.parallelQ8FfnPreparation(),
                     valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("execution plan runtime");
@@ -252,6 +256,7 @@ class ExecutionPlannerTest {
             32,
             true,
             true,
+            false,
             false,
             false,
             false,
@@ -338,6 +343,7 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
+                false,
                 false));
 
     assertThat(plan.groupedProjections()).isTrue();
@@ -351,7 +357,18 @@ class ExecutionPlannerTest {
   void explicitOverridesDisableOtherwiseEligibleOptimizations() {
     PureJavaPlanConfiguration configuration =
         new PureJavaPlanConfiguration(
-            false, true, GgufQ4Kernel.WIDENED, 1, false, false, false, false, false, false, false);
+            false,
+            true,
+            GgufQ4Kernel.WIDENED,
+            1,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -392,6 +409,7 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
+                false,
                 false));
 
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
@@ -417,6 +435,7 @@ class ExecutionPlannerTest {
                 32,
                 false,
                 true,
+                false,
                 false,
                 false,
                 false,
@@ -619,6 +638,93 @@ class ExecutionPlannerTest {
   }
 
   @Test
+  void enablesParallelQ8FfnPreparationOnlyForRequestedAllQ8StagedBlockMajorLayers() {
+    PureJavaPlanConfiguration recommended =
+        PureJavaPlanConfiguration.from(
+            Map.of(),
+            Map.of(
+                PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY,
+                "true"));
+
+    PureJavaExecutionPlan q8 =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q8_0), recommended);
+
+    assertThat(q8.parallelQ8FfnPreparation()).isTrue();
+    assertThat(q8.diagnostics().optimization("parallel-q8-ffn-preparation"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(decision.settings())
+                  .containsEntry("partition", "batch-rows")
+                  .containsEntry("partitions", "8")
+                  .containsEntry("eligible-layers", "1");
+            });
+
+    PureJavaExecutionPlan singleParticipant =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci", true, 1), uniformTopology(GgufTensorType.Q8_0), recommended);
+    assertThat(singleParticipant.parallelQ8FfnPreparation()).isFalse();
+    assertThat(singleParticipant.diagnostics().optimization("parallel-q8-ffn-preparation"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
+              assertThat(decision.reason()).contains("at least two GGUF participants");
+              assertThat(decision.settings()).containsEntry("partitions", "1");
+            });
+
+    PureJavaExecutionPlan q4 =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), recommended);
+    assertThat(q4.parallelQ8FfnPreparation()).isFalse();
+    assertThat(q4.diagnostics().optimization("parallel-q8-ffn-preparation"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+
+    ModelTopology.LayerTopology mixedFfnInput =
+        new ModelTopology.LayerTopology(
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q8_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q8_0);
+    PureJavaExecutionPlan mixed =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"),
+            new ModelTopology("llama", 1024, 128, 128, List.of(mixedFfnInput), true),
+            recommended);
+    assertThat(mixed.stagedQuantizedLayer()).isTrue();
+    assertThat(mixed.blockMajorQ8Activations()).isTrue();
+    assertThat(mixed.parallelQ8FfnPreparation()).isFalse();
+
+    PureJavaPlanConfiguration withoutBlockMajor =
+        PureJavaPlanConfiguration.from(
+            Map.of(),
+            Map.of(
+                PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY,
+                "true"));
+    PureJavaExecutionPlan packed =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q8_0), withoutBlockMajor);
+    assertThat(packed.parallelQ8FfnPreparation()).isFalse();
+    assertThat(packed.diagnostics().optimization("parallel-q8-ffn-preparation"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
+              assertThat(decision.reason()).contains("block-major Q8 activations");
+            });
+    assertThat(PureJavaPlanConfiguration.defaults().parallelQ8FfnPreparation()).isFalse();
+  }
+
+  @Test
   void rejectsStagedQuantizedFfnWhenParallelExecutionOrWeightSharingIsUnavailable() {
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(
@@ -688,6 +794,7 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     false,
+                    false,
                     false))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
@@ -742,6 +849,11 @@ class ExecutionPlannerTest {
     assertThatThrownBy(() -> PureJavaPlanConfiguration.blockMajorQ8Activations("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.blockMajorQ8Activations");
+    assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation(null)).isFalse();
+    assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation("true")).isTrue();
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.parallelQ8FfnPreparation("sometimes"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.parallelQ8FfnPreparation");
     assertThat(PureJavaPlanConfiguration.q4Kernel(null)).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(PureJavaPlanConfiguration.q4Kernel("short-pairwise"))
         .isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
@@ -770,7 +882,8 @@ class ExecutionPlannerTest {
             Map.entry(PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY, "true"),
             Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY, "true"),
             Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "true"),
-            Map.entry(PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, "true"));
+            Map.entry(PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, "true"),
+            Map.entry(PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY, "true"));
 
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(Map.of(), recommendations);
@@ -786,6 +899,7 @@ class ExecutionPlannerTest {
     assertThat(recommended.stagedQuantizedFfn()).isTrue();
     assertThat(recommended.stagedQuantizedLayer()).isTrue();
     assertThat(recommended.blockMajorQ8Activations()).isTrue();
+    assertThat(recommended.parallelQ8FfnPreparation()).isTrue();
 
     PureJavaPlanConfiguration overridden =
         PureJavaPlanConfiguration.from(
@@ -803,6 +917,8 @@ class ExecutionPlannerTest {
                 PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
                 "false",
                 PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
+                "false",
+                PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY,
                 "false"),
             recommendations);
 
@@ -813,6 +929,7 @@ class ExecutionPlannerTest {
     assertThat(overridden.stagedQuantizedFfn()).isFalse();
     assertThat(overridden.stagedQuantizedLayer()).isFalse();
     assertThat(overridden.blockMajorQ8Activations()).isFalse();
+    assertThat(overridden.parallelQ8FfnPreparation()).isFalse();
     assertThatThrownBy(
             () ->
                 PureJavaPlanConfiguration.from(
@@ -860,6 +977,7 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     false,
+                    false,
                     valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("topology");
@@ -888,6 +1006,7 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     false,
+                    false,
                     valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("K/V-only");
@@ -898,6 +1017,11 @@ class ExecutionPlannerTest {
   }
 
   private static RuntimeFingerprint runtime(String compiler, boolean ggufParallel) {
+    return runtime(compiler, ggufParallel, 8);
+  }
+
+  private static RuntimeFingerprint runtime(
+      String compiler, boolean ggufParallel, int ggufThreads) {
     return new RuntimeFingerprint(
         "25.0.3",
         "OpenJDK 64-Bit Server VM",
@@ -918,7 +1042,7 @@ class ExecutionPlannerTest {
         true,
         ggufParallel,
         "persistent",
-        8,
+        ggufThreads,
         2,
         8);
   }

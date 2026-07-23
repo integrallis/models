@@ -111,6 +111,28 @@ input count, output count, and output SHA-256 matched. A 1024x2048 batch-32 kern
 rejected despite an 18.8% local batch-32 improvement because it was neutral on controlled EPYC and
 its four-times-larger payload did not fix the cache-locality boundary.
 
+A follow-up gate addressed the serial FFN preparation stage identified by JFR after block-major
+activation retention. Vectors candidate `4dcf935`, merged as `523f3aa`, added exact disjoint Q8
+activation batch-range quantization, while Models `4887cde` partitions residual addition, RMSNorm,
+and quantization by active batch row only for eligible all-Q8 staged layers. ModelJars remained
+fixed at `6db5163`.
+The model, prompt, GraalVM Java 25 runtime, fixed 1 GiB heap, eight workers, batch 32, and every
+other model setting remained constant across six counterbalanced fresh-process pairs:
+
+| Metric | Serial FFN preparation | Batch-row preparation | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 913.102 ms | 899.064 ms | -1.54%; -1.68% paired-process median |
+| p95 TTFT | 930.788 ms | 914.340 ms | -1.77% |
+| p50 prefill | 172.543 tok/s | 175.592 tok/s | +1.77% |
+| p50 process CPU | 6,860 ms | 6,840 ms | -0.29% |
+| median process RSS | 1,015,816,192 B | 1,013,358,592 B | -0.24% |
+
+All six process-pair medians and 28 of 30 corresponding trials favored the candidate. All 60
+trials succeeded with exact corresponding input counts, output counts, and output SHA-256 values.
+Maximum observed RSS moved by +0.76%, which is not a material memory regression. The option is
+default-off and requires all-Q8 gate/up projections, the staged layer plan, block-major
+activations, and at least two row partitions.
+
 ### Controlled mixed K-quant projection result
 
 MiniCPM5 stores query and key projections as Q4_K and the narrower value

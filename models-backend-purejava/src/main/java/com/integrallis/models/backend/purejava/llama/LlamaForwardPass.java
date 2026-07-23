@@ -59,6 +59,7 @@ public final class LlamaForwardPass {
   private final boolean stagedQuantizedFfn;
   private final boolean stagedQuantizedLayer;
   private final boolean blockMajorQ8Activations;
+  private final boolean parallelQ8FfnPreparation;
   private final QuantizedBatchedLayerPlan stagedQuantizedPlan;
   private final int prefillBatchCapacity;
 
@@ -143,6 +144,7 @@ public final class LlamaForwardPass {
     this.stagedQuantizedFfn = executionPlan.stagedQuantizedFfn();
     this.stagedQuantizedLayer = executionPlan.stagedQuantizedLayer();
     this.blockMajorQ8Activations = executionPlan.blockMajorQ8Activations();
+    this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -218,6 +220,8 @@ public final class LlamaForwardPass {
                 config.rmsNormEps(),
                 q4Kernel,
                 blockMajorQ8Activations,
+                parallelQ8FfnPreparation,
+                executionPlan.runtime().ggufThreads(),
                 batchX,
                 batchXNorm,
                 batchAttnOut,
@@ -746,6 +750,10 @@ public final class LlamaForwardPass {
 
   boolean usesBlockMajorQ8Activations() {
     return blockMajorQ8Activations && stagedQuantizedPlan != null;
+  }
+
+  boolean usesParallelQ8FfnPreparation() {
+    return parallelQ8FfnPreparation && stagedQuantizedPlan != null;
   }
 
   int stagedQuantizedLayerStageCount() {

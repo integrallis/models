@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v13";
+  public static final String PLAN_VERSION = "pure-java-v14";
 
   private ExecutionPlanner() {}
 
@@ -61,6 +61,14 @@ public final class ExecutionPlanner {
             stagedQuantizedFfn,
             stagedQuantizedLayer,
             decisions);
+    boolean parallelQ8FfnPreparation =
+        parallelQ8FfnPreparation(
+            runtime,
+            topology,
+            configuration,
+            stagedQuantizedLayer,
+            blockMajorQ8Activations,
+            decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -89,7 +97,64 @@ public final class ExecutionPlanner {
         stagedQuantizedFfn,
         stagedQuantizedLayer,
         blockMajorQ8Activations,
+        parallelQ8FfnPreparation,
         diagnostics);
+  }
+
+  private static boolean parallelQ8FfnPreparation(
+      RuntimeFingerprint runtime,
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      boolean stagedQuantizedLayer,
+      boolean blockMajorQ8Activations,
+      List<OptimizationDecision> decisions) {
+    int eligibleLayers = topology.parallelQ8FfnPreparationLayers();
+    int stagedLayers = topology.stagedQuantizedLayerLayers();
+    int partitions = Math.min(configuration.prefillBatchSize(), runtime.ggufThreads());
+    boolean topologyEligible = topology.supportsParallelQ8FfnPreparation();
+    boolean requested = configuration.parallelQ8FfnPreparation();
+    boolean enabled =
+        requested
+            && stagedQuantizedLayer
+            && blockMajorQ8Activations
+            && topologyEligible
+            && partitions >= 2;
+    OptimizationStatus status;
+    String reason;
+    if (enabled) {
+      status = OptimizationStatus.ENABLED;
+      reason = "all staged Q8 FFN input rows are prepared concurrently";
+    } else if (!topologyEligible) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "every staged layer requires Q8_0 gate and up projections";
+    } else if (!requested) {
+      status = OptimizationStatus.DISABLED;
+      reason = "disabled by models.purejava.parallelQ8FfnPreparation";
+    } else if (!stagedQuantizedLayer) {
+      status = OptimizationStatus.DISABLED;
+      reason = "parallel Q8 FFN preparation requires the staged quantized layer plan";
+    } else if (!blockMajorQ8Activations) {
+      status = OptimizationStatus.DISABLED;
+      reason = "parallel Q8 FFN preparation requires block-major Q8 activations";
+    } else {
+      status = OptimizationStatus.DISABLED;
+      reason = "parallel Q8 FFN preparation requires at least two GGUF participants";
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "parallel-q8-ffn-preparation",
+            status,
+            reason,
+            Map.of(
+                "eligible-layers",
+                Integer.toString(eligibleLayers),
+                "partition",
+                "batch-rows",
+                "partitions",
+                Integer.toString(partitions),
+                "staged-layers",
+                Integer.toString(stagedLayers))));
+    return enabled;
   }
 
   private static boolean blockMajorQ8Activations(
