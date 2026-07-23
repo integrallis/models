@@ -192,8 +192,8 @@ class ExecutionPlannerTest {
                     valid.finalLayerKvOnlyPrefill(),
                     valid.batchedAttentionScores(),
                     valid.batchedAttentionValues(),
-                    valid.stagedQ4Ffn(),
-                    valid.stagedQ4Layer(),
+                    valid.stagedQuantizedFfn(),
+                    valid.stagedQuantizedLayer(),
                     valid.diagnostics()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("execution plan runtime");
@@ -428,17 +428,17 @@ class ExecutionPlannerTest {
   }
 
   @Test
-  void enablesStagedQ4FfnOnlyForEligiblePersistentBatchedPlans() {
+  void enablesStagedQuantizedFfnOnlyForEligiblePersistentBatchedPlans() {
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(
-            Map.of(), Map.of(PureJavaPlanConfiguration.STAGED_Q4_FFN_PROPERTY, "true"));
+            Map.of(), Map.of(PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY, "true"));
 
     PureJavaExecutionPlan enabled =
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), recommended);
 
-    assertThat(enabled.stagedQ4Ffn()).isTrue();
-    assertThat(enabled.diagnostics().optimization("staged-q4-ffn"))
+    assertThat(enabled.stagedQuantizedFfn()).isTrue();
+    assertThat(enabled.diagnostics().optimization("staged-quantized-ffn"))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
@@ -447,28 +447,33 @@ class ExecutionPlannerTest {
                   .containsEntry("stages", "2");
             });
 
-    PureJavaExecutionPlan unsupported =
+    PureJavaExecutionPlan q8 =
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q8_0), recommended);
-    assertThat(unsupported.stagedQ4Ffn()).isFalse();
-    assertThat(unsupported.diagnostics().optimization("staged-q4-ffn"))
+    assertThat(q8.stagedQuantizedFfn()).isTrue();
+
+    PureJavaExecutionPlan unsupported =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q5_0), recommended);
+    assertThat(unsupported.stagedQuantizedFfn()).isFalse();
+    assertThat(unsupported.diagnostics().optimization("staged-quantized-ffn"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
-    assertThat(PureJavaPlanConfiguration.defaults().stagedQ4Ffn()).isFalse();
+    assertThat(PureJavaPlanConfiguration.defaults().stagedQuantizedFfn()).isFalse();
   }
 
   @Test
-  void enablesStagedQ4LayerOnlyForEligiblePersistentBatchedPlans() {
+  void enablesStagedQuantizedLayerOnlyForEligiblePersistentBatchedPlans() {
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(
-            Map.of(), Map.of(PureJavaPlanConfiguration.STAGED_Q4_LAYER_PROPERTY, "true"));
+            Map.of(), Map.of(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "true"));
 
     PureJavaExecutionPlan enabled =
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), recommended);
 
-    assertThat(enabled.stagedQ4Layer()).isTrue();
-    assertThat(enabled.diagnostics().optimization("staged-q4-layer"))
+    assertThat(enabled.stagedQuantizedLayer()).isTrue();
+    assertThat(enabled.diagnostics().optimization("staged-quantized-layer"))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
@@ -477,11 +482,16 @@ class ExecutionPlannerTest {
                   .containsEntry("stages", "7");
             });
 
-    PureJavaExecutionPlan unsupported =
+    PureJavaExecutionPlan q8 =
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q8_0), recommended);
-    assertThat(unsupported.stagedQ4Layer()).isFalse();
-    assertThat(unsupported.diagnostics().optimization("staged-q4-layer"))
+    assertThat(q8.stagedQuantizedLayer()).isTrue();
+
+    PureJavaExecutionPlan unsupported =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q5_0), recommended);
+    assertThat(unsupported.stagedQuantizedLayer()).isFalse();
+    assertThat(unsupported.diagnostics().optimization("staged-quantized-layer"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
 
@@ -499,22 +509,22 @@ class ExecutionPlannerTest {
             runtime("graal-jvmci"),
             new ModelTopology("llama", 1024, 128, 128, List.of(q8Output), true),
             recommended);
-    assertThat(mixed.stagedQ4Layer()).isFalse();
-    assertThat(mixed.topology().stagedQ4FfnLayers()).isEqualTo(1);
-    assertThat(PureJavaPlanConfiguration.defaults().stagedQ4Layer()).isFalse();
+    assertThat(mixed.stagedQuantizedLayer()).isTrue();
+    assertThat(mixed.topology().stagedQuantizedFfnLayers()).isEqualTo(1);
+    assertThat(PureJavaPlanConfiguration.defaults().stagedQuantizedLayer()).isFalse();
   }
 
   @Test
-  void rejectsStagedQ4FfnWhenParallelExecutionOrWeightSharingIsUnavailable() {
+  void rejectsStagedQuantizedFfnWhenParallelExecutionOrWeightSharingIsUnavailable() {
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(
-            Map.of(), Map.of(PureJavaPlanConfiguration.STAGED_Q4_FFN_PROPERTY, "true"));
+            Map.of(), Map.of(PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY, "true"));
 
     PureJavaExecutionPlan parallelDisabled =
         ExecutionPlanner.plan(
             runtime("graal-jvmci", false), uniformTopology(GgufTensorType.Q4_0), recommended);
-    assertThat(parallelDisabled.stagedQ4Ffn()).isFalse();
-    assertThat(parallelDisabled.diagnostics().optimization("staged-q4-ffn"))
+    assertThat(parallelDisabled.stagedQuantizedFfn()).isFalse();
+    assertThat(parallelDisabled.diagnostics().optimization("staged-quantized-ffn"))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
@@ -526,8 +536,8 @@ class ExecutionPlannerTest {
             "llama", 1024, 128, 128, uniformTopology(GgufTensorType.Q4_0).layers(), false);
     PureJavaExecutionPlan weightsNotShareable =
         ExecutionPlanner.plan(runtime("graal-jvmci"), confined, recommended);
-    assertThat(weightsNotShareable.stagedQ4Ffn()).isFalse();
-    assertThat(weightsNotShareable.diagnostics().optimization("staged-q4-ffn"))
+    assertThat(weightsNotShareable.stagedQuantizedFfn()).isFalse();
+    assertThat(weightsNotShareable.diagnostics().optimization("staged-quantized-ffn"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
   }
@@ -603,16 +613,16 @@ class ExecutionPlannerTest {
     assertThatThrownBy(() -> PureJavaPlanConfiguration.batchedAttentionScores("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.batchedAttentionScores");
-    assertThat(PureJavaPlanConfiguration.stagedQ4Ffn(null)).isFalse();
-    assertThat(PureJavaPlanConfiguration.stagedQ4Ffn("true")).isTrue();
-    assertThatThrownBy(() -> PureJavaPlanConfiguration.stagedQ4Ffn("sometimes"))
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedFfn(null)).isFalse();
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedFfn("true")).isTrue();
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.stagedQuantizedFfn("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("models.purejava.stagedQ4Ffn");
-    assertThat(PureJavaPlanConfiguration.stagedQ4Layer(null)).isFalse();
-    assertThat(PureJavaPlanConfiguration.stagedQ4Layer("true")).isTrue();
-    assertThatThrownBy(() -> PureJavaPlanConfiguration.stagedQ4Layer("sometimes"))
+        .hasMessageContaining("models.purejava.stagedQuantizedFfn");
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedLayer(null)).isFalse();
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedLayer("true")).isTrue();
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.stagedQuantizedLayer("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("models.purejava.stagedQ4Layer");
+        .hasMessageContaining("models.purejava.stagedQuantizedLayer");
     assertThat(PureJavaPlanConfiguration.q4Kernel(null)).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(PureJavaPlanConfiguration.q4Kernel("short-pairwise"))
         .isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
@@ -647,9 +657,9 @@ class ExecutionPlannerTest {
             "true",
             PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY,
             "true",
-            PureJavaPlanConfiguration.STAGED_Q4_FFN_PROPERTY,
+            PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
             "true",
-            PureJavaPlanConfiguration.STAGED_Q4_LAYER_PROPERTY,
+            PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
             "true");
 
     PureJavaPlanConfiguration recommended =
@@ -663,8 +673,8 @@ class ExecutionPlannerTest {
     assertThat(recommended.finalLayerKvOnlyPrefill()).isFalse();
     assertThat(recommended.batchedAttentionValues()).isTrue();
     assertThat(recommended.batchedAttentionScores()).isTrue();
-    assertThat(recommended.stagedQ4Ffn()).isTrue();
-    assertThat(recommended.stagedQ4Layer()).isTrue();
+    assertThat(recommended.stagedQuantizedFfn()).isTrue();
+    assertThat(recommended.stagedQuantizedLayer()).isTrue();
 
     PureJavaPlanConfiguration overridden =
         PureJavaPlanConfiguration.from(
@@ -677,9 +687,9 @@ class ExecutionPlannerTest {
                 "false",
                 PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY,
                 "false",
-                PureJavaPlanConfiguration.STAGED_Q4_FFN_PROPERTY,
+                PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
                 "false",
-                PureJavaPlanConfiguration.STAGED_Q4_LAYER_PROPERTY,
+                PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
                 "false"),
             recommendations);
 
@@ -687,8 +697,8 @@ class ExecutionPlannerTest {
     assertThat(overridden.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(overridden.batchedAttentionValues()).isFalse();
     assertThat(overridden.batchedAttentionScores()).isFalse();
-    assertThat(overridden.stagedQ4Ffn()).isFalse();
-    assertThat(overridden.stagedQ4Layer()).isFalse();
+    assertThat(overridden.stagedQuantizedFfn()).isFalse();
+    assertThat(overridden.stagedQuantizedLayer()).isFalse();
     assertThatThrownBy(
             () ->
                 PureJavaPlanConfiguration.from(

@@ -33,8 +33,8 @@ public record PureJavaPlanConfiguration(
     boolean finalLayerKvOnlyPrefill,
     boolean batchedAttentionScores,
     boolean batchedAttentionValues,
-    boolean stagedQ4Ffn,
-    boolean stagedQ4Layer) {
+    boolean stagedQuantizedFfn,
+    boolean stagedQuantizedLayer) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
@@ -48,8 +48,9 @@ public record PureJavaPlanConfiguration(
       "models.purejava.batchedAttentionScores";
   public static final String BATCHED_ATTENTION_VALUES_PROPERTY =
       "models.purejava.batchedAttentionValues";
-  public static final String STAGED_Q4_FFN_PROPERTY = "models.purejava.stagedQ4Ffn";
-  public static final String STAGED_Q4_LAYER_PROPERTY = "models.purejava.stagedQ4Layer";
+  public static final String STAGED_QUANTIZED_FFN_PROPERTY = "models.purejava.stagedQuantizedFfn";
+  public static final String STAGED_QUANTIZED_LAYER_PROPERTY =
+      "models.purejava.stagedQuantizedLayer";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
   private static final String PROPERTY_PREFIX = "models.purejava.";
   private static final Set<String> SUPPORTED_SETTINGS =
@@ -62,8 +63,8 @@ public record PureJavaPlanConfiguration(
           FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
           BATCHED_ATTENTION_SCORES_PROPERTY,
           BATCHED_ATTENTION_VALUES_PROPERTY,
-          STAGED_Q4_FFN_PROPERTY,
-          STAGED_Q4_LAYER_PROPERTY);
+          STAGED_QUANTIZED_FFN_PROPERTY,
+          STAGED_QUANTIZED_LAYER_PROPERTY);
 
   public PureJavaPlanConfiguration {
     q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
@@ -126,8 +127,9 @@ public record PureJavaPlanConfiguration(
             configured(BATCHED_ATTENTION_SCORES_PROPERTY, deployment, recommendations)),
         batchedAttentionValues(
             configured(BATCHED_ATTENTION_VALUES_PROPERTY, deployment, recommendations)),
-        stagedQ4Ffn(configured(STAGED_Q4_FFN_PROPERTY, deployment, recommendations)),
-        stagedQ4Layer(configured(STAGED_Q4_LAYER_PROPERTY, deployment, recommendations)));
+        stagedQuantizedFfn(configured(STAGED_QUANTIZED_FFN_PROPERTY, deployment, recommendations)),
+        stagedQuantizedLayer(
+            configured(STAGED_QUANTIZED_LAYER_PROPERTY, deployment, recommendations)));
   }
 
   private static void validateSettings(Map<String, String> settings, String source) {
@@ -187,12 +189,12 @@ public record PureJavaPlanConfiguration(
     return configured != null && booleanProperty(BATCHED_ATTENTION_VALUES_PROPERTY, configured);
   }
 
-  static boolean stagedQ4Ffn(String configured) {
-    return configured != null && booleanProperty(STAGED_Q4_FFN_PROPERTY, configured);
+  static boolean stagedQuantizedFfn(String configured) {
+    return configured != null && booleanProperty(STAGED_QUANTIZED_FFN_PROPERTY, configured);
   }
 
-  static boolean stagedQ4Layer(String configured) {
-    return configured != null && booleanProperty(STAGED_Q4_LAYER_PROPERTY, configured);
+  static boolean stagedQuantizedLayer(String configured) {
+    return configured != null && booleanProperty(STAGED_QUANTIZED_LAYER_PROPERTY, configured);
   }
 
   private static boolean booleanProperty(String property, String configured) {

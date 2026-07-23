@@ -56,9 +56,9 @@ public final class LlamaForwardPass {
   private final boolean finalLayerKvOnlyPrefill;
   private final boolean batchedAttentionScores;
   private final boolean batchedAttentionValues;
-  private final boolean stagedQ4Ffn;
-  private final boolean stagedQ4Layer;
-  private final Q4BatchedLayerPlan stagedQ4Plan;
+  private final boolean stagedQuantizedFfn;
+  private final boolean stagedQuantizedLayer;
+  private final QuantizedBatchedLayerPlan stagedQuantizedPlan;
   private final int prefillBatchCapacity;
 
   // Scratch buffers
@@ -139,8 +139,8 @@ public final class LlamaForwardPass {
     this.finalLayerKvOnlyPrefill = executionPlan.finalLayerKvOnlyPrefill();
     this.batchedAttentionScores = executionPlan.batchedAttentionScores();
     this.batchedAttentionValues = executionPlan.batchedAttentionValues();
-    this.stagedQ4Ffn = executionPlan.stagedQ4Ffn();
-    this.stagedQ4Layer = executionPlan.stagedQ4Layer();
+    this.stagedQuantizedFfn = executionPlan.stagedQuantizedFfn();
+    this.stagedQuantizedLayer = executionPlan.stagedQuantizedLayer();
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -181,7 +181,7 @@ public final class LlamaForwardPass {
     this.batchK = batchBuffer(prefillBatchCapacity, config.keyDim());
     this.batchV = batchBuffer(prefillBatchCapacity, config.valueDim());
     this.batchAttentionScores =
-        stagedQ4Layer ? batchBuffer(prefillBatchCapacity, cache.maxSeqLen()) : new float[0];
+        stagedQuantizedLayer ? batchBuffer(prefillBatchCapacity, cache.maxSeqLen()) : new float[0];
     this.batchAttnOut = batchBuffer(prefillBatchCapacity, config.attentionOutputDim());
     this.batchAttnProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchFfnGate = batchBuffer(prefillBatchCapacity, hiddenDim);
@@ -206,9 +206,9 @@ public final class LlamaForwardPass {
         usesProjectionType(config, weights, GgufTensorType.Q4_0)
             ? new float[Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, q4LaneRows), 8)]
             : new float[0];
-    this.stagedQ4Plan =
-        (stagedQ4Ffn || stagedQ4Layer) && batchedPrefill
-            ? new Q4BatchedLayerPlan(
+    this.stagedQuantizedPlan =
+        (stagedQuantizedFfn || stagedQuantizedLayer) && batchedPrefill
+            ? new QuantizedBatchedLayerPlan(
                 prefillBatchCapacity,
                 dim,
                 config.attentionOutputDim(),
@@ -355,14 +355,14 @@ public final class LlamaForwardPass {
               && batchLogits == null
               && layerObserver == null
               && layer == config.numLayers() - 1;
-      boolean useStagedQ4Layer =
+      boolean useStagedQuantizedLayer =
           !pruneFinalLayer
-              && stagedQ4Layer
-              && stagedQ4Plan != null
-              && stagedQ4Plan.supportsLayer(lw);
-      if (useStagedQ4Layer) {
+              && stagedQuantizedLayer
+              && stagedQuantizedPlan != null
+              && stagedQuantizedPlan.supportsLayer(lw);
+      if (useStagedQuantizedLayer) {
         cache.reserveSequenceCapacity(startPosition + batchSize);
-        stagedQ4Plan.executeLayer(lw, layer, startPosition, batchSize);
+        stagedQuantizedPlan.executeLayer(lw, layer, startPosition, batchSize);
       } else {
         prepareBatchedAttention(lw, layer, startPosition, 0, batchSize);
         computeBatchedAttention(lw, layer, startPosition, 0, batchSize);
@@ -388,8 +388,10 @@ public final class LlamaForwardPass {
           TensorOps.rmsNorm(
               batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
         }
-        if (stagedQ4Ffn && stagedQ4Plan != null && stagedQ4Plan.supportsFfn(lw)) {
-          stagedQ4Plan.executeFfn(lw, batchSize);
+        if (stagedQuantizedFfn
+            && stagedQuantizedPlan != null
+            && stagedQuantizedPlan.supportsFfn(lw)) {
+          stagedQuantizedPlan.executeFfn(lw, batchSize);
         } else {
           if (groupedBatchedPrefill) {
             dualBatchedMatmulDispatch(
@@ -731,16 +733,16 @@ public final class LlamaForwardPass {
     return batchedAttentionScores;
   }
 
-  boolean usesStagedQ4Ffn() {
-    return stagedQ4Ffn && stagedQ4Plan != null;
+  boolean usesStagedQuantizedFfn() {
+    return stagedQuantizedFfn && stagedQuantizedPlan != null;
   }
 
-  boolean usesStagedQ4Layer() {
-    return stagedQ4Layer && stagedQ4Plan != null;
+  boolean usesStagedQuantizedLayer() {
+    return stagedQuantizedLayer && stagedQuantizedPlan != null;
   }
 
-  int stagedQ4LayerStageCount() {
-    return usesStagedQ4Layer() ? stagedQ4Plan.layerStageCount() : 0;
+  int stagedQuantizedLayerStageCount() {
+    return usesStagedQuantizedLayer() ? stagedQuantizedPlan.layerStageCount() : 0;
   }
 
   private void finishFinalLayerKvOnlyBatch(

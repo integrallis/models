@@ -75,14 +75,18 @@ public record ModelTopology(
           && value == GgufTensorType.Q6_K;
     }
 
-    boolean supportsStagedQ4Ffn() {
-      return gate == GgufTensorType.Q4_0
-          && up == GgufTensorType.Q4_0
-          && down == GgufTensorType.Q4_0;
+    boolean supportsStagedQuantizedFfn() {
+      return supportsStagedProjection(gate)
+          && supportsStagedProjection(up)
+          && supportsStagedProjection(down);
     }
 
-    boolean supportsStagedQ4Layer() {
-      return attentionOutput == GgufTensorType.Q4_0 && supportsStagedQ4Ffn();
+    boolean supportsStagedQuantizedLayer() {
+      return supportsStagedProjection(attentionOutput) && supportsStagedQuantizedFfn();
+    }
+
+    private static boolean supportsStagedProjection(GgufTensorType type) {
+      return type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0;
     }
 
     String qkvMode() {
@@ -149,18 +153,20 @@ public record ModelTopology(
     return Math.toIntExact(layers.stream().filter(LayerTopology::groupsMixedKQkv).count());
   }
 
-  int stagedQ4FfnLayers() {
+  int stagedQuantizedFfnLayers() {
     if (!threadShareableProjectionWeights) {
       return 0;
     }
-    return Math.toIntExact(layers.stream().filter(LayerTopology::supportsStagedQ4Ffn).count());
+    return Math.toIntExact(
+        layers.stream().filter(LayerTopology::supportsStagedQuantizedFfn).count());
   }
 
-  int stagedQ4LayerLayers() {
+  int stagedQuantizedLayerLayers() {
     if (!threadShareableProjectionWeights) {
       return 0;
     }
-    return Math.toIntExact(layers.stream().filter(LayerTopology::supportsStagedQ4Layer).count());
+    return Math.toIntExact(
+        layers.stream().filter(LayerTopology::supportsStagedQuantizedLayer).count());
   }
 
   private static boolean threadShareableProjectionWeights(
