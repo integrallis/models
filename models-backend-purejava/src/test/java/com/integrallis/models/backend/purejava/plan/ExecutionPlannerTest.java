@@ -38,7 +38,7 @@ class ExecutionPlannerTest {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
-    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v15");
+    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v16");
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
@@ -125,7 +125,7 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
-            false,
+            GgufQ8BlockMajorKernel.SCATTERED,
             false);
 
     PureJavaExecutionPlan plan =
@@ -153,7 +153,7 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
-            false,
+            GgufQ8BlockMajorKernel.SCATTERED,
             false);
 
     PureJavaExecutionPlan plan =
@@ -187,7 +187,7 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
-            false,
+            GgufQ8BlockMajorKernel.SCATTERED,
             false);
 
     PureJavaExecutionPlan plan =
@@ -266,7 +266,7 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
-            false,
+            GgufQ8BlockMajorKernel.SCATTERED,
             false);
 
     PureJavaExecutionPlan plan =
@@ -350,7 +350,7 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false));
 
     assertThat(plan.groupedProjections()).isTrue();
@@ -375,7 +375,7 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
-            false,
+            GgufQ8BlockMajorKernel.SCATTERED,
             false);
 
     PureJavaExecutionPlan plan =
@@ -418,7 +418,7 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false));
 
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
@@ -449,7 +449,7 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false));
 
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
@@ -657,15 +657,15 @@ class ExecutionPlannerTest {
                 "true",
                 PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
                 "true",
-                PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY,
-                "true"));
+                PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_KERNEL_PROPERTY,
+                "row-accumulated"));
 
     PureJavaExecutionPlan graal =
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q8_0), recommended);
 
     assertThat(graal.q8BlockMajorKernel()).isEqualTo(GgufQ8BlockMajorKernel.ROW_ACCUMULATED);
-    assertThat(graal.diagnostics().optimization("q8-block-major-row-accumulator"))
+    assertThat(graal.diagnostics().optimization("q8-block-major-kernel"))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
@@ -678,7 +678,7 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("hotspot-c2"), uniformTopology(GgufTensorType.Q8_0), recommended);
     assertThat(hotspot.q8BlockMajorKernel()).isEqualTo(GgufQ8BlockMajorKernel.SCATTERED);
-    assertThat(hotspot.diagnostics().optimization("q8-block-major-row-accumulator"))
+    assertThat(hotspot.diagnostics().optimization("q8-block-major-kernel"))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED);
@@ -689,7 +689,61 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), recommended);
     assertThat(q4.q8BlockMajorKernel()).isEqualTo(GgufQ8BlockMajorKernel.SCATTERED);
-    assertThat(PureJavaPlanConfiguration.defaults().q8BlockMajorRowAccumulator()).isFalse();
+    assertThat(PureJavaPlanConfiguration.defaults().q8BlockMajorKernel())
+        .isEqualTo(GgufQ8BlockMajorKernel.SCATTERED);
+  }
+
+  @Test
+  void parsesTypedQ8BlockMajorKernelSelection() {
+    assertThat(PureJavaPlanConfiguration.q8BlockMajorKernel(null))
+        .isEqualTo(GgufQ8BlockMajorKernel.SCATTERED);
+    assertThat(PureJavaPlanConfiguration.q8BlockMajorKernel("row-accumulated"))
+        .isEqualTo(GgufQ8BlockMajorKernel.ROW_ACCUMULATED);
+    assertThat(PureJavaPlanConfiguration.q8BlockMajorKernel("float-lane-accumulated"))
+        .isEqualTo(GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED);
+  }
+
+  @Test
+  void selectsFloatLaneQ8KernelOnlyForAnExact256BitGraalRuntime() {
+    PureJavaPlanConfiguration recommended =
+        PureJavaPlanConfiguration.from(
+            Map.of(),
+            Map.of(
+                PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_KERNEL_PROPERTY,
+                "float-lane-accumulated"));
+
+    PureJavaExecutionPlan selected =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q8_0), recommended);
+
+    assertThat(selected.q8BlockMajorKernel())
+        .isEqualTo(GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED);
+    assertThat(selected.diagnostics().optimization("q8-block-major-kernel"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(decision.settings())
+                  .containsEntry("requested-kernel", "float-lane-accumulated")
+                  .containsEntry("kernel", "float-lane-accumulated")
+                  .containsEntry("active-vector-bits", "256");
+            });
+
+    PureJavaExecutionPlan wider =
+        ExecutionPlanner.plan(
+            runtime("graal-jvmci", true, 8, 512),
+            uniformTopology(GgufTensorType.Q8_0),
+            recommended);
+    assertThat(wider.q8BlockMajorKernel()).isEqualTo(GgufQ8BlockMajorKernel.SCATTERED);
+    assertThat(wider.diagnostics().optimization("q8-block-major-kernel"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED);
+              assertThat(decision.reason()).contains("256-bit");
+            });
   }
 
   @Test
@@ -850,7 +904,7 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     false,
-                    false,
+                    GgufQ8BlockMajorKernel.SCATTERED,
                     false))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
@@ -905,11 +959,13 @@ class ExecutionPlannerTest {
     assertThatThrownBy(() -> PureJavaPlanConfiguration.blockMajorQ8Activations("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.blockMajorQ8Activations");
-    assertThat(PureJavaPlanConfiguration.q8BlockMajorRowAccumulator(null)).isFalse();
-    assertThat(PureJavaPlanConfiguration.q8BlockMajorRowAccumulator("true")).isTrue();
-    assertThatThrownBy(() -> PureJavaPlanConfiguration.q8BlockMajorRowAccumulator("sometimes"))
+    assertThat(PureJavaPlanConfiguration.q8BlockMajorKernel(null))
+        .isEqualTo(GgufQ8BlockMajorKernel.SCATTERED);
+    assertThat(PureJavaPlanConfiguration.q8BlockMajorKernel("row-accumulated"))
+        .isEqualTo(GgufQ8BlockMajorKernel.ROW_ACCUMULATED);
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.q8BlockMajorKernel("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("models.purejava.q8BlockMajorRowAccumulator");
+        .hasMessageContaining("models.purejava.q8BlockMajorKernel");
     assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation(null)).isFalse();
     assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation("true")).isTrue();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.parallelQ8FfnPreparation("sometimes"))
@@ -944,7 +1000,7 @@ class ExecutionPlannerTest {
             Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY, "true"),
             Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "true"),
             Map.entry(PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, "true"),
-            Map.entry(PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY, "true"),
+            Map.entry(PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_KERNEL_PROPERTY, "row-accumulated"),
             Map.entry(PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY, "true"));
 
     PureJavaPlanConfiguration recommended =
@@ -961,7 +1017,7 @@ class ExecutionPlannerTest {
     assertThat(recommended.stagedQuantizedFfn()).isTrue();
     assertThat(recommended.stagedQuantizedLayer()).isTrue();
     assertThat(recommended.blockMajorQ8Activations()).isTrue();
-    assertThat(recommended.q8BlockMajorRowAccumulator()).isTrue();
+    assertThat(recommended.q8BlockMajorKernel()).isEqualTo(GgufQ8BlockMajorKernel.ROW_ACCUMULATED);
     assertThat(recommended.parallelQ8FfnPreparation()).isTrue();
 
     PureJavaPlanConfiguration overridden =
@@ -981,8 +1037,8 @@ class ExecutionPlannerTest {
                 "false",
                 PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
                 "false",
-                PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY,
-                "false",
+                PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_KERNEL_PROPERTY,
+                "scattered",
                 PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY,
                 "false"),
             recommendations);
@@ -994,7 +1050,7 @@ class ExecutionPlannerTest {
     assertThat(overridden.stagedQuantizedFfn()).isFalse();
     assertThat(overridden.stagedQuantizedLayer()).isFalse();
     assertThat(overridden.blockMajorQ8Activations()).isFalse();
-    assertThat(overridden.q8BlockMajorRowAccumulator()).isFalse();
+    assertThat(overridden.q8BlockMajorKernel()).isEqualTo(GgufQ8BlockMajorKernel.SCATTERED);
     assertThat(overridden.parallelQ8FfnPreparation()).isFalse();
     assertThatThrownBy(
             () ->
@@ -1090,6 +1146,11 @@ class ExecutionPlannerTest {
 
   private static RuntimeFingerprint runtime(
       String compiler, boolean ggufParallel, int ggufThreads) {
+    return runtime(compiler, ggufParallel, ggufThreads, 256);
+  }
+
+  private static RuntimeFingerprint runtime(
+      String compiler, boolean ggufParallel, int ggufThreads, int vectorBits) {
     return new RuntimeFingerprint(
         "25.0.3",
         "OpenJDK 64-Bit Server VM",
@@ -1101,13 +1162,13 @@ class ExecutionPlannerTest {
         "AMD EPYC-Milan Processor",
         "test-vector",
         true,
-        256,
-        256,
+        vectorBits,
+        vectorBits,
         false,
         false,
         false,
-        true,
-        true,
+        vectorBits >= 256,
+        vectorBits >= 256,
         ggufParallel,
         "persistent",
         ggufThreads,

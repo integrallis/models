@@ -462,7 +462,7 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false);
         KvCache stagedCache =
             new KvCache(
@@ -511,7 +511,7 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false);
         KvCache baselineCache =
             new KvCache(
@@ -544,7 +544,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 false,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false);
         KvCache stagedCache =
             new KvCache(
@@ -807,7 +807,7 @@ class LlamaForwardPassTest {
                 false,
                 false,
                 false,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false);
         KvCache baselineCache =
             new KvCache(
@@ -840,7 +840,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 true,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 false);
         KvCache stagedCache =
             new KvCache(
@@ -873,7 +873,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 true,
-                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
                 true);
         KvCache parallelCache =
             new KvCache(
@@ -902,7 +902,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 true,
-                true,
+                GgufQ8BlockMajorKernel.ROW_ACCUMULATED,
                 true);
         PureJavaExecutionPlan rowAccumulatedPlan =
             ExecutionPlanner.plan(
@@ -915,6 +915,46 @@ class LlamaForwardPassTest {
         LlamaForwardPass rowAccumulated =
             new LlamaForwardPass(config, weights, rowAccumulatedCache, rowAccumulatedPlan);
         float[] rowAccumulatedActual = rowAccumulated.prefill(tokens, 0).clone();
+
+        PureJavaPlanConfiguration floatLaneConfiguration =
+            new PureJavaPlanConfiguration(
+                true,
+                true,
+                GgufQ4Kernel.WIDENED,
+                32,
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                true,
+                GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED,
+                true);
+        PureJavaExecutionPlan floatLanePlan =
+            ExecutionPlanner.plan(
+                graalRuntime256(),
+                ModelTopology.from("llama", config, weights),
+                floatLaneConfiguration);
+        KvCache firstFloatLaneCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass firstFloatLane =
+            new LlamaForwardPass(config, weights, firstFloatLaneCache, floatLanePlan);
+        float[] firstFloatLaneActual = firstFloatLane.prefill(tokens, 0).clone();
+        float[] firstFloatLaneKeys = firstFloatLaneCache.keyBuffer().clone();
+        float[] firstFloatLaneValues = firstFloatLaneCache.valueBuffer().clone();
+        float[] firstFloatLaneNext = firstFloatLane.forward(nextToken, tokens.length).clone();
+
+        KvCache secondFloatLaneCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass secondFloatLane =
+            new LlamaForwardPass(config, weights, secondFloatLaneCache, floatLanePlan);
+        float[] secondFloatLaneActual = secondFloatLane.prefill(tokens, 0).clone();
+        float[] secondFloatLaneKeys = secondFloatLaneCache.keyBuffer().clone();
+        float[] secondFloatLaneValues = secondFloatLaneCache.valueBuffer().clone();
+        float[] secondFloatLaneNext = secondFloatLane.forward(nextToken, tokens.length).clone();
 
         assertThat(staged.usesStagedQuantizedLayer()).isTrue();
         assertThat(staged.usesBlockMajorQ8Activations()).isTrue();
@@ -934,6 +974,18 @@ class LlamaForwardPassTest {
         assertThat(rowAccumulatedCache.keyBuffer()).containsExactly(actualKeys);
         assertThat(rowAccumulatedCache.valueBuffer()).containsExactly(actualValues);
         assertThat(rowAccumulated.forward(nextToken, tokens.length)).containsExactly(actualNext);
+        assertThat(floatLanePlan.q8BlockMajorKernel())
+            .isEqualTo(GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED);
+        assertThat(secondFloatLaneActual).containsExactly(firstFloatLaneActual);
+        assertThat(secondFloatLaneKeys).containsExactly(firstFloatLaneKeys);
+        assertThat(secondFloatLaneValues).containsExactly(firstFloatLaneValues);
+        assertThat(secondFloatLaneNext).containsExactly(firstFloatLaneNext);
+        assertNumericallyClose(actual, firstFloatLaneActual, 2.0e-3f, 5.0e-5f);
+        assertNumericallyClose(actualKeys, firstFloatLaneKeys, 2.0e-3f, 5.0e-5f);
+        assertNumericallyClose(actualValues, firstFloatLaneValues, 2.0e-3f, 5.0e-5f);
+        assertNumericallyClose(actualNext, firstFloatLaneNext, 2.0e-3f, 5.0e-5f);
+        assertThat(argmax(firstFloatLaneActual)).isEqualTo(argmax(actual));
+        assertThat(argmax(firstFloatLaneNext)).isEqualTo(argmax(actualNext));
       }
     }
 
@@ -1307,7 +1359,7 @@ class LlamaForwardPassTest {
             false,
             false,
             false,
-            false,
+            GgufQ8BlockMajorKernel.SCATTERED,
             false));
   }
 
@@ -1336,6 +1388,45 @@ class LlamaForwardPassTest {
         runtime.ggufThreads(),
         runtime.ggufChunksPerThread(),
         runtime.processors());
+  }
+
+  private static RuntimeFingerprint graalRuntime256() {
+    RuntimeFingerprint runtime = graalRuntime();
+    return new RuntimeFingerprint(
+        runtime.javaVersion(),
+        runtime.vmName(),
+        runtime.vmVendor(),
+        runtime.vmVersion(),
+        runtime.compiler(),
+        runtime.osName(),
+        runtime.architecture(),
+        runtime.cpuModel(),
+        runtime.vectorProvider(),
+        true,
+        Math.max(256, runtime.preferredVectorBits()),
+        256,
+        runtime.fastVectorFma(),
+        runtime.fastScalarFma(),
+        runtime.sve(),
+        true,
+        true,
+        runtime.ggufParallel(),
+        runtime.ggufExecutor(),
+        runtime.ggufThreads(),
+        runtime.ggufChunksPerThread(),
+        runtime.processors());
+  }
+
+  private static void assertNumericallyClose(
+      float[] expected, float[] actual, float absoluteTolerance, float relativeTolerance) {
+    assertThat(actual).hasSameSizeAs(expected);
+    for (int index = 0; index < expected.length; index++) {
+      float allowedError =
+          Math.max(absoluteTolerance, Math.abs(expected[index]) * relativeTolerance);
+      assertThat(Math.abs(actual[index] - expected[index]))
+          .as("index=%s, expected=%s, actual=%s", index, expected[index], actual[index])
+          .isLessThanOrEqualTo(allowedError);
+    }
   }
 
   private static int argmax(float[] values) {

@@ -30,7 +30,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v15";
+  public static final String PLAN_VERSION = "pure-java-v16";
 
   private ExecutionPlanner() {}
 
@@ -118,41 +118,73 @@ public final class ExecutionPlanner {
       boolean stagedQuantizedLayer,
       boolean blockMajorQ8Activations,
       List<OptimizationDecision> decisions) {
-    boolean requested = configuration.q8BlockMajorRowAccumulator();
+    GgufQ8BlockMajorKernel requested = configuration.q8BlockMajorKernel();
+    boolean specialized = requested != GgufQ8BlockMajorKernel.SCATTERED;
     boolean q8Eligible = topology.hasStagedQ8Projection(stagedQuantizedLayer);
     boolean graal = "graal-jvmci".equals(runtime.compiler());
-    boolean enabled = requested && q8Eligible && blockMajorQ8Activations && graal;
+    boolean vectorWidthEligible =
+        requested == GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED
+            ? runtime.vectorBits() == 256
+            : runtime.vectorBits() >= 256;
+    boolean enabled =
+        specialized && q8Eligible && blockMajorQ8Activations && graal && vectorWidthEligible;
     OptimizationStatus status;
     String reason;
     if (enabled) {
       status = OptimizationStatus.ENABLED;
-      reason = "Q8 partial sums stay row-local and scatter once per output row";
+      reason =
+          requested == GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED
+              ? "Q8 partial sums retain eight floating lanes until the completed output"
+              : "Q8 partial sums stay row-local and scatter once per output row";
     } else if (!q8Eligible) {
       status = OptimizationStatus.UNSUPPORTED;
       reason = "loaded staged projection topology has no Q8_0 consumer";
-    } else if (!requested) {
+    } else if (!specialized) {
       status = OptimizationStatus.DISABLED;
-      reason = "disabled by models.purejava.q8BlockMajorRowAccumulator";
+      reason = "models.purejava.q8BlockMajorKernel selects scattered accumulation";
+    } else if (!blockMajorQ8Activations) {
+      status = OptimizationStatus.DISABLED;
+      reason = "specialized Q8 accumulation requires block-major Q8 activations";
     } else if (!graal) {
       status = OptimizationStatus.UNSUPPORTED;
-      reason = "row-accumulated Q8 is retained only for measured Graal JVMCI runtimes";
+      reason = "specialized Q8 accumulation is retained only for measured Graal JVMCI runtimes";
+    } else if (!vectorWidthEligible) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason =
+          requested == GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED
+              ? "float-lane Q8 accumulation requires an active 256-bit vector species"
+              : "row-accumulated Q8 requires at least a 256-bit vector species";
     } else {
-      status = OptimizationStatus.DISABLED;
-      reason = "row-accumulated Q8 requires block-major Q8 activations";
+      throw new IllegalStateException("unhandled Q8 block-major kernel decision");
     }
-    GgufQ8BlockMajorKernel kernel =
-        enabled ? GgufQ8BlockMajorKernel.ROW_ACCUMULATED : GgufQ8BlockMajorKernel.SCATTERED;
+    GgufQ8BlockMajorKernel kernel = enabled ? requested : GgufQ8BlockMajorKernel.SCATTERED;
     decisions.add(
         new OptimizationDecision(
-            "q8-block-major-row-accumulator",
+            "q8-block-major-kernel",
             status,
             reason,
             Map.of(
+                "active-vector-bits",
+                Integer.toString(runtime.vectorBits()),
                 "compiler",
                 runtime.compiler(),
+                "floating-point-order",
+                requested == GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED
+                    ? "eight-strided-lanes"
+                    : "scalar-block-order",
                 "kernel",
-                enabled ? "row-accumulated" : "scattered")));
+                kernelName(kernel),
+                "requested-kernel",
+                kernelName(requested))));
     return kernel;
+  }
+
+  private static String kernelName(GgufQ8BlockMajorKernel kernel) {
+    return switch (kernel) {
+      case SCATTERED -> "scattered";
+      case ROW_ACCUMULATED -> "row-accumulated";
+      case FLOAT_LANE_ACCUMULATED -> "float-lane-accumulated";
+    };
   }
 
   private static boolean parallelQ8FfnPreparation(
