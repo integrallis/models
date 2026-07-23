@@ -245,6 +245,33 @@ were copied to `/private/tmp/q8-staged-layer/`. Select the route with
 `-Dmodels.purejava.stagedQuantizedLayer=true`; exact ModelJars profiles supply both staged settings
 only for measured runtime tuples.
 
+## Retained Q8_0 batch weight reuse gate
+
+The staged Q8_0 profile made row-range projection dominant. Vectors now widens each packed weight
+block once and reuses those integer lanes across the activation batch instead of repeating the
+same weight conversion for every prompt row. The batch-one path retains the established integer
+dot. A prequantized 1024x2048 JMH gate on AVX2 reduced batch-32 latency from 21.044 to 13.781 ms
+(-34.5%) while exact scalar-versus-Panama row-range tests remained bit identical.
+
+The full-model gate held Models `6c306f0`, the SmolLM2 bytes, GraalVM Java 25.0.3, batch 32, fixed
+1 GiB heap, eight processors/workers, staged settings, and `MaximumInliningSize=10000` constant.
+It compared Vectors `7fb6fa5` and `25aa094` over five warmups and five one-token measurements in
+each of six counterbalanced process pairs:
+
+| Metric | Repeated weight conversion | Reused weight conversion | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 1,003.739 ms | 925.665 ms | -7.78%; -7.63% paired median |
+| p95 TTFT | 1,031.209 ms | 935.595 ms | -9.27% |
+| p50 prefill | 158.580 tok/s | 170.463 tok/s | +7.49%; +7.47% paired median |
+| p50 process CPU | 7,545 ms | 6,960 ms | -7.75% |
+| median process RSS | 992,069,632 B | 1,038,714,880 B | +4.70%; no memory claim |
+
+All 30 corresponding input counts, output counts, and output SHA-256 values matched, and every pair
+favored the candidate. A fixed-position decode control measured 42.46 versus 42.23 tok/s median
+throughput (-0.54%, treated as neutral variance); every process reported checksum `763.224787`,
+zero collections, and zero GC pause. Reports remain under
+`/opt/modeljars-bench/q8-weight-reuse-reports/`.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
