@@ -169,6 +169,23 @@ public record ModelTopology(
         layers.stream().filter(LayerTopology::supportsStagedQuantizedLayer).count());
   }
 
+  boolean hasStagedQ8Projection(boolean includeAttentionOutput) {
+    if (!threadShareableProjectionWeights) {
+      return false;
+    }
+    return layers.stream()
+        .anyMatch(
+            layer ->
+                (includeAttentionOutput
+                        ? layer.supportsStagedQuantizedLayer()
+                        : layer.supportsStagedQuantizedFfn())
+                    && (layer.gate() == GgufTensorType.Q8_0
+                        || layer.up() == GgufTensorType.Q8_0
+                        || layer.down() == GgufTensorType.Q8_0
+                        || (includeAttentionOutput
+                            && layer.attentionOutput() == GgufTensorType.Q8_0)));
+  }
+
   private static boolean threadShareableProjectionWeights(
       LlamaConfig config, LlamaWeights weights) {
     for (int layer = 0; layer < config.numLayers(); layer++) {

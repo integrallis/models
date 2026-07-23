@@ -450,7 +450,7 @@ class LlamaForwardPassTest {
 
         PureJavaPlanConfiguration configuration =
             new PureJavaPlanConfiguration(
-                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, false);
+                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, false, false);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -487,7 +487,7 @@ class LlamaForwardPassTest {
 
         PureJavaPlanConfiguration ffnConfiguration =
             new PureJavaPlanConfiguration(
-                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, false);
+                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, false, false);
         KvCache baselineCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -508,7 +508,7 @@ class LlamaForwardPassTest {
 
         PureJavaPlanConfiguration layerConfiguration =
             new PureJavaPlanConfiguration(
-                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, true);
+                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, true, false);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -759,7 +759,17 @@ class LlamaForwardPassTest {
 
         PureJavaPlanConfiguration baselineConfiguration =
             new PureJavaPlanConfiguration(
-                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, false, false);
+                true,
+                true,
+                GgufQ4Kernel.WIDENED,
+                32,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false);
         KvCache baselineCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -780,7 +790,7 @@ class LlamaForwardPassTest {
 
         PureJavaPlanConfiguration stagedConfiguration =
             new PureJavaPlanConfiguration(
-                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, true);
+                true, true, GgufQ4Kernel.WIDENED, 32, true, true, false, false, true, true, true);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -797,6 +807,7 @@ class LlamaForwardPassTest {
         float[] actual = staged.prefill(tokens, 0);
 
         assertThat(staged.usesStagedQuantizedLayer()).isTrue();
+        assertThat(staged.usesBlockMajorQ8Activations()).isTrue();
         assertThat(staged.stagedQuantizedLayerStageCount()).isEqualTo(7);
         assertThat(actual).containsExactly(expected);
         assertThat(stagedCache.keyBuffer()).containsExactly(expectedKeys);
@@ -1172,6 +1183,7 @@ class LlamaForwardPassTest {
             finalLayerKvOnlyPrefill,
             batchedAttentionScores,
             batchedAttentionValues,
+            false,
             false,
             false));
   }
