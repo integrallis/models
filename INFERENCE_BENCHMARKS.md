@@ -13,28 +13,206 @@ outputs whose SHA-256 equals llama.cpp for the same per-trial prompt.
 
 | Model | Backend | Load ms | TTFT ms | TPOT ms | Prefill tok/s | Decode tok/s | Peak RSS GiB | vs llama.cpp | Match |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Qwen3 0.6B Q4_0 | pure Java | 175.1 | 5,423.9 | 39.5 | 49.79 | 25.46 | 0.98 | 24.8% | 20% |
-| Qwen3 0.6B Q4_0 | llama.cpp | 1,123.0 | 374.1 | 10.3 | 456.11 | 102.59 | 1.19 | 100% | 100% |
-| Qwen3 0.6B Q4_0 | Ollama | 1,470.8 | 512.3 | 24.2 | 458.40 | 51.65 | 1.01 | 50.3% | 100% |
-| SmolLM2 360M Q8_0 | pure Java | 138.8 | 6,509.8 | 46.8 | 24.19 | 21.42 | 0.76 | 20.9% | 50% |
-| SmolLM2 360M Q8_0 | llama.cpp | 585.0 | 293.7 | 10.6 | 586.20 | 102.38 | 0.58 | 100% | 100% |
-| SmolLM2 360M Q8_0 | Ollama | 833.2 | 327.7 | 25.6 | 586.25 | 50.38 | 0.62 | 49.2% | 100% |
-| MiniCPM5 1B Q4_K_M | pure Java | 174.2 | 11,537.1 | 103.5 | 13.18 | 9.67 | 2.77 | 13.3% | 30% |
-| MiniCPM5 1B Q4_K_M | llama.cpp | 1,126.0 | 518.9 | 14.6 | 303.05 | 72.47 | 1.12 | 100% | 100% |
-| MiniCPM5 1B Q4_K_M | Ollama | 1,453.9 | 638.0 | 28.4 | 306.11 | 39.18 | 0.86 | 54.1% | 100% |
+| Qwen3 0.6B Q4_0 | pure Java | 194.1 | 3,145.6 | 39.0 | 49.54 | 25.86 | 1.04 | 25.0% | 20% |
+| Qwen3 0.6B Q4_0 | llama.cpp | 1,118.0 | 364.6 | 10.5 | 457.13 | 103.51 | 1.19 | 100% | 100% |
+| Qwen3 0.6B Q4_0 | Ollama | 1,475.7 | 515.7 | 25.5 | 460.93 | 47.39 | 1.01 | 45.8% | 100% |
+| SmolLM2 360M Q8_0 | pure Java | 131.2 | 2,643.7 | 47.4 | 60.16 | 21.23 | 0.69 | 20.6% | 50% |
+| SmolLM2 360M Q8_0 | llama.cpp | 471.0 | 298.7 | 10.6 | 575.14 | 103.13 | 0.58 | 100% | 100% |
+| SmolLM2 360M Q8_0 | Ollama | 830.9 | 336.5 | 26.2 | 587.08 | 43.18 | 0.63 | 41.9% | 100% |
+| MiniCPM5 1B Q4_K_M | pure Java | 172.9 | 8,527.9 | 76.3 | 17.82 | 13.19 | 0.88 | 18.4% | 10% |
+| MiniCPM5 1B Q4_K_M | llama.cpp | 1,244.0 | 513.1 | 14.3 | 306.88 | 71.74 | 1.12 | 100% | 100% |
+| MiniCPM5 1B Q4_K_M | Ollama | 1,450.9 | 630.0 | 29.9 | 307.44 | 37.42 | 0.87 | 52.2% | 100% |
 
 Across these three formats, the arithmetic mean of the per-model pure-Java
-decode ratios is 19.7% of llama.cpp and 38.8% of Ollama. Dividing the summed
-throughput gives similar values, 20.4% and 40.0%. Qwen is currently strongest
-at 24.8% of llama.cpp and 49.3% of Ollama; MiniCPM is weakest at 13.3% and
-24.7%.
+decode ratios is 21.3% of llama.cpp and 46.3% of Ollama. Dividing summed
+throughput gives 21.7% and 47.1%. Qwen is currently strongest at 25.0% of
+llama.cpp and 54.6% of Ollama; MiniCPM remains weakest at 18.4% and 35.2%.
 
-In-process model mapping remains fast and memory use is bounded, but the
-complete pure-Java requests remain `OFFLINE` on this workload because prompt
-processing averages only 6.5% of both native backends. Decode has improved
-materially but remains 4.0x to 7.5x slower than llama.cpp and 2.0x to 4.1x
-slower than Ollama. Output parity is prompt-sensitive and must improve before
-performance alone can qualify a model.
+Relative to the preceding matrix, summed pure-Java decode increased 6.6%:
+MiniCPM improved 36.4%, Qwen improved 1.6%, and SmolLM2 changed -0.9%. Summed
+llama.cpp throughput changed +0.3%, while Ollama changed -9.4%. The arithmetic
+mean therefore moved +1.6 percentage points against llama.cpp and +7.5 points
+against Ollama, but most of the latter movement is native-run variance rather
+than a Java speedup.
+
+Prompt processing moved further. Summed pure-Java prefill increased 46.3%, its
+ratio to llama.cpp rose from 6.5% to 9.5%, and mean p95 TTFT fell 39.0%.
+SmolLM2's retained Q8_0 batching accounts for the largest gain. In-process
+model mapping remains fast and memory use is bounded, but all three complete
+pure-Java requests remain `OFFLINE` on this long-prompt workload. Decode is
+still 4.0x to 5.4x slower than llama.cpp and 1.8x to 2.8x slower than Ollama.
+Output parity is prompt-sensitive and must improve before performance alone can
+qualify a model.
+
+### Controlled JVM compiler matrix
+
+The unchanged backend was then run under GraalVM Community
+`25.2.4-dev-20260717_0119` on the same idle host, model bytes, prompt, context,
+thread count, warmups, and ten-trial protocol. This is a JVM deployment choice,
+not a kernel rewrite:
+
+| Model | HotSpot decode | Graal decode | Decode change | HotSpot p95 TTFT | Graal p95 TTFT | RSS change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen3 0.6B Q4_0 | 25.86 tok/s | 19.65 tok/s | -24.0% | 3,145.6 ms | 5,900.3 ms | +58.5% |
+| SmolLM2 360M Q8_0 | 21.23 tok/s | 44.70 tok/s | +110.6% | 2,643.7 ms | 1,299.1 ms | +13.8% |
+| MiniCPM5 1B Q4_K_M | 13.19 tok/s | 15.34 tok/s | +16.3% | 8,527.9 ms | 7,377.2 ms | +8.4% |
+
+Every corresponding Java output SHA-256 matched across the two compilers. A
+separate Qwen control with six warmups still decoded at 19.75 tok/s, so its
+regression is not explained by the standard two-warmup protocol.
+
+Choosing the best measured compiler per model raises summed pure-Java decode to
+30.9% of llama.cpp and 67.1% of Ollama, versus the HotSpot-only 21.7% and 47.1%.
+Individually, the selected paths reach 25.0%/54.6% for Qwen, 43.4%/103.5% for
+SmolLM2, and 21.4%/41.0% for MiniCPM against llama.cpp/Ollama. This is evidence
+for model-, quantization-, topology-, and host-specific planning; Graal is not a
+global default. The exact-SHA-bound recommendations and evidence are published
+through ModelJars performance profile schema v1.
+
+### Current staged Q8_0 prefill checkpoint
+
+The later SmolLM2 prefill path combines the model-scoped Graal deployment, batch-32 projection,
+seven-stage attention/FFN schedule, and Vectors weight-conversion reuse. The final incremental gate
+compared only Vectors `7fb6fa5` and `25aa094`; Models `6c306f0`, model bytes, prompt strategy,
+GraalVM Java 25.0.3, fixed 1 GiB heap, eight workers, and every model setting remained constant.
+Five warmups and five one-token measurements in each of six counterbalanced process pairs produced:
+
+| Metric | Before weight reuse | Current pure Java | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 1,003.739 ms | 925.665 ms | -7.78% |
+| p95 TTFT | 1,031.209 ms | 935.595 ms | -9.27% |
+| p50 prefill | 158.580 tok/s | 170.463 tok/s | +7.49% |
+| p50 process CPU | 7,545 ms | 6,960 ms | -7.75% |
+
+Every one of the six pair medians improved and all 30 corresponding output hashes matched. Using
+the recorded same-host native controls above, current SmolLM2 prefill is 29.64% of llama.cpp and
+29.04% of Ollama; median TTFT is 3.10x llama.cpp and 2.75x Ollama. The native engines were not
+rerun for this incremental gate, so these are pinned comparisons rather than a fresh cross-engine
+study. Fixed-position decode remained neutral at 42.46 versus 42.23 tok/s median with identical
+checksums and zero GC.
+
+A subsequent layout gate kept Vectors `d295f32`, Models `29b5169`, model bytes, and the complete
+runtime profile constant, changing only
+`models.purejava.blockMajorQ8Activations=false/true`. The retained representation keeps canonical
+batch-major Q8 bytes and one compact block-major byte copy so matrix rows consume all activation
+rows for one block contiguously. It does not widen activations to integers.
+
+| Metric | Packed activation bytes | Block-major activation bytes | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 939.347 ms | 925.622 ms | -1.46%; -1.69% paired-process median |
+| p95 TTFT | 965.011 ms | 943.771 ms | -2.20% |
+| p50 prefill | 167.890 tok/s | 170.006 tok/s | +1.26% |
+| p50 process CPU | 7,040 ms | 6,920 ms | -1.70% |
+| median process RSS | 1,020,530,688 B | 1,018,851,328 B | no regression observed |
+
+Five of six process medians favored the candidate, all 60 trials succeeded, and every corresponding
+input count, output count, and output SHA-256 matched. A 1024x2048 batch-32 kernel gate improved
+11.5% on local AVX2 and 4.6% on controlled EPYC/GraalVM. A pre-widened `int[]` alternative was
+rejected despite an 18.8% local batch-32 improvement because it was neutral on controlled EPYC and
+its four-times-larger payload did not fix the cache-locality boundary.
+
+A follow-up gate addressed the serial FFN preparation stage identified by JFR after block-major
+activation retention. Vectors candidate `4dcf935`, merged as `523f3aa`, added exact disjoint Q8
+activation batch-range quantization, while Models `4887cde` partitions residual addition, RMSNorm,
+and quantization by active batch row only for eligible all-Q8 staged layers. ModelJars remained
+fixed at `6db5163`.
+The model, prompt, GraalVM Java 25 runtime, fixed 1 GiB heap, eight workers, batch 32, and every
+other model setting remained constant across six counterbalanced fresh-process pairs:
+
+| Metric | Serial FFN preparation | Batch-row preparation | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 913.102 ms | 899.064 ms | -1.54%; -1.68% paired-process median |
+| p95 TTFT | 930.788 ms | 914.340 ms | -1.77% |
+| p50 prefill | 172.543 tok/s | 175.592 tok/s | +1.77% |
+| p50 process CPU | 6,860 ms | 6,840 ms | -0.29% |
+| median process RSS | 1,015,816,192 B | 1,013,358,592 B | -0.24% |
+
+All six process-pair medians and 28 of 30 corresponding trials favored the candidate. All 60
+trials succeeded with exact corresponding input counts, output counts, and output SHA-256 values.
+Maximum observed RSS moved by +0.76%, which is not a material memory regression. The option is
+default-off and requires all-Q8 gate/up projections, the staged layer plan, block-major
+activations, and at least two row partitions.
+
+The next gate replaced the block-by-block scattered output updates with one row-local batch
+accumulator. Vectors keeps this as an explicit kernel strategy because local Java 25 HotSpot/C2 was
+neutral, while the controlled EPYC/GraalVM batch-32 JMH improved from 20.571 to 4.335 ms/op
+(-78.9%). Models plan schema `pure-java-v16` requires an exact recommendation, Graal JVMCI, and
+eligible staged block-major Q8 topology before selecting
+`models.purejava.q8BlockMajorKernel=row-accumulated`.
+
+| Metric | Scattered output updates | Row-local accumulator | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 898.794 ms | 878.801 ms | -2.22% |
+| p95 TTFT | 919.981 ms | 886.209 ms | -3.67% |
+| p50 prefill | 175.219 tok/s | 179.479 tok/s | +2.43% |
+| p50 process CPU | 6,840 ms | 6,680 ms | -2.34% |
+| median process RSS | 1,009,147,904 B | 1,015,336,960 B | +0.61% |
+
+All 30 corresponding TTFT, prefill, and CPU trials favored the row-local strategy, as did all six
+process-pair medians. Token counts and output hashes remained exact, and maximum RSS changed by
++0.41%. Against the pinned same-host native controls, the resulting 179.479 tok/s is approximately
+31.2% of llama.cpp prefill and 30.6% of Ollama prefill; 878.801 ms TTFT is approximately 2.94x
+llama.cpp and 2.61x Ollama. These native values were not rerun for this incremental gate.
+
+The next Q8 gate retains eight strided float lanes across all weight blocks and performs one
+horizontal reduction per completed batch output. It requires an exact 256-bit vector species and
+`models.purejava.q8BlockMajorKernel=float-lane-accumulated`. Controlled EPYC/GraalVM Java 25 JMH
+improved the 1,024x2,048 batch-32 row kernel from `4.320 +/- 0.012 ms/op` to
+`2.829 +/- 0.019 ms/op` (-34.5%). A bounded startup prewarm and two helper-specific compilation
+commands prevent concurrent worker compilation without a material steady allocation cost.
+
+| Metric | Row-local accumulator | Eight retained float lanes | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 876.832 ms | 746.621 ms | -14.85% |
+| p95 TTFT | 886.504 ms | 756.694 ms | -14.64% |
+| p50 prefill | 180.000 tok/s | 211.547 tok/s | +17.53% |
+| p50 process CPU | 6,660 ms | 5,600 ms | -15.92% |
+| median process RSS | 1,019,949,056 B | 1,038,696,448 B | +1.84% |
+| maximum process RSS | 1,044,836,352 B | 1,058,574,336 B | +1.31% |
+
+All 30 corresponding TTFT, prefill, and CPU trials and all six process-pair medians favored the
+candidate. Every corresponding one-token output matched. Three repeated 64-token runs over three
+prompts were exactly repeatable within each kernel, but the float-lane arithmetic order is
+non-associative relative to row/scattered accumulation and does not promise cross-kernel sequence
+identity. Using the previously pinned native controls, 211.547 tok/s is approximately 36.8% of
+llama.cpp prefill and 36.1% of Ollama prefill; 746.621 ms TTFT is approximately 2.50x llama.cpp and
+2.22x Ollama. The native values were not rerun for this incremental gate.
+
+### Controlled mixed K-quant projection result
+
+MiniCPM5 stores query and key projections as Q4_K and the narrower value
+projection as Q6_K. The retained path quantizes the shared attention activation
+once and publishes all three row ranges through one persistent-worker dispatch.
+The immutable execution plan enables this only for the exact
+Q4_K/Q4_K/Q6_K topology; `models.purejava.mixedKProjections=false` is the
+explicit control.
+
+Two warmups and ten 64-token trials were run in each order on the controlled
+eight-vCPU AMD EPYC Milan host. The table combines control-first and
+candidate-first runs, so each cell covers 20 measured generations. Decode and
+TTFT values are arithmetic means over those trials.
+
+| JVM | Independent decode | Mixed decode | Decode change | Independent TTFT | Mixed TTFT | TTFT change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| OpenJDK 25.0.3 HotSpot | 13.05 tok/s | 13.37 tok/s | +2.52% | 8,425.9 ms | 8,427.2 ms | +0.02% |
+| GraalVM CE 25.2.4-dev | 15.28 tok/s | 15.47 tok/s | +1.31% | 7,320.3 ms | 7,316.1 ms | -0.06% |
+
+All 40 paired output SHA-256 values matched. Both process orders improved on
+each JVM; HotSpot's 20 paired decode deltas ranged from +1.32% to +4.26%.
+Graal's combined result remained positive despite one -0.08% trial-level delta.
+The retained Vectors implementation deliberately leaves the existing standalone
+Q4_K and Q6_K hot-loop source shapes unchanged. An initial helper extraction
+coincided with a severe Graal slowdown, but an untouched baseline reproduced the
+slowdown while the host was contended, so no compiler regression is attributed
+to that refactor. Preserving the established source shape removes that risk from
+the retained change.
+
+The evidence is pinned to Models `00de3059`, Vectors `e957a50e`, model SHA-256
+`81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa`,
+2,048-token context capacity, eight inference threads, and the same deterministic
+nonce-prefix prompt strategy used by the compiler matrix. Reports are retained
+under `/opt/inference-mixed-20260718/results-{hotspot,graal}-final*` on the
+controlled host.
 
 ## Optimization evidence
 
@@ -76,8 +254,9 @@ bytes, prompt strategy, 128-token context, two warmups, and 24 generated tokens:
 All ten corresponding output SHA-256 values matched. Each independent 2,560x960
 gate/up matrix is below the Q8 parallel threshold; the combined row range crosses
 it and uses the persistent workers. The benchmark policy changed from `USABLE`
-to `RESPONSIVE`. This focused A/B does not replace the cross-backend table above,
-which uses a different prompt workload and must be rerun as a complete matrix.
+to `RESPONSIVE`. This focused A/B isolates grouping; the refreshed cross-backend
+table above uses a different prompt workload and includes the later Q8_0 prefill
+path.
 
 ## Latency policy
 
@@ -116,7 +295,7 @@ match. It recalculates summaries from raw trials before producing a comparison.
 - Host: Hetzner dedicated-vCPU VM, AMD EPYC Milan, 8 vCPU, 30.6 GiB RAM
 - OS: Ubuntu 24.04, Linux 6.8.0-124, no swap
 - JVM: Eclipse Temurin 25.0.3, `jdk.incubator.vector`, 256-bit vector cap
-- Pure Java: Models `03889f5`, Vectors `2a3466e`
+- Pure Java: Models `a1f0919`, Vectors `4144202`
 - Native references: llama.cpp b10012 (`c71854292`), Ollama 0.32.0
 - Workload: one request at a time, 8 backend threads, 2 warmups, 10 trials
 - Prompt: fixed 723-byte production-review prompt plus a deterministic,

@@ -13,19 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.bench;
+package com.integrallis.models.api;
 
-import com.integrallis.models.api.BackendDiagnostics;
-
-/** One loaded inference implementation used by the common benchmark runner. */
-interface BenchmarkTarget extends AutoCloseable {
-
-  TrialMeasurement generate(String prompt, int maxTokens);
-
-  double loadMillis();
-
-  BackendDiagnostics diagnostics();
-
-  @Override
-  void close();
+/** Outcome of one deterministic backend optimization decision. */
+public enum OptimizationStatus {
+  ENABLED,
+  DISABLED,
+  UNSUPPORTED
 }

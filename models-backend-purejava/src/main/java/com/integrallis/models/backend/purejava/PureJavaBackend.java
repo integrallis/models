@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -25,16 +26,24 @@ import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
+import com.integrallis.models.backend.purejava.plan.ModelTopology;
+import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
+import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
+import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 import org.modeljars.ModelJarDescriptor;
 import org.modeljars.ModelJarException;
 import org.modeljars.ModelJarRegistry;
 import org.modeljars.ModelJarRequirement;
+import org.modeljars.ModelPerformanceProfileRegistry;
 
 /**
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
@@ -49,18 +58,24 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   private final GgufTokenizer tokenizer;
   private final LlamaForwardPass forwardPass;
   private final ModelMetadata modelMetadata;
+  private final PureJavaExecutionPlan executionPlan;
+  private final BackendDiagnostics diagnostics;
 
   private PureJavaBackend(
       Arena arena,
       LlamaConfig config,
       GgufTokenizer tokenizer,
       LlamaForwardPass forwardPass,
-      ModelMetadata modelMetadata) {
+      ModelMetadata modelMetadata,
+      PureJavaExecutionPlan executionPlan,
+      BackendDiagnostics diagnostics) {
     this.arena = arena;
     this.config = config;
     this.tokenizer = tokenizer;
     this.forwardPass = forwardPass;
     this.modelMetadata = modelMetadata;
+    this.executionPlan = executionPlan;
+    this.diagnostics = diagnostics;
   }
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
@@ -69,22 +84,44 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   }
 
   static PureJavaBackend load(Path modelPath, Arena arena) {
+    return load(modelPath, arena, Optional.empty());
+  }
+
+  private static PureJavaBackend load(
+      Path modelPath, Arena arena, Optional<ModelJarDescriptor> descriptor) {
     Objects.requireNonNull(arena, "arena");
+    Objects.requireNonNull(descriptor, "descriptor");
     try {
       Objects.requireNonNull(modelPath, "modelPath");
       GgufFile file = GgufParser.parse(modelPath, arena);
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
+      String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
+      RuntimeFingerprint runtime = RuntimeFingerprint.capture();
+      ModelJarPerformanceSelection performanceSelection =
+          descriptor
+              .map(
+                  value ->
+                      ModelJarPerformanceSelection.evaluate(
+                          value,
+                          ModelPerformanceProfileRegistry.fromClasspath(),
+                          runtime.asEnvironment(),
+                          ManagementFactory.getRuntimeMXBean().getInputArguments()))
+              .orElseGet(ModelJarPerformanceSelection::none);
+      PureJavaExecutionPlan executionPlan =
+          ExecutionPlanner.plan(
+              runtime,
+              ModelTopology.from(modelFamily, config, weights),
+              PureJavaPlanConfiguration.fromSystemProperties(
+                  performanceSelection.recommendations()));
       KvCache cache =
           new KvCache(
               config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());
-      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
+      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache, executionPlan);
 
       String modelName =
           file.metadata().getString("general.name").orElse(modelPath.getFileName().toString());
-      String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
-
       ModelMetadata metadata =
           new ModelMetadata(
               modelFamily,
@@ -96,7 +133,10 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
               config.numHeads(),
               config.numKvHeads());
 
-      return new PureJavaBackend(arena, config, tokenizer, forwardPass, metadata);
+      BackendDiagnostics diagnostics = performanceSelection.enrich(executionPlan.diagnostics());
+
+      return new PureJavaBackend(
+          arena, config, tokenizer, forwardPass, metadata, executionPlan, diagnostics);
     } catch (IOException e) {
       closeAfterFailure(arena, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
@@ -135,7 +175,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
                 () ->
                     new ModelJarException(
                         "ModelJars descriptor has no local path: " + descriptor.alias()));
-    return load(modelPath);
+    return load(modelPath, Arena.ofShared(), Optional.of(descriptor));
   }
 
   @Override
@@ -146,6 +186,16 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   @Override
   public ModelMetadata metadata() {
     return modelMetadata;
+  }
+
+  /** Returns the immutable execution plan selected while loading this model. */
+  public PureJavaExecutionPlan executionPlan() {
+    return executionPlan;
+  }
+
+  @Override
+  public BackendDiagnostics diagnostics() {
+    return diagnostics;
   }
 
   @Override

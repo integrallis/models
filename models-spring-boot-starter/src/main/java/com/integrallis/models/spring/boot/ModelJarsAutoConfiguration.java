@@ -20,6 +20,7 @@ import org.modeljars.ModelJarException;
 import org.modeljars.ModelJarLocator;
 import org.modeljars.ModelJarRegistry;
 import org.modeljars.ModelJarRequirement;
+import org.modeljars.ModelPerformanceProfileRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,6 +42,12 @@ public class ModelJarsAutoConfiguration {
   @ConditionalOnMissingBean
   ModelJarLocator modelJarLocator(ModelJarRegistry registry) {
     return new ModelJarLocator(registry);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  ModelPerformanceProfileRegistry modelPerformanceProfileRegistry() {
+    return ModelPerformanceProfileRegistry.fromClasspath();
   }
 
   @Bean

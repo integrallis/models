@@ -19,10 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -50,6 +52,12 @@ class BenchmarkComparisonTest {
   }
 
   @Test
+  void retainsTheSelectedBackendPlanInBenchmarkEvidence() {
+    assertThat(report("pure-java", "sha", 10).backendDiagnostics().planVersion())
+        .isEqualTo("fixture-plan");
+  }
+
+  @Test
   void rejectsDifferentModelBytes() {
     assertThatThrownBy(
             () ->
@@ -74,6 +82,7 @@ class BenchmarkComparisonTest {
             report.artifactSizeBytes(),
             report.run(),
             report.environment(),
+            report.backendDiagnostics(),
             report.speculativeOptions(),
             report.summary(),
             report.performanceTier(),
@@ -155,6 +164,7 @@ class BenchmarkComparisonTest {
         1024,
         run,
         environment,
+        new BackendDiagnostics(backend, "fixture-plan", Map.of(), List.of()),
         SpeculativeGenerationOptions.disabled(),
         summary,
         PerformanceTier.RESPONSIVE,

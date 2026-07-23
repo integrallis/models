@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
@@ -77,6 +78,42 @@ class DeepSeekCoderModelJarsIntegrationTest {
           .containsExactly(185, 315, 562, 291);
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
+  }
+
+  @Test
+  void q5_0BatchedPrefillMatchesSequentialStateExactly() {
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
+    String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    String previousBatch =
+        System.getProperty(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+
+    try {
+      int[] promptTokens;
+      float[] expected;
+      float[] expectedNext;
+      int nextToken;
+      System.setProperty(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, "1");
+      try (PureJavaBackend sequential = PureJavaBackend.load(descriptor)) {
+        promptTokens = sequential.tokenizer().encode("def fibonacci(n):");
+        expected = sequential.prefill(promptTokens, 0).clone();
+        nextToken = argmax(expected);
+        expectedNext = sequential.forward(nextToken, promptTokens.length);
+      }
+
+      System.setProperty(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, "32");
+      try (PureJavaBackend batched = PureJavaBackend.load(descriptor)) {
+        float[] actual = batched.prefill(promptTokens, 0);
+
+        assertThat(batched.executionPlan().prefillBatchSize()).isEqualTo(32);
+        assertThat(actual).containsExactly(expected);
+        assertThat(batched.forward(nextToken, promptTokens.length)).containsExactly(expectedNext);
+      }
+    } finally {
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
+      restoreSystemProperty(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, previousBatch);
     }
   }
 

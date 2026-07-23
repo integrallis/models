@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -77,10 +78,12 @@ class Qwen3BatchedPrefillIntegrationTest {
       float[] gemvOut = new float[rows];
       byte[] gemvQuants = new byte[cols];
       float[] gemvScales = new float[blocks];
+      int[] gemvCorrections = new int[(cols + 3) / 4];
       byte[] expectedQuants = new byte[batchSize * cols];
       float[] expectedScales = new float[batchSize * blocks];
       byte[] batchQuants = new byte[batchSize * cols];
       float[] batchScales = new float[batchSize * blocks];
+      int[] batchCorrections = new int[batchSize * ((cols + 3) / 4)];
       float[] batchLanes = new float[batchSize * rows * 8];
       RopeTable sequentialRope =
           new RopeTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
@@ -99,7 +102,9 @@ class Qwen3BatchedPrefillIntegrationTest {
               cols,
               gemvQuants,
               gemvScales,
-              new short[(cols + 15) / 16]);
+              gemvCorrections,
+              new short[(cols + 15) / 16],
+              GgufQ4Kernel.WIDENED);
           int outputOffset = batch * rows;
           System.arraycopy(gemvQuants, 0, expectedQuants, batch * cols, cols);
           System.arraycopy(gemvScales, 0, expectedScales, batch * blocks, blocks);
@@ -137,8 +142,10 @@ class Qwen3BatchedPrefillIntegrationTest {
             cols,
             batchQuants,
             batchScales,
+            batchCorrections,
             new short[batchSize * ((cols + 15) / 16)],
-            batchLanes);
+            batchLanes,
+            GgufQ4Kernel.WIDENED);
         assertSameBytes("Q8 activation iteration " + iteration, expectedQuants, batchQuants);
         assertSameBits("Q8 scale iteration " + iteration, expectedScales, batchScales);
         assertSameBits("layer 0 key projection iteration " + iteration, expectedProjection, actual);

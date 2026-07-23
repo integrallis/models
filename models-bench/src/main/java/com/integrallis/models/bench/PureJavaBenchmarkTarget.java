@@ -15,13 +15,13 @@
  */
 package com.integrallis.models.bench;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
 import com.integrallis.models.runtime.SpeculativeGenerationMetrics;
 import com.integrallis.models.runtime.SpeculativeGenerationOptions;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -31,26 +31,29 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
   private final TimingBackend backend;
   private final GenerationLoop loop;
   private final double loadMillis;
+  private final BackendDiagnostics diagnostics;
 
   private PureJavaBenchmarkTarget(
-      TimingBackend backend, double loadMillis, SpeculativeGenerationOptions speculativeOptions) {
+      TimingBackend backend,
+      double loadMillis,
+      BackendDiagnostics diagnostics,
+      SpeculativeGenerationOptions speculativeOptions) {
     this.backend = backend;
     this.loop = new GenerationLoop(backend, speculativeOptions);
     this.loadMillis = loadMillis;
-  }
-
-  static PureJavaBenchmarkTarget load(Path model, int contextLength) {
-    return load(model, contextLength, SpeculativeGenerationOptions.disabled());
+    this.diagnostics = diagnostics;
   }
 
   static PureJavaBenchmarkTarget load(
-      Path model, int contextLength, SpeculativeGenerationOptions speculativeOptions) {
+      PureJavaModelSource model,
+      int contextLength,
+      SpeculativeGenerationOptions speculativeOptions) {
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
-    PureJavaBackend loaded = PureJavaBackend.load(model);
+    PureJavaBackend loaded = model.load();
     double elapsedMillis = nanosToMillis(System.nanoTime() - start);
     return new PureJavaBenchmarkTarget(
-        new TimingBackend(loaded), elapsedMillis, speculativeOptions);
+        new TimingBackend(loaded), elapsedMillis, loaded.diagnostics(), speculativeOptions);
   }
 
   @Override
@@ -122,6 +125,11 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
   @Override
   public double loadMillis() {
     return loadMillis;
+  }
+
+  @Override
+  public BackendDiagnostics diagnostics() {
+    return diagnostics;
   }
 
   @Override

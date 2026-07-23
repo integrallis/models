@@ -25,12 +25,22 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class KvCacheTest {
 
+  @Test
+  void doesNotExposeEqualWidthCompatibilityApi() {
+    assertThatThrownBy(() -> KvCache.class.getConstructor(int.class, int.class, int.class))
+        .isInstanceOf(NoSuchMethodException.class);
+    assertThatThrownBy(() -> KvCache.class.getDeclaredMethod("vectorOffset", int.class, int.class))
+        .isInstanceOf(NoSuchMethodException.class);
+    assertThatThrownBy(() -> KvCache.class.getDeclaredMethod("kvDim"))
+        .isInstanceOf(NoSuchMethodException.class);
+  }
+
   @Nested
   class StoreAndRetrieve {
 
     @Test
     void storeAndRetrieveSinglePosition() {
-      var cache = new KvCache(2, 10, 4);
+      var cache = new KvCache(2, 10, 4, 4);
       float[] key = {1.0f, 2.0f, 3.0f, 4.0f};
       float[] value = {5.0f, 6.0f, 7.0f, 8.0f};
 
@@ -42,7 +52,7 @@ class KvCacheTest {
 
     @Test
     void sequentialPositions() {
-      var cache = new KvCache(1, 10, 2);
+      var cache = new KvCache(1, 10, 2, 2);
       cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});
       cache.store(0, 1, new float[] {3, 4}, new float[] {30, 40});
       cache.store(0, 2, new float[] {5, 6}, new float[] {50, 60});
@@ -65,21 +75,24 @@ class KvCacheTest {
 
     @Test
     void storesVectorsInContiguousFlatBuffers() {
-      var cache = new KvCache(2, 3, 2);
+      var cache = new KvCache(2, 3, 2, 2);
       cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});
       cache.store(0, 1, new float[] {3, 4}, new float[] {30, 40});
       cache.store(1, 0, new float[] {5, 6}, new float[] {50, 60});
 
-      assertThat(cache.vectorOffset(0, 0)).isZero();
-      assertThat(cache.vectorOffset(0, 1)).isEqualTo(2);
-      assertThat(cache.vectorOffset(1, 0)).isEqualTo(6);
+      assertThat(cache.keyOffset(0, 0)).isZero();
+      assertThat(cache.keyOffset(0, 1)).isEqualTo(2);
+      assertThat(cache.keyOffset(1, 0)).isEqualTo(6);
+      assertThat(cache.valueOffset(0, 0)).isZero();
+      assertThat(cache.valueOffset(0, 1)).isEqualTo(2);
+      assertThat(cache.valueOffset(1, 0)).isEqualTo(6);
       assertThat(cache.keyBuffer()).containsExactly(1, 2, 3, 4, 0, 0, 5, 6, 0, 0, 0, 0);
       assertThat(cache.valueBuffer()).containsExactly(10, 20, 30, 40, 0, 0, 50, 60, 0, 0, 0, 0);
     }
 
     @Test
     void retrievedVectorsDoNotAliasFlatStorage() {
-      var cache = new KvCache(1, 2, 2);
+      var cache = new KvCache(1, 2, 2, 2);
       cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});
 
       float[] key = cache.key(0, 0);
@@ -97,7 +110,7 @@ class KvCacheTest {
 
     @Test
     void sliceCorrectRange() {
-      var cache = new KvCache(1, 10, 2);
+      var cache = new KvCache(1, 10, 2, 2);
       cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});
       cache.store(0, 1, new float[] {3, 4}, new float[] {30, 40});
       cache.store(0, 2, new float[] {5, 6}, new float[] {50, 60});
@@ -115,7 +128,7 @@ class KvCacheTest {
 
     @Test
     void layersAreIndependent() {
-      var cache = new KvCache(2, 10, 2);
+      var cache = new KvCache(2, 10, 2, 2);
       cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});
       cache.store(1, 0, new float[] {3, 4}, new float[] {30, 40});
 
@@ -129,7 +142,7 @@ class KvCacheTest {
 
     @Test
     void clearResetsAllEntries() {
-      var cache = new KvCache(1, 10, 2);
+      var cache = new KvCache(1, 10, 2, 2);
       cache.store(0, 0, new float[] {1, 2}, new float[] {3, 4});
 
       cache.clear();
@@ -144,7 +157,7 @@ class KvCacheTest {
 
     @Test
     void discardFromPreservesAcceptedPrefixAndClearsSpeculativeTail() {
-      var cache = new KvCache(2, 10, 2);
+      var cache = new KvCache(2, 10, 2, 2);
       for (int layer = 0; layer < 2; layer++) {
         for (int position = 0; position < 4; position++) {
           float marker = layer * 10 + position;
@@ -170,7 +183,7 @@ class KvCacheTest {
 
     @Test
     void largeLogicalContextStartsWithSmallPhysicalCapacity() {
-      var cache = new KvCache(2, 10_000, 4);
+      var cache = new KvCache(2, 10_000, 4, 4);
 
       assertThat(cache.allocatedSequenceCapacity()).isEqualTo(16);
       assertThat(cache.keyBuffer()).hasSize(2 * 16 * 4);
@@ -192,6 +205,17 @@ class KvCacheTest {
       assertThat(cache.keyOffset(1, 0)).isEqualTo(32 * 2);
       assertThat(cache.valueOffset(1, 0)).isEqualTo(32 * 3);
     }
+
+    @Test
+    void reservationGrowsStorageBeforeDisjointBatchWrites() {
+      var cache = new KvCache(2, 40, 2, 3);
+
+      cache.reserveSequenceCapacity(24);
+
+      assertThat(cache.allocatedSequenceCapacity()).isEqualTo(32);
+      cache.store(0, 23, new float[] {1, 2}, new float[] {3, 4, 5});
+      assertThat(cache.key(0, 23)).containsExactly(1, 2);
+    }
   }
 
   @Nested
@@ -199,22 +223,31 @@ class KvCacheTest {
 
     @Test
     void positionBeyondMaxThrows() {
-      var cache = new KvCache(1, 5, 2);
+      var cache = new KvCache(1, 5, 2, 2);
       assertThatThrownBy(() -> cache.store(0, 5, new float[] {1, 2}, new float[] {3, 4}))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("position");
     }
 
     @Test
+    void reservationBeyondMaxThrows() {
+      var cache = new KvCache(1, 5, 2, 2);
+
+      assertThatThrownBy(() -> cache.reserveSequenceCapacity(6))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("requiredSequenceCapacity");
+    }
+
+    @Test
     void negativeLayerThrows() {
-      var cache = new KvCache(2, 10, 2);
+      var cache = new KvCache(2, 10, 2, 2);
       assertThatThrownBy(() -> cache.store(-1, 0, new float[] {1, 2}, new float[] {3, 4}))
           .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void layerBeyondRangeThrows() {
-      var cache = new KvCache(2, 10, 2);
+      var cache = new KvCache(2, 10, 2, 2);
       assertThatThrownBy(() -> cache.store(2, 0, new float[] {1, 2}, new float[] {3, 4}))
           .isInstanceOf(IllegalArgumentException.class);
     }

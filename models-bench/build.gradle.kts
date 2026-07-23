@@ -4,7 +4,6 @@ plugins {
     java
     application
     id("com.github.spotbugs")
-    id("com.diffplug.spotless")
     id("me.champeau.jmh") version "0.7.2"
 }
 
@@ -28,15 +27,7 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-}
-
-spotless {
-    java {
-        googleJavaFormat("1.35.0")
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
+    jvmArgs("--add-modules", "jdk.incubator.vector")
 }
 
 tasks.named("spotbugsTest") {
@@ -57,6 +48,7 @@ dependencies {
     implementation(project(":models-backend-purejava"))
     implementation("com.integrallis:vectors-core:0.1.0-SNAPSHOT")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
+    runtimeOnly("org.modeljars:modeljars-catalog:0.1.0-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")

@@ -96,7 +96,6 @@ PURE_JAVA_VERSION="models@$MODELS_COMMIT vectors@$VECTORS_COMMIT"
 
 COMMON_ARGS=(
   --model-id "$MODEL_ID"
-  --artifact "$MODEL_PATH"
   --prompt-file "$PROMPT_FILE"
   --max-tokens "$MAX_TOKENS"
   --warmups "$WARMUPS"
@@ -146,6 +145,7 @@ drop_file_cache
 "$BENCHMARK_CLI" \
   --backend ollama \
   --model "$OLLAMA_MODEL" \
+  --artifact "$MODEL_PATH" \
   --endpoint http://127.0.0.1:11434 \
   --backend-version "$OLLAMA_VERSION" \
   --pid "$OLLAMA_PID" \
@@ -184,6 +184,7 @@ LLAMA_VERSION=$("$LLAMA_SERVER" --version 2>&1 | head -n 1)
 "$BENCHMARK_CLI" \
   --backend llama.cpp \
   --model "$MODEL_PATH" \
+  --artifact "$MODEL_PATH" \
   --endpoint "http://127.0.0.1:$LLAMA_PORT" \
   --backend-version "$LLAMA_VERSION" \
   --pid "$LLAMA_PID" \

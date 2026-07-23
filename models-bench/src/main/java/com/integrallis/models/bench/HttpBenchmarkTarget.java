@@ -17,6 +17,7 @@ package com.integrallis.models.bench;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.integrallis.models.api.BackendDiagnostics;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -114,6 +115,11 @@ final class HttpBenchmarkTarget implements BenchmarkTarget {
   @Override
   public double loadMillis() {
     return loadMillis;
+  }
+
+  @Override
+  public BackendDiagnostics diagnostics() {
+    return BackendDiagnostics.unavailable(backend);
   }
 
   @Override

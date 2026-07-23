@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
@@ -219,7 +220,9 @@ class SqlCoderLargeModelJarsSlowTest {
         cols,
         new byte[cols],
         new float[cols / 256],
-        new short[cols / 16]);
+        new int[(cols + 3) / 4],
+        new short[cols / 16],
+        GgufQ4Kernel.WIDENED);
 
     assertThat(actualQuery).containsExactly(expectedQuery);
     assertThat(actualKey).containsExactly(expectedKey);
@@ -249,7 +252,9 @@ class SqlCoderLargeModelJarsSlowTest {
         cols,
         new byte[cols],
         new float[cols / 256],
-        new short[cols / 16]);
+        new int[(cols + 3) / 4],
+        new short[cols / 16],
+        GgufQ4Kernel.WIDENED);
 
     assertThat(actualGate).containsExactly(expectedGate);
     assertThat(actualUp).containsExactly(expectedUp);

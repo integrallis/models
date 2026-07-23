@@ -17,12 +17,14 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
@@ -35,6 +37,7 @@ import org.modeljars.ModelJarRequirement;
 class MiniCpm5ModelJarsIntegrationTest {
 
   private static final int INTEGRATION_CONTEXT_LENGTH = 128;
+  private static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
   private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
 
   private static final ModelJarRequirement MINICPM5_1B_Q4_K_M =
@@ -122,6 +125,10 @@ class MiniCpm5ModelJarsIntegrationTest {
     try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
       assertThat(backend.metadata().modelFamily()).isEqualTo("llama");
       assertThat(backend.metadata().contextLength()).isEqualTo(131_072);
+      assertThat(backend.executionPlan().mixedKProjections()).isTrue();
+      assertThat(backend.diagnostics().optimization("mixed-k-projections"))
+          .hasValueSatisfying(
+              decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
 
       int[] promptTokens = backend.tokenizer().encode("public static void main(String[] args) {");
       assertThat(promptTokens)
@@ -131,6 +138,35 @@ class MiniCpm5ModelJarsIntegrationTest {
           .containsExactly(5028, 6706, 5018, 1735);
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
+  }
+
+  @Test
+  void mixedKProjectionGroupingMatchesTheTwoDispatchControlExactly() {
+    ModelJarDescriptor descriptor = descriptorWithInstalledArtifact();
+    String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    String previousMixedK = System.getProperty(MIXED_K_PROJECTIONS_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+    System.setProperty(MIXED_K_PROJECTIONS_PROPERTY, "false");
+
+    try {
+      float[] expected;
+      int[] promptTokens;
+      try (PureJavaBackend control = PureJavaBackend.load(descriptor)) {
+        assertThat(control.executionPlan().mixedKProjections()).isFalse();
+        promptTokens = control.tokenizer().encode("public static void main(String[] args) {");
+        expected = finalLogits(control, promptTokens, 2);
+      }
+
+      System.setProperty(MIXED_K_PROJECTIONS_PROPERTY, "true");
+      try (PureJavaBackend grouped = PureJavaBackend.load(descriptor)) {
+        assertThat(grouped.executionPlan().mixedKProjections()).isTrue();
+        assertThat(finalLogits(grouped, promptTokens, 2)).containsExactly(expected);
+      }
+    } finally {
+      restoreSystemProperty(MIXED_K_PROJECTIONS_PROPERTY, previousMixedK);
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
     }
   }
 
@@ -201,6 +237,19 @@ class MiniCpm5ModelJarsIntegrationTest {
     return generated;
   }
 
+  private static float[] finalLogits(
+      PureJavaBackend backend, int[] promptTokens, int generatedTokens) {
+    float[] logits = null;
+    int position = 0;
+    for (int token : promptTokens) {
+      logits = backend.forward(token, position++);
+    }
+    for (int index = 0; index < generatedTokens; index++) {
+      logits = backend.forward(argmax(logits), position++);
+    }
+    return logits;
+  }
+
   private static void assertTripleProjectionMatchesSeparate(
       float[] input,
       int cols,
@@ -235,7 +284,9 @@ class MiniCpm5ModelJarsIntegrationTest {
         cols,
         new byte[cols],
         new float[cols / 256],
-        new short[cols / 16]);
+        new int[(cols + 3) / 4],
+        new short[cols / 16],
+        GgufQ4Kernel.WIDENED);
 
     assertThat(actualQuery).containsExactly(expectedQuery);
     assertThat(actualKey).containsExactly(expectedKey);
@@ -265,7 +316,9 @@ class MiniCpm5ModelJarsIntegrationTest {
         cols,
         new byte[cols],
         new float[cols / 256],
-        new short[cols / 16]);
+        new int[(cols + 3) / 4],
+        new short[cols / 16],
+        GgufQ4Kernel.WIDENED);
 
     assertThat(actualGate).containsExactly(expectedGate);
     assertThat(actualUp).containsExactly(expectedUp);

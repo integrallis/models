@@ -32,10 +32,6 @@ public final class KvCache {
   private float[] values;
   private boolean[] populated;
 
-  public KvCache(int numLayers, int maxSeqLen, int kvDim) {
-    this(numLayers, maxSeqLen, kvDim, kvDim);
-  }
-
   public KvCache(int numLayers, int maxSeqLen, int keyDim, int valueDim) {
     if (numLayers <= 0) throw new IllegalArgumentException("numLayers must be > 0");
     if (maxSeqLen <= 0) throw new IllegalArgumentException("maxSeqLen must be > 0");
@@ -98,13 +94,13 @@ public final class KvCache {
     return vectorOrNull(values, valueDim, layer, position);
   }
 
-  /** Returns the contiguous key buffer. Callers should use {@link #vectorOffset} for addressing. */
+  /** Returns the contiguous key buffer. Callers should use {@link #keyOffset} for addressing. */
   public float[] keyBuffer() {
     return keys;
   }
 
   /**
-   * Returns the contiguous value buffer. Callers should use {@link #vectorOffset} for addressing.
+   * Returns the contiguous value buffer. Callers should use {@link #valueOffset} for addressing.
    */
   public float[] valueBuffer() {
     return values;
@@ -122,11 +118,6 @@ public final class KvCache {
     checkBounds(layer, position);
     checkAllocated(position);
     return slotIndex(layer, position) * valueDim;
-  }
-
-  /** Legacy key offset accessor retained for equal-width key/value caches. */
-  public int vectorOffset(int layer, int position) {
-    return keyOffset(layer, position);
   }
 
   /** Clears all cached keys and values. */
@@ -154,13 +145,6 @@ public final class KvCache {
     return allocatedSequenceCapacity;
   }
 
-  public int kvDim() {
-    if (keyDim != valueDim) {
-      throw new IllegalStateException("key and value dimensions differ");
-    }
-    return keyDim;
-  }
-
   public int keyDim() {
     return keyDim;
   }
@@ -175,6 +159,18 @@ public final class KvCache {
 
   public int numLayers() {
     return numLayers;
+  }
+
+  /** Ensures physical storage exists for the requested number of sequence positions. */
+  public void reserveSequenceCapacity(int requiredSequenceCapacity) {
+    if (requiredSequenceCapacity < 0 || requiredSequenceCapacity > maxSeqLen) {
+      throw new IllegalArgumentException(
+          "requiredSequenceCapacity must be between 0 and "
+              + maxSeqLen
+              + ": "
+              + requiredSequenceCapacity);
+    }
+    ensureCapacity(requiredSequenceCapacity);
   }
 
   private float[] slice(float[] store, int dimension, int layer, int fromPos, int toPos) {

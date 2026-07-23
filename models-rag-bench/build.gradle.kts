@@ -2,7 +2,6 @@ plugins {
     java
     application
     id("com.github.spotbugs")
-    id("com.diffplug.spotless")
 }
 
 java {
@@ -26,15 +25,6 @@ tasks.withType<JavaCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
     jvmArgs("--add-modules", "jdk.incubator.vector")
-}
-
-spotless {
-    java {
-        googleJavaFormat("1.35.0")
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
 }
 
 tasks.named("spotbugsTest") {
