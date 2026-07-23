@@ -95,10 +95,14 @@ public record PureJavaExecutionPlan(
       throw new IllegalArgumentException(
           "block-major Q8 activations contradict the execution plan topology");
     }
-    if (q8BlockMajorKernel == GgufQ8BlockMajorKernel.ROW_ACCUMULATED
-        && (!blockMajorQ8Activations || !"graal-jvmci".equals(runtime.compiler()))) {
+    if (q8BlockMajorKernel != GgufQ8BlockMajorKernel.SCATTERED
+        && (!blockMajorQ8Activations
+            || !"graal-jvmci".equals(runtime.compiler())
+            || runtime.vectorBits() < 256
+            || (q8BlockMajorKernel == GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED
+                && runtime.vectorBits() != 256))) {
       throw new IllegalArgumentException(
-          "row-accumulated Q8 kernel contradicts the execution plan topology or runtime");
+          "specialized Q8 kernel contradicts the execution plan topology or runtime");
     }
     if (parallelQ8FfnPreparation
         && (!stagedQuantizedLayer

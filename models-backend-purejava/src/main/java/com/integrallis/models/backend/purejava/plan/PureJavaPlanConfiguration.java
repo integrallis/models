@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.plan;
 
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -36,7 +37,7 @@ public record PureJavaPlanConfiguration(
     boolean stagedQuantizedFfn,
     boolean stagedQuantizedLayer,
     boolean blockMajorQ8Activations,
-    boolean q8BlockMajorRowAccumulator,
+    GgufQ8BlockMajorKernel q8BlockMajorKernel,
     boolean parallelQ8FfnPreparation) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
@@ -56,8 +57,7 @@ public record PureJavaPlanConfiguration(
       "models.purejava.stagedQuantizedLayer";
   public static final String BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY =
       "models.purejava.blockMajorQ8Activations";
-  public static final String Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY =
-      "models.purejava.q8BlockMajorRowAccumulator";
+  public static final String Q8_BLOCK_MAJOR_KERNEL_PROPERTY = "models.purejava.q8BlockMajorKernel";
   public static final String PARALLEL_Q8_FFN_PREPARATION_PROPERTY =
       "models.purejava.parallelQ8FfnPreparation";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
@@ -75,11 +75,12 @@ public record PureJavaPlanConfiguration(
           STAGED_QUANTIZED_FFN_PROPERTY,
           STAGED_QUANTIZED_LAYER_PROPERTY,
           BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
-          Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY,
+          Q8_BLOCK_MAJOR_KERNEL_PROPERTY,
           PARALLEL_Q8_FFN_PREPARATION_PROPERTY);
 
   public PureJavaPlanConfiguration {
     q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
+    q8BlockMajorKernel = Objects.requireNonNull(q8BlockMajorKernel, "q8BlockMajorKernel");
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException(
           PREFILL_BATCH_SIZE_PROPERTY + " must be >= 1: " + prefillBatchSize);
@@ -100,7 +101,7 @@ public record PureJavaPlanConfiguration(
         false,
         false,
         false,
-        false,
+        GgufQ8BlockMajorKernel.SCATTERED,
         false);
   }
 
@@ -147,8 +148,7 @@ public record PureJavaPlanConfiguration(
             configured(STAGED_QUANTIZED_LAYER_PROPERTY, deployment, recommendations)),
         blockMajorQ8Activations(
             configured(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, deployment, recommendations)),
-        q8BlockMajorRowAccumulator(
-            configured(Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY, deployment, recommendations)),
+        q8BlockMajorKernel(configured(Q8_BLOCK_MAJOR_KERNEL_PROPERTY, deployment, recommendations)),
         parallelQ8FfnPreparation(
             configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, deployment, recommendations)));
   }
@@ -222,9 +222,20 @@ public record PureJavaPlanConfiguration(
     return configured != null && booleanProperty(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, configured);
   }
 
-  static boolean q8BlockMajorRowAccumulator(String configured) {
-    return configured != null
-        && booleanProperty(Q8_BLOCK_MAJOR_ROW_ACCUMULATOR_PROPERTY, configured);
+  static GgufQ8BlockMajorKernel q8BlockMajorKernel(String configured) {
+    if (configured == null) {
+      return GgufQ8BlockMajorKernel.SCATTERED;
+    }
+    return switch (configured.trim().toLowerCase(Locale.ROOT)) {
+      case "scattered" -> GgufQ8BlockMajorKernel.SCATTERED;
+      case "row-accumulated" -> GgufQ8BlockMajorKernel.ROW_ACCUMULATED;
+      case "float-lane-accumulated" -> GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED;
+      default ->
+          throw new IllegalArgumentException(
+              Q8_BLOCK_MAJOR_KERNEL_PROPERTY
+                  + " must be scattered, row-accumulated, or float-lane-accumulated: "
+                  + configured);
+    };
   }
 
   static boolean parallelQ8FfnPreparation(String configured) {

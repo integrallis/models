@@ -136,8 +136,9 @@ activations, and at least two row partitions.
 The next gate replaced the block-by-block scattered output updates with one row-local batch
 accumulator. Vectors keeps this as an explicit kernel strategy because local Java 25 HotSpot/C2 was
 neutral, while the controlled EPYC/GraalVM batch-32 JMH improved from 20.571 to 4.335 ms/op
-(-78.9%). Models plan schema `pure-java-v15` requires an exact recommendation, Graal JVMCI, and
-eligible staged block-major Q8 topology before selecting it.
+(-78.9%). Models plan schema `pure-java-v16` requires an exact recommendation, Graal JVMCI, and
+eligible staged block-major Q8 topology before selecting
+`models.purejava.q8BlockMajorKernel=row-accumulated`.
 
 | Metric | Scattered output updates | Row-local accumulator | Change |
 | --- | ---: | ---: | ---: |
@@ -152,6 +153,30 @@ process-pair medians. Token counts and output hashes remained exact, and maximum
 +0.41%. Against the pinned same-host native controls, the resulting 179.479 tok/s is approximately
 31.2% of llama.cpp prefill and 30.6% of Ollama prefill; 878.801 ms TTFT is approximately 2.94x
 llama.cpp and 2.61x Ollama. These native values were not rerun for this incremental gate.
+
+The next Q8 gate retains eight strided float lanes across all weight blocks and performs one
+horizontal reduction per completed batch output. It requires an exact 256-bit vector species and
+`models.purejava.q8BlockMajorKernel=float-lane-accumulated`. Controlled EPYC/GraalVM Java 25 JMH
+improved the 1,024x2,048 batch-32 row kernel from `4.320 +/- 0.012 ms/op` to
+`2.829 +/- 0.019 ms/op` (-34.5%). A bounded startup prewarm and two helper-specific compilation
+commands prevent concurrent worker compilation without a material steady allocation cost.
+
+| Metric | Row-local accumulator | Eight retained float lanes | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 876.832 ms | 746.621 ms | -14.85% |
+| p95 TTFT | 886.504 ms | 756.694 ms | -14.64% |
+| p50 prefill | 180.000 tok/s | 211.547 tok/s | +17.53% |
+| p50 process CPU | 6,660 ms | 5,600 ms | -15.92% |
+| median process RSS | 1,019,949,056 B | 1,038,696,448 B | +1.84% |
+| maximum process RSS | 1,044,836,352 B | 1,058,574,336 B | +1.31% |
+
+All 30 corresponding TTFT, prefill, and CPU trials and all six process-pair medians favored the
+candidate. Every corresponding one-token output matched. Three repeated 64-token runs over three
+prompts were exactly repeatable within each kernel, but the float-lane arithmetic order is
+non-associative relative to row/scattered accumulation and does not promise cross-kernel sequence
+identity. Using the previously pinned native controls, 211.547 tok/s is approximately 36.8% of
+llama.cpp prefill and 36.1% of Ollama prefill; 746.621 ms TTFT is approximately 2.50x llama.cpp and
+2.22x Ollama. The native values were not rerun for this incremental gate.
 
 ### Controlled mixed K-quant projection result
 

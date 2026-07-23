@@ -40,6 +40,8 @@ final class QuantizedBatchedLayerPlan {
   }
 
   private static final int Q8_BLOCK_SIZE = 32;
+  private static final int Q8_FLOAT_LANE_PREWARM_ITERATIONS = 32;
+  private static final int Q8_FLOAT_LANE_PREWARM_BATCH_SIZE = 2;
 
   private final int batchCapacity;
   private final int embeddingDim;
@@ -72,6 +74,7 @@ final class QuantizedBatchedLayerPlan {
   private int activeLayerIndex;
   private int activeStartPosition;
   private int activeBatchSize;
+  private boolean q8FloatLaneKernelPrewarmed;
 
   QuantizedBatchedLayerPlan(
       int batchCapacity,
@@ -221,6 +224,7 @@ final class QuantizedBatchedLayerPlan {
 
   private void execute(
       LlamaWeights.LayerWeights layer, int batchSize, GgufStagePlan selectedStagePlan) {
+    prewarmQ8FloatLaneKernel(layer);
     activeLayer = layer;
     activeBatchSize = batchSize;
     try {
@@ -228,6 +232,44 @@ final class QuantizedBatchedLayerPlan {
     } finally {
       activeLayer = null;
       activeBatchSize = 0;
+    }
+  }
+
+  private void prewarmQ8FloatLaneKernel(LlamaWeights.LayerWeights layer) {
+    if (q8BlockMajorKernel != GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED
+        || q8FloatLaneKernelPrewarmed) {
+      return;
+    }
+
+    if (layer.ffnGateType() == GgufTensorType.Q8_0) {
+      prewarmQ8FloatLaneKernel(layer.ffnGate(), embeddingDim, inputActivation);
+    } else if (layer.ffnUpType() == GgufTensorType.Q8_0) {
+      prewarmQ8FloatLaneKernel(layer.ffnUp(), embeddingDim, inputActivation);
+    } else if (layer.ffnDownType() == GgufTensorType.Q8_0) {
+      prewarmQ8FloatLaneKernel(layer.ffnDown(), hiddenDim, outputActivation);
+    } else if (layer.woType() == GgufTensorType.Q8_0) {
+      prewarmQ8FloatLaneKernel(layer.wo(), attentionOutputDim, attentionActivation);
+    } else {
+      throw new IllegalStateException("float-lane Q8 plan has no Q8_0 projection to prewarm");
+    }
+    q8FloatLaneKernelPrewarmed = true;
+  }
+
+  private void prewarmQ8FloatLaneKernel(MemorySegment weight, int cols, GgufQ8_0Batch activation) {
+    float[] output = new float[Q8_FLOAT_LANE_PREWARM_BATCH_SIZE];
+    // The measured launch profile lowers this helper's compile threshold. Repeated bounded calls
+    // produce a normal entry compilation before the staged workers fan out over full projections.
+    for (int iteration = 0; iteration < Q8_FLOAT_LANE_PREWARM_ITERATIONS; iteration++) {
+      VectorUtil.ggufQ8_0Q8_0BlockMajorBatchedMatmulRows(
+          weight,
+          Q8_FLOAT_LANE_PREWARM_BATCH_SIZE,
+          1,
+          cols,
+          0,
+          1,
+          output,
+          activation,
+          GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED);
     }
   }
 

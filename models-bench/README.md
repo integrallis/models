@@ -353,8 +353,8 @@ an explicit `GgufQ8BlockMajorKernel` choice; the existing scattered strategy rem
 
 Local Java 25 HotSpot/C2 was neutral at 17.713 versus 17.480 ms/op. Controlled EPYC/GraalVM Java
 25 improved the 1,024x2,048 batch-32 JMH kernel from 20.571 to 4.335 ms/op (-78.9%). Models plan
-schema `pure-java-v15` therefore selects the row accumulator only when an exact profile recommends
-`models.purejava.q8BlockMajorRowAccumulator=true`, the compiler is Graal JVMCI, and staged
+schema `pure-java-v16` therefore selects the row accumulator only when an exact profile recommends
+`models.purejava.q8BlockMajorKernel=row-accumulated`, the compiler is Graal JVMCI, and staged
 block-major Q8 topology is active. Other runtimes and models retain the scattered kernel.
 
 The full-model gate held the exact SmolLM2 and prompt bytes, GraalVM Java 25, a fixed 1 GiB heap,
@@ -375,6 +375,44 @@ medians. Every corresponding input count, output count, and output SHA-256 match
 moved by +0.41%. Reports remain under
 `/opt/q8-signed-pairwise-20260723/reports/row-accumulator-full-*.json` with local copies under
 `/private/tmp/q8-row-accumulator-reports/`.
+
+## Retained float-lane Q8_0 block-major gate
+
+The row-local kernel still horizontally reduced eight integer lanes after every Q8 block. The
+float-lane strategy keeps those eight strided lanes live across the complete output and reduces
+once. It is available only with an exact 256-bit vector species and remains profile-selected with
+`models.purejava.q8BlockMajorKernel=float-lane-accumulated`. Its deterministic arithmetic order is
+not bit-identical to row/scattered accumulation, so a profile must not imply cross-kernel token
+identity.
+
+Controlled 1,024x2,048 batch-32 EPYC/GraalVM Java 25 JMH improved from
+`4.320 +/- 0.012 ms/op` for the row accumulator to `2.829 +/- 0.019 ms/op` (-34.5%). Reusable
+thread-local lane scratch reduced normalized candidate allocation to `19.613 +/- 0.137 B/op`.
+Models performs one bounded prewarm before staged worker fan-out. The exact launch profile also
+uses:
+
+```text
+-XX:CompileCommand=option,com.integrallis.vectors.core.PanamaVectorUtilSupport::ggufQ8_0Q8_0BlockMajorFloatLaneRow,double,CompileThresholdScaling,0.001
+-XX:CompileCommand=option,com.integrallis.vectors.core.PanamaVectorUtilSupport::ggufQ8_0Q8_0BlockMajorFloatLaneRow,bool,BackgroundCompilation,false
+```
+
+The authoritative full-model gate held the row-accumulator setup above constant and used six
+counterbalanced process pairs, each with five warmups and five measured requests:
+
+| Metric | Row-local accumulator | Eight retained float lanes | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 876.832 ms | 746.621 ms | -14.85% |
+| p95 TTFT | 886.504 ms | 756.694 ms | -14.64% |
+| p50 prefill | 180.000 tok/s | 211.547 tok/s | +17.53% |
+| p50 process CPU | 6,660 ms | 5,600 ms | -15.92% |
+| median process RSS | 1,019,949,056 B | 1,038,696,448 B | +1.84% |
+| maximum process RSS | 1,044,836,352 B | 1,058,574,336 B | +1.31% |
+
+The candidate won all 30 corresponding TTFT, prefill, and CPU trials and all six process-pair
+medians. Every corresponding one-token output matched. A three-prompt, 64-token, three-repeat audit
+proved exact internal repeatability while explicitly confirming expected trajectory divergence from
+the row/scattered arithmetic order. Reports remain under `/opt/q8-float-lane-model-gate/reports/`
+with local copies under `/private/tmp/q8-float-lane-reports/`.
 
 ## Exact determinism audit
 
