@@ -37,6 +37,7 @@ class ExecutionPlannerTest {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
+    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v13");
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
@@ -758,27 +759,18 @@ class ExecutionPlannerTest {
   @Test
   void modelRecommendationsConfigureThePlanAndDeploymentSettingsTakePrecedence() {
     Map<String, String> recommendations =
-        Map.of(
-            PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY,
-            "false",
-            PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
-            "false",
-            PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY,
-            "short-pairwise",
-            PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY,
-            "16",
-            PureJavaPlanConfiguration.FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
-            "false",
-            PureJavaPlanConfiguration.FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
-            "false",
-            PureJavaPlanConfiguration.BATCHED_ATTENTION_VALUES_PROPERTY,
-            "true",
-            PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY,
-            "true",
-            PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
-            "true",
-            PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
-            "true");
+        Map.ofEntries(
+            Map.entry(PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY, "false"),
+            Map.entry(PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY, "false"),
+            Map.entry(PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY, "short-pairwise"),
+            Map.entry(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, "16"),
+            Map.entry(PureJavaPlanConfiguration.FINAL_LAYER_PREFILL_PRUNING_PROPERTY, "false"),
+            Map.entry(PureJavaPlanConfiguration.FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, "false"),
+            Map.entry(PureJavaPlanConfiguration.BATCHED_ATTENTION_VALUES_PROPERTY, "true"),
+            Map.entry(PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY, "true"),
+            Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY, "true"),
+            Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "true"),
+            Map.entry(PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, "true"));
 
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(Map.of(), recommendations);
@@ -793,6 +785,7 @@ class ExecutionPlannerTest {
     assertThat(recommended.batchedAttentionScores()).isTrue();
     assertThat(recommended.stagedQuantizedFfn()).isTrue();
     assertThat(recommended.stagedQuantizedLayer()).isTrue();
+    assertThat(recommended.blockMajorQ8Activations()).isTrue();
 
     PureJavaPlanConfiguration overridden =
         PureJavaPlanConfiguration.from(
@@ -808,6 +801,8 @@ class ExecutionPlannerTest {
                 PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
                 "false",
                 PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
+                "false",
+                PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
                 "false"),
             recommendations);
 
@@ -817,6 +812,7 @@ class ExecutionPlannerTest {
     assertThat(overridden.batchedAttentionScores()).isFalse();
     assertThat(overridden.stagedQuantizedFfn()).isFalse();
     assertThat(overridden.stagedQuantizedLayer()).isFalse();
+    assertThat(overridden.blockMajorQ8Activations()).isFalse();
     assertThatThrownBy(
             () ->
                 PureJavaPlanConfiguration.from(
