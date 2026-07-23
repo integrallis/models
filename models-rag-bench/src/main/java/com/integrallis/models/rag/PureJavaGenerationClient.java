@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SamplingOptions;
@@ -26,6 +27,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import org.modeljars.ModelJarDescriptor;
 
 /** In-process Models generation client with production timing measurements. */
 public final class PureJavaGenerationClient implements GenerationClient {
@@ -41,12 +43,22 @@ public final class PureJavaGenerationClient implements GenerationClient {
 
   public static PureJavaGenerationClient load(Path model, int contextLength) {
     Objects.requireNonNull(model, "model");
+    return load(contextLength, () -> PureJavaBackend.load(model));
+  }
+
+  public static PureJavaGenerationClient load(ModelJarDescriptor descriptor, int contextLength) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    return load(contextLength, () -> PureJavaBackend.load(descriptor));
+  }
+
+  private static PureJavaGenerationClient load(
+      int contextLength, java.util.function.Supplier<PureJavaBackend> backendLoader) {
     if (contextLength < 1) {
       throw new IllegalArgumentException("contextLength must be positive");
     }
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
-    PureJavaBackend backend = PureJavaBackend.load(model);
+    PureJavaBackend backend = backendLoader.get();
     return new PureJavaGenerationClient(backend, elapsedMillis(start));
   }
 
@@ -58,6 +70,11 @@ public final class PureJavaGenerationClient implements GenerationClient {
   @Override
   public String model() {
     return backend.metadata().modelName();
+  }
+
+  @Override
+  public BackendDiagnostics diagnostics() {
+    return backend.diagnostics();
   }
 
   @Override
@@ -167,6 +184,11 @@ public final class PureJavaGenerationClient implements GenerationClient {
     @Override
     public Tokenizer tokenizer() {
       return delegate.tokenizer();
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return delegate.diagnostics();
     }
 
     @Override

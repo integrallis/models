@@ -17,6 +17,7 @@ package com.integrallis.models.rag;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.integrallis.models.api.BackendDiagnostics;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -33,7 +34,11 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import org.modeljars.ModelJarDescriptor;
+import org.modeljars.ModelJarRegistry;
 
 /** Runs controlled plain Java, LangChain4j, and Spring AI RAG workloads. */
 public final class RagBenchmarkCli {
@@ -45,6 +50,7 @@ public final class RagBenchmarkCli {
           "backend",
           "backend-version",
           "model",
+          "modeljar",
           "model-id",
           "artifact",
           "endpoint",
@@ -69,6 +75,11 @@ public final class RagBenchmarkCli {
   }
 
   static RagBenchmarkConfiguration parse(String[] args) {
+    return parse(args, ModelJarRegistry.fromClasspath());
+  }
+
+  static RagBenchmarkConfiguration parse(String[] args, ModelJarRegistry modelJarRegistry) {
+    Objects.requireNonNull(modelJarRegistry, "modelJarRegistry");
     Map<String, String> values = parseOptions(args);
     String framework = required(values, "framework");
     if (!FRAMEWORKS.contains(framework)) {
@@ -78,11 +89,44 @@ public final class RagBenchmarkCli {
     if (!BACKENDS.contains(backend)) {
       throw new IllegalArgumentException("backend must be one of " + BACKENDS);
     }
-    String model = required(values, "model");
-    Path artifact =
-        values.containsKey("artifact")
-            ? Path.of(values.get("artifact"))
-            : "pure-java".equals(backend) ? Path.of(model) : null;
+    String model;
+    Path artifact;
+    Optional<ModelJarDescriptor> modelJarDescriptor;
+    if ("pure-java".equals(backend)) {
+      if (values.containsKey("artifact")) {
+        throw new IllegalArgumentException("--artifact cannot override a pure-java model source");
+      }
+      boolean hasModel = hasText(values.get("model"));
+      boolean hasModelJar = hasText(values.get("modeljar"));
+      if (hasModel == hasModelJar) {
+        throw new IllegalArgumentException(
+            "pure-java requires exactly one of --model or --modeljar");
+      }
+      if (hasModel) {
+        model = values.get("model");
+        artifact = Path.of(model);
+        modelJarDescriptor = Optional.empty();
+      } else {
+        ModelJarDescriptor descriptor =
+            resolveModelJar(values.get("modeljar").trim(), modelJarRegistry);
+        model = descriptor.alias();
+        artifact =
+            descriptor
+                .localPath()
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            "ModelJar has no local artifact: " + descriptor.alias()));
+        modelJarDescriptor = Optional.of(descriptor);
+      }
+    } else {
+      if (values.containsKey("modeljar")) {
+        throw new IllegalArgumentException("--modeljar is supported only by pure-java");
+      }
+      model = required(values, "model");
+      artifact = values.containsKey("artifact") ? Path.of(values.get("artifact")) : null;
+      modelJarDescriptor = Optional.empty();
+    }
     if (artifact != null && !Files.isRegularFile(artifact)) {
       throw new IllegalArgumentException("artifact does not exist: " + artifact);
     }
@@ -121,6 +165,7 @@ public final class RagBenchmarkCli {
         modelId,
         model,
         artifact,
+        modelJarDescriptor,
         endpoint,
         promptTemplate,
         context,
@@ -142,7 +187,9 @@ public final class RagBenchmarkCli {
     List<RagRun> runs = new ArrayList<>();
     List<RagBenchmarkFailure> failures = new ArrayList<>();
 
-    try (GenerationClient generation = generationClient(configuration);
+    GenerationClient generation = generationClient(configuration);
+    BackendDiagnostics backendDiagnostics = generation.diagnostics();
+    try (generation;
         LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents());
         RagApplication application =
             application(
@@ -202,6 +249,7 @@ public final class RagBenchmarkCli {
             42,
             false),
         RagBenchmarkEnvironment.capture(),
+        backendDiagnostics,
         summary,
         RagPerformancePolicy.classify(summary.policyMetrics()),
         runs,
@@ -210,7 +258,15 @@ public final class RagBenchmarkCli {
 
   private static GenerationClient generationClient(RagBenchmarkConfiguration configuration) {
     if ("pure-java".equals(configuration.backend())) {
-      return PureJavaGenerationClient.load(configuration.artifact(), configuration.contextLength());
+      return configuration
+          .modelJarDescriptor()
+          .<GenerationClient>map(
+              descriptor ->
+                  PureJavaGenerationClient.load(descriptor, configuration.contextLength()))
+          .orElseGet(
+              () ->
+                  PureJavaGenerationClient.load(
+                      configuration.artifact(), configuration.contextLength()));
     }
     return new HttpGenerationClient(
         configuration.backend(),
@@ -321,6 +377,29 @@ public final class RagBenchmarkCli {
       throw new IllegalArgumentException("--" + option + " is required");
     }
     return value;
+  }
+
+  private static boolean hasText(String value) {
+    return value != null && !value.isBlank();
+  }
+
+  private static ModelJarDescriptor resolveModelJar(
+      String alias, ModelJarRegistry modelJarRegistry) {
+    List<ModelJarDescriptor> matches =
+        modelJarRegistry.descriptors().stream()
+            .filter(descriptor -> alias.equals(descriptor.alias()))
+            .toList();
+    if (matches.isEmpty()) {
+      throw new IllegalArgumentException("unknown ModelJar alias: " + alias);
+    }
+    if (matches.size() > 1) {
+      throw new IllegalArgumentException("ambiguous ModelJar alias: " + alias);
+    }
+    ModelJarDescriptor descriptor = matches.getFirst();
+    if (!descriptor.supportsBackend("pure-java")) {
+      throw new IllegalArgumentException("ModelJar does not support pure-java: " + alias);
+    }
+    return descriptor;
   }
 
   private static int positiveInteger(Map<String, String> values, String option, int fallback) {

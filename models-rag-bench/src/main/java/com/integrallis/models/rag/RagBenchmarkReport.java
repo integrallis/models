@@ -15,7 +15,9 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import java.util.List;
+import java.util.Objects;
 
 /** Reproducible machine-readable RAG benchmark report. */
 public record RagBenchmarkReport(
@@ -30,13 +32,15 @@ public record RagBenchmarkReport(
     long artifactSizeBytes,
     RagBenchmarkSettings settings,
     RagBenchmarkEnvironment environment,
+    BackendDiagnostics backendDiagnostics,
     RagBenchmarkSummary summary,
     RagPerformanceTier performanceTier,
     List<RagRun> runs,
     List<RagBenchmarkFailure> failures) {
-  public static final int CURRENT_SCHEMA_VERSION = 2;
+  public static final int CURRENT_SCHEMA_VERSION = 3;
 
   public RagBenchmarkReport {
+    backendDiagnostics = Objects.requireNonNull(backendDiagnostics, "backendDiagnostics");
     runs = List.copyOf(runs);
     failures = List.copyOf(failures);
   }

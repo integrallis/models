@@ -48,6 +48,7 @@ dependencies {
     implementation("org.apache.lucene:lucene-core:10.4.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     implementation("org.springframework.ai:spring-ai-rag:2.0.0")
+    runtimeOnly("org.modeljars:modeljars-catalog:0.1.0-SNAPSHOT")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")

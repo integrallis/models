@@ -330,10 +330,16 @@ scripts/bootstrap-inference-bench-host.sh
 Run all three backends and produce raw JSON plus Markdown comparison evidence:
 
 ```bash
-BENCH_DROP_CACHES=1 scripts/run-controlled-inference-benchmarks.sh \
+BENCH_DROP_CACHES=1 \
+BENCH_MODELJAR_ALIAS=qwen3_0_6b_q4_0 \
+scripts/run-controlled-inference-benchmarks.sh \
   ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   qwen3-0.6b-q4_0
 ```
 
 The script records exact `models` and `vectors` commits in the pure-Java backend
-version. Do not publish comparisons from dirty checkouts or mixed hosts.
+version and rejects a ModelJar artifact whose SHA differs from the native
+artifact. Run it under the Java runtime and startup arguments required by the
+selected ModelJars profile. Omitting `BENCH_MODELJAR_ALIAS` deliberately runs
+the unprofiled path control. Do not publish comparisons from dirty checkouts or
+mixed hosts.

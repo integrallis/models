@@ -17,6 +17,7 @@ package com.integrallis.models.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.Tokenizer;
@@ -30,6 +31,7 @@ class PureJavaGenerationClientTest {
     try (PureJavaGenerationClient client = new PureJavaGenerationClient(backend(), 12.5)) {
       GenerationResult result = client.generate("hello", 8);
 
+      assertThat(client.diagnostics().planVersion()).isEqualTo("fixture-v1");
       assertThat(result.text()).isEqualTo(" world");
       assertThat(result.inputTokens()).isEqualTo(1);
       assertThat(result.outputTokens()).isEqualTo(2);
@@ -50,6 +52,11 @@ class PureJavaGenerationClientTest {
       @Override
       public ModelMetadata metadata() {
         return new ModelMetadata("test", "Tiny", 16, 5, 8, 1, 1, 1);
+      }
+
+      @Override
+      public BackendDiagnostics diagnostics() {
+        return new BackendDiagnostics(name(), "fixture-v1", java.util.Map.of(), List.of());
       }
 
       @Override

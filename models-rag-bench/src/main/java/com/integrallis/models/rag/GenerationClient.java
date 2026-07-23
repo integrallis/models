@@ -15,11 +15,17 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.BackendDiagnostics;
+
 /** Measured text-generation boundary for in-process and server backends. */
 public interface GenerationClient extends AutoCloseable {
   String backend();
 
   String model();
+
+  default BackendDiagnostics diagnostics() {
+    return BackendDiagnostics.unavailable(backend());
+  }
 
   GenerationResult generate(String prompt, int maxTokens);
 
