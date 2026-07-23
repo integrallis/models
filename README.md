@@ -181,7 +181,7 @@ Diagnostics identify enabled, disabled, and unsupported choices, including the
 resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, Q4_0
 arithmetic kernel, prefill batch size, final-layer output-row policy, mapped
 weights, Vector FMA policy, final-layer K/V-only policy, and persistent row
-executor, including the staged Q4_0 FFN schedule when selected.
+executor, including the staged Q4_0/Q8_0 layer schedule when selected.
 When the backend is loaded from a `ModelJarDescriptor`, diagnostics also retain
 the exact marker coordinate and SHA and assess every measured performance
 profile against the current JVM, processor topology, vector width, and startup
@@ -194,8 +194,9 @@ restart; Models never pretends to apply JVM startup options after model loading.
 `models.purejava.finalLayerPrefillPruning`,
 `models.purejava.finalLayerKvOnlyPrefill`,
 `models.purejava.batchedAttentionScores`,
-`models.purejava.batchedAttentionValues`, `models.purejava.stagedQ4Ffn`, and
-`models.purejava.stagedQ4Layer` are parsed once per load. Malformed
+`models.purejava.batchedAttentionValues`,
+`models.purejava.stagedQuantizedFfn`, and
+`models.purejava.stagedQuantizedLayer` are parsed once per load. Malformed
 explicit values fail rather than silently reverting to defaults, and explicit
 deployment values override ModelJars recommendations. The Q4 kernel accepts
 `widened`, `short-pairwise`, or `unsigned-pairwise`; ordinary loads use
@@ -222,25 +223,25 @@ load across two strided key-cache rows through Vectors while preserving the
 active provider's independent dot-product result bit for bit. Diagnostics
 report the route as `batched-attention-scores`.
 
-Staged Q4_0 feed-forward execution is disabled for ordinary loads and selected
+Staged quantized feed-forward execution is disabled for ordinary loads and selected
 only by a matching profile or
-`-Dmodels.purejava.stagedQ4Ffn=true`. Eligible layers require batched prefill,
-thread-shareable Q4_0 gate, up, and down weights, parallel GGUF execution, and the
+`-Dmodels.purejava.stagedQuantizedFfn=true`. Eligible layers require batched prefill,
+thread-shareable Q4_0 or Q8_0 gate, up, and down weights, parallel GGUF execution, and the
 persistent Vectors row executor. The first stage runs gate/up projection, exact
 SwiGLU, and Q8_0 preparation before the down-projection stage; diagnostics
-report it as `staged-q4-ffn`. Ineligible runtimes keep the established path.
+report it as `staged-quantized-ffn`. Ineligible runtimes keep the established path.
 
-Retained Q4_0 layer execution is independently disabled for ordinary loads and
+Retained quantized layer execution is independently disabled for ordinary loads and
 selected only by a matching profile or
-`-Dmodels.purejava.stagedQ4Layer=true`. When the attention output, gate, up, and
-down projections are all Q4_0, one seven-stage Vectors publication spans Q/K/V
+`-Dmodels.purejava.stagedQuantizedLayer=true`. When the attention output, gate, up, and
+down projections use Q4_0 or Q8_0, one seven-stage Vectors publication spans Q/K/V
 normalization, RoPE, and cache writes; exact grouped-query attention; Q8_0
 attention preparation; output projection; residual addition, FFN normalization,
 and Q8_0 input preparation; gate/up projection plus exact SwiGLU; and down
 projection. Cache storage is reserved before worker publication and each batch
 row owns separate attention-score scratch. The FFN-only schedule remains
 available for layers whose attention output uses another format. Diagnostics
-report the wider route as `staged-q4-layer`.
+report the wider route as `staged-quantized-layer`.
 
 Ordinary prefill requests logits only for the final prompt token. For validated
 final layers whose attention and FFN projections are uniformly Q4_0 or uniformly

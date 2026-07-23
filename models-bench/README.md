@@ -191,11 +191,12 @@ RoPE, and cache writes; exact grouped-query attention; and Q8_0 attention prepar
 stages precede the retained output-and-FFN stages, producing one seven-stage plan. Cache storage is
 reserved before worker publication, the first stage writes disjoint positions, and each batch row
 has independent score scratch. The QKV matrix projection remains the preceding boundary. No
-Vectors source or API change was needed, and the established two-stage FFN route remains the
-fallback when a layer's output projection is not Q4_0.
+Vectors source or API change was needed for the original Q4_0 widening, and the established
+two-stage FFN route remains the fallback when a layer's output projection is not supported.
 
 The incremental gate used Models candidate `18552bc` and otherwise repeated the controls above.
-It differed only by `models.purejava.stagedQ4Layer=false/true` within one candidate distribution:
+It differed only by `models.purejava.stagedQuantizedLayer=false/true` within one candidate
+distribution:
 
 | Metric | Staged FFN baseline | Seven-stage layer plan | Change |
 | --- | ---: | ---: | ---: |
@@ -210,7 +211,39 @@ RSS was 1,140,885,504 bytes for the baseline and 1,179,170,816 bytes for the can
 nor the small CPU change supports an efficiency claim. Reports remain on the controlled host under
 `/opt/modeljars-bench/q4-layer-candidate/reports/attention-full/` and were copied to
 `/private/tmp/q4-attention-full/`. Select the route with
-`-Dmodels.purejava.stagedQ4Layer=true`; exact ModelJars profiles supply it only for measured tuples.
+`-Dmodels.purejava.stagedQuantizedLayer=true`; exact ModelJars profiles supply it only for measured
+tuples.
+
+## Retained Q8_0 attention-and-FFN stage plan
+
+The format-neutral schedule now dispatches Q4_0 and Q8_0 row ranges through their corresponding
+Vectors kernels. Q8_0 support added reusable generic activation block-range quantization and a
+prequantized row-range matrix primitive to Vectors; Models continues to own transformer staging.
+Synthetic tests require bit-identical final logits, complete K/V buffers, and the next
+autoregressive step.
+
+The controlled gate used SmolLM2 360M Instruct Q8_0, Models `b2eb75b`, Vectors `fa24b91`, GraalVM
+Java 25.0.3, batch 32, a fixed 1 GiB heap, eight processors and workers, and
+`MaximumInliningSize=10000`. Five warmups and five measured one-token requests per fresh process
+across six counterbalanced pairs produced 30 trials per mode:
+
+| Metric | Established Q8_0 prefill | Seven-stage Q8_0 layer | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 1,183.920 ms | 995.194 ms | -15.94%; -15.76% paired median |
+| p95 TTFT | 1,254.584 ms | 1,015.008 ms | -19.10% |
+| p50 prefill | 133.829 tok/s | 159.522 tok/s | +19.20%; +19.19% paired median |
+| p50 CPU | 7,525 ms | 7,490 ms | -0.47%; -0.40% paired median |
+| median process RSS | 993,314,816 bytes | 988,583,936 bytes | no regression observed |
+
+All 30 paired TTFT and prefill trials and all six process-pair medians favored the staged route.
+Every corresponding input count, output count, and output SHA-256 matched. A separate prefill-only
+gate with ten warmups improved median throughput from 130.08 to 150.71 tok/s (+15.86%) with zero GC
+and checksum `-114227.445` in every process. Candidate JFR samples moved activation quantization
+from 15.82% of the established profile to 3.08%; the Q8_0 row-range kernel then represented 74.79%
+of samples. Reports remain under `/opt/modeljars-bench/q8-staged-layer/reports/` and the JSON reports
+were copied to `/private/tmp/q8-staged-layer/`. Select the route with
+`-Dmodels.purejava.stagedQuantizedLayer=true`; exact ModelJars profiles supply both staged settings
+only for measured runtime tuples.
 
 ## Exact determinism audit
 
