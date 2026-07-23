@@ -133,6 +133,26 @@ Maximum observed RSS moved by +0.76%, which is not a material memory regression.
 default-off and requires all-Q8 gate/up projections, the staged layer plan, block-major
 activations, and at least two row partitions.
 
+The next gate replaced the block-by-block scattered output updates with one row-local batch
+accumulator. Vectors keeps this as an explicit kernel strategy because local Java 25 HotSpot/C2 was
+neutral, while the controlled EPYC/GraalVM batch-32 JMH improved from 20.571 to 4.335 ms/op
+(-78.9%). Models plan schema `pure-java-v15` requires an exact recommendation, Graal JVMCI, and
+eligible staged block-major Q8 topology before selecting it.
+
+| Metric | Scattered output updates | Row-local accumulator | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 898.794 ms | 878.801 ms | -2.22% |
+| p95 TTFT | 919.981 ms | 886.209 ms | -3.67% |
+| p50 prefill | 175.219 tok/s | 179.479 tok/s | +2.43% |
+| p50 process CPU | 6,840 ms | 6,680 ms | -2.34% |
+| median process RSS | 1,009,147,904 B | 1,015,336,960 B | +0.61% |
+
+All 30 corresponding TTFT, prefill, and CPU trials favored the row-local strategy, as did all six
+process-pair medians. Token counts and output hashes remained exact, and maximum RSS changed by
++0.41%. Against the pinned same-host native controls, the resulting 179.479 tok/s is approximately
+31.2% of llama.cpp prefill and 30.6% of Ollama prefill; 878.801 ms TTFT is approximately 2.94x
+llama.cpp and 2.61x Ollama. These native values were not rerun for this incremental gate.
+
 ### Controlled mixed K-quant projection result
 
 MiniCPM5 stores query and key projections as Q4_K and the narrower value

@@ -30,6 +30,7 @@ import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -461,6 +462,7 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 false);
         KvCache stagedCache =
             new KvCache(
@@ -509,6 +511,7 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 false);
         KvCache baselineCache =
             new KvCache(
@@ -540,6 +543,7 @@ class LlamaForwardPassTest {
                 false,
                 true,
                 true,
+                false,
                 false,
                 false);
         KvCache stagedCache =
@@ -803,6 +807,7 @@ class LlamaForwardPassTest {
                 false,
                 false,
                 false,
+                false,
                 false);
         KvCache baselineCache =
             new KvCache(
@@ -835,6 +840,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 true,
+                false,
                 false);
         KvCache stagedCache =
             new KvCache(
@@ -867,6 +873,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 true,
+                false,
                 true);
         KvCache parallelCache =
             new KvCache(
@@ -882,6 +889,33 @@ class LlamaForwardPassTest {
                     parallelConfiguration));
         float[] parallelActual = parallel.prefill(tokens, 0).clone();
 
+        PureJavaPlanConfiguration rowAccumulatedConfiguration =
+            new PureJavaPlanConfiguration(
+                true,
+                true,
+                GgufQ4Kernel.WIDENED,
+                32,
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true);
+        PureJavaExecutionPlan rowAccumulatedPlan =
+            ExecutionPlanner.plan(
+                graalRuntime(),
+                ModelTopology.from("llama", config, weights),
+                rowAccumulatedConfiguration);
+        KvCache rowAccumulatedCache =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        LlamaForwardPass rowAccumulated =
+            new LlamaForwardPass(config, weights, rowAccumulatedCache, rowAccumulatedPlan);
+        float[] rowAccumulatedActual = rowAccumulated.prefill(tokens, 0).clone();
+
         assertThat(staged.usesStagedQuantizedLayer()).isTrue();
         assertThat(staged.usesBlockMajorQ8Activations()).isTrue();
         assertThat(staged.stagedQuantizedLayerStageCount()).isEqualTo(7);
@@ -894,6 +928,12 @@ class LlamaForwardPassTest {
         assertThat(parallelCache.keyBuffer()).containsExactly(actualKeys);
         assertThat(parallelCache.valueBuffer()).containsExactly(actualValues);
         assertThat(parallel.forward(nextToken, tokens.length)).containsExactly(actualNext);
+        assertThat(rowAccumulatedPlan.q8BlockMajorKernel())
+            .isEqualTo(GgufQ8BlockMajorKernel.ROW_ACCUMULATED);
+        assertThat(rowAccumulatedActual).containsExactly(actual);
+        assertThat(rowAccumulatedCache.keyBuffer()).containsExactly(actualKeys);
+        assertThat(rowAccumulatedCache.valueBuffer()).containsExactly(actualValues);
+        assertThat(rowAccumulated.forward(nextToken, tokens.length)).containsExactly(actualNext);
       }
     }
 
@@ -1267,7 +1307,35 @@ class LlamaForwardPassTest {
             false,
             false,
             false,
+            false,
             false));
+  }
+
+  private static RuntimeFingerprint graalRuntime() {
+    RuntimeFingerprint runtime = RuntimeFingerprint.capture();
+    return new RuntimeFingerprint(
+        runtime.javaVersion(),
+        runtime.vmName(),
+        runtime.vmVendor(),
+        runtime.vmVersion(),
+        "graal-jvmci",
+        runtime.osName(),
+        runtime.architecture(),
+        runtime.cpuModel(),
+        runtime.vectorProvider(),
+        runtime.vectorApi(),
+        runtime.preferredVectorBits(),
+        runtime.vectorBits(),
+        runtime.fastVectorFma(),
+        runtime.fastScalarFma(),
+        runtime.sve(),
+        runtime.q4ShortPairwiseSupported(),
+        runtime.q4UnsignedPairwiseSupported(),
+        runtime.ggufParallel(),
+        runtime.ggufExecutor(),
+        runtime.ggufThreads(),
+        runtime.ggufChunksPerThread(),
+        runtime.processors());
   }
 
   private static int argmax(float[] values) {

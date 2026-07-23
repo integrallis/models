@@ -341,7 +341,40 @@ prefill. All 60 trials succeeded, and every corresponding input count, output co
 SHA-256 matched. Maximum observed RSS changed by +0.76%, with no median-memory regression. Reports
 remain under `/opt/modeljars-bench/q8-ffn-preparation-reports/` and local copies under
 `/private/tmp/q8-ffn-preparation-reports/`. The option remains default-off in plan schema
-`pure-java-v14` pending an exact ModelJars performance profile.
+`pure-java-v14`; the exact ModelJars profile
+`smollm2_360m_q8_0_epyc_milan_jdk25_parallel_ffn` opts in for the measured tuple.
+
+## Retained row-accumulated Q8_0 block-major gate
+
+The established block-major kernel updated each widely separated batch output after every weight
+block. The retained Vectors strategy instead keeps one batch-sized partial-sum array local to an
+output row, preserves the exact block arithmetic order, and scatters the completed row once. It is
+an explicit `GgufQ8BlockMajorKernel` choice; the existing scattered strategy remains the default.
+
+Local Java 25 HotSpot/C2 was neutral at 17.713 versus 17.480 ms/op. Controlled EPYC/GraalVM Java
+25 improved the 1,024x2,048 batch-32 JMH kernel from 20.571 to 4.335 ms/op (-78.9%). Models plan
+schema `pure-java-v15` therefore selects the row accumulator only when an exact profile recommends
+`models.purejava.q8BlockMajorRowAccumulator=true`, the compiler is Graal JVMCI, and staged
+block-major Q8 topology is active. Other runtimes and models retain the scattered kernel.
+
+The full-model gate held the exact SmolLM2 and prompt bytes, GraalVM Java 25, a fixed 1 GiB heap,
+eight processors/workers, batch 32, all prior staged Q8 settings, parallel FFN preparation, and
+`MaximumInliningSize=10000` constant. Six counterbalanced process pairs with five warmups and five
+measured requests per mode produced:
+
+| Metric | Scattered output updates | Row-local accumulator | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 898.794 ms | 878.801 ms | -2.22% |
+| p95 TTFT | 919.981 ms | 886.209 ms | -3.67% |
+| p50 prefill | 175.219 tok/s | 179.479 tok/s | +2.43% |
+| p50 process CPU | 6,840 ms | 6,680 ms | -2.34% |
+| median process RSS | 1,009,147,904 B | 1,015,336,960 B | +0.61% |
+
+The candidate won TTFT, prefill, and CPU in all 30 corresponding trials and all six process-pair
+medians. Every corresponding input count, output count, and output SHA-256 matched. Maximum RSS
+moved by +0.41%. Reports remain under
+`/opt/q8-signed-pairwise-20260723/reports/row-accumulator-full-*.json` with local copies under
+`/private/tmp/q8-row-accumulator-reports/`.
 
 ## Exact determinism audit
 

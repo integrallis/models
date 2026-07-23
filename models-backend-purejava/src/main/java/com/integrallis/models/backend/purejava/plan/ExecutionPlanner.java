@@ -20,6 +20,7 @@ import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,7 +30,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v14";
+  public static final String PLAN_VERSION = "pure-java-v15";
 
   private ExecutionPlanner() {}
 
@@ -60,6 +61,14 @@ public final class ExecutionPlanner {
             prefillBatchSize,
             stagedQuantizedFfn,
             stagedQuantizedLayer,
+            decisions);
+    GgufQ8BlockMajorKernel q8BlockMajorKernel =
+        q8BlockMajorKernel(
+            runtime,
+            topology,
+            configuration,
+            stagedQuantizedLayer,
+            blockMajorQ8Activations,
             decisions);
     boolean parallelQ8FfnPreparation =
         parallelQ8FfnPreparation(
@@ -97,8 +106,53 @@ public final class ExecutionPlanner {
         stagedQuantizedFfn,
         stagedQuantizedLayer,
         blockMajorQ8Activations,
+        q8BlockMajorKernel,
         parallelQ8FfnPreparation,
         diagnostics);
+  }
+
+  private static GgufQ8BlockMajorKernel q8BlockMajorKernel(
+      RuntimeFingerprint runtime,
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      boolean stagedQuantizedLayer,
+      boolean blockMajorQ8Activations,
+      List<OptimizationDecision> decisions) {
+    boolean requested = configuration.q8BlockMajorRowAccumulator();
+    boolean q8Eligible = topology.hasStagedQ8Projection(stagedQuantizedLayer);
+    boolean graal = "graal-jvmci".equals(runtime.compiler());
+    boolean enabled = requested && q8Eligible && blockMajorQ8Activations && graal;
+    OptimizationStatus status;
+    String reason;
+    if (enabled) {
+      status = OptimizationStatus.ENABLED;
+      reason = "Q8 partial sums stay row-local and scatter once per output row";
+    } else if (!q8Eligible) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "loaded staged projection topology has no Q8_0 consumer";
+    } else if (!requested) {
+      status = OptimizationStatus.DISABLED;
+      reason = "disabled by models.purejava.q8BlockMajorRowAccumulator";
+    } else if (!graal) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "row-accumulated Q8 is retained only for measured Graal JVMCI runtimes";
+    } else {
+      status = OptimizationStatus.DISABLED;
+      reason = "row-accumulated Q8 requires block-major Q8 activations";
+    }
+    GgufQ8BlockMajorKernel kernel =
+        enabled ? GgufQ8BlockMajorKernel.ROW_ACCUMULATED : GgufQ8BlockMajorKernel.SCATTERED;
+    decisions.add(
+        new OptimizationDecision(
+            "q8-block-major-row-accumulator",
+            status,
+            reason,
+            Map.of(
+                "compiler",
+                runtime.compiler(),
+                "kernel",
+                enabled ? "row-accumulated" : "scattered")));
+    return kernel;
   }
 
   private static boolean parallelQ8FfnPreparation(

@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.plan;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.util.Objects;
 
 /** Immutable execution choices selected for one loaded pure-Java model. */
@@ -35,6 +36,7 @@ public record PureJavaExecutionPlan(
     boolean stagedQuantizedFfn,
     boolean stagedQuantizedLayer,
     boolean blockMajorQ8Activations,
+    GgufQ8BlockMajorKernel q8BlockMajorKernel,
     boolean parallelQ8FfnPreparation,
     BackendDiagnostics diagnostics) {
 
@@ -42,6 +44,7 @@ public record PureJavaExecutionPlan(
     runtime = Objects.requireNonNull(runtime, "runtime");
     topology = Objects.requireNonNull(topology, "topology");
     q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
+    q8BlockMajorKernel = Objects.requireNonNull(q8BlockMajorKernel, "q8BlockMajorKernel");
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException("prefillBatchSize must be >= 1");
     }
@@ -91,6 +94,11 @@ public record PureJavaExecutionPlan(
             || !topology.hasStagedQ8Projection(stagedQuantizedLayer))) {
       throw new IllegalArgumentException(
           "block-major Q8 activations contradict the execution plan topology");
+    }
+    if (q8BlockMajorKernel == GgufQ8BlockMajorKernel.ROW_ACCUMULATED
+        && (!blockMajorQ8Activations || !"graal-jvmci".equals(runtime.compiler()))) {
+      throw new IllegalArgumentException(
+          "row-accumulated Q8 kernel contradicts the execution plan topology or runtime");
     }
     if (parallelQ8FfnPreparation
         && (!stagedQuantizedLayer
