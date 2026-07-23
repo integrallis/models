@@ -69,6 +69,28 @@ for model-, quantization-, topology-, and host-specific planning; Graal is not a
 global default. The exact-SHA-bound recommendations and evidence are published
 through ModelJars performance profile schema v1.
 
+### Current staged Q8_0 prefill checkpoint
+
+The later SmolLM2 prefill path combines the model-scoped Graal deployment, batch-32 projection,
+seven-stage attention/FFN schedule, and Vectors weight-conversion reuse. The final incremental gate
+compared only Vectors `7fb6fa5` and `25aa094`; Models `6c306f0`, model bytes, prompt strategy,
+GraalVM Java 25.0.3, fixed 1 GiB heap, eight workers, and every model setting remained constant.
+Five warmups and five one-token measurements in each of six counterbalanced process pairs produced:
+
+| Metric | Before weight reuse | Current pure Java | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 1,003.739 ms | 925.665 ms | -7.78% |
+| p95 TTFT | 1,031.209 ms | 935.595 ms | -9.27% |
+| p50 prefill | 158.580 tok/s | 170.463 tok/s | +7.49% |
+| p50 process CPU | 7,545 ms | 6,960 ms | -7.75% |
+
+Every one of the six pair medians improved and all 30 corresponding output hashes matched. Using
+the recorded same-host native controls above, current SmolLM2 prefill is 29.64% of llama.cpp and
+29.04% of Ollama; median TTFT is 3.10x llama.cpp and 2.75x Ollama. The native engines were not
+rerun for this incremental gate, so these are pinned comparisons rather than a fresh cross-engine
+study. Fixed-position decode remained neutral at 42.46 versus 42.23 tok/s median with identical
+checksums and zero GC.
+
 ### Controlled mixed K-quant projection result
 
 MiniCPM5 stores query and key projections as Q4_K and the narrower value
