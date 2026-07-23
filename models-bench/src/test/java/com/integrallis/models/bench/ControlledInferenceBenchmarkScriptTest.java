@@ -50,6 +50,14 @@ class ControlledInferenceBenchmarkScriptTest {
         .contains("\"${PURE_JAVA_MODEL_ARGS[@]}\"");
   }
 
+  @Test
+  void bootstrapRequiresTheJsonToolUsedByTheRunner() throws IOException {
+    String bootstrap =
+        Files.readString(benchmarkScript().resolveSibling("bootstrap-inference-bench-host.sh"));
+
+    assertThat(bootstrap).contains("for command in awk curl jq sha256sum tar zstd");
+  }
+
   private static Path benchmarkScript() {
     Path fromModule = Path.of("..", "scripts", "run-controlled-inference-benchmarks.sh");
     return Files.isRegularFile(fromModule)
