@@ -34,7 +34,8 @@ public record PureJavaPlanConfiguration(
     boolean batchedAttentionScores,
     boolean batchedAttentionValues,
     boolean stagedQuantizedFfn,
-    boolean stagedQuantizedLayer) {
+    boolean stagedQuantizedLayer,
+    boolean blockMajorQ8Activations) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
@@ -51,6 +52,8 @@ public record PureJavaPlanConfiguration(
   public static final String STAGED_QUANTIZED_FFN_PROPERTY = "models.purejava.stagedQuantizedFfn";
   public static final String STAGED_QUANTIZED_LAYER_PROPERTY =
       "models.purejava.stagedQuantizedLayer";
+  public static final String BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY =
+      "models.purejava.blockMajorQ8Activations";
   public static final int DEFAULT_PREFILL_BATCH_SIZE = 32;
   private static final String PROPERTY_PREFIX = "models.purejava.";
   private static final Set<String> SUPPORTED_SETTINGS =
@@ -64,7 +67,8 @@ public record PureJavaPlanConfiguration(
           BATCHED_ATTENTION_SCORES_PROPERTY,
           BATCHED_ATTENTION_VALUES_PROPERTY,
           STAGED_QUANTIZED_FFN_PROPERTY,
-          STAGED_QUANTIZED_LAYER_PROPERTY);
+          STAGED_QUANTIZED_LAYER_PROPERTY,
+          BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY);
 
   public PureJavaPlanConfiguration {
     q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
@@ -83,6 +87,7 @@ public record PureJavaPlanConfiguration(
         DEFAULT_PREFILL_BATCH_SIZE,
         true,
         true,
+        false,
         false,
         false,
         false,
@@ -129,7 +134,9 @@ public record PureJavaPlanConfiguration(
             configured(BATCHED_ATTENTION_VALUES_PROPERTY, deployment, recommendations)),
         stagedQuantizedFfn(configured(STAGED_QUANTIZED_FFN_PROPERTY, deployment, recommendations)),
         stagedQuantizedLayer(
-            configured(STAGED_QUANTIZED_LAYER_PROPERTY, deployment, recommendations)));
+            configured(STAGED_QUANTIZED_LAYER_PROPERTY, deployment, recommendations)),
+        blockMajorQ8Activations(
+            configured(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, deployment, recommendations)));
   }
 
   private static void validateSettings(Map<String, String> settings, String source) {
@@ -195,6 +202,10 @@ public record PureJavaPlanConfiguration(
 
   static boolean stagedQuantizedLayer(String configured) {
     return configured != null && booleanProperty(STAGED_QUANTIZED_LAYER_PROPERTY, configured);
+  }
+
+  static boolean blockMajorQ8Activations(String configured) {
+    return configured != null && booleanProperty(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, configured);
   }
 
   private static boolean booleanProperty(String property, String configured) {

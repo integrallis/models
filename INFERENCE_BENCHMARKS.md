@@ -91,6 +91,26 @@ rerun for this incremental gate, so these are pinned comparisons rather than a f
 study. Fixed-position decode remained neutral at 42.46 versus 42.23 tok/s median with identical
 checksums and zero GC.
 
+A subsequent layout gate kept Vectors `d295f32`, Models `29b5169`, model bytes, and the complete
+runtime profile constant, changing only
+`models.purejava.blockMajorQ8Activations=false/true`. The retained representation keeps canonical
+batch-major Q8 bytes and one compact block-major byte copy so matrix rows consume all activation
+rows for one block contiguously. It does not widen activations to integers.
+
+| Metric | Packed activation bytes | Block-major activation bytes | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 939.347 ms | 925.622 ms | -1.46%; -1.69% paired-process median |
+| p95 TTFT | 965.011 ms | 943.771 ms | -2.20% |
+| p50 prefill | 167.890 tok/s | 170.006 tok/s | +1.26% |
+| p50 process CPU | 7,040 ms | 6,920 ms | -1.70% |
+| median process RSS | 1,020,530,688 B | 1,018,851,328 B | no regression observed |
+
+Five of six process medians favored the candidate, all 60 trials succeeded, and every corresponding
+input count, output count, and output SHA-256 matched. A 1024x2048 batch-32 kernel gate improved
+11.5% on local AVX2 and 4.6% on controlled EPYC/GraalVM. A pre-widened `int[]` alternative was
+rejected despite an 18.8% local batch-32 improvement because it was neutral on controlled EPYC and
+its four-times-larger payload did not fix the cache-locality boundary.
+
 ### Controlled mixed K-quant projection result
 
 MiniCPM5 stores query and key projections as Q4_K and the narrower value

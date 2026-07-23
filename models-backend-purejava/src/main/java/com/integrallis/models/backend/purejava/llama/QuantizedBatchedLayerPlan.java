@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.llama;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ8ActivationLayout;
 import com.integrallis.vectors.core.GgufQ8_0Batch;
 import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
@@ -45,6 +46,7 @@ final class QuantizedBatchedLayerPlan {
   private final int hiddenDim;
   private final float rmsNormEps;
   private final GgufQ4Kernel q4Kernel;
+  private final boolean blockMajorQ8Activations;
   private final float[] residual;
   private final float[] normalizedInput;
   private final float[] attentionOutput;
@@ -74,6 +76,7 @@ final class QuantizedBatchedLayerPlan {
       int hiddenDim,
       float rmsNormEps,
       GgufQ4Kernel q4Kernel,
+      boolean blockMajorQ8Activations,
       float[] residual,
       float[] normalizedInput,
       float[] attentionOutput,
@@ -99,6 +102,7 @@ final class QuantizedBatchedLayerPlan {
     this.hiddenDim = hiddenDim;
     this.rmsNormEps = rmsNormEps;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
+    this.blockMajorQ8Activations = blockMajorQ8Activations;
     this.residual = Objects.requireNonNull(residual, "residual");
     this.normalizedInput = Objects.requireNonNull(normalizedInput, "normalizedInput");
     this.attentionOutput = Objects.requireNonNull(attentionOutput, "attentionOutput");
@@ -112,9 +116,14 @@ final class QuantizedBatchedLayerPlan {
         Objects.requireNonNull(attentionPreparation, "attentionPreparation");
     this.attentionComputation =
         Objects.requireNonNull(attentionComputation, "attentionComputation");
-    this.attentionActivation = GgufQ8_0Batch.allocate(batchCapacity, attentionOutputDim);
-    this.inputActivation = GgufQ8_0Batch.allocate(batchCapacity, embeddingDim);
-    this.outputActivation = GgufQ8_0Batch.allocate(batchCapacity, hiddenDim);
+    GgufQ8ActivationLayout activationLayout =
+        blockMajorQ8Activations
+            ? GgufQ8ActivationLayout.BLOCK_MAJOR_BYTES
+            : GgufQ8ActivationLayout.PACKED_BYTES;
+    this.attentionActivation =
+        GgufQ8_0Batch.allocate(batchCapacity, attentionOutputDim, activationLayout);
+    this.inputActivation = GgufQ8_0Batch.allocate(batchCapacity, embeddingDim, activationLayout);
+    this.outputActivation = GgufQ8_0Batch.allocate(batchCapacity, hiddenDim, activationLayout);
     this.ffnStagePlan =
         GgufStagePlan.of(
             GgufStagePlan.stage(hiddenDim / Q8_BLOCK_SIZE, this::projectGateUpAndActivate),
@@ -332,9 +341,15 @@ final class QuantizedBatchedLayerPlan {
               activation,
               laneScratch,
               q4Kernel);
-      case Q8_0 ->
+      case Q8_0 -> {
+        if (blockMajorQ8Activations) {
+          VectorUtil.ggufQ8_0Q8_0BlockMajorBatchedMatmulRows(
+              weight, batchSize, rows, cols, fromRow, toRow, out, activation);
+        } else {
           VectorUtil.ggufQ8_0Q8_0BatchedMatmulRows(
               weight, batchSize, rows, cols, fromRow, toRow, out, activation);
+        }
+      }
       default -> throw new IllegalArgumentException("unsupported staged weight type: " + type);
     }
   }

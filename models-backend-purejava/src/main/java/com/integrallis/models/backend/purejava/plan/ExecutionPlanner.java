@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v12";
+  public static final String PLAN_VERSION = "pure-java-v13";
 
   private ExecutionPlanner() {}
 
@@ -53,6 +53,14 @@ public final class ExecutionPlanner {
         stagedQuantizedFfn(runtime, topology, configuration, prefillBatchSize, decisions);
     boolean stagedQuantizedLayer =
         stagedQuantizedLayer(runtime, topology, configuration, prefillBatchSize, decisions);
+    boolean blockMajorQ8Activations =
+        blockMajorQ8Activations(
+            topology,
+            configuration,
+            prefillBatchSize,
+            stagedQuantizedFfn,
+            stagedQuantizedLayer,
+            decisions);
     decisions.add(
         new OptimizationDecision(
             "mapped-model-weights",
@@ -80,7 +88,50 @@ public final class ExecutionPlanner {
         batchedAttentionValues,
         stagedQuantizedFfn,
         stagedQuantizedLayer,
+        blockMajorQ8Activations,
         diagnostics);
+  }
+
+  private static boolean blockMajorQ8Activations(
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      int prefillBatchSize,
+      boolean stagedQuantizedFfn,
+      boolean stagedQuantizedLayer,
+      List<OptimizationDecision> decisions) {
+    boolean requested = configuration.blockMajorQ8Activations();
+    boolean staged = stagedQuantizedFfn || stagedQuantizedLayer;
+    boolean q8Eligible = topology.hasStagedQ8Projection(stagedQuantizedLayer);
+    boolean enabled = requested && staged && q8Eligible && prefillBatchSize > 1;
+    OptimizationStatus status;
+    String reason;
+    if (enabled) {
+      status = OptimizationStatus.ENABLED;
+      reason = "staged Q8 projections traverse each activation block sequentially";
+    } else if (!q8Eligible) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "loaded staged projection topology has no Q8_0 consumer";
+    } else if (!requested) {
+      status = OptimizationStatus.DISABLED;
+      reason = "disabled by models.purejava.blockMajorQ8Activations";
+    } else if (!staged) {
+      status = OptimizationStatus.DISABLED;
+      reason = "block-major Q8 activations require a retained staged plan";
+    } else {
+      status = OptimizationStatus.DISABLED;
+      reason = "block-major Q8 activations require batched prefill";
+    }
+    decisions.add(
+        new OptimizationDecision(
+            "block-major-q8-activations",
+            status,
+            reason,
+            Map.of(
+                "layout",
+                "block-major-bytes",
+                "prefill-batch-size",
+                Integer.toString(prefillBatchSize))));
+    return enabled;
   }
 
   private static boolean stagedQuantizedLayer(
