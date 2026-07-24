@@ -18,6 +18,7 @@ package com.integrallis.models.rag;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.integrallis.models.api.OptimizationStatus;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -31,6 +32,9 @@ class CertifiedRagEvidenceTest {
   private static final Path QWEN3_1_7B_EVIDENCE = EVIDENCE_ROOT.resolve("qwen3-1.7b-q8_0");
   private static final Path QWEN2_5_CODER_EVIDENCE =
       EVIDENCE_ROOT.resolve("qwen2.5-coder-0.5b-q8_0");
+  private static final Path QWEN3_0_6B_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260724/rag/native-q4-profiled/qwen3-0.6b-q4_0");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -185,6 +189,63 @@ class CertifiedRagEvidenceTest {
             comparison -> {
               assertThat(comparison.decodeThroughputRatio()).isBetween(1.32, 1.33);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(0.84, 0.85);
+            });
+  }
+
+  @Test
+  void qwen3SixHundredMillionQualifiesPureJavaWithTheProfiledQ4Kernel() throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            QWEN3_0_6B_EVIDENCE, "qwen3-0.6b-q4_0-pure-java-q4-unsigned-coding-v4-grounded.json");
+    RagBenchmarkReport rustFfm =
+        report(QWEN3_0_6B_EVIDENCE, "qwen3-0.6b-q4_0-rust-ffm-q4-unsigned-coding-v4-grounded.json");
+    RagBenchmarkReport ollama =
+        report(QWEN3_0_6B_EVIDENCE, "qwen3-0.6b-q4_0-ollama-coding-v4-grounded.json");
+    RagBenchmarkReport llama =
+        report(QWEN3_0_6B_EVIDENCE, "qwen3-0.6b-q4_0-llama-coding-v4-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4");
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.CODING.id());
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(12);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(12.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(candidate.backendDiagnostics().optimization("q4-kernel"))
+        .get()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings()).containsEntry("requested", "unsigned-pairwise");
+            });
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(rustFfm.summary().p50DecodeTokensPerSecond());
+    assertThat(candidate.summary().ttftMillis().p95())
+        .isLessThan(rustFfm.summary().ttftMillis().p95());
+    assertThat(candidate.runs())
+        .filteredOn(run -> run.grounding().decision().modelContributed())
+        .hasSize(12)
+        .allSatisfy(run -> assertThat(run.evaluation().correct()).isTrue());
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.46, 0.47);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.77, 1.79);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.99, 1.00);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.02, 1.03);
             });
   }
 
