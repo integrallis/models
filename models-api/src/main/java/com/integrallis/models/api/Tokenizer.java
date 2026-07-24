@@ -35,4 +35,15 @@ public interface Tokenizer {
 
   /** Returns the end-of-sequence token ID. */
   int eosToken();
+
+  /**
+   * Returns whether a token ends generation.
+   *
+   * <p>Modern chat tokenizers can define several terminal tokens, such as end-of-sequence,
+   * end-of-turn, and end-of-message. Implementations that only have one terminal token inherit the
+   * end-of-sequence behavior.
+   */
+  default boolean isEndOfGeneration(int token) {
+    return token == eosToken();
+  }
 }
