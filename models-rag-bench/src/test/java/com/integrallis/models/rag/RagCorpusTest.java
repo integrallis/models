@@ -32,7 +32,7 @@ class RagCorpusTest {
     assertThat(corpus.cases()).extracting(RagCase::id).doesNotHaveDuplicates();
     assertThat(corpus.cases()).filteredOn(RagCase::answerable).hasSize(8);
     assertThat(corpus.fingerprint())
-        .isEqualTo("3bcdd611817a5884044cd50ee225bae545f48a70282d7032871954dff420dd4e");
+        .isEqualTo("4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c");
   }
 
   @Test
@@ -54,8 +54,14 @@ class RagCorpusTest {
             testCase,
             List.of(new RetrievedDocument(document, 3.0f, 1)),
             "The code name is Cobalt-17 and two managers approve it [security-access].");
+    RagEvaluation canonicalEvaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(document, 3.0f, 1)),
+            "Cobalt-17 requires two on-call managers [security-access].");
 
     assertThat(evaluation.factCoverage()).isEqualTo(1.0);
     assertThat(evaluation.correct()).isTrue();
+    assertThat(canonicalEvaluation.correct()).isTrue();
   }
 }
