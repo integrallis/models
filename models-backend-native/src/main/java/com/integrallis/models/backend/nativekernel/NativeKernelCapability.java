@@ -19,7 +19,9 @@ package com.integrallis.models.backend.nativekernel;
 public enum NativeKernelCapability {
   Q4_0_F32_BATCHED_MATMUL(1L),
   Q4_0_F32_GROUPED_BATCHED_MATMUL(1L << 1),
-  PERSISTENT_WORKER_CONTEXT(1L << 2);
+  PERSISTENT_WORKER_CONTEXT(1L << 2),
+  Q8_0_F32_BATCHED_MATMUL(1L << 3),
+  Q8_0_F32_GROUPED_BATCHED_MATMUL(1L << 4);
 
   private final long mask;
 
