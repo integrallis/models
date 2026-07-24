@@ -4,7 +4,7 @@ Last updated: 2026-07-24
 
 ## Result
 
-Six exact artifacts now clear the current absolute RAG SLOs, minimum model
+Seven exact artifacts now clear the current absolute RAG SLOs, minimum model
 contribution, and same-host Ollama comparison:
 
 - **SmolLM2 360M Q8_0** is `PRODUCTION_READY` for the general guarded-RAG
@@ -26,6 +26,9 @@ contribution, and same-host Ollama comparison:
 - **Qwen2.5-Coder 1.5B Q4_0** is `USABLE` for the coding workload through its
   measured hybrid profile. It reaches 80.2% of Ollama and 48.9% of llama.cpp
   median decode throughput while preserving 15 correct model answers.
+- **Qwen2.5-Coder 1.5B Q8_0** is `USABLE` for the coding workload through
+  Rust/FFM prefill. It reaches 89.9% of Ollama and 69.4% of llama.cpp median
+  decode throughput while preserving 15 correct model answers.
 
 These are guarded, workload-specific qualifications, not claims of unrestricted
 question-answering quality. Every report preserves raw output, final grounded
@@ -92,6 +95,10 @@ cap, and deterministic sampling.
 | Qwen2.5-Coder 1.5B Q4_0, coding | Models Rust/FFM, profiled Java Q4 | USABLE | 1,162.1 ms | 23.72 tok/s | 2,545.6 ms | 100% |
 | Qwen2.5-Coder 1.5B Q4_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 584.0 ms | 29.58 tok/s | 1,830.0 ms | 100% |
 | Qwen2.5-Coder 1.5B Q4_0, coding | llama.cpp b10012 | PRODUCTION_READY | 943.3 ms | 48.46 tok/s | 1,659.5 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | Models pure Java | USABLE | 1,884.0 ms | 19.77 tok/s | 3,588.8 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | Models Rust/FFM | USABLE | 1,288.0 ms | 19.70 tok/s | 3,003.5 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 660.3 ms | 21.92 tok/s | 2,325.8 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | llama.cpp b10012 | USABLE | 1,083.3 ms | 28.37 tok/s | 2,317.3 ms | 100% |
 
 Each Qwen3 artifact contributes 12 correct model answers, uses 12 extractive
 fallbacks, and abstains for 3 unsupported requests. Qwen2.5-Coder preserves 15
@@ -121,6 +128,16 @@ fallbacks, and abstains for 3 unsupported requests. Its selected hybrid reaches
 to the unprofiled Rust/FFM path, the exact unsigned-Q4/four-worker profile
 improves decode 1.82x, reduces p95 end-to-end latency 30.8%, and reduces
 measured CPU 50.3%. All 27 raw generations are byte-identical.
+
+The 1.5B Q8_0 artifact also contributes 15 correct model answers, uses 9
+extractive fallbacks, and abstains for 3 unsupported requests. Rust/FFM reaches
+89.9% of Ollama and 69.4% of llama.cpp decode, with p95 end-to-end ratios of
+1.29 against both controls. Pure Java independently remains `USABLE` but
+narrowly misses Ollama's relative end-to-end ceiling at 1.54x. Rust prefill
+improves prefill throughput 1.46x, p95 TTFT 31.6%, p95 end-to-end latency
+16.3%, and measured CPU 20.2%. Pure Java and Rust/FFM both produce 27 correct
+grounded answers, but their raw generations and contribution decisions differ;
+this is semantic parity, not byte-identical output.
 
 ## What Acceptable Means
 
@@ -295,6 +312,7 @@ end-of-generation metadata correctly and stop before exposing control tokens.
 | Qwen2.5-Coder 0.5B Q8_0 | Current coding guarded-RAG suite | Pure Java and Rust/FFM both qualify; Rust/FFM reaches 53.01 tok/s, 132.8% of Ollama and 67.0% of llama.cpp, with lower p95 end-to-end latency than Ollama | `PRODUCTION_READY`; 15 of 27 accepted answers retain model text and all 15 are correct. |
 | Qwen2.5-Coder 0.5B Q4_0 | Current coding guarded-RAG suite | Profiled Rust/FFM reaches 39.50 tok/s, 80.7% of Ollama and 35.1% of llama.cpp, at 1.22x Ollama p95 end-to-end latency | `PRODUCTION_READY`; 12 of 27 accepted answers retain model text and all 12 are correct. Pure Java remains a nonqualifying control. |
 | Qwen2.5-Coder 1.5B Q4_0 | Current coding guarded-RAG suite | Profiled Rust/FFM reaches 23.72 tok/s, 80.2% of Ollama and 48.9% of llama.cpp, at 1.39x Ollama p95 end-to-end latency | `USABLE`; 15 of 27 accepted answers retain model text and all 15 are correct. |
+| Qwen2.5-Coder 1.5B Q8_0 | Current coding guarded-RAG suite | Rust/FFM reaches 19.70 tok/s, 89.9% of Ollama and 69.4% of llama.cpp, at 1.29x Ollama p95 end-to-end latency | `USABLE`; 15 of 27 accepted answers retain model text and all 15 are correct. Pure Java narrowly misses the relative end-to-end gate. |
 
 Retrieval is perfect in every full run. The historical failed answerable case
 was therefore generation, not search: Qwen3 1.7B said the context did not state
