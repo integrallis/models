@@ -20,6 +20,7 @@ import java.util.Locale;
 /** Explicit prompt envelopes used to keep native and pure-Java requests byte-identical. */
 public enum RagPromptTemplate {
   RAW("raw"),
+  NATIVE_CHAT("native-chat"),
   CHATML("chatml"),
   CHATML_NO_THINK("chatml-no-think");
 
@@ -37,13 +38,18 @@ public enum RagPromptTemplate {
   /** Applies this model-facing envelope to the canonical RAG prompt. */
   public String apply(String prompt) {
     return switch (this) {
-      case RAW -> prompt;
+      case RAW, NATIVE_CHAT -> prompt;
       case CHATML -> "<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\n";
       case CHATML_NO_THINK ->
           "<|im_start|>user\n"
               + prompt
               + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
     };
+  }
+
+  /** Whether the local engine must apply the model's embedded chat template. */
+  public boolean usesEngineTemplate() {
+    return this == NATIVE_CHAT;
   }
 
   /** Resolves a CLI identifier. */
@@ -54,6 +60,6 @@ public enum RagPromptTemplate {
       }
     }
     throw new IllegalArgumentException(
-        "prompt-template must be one of raw, chatml, chatml-no-think");
+        "prompt-template must be one of raw, native-chat, chatml, chatml-no-think");
   }
 }

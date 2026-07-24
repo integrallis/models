@@ -1,2 +1,4 @@
-// models-backend-native — llama.cpp via FFM (Phase 2+)
-// Placeholder: no implementation or dependencies yet
+dependencies {
+    api(project(":models-api"))
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
+}

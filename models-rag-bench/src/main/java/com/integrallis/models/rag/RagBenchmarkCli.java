@@ -18,6 +18,7 @@ package com.integrallis.models.rag;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.backend.nativellm.PromptMode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -146,6 +147,10 @@ public final class RagBenchmarkCli {
     URI endpoint = URI.create(values.getOrDefault("endpoint", defaultEndpoint(backend)));
     RagPromptTemplate promptTemplate =
         RagPromptTemplate.parse(values.getOrDefault("prompt-template", "raw"));
+    if ("pure-java".equals(backend) && promptTemplate.usesEngineTemplate()) {
+      throw new IllegalArgumentException(
+          "pure-java requires an explicit prompt template; native-chat is engine-owned");
+    }
     int context = positiveInteger(values, "context", 2_048);
     int threads = positiveInteger(values, "threads", Runtime.getRuntime().availableProcessors());
     long backendPid = nonNegativeLong(values, "pid", 0);
@@ -284,7 +289,10 @@ public final class RagBenchmarkCli {
         configuration.endpoint(),
         configuration.contextLength(),
         configuration.threads(),
-        configuration.backendPid());
+        configuration.backendPid(),
+        configuration.promptTemplate().usesEngineTemplate()
+            ? PromptMode.NATIVE_CHAT
+            : PromptMode.RAW);
   }
 
   private static RagApplication application(

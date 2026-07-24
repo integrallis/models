@@ -17,8 +17,9 @@ package com.integrallis.models.spring.ai;
 
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
-import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.RuntimeTextGenerationModel;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -32,22 +33,29 @@ import reactor.core.publisher.Flux;
 /** Spring AI {@link ChatModel} backed by the Models runtime generation loop. */
 public final class ModelsSpringAiChatModel implements ChatModel {
   private final SamplingOptions defaults;
-  private final GenerationLoop generationLoop;
+  private final TextGenerationModel model;
 
   public ModelsSpringAiChatModel(InferenceBackend backend) {
-    this(backend, SamplingOptions.builder().build());
+    this(new RuntimeTextGenerationModel(backend));
   }
 
   public ModelsSpringAiChatModel(InferenceBackend backend, SamplingOptions defaults) {
-    Objects.requireNonNull(backend, "backend");
+    this(new RuntimeTextGenerationModel(backend), defaults);
+  }
+
+  public ModelsSpringAiChatModel(TextGenerationModel model) {
+    this(model, SamplingOptions.builder().build());
+  }
+
+  public ModelsSpringAiChatModel(TextGenerationModel model, SamplingOptions defaults) {
+    this.model = Objects.requireNonNull(model, "model");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
-    this.generationLoop = new GenerationLoop(backend);
   }
 
   @Override
   public ChatResponse call(Prompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
-    String output = generationLoop.generate(prompt.getContents(), options(prompt));
+    String output = model.generate(prompt.getContents(), options(prompt));
     return response(output);
   }
 
@@ -56,7 +64,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     Objects.requireNonNull(prompt, "prompt");
     return Flux.create(
         sink ->
-            generationLoop.generate(
+            model.generate(
                 prompt.getContents(),
                 options(prompt),
                 new TokenStream() {

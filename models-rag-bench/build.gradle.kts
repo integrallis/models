@@ -43,6 +43,7 @@ tasks.withType<JavaExec>().configureEach {
 dependencies {
     implementation(project(":models-rag"))
     implementation(project(":models-runtime"))
+    implementation(project(":models-backend-native"))
     implementation(project(":models-backend-purejava"))
     implementation(project(":models-langchain4j"))
     implementation(project(":models-spring-ai"))

@@ -69,4 +69,11 @@ class RagPromptRendererTest {
     assertThat(prompt)
         .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n");
   }
+
+  @Test
+  void nativeChatLeavesTheCanonicalPromptForTheEngineOwnedTemplate() {
+    assertThat(RagPromptTemplate.NATIVE_CHAT.apply("canonical prompt"))
+        .isEqualTo("canonical prompt");
+    assertThat(RagPromptTemplate.NATIVE_CHAT.usesEngineTemplate()).isTrue();
+  }
 }
