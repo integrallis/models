@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,21 @@ class InProcessGenerationClientTest {
       assertThat(result.ttftMillis()).isGreaterThanOrEqualTo(0);
       assertThat(result.totalMillis()).isGreaterThanOrEqualTo(result.ttftMillis());
       assertThat(result.loadMillis()).isEqualTo(12.5);
+    }
+  }
+
+  @Test
+  void preservesAndReportsPromptCacheReuseThroughTimingInstrumentation() {
+    PrefixBackend backend = new PrefixBackend();
+    try (InProcessGenerationClient client =
+        new InProcessGenerationClient("rust-ffm", backend, 12.5)) {
+      client.generate("first", 1);
+      GenerationResult result = client.generate("second", 1);
+
+      assertThat(result.inputTokens()).isEqualTo(3);
+      assertThat(result.cacheReadInputTokens()).isEqualTo(2);
+      assertThat(result.cacheWriteInputTokens()).isEqualTo(1);
+      assertThat(backend.rewindCheckpoints).containsExactly(2);
     }
   }
 
@@ -112,5 +128,88 @@ class InProcessGenerationClientTest {
         return 1;
       }
     };
+  }
+
+  private static final class PrefixBackend implements RewindableInferenceBackend {
+    private final List<Integer> rewindCheckpoints = new java.util.ArrayList<>();
+    private int nextPosition;
+
+    @Override
+    public String name() {
+      return "prefix-stub";
+    }
+
+    @Override
+    public ModelMetadata metadata() {
+      return new ModelMetadata("test", "PrefixStub", 16, 6, 8, 1, 1, 1);
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return new Tokenizer() {
+        @Override
+        public int[] encode(String text) {
+          return "first".equals(text) ? new int[] {2, 3, 4} : new int[] {2, 3, 5};
+        }
+
+        @Override
+        public String decode(int[] tokens) {
+          return "";
+        }
+
+        @Override
+        public String decode(int token) {
+          return token == 4 ? "answer" : "";
+        }
+
+        @Override
+        public int vocabSize() {
+          return 6;
+        }
+
+        @Override
+        public int bosToken() {
+          return 0;
+        }
+
+        @Override
+        public int eosToken() {
+          return 1;
+        }
+      };
+    }
+
+    @Override
+    public float[] prefill(int[] tokens, int startPosition) {
+      assertThat(startPosition).isEqualTo(nextPosition);
+      nextPosition += tokens.length;
+      float[] logits = new float[6];
+      logits[4] = 100;
+      return logits;
+    }
+
+    @Override
+    public float[] forward(int token, int position) {
+      throw new UnsupportedOperationException("maxTokens=1 does not forward the final token");
+    }
+
+    @Override
+    public int checkpoint() {
+      return nextPosition;
+    }
+
+    @Override
+    public void rewind(int checkpoint) {
+      rewindCheckpoints.add(checkpoint);
+      nextPosition = checkpoint;
+    }
+
+    @Override
+    public void reset() {
+      nextPosition = 0;
+    }
+
+    @Override
+    public void close() {}
   }
 }

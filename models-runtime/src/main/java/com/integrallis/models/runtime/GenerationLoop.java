@@ -17,19 +17,22 @@ package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.LogitBatch;
+import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * Autoregressive generation loop that drives an inference backend to generate text.
  *
- * <p>Generation resets request-specific backend state before prefill. Calls that share the same
- * backend instance are serialized because stateful backends may own a single key-value cache.
+ * <p>Calls that share the same backend instance are serialized because stateful backends may own a
+ * single key-value cache. Rewindable backends retain the longest exact token prefix between
+ * sequential requests and prefill only the changed suffix.
  */
 public final class GenerationLoop {
 
@@ -37,6 +40,8 @@ public final class GenerationLoop {
   private final SpeculativeGenerationOptions speculativeOptions;
   private volatile SpeculativeGenerationMetrics lastSpeculativeMetrics =
       SpeculativeGenerationMetrics.inactive();
+  private volatile PromptCacheMetrics lastPromptCacheMetrics = PromptCacheMetrics.unavailable();
+  private int[] cachedPromptTokens;
 
   public GenerationLoop(InferenceBackend backend) {
     this(backend, SpeculativeGenerationOptions.disabled());
@@ -50,6 +55,11 @@ public final class GenerationLoop {
   /** Returns the measurements captured by the most recently completed request. */
   public SpeculativeGenerationMetrics lastSpeculativeMetrics() {
     return lastSpeculativeMetrics;
+  }
+
+  /** Returns prompt-prefix cache measurements for the most recently completed request. */
+  public PromptCacheMetrics lastPromptCacheMetrics() {
+    return lastPromptCacheMetrics;
   }
 
   /** Generates text from a prompt, returning the complete generated string. */
@@ -91,12 +101,12 @@ public final class GenerationLoop {
     Objects.requireNonNull(stream, "stream");
 
     synchronized (backend) {
-      backend.reset();
       Tokenizer tokenizer = backend.tokenizer();
       int[] promptTokens = tokenizer.encode(prompt);
       if (promptTokens.length == 0) {
         throw new IllegalArgumentException("prompt produced no tokens");
       }
+      PromptPrefill promptPrefill = preparePrompt(promptTokens);
 
       Sampler sampler = new Sampler(options);
       List<Integer> allTokens = new ArrayList<>();
@@ -106,7 +116,8 @@ public final class GenerationLoop {
           new MutableSpeculativeMetrics(speculativeActive, speculativeOptions.maximumDraftTokens());
 
       try {
-        float[] logits = backend.prefill(promptTokens, 0);
+        float[] logits =
+            backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
         for (int token : promptTokens) {
           allTokens.add(token);
         }
@@ -128,13 +139,50 @@ public final class GenerationLoop {
               tokenizer, sampler, stream, allTokens, logits, position, options.maxTokens());
         }
 
+        cachedPromptTokens =
+            backend instanceof RewindableInferenceBackend ? promptTokens.clone() : null;
         stream.onComplete();
       } catch (Exception e) {
+        cachedPromptTokens = null;
         stream.onError(e);
       } finally {
         lastSpeculativeMetrics = speculativeMetrics.snapshot();
+        lastPromptCacheMetrics = promptPrefill.metrics();
       }
     }
+  }
+
+  private PromptPrefill preparePrompt(int[] promptTokens) {
+    if (!(backend instanceof RewindableInferenceBackend rewindableBackend)) {
+      backend.reset();
+      return new PromptPrefill(
+          0, promptTokens, new PromptCacheMetrics(false, promptTokens.length, 0, 0));
+    }
+
+    int reusableTokens = reusablePrefixLength(promptTokens);
+    if (reusableTokens == 0 || rewindableBackend.checkpoint() < reusableTokens) {
+      backend.reset();
+      reusableTokens = 0;
+    } else {
+      rewindableBackend.rewind(reusableTokens);
+    }
+    return new PromptPrefill(
+        reusableTokens,
+        Arrays.copyOfRange(promptTokens, reusableTokens, promptTokens.length),
+        new PromptCacheMetrics(
+            true, promptTokens.length, reusableTokens, promptTokens.length - reusableTokens));
+  }
+
+  private int reusablePrefixLength(int[] promptTokens) {
+    if (cachedPromptTokens == null) {
+      return 0;
+    }
+    int shared = 0;
+    int limit = Math.min(cachedPromptTokens.length, promptTokens.length);
+    while (shared < limit && cachedPromptTokens[shared] == promptTokens[shared]) {
+      shared++;
+    }
+    return Math.min(shared, promptTokens.length - 1);
   }
 
   private void generateSequentially(
@@ -287,6 +335,9 @@ public final class GenerationLoop {
     stream.onToken(tokenizer.decode(token));
     allTokens.add(token);
   }
+
+  private record PromptPrefill(
+      int startPosition, int[] tokensToEvaluate, PromptCacheMetrics metrics) {}
 
   private static final class MutableSpeculativeMetrics {
     private final boolean active;

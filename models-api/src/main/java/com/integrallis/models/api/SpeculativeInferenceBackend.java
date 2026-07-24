@@ -21,10 +21,7 @@ package com.integrallis.models.api;
  * <p>Verification consumes every proposed token and advances backend state. Callers retain the
  * accepted prefix by rewinding to {@code checkpoint + acceptedTokenCount}.
  */
-public interface SpeculativeInferenceBackend extends InferenceBackend {
-
-  /** Returns the next sequence position, suitable for a later {@link #rewind(int)} call. */
-  int checkpoint();
+public interface SpeculativeInferenceBackend extends RewindableInferenceBackend {
 
   /**
    * Consumes contiguous proposed tokens and returns the logits produced after each token.
@@ -42,7 +39,4 @@ public interface SpeculativeInferenceBackend extends InferenceBackend {
   default LogitBatch verifyTransient(int[] tokens, int startPosition) {
     return verify(tokens, startPosition);
   }
-
-  /** Discards cached sequence state at and after {@code checkpoint}. */
-  void rewind(int checkpoint);
 }

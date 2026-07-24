@@ -17,13 +17,17 @@ package com.integrallis.models.rag;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.nativekernel.RustFfmBackend;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.PromptCacheMetrics;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
@@ -43,7 +47,7 @@ public final class InProcessGenerationClient implements GenerationClient {
       throw new IllegalArgumentException("backendName must not be blank");
     }
     this.backendName = backendName;
-    this.backend = new TimingBackend(Objects.requireNonNull(backend, "backend"));
+    this.backend = instrument(Objects.requireNonNull(backend, "backend"));
     this.generationLoop = new GenerationLoop(this.backend);
     this.loadMillis = loadMillis;
   }
@@ -106,7 +110,7 @@ public final class InProcessGenerationClient implements GenerationClient {
         "topP", "1",
         "seed", "42",
         "repetitionPenalty", "1",
-        "promptCache", "false");
+        "promptCache", "longest-common-prefix");
   }
 
   @Override
@@ -157,17 +161,23 @@ public final class InProcessGenerationClient implements GenerationClient {
     if (firstTokenNanos[0] == 0 || outputTokens[0] == 0) {
       throw new IllegalStateException(backendName + " generation produced no output token");
     }
+    PromptCacheMetrics promptCache = generationLoop.lastPromptCacheMetrics();
+    int evaluatedInputTokens =
+        promptCache.supported() ? promptCache.cacheWriteInputTokens() : inputTokens;
     Duration cpuAfter = ProcessResourceProbe.cpuDuration(pid);
     return new GenerationResult(
         output.toString(),
         inputTokens,
+        promptCache.cacheReadInputTokens(),
+        promptCache.cacheWriteInputTokens(),
         outputTokens[0],
         nanosToMillis(firstTokenNanos[0] - start),
         nanosToMillis(end - start),
-        tokenRate(inputTokens, backend.prefillNanos()),
+        tokenRate(evaluatedInputTokens, backend.prefillNanos()),
         loadMillis,
         ProcessResourceProbe.highWaterBytes(pid),
-        nanosToMillis(cpuAfter.minus(cpuBefore).toNanos()));
+        nanosToMillis(cpuAfter.minus(cpuBefore).toNanos()),
+        null);
   }
 
   @Override
@@ -187,7 +197,17 @@ public final class InProcessGenerationClient implements GenerationClient {
     return nanos / 1_000_000.0;
   }
 
-  private static final class TimingBackend implements InferenceBackend {
+  private static TimingBackend instrument(InferenceBackend backend) {
+    if (backend instanceof SpeculativeInferenceBackend speculative) {
+      return new TimingSpeculativeBackend(speculative);
+    }
+    if (backend instanceof RewindableInferenceBackend rewindable) {
+      return new TimingRewindableBackend(rewindable);
+    }
+    return new TimingBackend(backend);
+  }
+
+  private static class TimingBackend implements InferenceBackend {
     private final InferenceBackend delegate;
     private long prefillNanos;
 
@@ -249,6 +269,46 @@ public final class InProcessGenerationClient implements GenerationClient {
     @Override
     public void close() {
       delegate.close();
+    }
+  }
+
+  private static class TimingRewindableBackend extends TimingBackend
+      implements RewindableInferenceBackend {
+    private final RewindableInferenceBackend delegate;
+
+    private TimingRewindableBackend(RewindableInferenceBackend delegate) {
+      super(delegate);
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int checkpoint() {
+      return delegate.checkpoint();
+    }
+
+    @Override
+    public void rewind(int checkpoint) {
+      delegate.rewind(checkpoint);
+    }
+  }
+
+  private static final class TimingSpeculativeBackend extends TimingRewindableBackend
+      implements SpeculativeInferenceBackend {
+    private final SpeculativeInferenceBackend delegate;
+
+    private TimingSpeculativeBackend(SpeculativeInferenceBackend delegate) {
+      super(delegate);
+      this.delegate = delegate;
+    }
+
+    @Override
+    public LogitBatch verify(int[] tokens, int startPosition) {
+      return delegate.verify(tokens, startPosition);
+    }
+
+    @Override
+    public LogitBatch verifyTransient(int[] tokens, int startPosition) {
+      return delegate.verifyTransient(tokens, startPosition);
     }
   }
 }
