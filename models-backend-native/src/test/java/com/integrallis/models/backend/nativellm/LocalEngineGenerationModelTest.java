@@ -212,6 +212,31 @@ class LocalEngineGenerationModelTest {
     }
   }
 
+  @Test
+  void surfacesLlamaCppStreamErrorsInsteadOfReportingAnAmbiguousTruncation() throws Exception {
+    AtomicReference<JsonNode> requestBody = new AtomicReference<>();
+    HttpServer server =
+        server(
+            "/v1/chat/completions",
+            requestBody,
+            "data: {\"error\":{\"message\":\"chat template parser rejected output\","
+                + "\"type\":\"server_error\",\"code\":500}}\n\n");
+    try {
+      try (LocalEngineGenerationModel model =
+          LocalEngineGenerationModel.llamaCpp("model", endpoint(server)).build()) {
+        assertThatThrownBy(
+                () ->
+                    model.generateObserved(
+                        "prompt", SamplingOptions.builder().temperature(0).maxTokens(8).build()))
+            .isInstanceOf(IllegalStateException.class)
+            .rootCause()
+            .hasMessageContaining("chat template parser rejected output");
+      }
+    } finally {
+      server.stop(0);
+    }
+  }
+
   private static HttpServer server(
       String path, AtomicReference<JsonNode> requestBody, String response) throws IOException {
     HttpServer server =

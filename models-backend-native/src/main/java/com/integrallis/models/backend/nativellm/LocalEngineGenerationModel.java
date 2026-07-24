@@ -264,6 +264,7 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
         continue;
       }
       JsonNode event = mapper.readTree(payload);
+      throwIfLlamaError(event);
       JsonNode choice = event.path("choices").path(0);
       JsonNode delta = choice.path("delta");
       if (!delta.path("reasoning_content").asText("").isEmpty()) {
@@ -288,6 +289,7 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
         continue;
       }
       JsonNode event = mapper.readTree(payload);
+      throwIfLlamaError(event);
       observation.emit(event.path("content").asText(""));
       complete |= event.path("stop").asBoolean(false);
       recordLlamaMetrics(event, observation);
@@ -302,6 +304,16 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
       return null;
     }
     return line.startsWith("data:") ? line.substring("data:".length()).trim() : line;
+  }
+
+  private static void throwIfLlamaError(JsonNode event) throws IOException {
+    JsonNode error = event.path("error");
+    if (error.isMissingNode() || error.isNull()) {
+      return;
+    }
+    String message =
+        error.isTextual() ? error.asText() : error.path("message").asText(error.toString());
+    throw new IOException("llama.cpp stream error: " + message);
   }
 
   private static void recordLlamaMetrics(JsonNode event, GenerationObservation observation) {
