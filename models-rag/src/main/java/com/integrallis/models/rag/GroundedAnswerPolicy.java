@@ -33,18 +33,20 @@ import java.util.regex.Pattern;
  */
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
-  public static final String POLICY_ID =
-      "trusted-provenance-lexical-entailment-extractive-fallback-v3";
+  public static final String POLICY_ID = "trusted-provenance-clause-anchors-extractive-fallback-v4";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^INSUFFICIENT_CONTEXT[.!]?$");
+  private static final Pattern CLAUSE_BOUNDARY =
+      Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
   private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
   private static final Set<String> FUNCTION_WORDS =
       Set.of(
           "a", "an", "and", "are", "as", "at", "be", "been", "being", "but", "by", "did", "do",
-          "does", "for", "from", "in", "is", "it", "its", "of", "on", "or", "that", "the", "these",
-          "this", "those", "to", "was", "were", "with");
+          "does", "for", "from", "how", "in", "is", "it", "its", "of", "on", "or", "that", "the",
+          "these", "this", "those", "to", "was", "were", "what", "when", "where", "which", "who",
+          "why", "with");
 
   private final float minimumRetrievalScore;
 
@@ -81,7 +83,8 @@ public final class GroundedAnswerPolicy {
     String candidate = generatedText.strip();
     if (candidate.isBlank()
         || ABSTENTION_PATTERN.matcher(candidate).matches()
-        || !hasOnlySupportedClaims(question, candidate, retrieved)) {
+        || !hasOnlySupportedClaims(question, candidate, retrieved)
+        || !hasEvidenceAnchorsForEveryQuestionClause(question, candidate, retrieved)) {
       return new GroundedAnswer(
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
@@ -117,6 +120,49 @@ public final class GroundedAnswerPolicy {
       }
     }
     return words;
+  }
+
+  private static boolean hasEvidenceAnchorsForEveryQuestionClause(
+      String question, String candidate, List<GroundingDocument> retrieved) {
+    Set<String> questionWords = words(question);
+    Set<String> evidenceWords = new HashSet<>();
+    retrieved.forEach(hit -> evidenceWords.addAll(words(hit.text())));
+    evidenceWords.removeAll(questionWords);
+
+    List<Set<String>> questionClauses = clauses(question);
+    List<Set<String>> candidateClauses = clauses(BRACKETED_TEXT.matcher(candidate).replaceAll(" "));
+    if (questionClauses.size() == 1) {
+      Set<String> anchors = new HashSet<>(words(candidate));
+      anchors.retainAll(evidenceWords);
+      return hasConcreteEvidenceAnchor(anchors);
+    }
+
+    for (Set<String> questionClause : questionClauses) {
+      int requiredOverlap = Math.min(2, questionClause.size());
+      Set<String> anchors = new HashSet<>();
+      for (Set<String> candidateClause : candidateClauses) {
+        long overlap = candidateClause.stream().filter(questionClause::contains).count();
+        if (overlap >= requiredOverlap) {
+          candidateClause.stream().filter(evidenceWords::contains).forEach(anchors::add);
+        }
+      }
+      if (!hasConcreteEvidenceAnchor(anchors)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static List<Set<String>> clauses(String text) {
+    return CLAUSE_BOUNDARY
+        .splitAsStream(text)
+        .map(GroundedAnswerPolicy::words)
+        .filter(clause -> !clause.isEmpty())
+        .toList();
+  }
+
+  private static boolean hasConcreteEvidenceAnchor(Set<String> anchors) {
+    return anchors.size() >= 2 || anchors.stream().anyMatch(anchor -> anchor.length() >= 8);
   }
 
   private static String normalizeWord(String word) {

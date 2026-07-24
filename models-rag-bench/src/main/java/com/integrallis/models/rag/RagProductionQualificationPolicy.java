@@ -23,7 +23,7 @@ import java.util.Objects;
 
 /** Production gate combining grounded RAG SLOs with same-host local-engine comparisons. */
 public final class RagProductionQualificationPolicy {
-  public static final String POLICY_ID = "production-rag-model-contribution-v3";
+  public static final String POLICY_ID = "production-rag-model-contribution-v4";
   public static final double MINIMUM_MODEL_ANSWER_RATE = 1.0 / 3.0;
   public static final double MINIMUM_MODEL_ANSWER_CORRECT_RATE = 0.90;
 

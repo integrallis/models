@@ -87,6 +87,53 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void doesNotDeriveCitationsForAQuestionRestatement() {
+    GroundingDocument toolchain =
+        new GroundingDocument(
+            "gradle-java-toolchain",
+            "The build selects JDK 25 with "
+                + "java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). "
+                + "Java compilation also sets options.release to 25.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which expression selects the Gradle Java toolchain, and which release does "
+                + "compilation target?",
+            List.of(toolchain),
+            "The expression selects the Gradle Java toolchain, and which release does "
+                + "compilation target?");
+
+    assertThat(answer.text())
+        .contains("JavaLanguageVersion.of(25)")
+        .endsWith("[gradle-java-toolchain]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
+  void doesNotDeriveCitationsWhenOneQuestionClauseHasNoEvidenceAnchor() {
+    GroundingDocument mapper =
+        new GroundingDocument(
+            "jackson-wire-format",
+            "The wire mapper calls findAndRegisterModules so Java time values use registered "
+                + "modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which mapper method registers Java time support, and which deserialization feature "
+                + "is disabled?",
+            List.of(mapper),
+            "The wire mapper registers Java time support, and "
+                + "DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES is disabled.");
+
+    assertThat(answer.text()).contains("findAndRegisterModules").endsWith("[jackson-wire-format]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
   void usesExtractiveEvidenceForAnUnsupportedCitation() {
     GroundedAnswer answer =
         policy.apply(
