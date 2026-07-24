@@ -35,6 +35,11 @@ class CertifiedRagEvidenceTest {
   private static final Path QWEN3_0_6B_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260724/rag/native-q4-profiled/qwen3-0.6b-q4_0");
+  private static final Path QWEN2_5_CODER_Q4_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve(
+              "benchmark-results/certified-20260724/rag/native-q4-profiled/"
+                  + "qwen2.5-coder-0.5b-q4_0");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -246,6 +251,87 @@ class CertifiedRagEvidenceTest {
             comparison -> {
               assertThat(comparison.decodeThroughputRatio()).isBetween(0.99, 1.00);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.02, 1.03);
+            });
+  }
+
+  @Test
+  void qwen25CoderQ4QualifiesWithRustPrefillAndTheProfiledJavaDecodeKernel() throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            QWEN2_5_CODER_Q4_EVIDENCE,
+            "qwen2.5-coder-0.5b-q4_0-rust-ffm-q4-unsigned-t4-coding-v4-grounded.json");
+    RagBenchmarkReport pureJava =
+        report(
+            QWEN2_5_CODER_Q4_EVIDENCE,
+            "qwen2.5-coder-0.5b-q4_0-pure-java-q4-unsigned-coding-v4-grounded.json");
+    RagBenchmarkReport ollama =
+        report(QWEN2_5_CODER_Q4_EVIDENCE, "qwen2.5-coder-0.5b-q4_0-ollama-coding-v4-grounded.json");
+    RagBenchmarkReport llama =
+        report(QWEN2_5_CODER_Q4_EVIDENCE, "qwen2.5-coder-0.5b-q4_0-llama-coding-v4-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+    RagProductionQualification pureJavaQualification =
+        RagProductionQualificationPolicy.assess(pureJava, List.of(llama, ollama));
+
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("9739055e046d62a937e5b7879012209ef40ebea8a1569a96028de491f3f091d5");
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.CODING.id());
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.modelAnswerCount()).isEqualTo(12);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(12.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(pureJava.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(pureJavaQualification.verdict())
+        .isEqualTo(RagQualificationVerdict.FAILED_RELATIVE_GATE);
+    assertThat(candidate.backendDiagnostics().optimization("q4-kernel"))
+        .get()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings()).containsEntry("requested", "unsigned-pairwise");
+            });
+    assertThat(candidate.backendDiagnostics().optimization("rust-q4-0-batched-matmul"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.backendDiagnostics().environment()).containsEntry("gguf-threads", "4");
+    assertThat(candidate.runs())
+        .filteredOn(run -> run.grounding().decision().modelContributed())
+        .hasSize(12)
+        .allSatisfy(run -> assertThat(run.evaluation().correct()).isTrue());
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            pureJava.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(candidate.summary().p50PrefillTokensPerSecond())
+        .isGreaterThan(pureJava.summary().p50PrefillTokensPerSecond() * 2.5);
+    assertThat(candidate.summary().ttftMillis().p95())
+        .isLessThan(pureJava.summary().ttftMillis().p95() * 0.42);
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(pureJava.summary().endToEndMillis().p95() * 0.78);
+    assertThat(candidate.summary().totalCpuMillis())
+        .isLessThan(pureJava.summary().totalCpuMillis() * 0.51);
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.35, 0.36);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(2.31, 2.33);
+              assertThat(comparison.qualified()).isFalse();
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.80, 0.81);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.21, 1.22);
+              assertThat(comparison.qualified()).isTrue();
             });
   }
 
