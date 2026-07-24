@@ -17,6 +17,7 @@ package com.integrallis.models.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RagCorpusTest {
@@ -31,6 +32,30 @@ class RagCorpusTest {
     assertThat(corpus.cases()).extracting(RagCase::id).doesNotHaveDuplicates();
     assertThat(corpus.cases()).filteredOn(RagCase::answerable).hasSize(8);
     assertThat(corpus.fingerprint())
-        .isEqualTo("6eeb61d5a4b48addb298889a2357cfbcbe7339c044308ba8cd23dcb27c603cb2");
+        .isEqualTo("3bcdd611817a5884044cd50ee225bae545f48a70282d7032871954dff420dd4e");
+  }
+
+  @Test
+  void breakGlassOracleAcceptsTheNumberOfApprovingManagersAskedFor() {
+    RagCorpus corpus = RagCorpus.loadDefault();
+    RagCase testCase =
+        corpus.cases().stream()
+            .filter(value -> value.id().equals("break-glass"))
+            .findFirst()
+            .orElseThrow();
+    RagDocument document =
+        corpus.documents().stream()
+            .filter(value -> value.id().equals("security-access"))
+            .findFirst()
+            .orElseThrow();
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(document, 3.0f, 1)),
+            "The code name is Cobalt-17 and two managers approve it [security-access].");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
   }
 }
