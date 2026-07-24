@@ -82,6 +82,8 @@ class RagPromptRendererTest {
 
     assertThat(prompt)
         .startsWith("<|system|>\nYou answer questions")
+        .contains("Copy answer wording from CONTEXT; do not paraphrase.")
+        .contains("Do not preface, explain, list, quote, or repeat")
         .contains("</s>\n<|user|>\nCONTEXT\n[source-1] Policy")
         .endsWith("ANSWER\n</s>\n<|assistant|>");
   }
