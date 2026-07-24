@@ -26,67 +26,9 @@ public final class RagProductionQualificationPolicy {
   private static final Map<String, RelativeThreshold> THRESHOLDS =
       Map.of(
           "llama.cpp", new RelativeThreshold(0.45, 2.0),
-          "ollama", new RelativeThreshold(0.75, 1.5));
+          "ollama", new RelativeThreshold(0.80, 1.5));
 
   private RagProductionQualificationPolicy() {}
-
-  /**
-   * Qualifies the published Models local-engine path. The engine itself is the comparison target,
-   * so this gate requires evidence that the measured client was the shipped backend.
-   */
-  public static RagProductionQualification assessLocalEngine(RagBenchmarkReport candidate) {
-    Objects.requireNonNull(candidate, "candidate");
-    RagPerformanceTier absoluteTier =
-        RagPerformancePolicy.classify(candidate.summary().policyMetrics());
-    if (absoluteTier != RagPerformanceTier.PRODUCTION_READY
-        && absoluteTier != RagPerformanceTier.USABLE) {
-      return result(
-          candidate,
-          absoluteTier,
-          RagQualificationVerdict.FAILED_ABSOLUTE_GATE,
-          List.of(),
-          List.of(),
-          Map.of());
-    }
-
-    boolean supportedEngine = THRESHOLDS.containsKey(candidate.backend());
-    boolean publishedClient =
-        candidate.backend().equals(candidate.backendDiagnostics().backend())
-            && "local-http-v1".equals(candidate.backendDiagnostics().planVersion());
-    boolean identifiedArtifact =
-        candidate.artifactSha256() != null
-            && !candidate.artifactSha256().isBlank()
-            && candidate.artifactSizeBytes() > 0;
-    boolean productionGrounding =
-        GroundedAnswerPolicy.POLICY_ID.equals(candidate.settings().groundingPolicy());
-    if (!supportedEngine || !publishedClient || !identifiedArtifact || !productionGrounding) {
-      String reason;
-      if (!supportedEngine) {
-        reason = "unsupported local engine";
-      } else if (!publishedClient) {
-        reason = "report was not produced by the published local-engine backend";
-      } else if (!identifiedArtifact) {
-        reason = "artifact identity is incomplete";
-      } else {
-        reason = "report does not use the current production grounding policy";
-      }
-      return result(
-          candidate,
-          absoluteTier,
-          RagQualificationVerdict.NO_COMPARABLE_BASELINE,
-          List.of(),
-          List.of(),
-          Map.of(candidate.backend(), reason));
-    }
-
-    return result(
-        candidate,
-        absoluteTier,
-        RagQualificationVerdict.QUALIFIED,
-        List.of(candidate.backend()),
-        List.of(),
-        Map.of());
-  }
 
   public static RagProductionQualification assess(
       RagBenchmarkReport candidate, List<RagBenchmarkReport> baselines) {
@@ -139,7 +81,7 @@ public final class RagProductionQualificationPolicy {
             .map(RagComparatorAssessment::comparatorBackend)
             .toList();
     RagQualificationVerdict verdict =
-        qualifyingComparators.isEmpty()
+        !qualifyingComparators.contains("ollama")
             ? RagQualificationVerdict.FAILED_RELATIVE_GATE
             : RagQualificationVerdict.QUALIFIED;
     return result(candidate, absoluteTier, verdict, qualifyingComparators, comparisons, exclusions);

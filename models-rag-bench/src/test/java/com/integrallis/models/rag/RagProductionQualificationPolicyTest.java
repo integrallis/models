@@ -89,27 +89,17 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
-  void publishedLocalEnginePathQualifiesDirectlyAgainstItsOwnEngine() {
-    RagBenchmarkReport llama =
-        withDiagnostics(
-            report("llama.cpp", "sha", 100, 900),
-            new BackendDiagnostics(
-                "llama.cpp", "local-http-v1", Map.of("promptMode", "NATIVE_CHAT"), List.of()));
+  void llamaCppPerformanceCannotSubstituteForTheRequiredOllamaFloor() {
+    RagBenchmarkReport candidate = report("rust-ffm", "sha", 79, 1_000);
+    RagBenchmarkReport llama = report("llama.cpp", "sha", 100, 900);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
 
     RagProductionQualification qualification =
-        RagProductionQualificationPolicy.assessLocalEngine(llama);
-
-    assertThat(qualification.qualified()).isTrue();
-    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp");
-  }
-
-  @Test
-  void benchmarkOnlyHttpClientCannotMasqueradeAsPublishedLocalEnginePath() {
-    RagProductionQualification qualification =
-        RagProductionQualificationPolicy.assessLocalEngine(report("llama.cpp", "sha", 100, 900));
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
 
     assertThat(qualification.qualified()).isFalse();
-    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.NO_COMPARABLE_BASELINE);
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp");
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.FAILED_RELATIVE_GATE);
   }
 
   private static RagBenchmarkReport report(
@@ -247,28 +237,6 @@ class RagProductionQualificationPolicyTest {
         report.hostedApiPricing(),
         summary,
         RagPerformancePolicy.classify(summary.policyMetrics()),
-        report.runs(),
-        report.failures());
-  }
-
-  private static RagBenchmarkReport withDiagnostics(
-      RagBenchmarkReport report, BackendDiagnostics diagnostics) {
-    return new RagBenchmarkReport(
-        report.schemaVersion(),
-        report.generatedAt(),
-        report.framework(),
-        report.backend(),
-        report.backendVersion(),
-        report.modelId(),
-        report.model(),
-        report.artifactSha256(),
-        report.artifactSizeBytes(),
-        report.settings(),
-        report.environment(),
-        diagnostics,
-        report.hostedApiPricing(),
-        report.summary(),
-        report.performanceTier(),
         report.runs(),
         report.failures());
   }
