@@ -155,8 +155,8 @@ jobs:
           ${{ matrix.gradle }}
           :models-backend-native:check
           :models-backend-native:nativePlatformJar
-          -Pversion=${{ needs.version.outputs.value }}
-          -PmodelsNativePlatform=${{ matrix.platform }}
+          "-Pversion=${{ needs.version.outputs.value }}"
+          "-PmodelsNativePlatform=${{ matrix.platform }}"
           --no-daemon
           --stacktrace
 
@@ -212,7 +212,7 @@ jobs:
         run: >
           ./gradlew
           :models-backend-native:jar
-          -Pversion=${{ needs.version.outputs.value }}
+          "-Pversion=${{ needs.version.outputs.value }}"
           --no-daemon
           --stacktrace
 
@@ -262,8 +262,8 @@ jobs:
         run: >
           ./gradlew
           :models-backend-native:verifyPrivateTestBundle
-          -Pversion=${{ needs.version.outputs.value }}
-          -PmodelsNativeArtifactDirectory=models-backend-native/build/ci-native-artifacts
+          "-Pversion=${{ needs.version.outputs.value }}"
+          "-PmodelsNativeArtifactDirectory=models-backend-native/build/ci-native-artifacts"
           --no-daemon
           --stacktrace
 
@@ -322,8 +322,8 @@ jobs:
         run: >
           ./gradlew
           :models-backend-native:publishAllPublicationsToGitHubPackagesRepository
-          -Pversion=${{ needs.version.outputs.value }}
+          "-Pversion=${{ needs.version.outputs.value }}"
           -PmodelsGithubPackages=true
-          -PmodelsNativeArtifactDirectory=models-backend-native/build/ci-native-artifacts
+          "-PmodelsNativeArtifactDirectory=models-backend-native/build/ci-native-artifacts"
           --no-daemon
           --stacktrace
