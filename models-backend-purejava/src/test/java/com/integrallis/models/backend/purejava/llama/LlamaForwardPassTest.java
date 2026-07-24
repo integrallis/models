@@ -24,11 +24,13 @@ import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
+import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.lang.foreign.Arena;
@@ -37,6 +39,7 @@ import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -424,6 +427,90 @@ class LlamaForwardPassTest {
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void injectedQ4KernelPreservesPrefillAndAutoregressiveState() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+      PureJavaExecutionPlan plan =
+          ExecutionPlanner.plan(
+              RuntimeFingerprint.capture(),
+              ModelTopology.from("qwen3", config, weights),
+              new PureJavaPlanConfiguration(
+                  false,
+                  false,
+                  GgufQ4Kernel.WIDENED,
+                  32,
+                  true,
+                  true,
+                  false,
+                  false,
+                  false,
+                  false,
+                  false,
+                  GgufQ8BlockMajorKernel.SCATTERED,
+                  false));
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan);
+      float[] expected = baseline.prefill(tokens, 0).clone();
+      int nextToken = argmax(expected);
+      float[] expectedNext = baseline.forward(nextToken, tokens.length);
+      AtomicInteger invocations = new AtomicInteger();
+      GgufBatchedMatrixKernel kernel =
+          new GgufBatchedMatrixKernel() {
+            @Override
+            public boolean supports(GgufTensorType type) {
+              return type == GgufTensorType.Q4_0;
+            }
+
+            @Override
+            public void multiply(
+                float[] output,
+                float[] input,
+                MemorySegment weights,
+                GgufTensorType type,
+                int batchSize,
+                int rows,
+                int cols) {
+              invocations.incrementAndGet();
+              TensorOps.ggufBatchedMatmul(
+                  output,
+                  input,
+                  weights,
+                  type,
+                  batchSize,
+                  rows,
+                  cols,
+                  new byte[batchSize * cols],
+                  new float[batchSize * cols / 32],
+                  new int[batchSize * cols / 4],
+                  new short[batchSize * cols / 16],
+                  new float[batchSize * rows * 8],
+                  GgufQ4Kernel.WIDENED);
+            }
+          };
+      LlamaForwardPass accelerated =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan,
+              kernel);
+
+      float[] actual = accelerated.prefill(tokens, 0);
+
+      assertThat(invocations).hasValueGreaterThan(0);
+      assertThat(actual).containsExactly(expected);
+      assertThat(accelerated.forward(nextToken, tokens.length)).containsExactly(expectedNext);
     }
 
     @Test

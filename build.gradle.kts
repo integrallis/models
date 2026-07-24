@@ -29,7 +29,6 @@ val publishedModuleNames =
         "models-rag",
         "models-semantic-order",
         "models-backend-purejava",
-        "models-backend-native",
         "models-langchain4j",
         "models-spring-ai"
     )
@@ -463,7 +462,13 @@ tasks.register("verifyGithubWorkflows") {
     description = "Verify GitHub Actions workflow files exist"
     doLast {
         val workflowDir = rootProject.file(".github/workflows")
-        listOf("ci.yml", "scorecard.yml", "codeql.yml", "release.yml").forEach { name ->
+        listOf(
+            "ci.yml",
+            "scorecard.yml",
+            "codeql.yml",
+            "release.yml",
+            "native-kernels.yml"
+        ).forEach { name ->
             val f = workflowDir.resolve(name)
             require(f.exists()) { "Missing workflow: ${f.absolutePath}" }
             require(f.readText().contains("jobs:")) { "$name missing 'jobs:' section" }

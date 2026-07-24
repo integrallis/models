@@ -31,12 +31,15 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.modeljars.ModelJarDescriptor;
@@ -51,7 +54,7 @@ import org.modeljars.ModelPerformanceProfileRegistry;
  */
 public final class PureJavaBackend implements SpeculativeInferenceBackend {
 
-  static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
+  public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
   private final Arena arena;
   private final LlamaConfig config;
@@ -60,6 +63,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   private final ModelMetadata modelMetadata;
   private final PureJavaExecutionPlan executionPlan;
   private final BackendDiagnostics diagnostics;
+  private final GgufBatchedMatrixKernel batchedMatrixKernel;
 
   private PureJavaBackend(
       Arena arena,
@@ -68,7 +72,8 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
       LlamaForwardPass forwardPass,
       ModelMetadata modelMetadata,
       PureJavaExecutionPlan executionPlan,
-      BackendDiagnostics diagnostics) {
+      BackendDiagnostics diagnostics,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
     this.arena = arena;
     this.config = config;
     this.tokenizer = tokenizer;
@@ -76,21 +81,39 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
     this.modelMetadata = modelMetadata;
     this.executionPlan = executionPlan;
     this.diagnostics = diagnostics;
+    this.batchedMatrixKernel = batchedMatrixKernel;
   }
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
   public static PureJavaBackend load(Path modelPath) {
-    return load(modelPath, Arena.ofShared());
+    return load(modelPath, Arena.ofShared(), Optional.empty(), GgufBatchedMatrixKernel.none());
+  }
+
+  /**
+   * Loads a GGUF model with an injected batched projection implementation.
+   *
+   * <p>The returned backend owns and closes {@code batchedMatrixKernel}.
+   */
+  public static PureJavaBackend load(Path modelPath, GgufBatchedMatrixKernel batchedMatrixKernel) {
+    return load(
+        modelPath,
+        Arena.ofShared(),
+        Optional.empty(),
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"));
   }
 
   static PureJavaBackend load(Path modelPath, Arena arena) {
-    return load(modelPath, arena, Optional.empty());
+    return load(modelPath, arena, Optional.empty(), GgufBatchedMatrixKernel.none());
   }
 
   private static PureJavaBackend load(
-      Path modelPath, Arena arena, Optional<ModelJarDescriptor> descriptor) {
+      Path modelPath,
+      Arena arena,
+      Optional<ModelJarDescriptor> descriptor,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
     Objects.requireNonNull(arena, "arena");
     Objects.requireNonNull(descriptor, "descriptor");
+    Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
     try {
       Objects.requireNonNull(modelPath, "modelPath");
       GgufFile file = GgufParser.parse(modelPath, arena);
@@ -114,11 +137,12 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
               runtime,
               ModelTopology.from(modelFamily, config, weights),
               PureJavaPlanConfiguration.fromSystemProperties(
-                  performanceSelection.recommendations()));
+                  recommendations(performanceSelection, batchedMatrixKernel)));
       KvCache cache =
           new KvCache(
               config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());
-      LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache, executionPlan);
+      LlamaForwardPass forwardPass =
+          new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel);
 
       String modelName =
           file.metadata().getString("general.name").orElse(modelPath.getFileName().toString());
@@ -136,12 +160,19 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
       BackendDiagnostics diagnostics = performanceSelection.enrich(executionPlan.diagnostics());
 
       return new PureJavaBackend(
-          arena, config, tokenizer, forwardPass, metadata, executionPlan, diagnostics);
+          arena,
+          config,
+          tokenizer,
+          forwardPass,
+          metadata,
+          executionPlan,
+          diagnostics,
+          batchedMatrixKernel);
     } catch (IOException e) {
-      closeAfterFailure(arena, e);
+      closeAfterFailure(arena, batchedMatrixKernel, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
     } catch (RuntimeException | Error e) {
-      closeAfterFailure(arena, e);
+      closeAfterFailure(arena, batchedMatrixKernel, e);
       throw e;
     }
   }
@@ -175,7 +206,8 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
                 () ->
                     new ModelJarException(
                         "ModelJars descriptor has no local path: " + descriptor.alias()));
-    return load(modelPath, Arena.ofShared(), Optional.of(descriptor));
+    return load(
+        modelPath, Arena.ofShared(), Optional.of(descriptor), GgufBatchedMatrixKernel.none());
   }
 
   @Override
@@ -245,7 +277,24 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
 
   @Override
   public void close() {
-    arena.close();
+    RuntimeException closeFailure = null;
+    try {
+      batchedMatrixKernel.close();
+    } catch (RuntimeException failure) {
+      closeFailure = failure;
+    }
+    try {
+      arena.close();
+    } catch (RuntimeException failure) {
+      if (closeFailure == null) {
+        closeFailure = failure;
+      } else {
+        closeFailure.addSuppressed(failure);
+      }
+    }
+    if (closeFailure != null) {
+      throw closeFailure;
+    }
   }
 
   private static int runtimeContextLength(LlamaConfig config) {
@@ -267,7 +316,21 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
     return Math.min(config.contextLength(), maxContextLength);
   }
 
-  private static void closeAfterFailure(Arena arena, Throwable failure) {
+  private static Map<String, String> recommendations(
+      ModelJarPerformanceSelection performanceSelection,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    Map<String, String> combined = new LinkedHashMap<>(performanceSelection.recommendations());
+    combined.putAll(batchedMatrixKernel.planRecommendations());
+    return Map.copyOf(combined);
+  }
+
+  private static void closeAfterFailure(
+      Arena arena, GgufBatchedMatrixKernel batchedMatrixKernel, Throwable failure) {
+    try {
+      batchedMatrixKernel.close();
+    } catch (RuntimeException closeFailure) {
+      failure.addSuppressed(closeFailure);
+    }
     try {
       arena.close();
     } catch (RuntimeException closeFailure) {

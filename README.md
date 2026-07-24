@@ -28,7 +28,7 @@
 > **Project status: pre-alpha.** The first publishable scope is
 > `models-api`, `models-runtime`, `models-rag`, `models-semantic-order`, and
 > `models-backend-purejava`. Framework,
-> Apple, ONNX, native, embedding, test, and benchmark modules remain experimental
+> Apple, ONNX, Rust FFM, embedding, test, and benchmark modules remain experimental
 > or scaffolded and are not part of release `0.1.x`.
 > Real-model integration tests download and run the configured Qwen,
 > Qwen-Coder, SQLCoder, SmolLM2, TinyLlama, DeepSeek-Coder, and MiniCPM GGUF
@@ -48,6 +48,9 @@ The current implementation is a research-grade local runtime:
 
 - **No native inference runtime in the pure-Java backend**: no Python, ONNX Runtime,
   or llama.cpp for `models-backend-purejava`.
+- **Models-owned native acceleration**: `models-backend-native` keeps GGUF loading,
+  tokenization, KV state, sampling, and the transformer graph in Java while selected
+  measured kernels run in a small Rust library through the final Java 25 FFM API.
 - **GGUF-oriented**: parse GGUF v2/v3 and run the tensor types currently
   supported by the pure-Java backend.
 - **Framework integration is emerging**: a LangChain4j `ChatModel` and Spring
@@ -389,7 +392,7 @@ token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
 | [models-backend-purejava](models-backend-purejava/) | experimental | GGUF parser, vectors-backed kernels, BPE tokenizer, KV cache, Llama forward pass |
 | [models-backend-apple](models-backend-apple/) | experimental | Optional Apple Foundation Models bridge via Java FFM and a tiny Swift C ABI dylib |
 | [models-backend-onnx](models-backend-onnx/) | planned | ONNX Runtime backend |
-| [models-backend-native](models-backend-native/) | planned | llama.cpp via Panama FFM |
+| [models-backend-native](models-backend-native/) | experimental | Models-owned Rust inference kernels via Java 25 FFM |
 | [models-spring-ai](models-spring-ai/) | scaffold | Spring AI adapter placeholder |
 | [models-langchain4j](models-langchain4j/) | experimental | LangChain4j `ChatModel` adapter |
 | [models-quarkus](models-quarkus/) | planned | Quarkus extension |
@@ -408,7 +411,7 @@ models-semantic-order               <- ModelJars core; no vectors dependency
 models-backend-purejava             <- api + vectors-core
 models-backend-apple                <- api + optional Apple Foundation Models dylib
 models-backend-onnx                 <- scaffold, no dependencies
-models-backend-native               <- scaffold, no dependencies
+models-backend-native               <- api + pure-Java graph + Models Rust kernels
 models-spring-ai                    <- scaffold, no dependencies
 models-langchain4j                  <- api + runtime + LangChain4j
 models-quarkus                      <- scaffold, no dependencies
@@ -548,6 +551,7 @@ without changing the model metadata reported to callers.
 ### Phase 3 — Performance & scale
 
 - Broader SIMD coverage and kernel benchmarking
+- Models-owned Rust FFM kernels for formats below the measured pure-Java release floor
 - Batched prefill (parallel token processing)
 - Speculative decoding
 - Continuous batching for concurrent requests
@@ -556,7 +560,7 @@ without changing the model metadata reported to callers.
 ### Phase 4 — Alternative backends
 
 - ONNX Runtime backend (DirectML, CUDA, CoreML)
-- llama.cpp backend via Panama FFM (leverage GPU)
+- Models-owned GPU kernel shims where a pure-Java device API cannot meet the release floor
 - Quarkus extension with native-image support
 - Semantic Kernel adapter
 

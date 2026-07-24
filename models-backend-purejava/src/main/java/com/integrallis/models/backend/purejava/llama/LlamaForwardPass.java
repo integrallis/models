@@ -24,6 +24,7 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import com.integrallis.vectors.core.VectorUtil;
@@ -62,6 +63,7 @@ public final class LlamaForwardPass {
   private final boolean blockMajorQ8Activations;
   private final GgufQ8BlockMajorKernel q8BlockMajorKernel;
   private final boolean parallelQ8FfnPreparation;
+  private final GgufBatchedMatrixKernel batchedMatrixKernel;
   private final QuantizedBatchedLayerPlan stagedQuantizedPlan;
   private final int prefillBatchCapacity;
 
@@ -104,7 +106,8 @@ public final class LlamaForwardPass {
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
-    this(config, weights, cache, null, defaultPlan(config, weights));
+    this(
+        config, weights, cache, null, defaultPlan(config, weights), GgufBatchedMatrixKernel.none());
   }
 
   public LlamaForwardPass(
@@ -112,12 +115,27 @@ public final class LlamaForwardPass {
       LlamaWeights weights,
       KvCache cache,
       PureJavaExecutionPlan executionPlan) {
-    this(config, weights, cache, null, executionPlan);
+    this(config, weights, cache, null, executionPlan, GgufBatchedMatrixKernel.none());
+  }
+
+  public LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      PureJavaExecutionPlan executionPlan,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    this(config, weights, cache, null, executionPlan, batchedMatrixKernel);
   }
 
   LlamaForwardPass(
       LlamaConfig config, LlamaWeights weights, KvCache cache, LayerObserver layerObserver) {
-    this(config, weights, cache, layerObserver, defaultPlan(config, weights));
+    this(
+        config,
+        weights,
+        cache,
+        layerObserver,
+        defaultPlan(config, weights),
+        GgufBatchedMatrixKernel.none());
   }
 
   LlamaForwardPass(
@@ -126,6 +144,16 @@ public final class LlamaForwardPass {
       KvCache cache,
       LayerObserver layerObserver,
       PureJavaExecutionPlan executionPlan) {
+    this(config, weights, cache, layerObserver, executionPlan, GgufBatchedMatrixKernel.none());
+  }
+
+  LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      LayerObserver layerObserver,
+      PureJavaExecutionPlan executionPlan,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
     this.config = config;
     this.weights = weights;
     this.cache = cache;
@@ -148,6 +176,7 @@ public final class LlamaForwardPass {
     this.blockMajorQ8Activations = executionPlan.blockMajorQ8Activations();
     this.q8BlockMajorKernel = executionPlan.q8BlockMajorKernel();
     this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
+    this.batchedMatrixKernel = Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 
@@ -1214,6 +1243,22 @@ public final class LlamaForwardPass {
       float[] input,
       int batchSize,
       int cols) {
+    if (batchedMatrixKernel.isDualEligible(
+        firstType, firstRows, secondType, secondRows, batchSize, cols)) {
+      batchedMatrixKernel.multiplyDual(
+          firstOut,
+          firstWeight,
+          firstType,
+          firstRows,
+          secondOut,
+          secondWeight,
+          secondType,
+          secondRows,
+          input,
+          batchSize,
+          cols);
+      return;
+    }
     TensorOps.ggufDualBatchedMatmul(
         firstOut,
         firstWeight,
@@ -1250,6 +1295,26 @@ public final class LlamaForwardPass {
       float[] input,
       int batchSize,
       int cols) {
+    if (batchedMatrixKernel.isTripleEligible(
+        firstType, firstRows, secondType, secondRows, thirdType, thirdRows, batchSize, cols)) {
+      batchedMatrixKernel.multiplyTriple(
+          firstOut,
+          firstWeight,
+          firstType,
+          firstRows,
+          secondOut,
+          secondWeight,
+          secondType,
+          secondRows,
+          thirdOut,
+          thirdWeight,
+          thirdType,
+          thirdRows,
+          input,
+          batchSize,
+          cols);
+      return;
+    }
     TensorOps.ggufTripleBatchedMatmul(
         firstOut,
         firstWeight,
@@ -1283,6 +1348,10 @@ public final class LlamaForwardPass {
       GgufTensorType type,
       int rows,
       int cols) {
+    if (batchedMatrixKernel.isEligible(type, batchSize, rows, cols)) {
+      batchedMatrixKernel.multiply(out, input, weight, type, batchSize, rows, cols);
+      return;
+    }
     TensorOps.ggufBatchedMatmul(
         out,
         input,

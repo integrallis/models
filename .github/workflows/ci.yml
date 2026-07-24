@@ -40,6 +40,11 @@ jobs:
           distribution: temurin
           java-version: 25
 
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --no-self-update
+          rustup component add --toolchain 1.96.0 clippy rustfmt
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
