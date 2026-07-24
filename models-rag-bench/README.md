@@ -69,6 +69,35 @@ for framework in plain-java langchain4j spring-ai; do
 done
 ```
 
+Run the Models-owned Rust/FFM projection backend through the same application
+paths:
+
+```shell
+export JAVA_OPTS="--enable-native-access=ALL-UNNAMED \
+  -Dmodels.native.kernels.library=/absolute/path/to/libjmodels_kernels"
+
+for framework in plain-java langchain4j spring-ai; do
+  models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+    --framework "$framework" \
+    --backend rust-ffm \
+    --model ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf \
+    --model-id smollm2-360m-instruct-q8_0 \
+    --prompt-template chatml \
+    --context 2048 \
+    --threads 8 \
+    --max-tokens 64 \
+    --warmups 1 \
+    --iterations 3 \
+    --output "build/reports/rag/smollm2-${framework}-rust-ffm.json"
+done
+```
+
+In-process backends retain the longest exact token prefix between sequential
+requests and report the reused and newly evaluated token counts separately.
+The final prompt token is always replayed, so an identical prompt never relies
+on a stale logits buffer. Backends without checkpoint/rewind support continue
+to reset and prefill the complete prompt.
+
 `--modeljar` resolves the exact artifact and applies only performance profiles
 whose artifact, processor, JVM, vector width, and required launch arguments all
 match. Use the catalog's recommended Java runtime and startup arguments before

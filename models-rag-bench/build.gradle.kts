@@ -25,6 +25,7 @@ tasks.withType<JavaCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
     jvmArgs("--add-modules", "jdk.incubator.vector")
+    systemProperty("models.repositoryRoot", rootProject.projectDir.absolutePath)
 }
 
 tasks.named("spotbugsTest") {
