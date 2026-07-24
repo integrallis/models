@@ -4,45 +4,63 @@ This study compares the pure-Java backend with Ollama and llama.cpp using the
 same GGUF bytes on one CPU-only host. It is an initial single-request latency
 study, not a concurrency, cost, model-quality, or production-capacity claim.
 
-## Results
+## Certified Results
 
-The values below are from ten measured generations after two warmups. TTFT and
-TPOT are p95; prefill and decode rates are p50. Lower is better for latency and
-higher is better for token rates. `Match` is the percentage of complete greedy
-outputs whose SHA-256 equals llama.cpp for the same per-trial prompt.
+Last updated: 2026-07-24.
+
+The values below are from a fresh cross-engine run of the current stack. Each
+row covers ten measured generations after two warmups. TTFT and TPOT are p95;
+prefill and decode rates are p50. `Match` is the percentage of complete greedy
+outputs whose SHA-256 equals llama.cpp for the corresponding prompt. It is a
+numerical-path parity signal, not a model-quality score.
 
 | Model | Backend | Load ms | TTFT ms | TPOT ms | Prefill tok/s | Decode tok/s | Peak RSS GiB | vs llama.cpp | Match |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Qwen3 0.6B Q4_0 | pure Java | 194.1 | 3,145.6 | 39.0 | 49.54 | 25.86 | 1.04 | 25.0% | 20% |
-| Qwen3 0.6B Q4_0 | llama.cpp | 1,118.0 | 364.6 | 10.5 | 457.13 | 103.51 | 1.19 | 100% | 100% |
-| Qwen3 0.6B Q4_0 | Ollama | 1,475.7 | 515.7 | 25.5 | 460.93 | 47.39 | 1.01 | 45.8% | 100% |
-| SmolLM2 360M Q8_0 | pure Java | 131.2 | 2,643.7 | 47.4 | 60.16 | 21.23 | 0.69 | 20.6% | 50% |
-| SmolLM2 360M Q8_0 | llama.cpp | 471.0 | 298.7 | 10.6 | 575.14 | 103.13 | 0.58 | 100% | 100% |
-| SmolLM2 360M Q8_0 | Ollama | 830.9 | 336.5 | 26.2 | 587.08 | 43.18 | 0.63 | 41.9% | 100% |
-| MiniCPM5 1B Q4_K_M | pure Java | 172.9 | 8,527.9 | 76.3 | 17.82 | 13.19 | 0.88 | 18.4% | 10% |
-| MiniCPM5 1B Q4_K_M | llama.cpp | 1,244.0 | 513.1 | 14.3 | 306.88 | 71.74 | 1.12 | 100% | 100% |
-| MiniCPM5 1B Q4_K_M | Ollama | 1,450.9 | 630.0 | 29.9 | 307.44 | 37.42 | 0.87 | 52.2% | 100% |
+| Qwen3 0.6B Q4_0 | pure Java | 393.7 | 765.5 | 17.3 | 207.68 | 60.34 | 1.25 | 59.4% | 40% |
+| Qwen3 0.6B Q4_0 | llama.cpp | 1,112.0 | 364.9 | 13.3 | 458.32 | 101.57 | 1.19 | 100% | 100% |
+| Qwen3 0.6B Q4_0 | Ollama | 1,471.4 | 512.5 | 26.0 | 461.14 | 47.99 | 1.01 | 47.2% | 100% |
+| SmolLM2 360M Q8_0 | pure Java | 286.4 | 764.9 | 22.5 | 214.49 | 44.86 | 0.98 | 45.6% | 60% |
+| SmolLM2 360M Q8_0 | llama.cpp | 574.0 | 296.8 | 11.7 | 573.90 | 98.31 | 0.58 | 100% | 100% |
+| SmolLM2 360M Q8_0 | Ollama | 833.8 | 343.0 | 26.5 | 587.44 | 45.02 | 0.63 | 45.8% | 100% |
+| MiniCPM5 1B Q4_K_M | pure Java | 327.3 | 7,167.8 | 63.6 | 21.27 | 15.87 | 1.09 | 21.9% | 10% |
+| MiniCPM5 1B Q4_K_M | llama.cpp | 1,121.0 | 509.6 | 14.4 | 307.43 | 72.51 | 1.12 | 100% | 100% |
+| MiniCPM5 1B Q4_K_M | Ollama | 1,446.0 | 630.9 | 28.8 | 308.19 | 41.42 | 0.87 | 57.1% | 100% |
+| Qwen3 1.7B Q8_0 candidate | pure Java | 378.1 | 4,187.0 | 54.1 | 37.85 | 18.63 | 2.37 | 74.4% | 40% |
+| Qwen3 1.7B Q8_0 | llama.cpp | 1,548.0 | 1,123.7 | 43.6 | 141.91 | 25.04 | 2.27 | 100% | 100% |
+| Qwen3 1.7B Q8_0 | Ollama | 2,477.4 | 1,261.3 | 61.4 | 142.43 | 17.74 | 2.32 | 70.8% | 100% |
 
-Across these three formats, the arithmetic mean of the per-model pure-Java
-decode ratios is 21.3% of llama.cpp and 46.3% of Ollama. Dividing summed
-throughput gives 21.7% and 47.1%. Qwen is currently strongest at 25.0% of
-llama.cpp and 54.6% of Ollama; MiniCPM remains weakest at 18.4% and 35.2%.
+The three exact ModelJars-profiled launch rows average 42.3% of llama.cpp
+decode throughput and 87.9% of Ollama. Including the output-validated Qwen3
+1.7B row candidate raises the arithmetic means to 50.3% and 92.2%;
+throughput-of-sums is 47.0% and 91.8%. These aggregates combine different
+models and formats, so per-model ratios remain the decision input:
 
-Relative to the preceding matrix, summed pure-Java decode increased 6.6%:
-MiniCPM improved 36.4%, Qwen improved 1.6%, and SmolLM2 changed -0.9%. Summed
-llama.cpp throughput changed +0.3%, while Ollama changed -9.4%. The arithmetic
-mean therefore moved +1.6 percentage points against llama.cpp and +7.5 points
-against Ollama, but most of the latter movement is native-run variance rather
-than a Java speedup.
+| Model | Decode vs llama.cpp | Decode vs Ollama | Prefill vs llama.cpp | Prefill vs Ollama | TTFT / llama.cpp | TTFT / Ollama |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen3 0.6B Q4_0 | 59.4% | 125.7% | 45.3% | 45.0% | 2.10x | 1.49x |
+| SmolLM2 360M Q8_0 | 45.6% | 99.6% | 37.4% | 36.5% | 2.58x | 2.23x |
+| MiniCPM5 1B Q4_K_M | 21.9% | 38.3% | 6.9% | 6.9% | 14.06x | 11.36x |
+| Qwen3 1.7B Q8_0 candidate | 74.4% | 105.0% | 26.7% | 26.6% | 3.73x | 3.32x |
 
-Prompt processing moved further. Summed pure-Java prefill increased 46.3%, its
-ratio to llama.cpp rose from 6.5% to 9.5%, and mean p95 TTFT fell 39.0%.
-SmolLM2's retained Q8_0 batching accounts for the largest gain. In-process
-model mapping remains fast and memory use is bounded, but all three complete
-pure-Java requests remain `OFFLINE` on this long-prompt workload. Decode is
-still 4.0x to 5.4x slower than llama.cpp and 1.8x to 2.8x slower than Ollama.
-Output parity is prompt-sensitive and must improve before performance alone can
-qualify a model.
+The needle has moved materially on decode. The earlier three-model checkpoint
+averaged 21.3% of llama.cpp and 46.3% of Ollama; the same three current
+profiled paths reach 42.3% and 87.9%. Prompt processing is now the dominant
+gap: the four current paths average only 29.1% of llama.cpp prefill and 28.8%
+of Ollama, and p95 TTFT remains 1.49x to 14.06x native.
+
+The Qwen3 1.7B result is not yet an automatic ModelJars recommendation. The
+row-accumulated Q8 plan matched the untuned Graal reference in all five
+corresponding screening outputs. A faster float-lane plan reached 43.95
+prefill tok/s but matched only three of five and was rejected. The retained
+row candidate was then run through the full ten-trial comparison and RAG
+matrix. It must pass the full profile gate before catalog activation.
+
+Pure Java maps and parses GGUF in-process, while native load measurements
+include server or request readiness, so load values are directional rather
+than equivalent lifecycle costs. Ollama RSS observes the service process and
+can omit memory owned by a separate runner.
+
+## Optimization History
 
 ### Controlled JVM compiler matrix
 
@@ -294,8 +312,9 @@ match. It recalculates summaries from raw trials before producing a comparison.
 
 - Host: Hetzner dedicated-vCPU VM, AMD EPYC Milan, 8 vCPU, 30.6 GiB RAM
 - OS: Ubuntu 24.04, Linux 6.8.0-124, no swap
-- JVM: Eclipse Temurin 25.0.3, `jdk.incubator.vector`, 256-bit vector cap
-- Pure Java: Models `a1f0919`, Vectors `4144202`
+- JVM: GraalVM Community Java 25.0.3 for the profiled pure-Java rows,
+  `jdk.incubator.vector`, 256-bit vector cap
+- Pure Java: Models `10949c7`, Vectors `fde9858`, ModelJars `b6575a1`
 - Native references: llama.cpp b10012 (`c71854292`), Ollama 0.32.0
 - Workload: one request at a time, 8 backend threads, 2 warmups, 10 trials
 - Prompt: fixed 723-byte production-review prompt plus a deterministic,
@@ -312,12 +331,16 @@ Artifact identities:
 | Qwen3 0.6B Q4_0 | 428,970,080 | `da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4` |
 | SmolLM2 360M Q8_0 | 386,404,992 | `48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201` |
 | MiniCPM5 1B Q4_K_M | 688,065,920 | `81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa` |
+| Qwen3 1.7B Q8_0 | 1,834,426,016 | `061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a` |
 
 Ten trials are sufficient for the repository's initial diagnostic gate but
 provide limited tail-latency confidence. Release or hardware qualification
 should use longer runs and workload-appropriate concurrency. Load times are
 also directional: pure Java measures in-process parse/map time, llama.cpp
 measures server readiness, and Ollama reports its request load phase.
+
+The committed raw reports, screening controls, and backend diagnostics are in
+[`benchmark-results/certified-20260724`](benchmark-results/certified-20260724/).
 
 ## Reproduce
 

@@ -1,0 +1,335 @@
+{
+  "schemaVersion" : 5,
+  "createdAt" : "2026-07-23T23:35:00.407898316Z",
+  "backend" : "pure-java",
+  "backendVersion" : "models@93d1dcb1395da24e94e537f815409bb5c6f3da2d vectors@fde9858901624d1661a1cf51195d2c59737bcf87 modeljars@b6575a10a600bd1838ea9033b32c4acecce2fd25",
+  "modelId" : "smollm2-profile-smoke",
+  "model" : "smollm2_360m_instruct_q8_0",
+  "artifactSha256" : "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201",
+  "artifactSizeBytes" : 386404992,
+  "run" : {
+    "promptSha256" : "2db2d875631cc7e3af3f6e4471ae4c9b2b7dfdb31ab561a41ef78182a31532e6",
+    "promptStrategy" : "sha256-nonce-prefix-v1",
+    "maxTokens" : 1,
+    "warmups" : 1,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "temperature" : 0.0,
+    "topK" : 1,
+    "topP" : 1.0,
+    "repetitionPenalty" : 1.0,
+    "rawPrompt" : true,
+    "seed" : 42
+  },
+  "environment" : {
+    "host" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "processors" : 8,
+    "physicalMemoryBytes" : 32857444352,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "GraalVM Community",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "pure-java",
+    "planVersion" : "pure-java-v16",
+    "environment" : {
+      "gguf-executor" : "persistent",
+      "java-version" : "25.0.3",
+      "model-architecture" : "llama",
+      "vm-vendor" : "GraalVM Community",
+      "gguf-chunks-per-thread" : "2",
+      "preferred-vector-bits" : "256",
+      "modeljar-coordinate" : "org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0:2.0.0-q8_0.1",
+      "projection-layers" : "32",
+      "gguf-threads" : "8",
+      "java-feature" : "25",
+      "compiler" : "graal-jvmci",
+      "modeljar-sha256" : "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "sve" : "false",
+      "fast-vector-fma" : "true",
+      "os" : "Linux",
+      "vm-version" : "25.0.3+9-jvmci-25.1-b19",
+      "q4-short-pairwise-supported" : "true",
+      "active-vector-bits" : "256",
+      "modeljar-alias" : "smollm2_360m_instruct_q8_0",
+      "q4-unsigned-pairwise-supported" : "true",
+      "fast-scalar-fma" : "true",
+      "gguf-parallel" : "true",
+      "processors" : "8",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "vector-api" : "true",
+      "architecture" : "amd64"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "independent"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "compiler" : "graal-jvmci",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "output-rows" : "requested",
+        "formats" : "Q8_0,Q8_0,Q8_0"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "formats" : "Q8_0,Q8_0,Q8_0,Q8_0",
+        "unused-rows" : "kv-only"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0/Q8_0 FFN layers share one retained two-stage row publication",
+      "settings" : {
+        "parallel" : "true",
+        "stages" : "2",
+        "executor" : "persistent",
+        "eligible-layers" : "32"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0/Q8_0 attention and FFN work shares one retained seven-stage publication",
+      "settings" : {
+        "parallel" : "true",
+        "stages" : "7",
+        "executor" : "persistent",
+        "eligible-layers" : "32"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "ENABLED",
+      "reason" : "staged Q8 projections traverse each activation block sequentially",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "ENABLED",
+      "reason" : "Q8 partial sums retain eight floating lanes until the completed output",
+      "settings" : {
+        "requested-kernel" : "float-lane-accumulated",
+        "kernel" : "float-lane-accumulated",
+        "floating-point-order" : "eight-strided-lanes",
+        "compiler" : "graal-jvmci",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "ENABLED",
+      "reason" : "all staged Q8 FFN input rows are prepared concurrently",
+      "settings" : {
+        "staged-layers" : "32",
+        "partition" : "batch-rows",
+        "partitions" : "8",
+        "eligible-layers" : "32"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "8",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "modeljars.profile.smollm2.360m.q8.0.epyc.milan.jdk25",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "profile-id" : "smollm2_360m_q8_0_epyc_milan_jdk25",
+        "recommendations" : "compiler=graal-jvmci",
+        "benchmark-id" : "inference-matrix-20260718",
+        "selector-mismatches" : "",
+        "missing-jvm-arguments" : "",
+        "marker-coordinate" : "org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0:2.0.0-q8_0.1"
+      }
+    }, {
+      "id" : "modeljars.profile.smollm2.360m.q8.0.epyc.milan.jdk25.block.major",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "selector-mismatches" : "",
+        "missing-jvm-arguments" : "",
+        "recommendations" : "models.purejava.blockMajorQ8Activations=true",
+        "benchmark-id" : "smollm2-q8-block-major-20260723",
+        "recommended-java-feature" : "25",
+        "marker-coordinate" : "org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0:2.0.0-q8_0.1",
+        "profile-id" : "smollm2_360m_q8_0_epyc_milan_jdk25_block_major",
+        "recommended-runtime" : "graal-jvmci",
+        "required-jvm-arguments" : "-Djdk.graal.MaximumInliningSize=10000"
+      }
+    }, {
+      "id" : "modeljars.profile.smollm2.360m.q8.0.epyc.milan.jdk25.float.lane",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "selector-mismatches" : "",
+        "missing-jvm-arguments" : "",
+        "recommendations" : "models.purejava.q8BlockMajorKernel=float-lane-accumulated",
+        "benchmark-id" : "smollm2-q8-float-lane-20260723",
+        "recommended-java-feature" : "25",
+        "marker-coordinate" : "org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0:2.0.0-q8_0.1",
+        "profile-id" : "smollm2_360m_q8_0_epyc_milan_jdk25_float_lane",
+        "recommended-runtime" : "graal-jvmci",
+        "required-jvm-arguments" : "-Djdk.graal.MaximumInliningSize=10000\n-XX:CompileCommand=option,com.integrallis.vectors.core.PanamaVectorUtilSupport::ggufQ8_0Q8_0BlockMajorFloatLaneRow,double,CompileThresholdScaling,0.001\n-XX:CompileCommand=option,com.integrallis.vectors.core.PanamaVectorUtilSupport::ggufQ8_0Q8_0BlockMajorFloatLaneRow,bool,BackgroundCompilation,false"
+      }
+    }, {
+      "id" : "modeljars.profile.smollm2.360m.q8.0.epyc.milan.jdk25.parallel.ffn",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "selector-mismatches" : "",
+        "missing-jvm-arguments" : "",
+        "recommendations" : "models.purejava.parallelQ8FfnPreparation=true",
+        "benchmark-id" : "smollm2-q8-parallel-ffn-preparation-20260723",
+        "recommended-java-feature" : "25",
+        "marker-coordinate" : "org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0:2.0.0-q8_0.1",
+        "profile-id" : "smollm2_360m_q8_0_epyc_milan_jdk25_parallel_ffn",
+        "recommended-runtime" : "graal-jvmci",
+        "required-jvm-arguments" : "-Djdk.graal.MaximumInliningSize=10000"
+      }
+    }, {
+      "id" : "modeljars.profile.smollm2.360m.q8.0.epyc.milan.jdk25.staged.layer",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "selector-mismatches" : "",
+        "missing-jvm-arguments" : "",
+        "recommendations" : "models.purejava.stagedQuantizedFfn=true\nmodels.purejava.stagedQuantizedLayer=true",
+        "benchmark-id" : "smollm2-staged-q8-layer-20260723",
+        "recommended-java-feature" : "25",
+        "marker-coordinate" : "org.modeljars.huggingface:huggingfacetb.smollm2-360m-instruct-gguf.q8_0:2.0.0-q8_0.1",
+        "profile-id" : "smollm2_360m_q8_0_epyc_milan_jdk25_staged_layer",
+        "recommended-runtime" : "graal-jvmci",
+        "required-jvm-arguments" : "-Djdk.graal.MaximumInliningSize=10000"
+      }
+    } ]
+  },
+  "speculativeOptions" : {
+    "enabled" : false,
+    "ngramSize" : 4,
+    "confidenceProbeTokens" : 1,
+    "minimumDraftTokens" : 3,
+    "maximumDraftTokens" : 7,
+    "historyWindow" : 2048,
+    "adaptationWindow" : 1,
+    "minimumAcceptanceRate" : 0.8,
+    "cooldownTokens" : 256
+  },
+  "summary" : {
+    "loadMillis" : 272.490098,
+    "p50TtftMillis" : 781.858844,
+    "p95TtftMillis" : 781.858844,
+    "p50TpotMillis" : "Infinity",
+    "p95TpotMillis" : "Infinity",
+    "p50PrefillTokensPerSecond" : 207.46300866832647,
+    "p50DecodeTokensPerSecond" : 0.0,
+    "peakRssBytes" : 1003204608,
+    "successfulTrials" : 1,
+    "totalTrials" : 1
+  },
+  "performanceTier" : "FAILED",
+  "trials" : [ {
+    "successful" : true,
+    "ttftMillis" : 781.858844,
+    "totalMillis" : 781.874758,
+    "prefillTokensPerSecond" : 207.46300866832647,
+    "decodeTokensPerSecond" : 0.0,
+    "inputTokens" : 157,
+    "outputTokens" : 1,
+    "peakRssBytes" : 1003204608,
+    "cpuMillis" : 5740.0,
+    "outputSha256" : "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+    "speculation" : {
+      "active" : false,
+      "draftAttempts" : 0,
+      "proposedTokens" : 0,
+      "acceptedTokens" : 0,
+      "rollbacks" : 0,
+      "suppressedSteps" : 0,
+      "ordinaryForwardCalls" : 0,
+      "proposedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "acceptedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "verificationBatchHistogram" : [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+      "draftSearchNanos" : 0,
+      "verificationNanos" : 0,
+      "ordinaryForwardNanos" : 0
+    },
+    "error" : null
+  } ]
+}
