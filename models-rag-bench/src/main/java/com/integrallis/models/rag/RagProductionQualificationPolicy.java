@@ -23,6 +23,10 @@ import java.util.Objects;
 
 /** Production gate combining grounded RAG SLOs with same-host local-engine comparisons. */
 public final class RagProductionQualificationPolicy {
+  public static final String POLICY_ID = "production-rag-model-contribution-v3";
+  public static final double MINIMUM_MODEL_ANSWER_RATE = 1.0 / 3.0;
+  public static final double MINIMUM_MODEL_ANSWER_CORRECT_RATE = 0.90;
+
   private static final List<String> MATCHED_GENERATION_CONTROLS =
       List.of("temperature", "topK", "topP", "seed", "repetitionPenalty");
   private static final Map<String, RelativeThreshold> THRESHOLDS =
@@ -37,6 +41,7 @@ public final class RagProductionQualificationPolicy {
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(baselines, "baselines");
 
+    ModelContribution contribution = modelContribution(candidate);
     RagPerformanceTier absoluteTier =
         RagPerformancePolicy.classify(candidate.summary().policyMetrics());
     if (absoluteTier != RagPerformanceTier.PRODUCTION_READY
@@ -47,7 +52,18 @@ public final class RagProductionQualificationPolicy {
           RagQualificationVerdict.FAILED_ABSOLUTE_GATE,
           List.of(),
           List.of(),
-          Map.of());
+          Map.of(),
+          contribution);
+    }
+    if (!contribution.qualifies()) {
+      return result(
+          candidate,
+          absoluteTier,
+          RagQualificationVerdict.FAILED_MODEL_CONTRIBUTION_GATE,
+          List.of(),
+          List.of(),
+          Map.of(),
+          contribution);
     }
 
     List<RagComparatorAssessment> comparisons = new ArrayList<>();
@@ -74,7 +90,8 @@ public final class RagProductionQualificationPolicy {
           RagQualificationVerdict.NO_COMPARABLE_BASELINE,
           List.of(),
           comparisons,
-          exclusions);
+          exclusions,
+          contribution);
     }
 
     List<String> qualifyingComparators =
@@ -86,7 +103,14 @@ public final class RagProductionQualificationPolicy {
         !qualifyingComparators.contains("ollama")
             ? RagQualificationVerdict.FAILED_RELATIVE_GATE
             : RagQualificationVerdict.QUALIFIED;
-    return result(candidate, absoluteTier, verdict, qualifyingComparators, comparisons, exclusions);
+    return result(
+        candidate,
+        absoluteTier,
+        verdict,
+        qualifyingComparators,
+        comparisons,
+        exclusions,
+        contribution);
   }
 
   private static RagProductionQualification result(
@@ -95,7 +119,8 @@ public final class RagProductionQualificationPolicy {
       RagQualificationVerdict verdict,
       List<String> qualifyingComparators,
       List<RagComparatorAssessment> comparisons,
-      Map<String, String> exclusions) {
+      Map<String, String> exclusions,
+      ModelContribution contribution) {
     return new RagProductionQualification(
         candidate.modelId(),
         candidate.backend(),
@@ -103,9 +128,40 @@ public final class RagProductionQualificationPolicy {
         absoluteTier,
         verdict,
         verdict == RagQualificationVerdict.QUALIFIED,
+        contribution.modelAnswerCount(),
+        contribution.modelAnswerRate(),
+        contribution.modelAnswerCorrectRate(),
+        MINIMUM_MODEL_ANSWER_RATE,
+        MINIMUM_MODEL_ANSWER_CORRECT_RATE,
         qualifyingComparators,
         comparisons,
         exclusions);
+  }
+
+  private static ModelContribution modelContribution(RagBenchmarkReport report) {
+    int totalAttempts = report.summary().totalAttempts();
+    int successfulAttempts = report.summary().successfulAttempts();
+    int modelAnswerCount =
+        Math.toIntExact(
+            report.runs().stream()
+                .filter(run -> run.grounding().decision() == GroundingDecision.MODEL_ANSWER)
+                .count());
+    int correctModelAnswerCount =
+        Math.toIntExact(
+            report.runs().stream()
+                .filter(run -> run.grounding().decision() == GroundingDecision.MODEL_ANSWER)
+                .filter(run -> run.evaluation().correct())
+                .count());
+    double modelAnswerRate = totalAttempts == 0 ? 0 : (double) modelAnswerCount / totalAttempts;
+    double modelAnswerCorrectRate =
+        modelAnswerCount == 0 ? 0 : (double) correctModelAnswerCount / modelAnswerCount;
+    boolean completeRunEvidence = report.runs().size() == successfulAttempts;
+    boolean qualifies =
+        completeRunEvidence
+            && modelAnswerRate >= MINIMUM_MODEL_ANSWER_RATE
+            && modelAnswerCorrectRate >= MINIMUM_MODEL_ANSWER_CORRECT_RATE;
+    return new ModelContribution(
+        modelAnswerCount, modelAnswerRate, modelAnswerCorrectRate, qualifies);
   }
 
   private static String exclusion(RagBenchmarkReport candidate, RagBenchmarkReport baseline) {
@@ -201,6 +257,12 @@ public final class RagProductionQualificationPolicy {
     }
     return numerator / denominator;
   }
+
+  private record ModelContribution(
+      int modelAnswerCount,
+      double modelAnswerRate,
+      double modelAnswerCorrectRate,
+      boolean qualifies) {}
 
   private record RelativeThreshold(double minimumDecodeRatio, double maximumEndToEndRatio) {}
 }

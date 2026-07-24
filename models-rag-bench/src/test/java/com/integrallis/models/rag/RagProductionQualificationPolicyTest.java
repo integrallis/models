@@ -18,6 +18,7 @@ package com.integrallis.models.rag;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -135,6 +136,51 @@ class RagProductionQualificationPolicyTest {
     assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
   }
 
+  @Test
+  void rejectsQualityProducedEntirelyByExtractiveFallback() {
+    RagBenchmarkReport candidate =
+        withGroundingDecisions(report("rust-ffm", "sha", 100, 1_000), 0, 24, 3, 0);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.verdict())
+        .isEqualTo(RagQualificationVerdict.FAILED_MODEL_CONTRIBUTION_GATE);
+    assertThat(qualification.modelAnswerRate()).isZero();
+  }
+
+  @Test
+  void rejectsAcceptedModelAnswersBelowTheCorrectnessFloor() {
+    RagBenchmarkReport candidate =
+        withGroundingDecisions(report("rust-ffm", "sha", 100, 1_000), 9, 15, 3, 1);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.verdict())
+        .isEqualTo(RagQualificationVerdict.FAILED_MODEL_CONTRIBUTION_GATE);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(8.0 / 9.0);
+  }
+
+  @Test
+  void acceptsOneThirdCorrectModelAnswersWithFallbackGuardrails() {
+    RagBenchmarkReport candidate =
+        withGroundingDecisions(report("rust-ffm", "sha", 100, 1_000), 9, 15, 3, 0);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+  }
+
   private static RagBenchmarkReport report(
       String backend,
       String artifactSha256,
@@ -161,8 +207,83 @@ class RagProductionQualificationPolicyTest {
             1.0,
             RagPerformanceTier.PRODUCTION_READY),
         RagPerformanceTier.PRODUCTION_READY,
-        List.of(),
+        runs(backend, 27, 0, 0, 0),
         List.of());
+  }
+
+  private static RagBenchmarkReport withGroundingDecisions(
+      RagBenchmarkReport report,
+      int modelAnswers,
+      int extractiveFallbacks,
+      int retrievalAbstentions,
+      int incorrectModelAnswers) {
+    return new RagBenchmarkReport(
+        report.schemaVersion(),
+        report.generatedAt(),
+        report.framework(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        report.settings(),
+        report.environment(),
+        report.backendDiagnostics(),
+        report.hostedApiPricing(),
+        report.summary(),
+        report.performanceTier(),
+        runs(
+            report.backend(),
+            modelAnswers,
+            extractiveFallbacks,
+            retrievalAbstentions,
+            incorrectModelAnswers),
+        report.failures());
+  }
+
+  private static List<RagRun> runs(
+      String backend,
+      int modelAnswers,
+      int extractiveFallbacks,
+      int retrievalAbstentions,
+      int incorrectModelAnswers) {
+    ArrayList<RagRun> runs = new ArrayList<>();
+    for (int index = 0; index < modelAnswers; index++) {
+      runs.add(
+          run(
+              backend,
+              runs.size(),
+              GroundingDecision.MODEL_ANSWER,
+              index >= incorrectModelAnswers));
+    }
+    for (int index = 0; index < extractiveFallbacks; index++) {
+      runs.add(run(backend, runs.size(), GroundingDecision.EXTRACTIVE_FALLBACK, true));
+    }
+    for (int index = 0; index < retrievalAbstentions; index++) {
+      runs.add(run(backend, runs.size(), GroundingDecision.RETRIEVAL_ABSTENTION, true));
+    }
+    return List.copyOf(runs);
+  }
+
+  private static RagRun run(
+      String backend, int index, GroundingDecision decision, boolean correct) {
+    GenerationResult generation = new GenerationResult("answer", 100, 2, 100, 120, 200, 0);
+    RagEvaluation evaluation = new RagEvaluation(1, 1, 1, 1, 1, false, correct);
+    return new RagRun(
+        "plain-java",
+        backend,
+        "model",
+        "case-" + index,
+        List.of(),
+        "prompt-" + index,
+        1,
+        1,
+        125,
+        generation,
+        new GroundedAnswer("answer", "answer", decision),
+        evaluation,
+        evaluation);
   }
 
   private static RagBenchmarkSummary summary(

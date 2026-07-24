@@ -43,6 +43,9 @@ class CertifiedRagEvidenceTest {
 
     assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
     assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(9);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
     assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
     assertThat(qualification.exclusions()).isEmpty();
     assertThat(qualification.comparisons())
