@@ -57,14 +57,18 @@ public final class RagProductionQualificationPolicy {
         candidate.artifactSha256() != null
             && !candidate.artifactSha256().isBlank()
             && candidate.artifactSizeBytes() > 0;
-    if (!supportedEngine || !publishedClient || !identifiedArtifact) {
+    boolean productionGrounding =
+        GroundedAnswerPolicy.POLICY_ID.equals(candidate.settings().groundingPolicy());
+    if (!supportedEngine || !publishedClient || !identifiedArtifact || !productionGrounding) {
       String reason;
       if (!supportedEngine) {
         reason = "unsupported local engine";
       } else if (!publishedClient) {
         reason = "report was not produced by the published local-engine backend";
-      } else {
+      } else if (!identifiedArtifact) {
         reason = "artifact identity is incomplete";
+      } else {
+        reason = "report does not use the current production grounding policy";
       }
       return result(
           candidate,

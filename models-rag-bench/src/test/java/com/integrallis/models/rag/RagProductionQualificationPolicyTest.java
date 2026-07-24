@@ -187,7 +187,7 @@ class RagProductionQualificationPolicyTest {
         3,
         2_048,
         8,
-        "trusted-citation-extractive-fallback-v1",
+        GroundedAnswerPolicy.POLICY_ID,
         2.0f,
         Map.of("temperature", "0"));
   }

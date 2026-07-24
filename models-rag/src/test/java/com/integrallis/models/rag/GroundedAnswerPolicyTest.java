@@ -90,6 +90,30 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void usesExtractiveEvidenceWhenATrustedCitationCarriesAnUnsupportedClaim() {
+    GroundingDocument telemedicine =
+        new GroundingDocument(
+            "health-telemedicine",
+            "Behavioral health telemedicine has a 15 dollar copay and allows 20 visits each year.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "What copay and annual limit apply to behavioral health telemedicine?",
+            List.of(telemedicine),
+            "The copay is 15 dollars and the annual visit count is unlimited. "
+                + "[health-telemedicine]");
+
+    assertThat(answer.text())
+        .isEqualTo(
+            "Behavioral health telemedicine has a 15 dollar copay and allows 20 visits each year. "
+                + "[health-telemedicine]");
+    assertThat(answer.rawText()).contains("unlimited");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
   void usesExtractiveEvidenceWhenAConfidentRetrievalIsFollowedByARefusal() {
     GroundedAnswer answer =
         policy.apply(
