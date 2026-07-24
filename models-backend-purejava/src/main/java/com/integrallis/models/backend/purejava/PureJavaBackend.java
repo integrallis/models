@@ -86,7 +86,8 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
   public static PureJavaBackend load(Path modelPath) {
-    return load(modelPath, Arena.ofShared(), Optional.empty(), GgufBatchedMatrixKernel.none());
+    return load(
+        modelPath, Arena.ofShared(), Optional.empty(), "pure-java", GgufBatchedMatrixKernel.none());
   }
 
   /**
@@ -99,20 +100,23 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
         modelPath,
         Arena.ofShared(),
         Optional.empty(),
+        "pure-java",
         Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"));
   }
 
   static PureJavaBackend load(Path modelPath, Arena arena) {
-    return load(modelPath, arena, Optional.empty(), GgufBatchedMatrixKernel.none());
+    return load(modelPath, arena, Optional.empty(), "pure-java", GgufBatchedMatrixKernel.none());
   }
 
   private static PureJavaBackend load(
       Path modelPath,
       Arena arena,
       Optional<ModelJarDescriptor> descriptor,
+      String profileBackend,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
     Objects.requireNonNull(arena, "arena");
     Objects.requireNonNull(descriptor, "descriptor");
+    Objects.requireNonNull(profileBackend, "profileBackend");
     Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
     try {
       Objects.requireNonNull(modelPath, "modelPath");
@@ -130,7 +134,8 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
                           value,
                           ModelPerformanceProfileRegistry.fromClasspath(),
                           runtime.asEnvironment(),
-                          ManagementFactory.getRuntimeMXBean().getInputArguments()))
+                          ManagementFactory.getRuntimeMXBean().getInputArguments(),
+                          profileBackend))
               .orElseGet(ModelJarPerformanceSelection::none);
       PureJavaExecutionPlan executionPlan =
           ExecutionPlanner.plan(
@@ -190,24 +195,54 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
 
   /** Loads a GGUF model described by a ModelJars marker descriptor. */
   public static PureJavaBackend load(ModelJarDescriptor descriptor) {
+    return load(descriptor, "pure-java", GgufBatchedMatrixKernel.none());
+  }
+
+  /**
+   * Loads a ModelJar descriptor with an injected projection kernel and backend-specific profile.
+   *
+   * <p>The returned backend owns and closes {@code batchedMatrixKernel}. This boundary is used by
+   * Models backends that retain the Java transformer graph while replacing selected kernels.
+   */
+  public static PureJavaBackend load(
+      ModelJarDescriptor descriptor,
+      String profileBackend,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
     Objects.requireNonNull(descriptor, "descriptor");
-    if (!descriptor.supportsBackend("pure-java")) {
-      throw new ModelJarException(
-          "ModelJars descriptor does not support pure-java backend: " + descriptor.alias());
+    Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
+    Path modelPath;
+    try {
+      if (profileBackend == null || profileBackend.isBlank()) {
+        throw new IllegalArgumentException("profileBackend must not be blank");
+      }
+      if (!descriptor.supportsBackend(profileBackend)) {
+        throw new ModelJarException(
+            "ModelJars descriptor does not support "
+                + profileBackend
+                + " backend: "
+                + descriptor.alias());
+      }
+      if (!"gguf".equals(descriptor.format())) {
+        throw new ModelJarException(
+            "Java GGUF graph only supports GGUF ModelJars descriptors: " + descriptor.alias());
+      }
+      modelPath =
+          descriptor
+              .localPath()
+              .orElseThrow(
+                  () ->
+                      new ModelJarException(
+                          "ModelJars descriptor has no local path: " + descriptor.alias()));
+    } catch (RuntimeException | Error failure) {
+      try {
+        batchedMatrixKernel.close();
+      } catch (RuntimeException closeFailure) {
+        failure.addSuppressed(closeFailure);
+      }
+      throw failure;
     }
-    if (!"gguf".equals(descriptor.format())) {
-      throw new ModelJarException(
-          "PureJavaBackend only supports GGUF ModelJars descriptors: " + descriptor.alias());
-    }
-    Path modelPath =
-        descriptor
-            .localPath()
-            .orElseThrow(
-                () ->
-                    new ModelJarException(
-                        "ModelJars descriptor has no local path: " + descriptor.alias()));
     return load(
-        modelPath, Arena.ofShared(), Optional.of(descriptor), GgufBatchedMatrixKernel.none());
+        modelPath, Arena.ofShared(), Optional.of(descriptor), profileBackend, batchedMatrixKernel);
   }
 
   @Override

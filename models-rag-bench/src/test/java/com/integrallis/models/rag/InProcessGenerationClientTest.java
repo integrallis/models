@@ -24,13 +24,15 @@ import com.integrallis.models.api.Tokenizer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class PureJavaGenerationClientTest {
+class InProcessGenerationClientTest {
 
   @Test
   void measuresInProcessModelsGeneration() {
-    try (PureJavaGenerationClient client = new PureJavaGenerationClient(backend(), 12.5)) {
+    try (InProcessGenerationClient client =
+        new InProcessGenerationClient("rust-ffm", backend(), 12.5)) {
       GenerationResult result = client.generate("hello", 8);
 
+      assertThat(client.backend()).isEqualTo("rust-ffm");
       assertThat(client.diagnostics().planVersion()).isEqualTo("fixture-v1");
       assertThat(result.text()).isEqualTo(" world");
       assertThat(result.inputTokens()).isEqualTo(1);

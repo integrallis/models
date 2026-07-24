@@ -30,6 +30,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.modeljars.ModelJarDescriptor;
+import org.modeljars.ModelJarException;
 
 /**
  * GGUF backend that keeps transformer execution in Java and delegates qualified matrix kernels to
@@ -66,6 +68,31 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     Objects.requireNonNull(libraryPath, "libraryPath");
     RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath);
     PureJavaBackend engine = PureJavaBackend.load(modelPath, kernel);
+    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel.implementation()));
+  }
+
+  /** Loads a ModelJar descriptor using its exact Rust/FFM performance profile. */
+  public static RustFfmBackend load(ModelJarDescriptor descriptor) {
+    String configured = System.getProperty(LIBRARY_PATH_PROPERTY);
+    if (configured == null || configured.isBlank()) {
+      configured = System.getenv(LIBRARY_PATH_ENV);
+    }
+    if (configured == null || configured.isBlank()) {
+      return load(descriptor, BundledNativeKernelLibrary.resolve());
+    }
+    return load(descriptor, Path.of(configured));
+  }
+
+  /** Loads a ModelJar descriptor with an explicit Models native-kernel platform library. */
+  public static RustFfmBackend load(ModelJarDescriptor descriptor, Path libraryPath) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    Objects.requireNonNull(libraryPath, "libraryPath");
+    if (!descriptor.supportsBackend("rust-ffm")) {
+      throw new ModelJarException(
+          "ModelJars descriptor does not support rust-ffm backend: " + descriptor.alias());
+    }
+    RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath);
+    PureJavaBackend engine = PureJavaBackend.load(descriptor, "rust-ffm", kernel);
     return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel.implementation()));
   }
 

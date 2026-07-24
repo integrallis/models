@@ -21,6 +21,7 @@ import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.nativekernel.RustFfmBackend;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
 import java.nio.file.Path;
@@ -31,41 +32,60 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.modeljars.ModelJarDescriptor;
 
 /** In-process Models generation client with production timing measurements. */
-public final class PureJavaGenerationClient implements GenerationClient {
+public final class InProcessGenerationClient implements GenerationClient {
+  private final String backendName;
   private final TimingBackend backend;
   private final GenerationLoop generationLoop;
   private final double loadMillis;
 
-  PureJavaGenerationClient(InferenceBackend backend, double loadMillis) {
+  InProcessGenerationClient(String backendName, InferenceBackend backend, double loadMillis) {
+    if (backendName == null || backendName.isBlank()) {
+      throw new IllegalArgumentException("backendName must not be blank");
+    }
+    this.backendName = backendName;
     this.backend = new TimingBackend(Objects.requireNonNull(backend, "backend"));
     this.generationLoop = new GenerationLoop(this.backend);
     this.loadMillis = loadMillis;
   }
 
-  public static PureJavaGenerationClient load(Path model, int contextLength) {
+  public static InProcessGenerationClient loadPureJava(Path model, int contextLength) {
     Objects.requireNonNull(model, "model");
-    return load(contextLength, () -> PureJavaBackend.load(model));
+    return load("pure-java", contextLength, () -> PureJavaBackend.load(model));
   }
 
-  public static PureJavaGenerationClient load(ModelJarDescriptor descriptor, int contextLength) {
+  public static InProcessGenerationClient loadPureJava(
+      ModelJarDescriptor descriptor, int contextLength) {
     Objects.requireNonNull(descriptor, "descriptor");
-    return load(contextLength, () -> PureJavaBackend.load(descriptor));
+    return load("pure-java", contextLength, () -> PureJavaBackend.load(descriptor));
   }
 
-  private static PureJavaGenerationClient load(
-      int contextLength, java.util.function.Supplier<PureJavaBackend> backendLoader) {
+  public static InProcessGenerationClient loadRustFfm(Path model, int contextLength) {
+    Objects.requireNonNull(model, "model");
+    return load("rust-ffm", contextLength, () -> RustFfmBackend.load(model));
+  }
+
+  public static InProcessGenerationClient loadRustFfm(
+      ModelJarDescriptor descriptor, int contextLength) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    return load("rust-ffm", contextLength, () -> RustFfmBackend.load(descriptor));
+  }
+
+  private static InProcessGenerationClient load(
+      String backendName,
+      int contextLength,
+      java.util.function.Supplier<? extends InferenceBackend> backendLoader) {
     if (contextLength < 1) {
       throw new IllegalArgumentException("contextLength must be positive");
     }
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
-    PureJavaBackend backend = backendLoader.get();
-    return new PureJavaGenerationClient(backend, elapsedMillis(start));
+    InferenceBackend backend = backendLoader.get();
+    return new InProcessGenerationClient(backendName, backend, elapsedMillis(start));
   }
 
   @Override
   public String backend() {
-    return "pure-java";
+    return backendName;
   }
 
   @Override
@@ -132,10 +152,10 @@ public final class PureJavaGenerationClient implements GenerationClient {
         });
     long end = System.nanoTime();
     if (failure.get() != null) {
-      throw new IllegalStateException("pure-Java generation failed", failure.get());
+      throw new IllegalStateException(backendName + " generation failed", failure.get());
     }
     if (firstTokenNanos[0] == 0 || outputTokens[0] == 0) {
-      throw new IllegalStateException("pure-Java generation produced no output token");
+      throw new IllegalStateException(backendName + " generation produced no output token");
     }
     Duration cpuAfter = ProcessResourceProbe.cpuDuration(pid);
     return new GenerationResult(

@@ -53,9 +53,18 @@ record ModelJarPerformanceSelection(
       ModelPerformanceProfileRegistry registry,
       Map<String, String> runtime,
       List<String> inputArguments) {
+    return evaluate(descriptor, registry, runtime, inputArguments, "pure-java");
+  }
+
+  static ModelJarPerformanceSelection evaluate(
+      ModelJarDescriptor descriptor,
+      ModelPerformanceProfileRegistry registry,
+      Map<String, String> runtime,
+      List<String> inputArguments,
+      String backend) {
     Objects.requireNonNull(descriptor, "descriptor");
     Objects.requireNonNull(registry, "registry");
-    return evaluate(descriptor, registry.profilesFor(descriptor), runtime, inputArguments);
+    return evaluate(descriptor, registry.profilesFor(descriptor), runtime, inputArguments, backend);
   }
 
   static ModelJarPerformanceSelection evaluate(
@@ -63,10 +72,22 @@ record ModelJarPerformanceSelection(
       List<ModelPerformanceProfile> profiles,
       Map<String, String> runtime,
       List<String> inputArguments) {
+    return evaluate(descriptor, profiles, runtime, inputArguments, "pure-java");
+  }
+
+  static ModelJarPerformanceSelection evaluate(
+      ModelJarDescriptor descriptor,
+      List<ModelPerformanceProfile> profiles,
+      Map<String, String> runtime,
+      List<String> inputArguments,
+      String backend) {
     Objects.requireNonNull(descriptor, "descriptor");
     Objects.requireNonNull(profiles, "profiles");
     Objects.requireNonNull(runtime, "runtime");
     Objects.requireNonNull(inputArguments, "inputArguments");
+    if (backend == null || backend.isBlank()) {
+      throw new IllegalArgumentException("backend must not be blank");
+    }
 
     Map<String, String> environment = new LinkedHashMap<>();
     environment.put("modeljar-alias", descriptor.alias());
@@ -76,7 +97,7 @@ record ModelJarPerformanceSelection(
     Map<String, String> recommendations = new LinkedHashMap<>();
     List<OptimizationDecision> decisions = new ArrayList<>();
     profiles.stream()
-        .filter(profile -> "pure-java".equals(profile.backend()))
+        .filter(profile -> backend.equals(profile.backend()))
         .forEach(
             profile -> {
               Evaluation evaluation = evaluate(profile, runtime, inputArguments);
