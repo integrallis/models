@@ -64,6 +64,8 @@ class CertifiedRagEvidenceTest {
   void qwen3RustFfmQualifiesAgainstBothExactArtifactControls() throws Exception {
     RagBenchmarkReport candidate =
         report(QWEN3_1_7B_EVIDENCE, "qwen3-1.7b-rust-ffm-prefix-cache-grounded.json");
+    RagBenchmarkReport pureJava =
+        report(QWEN3_1_7B_EVIDENCE, "qwen3-1.7b-pure-java-prefix-cache-grounded.json");
     RagBenchmarkReport ollama = report(QWEN3_1_7B_EVIDENCE, "qwen3-1.7b-ollama-grounded.json");
     RagBenchmarkReport llama = report(QWEN3_1_7B_EVIDENCE, "qwen3-1.7b-llama-grounded.json");
 
@@ -73,11 +75,24 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.artifactSha256())
         .isEqualTo("061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a");
     assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
+    assertThat(pureJava.performanceTier()).isEqualTo(RagPerformanceTier.OFFLINE);
     assertThat(qualification.qualified()).isTrue();
     assertThat(qualification.modelAnswerCount()).isEqualTo(12);
     assertThat(qualification.modelAnswerRate()).isEqualTo(12.0 / 27.0);
     assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
     assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(candidate.summary().ttftMillis().p95())
+        .isLessThan(pureJava.summary().ttftMillis().p95() * 0.38);
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(pureJava.summary().endToEndMillis().p95() * 0.66);
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            pureJava.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.evaluation().correct())
+        .containsExactlyElementsOf(
+            pureJava.runs().stream().map(run -> run.evaluation().correct()).toList());
     assertThat(qualification.comparisons())
         .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
         .singleElement()
