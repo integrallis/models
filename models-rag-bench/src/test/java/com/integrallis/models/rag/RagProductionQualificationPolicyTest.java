@@ -75,6 +75,28 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
+  void rejectsComparatorsFromADifferentRagWorkload() {
+    RagBenchmarkReport candidate = report("rust-ffm", "sha", 100, 1_000);
+    RagBenchmarkReport codingComparator =
+        withSettings(
+            report("ollama", "sha", 100, 1_000),
+            settings(
+                RagWorkload.CODING.id(),
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1")));
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(codingComparator));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.exclusions()).containsEntry("ollama", "benchmark workload differs");
+  }
+
+  @Test
   void absoluteRagFailureCannotBeOverriddenByFastRelativePerformance() {
     RagBenchmarkReport candidate =
         withSummary(
@@ -181,6 +203,21 @@ class RagProductionQualificationPolicyTest {
     assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
   }
 
+  @Test
+  void countsModelAnswersWithDerivedCitationsAsModelContribution() {
+    RagBenchmarkReport candidate =
+        withDerivedCitationAnswers(report("rust-ffm", "sha", 100, 1_000), 9, 15, 3);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(9);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+  }
+
   private static RagBenchmarkReport report(
       String backend,
       String artifactSha256,
@@ -266,6 +303,46 @@ class RagProductionQualificationPolicyTest {
     return List.copyOf(runs);
   }
 
+  private static RagBenchmarkReport withDerivedCitationAnswers(
+      RagBenchmarkReport report,
+      int modelAnswers,
+      int extractiveFallbacks,
+      int retrievalAbstentions) {
+    ArrayList<RagRun> runs = new ArrayList<>();
+    for (int index = 0; index < modelAnswers; index++) {
+      runs.add(
+          run(
+              report.backend(),
+              runs.size(),
+              GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS,
+              true));
+    }
+    for (int index = 0; index < extractiveFallbacks; index++) {
+      runs.add(run(report.backend(), runs.size(), GroundingDecision.EXTRACTIVE_FALLBACK, true));
+    }
+    for (int index = 0; index < retrievalAbstentions; index++) {
+      runs.add(run(report.backend(), runs.size(), GroundingDecision.RETRIEVAL_ABSTENTION, true));
+    }
+    return new RagBenchmarkReport(
+        report.schemaVersion(),
+        report.generatedAt(),
+        report.framework(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        report.settings(),
+        report.environment(),
+        report.backendDiagnostics(),
+        report.hostedApiPricing(),
+        report.summary(),
+        report.performanceTier(),
+        runs,
+        report.failures());
+  }
+
   private static RagRun run(
       String backend, int index, GroundingDecision decision, boolean correct) {
     GenerationResult generation = new GenerationResult("answer", 100, 2, 100, 120, 200, 0);
@@ -331,8 +408,14 @@ class RagProductionQualificationPolicyTest {
   }
 
   private static RagBenchmarkSettings settings(Map<String, String> generationControls) {
+    return settings(RagWorkload.GENERAL.id(), generationControls);
+  }
+
+  private static RagBenchmarkSettings settings(
+      String workload, Map<String, String> generationControls) {
     return new RagBenchmarkSettings(
         "corpus-sha",
+        workload,
         List.of("case-one", "case-two"),
         "chatml-no-think",
         1,

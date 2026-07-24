@@ -41,6 +41,31 @@ class LuceneRagRetrieverTest {
   }
 
   @Test
+  void bm25RanksCodingSourcesAndRejectsTheUnsupportedCase() throws Exception {
+    RagCorpus corpus = RagCorpus.load(RagWorkload.CODING);
+
+    try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
+      for (RagCase testCase : corpus.cases().stream().filter(RagCase::answerable).toList()) {
+        assertThat(retriever.retrieve(testCase.question(), 1))
+            .as(testCase.id())
+            .extracting(hit -> hit.document().id())
+            .containsExactly(testCase.relevantDocumentIds().getFirst());
+      }
+
+      RagCase unsupported =
+          corpus.cases().stream()
+              .filter(testCase -> !testCase.answerable())
+              .findFirst()
+              .orElseThrow();
+      assertThat(retriever.retrieve(unsupported.question(), 1))
+          .singleElement()
+          .extracting(RetrievedDocument::score)
+          .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.FLOAT)
+          .isLessThan(GroundedAnswerPolicy.DEFAULT_MINIMUM_RETRIEVAL_SCORE);
+    }
+  }
+
+  @Test
   void everyTopThreePromptMatchesThePythonContract() throws Exception {
     RagCorpus corpus = RagCorpus.loadDefault();
 

@@ -62,18 +62,27 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
-  void usesExtractiveEvidenceWhenTheModelOmitsCitations() {
+  void derivesTrustedCitationsWhenTheModelAnswerIsOtherwiseSupported() {
+    String generated = "Domestic claims settle within 2 business days.";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+    assertThat(answer.rawText()).isEqualTo(generated);
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void doesNotDeriveCitationsForAnUnsupportedUncitedClaim() {
     GroundedAnswer answer =
         policy.apply(
             "How long do both payment types take?",
             List.of(HIGH_CONFIDENCE),
-            "Both payment types settle within 2 days.");
+            "Both payment types settle instantly.");
 
-    assertThat(answer.text())
-        .isEqualTo(
-            "Approved domestic ACH claims settle within 2 business days. "
-                + "International claim wires settle within 5 business days. "
-                + "[payments-settlement]");
+    assertThat(answer.text()).contains("2 business days").endsWith("[payments-settlement]");
     assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
   }
 

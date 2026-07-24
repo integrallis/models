@@ -17,7 +17,19 @@ package com.integrallis.models.rag;
 
 /** How a final RAG answer was selected. */
 public enum GroundingDecision {
-  MODEL_ANSWER,
-  RETRIEVAL_ABSTENTION,
-  EXTRACTIVE_FALLBACK
+  MODEL_ANSWER(true),
+  MODEL_ANSWER_WITH_DERIVED_CITATIONS(true),
+  RETRIEVAL_ABSTENTION(false),
+  EXTRACTIVE_FALLBACK(false);
+
+  private final boolean modelContributed;
+
+  GroundingDecision(boolean modelContributed) {
+    this.modelContributed = modelContributed;
+  }
+
+  /** Whether the final answer preserves the model-generated substantive text. */
+  public boolean modelContributed() {
+    return modelContributed;
+  }
 }

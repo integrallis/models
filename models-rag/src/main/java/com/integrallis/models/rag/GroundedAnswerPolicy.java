@@ -27,14 +27,14 @@ import java.util.regex.Pattern;
  * Applies deterministic retrieval and source-attribution guardrails to generated RAG answers.
  *
  * <p>A weak retrieval abstains. A high-confidence answer is accepted only when every bracketed
- * citation names a retrieved source, at least one trusted citation is present, and every
- * substantive answer token is supported by the question or retrieved evidence. Otherwise the exact
- * retrieved evidence is returned with trusted source IDs.
+ * citation names a retrieved source and every substantive answer token is supported by the question
+ * or retrieved evidence. When a supported answer omits citations, retrieved provenance is attached
+ * deterministically. Otherwise the exact retrieved evidence is returned with trusted source IDs.
  */
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-citation-lexical-entailment-extractive-fallback-v2";
+      "trusted-provenance-lexical-entailment-extractive-fallback-v3";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -79,9 +79,19 @@ public final class GroundedAnswerPolicy {
     }
 
     String candidate = generatedText.strip();
-    if (ABSTENTION_PATTERN.matcher(candidate).matches()
-        || !hasOnlyTrustedCitations(candidate, retrieved)
+    if (candidate.isBlank()
+        || ABSTENTION_PATTERN.matcher(candidate).matches()
         || !hasOnlySupportedClaims(question, candidate, retrieved)) {
+      return new GroundedAnswer(
+          generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
+    }
+    if (!hasCitations(candidate)) {
+      return new GroundedAnswer(
+          generatedText,
+          attachCitations(candidate, retrieved),
+          GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+    }
+    if (!hasOnlyTrustedCitations(candidate, retrieved)) {
       return new GroundedAnswer(
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
@@ -134,6 +144,21 @@ public final class GroundedAnswerPolicy {
       foundTrusted = true;
     }
     return foundTrusted;
+  }
+
+  private static boolean hasCitations(String candidate) {
+    return BRACKETED_TEXT.matcher(candidate).find();
+  }
+
+  private static String attachCitations(String candidate, List<GroundingDocument> retrieved) {
+    StringBuilder answer = new StringBuilder(candidate);
+    for (GroundingDocument hit : retrieved) {
+      if (!answer.isEmpty() && !Character.isWhitespace(answer.charAt(answer.length() - 1))) {
+        answer.append(' ');
+      }
+      answer.append('[').append(hit.id()).append(']');
+    }
+    return answer.toString();
   }
 
   private static String extractiveAnswer(List<GroundingDocument> retrieved) {

@@ -1,0 +1,65 @@
+[
+  {
+    "id": "list-copy-null-handling",
+    "question": "Which Java method freezes parsed SKU values, and what exception is thrown if an element is null?",
+    "relevantDocumentIds": ["java-list-copy"],
+    "requiredFacts": ["List.copyOf", "NullPointerException"],
+    "answerable": true
+  },
+  {
+    "id": "compute-if-absent-null",
+    "question": "Which map operation initializes SessionCache entries, and what happens when its mapping function returns null?",
+    "relevantDocumentIds": ["java-map-compute"],
+    "requiredFacts": ["computeIfAbsent", "no mapping"],
+    "answerable": true
+  },
+  {
+    "id": "virtual-thread-executor",
+    "question": "Which executor factory does LinkChecker use, and what does closing the executor wait for?",
+    "relevantDocumentIds": ["java-virtual-threads"],
+    "requiredFacts": ["Executors.newVirtualThreadPerTaskExecutor", "all submitted tasks to finish"],
+    "answerable": true
+  },
+  {
+    "id": "record-compact-validation",
+    "question": "Where does ServiceConfig validate its endpoint, and which exception does a blank endpoint cause?",
+    "relevantDocumentIds": ["java-record-validation"],
+    "requiredFacts": ["compact constructor", "IllegalArgumentException"],
+    "answerable": true
+  },
+  {
+    "id": "gradle-java-25",
+    "question": "Which expression selects the Gradle Java toolchain, and which release does compilation target?",
+    "relevantDocumentIds": ["gradle-java-toolchain"],
+    "requiredFacts": ["JavaLanguageVersion.of(25)", "options.release to 25"],
+    "answerable": true
+  },
+  {
+    "id": "http-retry-rules",
+    "question": "Which HTTP methods are retried up to three attempts, and what header permits retrying POST?",
+    "relevantDocumentIds": ["http-retry-idempotency"],
+    "requiredFacts": ["GET and HEAD", "Idempotency-Key"],
+    "answerable": true
+  },
+  {
+    "id": "migration-lock-expiry",
+    "question": "Which table stores the migration lease, and when does that lease expire?",
+    "relevantDocumentIds": ["database-migration-lock"],
+    "requiredFacts": ["schema_history_lock", "90 seconds"],
+    "answerable": true
+  },
+  {
+    "id": "jackson-module-and-feature",
+    "question": "Which mapper method registers Java time support, and which deserialization feature is disabled?",
+    "relevantDocumentIds": ["jackson-wire-format"],
+    "requiredFacts": ["findAndRegisterModules", "FAIL_ON_UNKNOWN_PROPERTIES"],
+    "answerable": true
+  },
+  {
+    "id": "unsupported-cuda-kernel",
+    "question": "What CUDA block size is used by the photon shader kernel?",
+    "relevantDocumentIds": [],
+    "requiredFacts": [],
+    "answerable": false
+  }
+]

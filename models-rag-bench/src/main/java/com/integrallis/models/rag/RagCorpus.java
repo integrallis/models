@@ -41,9 +41,15 @@ public record RagCorpus(List<RagDocument> documents, List<RagCase> cases) {
 
   /** Loads the controlled classpath corpus. */
   public static RagCorpus loadDefault() {
+    return load(RagWorkload.GENERAL);
+  }
+
+  /** Loads one controlled classpath workload. */
+  public static RagCorpus load(RagWorkload workload) {
+    Objects.requireNonNull(workload, "workload");
     return new RagCorpus(
-        read("/rag/documents.json", new TypeReference<List<RagDocument>>() {}),
-        read("/rag/cases.json", new TypeReference<List<RagCase>>() {}));
+        read(workload.documentsResource(), new TypeReference<List<RagDocument>>() {}),
+        read(workload.casesResource(), new TypeReference<List<RagCase>>() {}));
   }
 
   /** Returns a stable SHA-256 over the parsed corpus content. */

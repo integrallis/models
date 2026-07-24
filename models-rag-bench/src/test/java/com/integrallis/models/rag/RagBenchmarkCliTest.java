@@ -41,6 +41,7 @@ class RagBenchmarkCliTest {
               "--backend", "pure-java",
               "--model", model.toString(),
               "--model-id", "fixture-q4",
+              "--workload", "coding",
               "--prompt-template", "chatml",
               "--case", "auto-glass-deadline,idempotency",
               "--max-tokens", "48",
@@ -50,6 +51,7 @@ class RagBenchmarkCliTest {
     assertThat(configuration.framework()).isEqualTo("spring-ai");
     assertThat(configuration.artifact()).isEqualTo(model);
     assertThat(configuration.modelId()).isEqualTo("fixture-q4");
+    assertThat(configuration.workload()).isEqualTo(RagWorkload.CODING);
     assertThat(configuration.promptTemplate()).isEqualTo(RagPromptTemplate.CHATML);
     assertThat(configuration.caseIds()).containsExactly("auto-glass-deadline", "idempotency");
     assertThat(configuration.maxTokens()).isEqualTo(48);
@@ -168,6 +170,21 @@ class RagBenchmarkCliTest {
                     }))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("framework");
+  }
+
+  @Test
+  void rejectsAnUnknownWorkloadBeforeRunningInference() {
+    assertThatThrownBy(
+            () ->
+                RagBenchmarkCli.parse(
+                    new String[] {
+                      "--framework", "plain-java",
+                      "--backend", "ollama",
+                      "--model", "qwen",
+                      "--workload", "invented"
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("workload");
   }
 
   @Test

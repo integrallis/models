@@ -144,12 +144,12 @@ public final class RagProductionQualificationPolicy {
     int modelAnswerCount =
         Math.toIntExact(
             report.runs().stream()
-                .filter(run -> run.grounding().decision() == GroundingDecision.MODEL_ANSWER)
+                .filter(run -> run.grounding().decision().modelContributed())
                 .count());
     int correctModelAnswerCount =
         Math.toIntExact(
             report.runs().stream()
-                .filter(run -> run.grounding().decision() == GroundingDecision.MODEL_ANSWER)
+                .filter(run -> run.grounding().decision().modelContributed())
                 .filter(run -> run.evaluation().correct())
                 .count());
     double modelAnswerRate = totalAttempts == 0 ? 0 : (double) modelAnswerCount / totalAttempts;
@@ -192,7 +192,8 @@ public final class RagProductionQualificationPolicy {
   }
 
   private static boolean sameWorkload(RagBenchmarkSettings left, RagBenchmarkSettings right) {
-    return left.corpusSha256().equals(right.corpusSha256())
+    return left.workload().equals(right.workload())
+        && left.corpusSha256().equals(right.corpusSha256())
         && left.caseIds().equals(right.caseIds())
         && left.promptTemplate().equals(right.promptTemplate())
         && left.retrievalTopK() == right.retrievalTopK()

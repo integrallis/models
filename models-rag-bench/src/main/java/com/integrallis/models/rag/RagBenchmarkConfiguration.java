@@ -32,6 +32,7 @@ public record RagBenchmarkConfiguration(
     Path artifact,
     Optional<ModelJarDescriptor> modelJarDescriptor,
     URI endpoint,
+    RagWorkload workload,
     RagPromptTemplate promptTemplate,
     int contextLength,
     int threads,
@@ -45,5 +46,6 @@ public record RagBenchmarkConfiguration(
   public RagBenchmarkConfiguration {
     caseIds = List.copyOf(caseIds);
     modelJarDescriptor = Objects.requireNonNull(modelJarDescriptor, "modelJarDescriptor");
+    workload = Objects.requireNonNull(workload, "workload");
   }
 }

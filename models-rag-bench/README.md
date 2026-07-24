@@ -1,22 +1,31 @@
 # Production RAG benchmark
 
-`models-rag-bench` is one controlled RAG workload with three Java application
-paths:
+`models-rag-bench` provides versioned controlled RAG workloads through three
+Java application paths:
 
 - plain Java using the Models runtime directly
 - LangChain4j using `DefaultRetrievalAugmentor`
 - Spring AI using `RetrievalAugmentationAdvisor`
 
-The Python baseline uses the same committed corpus and prompt contract with
-BM25S, the official Ollama client, revision-matched llama.cpp server HTTP, or an
-optional direct `llama-cpp-python` binding.
+The Python general-workload baseline uses the same committed corpus and prompt
+contract with BM25S, the official Ollama client, revision-matched llama.cpp
+server HTTP, or an optional direct `llama-cpp-python` binding.
 
 ## Workload contract
 
-The synthetic Northstar policy corpus has 12 documents, eight answerable
-questions, and one unanswerable question. Every answerable case declares its
-required facts and source IDs. Answers must cite the source, while the
-unanswerable case must return exactly `INSUFFICIENT_CONTEXT`.
+`--workload general` selects the synthetic Northstar policy corpus.
+`--workload coding` selects Java, Gradle, HTTP, database, and JSON implementation
+notes intended to evaluate coding-specialized models. Each workload has 12
+documents, eight answerable questions, and one unanswerable question. Every
+answerable case declares its required facts and source IDs, while the
+unanswerable case must return exactly `INSUFFICIENT_CONTEXT`. `general` remains
+the default.
+
+Models are encouraged to emit source IDs, but source formatting is not treated
+as generation quality. When an otherwise supported answer omits citations, the
+grounding layer retains the model text, appends retrieved provenance, and records
+`MODEL_ANSWER_WITH_DERIVED_CITATIONS`. Unsupported output still uses an
+extractive fallback.
 
 The controlled comparison uses top-1 BM25 retrieval because each case has one
 relevant source. Lucene and BM25S agree on every top result and all nine
@@ -34,7 +43,7 @@ block so the measured output budget contains the answer.
 
 The report records:
 
-- artifact and corpus SHA-256
+- artifact and corpus SHA-256 plus the workload ID
 - retrieval and framework overhead p50/p95
 - model load, TTFT, TPOT, end-to-end p50/p95, prefill and decode throughput
 - process CPU and Linux peak RSS when `--pid` is supplied
@@ -82,6 +91,7 @@ for framework in plain-java langchain4j spring-ai; do
     --backend rust-ffm \
     --model ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf \
     --model-id smollm2-360m-instruct-q8_0 \
+    --workload general \
     --prompt-template chatml \
     --context 2048 \
     --threads 8 \
@@ -90,6 +100,23 @@ for framework in plain-java langchain4j spring-ai; do
     --iterations 3 \
     --output "build/reports/rag/smollm2-${framework}-rust-ffm.json"
 done
+```
+
+Use the coding workload for a coding-specialized model:
+
+```shell
+models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+  --framework plain-java \
+  --backend rust-ffm \
+  --model ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf \
+  --model-id qwen2.5-coder-0.5b-instruct-q8_0 \
+  --workload coding \
+  --prompt-template chatml \
+  --context 2048 \
+  --threads 8 \
+  --max-tokens 64 \
+  --warmups 1 \
+  --iterations 3
 ```
 
 In-process backends retain the longest exact token prefix between sequential

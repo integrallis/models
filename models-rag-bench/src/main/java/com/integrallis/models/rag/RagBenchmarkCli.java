@@ -57,6 +57,7 @@ public final class RagBenchmarkCli {
           "model-id",
           "artifact",
           "endpoint",
+          "workload",
           "prompt-template",
           "context",
           "threads",
@@ -151,6 +152,8 @@ public final class RagBenchmarkCli {
         values.containsKey("endpoint")
             ? URI.create(values.get("endpoint"))
             : defaultEndpoint(backend);
+    RagWorkload workload =
+        RagWorkload.parse(values.getOrDefault("workload", RagWorkload.GENERAL.id()));
     RagPromptTemplate promptTemplate =
         RagPromptTemplate.parse(values.getOrDefault("prompt-template", "raw"));
     int context = positiveInteger(values, "context", 2_048);
@@ -182,6 +185,7 @@ public final class RagBenchmarkCli {
         artifact,
         modelJarDescriptor,
         endpoint,
+        workload,
         promptTemplate,
         context,
         threads,
@@ -195,7 +199,7 @@ public final class RagBenchmarkCli {
   }
 
   private static RagBenchmarkReport run(RagBenchmarkConfiguration configuration) throws Exception {
-    RagCorpus corpus = RagCorpus.loadDefault();
+    RagCorpus corpus = RagCorpus.load(configuration.workload());
     List<RagCase> cases = selectedCases(corpus, configuration.caseIds());
     Map<String, RagCase> casesById = new LinkedHashMap<>();
     cases.forEach(testCase -> casesById.put(testCase.id(), testCase));
@@ -249,6 +253,7 @@ public final class RagBenchmarkCli {
         artifact == null ? 0 : Files.size(artifact),
         new RagBenchmarkSettings(
             corpus.fingerprint(),
+            configuration.workload().id(),
             cases.stream().map(RagCase::id).toList(),
             configuration.promptTemplate().id(),
             configuration.topK(),

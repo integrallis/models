@@ -20,12 +20,15 @@ System.out.println(answer.text());
 System.out.println(answer.decision());
 ```
 
-The policy has three explicit outcomes:
+The policy has four explicit outcomes:
 
 - `MODEL_ANSWER`: the response contains only citations from retrieved sources.
+- `MODEL_ANSWER_WITH_DERIVED_CITATIONS`: the response text is supported by the
+  retrieved evidence but omitted citations, so the library retained the model
+  text and attached the retrieved source IDs.
 - `RETRIEVAL_ABSTENTION`: no retrieved source clears the configured score.
-- `EXTRACTIVE_FALLBACK`: retrieval is strong, but the model refuses, omits a
-  citation, or emits an unsupported citation; exact source text is returned.
+- `EXTRACTIVE_FALLBACK`: retrieval is strong, but the model refuses or emits
+  unsupported text or citations; exact source text is returned.
 
 The score threshold must be calibrated for the chosen retriever, corpus, and
 chunking strategy. `2.0` is the committed benchmark corpus threshold, not a

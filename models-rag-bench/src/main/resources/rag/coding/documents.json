@@ -1,0 +1,62 @@
+[
+  {
+    "id": "java-list-copy",
+    "title": "Freezing parsed values",
+    "text": "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+  },
+  {
+    "id": "java-map-compute",
+    "title": "Atomic session cache initialization",
+    "text": "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+  },
+  {
+    "id": "java-virtual-threads",
+    "title": "Link checker task execution",
+    "text": "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+  },
+  {
+    "id": "java-record-validation",
+    "title": "Service configuration validation",
+    "text": "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+  },
+  {
+    "id": "gradle-java-toolchain",
+    "title": "Java build toolchain",
+    "text": "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+  },
+  {
+    "id": "http-retry-idempotency",
+    "title": "HTTP retry rules",
+    "text": "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+  },
+  {
+    "id": "database-migration-lock",
+    "title": "Database migration lease",
+    "text": "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+  },
+  {
+    "id": "jackson-wire-format",
+    "title": "JSON wire mapper",
+    "text": "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+  },
+  {
+    "id": "kotlin-state-flow",
+    "title": "Mobile view state",
+    "text": "The mobile client uses MutableStateFlow for view state. Updates use the update function and collectors receive the latest value."
+  },
+  {
+    "id": "python-worker-cache",
+    "title": "Python schema cache",
+    "text": "The Python worker decorates parse_schema with functools.lru_cache(maxsize=128). Cache invalidation calls parse_schema.cache_clear()."
+  },
+  {
+    "id": "node-stream-backpressure",
+    "title": "Node.js exporter backpressure",
+    "text": "The Node.js exporter pauses its readable stream when writable.write returns false. It resumes after the writable emits drain."
+  },
+  {
+    "id": "database-connection-pool",
+    "title": "Reporting connection pool",
+    "text": "The reporting data source allows 12 database connections. Idle connections are retired after 10 minutes."
+  }
+]
