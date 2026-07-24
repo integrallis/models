@@ -40,7 +40,7 @@ import org.modeljars.ModelJarException;
 public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String PLAN_VERSION = "rust-ffm-v2";
+  public static final String PLAN_VERSION = "rust-ffm-v3";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -68,7 +68,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     Objects.requireNonNull(libraryPath, "libraryPath");
     RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath);
     PureJavaBackend engine = PureJavaBackend.load(modelPath, kernel);
-    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel.implementation()));
+    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel));
   }
 
   /** Loads a ModelJar descriptor using its exact Rust/FFM performance profile. */
@@ -93,7 +93,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     }
     RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath);
     PureJavaBackend engine = PureJavaBackend.load(descriptor, "rust-ffm", kernel);
-    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel.implementation()));
+    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel));
   }
 
   @Override
@@ -167,12 +167,13 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
   }
 
   private static BackendDiagnostics diagnostics(
-      BackendDiagnostics javaDiagnostics, String kernelImplementation) {
+      BackendDiagnostics javaDiagnostics, RustGgufBatchedMatrixKernel kernel) {
     Map<String, String> environment = new LinkedHashMap<>(javaDiagnostics.environment());
     environment.put("transformer-runtime", "java");
     environment.put("kernel-runtime", "rust-ffm");
-    environment.put("kernel-implementation", kernelImplementation);
+    environment.put("kernel-implementation", kernel.implementation());
     environment.put("native-kernel-abi", Integer.toString(NativeKernelLibrary.ABI_VERSION));
+    environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
     optimizations.add(
         nativeQuantizedDecision(
@@ -182,6 +183,18 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
         nativeQuantizedDecision(
             "rust-q8-0-batched-matmul",
             "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        new OptimizationDecision(
+            "rust-quantized-decode",
+            kernel.nativeDecodeEnabled() ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            kernel.nativeDecodeEnabled()
+                ? "single-token Q4_0 and Q8_0 projections execute in the Models Rust kernel"
+                : "disabled by " + RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
+            Map.of(
+                "property",
+                RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
+                "transformer",
+                "java")));
     return new BackendDiagnostics("rust-ffm", PLAN_VERSION, environment, optimizations);
   }
 

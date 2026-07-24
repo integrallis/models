@@ -105,6 +105,28 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void profiledNativeDecodeMakesSingleTokenProjectionsEligible() {
+    try (RustGgufBatchedMatrixKernel kernel =
+        RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+      assertThat(kernel.nativeDecodeEnabled()).isTrue();
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 128, 64)).isTrue();
+      assertThat(kernel.isDualEligible(GgufTensorType.Q4_0, 128, GgufTensorType.Q4_0, 128, 1, 64))
+          .isTrue();
+      assertThat(
+              kernel.isTripleEligible(
+                  GgufTensorType.Q4_0,
+                  128,
+                  GgufTensorType.Q4_0,
+                  128,
+                  GgufTensorType.Q4_0,
+                  128,
+                  1,
+                  64))
+          .isTrue();
+    }
+  }
+
+  @Test
   void reusableGgufKernelComputesExactQ8_0BatchedMatrixMultiplication() {
     int batchSize = 3;
     int rows = 5;

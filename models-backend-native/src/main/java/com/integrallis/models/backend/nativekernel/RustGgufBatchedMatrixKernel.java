@@ -27,6 +27,8 @@ import java.util.Objects;
 
 /** Reusable off-heap workspace for Models-owned Rust quantized projection kernels. */
 public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
+  public static final String NATIVE_DECODE_PROPERTY = "models.native.quantizedDecode";
+
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
           PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY,
@@ -39,6 +41,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           "false");
 
   private final NativeKernelLibrary library;
+  private final boolean nativeDecode;
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
@@ -49,13 +52,18 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private int outputCapacity;
   private boolean closed;
 
-  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library) {
+  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library, boolean nativeDecode) {
     this.library = Objects.requireNonNull(library, "library");
+    this.nativeDecode = nativeDecode;
   }
 
   /** Opens a Rust kernel provider from an explicit platform library. */
   public static RustGgufBatchedMatrixKernel open(Path libraryPath) {
-    return new RustGgufBatchedMatrixKernel(NativeKernelLibrary.open(libraryPath));
+    return open(libraryPath, Boolean.getBoolean(NATIVE_DECODE_PROPERTY));
+  }
+
+  static RustGgufBatchedMatrixKernel open(Path libraryPath, boolean nativeDecode) {
+    return new RustGgufBatchedMatrixKernel(NativeKernelLibrary.open(libraryPath), nativeDecode);
   }
 
   @Override
@@ -66,6 +74,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   @Override
   public Map<String, String> planRecommendations() {
     return PLAN_RECOMMENDATIONS;
+  }
+
+  boolean nativeDecodeEnabled() {
+    return nativeDecode;
   }
 
   @Override
@@ -82,7 +94,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
-    return batchSize > 1 && supports(type);
+    return eligibleBatch(batchSize) && supports(type);
   }
 
   @Override
@@ -93,7 +105,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int secondRows,
       int batchSize,
       int cols) {
-    return batchSize > 1
+    return eligibleBatch(batchSize)
         && firstType == secondType
         && supportsGrouped(firstType)
         && supportsGrouped(secondType);
@@ -137,7 +149,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int thirdRows,
       int batchSize,
       int cols) {
-    return batchSize > 1
+    return eligibleBatch(batchSize)
         && firstType == secondType
         && firstType == thirdType
         && supportsGrouped(firstType)
@@ -307,6 +319,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL);
       default -> false;
     };
+  }
+
+  private boolean eligibleBatch(int batchSize) {
+    return batchSize > 1 || (nativeDecode && batchSize == 1);
   }
 
   private int validateGroupedProjection(
