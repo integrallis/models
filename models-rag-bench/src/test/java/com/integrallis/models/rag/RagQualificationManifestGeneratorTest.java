@@ -53,7 +53,11 @@ class RagQualificationManifestGeneratorTest {
         .writeValue(reports.resolve("rejected.json").toFile(), rejected);
 
     RagQualificationManifest manifest =
-        RagQualificationManifestGenerator.generate(reports, "models-revision", 1);
+        RagQualificationManifestGenerator.generate(
+            reports,
+            "models-revision",
+            1,
+            "benchmark-results/certified-20260724/rag/launch-campaign-v2");
 
     assertThat(manifest.qualifiedModels()).isEqualTo(1);
     assertThat(manifest.rejectedModels()).isEqualTo(1);
@@ -63,6 +67,9 @@ class RagQualificationManifestGeneratorTest {
         .satisfies(
             entry -> {
               assertThat(entry.modelId()).isEqualTo("qwen3-0.6b-q4_0");
+              assertThat(entry.report())
+                  .isEqualTo(
+                      "benchmark-results/certified-20260724/rag/launch-campaign-v2/qualified.json");
               assertThat(entry.reportSha256()).hasSize(64);
               assertThat(entry.rawCorrectAnswerRate()).isBetween(0.0, 1.0);
               assertThat(entry.extractiveFallbackRate()).isBetween(0.0, 1.0);
@@ -70,7 +77,11 @@ class RagQualificationManifestGeneratorTest {
     manifest.requireTarget();
 
     RagQualificationManifest impossible =
-        RagQualificationManifestGenerator.generate(reports, "models-revision", 2);
+        RagQualificationManifestGenerator.generate(
+            reports,
+            "models-revision",
+            2,
+            "benchmark-results/certified-20260724/rag/launch-campaign-v2");
     assertThatThrownBy(impossible::requireTarget)
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("1 distinct models qualified; target is 2");
@@ -95,12 +106,29 @@ class RagQualificationManifestGeneratorTest {
                       output.toString(),
                       "--models-revision",
                       "revision",
+                      "--report-prefix",
+                      "benchmark-results/certified-20260724/rag/launch-campaign-v2",
                       "--target",
                       "1"
                     }))
         .isInstanceOf(IllegalStateException.class);
     assertThat(output).isRegularFile();
-    assertThat(mapper.readTree(output.toFile()).path("qualifiedModels").asInt()).isZero();
+    var manifest = mapper.readTree(output.toFile());
+    assertThat(manifest.path("qualifiedModels").asInt()).isZero();
+    assertThat(manifest.path("entries").get(0).path("report").asText())
+        .isEqualTo("benchmark-results/certified-20260724/rag/launch-campaign-v2/rejected.json");
+  }
+
+  @Test
+  void rejectsUnsafeReportPrefixes(@TempDir Path reports) throws Exception {
+    Files.copy(certifiedReport(), reports.resolve("report.json"));
+
+    assertThatThrownBy(
+            () ->
+                RagQualificationManifestGenerator.generate(
+                    reports, "models-revision", 1, "../outside"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("reportPrefix");
   }
 
   private static Path certifiedReport() {

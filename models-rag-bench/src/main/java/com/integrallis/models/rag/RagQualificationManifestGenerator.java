@@ -40,6 +40,12 @@ public final class RagQualificationManifestGenerator {
 
   public static RagQualificationManifest generate(
       Path reportsDirectory, String modelsRevision, int targetQualifiedModels) throws IOException {
+    return generate(reportsDirectory, modelsRevision, targetQualifiedModels, "");
+  }
+
+  public static RagQualificationManifest generate(
+      Path reportsDirectory, String modelsRevision, int targetQualifiedModels, String reportPrefix)
+      throws IOException {
     if (!Files.isDirectory(reportsDirectory)) {
       throw new IllegalArgumentException("reports directory does not exist: " + reportsDirectory);
     }
@@ -49,6 +55,7 @@ public final class RagQualificationManifestGenerator {
     if (targetQualifiedModels < 1) {
       throw new IllegalArgumentException("targetQualifiedModels must be positive");
     }
+    Path normalizedPrefix = normalizedReportPrefix(reportPrefix);
 
     List<Path> reportPaths;
     try (Stream<Path> paths = Files.list(reportsDirectory)) {
@@ -72,7 +79,7 @@ public final class RagQualificationManifestGenerator {
       }
       RagProductionQualification qualification =
           RagProductionQualificationPolicy.assessLocalEngine(report);
-      entries.add(entry(reportsDirectory, path, report, qualification));
+      entries.add(entry(reportsDirectory, normalizedPrefix, path, report, qualification));
     }
 
     int qualified =
@@ -90,6 +97,7 @@ public final class RagQualificationManifestGenerator {
 
   private static RagQualificationManifestEntry entry(
       Path reportsDirectory,
+      Path reportPrefix,
       Path path,
       RagBenchmarkReport report,
       RagProductionQualification qualification)
@@ -112,7 +120,7 @@ public final class RagQualificationManifestGenerator {
         report.backendVersion(),
         report.artifactSha256(),
         report.artifactSizeBytes(),
-        reportsDirectory.relativize(path).toString(),
+        portablePath(reportPrefix.resolve(reportsDirectory.relativize(path))),
         sha256(path),
         qualification.absoluteTier(),
         qualification.verdict(),
@@ -131,6 +139,22 @@ public final class RagQualificationManifestGenerator {
         rate(modelAnswers, runCount),
         rate(extractiveFallbacks, runCount),
         report.environment());
+  }
+
+  private static Path normalizedReportPrefix(String reportPrefix) {
+    if (reportPrefix == null || reportPrefix.isBlank()) {
+      return Path.of("");
+    }
+    Path prefix = Path.of(reportPrefix.trim()).normalize();
+    if (prefix.isAbsolute() || prefix.startsWith("..")) {
+      throw new IllegalArgumentException(
+          "reportPrefix must be a repository-relative path: " + reportPrefix);
+    }
+    return prefix;
+  }
+
+  private static String portablePath(Path path) {
+    return path.toString().replace(path.getFileSystem().getSeparator(), "/");
   }
 
   private static double rate(long count, int total) {

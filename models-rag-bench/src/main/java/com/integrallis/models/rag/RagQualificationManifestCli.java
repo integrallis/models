@@ -27,7 +27,7 @@ import java.util.Set;
 /** Generates and verifies a production qualification manifest from raw RAG reports. */
 public final class RagQualificationManifestCli {
   private static final Set<String> OPTIONS =
-      Set.of("reports", "output", "models-revision", "target");
+      Set.of("reports", "output", "models-revision", "report-prefix", "target");
 
   private RagQualificationManifestCli() {}
 
@@ -40,10 +40,11 @@ public final class RagQualificationManifestCli {
     Path reports = Path.of(required(options, "reports"));
     Path output = Path.of(required(options, "output"));
     String revision = required(options, "models-revision");
+    String reportPrefix = options.getOrDefault("report-prefix", "");
     int target = positiveInteger(required(options, "target"), "target");
 
     RagQualificationManifest manifest =
-        RagQualificationManifestGenerator.generate(reports, revision, target);
+        RagQualificationManifestGenerator.generate(reports, revision, target, reportPrefix);
     Path parent = output.toAbsolutePath().getParent();
     if (parent != null) {
       Files.createDirectories(parent);
