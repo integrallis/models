@@ -4,44 +4,28 @@ Last updated: 2026-07-24
 
 ## Result
 
-**SmolLM2 360M Q8_0 is now `PRODUCTION_READY` for the committed guarded RAG
-workflow** through plain Java, LangChain4j, and Spring AI. The Models-owned
-Rust/FFM backend reaches about 0.55 seconds p95 TTFT, 1.94 seconds p95
-end-to-end latency, 43.9 tok/s median decode, and 100% grounded correctness on
-all three application paths. The pure-Java path also reaches
-`PRODUCTION_READY` at 0.76 seconds p95 TTFT and 2.15 seconds p95 end to end.
+Three exact artifacts now clear the current absolute RAG SLOs, minimum model
+contribution, and same-host Ollama comparison:
 
-This is deliberately narrower than claiming that the 360M model answers
-arbitrary questions reliably. Its raw answer is independently correct in 18
-of 27 trials. The trusted-retrieval policy accepts 9 model answers, replaces 15
-with a validated extractive answer, and abstains before generation for 3
-unsupported questions. The exact qualification evidence is under
+- **SmolLM2 360M Q8_0** is `PRODUCTION_READY` for the general guarded-RAG
+  workload through plain Java, LangChain4j, and Spring AI.
+- **Qwen3 1.7B Q8_0** is `USABLE` for the general guarded-RAG workload. Its
+  Models Rust/FFM path reaches 100.1% of Ollama and 70.6% of llama.cpp median
+  decode throughput, with p95 end-to-end latency 1.15x and 1.26x respectively.
+- **Qwen2.5-Coder 0.5B Q8_0** is `PRODUCTION_READY` for the coding workload.
+  Models reaches 132.8% of Ollama and 67.0% of llama.cpp median decode
+  throughput while preserving 15 correct model answers across 27 trials.
+
+These are guarded, workload-specific qualifications, not claims of unrestricted
+question-answering quality. Every report preserves raw output, final grounded
+output, decision type, artifact SHA-256, corpus SHA-256, workload ID, runtime
+controls, and same-host comparator evidence. Exact reports are under
 `benchmark-results/certified-20260724/rag/native-q8-prefix-cache/`.
 
-No measured **local Qwen3 1.7B path** is ready for the same production claim.
-The hosted control changes that older study's broader developer-facing result:
-OpenAI GPT-5.4 nano passes every latency and strict-quality gate. Anthropic
-Claude Haiku 4.5 and DeepSeek V4 Flash pass the latency gates, but their
-deterministic exact-phrase score is 88.9%.
-
-Ollama has acceptable single-request latency on this workload: p95 TTFT is
-693.6 ms and p95 end-to-end latency is 4.03 seconds. llama.cpp is usable but
-misses the project's 1-second production TTFT gate at 1.29 seconds. Both
-produce seven of nine exact contract-compliant answers, or 77.8%. Treating a
-trailing period after `INSUFFICIENT_CONTEXT` as semantically equivalent raises
-both native paths to eight of nine, or 88.9%, which still misses the 90%
-quality gate.
-
-The tuned pure-Java Qwen3 1.7B candidate decodes at 18.39 tok/s, essentially
-the same as Ollama's 18.60 tok/s and 71.8% of llama.cpp's 25.62 tok/s. Its
-prompt path is not competitive: p95 TTFT is 5.35 seconds, 4.13x llama.cpp and
-7.71x Ollama. It also produces only six of nine exact answers and leaks Qwen
-control tokens or continues beyond an end marker in the failed cases.
-
-LangChain4j and Spring AI do not materially change these results. Their
-measured adapter overhead remains below 24 ms at p95, while inference consumes
-hundreds or thousands of milliseconds. The remaining blockers are pure-Java
-prefill, correct chat/stop-token behavior, and model instruction adherence.
+The older Qwen3 framework and hosted-provider tables below remain useful
+historical diagnostics, but they predate cross-request KV reuse and the current
+grounding/model-contribution policies. The certified sections and executable
+`CertifiedRagEvidenceTest` are authoritative when the results differ.
 
 ## SmolLM2 Q8_0 Launch Qualification
 
@@ -67,6 +51,29 @@ CPU time fell 40.7% without changing one raw output. Cached Rust/FFM reaches
 91.4% of Ollama's median end-to-end performance and exceeds Ollama at p95 for
 this response mix. It remains behind on TTFT and behind llama.cpp decode, so
 the broader optimization work is not complete.
+
+## Qwen Qualifications
+
+All rows use the exact named artifact on the same 8-vCPU EPYC Milan host, one
+complete warmup, 27 measured requests, 2,048-token context, 64-token output
+cap, and deterministic sampling.
+
+| Model and workload | Backend | Tier | p95 TTFT | Median decode | p95 end to end | Grounded quality |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Qwen3 1.7B Q8_0, general | Models pure Java | OFFLINE | 4,736.8 ms | 18.11 tok/s | 7,336.4 ms | 100% |
+| Qwen3 1.7B Q8_0, general | Models Rust/FFM | USABLE | 1,747.6 ms | 17.99 tok/s | 4,785.1 ms | 100% |
+| Qwen3 1.7B Q8_0, general | Ollama 0.32.0 | PRODUCTION_READY | 697.7 ms | 17.97 tok/s | 4,155.5 ms | 100% |
+| Qwen3 1.7B Q8_0, general | llama.cpp b10012 | USABLE | 1,308.3 ms | 25.48 tok/s | 3,795.2 ms | 100% |
+| Qwen2.5-Coder 0.5B Q8_0, coding | Models Rust/FFM | PRODUCTION_READY | 434.6 ms | 53.01 tok/s | 980.4 ms | 100% |
+| Qwen2.5-Coder 0.5B Q8_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 301.6 ms | 39.93 tok/s | 1,164.1 ms | 100% |
+| Qwen2.5-Coder 0.5B Q8_0, coding | llama.cpp b10012 | PRODUCTION_READY | 336.9 ms | 79.19 tok/s | 733.4 ms | 100% |
+
+Qwen3 contributes 12 correct model answers, uses 12 extractive fallbacks, and
+abstains for 3 unsupported requests. Qwen2.5-Coder preserves 15 correct model
+answers with deterministically derived source IDs, uses 9 conservative
+fallbacks for incomplete answers, and abstains for 3 unsupported requests.
+The latter clears both relative gates: its p95 end-to-end latency is 0.84x
+Ollama and 1.34x llama.cpp.
 
 ## What Acceptable Means
 
@@ -120,16 +127,15 @@ The executable `models-rag-bench` module runs the same workload through:
 - Python against a revision-matched llama.cpp server; and
 - optionally, the direct `llama-cpp-python` binding.
 
-The committed synthetic Northstar corpus contains 12 short policy documents,
+The committed `general` and `coding` corpora each contain 12 short documents,
 eight answerable questions, and one deliberately unanswerable question. Lucene
 BM25 and Python BM25S use top-1 retrieval and agree on all retrieved documents
 and rendered prompt hashes. The evaluator checks required facts, source IDs,
 unsupported citations, and exact `INSUFFICIENT_CONTEXT` abstention without an
 LLM judge. Temperature is zero and top-k is one. The historical Qwen3 1.7B
 matrix disables prompt caching and sends the same ChatML-no-think prompt bytes.
-The current SmolLM2 matrix includes explicit uncached controls and a
-longest-common-prefix KV-cache treatment whose read/write token counts are
-retained in every report.
+The current qualification matrices include longest-common-prefix KV reuse and
+retain cache read/write token counts in every report.
 
 The strict abstention contract intentionally counts `INSUFFICIENT_CONTEXT.` as
 instruction noncompliance. Normalizing that trailing period raises each native
@@ -140,7 +146,11 @@ its extra citation and control-token failures remain. Production applications
 should use schema-constrained output rather than punctuation-sensitive control
 text.
 
-## Qwen3 1.7B Environment
+## Historical Qwen3 1.7B Baseline
+
+This section records the pre-prefix-cache diagnostic matrix. It explains the
+bottlenecks that motivated the retained runtime changes but is superseded for
+qualification purposes by the current tables above.
 
 | Property | Controlled value |
 | --- | --- |
@@ -154,7 +164,7 @@ text.
 | llama.cpp | `b10012`, commit `c71854292` |
 | llama-cpp-python | `0.3.34` bundled native revision |
 | Ollama | `0.32.0` |
-| Main qualified artifact | Qwen3 1.7B Q8_0, 1,834,426,016 bytes |
+| Measured artifact | Qwen3 1.7B Q8_0, 1,834,426,016 bytes |
 | Artifact SHA-256 | `061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a` |
 | Context / threads / output cap | 2,048 / 8 / 64 tokens |
 
@@ -234,13 +244,15 @@ end-of-generation metadata correctly and stop before exposing control tokens.
 | SmolLM2 360M Q8_0 | Current guarded RAG suite across plain Java, LangChain4j, and Spring AI | Rust/FFM reaches 43.92 tok/s and about 0.55 seconds p95 TTFT with prefix reuse | `PRODUCTION_READY` for the committed trusted-retrieval policy; raw model-only correctness is 66.7%, so unguarded QA is not qualified. |
 | Qwen3 0.6B Q4_0 | Engine and prompt diagnostics | Pure Java reaches 60.34 tok/s, 125.7% of Ollama and 59.4% of llama.cpp | It is responsive, but the current study does not quality-qualify it for RAG. |
 | MiniCPM5 1B Q4_K_M | Prompt diagnostics | Pure Java reaches 15.87 tok/s, but p95 TTFT is 7.17 seconds | Its prompt/template profile and pure-Java K-quant prefill remain unresolved. |
-| Qwen3 1.7B Q8_0 | Full suite across plain Java, LangChain4j, and Spring AI | Pure-Java decode is near Ollama; Ollama meets the latency gate at concurrency one | Native exact/tolerant quality is 77.8%/88.9%. Pure Java is 66.7%/77.8%, leaks control tokens, and misses usable TTFT. |
+| Qwen3 1.7B Q8_0 | Current general guarded-RAG suite | Rust/FFM reaches 17.99 tok/s, 100.1% of Ollama and 70.6% of llama.cpp, at 1.15x Ollama p95 end-to-end latency | `USABLE`; 12 of 27 accepted answers come from the model and all 12 are correct. |
+| Qwen2.5-Coder 0.5B Q8_0 | Current coding guarded-RAG suite | Rust/FFM reaches 53.01 tok/s, 132.8% of Ollama and 67.0% of llama.cpp, with lower p95 end-to-end latency than Ollama | `PRODUCTION_READY`; 15 of 27 accepted answers retain model text and all 15 are correct. |
 
-Retrieval is perfect in every full run. The failed answerable case is therefore
-generation, not search: Qwen3 1.7B says the context does not state whether a
-telemedicine referral is required even though the retrieved passage explicitly
-says no referral is required. This is exactly why token throughput cannot stand
-in for RAG viability.
+Retrieval is perfect in every full run. The historical failed answerable case
+was therefore generation, not search: Qwen3 1.7B said the context did not state
+whether a telemedicine referral was required even though the retrieved passage
+explicitly said no referral was required. The current grounding policy
+conservatively replaces that incomplete output. This is exactly why token
+throughput cannot stand in for RAG viability.
 
 ## Hosted API Comparison
 

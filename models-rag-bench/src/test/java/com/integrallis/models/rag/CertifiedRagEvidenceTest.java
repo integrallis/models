@@ -29,6 +29,8 @@ class CertifiedRagEvidenceTest {
           .resolve("benchmark-results/certified-20260724/rag/native-q8-prefix-cache");
   private static final Path SMOLLM2_EVIDENCE = EVIDENCE_ROOT.resolve("smollm2-360m-q8_0");
   private static final Path QWEN3_1_7B_EVIDENCE = EVIDENCE_ROOT.resolve("qwen3-1.7b-q8_0");
+  private static final Path QWEN2_5_CODER_EVIDENCE =
+      EVIDENCE_ROOT.resolve("qwen2.5-coder-0.5b-q8_0");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -108,6 +110,61 @@ class CertifiedRagEvidenceTest {
             comparison -> {
               assertThat(comparison.decodeThroughputRatio()).isBetween(1.00, 1.01);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.15, 1.16);
+            });
+  }
+
+  @Test
+  void qwen25CoderRustFfmQualifiesOnTheCodingWorkload() throws Exception {
+    RagBenchmarkReport candidate =
+        report(QWEN2_5_CODER_EVIDENCE, "qwen2.5-coder-0.5b-rust-ffm-coding-v4-grounded.json");
+    RagBenchmarkReport ollama =
+        report(QWEN2_5_CODER_EVIDENCE, "qwen2.5-coder-0.5b-ollama-coding-v4-grounded.json");
+    RagBenchmarkReport llama =
+        report(QWEN2_5_CODER_EVIDENCE, "qwen2.5-coder-0.5b-llama-coding-v4-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("e1a77721fa97d412f121878223eec81fb4ae6f271e18f922d746711f67b344d1");
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.CODING.id());
+    assertThat(candidate.settings().corpusSha256())
+        .isEqualTo("6841c286837b4c45c06fe8d103b2e044b61a1bfe75a61b64fa04c7ca31b20e45");
+    assertThat(candidate.settings().groundingPolicy())
+        .isEqualTo("trusted-provenance-clause-anchors-extractive-fallback-v4");
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(15);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(15.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(candidate.runs())
+        .filteredOn(
+            run ->
+                run.grounding().decision() == GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS)
+        .hasSize(15)
+        .allSatisfy(run -> assertThat(run.evaluation().correct()).isTrue());
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            ollama.runs().stream().map(run -> run.grounding().decision()).toList())
+        .containsExactlyElementsOf(
+            llama.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.66, 0.68);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.33, 1.34);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(1.32, 1.33);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.84, 0.85);
             });
   }
 
