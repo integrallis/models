@@ -24,13 +24,6 @@ public enum RagPromptTemplate {
   CHATML_NO_THINK("chatml-no-think"),
   ZEPHYR("zephyr");
 
-  private static final String ZEPHYR_RESPONSE_CONSTRAINTS =
-      "\n\nFinal response constraints:\n"
-          + "- Return only one answer sentence followed by source IDs, or exactly "
-          + "INSUFFICIENT_CONTEXT.\n"
-          + "- Copy answer wording from CONTEXT; do not paraphrase.\n"
-          + "- Do not preface, explain, list, quote, or repeat the rules, context, or question.";
-
   private final String id;
 
   RagPromptTemplate(String id) {
@@ -60,7 +53,6 @@ public enum RagPromptTemplate {
     if (this == ZEPHYR) {
       return "<|system|>\n"
           + systemPrompt.stripTrailing()
-          + ZEPHYR_RESPONSE_CONSTRAINTS
           + "</s>\n<|user|>\n"
           + userPrompt
           + "</s>\n<|assistant|>";
