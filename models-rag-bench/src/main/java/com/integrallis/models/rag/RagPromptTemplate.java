@@ -21,7 +21,8 @@ import java.util.Locale;
 public enum RagPromptTemplate {
   RAW("raw"),
   CHATML("chatml"),
-  CHATML_NO_THINK("chatml-no-think");
+  CHATML_NO_THINK("chatml-no-think"),
+  ZEPHYR("zephyr");
 
   private final String id;
 
@@ -43,6 +44,7 @@ public enum RagPromptTemplate {
           "<|im_start|>user\n"
               + prompt
               + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+      case ZEPHYR -> "<|user|>\n" + prompt + "</s>\n<|assistant|>";
     };
   }
 
@@ -54,6 +56,6 @@ public enum RagPromptTemplate {
       }
     }
     throw new IllegalArgumentException(
-        "prompt-template must be one of raw, chatml, chatml-no-think");
+        "prompt-template must be one of raw, chatml, chatml-no-think, zephyr");
   }
 }

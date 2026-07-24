@@ -39,7 +39,10 @@ model-facing bytes. `--prompt-template raw` remains available for base models
 and is the default so template selection is never hidden. Use
 `--prompt-template chatml-no-think` for reasoning models whose GGUF template
 supports `enable_thinking=false`; it prefills the template's empty reasoning
-block so the measured output budget contains the answer.
+block so the measured output budget contains the answer. Use
+`--prompt-template zephyr` for Zephyr-family chat models such as TinyLlama
+1.1B Chat; it emits the model's user turn, EOS, and assistant-generation
+markers explicitly.
 
 The report records:
 
