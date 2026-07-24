@@ -117,6 +117,8 @@ class CertifiedRagEvidenceTest {
   void qwen25CoderRustFfmQualifiesOnTheCodingWorkload() throws Exception {
     RagBenchmarkReport candidate =
         report(QWEN2_5_CODER_EVIDENCE, "qwen2.5-coder-0.5b-rust-ffm-coding-v4-grounded.json");
+    RagBenchmarkReport pureJava =
+        report(QWEN2_5_CODER_EVIDENCE, "qwen2.5-coder-0.5b-pure-java-coding-v4-grounded.json");
     RagBenchmarkReport ollama =
         report(QWEN2_5_CODER_EVIDENCE, "qwen2.5-coder-0.5b-ollama-coding-v4-grounded.json");
     RagBenchmarkReport llama =
@@ -124,6 +126,8 @@ class CertifiedRagEvidenceTest {
 
     RagProductionQualification qualification =
         RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+    RagProductionQualification pureJavaQualification =
+        RagProductionQualificationPolicy.assess(pureJava, List.of(llama, ollama));
 
     assertThat(candidate.artifactSha256())
         .isEqualTo("e1a77721fa97d412f121878223eec81fb4ae6f271e18f922d746711f67b344d1");
@@ -134,6 +138,8 @@ class CertifiedRagEvidenceTest {
         .isEqualTo("trusted-provenance-clause-anchors-extractive-fallback-v4");
     assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
     assertThat(qualification.qualified()).isTrue();
+    assertThat(pureJava.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(pureJavaQualification.qualified()).isTrue();
     assertThat(qualification.modelAnswerCount()).isEqualTo(15);
     assertThat(qualification.modelAnswerRate()).isEqualTo(15.0 / 27.0);
     assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
@@ -147,9 +153,23 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.runs())
         .extracting(run -> run.grounding().decision())
         .containsExactlyElementsOf(
+            pureJava.runs().stream().map(run -> run.grounding().decision()).toList())
+        .containsExactlyElementsOf(
             ollama.runs().stream().map(run -> run.grounding().decision()).toList())
         .containsExactlyElementsOf(
             llama.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().text())
+        .containsExactlyElementsOf(
+            pureJava.runs().stream().map(run -> run.grounding().text()).toList());
+    assertThat(candidate.summary().p50PrefillTokensPerSecond())
+        .isGreaterThan(pureJava.summary().p50PrefillTokensPerSecond() * 1.43);
+    assertThat(candidate.summary().ttftMillis().p95())
+        .isLessThan(pureJava.summary().ttftMillis().p95() * 0.71);
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(pureJava.summary().endToEndMillis().p95() * 0.84);
+    assertThat(candidate.summary().totalCpuMillis())
+        .isLessThan(pureJava.summary().totalCpuMillis() * 0.80);
     assertThat(qualification.comparisons())
         .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
         .singleElement()
