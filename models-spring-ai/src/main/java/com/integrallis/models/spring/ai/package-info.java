@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 
-/** Spring AI ChatModel and StreamingChatModel adapters. */
+/** Spring AI chat model adapters backed by the Models runtime. */
 package com.integrallis.models.spring.ai;

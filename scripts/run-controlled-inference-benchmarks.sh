@@ -20,8 +20,9 @@ DROP_CACHES=${BENCH_DROP_CACHES:-0}
 LLAMA_PORT=${LLAMA_PORT:-18080}
 LLAMA_SERVER=${LLAMA_SERVER:-llama-server}
 PROMPT_FILE=${BENCH_PROMPT_FILE:-"$ROOT_DIR/models-bench/prompts/completion.txt"}
+BENCH_MODELJAR_ALIAS=${BENCH_MODELJAR_ALIAS:-}
 
-for command in awk curl git java nproc ollama realpath sha256sum sync "$LLAMA_SERVER"; do
+for command in awk curl git java jq nproc ollama realpath sha256sum sync "$LLAMA_SERVER"; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "required command not found: $command" >&2
     exit 1
@@ -104,13 +105,23 @@ COMMON_ARGS=(
   --threads "$THREADS"
 )
 
+PURE_JAVA_MODEL_ARGS=(--model "$MODEL_PATH")
+if [[ -n "$BENCH_MODELJAR_ALIAS" ]]; then
+  PURE_JAVA_MODEL_ARGS=(--modeljar "$BENCH_MODELJAR_ALIAS")
+fi
+
 drop_file_cache
 "$BENCHMARK_CLI" \
   --backend pure-java \
-  --model "$MODEL_PATH" \
+  "${PURE_JAVA_MODEL_ARGS[@]}" \
   --backend-version "$PURE_JAVA_VERSION" \
   --output "$OUTPUT_DIR/pure-java.json" \
   "${COMMON_ARGS[@]}"
+PURE_JAVA_ARTIFACT_SHA=$(jq -r '.artifactSha256' "$OUTPUT_DIR/pure-java.json")
+if [[ "$PURE_JAVA_ARTIFACT_SHA" != "$MODEL_SHA" ]]; then
+  echo "pure-Java and native benchmark artifacts differ" >&2
+  exit 1
+fi
 
 if ! curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
   ollama serve >"$OUTPUT_DIR/ollama.log" 2>&1 &

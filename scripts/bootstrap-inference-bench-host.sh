@@ -15,7 +15,7 @@ if [[ $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
   echo "this pinned bootstrap supports Linux x86_64 only" >&2
   exit 1
 fi
-for command in awk curl sha256sum tar zstd; do
+for command in awk curl jq sha256sum tar zstd; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "required command not found: $command" >&2
     exit 1

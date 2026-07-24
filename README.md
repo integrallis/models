@@ -156,11 +156,20 @@ unrelated.
 
 ### Framework adapters
 
-`models-langchain4j` provides `ModelsChatModel`. The Spring Boot starter resolves
-ModelJars descriptors and performance profiles and is the foundation for Spring
-AI auto-configuration. `ModelsChatModel.diagnostics()` returns the same backend
-plan used by plain Java generation; framework adapters do not select a separate
-kernel path.
+`models-langchain4j` provides `ModelsChatModel`, and `models-spring-ai` provides
+blocking and streaming `ModelsSpringAiChatModel` adapters. The Spring Boot
+starter resolves ModelJars descriptors and performance profiles and is the
+foundation for Spring AI auto-configuration. `ModelsChatModel.diagnostics()`
+returns the same backend plan used by plain Java generation; framework adapters
+do not select a separate kernel path.
+
+`models-rag-bench` is a controlled, executable RAG application with plain Java,
+LangChain4j, and Spring AI entry points plus revision-matched Python/Ollama and
+Python/llama.cpp baselines. It enforces the same corpus, retrieval result,
+prompt hash, sampling controls, and deterministic quality checks across the
+implementations. See [models-rag-bench/README.md](models-rag-bench/README.md).
+The controlled production findings and acceptance criteria are recorded in
+[RAG_BENCHMARKS.md](RAG_BENCHMARKS.md).
 
 ### Execution planning
 

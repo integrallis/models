@@ -40,6 +40,24 @@ class ControlledInferenceBenchmarkScriptTest {
     assertThat(llamaCppInvocation).contains("--artifact \"$MODEL_PATH\"");
   }
 
+  @Test
+  void canSelectTheProfiledModelJarPathForPureJava() throws IOException {
+    String script = Files.readString(benchmarkScript());
+
+    assertThat(script)
+        .contains("BENCH_MODELJAR_ALIAS=${BENCH_MODELJAR_ALIAS:-}")
+        .contains("PURE_JAVA_MODEL_ARGS=(--modeljar \"$BENCH_MODELJAR_ALIAS\")")
+        .contains("\"${PURE_JAVA_MODEL_ARGS[@]}\"");
+  }
+
+  @Test
+  void bootstrapRequiresTheJsonToolUsedByTheRunner() throws IOException {
+    String bootstrap =
+        Files.readString(benchmarkScript().resolveSibling("bootstrap-inference-bench-host.sh"));
+
+    assertThat(bootstrap).contains("for command in awk curl jq sha256sum tar zstd");
+  }
+
   private static Path benchmarkScript() {
     Path fromModule = Path.of("..", "scripts", "run-controlled-inference-benchmarks.sh");
     return Files.isRegularFile(fromModule)
