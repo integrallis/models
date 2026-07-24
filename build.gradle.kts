@@ -29,7 +29,9 @@ val publishedModuleNames =
         "models-rag",
         "models-semantic-order",
         "models-backend-purejava",
-        "models-backend-native"
+        "models-backend-native",
+        "models-langchain4j",
+        "models-spring-ai"
     )
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
 val scaffoldProjects = libraryProjects.filterNot { it.name in publishedModuleNames }
