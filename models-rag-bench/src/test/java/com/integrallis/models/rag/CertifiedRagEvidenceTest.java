@@ -264,6 +264,10 @@ class CertifiedRagEvidenceTest {
         report(
             QWEN2_5_CODER_Q4_EVIDENCE,
             "qwen2.5-coder-0.5b-q4_0-pure-java-q4-unsigned-coding-v4-grounded.json");
+    RagBenchmarkReport unprofiledRust =
+        report(
+            QWEN2_5_CODER_Q4_EVIDENCE,
+            "qwen2.5-coder-0.5b-q4_0-rust-ffm-default-coding-v4-grounded.json");
     RagBenchmarkReport ollama =
         report(QWEN2_5_CODER_Q4_EVIDENCE, "qwen2.5-coder-0.5b-q4_0-ollama-coding-v4-grounded.json");
     RagBenchmarkReport llama =
@@ -299,6 +303,23 @@ class CertifiedRagEvidenceTest {
             optimization ->
                 assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(candidate.backendDiagnostics().environment()).containsEntry("gguf-threads", "4");
+    assertThat(unprofiledRust.backendDiagnostics().optimization("q4-kernel"))
+        .get()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.DISABLED);
+              assertThat(optimization.settings()).containsEntry("requested", "widened");
+            });
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().rawText())
+        .containsExactlyElementsOf(
+            unprofiledRust.runs().stream().map(run -> run.grounding().rawText()).toList());
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(unprofiledRust.summary().p50DecodeTokensPerSecond() * 1.67);
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(unprofiledRust.summary().endToEndMillis().p95() * 0.66);
+    assertThat(candidate.summary().totalCpuMillis())
+        .isLessThan(unprofiledRust.summary().totalCpuMillis() * 0.48);
     assertThat(candidate.runs())
         .filteredOn(run -> run.grounding().decision().modelContributed())
         .hasSize(12)
