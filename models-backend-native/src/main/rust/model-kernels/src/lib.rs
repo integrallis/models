@@ -13,6 +13,8 @@ const ABI_VERSION: u32 = 1;
 const CAPABILITY_Q4_0_F32_BATCHED_MATMUL: u64 = 1;
 const CAPABILITY_Q4_0_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 1;
 const CAPABILITY_PERSISTENT_WORKER_CONTEXT: u64 = 1 << 2;
+const CAPABILITY_Q8_0_F32_BATCHED_MATMUL: u64 = 1 << 3;
+const CAPABILITY_Q8_0_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 4;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -22,13 +24,39 @@ const STATUS_PANIC: i32 = 4;
 
 const QK: usize = 32;
 const Q4_0_BLOCK_BYTES: usize = 18;
+const Q8_0_BLOCK_BYTES: usize = 34;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 
 #[derive(Clone, Copy)]
-enum Q4Kernel {
-    Scalar,
+enum DotKernel {
+    Q4Scalar,
     #[cfg(target_arch = "x86_64")]
-    Avx2,
+    Q4Avx2,
+    Q8Scalar,
+    #[cfg(target_arch = "x86_64")]
+    Q8Avx2,
+}
+
+#[derive(Clone, Copy)]
+enum WeightFormat {
+    Q4_0,
+    Q8_0,
+}
+
+impl WeightFormat {
+    fn block_bytes(self) -> usize {
+        match self {
+            Self::Q4_0 => Q4_0_BLOCK_BYTES,
+            Self::Q8_0 => Q8_0_BLOCK_BYTES,
+        }
+    }
+
+    fn selected_kernel(self) -> DotKernel {
+        match self {
+            Self::Q4_0 => selected_q4_kernel(),
+            Self::Q8_0 => selected_q8_kernel(),
+        }
+    }
 }
 
 pub struct KernelContext {
@@ -69,7 +97,7 @@ struct ParallelJob {
     batch_size: usize,
     rows: usize,
     cols: usize,
-    kernel: Q4Kernel,
+    kernel: DotKernel,
 }
 
 impl WorkerPool {
@@ -228,6 +256,8 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
     CAPABILITY_Q4_0_F32_BATCHED_MATMUL
         | CAPABILITY_Q4_0_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_PERSISTENT_WORKER_CONTEXT
+        | CAPABILITY_Q8_0_F32_BATCHED_MATMUL
+        | CAPABILITY_Q8_0_F32_GROUPED_BATCHED_MATMUL
 }
 
 #[unsafe(no_mangle)]
@@ -281,7 +311,7 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_batched_matmul(
     cols: u32,
 ) -> i32 {
     match catch_unwind(AssertUnwindSafe(|| {
-        q4_0_f32_batched_matmul(
+        quantized_f32_batched_matmul(
             None,
             weights,
             weight_bytes,
@@ -292,6 +322,7 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_batched_matmul(
             batch_size,
             rows,
             cols,
+            WeightFormat::Q4_0,
         )
     })) {
         Ok(status) => status,
@@ -322,7 +353,7 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_batched_matmul_with_context(
     match catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: Java owns the context for the duration of this synchronous call.
         let context = unsafe { &*context };
-        q4_0_f32_batched_matmul(
+        quantized_f32_batched_matmul(
             Some(context),
             weights,
             weight_bytes,
@@ -333,6 +364,85 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_batched_matmul_with_context(
             batch_size,
             rows,
             cols,
+            WeightFormat::Q4_0,
+        )
+    })) {
+        Ok(status) => status,
+        Err(_) => STATUS_PANIC,
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+///
+/// Every pointer must remain valid for its advertised length for the synchronous call. Output must
+/// be writable and must not alias either input.
+pub unsafe extern "C" fn jmodels_q8_0_f32_batched_matmul(
+    weights: *const u8,
+    weight_bytes: u64,
+    input: *const f32,
+    input_elements: u64,
+    output: *mut f32,
+    output_elements: u64,
+    batch_size: u32,
+    rows: u32,
+    cols: u32,
+) -> i32 {
+    match catch_unwind(AssertUnwindSafe(|| {
+        quantized_f32_batched_matmul(
+            None,
+            weights,
+            weight_bytes,
+            input,
+            input_elements,
+            output,
+            output_elements,
+            batch_size,
+            rows,
+            cols,
+            WeightFormat::Q8_0,
+        )
+    })) {
+        Ok(status) => status,
+        Err(_) => STATUS_PANIC,
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+///
+/// `context` must be a live kernel context. Every data pointer must remain valid for its advertised
+/// length for the synchronous call. Output must be writable and must not alias either input.
+pub unsafe extern "C" fn jmodels_q8_0_f32_batched_matmul_with_context(
+    context: *const KernelContext,
+    weights: *const u8,
+    weight_bytes: u64,
+    input: *const f32,
+    input_elements: u64,
+    output: *mut f32,
+    output_elements: u64,
+    batch_size: u32,
+    rows: u32,
+    cols: u32,
+) -> i32 {
+    if context.is_null() {
+        return STATUS_NULL_POINTER;
+    }
+    match catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: Java owns the context for the duration of this synchronous call.
+        let context = unsafe { &*context };
+        quantized_f32_batched_matmul(
+            Some(context),
+            weights,
+            weight_bytes,
+            input,
+            input_elements,
+            output,
+            output_elements,
+            batch_size,
+            rows,
+            cols,
+            WeightFormat::Q8_0,
         )
     })) {
         Ok(status) => status,
@@ -358,7 +468,7 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_grouped_batched_matmul(
     cols: u32,
 ) -> i32 {
     match catch_unwind(AssertUnwindSafe(|| {
-        q4_0_f32_grouped_batched_matmul(
+        quantized_f32_grouped_batched_matmul(
             None,
             weight_pointers,
             weight_bytes,
@@ -370,6 +480,7 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_grouped_batched_matmul(
             output_elements,
             batch_size,
             cols,
+            WeightFormat::Q4_0,
         )
     })) {
         Ok(status) => status,
@@ -401,7 +512,7 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_grouped_batched_matmul_with_context(
     match catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: Java owns the context for the duration of this synchronous call.
         let context = unsafe { &*context };
-        q4_0_f32_grouped_batched_matmul(
+        quantized_f32_grouped_batched_matmul(
             Some(context),
             weight_pointers,
             weight_bytes,
@@ -413,6 +524,89 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_grouped_batched_matmul_with_context(
             output_elements,
             batch_size,
             cols,
+            WeightFormat::Q4_0,
+        )
+    })) {
+        Ok(status) => status,
+        Err(_) => STATUS_PANIC,
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+///
+/// Metadata arrays must contain `matrix_count` entries. Every data pointer must remain valid for
+/// its advertised length for the synchronous call, and output must not alias any input.
+pub unsafe extern "C" fn jmodels_q8_0_f32_grouped_batched_matmul(
+    weight_pointers: *const *const u8,
+    weight_bytes: *const u64,
+    rows: *const u32,
+    matrix_count: u32,
+    input: *const f32,
+    input_elements: u64,
+    output: *mut f32,
+    output_elements: u64,
+    batch_size: u32,
+    cols: u32,
+) -> i32 {
+    match catch_unwind(AssertUnwindSafe(|| {
+        quantized_f32_grouped_batched_matmul(
+            None,
+            weight_pointers,
+            weight_bytes,
+            rows,
+            matrix_count,
+            input,
+            input_elements,
+            output,
+            output_elements,
+            batch_size,
+            cols,
+            WeightFormat::Q8_0,
+        )
+    })) {
+        Ok(status) => status,
+        Err(_) => STATUS_PANIC,
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+///
+/// `context` must be live, metadata arrays must contain `matrix_count` entries, and every data
+/// pointer must remain valid for its advertised length. Output must not alias any input.
+pub unsafe extern "C" fn jmodels_q8_0_f32_grouped_batched_matmul_with_context(
+    context: *const KernelContext,
+    weight_pointers: *const *const u8,
+    weight_bytes: *const u64,
+    rows: *const u32,
+    matrix_count: u32,
+    input: *const f32,
+    input_elements: u64,
+    output: *mut f32,
+    output_elements: u64,
+    batch_size: u32,
+    cols: u32,
+) -> i32 {
+    if context.is_null() {
+        return STATUS_NULL_POINTER;
+    }
+    match catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: Java owns the context for the duration of this synchronous call.
+        let context = unsafe { &*context };
+        quantized_f32_grouped_batched_matmul(
+            Some(context),
+            weight_pointers,
+            weight_bytes,
+            rows,
+            matrix_count,
+            input,
+            input_elements,
+            output,
+            output_elements,
+            batch_size,
+            cols,
+            WeightFormat::Q8_0,
         )
     })) {
         Ok(status) => status,
@@ -421,7 +615,7 @@ pub unsafe extern "C" fn jmodels_q4_0_f32_grouped_batched_matmul_with_context(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn q4_0_f32_batched_matmul(
+fn quantized_f32_batched_matmul(
     context: Option<&KernelContext>,
     weights: *const u8,
     weight_bytes: u64,
@@ -432,6 +626,7 @@ fn q4_0_f32_batched_matmul(
     batch_size: u32,
     rows: u32,
     cols: u32,
+    format: WeightFormat,
 ) -> i32 {
     if weights.is_null() || input.is_null() || output.is_null() {
         return STATUS_NULL_POINTER;
@@ -444,7 +639,7 @@ fn q4_0_f32_batched_matmul(
     let blocks_per_row = cols / QK;
     let Some(required_weight_bytes) = rows
         .checked_mul(blocks_per_row)
-        .and_then(|blocks| blocks.checked_mul(Q4_0_BLOCK_BYTES))
+        .and_then(|blocks| blocks.checked_mul(format.block_bytes()))
     else {
         return STATUS_INVALID_SHAPE;
     };
@@ -486,7 +681,7 @@ fn q4_0_f32_batched_matmul(
         rows,
         cols,
         output,
-        selected_q4_kernel(),
+        format.selected_kernel(),
     ) {
         return STATUS_PANIC;
     }
@@ -494,7 +689,7 @@ fn q4_0_f32_batched_matmul(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn q4_0_f32_grouped_batched_matmul(
+fn quantized_f32_grouped_batched_matmul(
     context: Option<&KernelContext>,
     weight_pointers: *const *const u8,
     weight_bytes: *const u64,
@@ -506,6 +701,7 @@ fn q4_0_f32_grouped_batched_matmul(
     output_elements: u64,
     batch_size: u32,
     cols: u32,
+    format: WeightFormat,
 ) -> i32 {
     if weight_pointers.is_null()
         || weight_bytes.is_null()
@@ -537,7 +733,7 @@ fn q4_0_f32_grouped_batched_matmul(
         }
         let Some(required_weight_bytes) = matrix_rows
             .checked_mul(blocks_per_row)
-            .and_then(|blocks| blocks.checked_mul(Q4_0_BLOCK_BYTES))
+            .and_then(|blocks| blocks.checked_mul(format.block_bytes()))
         else {
             return STATUS_INVALID_SHAPE;
         };
@@ -574,11 +770,11 @@ fn q4_0_f32_grouped_batched_matmul(
         &mut activation_scales,
     );
 
-    let kernel = selected_q4_kernel();
+    let kernel = format.selected_kernel();
     let mut output_offset = 0;
     for matrix in 0..matrix_count {
         let matrix_rows = rows[matrix] as usize;
-        let required_weight_bytes = matrix_rows * blocks_per_row * Q4_0_BLOCK_BYTES;
+        let required_weight_bytes = matrix_rows * blocks_per_row * format.block_bytes();
         let matrix_output_elements = batch_size * matrix_rows;
         // SAFETY: each pointer and byte length was validated above.
         let weights =
@@ -611,7 +807,7 @@ fn compute_outputs(
     rows: usize,
     cols: usize,
     output: &mut [f32],
-    kernel: Q4Kernel,
+    kernel: DotKernel,
 ) -> bool {
     if let Some(context) = context {
         return context.workers.execute(ParallelJob {
@@ -679,13 +875,13 @@ unsafe fn compute_batched_row_range(
     cols: usize,
     start_row: usize,
     end_row: usize,
-    kernel: Q4Kernel,
+    kernel: DotKernel,
 ) {
     match kernel {
-        Q4Kernel::Scalar => {
+        DotKernel::Q4Scalar => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
-                compute_batched_row_range_scalar(
+                compute_q4_batched_row_range_scalar(
                     weights,
                     quantized,
                     activation_scales,
@@ -699,10 +895,43 @@ unsafe fn compute_batched_row_range(
             }
         }
         #[cfg(target_arch = "x86_64")]
-        Q4Kernel::Avx2 => {
+        DotKernel::Q4Avx2 => {
             // SAFETY: runtime dispatch selected this variant only when AVX2 and FMA are available.
             unsafe {
-                compute_batched_row_range_avx2(
+                compute_q4_batched_row_range_avx2(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        DotKernel::Q8Scalar => {
+            // SAFETY: the caller assigns this worker an exclusive matrix-row range.
+            unsafe {
+                compute_q8_batched_row_range_scalar(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
+        DotKernel::Q8Avx2 => {
+            // SAFETY: runtime dispatch selected this variant only when AVX2 and FMA are available.
+            unsafe {
+                compute_q8_batched_row_range_avx2(
                     weights,
                     quantized,
                     activation_scales,
@@ -719,7 +948,7 @@ unsafe fn compute_batched_row_range(
 }
 
 #[allow(clippy::too_many_arguments)]
-unsafe fn compute_batched_row_range_scalar(
+unsafe fn compute_q4_batched_row_range_scalar(
     weights: &[u8],
     quantized: &[i8],
     activation_scales: &[f32],
@@ -762,7 +991,7 @@ unsafe fn compute_batched_row_range_scalar(
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
 #[target_feature(enable = "avx2,fma")]
-unsafe fn compute_batched_row_range_avx2(
+unsafe fn compute_q4_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
     activation_scales: &[f32],
@@ -809,6 +1038,93 @@ unsafe fn compute_batched_row_range_avx2(
 }
 
 #[allow(clippy::too_many_arguments)]
+unsafe fn compute_q8_batched_row_range_scalar(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    let blocks_per_row = cols / QK;
+    let mut sums = vec![0_f32; batch_size];
+    for row in start_row..end_row {
+        sums.fill(0.0);
+        for block in 0..blocks_per_row {
+            let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
+            let weight_scale = f16_to_f32(u16::from_le_bytes([
+                weights[weight_offset],
+                weights[weight_offset + 1],
+            ]));
+            for batch in 0..batch_size {
+                let input_offset = batch * cols + block * QK;
+                let integer_sum = q8_0_q8_0_block_sum_scalar(
+                    &weights[weight_offset + 2..],
+                    &quantized[input_offset..],
+                );
+                let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+                sums[batch] = scale.mul_add(integer_sum as f32, sums[batch]);
+            }
+        }
+        for (batch, &sum) in sums.iter().enumerate() {
+            // SAFETY: each worker owns this row across all batch-major output planes.
+            unsafe {
+                output.add(batch * rows + row).write(sum);
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn compute_q8_batched_row_range_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    let blocks_per_row = cols / QK;
+    let mut sums = vec![0_f32; batch_size];
+    for row in start_row..end_row {
+        sums.fill(0.0);
+        for block in 0..blocks_per_row {
+            let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
+            let weight_scale = f16_to_f32(u16::from_le_bytes([
+                weights[weight_offset],
+                weights[weight_offset + 1],
+            ]));
+            for batch in 0..batch_size {
+                let input_offset = batch * cols + block * QK;
+                // SAFETY: every validated weight and activation block contains 32 signed bytes.
+                let integer_sum = unsafe {
+                    q8_0_q8_0_block_sum_avx2(
+                        weights.as_ptr().add(weight_offset + 2).cast(),
+                        quantized.as_ptr().add(input_offset),
+                    )
+                };
+                let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+                sums[batch] = scale.mul_add(integer_sum as f32, sums[batch]);
+            }
+        }
+        for (batch, &sum) in sums.iter().enumerate() {
+            // SAFETY: each worker owns this row across all batch-major output planes.
+            unsafe {
+                output.add(batch * rows + row).write(sum);
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn compute_output_range(
     weights: &[u8],
     quantized: &[i8],
@@ -817,33 +1133,51 @@ fn compute_output_range(
     cols: usize,
     start_index: usize,
     output: &mut [f32],
-    kernel: Q4Kernel,
+    kernel: DotKernel,
 ) {
     for (local_index, slot) in output.iter_mut().enumerate() {
         let output_index = start_index + local_index;
         let batch = output_index / rows;
         let row = output_index % rows;
         *slot = match kernel {
-            Q4Kernel::Scalar => {
+            DotKernel::Q4Scalar => {
                 dot_q4_0_q8_0_row_scalar(weights, quantized, activation_scales, batch, row, cols)
             }
             #[cfg(target_arch = "x86_64")]
-            Q4Kernel::Avx2 => {
+            DotKernel::Q4Avx2 => {
                 // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
                 unsafe {
                     dot_q4_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
+                }
+            }
+            DotKernel::Q8Scalar => {
+                dot_q8_0_q8_0_row_scalar(weights, quantized, activation_scales, batch, row, cols)
+            }
+            #[cfg(target_arch = "x86_64")]
+            DotKernel::Q8Avx2 => {
+                // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
+                unsafe {
+                    dot_q8_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
             }
         };
     }
 }
 
-fn selected_q4_kernel() -> Q4Kernel {
+fn selected_q4_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
     if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
-        return Q4Kernel::Avx2;
+        return DotKernel::Q4Avx2;
     }
-    Q4Kernel::Scalar
+    DotKernel::Q4Scalar
+}
+
+fn selected_q8_kernel() -> DotKernel {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+        return DotKernel::Q8Avx2;
+    }
+    DotKernel::Q8Scalar
 }
 
 fn dot_q4_0_q8_0_row_scalar(
@@ -946,6 +1280,89 @@ unsafe fn q4_0_q8_0_signed_block_sum_avx2(signed_weights: __m256i, quantized: *c
     let signed_activations = _mm256_sign_epi8(activations, signed_weights);
     let pair_products = _mm256_maddubs_epi16(absolute_weights, signed_activations);
     let pair_sums = _mm256_madd_epi16(pair_products, _mm256_set1_epi16(1));
+    let mut lanes = [0_i32; 8];
+    unsafe { _mm256_storeu_si256(lanes.as_mut_ptr().cast(), pair_sums) };
+    lanes.into_iter().sum()
+}
+
+fn dot_q8_0_q8_0_row_scalar(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK;
+    let mut sum = 0_f32;
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
+        let input_offset = batch * cols + block * QK;
+        let integer_sum =
+            q8_0_q8_0_block_sum_scalar(&weights[weight_offset + 2..], &quantized[input_offset..]);
+        let weight_scale = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ]));
+        let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+        sum = scale.mul_add(integer_sum as f32, sum);
+    }
+    sum
+}
+
+#[inline(always)]
+fn q8_0_q8_0_block_sum_scalar(weights: &[u8], quantized: &[i8]) -> i32 {
+    let mut integer_sum = 0_i32;
+    for lane in 0..QK {
+        integer_sum += weights[lane] as i8 as i32 * quantized[lane] as i32;
+    }
+    integer_sum
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn dot_q8_0_q8_0_row_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK;
+    let mut sum = 0_f32;
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
+        let input_offset = batch * cols + block * QK;
+        // SAFETY: each validated Q8_0 block provides 32 signed bytes.
+        let integer_sum = unsafe {
+            q8_0_q8_0_block_sum_avx2(
+                weights.as_ptr().add(weight_offset + 2).cast(),
+                quantized.as_ptr().add(input_offset),
+            )
+        };
+        let weight_scale = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ]));
+        let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+        sum = scale.mul_add(integer_sum as f32, sum);
+    }
+    sum
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn q8_0_q8_0_block_sum_avx2(weights: *const i8, quantized: *const i8) -> i32 {
+    // Widen signed bytes before multiplication so every Q8 value, including -128, is exact and
+    // adjacent products cannot saturate in 16-bit lanes.
+    let weight_low = _mm256_cvtepi8_epi16(unsafe { _mm_loadu_si128(weights.cast()) });
+    let weight_high = _mm256_cvtepi8_epi16(unsafe { _mm_loadu_si128(weights.add(16).cast()) });
+    let input_low = _mm256_cvtepi8_epi16(unsafe { _mm_loadu_si128(quantized.cast()) });
+    let input_high = _mm256_cvtepi8_epi16(unsafe { _mm_loadu_si128(quantized.add(16).cast()) });
+    let low_pairs = _mm256_madd_epi16(weight_low, input_low);
+    let high_pairs = _mm256_madd_epi16(weight_high, input_high);
+    let pair_sums = _mm256_add_epi32(low_pairs, high_pairs);
     let mut lanes = [0_i32; 8];
     unsafe { _mm256_storeu_si256(lanes.as_mut_ptr().cast(), pair_sums) };
     lanes.into_iter().sum()
@@ -1156,6 +1573,8 @@ mod tests {
             CAPABILITY_Q4_0_F32_BATCHED_MATMUL
                 | CAPABILITY_Q4_0_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_PERSISTENT_WORKER_CONTEXT
+                | CAPABILITY_Q8_0_F32_BATCHED_MATMUL
+                | CAPABILITY_Q8_0_F32_GROUPED_BATCHED_MATMUL
         );
     }
 

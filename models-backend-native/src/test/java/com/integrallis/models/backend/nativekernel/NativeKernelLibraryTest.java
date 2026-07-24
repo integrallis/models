@@ -32,10 +32,12 @@ class NativeKernelLibraryTest {
       ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   @Test
-  void exposesVersionedQ4KernelCapability() {
+  void exposesVersionedQuantizedKernelCapabilities() {
     try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath())) {
       assertThat(kernels.abiVersion()).isEqualTo(NativeKernelLibrary.ABI_VERSION);
       assertThat(kernels.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.PERSISTENT_WORKER_CONTEXT)).isTrue();
     }
   }
@@ -93,12 +95,35 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-q4_0-v1");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-q4_0-q8_0-v1");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
           .containsEntry(PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY, "true")
           .containsEntry(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "false");
+    }
+  }
+
+  @Test
+  void reusableGgufKernelComputesExactQ8_0BatchedMatrixMultiplication() {
+    int batchSize = 3;
+    int rows = 5;
+    int cols = 64;
+    float[] input = inputs(batchSize, cols);
+    float[] expected = new float[batchSize * rows];
+    float[] actual = new float[batchSize * rows];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment weights = arena.allocate(rows * cols / 32L * 34L);
+      fillQ8_0Weights(weights, rows, cols);
+      referenceQ8_0F32BatchedMatmul(weights, input, batchSize, rows, cols, expected);
+
+      assertThat(kernel.supports(GgufTensorType.Q8_0)).isTrue();
+      assertThat(kernel.isEligible(GgufTensorType.Q8_0, batchSize, rows, cols)).isTrue();
+      kernel.multiply(actual, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
+
+      assertThat(actual).containsExactly(expected);
     }
   }
 
@@ -136,6 +161,54 @@ class NativeKernelLibraryTest {
           actualSecond,
           secondWeights,
           GgufTensorType.Q4_0,
+          secondRows,
+          input,
+          batchSize,
+          cols);
+
+      assertThat(actualFirst).containsExactly(expectedFirst);
+      assertThat(actualSecond).containsExactly(expectedSecond);
+    }
+  }
+
+  @Test
+  void groupedKernelSharesInputAcrossTwoExactQ8Projections() {
+    int batchSize = 3;
+    int cols = 64;
+    int firstRows = 5;
+    int secondRows = 7;
+    float[] input = inputs(batchSize, cols);
+    float[] expectedFirst = new float[batchSize * firstRows];
+    float[] expectedSecond = new float[batchSize * secondRows];
+    float[] actualFirst = new float[expectedFirst.length];
+    float[] actualSecond = new float[expectedSecond.length];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment firstWeights = arena.allocate(firstRows * cols / 32L * 34L);
+      MemorySegment secondWeights = arena.allocate(secondRows * cols / 32L * 34L);
+      fillQ8_0Weights(firstWeights, firstRows, cols);
+      fillQ8_0Weights(secondWeights, secondRows, cols);
+      referenceQ8_0F32BatchedMatmul(firstWeights, input, batchSize, firstRows, cols, expectedFirst);
+      referenceQ8_0F32BatchedMatmul(
+          secondWeights, input, batchSize, secondRows, cols, expectedSecond);
+
+      assertThat(
+              kernel.isDualEligible(
+                  GgufTensorType.Q8_0, firstRows, GgufTensorType.Q8_0, secondRows, batchSize, cols))
+          .isTrue();
+      assertThat(
+              kernel.isDualEligible(
+                  GgufTensorType.Q4_0, firstRows, GgufTensorType.Q8_0, secondRows, batchSize, cols))
+          .isFalse();
+      kernel.multiplyDual(
+          actualFirst,
+          firstWeights,
+          GgufTensorType.Q8_0,
+          firstRows,
+          actualSecond,
+          secondWeights,
+          GgufTensorType.Q8_0,
           secondRows,
           input,
           batchSize,
@@ -232,27 +305,27 @@ class NativeKernelLibraryTest {
     }
   }
 
+  private static void fillQ8_0Weights(MemorySegment weights, int rows, int cols) {
+    int blocksPerRow = cols / 32;
+    for (int row = 0; row < rows; row++) {
+      for (int block = 0; block < blocksPerRow; block++) {
+        long offset = ((long) row * blocksPerRow + block) * 34;
+        float scale = (row + block + 1) * 0.03125f;
+        weights.set(LE_SHORT, offset, Float.floatToFloat16(scale));
+        for (int lane = 0; lane < 32; lane++) {
+          int quantized = ((row * 37 + block * 19 + lane * 11) & 0xff) - 128;
+          weights.set(ValueLayout.JAVA_BYTE, offset + 2 + lane, (byte) quantized);
+        }
+      }
+    }
+  }
+
   private static void referenceQ4_0F32BatchedMatmul(
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
     int blocksPerRow = cols / 32;
     byte[] quantized = new byte[batchSize * cols];
     float[] scales = new float[batchSize * blocksPerRow];
-    for (int batch = 0; batch < batchSize; batch++) {
-      for (int block = 0; block < blocksPerRow; block++) {
-        int inputOffset = batch * cols + block * 32;
-        float absoluteMax = 0;
-        for (int lane = 0; lane < 32; lane++) {
-          absoluteMax = Math.max(absoluteMax, Math.abs(input[inputOffset + lane]));
-        }
-        float inverseScale = absoluteMax == 0 ? 0 : 127.0f / absoluteMax;
-        scales[batch * blocksPerRow + block] =
-            Float.float16ToFloat(Float.floatToFloat16(absoluteMax / 127.0f));
-        for (int lane = 0; lane < 32; lane++) {
-          quantized[inputOffset + lane] =
-              (byte) ggmlNearestInt(input[inputOffset + lane] * inverseScale);
-        }
-      }
-    }
+    quantizeInputs(input, batchSize, cols, quantized, scales);
 
     for (int batch = 0; batch < batchSize; batch++) {
       for (int row = 0; row < rows; row++) {
@@ -272,6 +345,55 @@ class NativeKernelLibraryTest {
           sum = Math.fma(scale, integerSum, sum);
         }
         output[batch * rows + row] = sum;
+      }
+    }
+  }
+
+  private static void referenceQ8_0F32BatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    int blocksPerRow = cols / 32;
+    byte[] quantized = new byte[batchSize * cols];
+    float[] scales = new float[batchSize * blocksPerRow];
+    quantizeInputs(input, batchSize, cols, quantized, scales);
+
+    for (int batch = 0; batch < batchSize; batch++) {
+      for (int row = 0; row < rows; row++) {
+        float sum = 0;
+        for (int block = 0; block < blocksPerRow; block++) {
+          long weightOffset = ((long) row * blocksPerRow + block) * 34;
+          float weightScale = Float.float16ToFloat(weights.get(LE_SHORT, weightOffset));
+          int inputOffset = batch * cols + block * 32;
+          int integerSum = 0;
+          for (int lane = 0; lane < 32; lane++) {
+            integerSum +=
+                weights.get(ValueLayout.JAVA_BYTE, weightOffset + 2 + lane)
+                    * quantized[inputOffset + lane];
+          }
+          float scale = weightScale * scales[batch * blocksPerRow + block];
+          sum = Math.fma(scale, integerSum, sum);
+        }
+        output[batch * rows + row] = sum;
+      }
+    }
+  }
+
+  private static void quantizeInputs(
+      float[] input, int batchSize, int cols, byte[] quantized, float[] scales) {
+    int blocksPerRow = cols / 32;
+    for (int batch = 0; batch < batchSize; batch++) {
+      for (int block = 0; block < blocksPerRow; block++) {
+        int inputOffset = batch * cols + block * 32;
+        float absoluteMax = 0;
+        for (int lane = 0; lane < 32; lane++) {
+          absoluteMax = Math.max(absoluteMax, Math.abs(input[inputOffset + lane]));
+        }
+        float inverseScale = absoluteMax == 0 ? 0 : 127.0f / absoluteMax;
+        scales[batch * blocksPerRow + block] =
+            Float.float16ToFloat(Float.floatToFloat16(absoluteMax / 127.0f));
+        for (int lane = 0; lane < 32; lane++) {
+          quantized[inputOffset + lane] =
+              (byte) ggmlNearestInt(input[inputOffset + lane] * inverseScale);
+        }
       }
     }
   }

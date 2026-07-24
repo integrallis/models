@@ -6,10 +6,10 @@ the transformer graph, KV-cache ownership, sampling, and generation remain in Ja
 The native boundary is a versioned C ABI implemented by the Models-owned
 `jmodels-kernels` Rust crate.
 
-The first ABI supports exact Q4_0 batched and grouped projections. Its x86-64 path
-uses AVX2/FMA packed-byte dots, vectorized Q8_0 activation preparation, batched
-weight reuse, and an explicitly owned persistent worker context. Scalar exports
-remain available as conformance fallbacks.
+The first ABI supports exact Q4_0 and Q8_0 batched and grouped projections. Its
+x86-64 path uses format-specialized AVX2/FMA integer dots, vectorized Q8_0
+activation preparation, batched weight reuse, and an explicitly owned persistent
+worker context. Scalar exports remain available as conformance fallbacks.
 
 ## Build and test
 
@@ -22,7 +22,8 @@ remain available as conformance fallbacks.
 Gradle builds the host library with Cargo under
 `models-backend-native/build/rust-target`. Native Java tests run with
 `--enable-native-access=ALL-UNNAMED`. The real-model integration test requires
-`~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf`.
+`~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf` and
+`~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf`.
 
 ## Load
 

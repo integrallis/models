@@ -76,6 +76,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle contextDestroyHandle;
   private final MethodHandle q4BatchedHandle;
   private final MethodHandle q4GroupedBatchedHandle;
+  private final MethodHandle q8BatchedHandle;
+  private final MethodHandle q8GroupedBatchedHandle;
   private boolean closed;
 
   private NativeKernelLibrary(
@@ -84,13 +86,17 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MemorySegment context,
       MethodHandle contextDestroyHandle,
       MethodHandle q4BatchedHandle,
-      MethodHandle q4GroupedBatchedHandle) {
+      MethodHandle q4GroupedBatchedHandle,
+      MethodHandle q8BatchedHandle,
+      MethodHandle q8GroupedBatchedHandle) {
     this.libraryArena = libraryArena;
     this.capabilities = capabilities;
     this.context = context;
     this.contextDestroyHandle = contextDestroyHandle;
     this.q4BatchedHandle = q4BatchedHandle;
     this.q4GroupedBatchedHandle = q4GroupedBatchedHandle;
+    this.q8BatchedHandle = q8BatchedHandle;
+    this.q8GroupedBatchedHandle = q8GroupedBatchedHandle;
   }
 
   /** Opens a platform library and rejects incompatible ABI versions immediately. */
@@ -132,13 +138,30 @@ public final class NativeKernelLibrary implements AutoCloseable {
               lookup,
               "jmodels_q4_0_f32_grouped_batched_matmul_with_context",
               Q4_0_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
+      MethodHandle q8Batched =
+          downcall(
+              lookup,
+              "jmodels_q8_0_f32_batched_matmul_with_context",
+              Q4_0_BATCHED_WITH_CONTEXT_DESCRIPTOR);
+      MethodHandle q8GroupedBatched =
+          downcall(
+              lookup,
+              "jmodels_q8_0_f32_grouped_batched_matmul_with_context",
+              Q4_0_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
       MemorySegment context =
           invokeAddress(contextCreate, configuredThreadCount(), "create worker context");
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
       }
       return new NativeKernelLibrary(
-          arena, capabilityMask, context, contextDestroy, q4Batched, q4GroupedBatched);
+          arena,
+          capabilityMask,
+          context,
+          contextDestroy,
+          q4Batched,
+          q4GroupedBatched,
+          q8Batched,
+          q8GroupedBatched);
     } catch (RuntimeException | LinkageError failure) {
       arena.close();
       throw failure;
@@ -159,22 +182,167 @@ public final class NativeKernelLibrary implements AutoCloseable {
   /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q4_0 projection. */
   public void q4_0F32BatchedMatmul(
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    f32BatchedMatmul(
+        "Q4_0",
+        18L,
+        NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL,
+        q4BatchedHandle,
+        weights,
+        input,
+        batchSize,
+        rows,
+        cols,
+        output);
+  }
+
+  /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q8_0 projection. */
+  public void q8_0F32BatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    f32BatchedMatmul(
+        "Q8_0",
+        34L,
+        NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL,
+        q8BatchedHandle,
+        weights,
+        input,
+        batchSize,
+        rows,
+        cols,
+        output);
+  }
+
+  void q4_0F32BatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "Q4_0",
+        NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL,
+        q4BatchedHandle,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void q8_0F32BatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "Q8_0",
+        NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL,
+        q8BatchedHandle,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void q4_0F32GroupedBatchedMatmul(
+      MemorySegment weightPointers,
+      MemorySegment weightBytes,
+      MemorySegment rows,
+      int matrixCount,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int cols) {
+    invokeGrouped(
+        "Q4_0",
+        NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL,
+        q4GroupedBatchedHandle,
+        weightPointers,
+        weightBytes,
+        rows,
+        matrixCount,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        cols);
+  }
+
+  void q8_0F32GroupedBatchedMatmul(
+      MemorySegment weightPointers,
+      MemorySegment weightBytes,
+      MemorySegment rows,
+      int matrixCount,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int cols) {
+    invokeGrouped(
+        "Q8_0",
+        NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL,
+        q8GroupedBatchedHandle,
+        weightPointers,
+        weightBytes,
+        rows,
+        matrixCount,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        cols);
+  }
+
+  private void f32BatchedMatmul(
+      String type,
+      long blockBytes,
+      NativeKernelCapability capability,
+      MethodHandle handle,
+      MemorySegment weights,
+      float[] input,
+      int batchSize,
+      int rows,
+      int cols,
+      float[] output) {
     Objects.requireNonNull(weights, "weights");
     Objects.requireNonNull(input, "input");
     Objects.requireNonNull(output, "output");
-    if (!supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL)) {
-      throw new UnsupportedOperationException("loaded native library has no Q4_0 batched kernel");
+    if (!supports(capability)) {
+      throw new UnsupportedOperationException(
+          "loaded native library has no " + type + " batched kernel");
     }
     if (batchSize < 1 || rows < 1 || cols < 1) {
       throw new IllegalArgumentException("batchSize, rows, and cols must be positive");
     }
     if (cols % 32 != 0) {
-      throw new IllegalArgumentException("Q4_0 column count must be a multiple of 32: " + cols);
+      throw new IllegalArgumentException(type + " column count must be a multiple of 32: " + cols);
     }
 
     int inputElements = Math.multiplyExact(batchSize, cols);
     int outputElements = Math.multiplyExact(batchSize, rows);
-    long weightBytes = Math.multiplyExact(Math.multiplyExact((long) rows, cols / 32L), 18L);
+    long weightBytes = Math.multiplyExact(Math.multiplyExact((long) rows, cols / 32L), blockBytes);
     if (input.length < inputElements) {
       throw new IllegalArgumentException(
           "input requires " + inputElements + " elements but has " + input.length);
@@ -195,7 +363,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MemorySegment nativeInput = callArena.allocate(ValueLayout.JAVA_FLOAT, inputElements);
       MemorySegment nativeOutput = callArena.allocate(ValueLayout.JAVA_FLOAT, outputElements);
       MemorySegment.copy(input, 0, nativeInput, ValueLayout.JAVA_FLOAT, 0, inputElements);
-      q4_0F32BatchedMatmul(
+      invokeBatched(
+          type,
+          capability,
+          handle,
           weights,
           weightBytes,
           nativeInput,
@@ -206,14 +377,13 @@ public final class NativeKernelLibrary implements AutoCloseable {
           rows,
           cols);
       MemorySegment.copy(nativeOutput, ValueLayout.JAVA_FLOAT, 0, output, 0, outputElements);
-    } catch (RuntimeException failure) {
-      throw failure;
-    } catch (Throwable failure) {
-      throw bridgeFailure("Q4_0 batched matmul", failure);
     }
   }
 
-  void q4_0F32BatchedMatmul(
+  private void invokeBatched(
+      String type,
+      NativeKernelCapability capability,
+      MethodHandle handle,
       MemorySegment weights,
       long weightBytes,
       MemorySegment nativeInput,
@@ -223,10 +393,14 @@ public final class NativeKernelLibrary implements AutoCloseable {
       int batchSize,
       int rows,
       int cols) {
+    if (!supports(capability)) {
+      throw new UnsupportedOperationException(
+          "loaded native library has no " + type + " batched kernel");
+    }
     try {
       int status =
           (int)
-              q4BatchedHandle.invokeExact(
+              handle.invokeExact(
                   context,
                   weights,
                   weightBytes,
@@ -238,16 +412,20 @@ public final class NativeKernelLibrary implements AutoCloseable {
                   rows,
                   cols);
       if (status != STATUS_OK) {
-        throw new IllegalStateException("native Q4_0 batched kernel failed: " + statusName(status));
+        throw new IllegalStateException(
+            "native " + type + " batched kernel failed: " + statusName(status));
       }
     } catch (RuntimeException failure) {
       throw failure;
     } catch (Throwable failure) {
-      throw bridgeFailure("Q4_0 batched matmul", failure);
+      throw bridgeFailure(type + " batched matmul", failure);
     }
   }
 
-  void q4_0F32GroupedBatchedMatmul(
+  private void invokeGrouped(
+      String type,
+      NativeKernelCapability capability,
+      MethodHandle handle,
       MemorySegment weightPointers,
       MemorySegment weightBytes,
       MemorySegment rows,
@@ -258,14 +436,14 @@ public final class NativeKernelLibrary implements AutoCloseable {
       long outputElements,
       int batchSize,
       int cols) {
-    if (!supports(NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL)) {
+    if (!supports(capability)) {
       throw new UnsupportedOperationException(
-          "loaded native library has no grouped Q4_0 batched kernel");
+          "loaded native library has no grouped " + type + " batched kernel");
     }
     try {
       int status =
           (int)
-              q4GroupedBatchedHandle.invokeExact(
+              handle.invokeExact(
                   context,
                   weightPointers,
                   weightBytes,
@@ -279,12 +457,12 @@ public final class NativeKernelLibrary implements AutoCloseable {
                   cols);
       if (status != STATUS_OK) {
         throw new IllegalStateException(
-            "native grouped Q4_0 batched kernel failed: " + statusName(status));
+            "native grouped " + type + " batched kernel failed: " + statusName(status));
       }
     } catch (RuntimeException failure) {
       throw failure;
     } catch (Throwable failure) {
-      throw bridgeFailure("grouped Q4_0 batched matmul", failure);
+      throw bridgeFailure("grouped " + type + " batched matmul", failure);
     }
   }
 

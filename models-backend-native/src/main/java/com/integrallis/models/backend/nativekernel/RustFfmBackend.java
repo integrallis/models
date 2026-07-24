@@ -38,7 +38,7 @@ import java.util.Objects;
 public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String PLAN_VERSION = "rust-ffm-v1";
+  public static final String PLAN_VERSION = "rust-ffm-v2";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -148,14 +148,24 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     environment.put("native-kernel-abi", Integer.toString(NativeKernelLibrary.ABI_VERSION));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
     optimizations.add(
-        new OptimizationDecision(
+        nativeQuantizedDecision(
             "rust-q4-0-batched-matmul",
-            OptimizationStatus.ENABLED,
-            "eligible Q4_0 batched projections execute in the Models Rust kernel",
-            Map.of(
-                "abi", Integer.toString(NativeKernelLibrary.ABI_VERSION),
-                "boundary", "panama-ffm",
-                "transformer", "java")));
+            "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        nativeQuantizedDecision(
+            "rust-q8-0-batched-matmul",
+            "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel"));
     return new BackendDiagnostics("rust-ffm", PLAN_VERSION, environment, optimizations);
+  }
+
+  private static OptimizationDecision nativeQuantizedDecision(String id, String reason) {
+    return new OptimizationDecision(
+        id,
+        OptimizationStatus.ENABLED,
+        reason,
+        Map.of(
+            "abi", Integer.toString(NativeKernelLibrary.ABI_VERSION),
+            "boundary", "panama-ffm",
+            "transformer", "java"));
   }
 }

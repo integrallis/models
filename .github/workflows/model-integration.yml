@@ -123,7 +123,7 @@ jobs:
           --no-daemon
           --stacktrace
 
-      - name: Run Models Rust FFM Q4 integration test
+      - name: Run Models Rust FFM Q4 and Q8 integration tests
         working-directory: models
         run: >
           ./gradlew
@@ -137,5 +137,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: purejava-model-integration-test-reports
-          path: models/models-backend-purejava/build/reports/tests/
+          path: |
+            models/models-backend-purejava/build/reports/tests/
+            models/models-backend-native/build/reports/tests/
           retention-days: 30
