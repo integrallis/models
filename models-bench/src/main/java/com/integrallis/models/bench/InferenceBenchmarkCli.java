@@ -34,10 +34,11 @@ import java.util.Set;
 import org.modeljars.ModelJarDescriptor;
 import org.modeljars.ModelJarRegistry;
 
-/** Runs comparable pure-Java, Ollama, and llama.cpp inference measurements. */
+/** Runs comparable in-process Models, Ollama, and llama.cpp inference measurements. */
 public final class InferenceBenchmarkCli {
 
-  private static final Set<String> BACKENDS = Set.of("pure-java", "ollama", "llama.cpp");
+  private static final Set<String> BACKENDS =
+      Set.of("pure-java", "rust-ffm", "ollama", "llama.cpp");
   private static final String PROMPT_STRATEGY = "sha256-nonce-prefix-v1";
   private static final Set<String> OPTIONS =
       Set.of(
@@ -112,9 +113,13 @@ public final class InferenceBenchmarkCli {
     String model;
     Path artifact;
     Optional<ModelJarDescriptor> modelJarDescriptor;
-    if ("pure-java".equals(backend)) {
+    if (isInProcess(backend)) {
       if (values.containsKey("artifact")) {
-        throw new IllegalArgumentException("--artifact cannot override a pure-java model source");
+        throw new IllegalArgumentException("--artifact cannot override an in-process model source");
+      }
+      if ("rust-ffm".equals(backend) && values.containsKey("modeljar")) {
+        throw new IllegalArgumentException(
+            "--modeljar requires rust-ffm catalog metadata and is not enabled yet");
       }
       PureJavaModelSource source =
           PureJavaModelSource.resolve(
@@ -148,13 +153,13 @@ public final class InferenceBenchmarkCli {
     int iterations = integer(values, "iterations", 10);
     int contextLength = integer(values, "context", 2_048);
     String backendVersion =
-        values.getOrDefault(
-            "backend-version", "pure-java".equals(backend) ? "development" : "unknown");
+        values.getOrDefault("backend-version", isInProcess(backend) ? "development" : "unknown");
     int threads = integer(values, "threads", Runtime.getRuntime().availableProcessors());
     int availableProcessors = Runtime.getRuntime().availableProcessors();
-    if ("pure-java".equals(backend) && threads != availableProcessors) {
+    if (isInProcess(backend) && threads != availableProcessors) {
       throw new IllegalArgumentException(
-          "pure-java uses the JVM processor allocation; --threads must be "
+          backend
+              + " uses the JVM processor allocation; --threads must be "
               + availableProcessors
               + " for this process");
     }
@@ -250,6 +255,12 @@ public final class InferenceBenchmarkCli {
       return PureJavaBenchmarkTarget.load(
           new PureJavaModelSource(
               configuration.model(), configuration.artifact(), configuration.modelJarDescriptor()),
+          configuration.contextLength(),
+          configuration.speculativeOptions());
+    }
+    if ("rust-ffm".equals(configuration.backend())) {
+      return PureJavaBenchmarkTarget.loadRust(
+          configuration.artifact(),
           configuration.contextLength(),
           configuration.speculativeOptions());
     }
@@ -371,8 +382,9 @@ public final class InferenceBenchmarkCli {
     if (!"ngram".equals(mode)) {
       throw new IllegalArgumentException("--speculation must be none or ngram: " + mode);
     }
-    if (!"pure-java".equals(backend)) {
-      throw new IllegalArgumentException("--speculation ngram is currently supported by pure-java");
+    if (!isInProcess(backend)) {
+      throw new IllegalArgumentException(
+          "--speculation ngram is supported only by in-process Models backends");
     }
 
     SpeculativeGenerationOptions defaults = SpeculativeGenerationOptions.builder().build();
@@ -388,6 +400,10 @@ public final class InferenceBenchmarkCli {
                 doubleValue(values, "speculation-min-acceptance", defaults.minimumAcceptanceRate()))
         .cooldownTokens(integer(values, "speculation-cooldown", defaults.cooldownTokens()))
         .build();
+  }
+
+  private static boolean isInProcess(String backend) {
+    return "pure-java".equals(backend) || "rust-ffm".equals(backend);
   }
 
   private static String required(Map<String, String> values, String name) {

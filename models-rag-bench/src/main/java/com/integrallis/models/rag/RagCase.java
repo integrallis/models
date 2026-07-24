@@ -24,6 +24,7 @@ public record RagCase(
     String question,
     List<String> relevantDocumentIds,
     List<String> requiredFacts,
+    List<RagFactAlternative> factAlternatives,
     boolean answerable) {
   public RagCase {
     id = requireText(id, "id");
@@ -31,12 +32,33 @@ public record RagCase(
     relevantDocumentIds =
         List.copyOf(Objects.requireNonNull(relevantDocumentIds, "relevantDocumentIds"));
     requiredFacts = List.copyOf(Objects.requireNonNull(requiredFacts, "requiredFacts"));
+    factAlternatives =
+        factAlternatives == null
+            ? List.of()
+            : List.copyOf(Objects.requireNonNull(factAlternatives, "factAlternatives"));
+    for (RagFactAlternative alternative : factAlternatives) {
+      if (!requiredFacts.contains(alternative.fact())) {
+        throw new IllegalArgumentException("fact alternatives must reference required facts");
+      }
+    }
     if (answerable && (relevantDocumentIds.isEmpty() || requiredFacts.isEmpty())) {
       throw new IllegalArgumentException("answerable cases require sources and facts");
     }
-    if (!answerable && (!relevantDocumentIds.isEmpty() || !requiredFacts.isEmpty())) {
+    if (!answerable
+        && (!relevantDocumentIds.isEmpty()
+            || !requiredFacts.isEmpty()
+            || !factAlternatives.isEmpty())) {
       throw new IllegalArgumentException("unanswerable cases must not declare sources or facts");
     }
+  }
+
+  public RagCase(
+      String id,
+      String question,
+      List<String> relevantDocumentIds,
+      List<String> requiredFacts,
+      boolean answerable) {
+    this(id, question, relevantDocumentIds, requiredFacts, List.of(), answerable);
   }
 
   private static String requireText(String value, String name) {

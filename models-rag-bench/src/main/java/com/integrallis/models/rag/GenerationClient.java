@@ -16,6 +16,7 @@
 package com.integrallis.models.rag;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import java.util.Map;
 
 /** Measured text-generation boundary for in-process and server backends. */
 public interface GenerationClient extends AutoCloseable {
@@ -25,6 +26,14 @@ public interface GenerationClient extends AutoCloseable {
 
   default BackendDiagnostics diagnostics() {
     return BackendDiagnostics.unavailable(backend());
+  }
+
+  default HostedApiPricing hostedApiPricing() {
+    return null;
+  }
+
+  default Map<String, String> generationControls() {
+    return Map.of();
   }
 
   GenerationResult generate(String prompt, int maxTokens);

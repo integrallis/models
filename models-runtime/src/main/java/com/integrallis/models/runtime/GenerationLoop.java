@@ -97,7 +97,6 @@ public final class GenerationLoop {
       if (promptTokens.length == 0) {
         throw new IllegalArgumentException("prompt produced no tokens");
       }
-      int eosToken = tokenizer.eosToken();
 
       Sampler sampler = new Sampler(options);
       List<Integer> allTokens = new ArrayList<>();
@@ -122,19 +121,11 @@ public final class GenerationLoop {
               allTokens,
               logits,
               position,
-              eosToken,
               options.maxTokens(),
               speculativeMetrics);
         } else {
           generateSequentially(
-              tokenizer,
-              sampler,
-              stream,
-              allTokens,
-              logits,
-              position,
-              eosToken,
-              options.maxTokens());
+              tokenizer, sampler, stream, allTokens, logits, position, options.maxTokens());
         }
 
         stream.onComplete();
@@ -153,13 +144,12 @@ public final class GenerationLoop {
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
-      int eosToken,
       int maxTokens) {
     float[] logits = initialLogits;
     int position = initialPosition;
     for (int generated = 0; generated < maxTokens; generated++) {
       int nextToken = sampler.sample(logits, allTokens);
-      if (nextToken == eosToken) {
+      if (tokenizer.isEndOfGeneration(nextToken)) {
         return;
       }
       emit(tokenizer, stream, allTokens, nextToken);
@@ -179,7 +169,6 @@ public final class GenerationLoop {
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
-      int eosToken,
       int maxTokens,
       MutableSpeculativeMetrics metrics) {
     NgramDraftStrategy strategy = new NgramDraftStrategy(speculativeOptions);
@@ -202,7 +191,7 @@ public final class GenerationLoop {
       carriedToken = null;
       carriedLogits = null;
       carriedLogitRow = -1;
-      if (nextToken == eosToken) {
+      if (tokenizer.isEndOfGeneration(nextToken)) {
         return;
       }
 
@@ -258,7 +247,7 @@ public final class GenerationLoop {
       boolean reachedEos = false;
       while (accepted < draft.length && generated < maxTokens) {
         int targetToken = sampler.sample(verification, accepted, allTokens);
-        if (targetToken == eosToken) {
+        if (tokenizer.isEndOfGeneration(targetToken)) {
           reachedEos = true;
           break;
         }

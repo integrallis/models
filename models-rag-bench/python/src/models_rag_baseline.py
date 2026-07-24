@@ -48,6 +48,7 @@ class RagCase:
     question: str
     relevant_document_ids: tuple[str, ...]
     required_facts: tuple[str, ...]
+    fact_alternatives: tuple[tuple[str, tuple[str, ...]], ...]
     answerable: bool
 
 
@@ -64,6 +65,11 @@ class RagCorpus:
                 "question": case.question,
                 "relevantDocumentIds": list(case.relevant_document_ids),
                 "requiredFacts": list(case.required_facts),
+                "factAlternatives": [
+                    {"fact": fact, "alternative": alternative}
+                    for fact, alternatives in case.fact_alternatives
+                    for alternative in alternatives
+                ],
                 "answerable": case.answerable,
             }
             for case in self.cases
@@ -145,6 +151,22 @@ def load_corpus(corpus_dir: Path) -> RagCorpus:
             question=item["question"],
             relevant_document_ids=tuple(item["relevantDocumentIds"]),
             required_facts=tuple(item["requiredFacts"]),
+            fact_alternatives=tuple(
+                (
+                    alternative["fact"],
+                    tuple(
+                        candidate["alternative"]
+                        for candidate in item.get("factAlternatives", [])
+                        if candidate["fact"] == alternative["fact"]
+                    ),
+                )
+                for index, alternative in enumerate(item.get("factAlternatives", []))
+                if alternative["fact"]
+                not in {
+                    previous["fact"]
+                    for previous in item.get("factAlternatives", [])[:index]
+                }
+            ),
             answerable=item["answerable"],
         )
         for item in cases_data
@@ -207,8 +229,15 @@ def evaluate(case: RagCase, hits: list[RetrievedDocument], answer: str) -> RagEv
                 reciprocal_rank = 1.0 / hit.rank
                 break
     normalized_answer = _normalize_text(answer)
+    fact_alternatives = dict(case.fact_alternatives)
     fact_coverage = (
-        sum(_normalize_text(fact) in normalized_answer for fact in case.required_facts)
+        sum(
+            any(
+                _normalize_text(candidate) in normalized_answer
+                for candidate in (fact, *fact_alternatives.get(fact, ()))
+            )
+            for fact in case.required_facts
+        )
         / len(case.required_facts)
         if case.required_facts
         else 1.0

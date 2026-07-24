@@ -16,6 +16,7 @@
 package com.integrallis.models.rag;
 
 import java.util.List;
+import java.util.Map;
 
 /** Workload and deterministic generation controls embedded in every report. */
 public record RagBenchmarkSettings(
@@ -28,13 +29,14 @@ public record RagBenchmarkSettings(
     int iterations,
     int contextLength,
     int threads,
-    double temperature,
-    int samplingTopK,
-    double topP,
-    double repetitionPenalty,
-    long seed,
-    boolean promptCacheEnabled) {
+    String groundingPolicy,
+    float minimumRetrievalScore,
+    Map<String, String> generationControls) {
   public RagBenchmarkSettings {
     caseIds = List.copyOf(caseIds);
+    generationControls = Map.copyOf(generationControls);
+    if (!Float.isFinite(minimumRetrievalScore) || minimumRetrievalScore < 0) {
+      throw new IllegalArgumentException("minimumRetrievalScore must be finite and non-negative");
+    }
   }
 }

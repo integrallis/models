@@ -29,8 +29,38 @@ public record RagRun(
     double frameworkOverheadMillis,
     double endToEndMillis,
     GenerationResult generation,
+    GroundedAnswer grounding,
+    RagEvaluation rawEvaluation,
     RagEvaluation evaluation) {
   public RagRun {
     retrieved = List.copyOf(retrieved);
+  }
+
+  public RagRun(
+      String framework,
+      String backend,
+      String model,
+      String caseId,
+      List<RetrievedDocument> retrieved,
+      String promptSha256,
+      double retrievalMillis,
+      double frameworkOverheadMillis,
+      double endToEndMillis,
+      GenerationResult generation,
+      RagEvaluation evaluation) {
+    this(
+        framework,
+        backend,
+        model,
+        caseId,
+        retrieved,
+        promptSha256,
+        retrievalMillis,
+        frameworkOverheadMillis,
+        endToEndMillis,
+        generation,
+        new GroundedAnswer(generation.text(), generation.text(), GroundingDecision.MODEL_ANSWER),
+        evaluation,
+        evaluation);
   }
 }

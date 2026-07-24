@@ -48,7 +48,7 @@ def test_prompt_and_deterministic_quality_match_java_contract():
     assert evaluation.correct
     assert evaluation.fact_coverage == 1.0
     assert evaluation.citation_recall == 1.0
-    assert corpus.fingerprint() == "6eeb61d5a4b48addb298889a2357cfbcbe7339c044308ba8cd23dcb27c603cb2"
+    assert corpus.fingerprint() == "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c"
     assert hashlib.sha256(prompt.encode()).hexdigest() == (
         "26fccba3e100ea107b382b25a9404ba8fb68bf9bd8c2003878ad6b6cefd87841"
     )
@@ -67,6 +67,29 @@ def test_prompt_and_deterministic_quality_match_java_contract():
     assert hashlib.sha256(no_think_prompt.encode()).hexdigest() == (
         "959555745e05099d76fd4af53d470399d4cabdaf0ed86bb9b7505b0d08c1cc4a"
     )
+
+
+def test_fact_alternatives_accept_the_answer_to_the_question():
+    corpus = rag.load_corpus(CORPUS_DIR)
+    case = next(case for case in corpus.cases if case.id == "break-glass")
+    document = next(
+        document for document in corpus.documents if document.id == "security-access"
+    )
+    hits = [rag.RetrievedDocument(document, 3.0, 1)]
+
+    concise = rag.evaluate(
+        case,
+        hits,
+        "The code name is Cobalt-17 and two managers approve it [security-access].",
+    )
+    canonical = rag.evaluate(
+        case,
+        hits,
+        "Cobalt-17 requires two on-call managers [security-access].",
+    )
+
+    assert concise.correct
+    assert canonical.correct
 
 
 def test_linear_percentiles_match_java_report_math():

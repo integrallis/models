@@ -28,4 +28,16 @@ class GenerationResultTest {
     assertThat(result.tpotMillis()).isEqualTo(100);
     assertThat(result.decodeTokensPerSecond()).isEqualTo(10);
   }
+
+  @Test
+  void recordsNormalizedHostedUsageAndCost() {
+    GenerationResult result =
+        new GenerationResult("answer", 100, 20, 10, 11, 250, 1_250, 0, 0, 0, 0, 0.00028);
+
+    assertThat(result.inputTokens()).isEqualTo(100);
+    assertThat(result.cacheReadInputTokens()).isEqualTo(20);
+    assertThat(result.cacheWriteInputTokens()).isEqualTo(10);
+    assertThat(result.outputTokens()).isEqualTo(11);
+    assertThat(result.estimatedApiCostUsd()).isEqualTo(0.00028);
+  }
 }

@@ -23,11 +23,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-/** Streaming client for Ollama and llama.cpp server using an identical raw prompt. */
+/** Benchmark-only streaming client for Ollama and llama.cpp using an identical raw prompt. */
 public final class HttpGenerationClient implements GenerationClient {
   private static final Set<String> BACKENDS = Set.of("ollama", "llama.cpp");
 
@@ -68,6 +69,25 @@ public final class HttpGenerationClient implements GenerationClient {
   @Override
   public String model() {
     return model;
+  }
+
+  @Override
+  public Map<String, String> generationControls() {
+    return "llama.cpp".equals(backend)
+        ? Map.of(
+            "temperature", "0",
+            "topK", "1",
+            "topP", "1",
+            "seed", "42",
+            "repetitionPenalty", "1",
+            "promptCache", "false")
+        : Map.of(
+            "temperature", "0",
+            "topK", "1",
+            "topP", "1",
+            "seed", "42",
+            "repetitionPenalty", "1",
+            "rawPrompt", "true");
   }
 
   @Override

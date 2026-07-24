@@ -130,6 +130,14 @@ class GgufTokenizerIntegrationTest {
       assertThat(tokens).isNotEmpty();
       assertThat(tokens.length).isGreaterThan(5);
     }
+
+    @Test
+    void encodesChatMlControlTokensLikeLlamaCpp() {
+      int[] tokens = tokenizer.encode("<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n");
+
+      assertThat(tokens).containsExactly(151644, 872, 198, 14990, 151645, 198, 151644, 77091, 198);
+      assertThat(tokenizer.isEndOfGeneration(151645)).isTrue();
+    }
   }
 
   @Nested

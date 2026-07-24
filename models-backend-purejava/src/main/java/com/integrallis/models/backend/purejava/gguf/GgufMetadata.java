@@ -105,4 +105,17 @@ public record GgufMetadata(Map<String, GgufMetadataValue> entries) {
                     .map(e -> ((GgufMetadataValue.Float32Value) e).value())
                     .toList());
   }
+
+  /** Returns an int32 array value for the given key. */
+  public Optional<List<Integer>> getInt32Array(String key) {
+    return get(key)
+        .filter(v -> v instanceof GgufMetadataValue.ArrayValue)
+        .map(v -> (GgufMetadataValue.ArrayValue) v)
+        .filter(a -> a.elementType() == GgufValueType.INT32)
+        .map(
+            a ->
+                a.elements().stream()
+                    .map(e -> ((GgufMetadataValue.Int32Value) e).value())
+                    .toList());
+  }
 }

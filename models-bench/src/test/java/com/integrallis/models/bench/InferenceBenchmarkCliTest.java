@@ -49,6 +49,22 @@ class InferenceBenchmarkCliTest {
   }
 
   @Test
+  void resolvesRustFfmAsAnInProcessModelBackend() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
+
+    BenchmarkConfiguration configuration =
+        InferenceBenchmarkCli.parse(
+            new String[] {
+              "--backend", "rust-ffm", "--model", model.toString(), "--model-id", "fixture"
+            });
+
+    assertThat(configuration.backend()).isEqualTo("rust-ffm");
+    assertThat(configuration.artifact()).isEqualTo(model);
+    assertThat(configuration.backendVersion()).isEqualTo("development");
+    assertThat(configuration.modelJarDescriptor()).isEmpty();
+  }
+
+  @Test
   void resolvesPureJavaModelJarWithoutDiscardingItsDescriptor() throws Exception {
     Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
     var descriptor = ModelJarTestFixtures.descriptor("fixture", model);

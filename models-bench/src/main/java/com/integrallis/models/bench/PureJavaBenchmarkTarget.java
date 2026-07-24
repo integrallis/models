@@ -18,14 +18,16 @@ package com.integrallis.models.bench;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
+import com.integrallis.models.backend.nativekernel.RustFfmBackend;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
 import com.integrallis.models.runtime.SpeculativeGenerationMetrics;
 import com.integrallis.models.runtime.SpeculativeGenerationOptions;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** In-process benchmark target for the dependency-free pure-Java backend. */
+/** In-process benchmark target for Java and Rust-FFM Models backends. */
 final class PureJavaBenchmarkTarget implements BenchmarkTarget {
 
   private final TimingBackend backend;
@@ -51,6 +53,16 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
     PureJavaBackend loaded = model.load();
+    double elapsedMillis = nanosToMillis(System.nanoTime() - start);
+    return new PureJavaBenchmarkTarget(
+        new TimingBackend(loaded), elapsedMillis, loaded.diagnostics(), speculativeOptions);
+  }
+
+  static PureJavaBenchmarkTarget loadRust(
+      Path model, int contextLength, SpeculativeGenerationOptions speculativeOptions) {
+    System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
+    long start = System.nanoTime();
+    RustFfmBackend loaded = RustFfmBackend.load(model);
     double elapsedMillis = nanosToMillis(System.nanoTime() - start);
     return new PureJavaBenchmarkTarget(
         new TimingBackend(loaded), elapsedMillis, loaded.diagnostics(), speculativeOptions);

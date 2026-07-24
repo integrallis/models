@@ -16,10 +16,15 @@
 package com.integrallis.models.spring.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +32,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
 @Tag("unit")
@@ -62,6 +68,82 @@ class ModelsSpringAiChatModelTest {
     assertThat(streamed).isEqualTo(" world!");
   }
 
+  @Test
+  void springAiChatModelAcceptsTheSharedLocalEngineContract() {
+    ChatModel model = new ModelsSpringAiChatModel(highLevelModel("local answer"));
+
+    assertThat(model.call("hello")).isEqualTo("local answer");
+  }
+
+  @Test
+  void springAiChatModelMapsRequestedOptionsAndExposesDefaults() {
+    RecordingModel delegate = new RecordingModel("mapped answer", null);
+    SamplingOptions defaults =
+        SamplingOptions.builder()
+            .temperature(0.8f)
+            .topP(0.7f)
+            .topK(40)
+            .maxTokens(200)
+            .repetitionPenalty(1.2f)
+            .seed(42L)
+            .build();
+    ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);
+    ChatOptions requested =
+        ChatOptions.builder().temperature(0.2).topP(0.3).topK(7).maxTokens(19).build();
+
+    ChatResponse response = model.call(new Prompt("question", requested));
+
+    assertThat(delegate.prompt).isEqualTo("question");
+    assertThat(delegate.options.temperature()).isEqualTo(0.2f);
+    assertThat(delegate.options.topP()).isEqualTo(0.3f);
+    assertThat(delegate.options.topK()).isEqualTo(7);
+    assertThat(delegate.options.maxTokens()).isEqualTo(19);
+    assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
+    assertThat(delegate.options.seed()).isEqualTo(42L);
+    assertThat(response.getResult().getOutput().getText()).isEqualTo("mapped answer");
+    assertThat(model.getOptions().getTemperature()).isEqualTo((double) defaults.temperature());
+    assertThat(model.getOptions().getTopP()).isEqualTo((double) defaults.topP());
+    assertThat(model.getOptions().getTopK()).isEqualTo(40);
+    assertThat(model.getOptions().getMaxTokens()).isEqualTo(200);
+  }
+
+  @Test
+  void springAiChatModelRetainsDefaultsWhenPromptHasNoOptions() {
+    RecordingModel delegate = new RecordingModel("answer", null);
+    SamplingOptions defaults =
+        SamplingOptions.builder()
+            .temperature(0.4f)
+            .topP(0.6f)
+            .topK(11)
+            .maxTokens(32)
+            .repetitionPenalty(1.1f)
+            .build();
+    ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);
+
+    model.call(new Prompt("question"));
+
+    assertThat(delegate.options).isEqualTo(defaults);
+  }
+
+  @Test
+  void springAiStreamingChatModelPropagatesGenerationFailure() {
+    IllegalStateException failure = new IllegalStateException("generation failed");
+    ChatModel model = new ModelsSpringAiChatModel(new RecordingModel("", failure));
+
+    assertThatThrownBy(() -> model.stream(new Prompt("question")).blockLast()).isSameAs(failure);
+  }
+
+  @Test
+  void springAiChatModelRejectsNullDependenciesAndPrompts() {
+    assertThatNullPointerException()
+        .isThrownBy(() -> new ModelsSpringAiChatModel((TextGenerationModel) null));
+    assertThatNullPointerException()
+        .isThrownBy(() -> new ModelsSpringAiChatModel(highLevelModel("answer"), null));
+    ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(highLevelModel("answer"));
+    assertThatNullPointerException().isThrownBy(() -> model.call((Prompt) null));
+    assertThatNullPointerException().isThrownBy(() -> model.stream((Prompt) null));
+  }
+
   private static InferenceBackend backendGenerating(int[] generatedSequence) {
     Tokenizer tokenizer = testTokenizer();
     return new InferenceBackend() {
@@ -95,6 +177,60 @@ class ModelsSpringAiChatModelTest {
       @Override
       public void close() {}
     };
+  }
+
+  private static TextGenerationModel highLevelModel(String answer) {
+    return new TextGenerationModel() {
+      @Override
+      public String modelName() {
+        return "LocalEngineModel";
+      }
+
+      @Override
+      public BackendDiagnostics diagnostics() {
+        return BackendDiagnostics.unavailable("local-test");
+      }
+
+      @Override
+      public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+        stream.onToken(answer);
+        stream.onComplete();
+      }
+    };
+  }
+
+  private static final class RecordingModel implements TextGenerationModel {
+    private final String answer;
+    private final RuntimeException failure;
+    private String prompt;
+    private SamplingOptions options;
+
+    private RecordingModel(String answer, RuntimeException failure) {
+      this.answer = answer;
+      this.failure = failure;
+    }
+
+    @Override
+    public String modelName() {
+      return "RecordingModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("recording");
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      this.prompt = prompt;
+      this.options = options;
+      if (failure != null) {
+        stream.onError(failure);
+        return;
+      }
+      stream.onToken(answer);
+      stream.onComplete();
+    }
   }
 
   private static Tokenizer testTokenizer() {

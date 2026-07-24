@@ -176,6 +176,53 @@ class GgufTokenizerTest {
     return new GgufMetadata(entries);
   }
 
+  private GgufMetadata createEndOfGenerationMetadata() {
+    List<String> tokens =
+        List.of("<unk>", "answer", "</s>", "<|im_end|>", "<|eom_id|>", "<|endoftext|>", "ordinary");
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(token -> (GgufMetadataValue) new GgufMetadataValue.StringValue(token))
+                .toList()));
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
+    entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(0));
+    entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(2));
+    entries.put("tokenizer.ggml.eot_token_id", new GgufMetadataValue.Uint32Value(3));
+    entries.put("tokenizer.ggml.eom_token_id", new GgufMetadataValue.Uint32Value(4));
+    return new GgufMetadata(entries);
+  }
+
+  private GgufMetadata createSpecialTokenMetadata() {
+    List<String> tokens = List.of("<unk>", "h", "i", "\u0120", "hi", "<|im_start|>", "<|im_end|>");
+    List<Integer> tokenTypes = List.of(2, 1, 1, 1, 1, 3, 3);
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(token -> (GgufMetadataValue) new GgufMetadataValue.StringValue(token))
+                .toList()));
+    entries.put(
+        "tokenizer.ggml.merges",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING, List.of(new GgufMetadataValue.StringValue("h i"))));
+    entries.put(
+        "tokenizer.ggml.token_type",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.INT32,
+            tokenTypes.stream()
+                .map(type -> (GgufMetadataValue) new GgufMetadataValue.Int32Value(type))
+                .toList()));
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
+    entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(6));
+    entries.put("tokenizer.ggml.eot_token_id", new GgufMetadataValue.Uint32Value(6));
+    return new GgufMetadata(entries);
+  }
+
   @Nested
   class BasicEncoding {
 
@@ -284,6 +331,13 @@ class GgufTokenizerTest {
 
       assertThat(tokenizer.encode("1234")).containsExactly(6, 4);
     }
+
+    @Test
+    void parsesControlTokensBeforeApplyingBpe() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSpecialTokenMetadata());
+
+      assertThat(tokenizer.encode("<|im_start|>hi<|im_end|>")).containsExactly(5, 4, 6);
+    }
   }
 
   @Nested
@@ -330,6 +384,27 @@ class GgufTokenizerTest {
     void eosTokenId() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
       assertThat(tokenizer.eosToken()).isEqualTo(15);
+    }
+
+    @Test
+    void recognizesAllMetadataAndVocabularyEndOfGenerationTokens() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createEndOfGenerationMetadata());
+
+      assertThat(tokenizer.isEndOfGeneration(2)).isTrue();
+      assertThat(tokenizer.isEndOfGeneration(3)).isTrue();
+      assertThat(tokenizer.isEndOfGeneration(4)).isTrue();
+      assertThat(tokenizer.isEndOfGeneration(5)).isTrue();
+      assertThat(tokenizer.isEndOfGeneration(1)).isFalse();
+      assertThat(tokenizer.isEndOfGeneration(-1)).isFalse();
+      assertThat(tokenizer.isEndOfGeneration(999)).isFalse();
+    }
+
+    @Test
+    void doesNotDecodeEndOfGenerationTokensAsAnswerText() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createEndOfGenerationMetadata());
+
+      assertThat(tokenizer.decode(3)).isEmpty();
+      assertThat(tokenizer.decode(new int[] {1, 3, 5, 1})).isEqualTo("answeranswer");
     }
 
     @Test

@@ -13,6 +13,8 @@ on:
       - "models-api/**"
       - "models-runtime/**"
       - "models-backend-purejava/**"
+      - "models-backend-native/**"
+      - "rust-toolchain.toml"
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +27,8 @@ on:
       - "models-api/**"
       - "models-runtime/**"
       - "models-backend-purejava/**"
+      - "models-backend-native/**"
+      - "rust-toolchain.toml"
   workflow_dispatch:
 
 permissions:
@@ -32,7 +36,7 @@ permissions:
 
 jobs:
   pure-java-models:
-    name: Pure-Java model integration
+    name: GGUF model integration
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -59,6 +63,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --no-self-update
+          rustup component add --toolchain 1.96.0 clippy rustfmt
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -111,6 +120,15 @@ jobs:
           --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.DeepSeekCoderModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.MiniCpm5ModelJarsIntegrationTest
+          --no-daemon
+          --stacktrace
+
+      - name: Run Models Rust FFM Q4 integration test
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-backend-native:integrationTest
+          --tests com.integrallis.models.backend.nativekernel.RustFfmBackendIntegrationTest
           --no-daemon
           --stacktrace
 

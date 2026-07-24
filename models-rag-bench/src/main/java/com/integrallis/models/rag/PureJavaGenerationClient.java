@@ -25,6 +25,7 @@ import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.modeljars.ModelJarDescriptor;
@@ -75,6 +76,17 @@ public final class PureJavaGenerationClient implements GenerationClient {
   @Override
   public BackendDiagnostics diagnostics() {
     return backend.diagnostics();
+  }
+
+  @Override
+  public Map<String, String> generationControls() {
+    return Map.of(
+        "temperature", "0",
+        "topK", "1",
+        "topP", "1",
+        "seed", "42",
+        "repetitionPenalty", "1",
+        "promptCache", "false");
   }
 
   @Override

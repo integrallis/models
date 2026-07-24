@@ -18,7 +18,8 @@ package com.integrallis.models.langchain4j;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
-import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.runtime.RuntimeTextGenerationModel;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -30,30 +31,38 @@ import java.util.Objects;
 
 /** LangChain4J {@link ChatModel} backed by the models runtime generation loop. */
 public final class ModelsChatModel implements ChatModel {
-  private final InferenceBackend backend;
+  private final TextGenerationModel model;
   private final SamplingOptions defaults;
 
   public ModelsChatModel(InferenceBackend backend) {
-    this(backend, SamplingOptions.builder().build());
+    this(new RuntimeTextGenerationModel(backend));
   }
 
   public ModelsChatModel(InferenceBackend backend, SamplingOptions defaults) {
-    this.backend = Objects.requireNonNull(backend, "backend");
+    this(new RuntimeTextGenerationModel(backend), defaults);
+  }
+
+  public ModelsChatModel(TextGenerationModel model) {
+    this(model, SamplingOptions.builder().build());
+  }
+
+  public ModelsChatModel(TextGenerationModel model, SamplingOptions defaults) {
+    this.model = Objects.requireNonNull(model, "model");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
   }
 
   /** Returns the execution decisions selected by the wrapped backend. */
   public BackendDiagnostics diagnostics() {
-    return backend.diagnostics();
+    return model.diagnostics();
   }
 
   @Override
   public ChatResponse doChat(ChatRequest request) {
     Objects.requireNonNull(request, "request");
-    String output = new GenerationLoop(backend).generate(prompt(request), options(request));
+    String output = model.generate(prompt(request), options(request));
     return ChatResponse.builder()
         .aiMessage(AiMessage.from(output))
-        .modelName(backend.metadata().modelName())
+        .modelName(model.modelName())
         .build();
   }
 

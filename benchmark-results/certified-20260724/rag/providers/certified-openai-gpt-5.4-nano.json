@@ -1,0 +1,1217 @@
+{
+  "schemaVersion" : 4,
+  "generatedAt" : "2026-07-24T03:16:02.223739424Z",
+  "framework" : "plain-java",
+  "backend" : "openai",
+  "backendVersion" : "hosted-api-2026-07-23",
+  "modelId" : "gpt-5.4-nano-2026-03-17",
+  "model" : "gpt-5.4-nano-2026-03-17",
+  "artifactSha256" : null,
+  "artifactSizeBytes" : 0,
+  "settings" : {
+    "corpusSha256" : "6eeb61d5a4b48addb298889a2357cfbcbe7339c044308ba8cd23dcb27c603cb2",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "raw",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "generationControls" : {
+      "reasoningEffort" : "none"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "openai",
+    "planVersion" : "hosted-api-v1",
+    "environment" : {
+      "pricingEffectiveDate" : "2026-07-23",
+      "cacheReadUsdPerMillionTokens" : "0.02",
+      "apiKeyEnvironment" : "OPENAI_API_KEY",
+      "outputUsdPerMillionTokens" : "1.25",
+      "requestControls" : "{reasoningEffort=none}",
+      "dataEgress" : "true",
+      "executionLocation" : "remote",
+      "inputUsdPerMillionTokens" : "0.2",
+      "pricingSource" : "https://developers.openai.com/api/docs/models/gpt-5.4-nano",
+      "endpointHost" : "api.openai.com"
+    },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : {
+    "provider" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "inputUsdPerMillionTokens" : 0.2,
+    "cacheReadUsdPerMillionTokens" : 0.02,
+    "cacheWriteUsdPerMillionTokens" : 0.2,
+    "outputUsdPerMillionTokens" : 1.25,
+    "effectiveDate" : "2026-07-23",
+    "sourceUrl" : "https://developers.openai.com/api/docs/models/gpt-5.4-nano"
+  },
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 0.0,
+    "retrievalMillis" : {
+      "p50" : 1.300153,
+      "p95" : 2.0625617999999997
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.25732299999992847,
+      "p95" : 0.3143757000000164
+    },
+    "ttftMillis" : {
+      "p50" : 299.986369,
+      "p95" : 440.93581509999996
+    },
+    "tpotMillis" : {
+      "p50" : 7.077754275862068,
+      "p95" : 10.1958879418124
+    },
+    "endToEndMillis" : {
+      "p50" : 559.253737,
+      "p95" : 727.9410709
+    },
+    "p50PrefillTokensPerSecond" : 0.0,
+    "p50DecodeTokensPerSecond" : 141.28775329349793,
+    "peakRssBytes" : 0,
+    "totalCpuMillis" : 0.0,
+    "totalInputTokens" : 4410,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 858,
+    "totalEstimatedApiCostUsd" : 0.0019545,
+    "projectedApiCostPer1kRequestsUsd" : 0.07238888888888889,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "PRODUCTION_READY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "26fccba3e100ea107b382b25a9404ba8fb68bf9bd8c2003878ad6b6cefd87841",
+    "retrievalMillis" : 1.995758,
+    "frameworkOverheadMillis" : 0.26241699999991397,
+    "endToEndMillis" : 519.009881,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75. [claims-auto-glass]",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 30,
+      "ttftMillis" : 291.813041,
+      "totalMillis" : 516.751706,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.130000000000001E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f2e9484289b45da144075a3f3a6c3f85781e8c8d35340d4e0e12a44ee419c8a5",
+    "retrievalMillis" : 1.679937,
+    "frameworkOverheadMillis" : 0.3144270000000233,
+    "endToEndMillis" : 568.375389,
+    "generation" : {
+      "text" : "Trip interruption claims use form T-19, and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 31,
+      "ttftMillis" : 357.510138,
+      "totalMillis" : 566.381025,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.095E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bca08a841d647e8cb50dee7c9643e1b42933af157e15bd54e39d1a6acaa601f4",
+    "retrievalMillis" : 1.80037,
+    "frameworkOverheadMillis" : 0.2520319999998719,
+    "endToEndMillis" : 635.189723,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral and the copay is 15 dollars per visit. [health-telemedicine]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 32,
+      "ttftMillis" : 396.141146,
+      "totalMillis" : 633.137321,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.259999999999999E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "67ee2c65a6f0530e9bed3f0d2677d62c8aa20dcad66705d85b878660d635680f",
+    "retrievalMillis" : 1.516991,
+    "frameworkOverheadMillis" : 0.24893700000006902,
+    "endToEndMillis" : 539.409941,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days, and international claim wires settle within 5 business days. [payments-settlement]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 32,
+      "ttftMillis" : 325.111511,
+      "totalMillis" : 537.644013,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.14E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "881bd997b237794a2a495df8edc1ee23102d129b533291797bd4331a33926a98",
+    "retrievalMillis" : 1.908245,
+    "frameworkOverheadMillis" : 0.29722800000001826,
+    "endToEndMillis" : 745.244914,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification and upload it as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 39,
+      "ttftMillis" : 456.278644,
+      "totalMillis" : 743.039441,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 8.075E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8b7d59aab68b9e33ed03fc6be8e0ad4b0c5dec1d536acd3b7d6bcb48269461b1",
+    "retrievalMillis" : 2.091192,
+    "frameworkOverheadMillis" : 0.3142560000000003,
+    "endToEndMillis" : 538.500913,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 30,
+      "ttftMillis" : 330.840591,
+      "totalMillis" : 536.095465,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.01E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "2e178c9b9007497e1cb18e0cbec9fa4484de01c2f7bde1b9f286b6b400accaa0",
+    "retrievalMillis" : 1.968886,
+    "frameworkOverheadMillis" : 0.3190950000000612,
+    "endToEndMillis" : 625.964871,
+    "generation" : {
+      "text" : "Claims API create requests use the `Idempotency-Key` header, and the key can be replayed for a 24-hour window. [api-idempotency]",
+      "inputTokens" : 175,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 37,
+      "ttftMillis" : 293.209747,
+      "totalMillis" : 623.67689,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 8.125E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0ffd68ca7e4aecf2251db9196eb844ec646e230c0bd7fe14cec4dd4319c9e803",
+    "retrievalMillis" : 1.868444,
+    "frameworkOverheadMillis" : 0.2852210000000923,
+    "endToEndMillis" : 626.058394,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes it is escalated by routing NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 43,
+      "ttftMillis" : 350.850348,
+      "totalMillis" : 623.904729,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 8.575E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ff5b1795fe17b95e6f47d8b7019a34352efef568a1f0710ee0fd93d7838c8d1a",
+    "retrievalMillis" : 1.438322,
+    "frameworkOverheadMillis" : 0.28381899999999405,
+    "endToEndMillis" : 334.347859,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 8,
+      "ttftMillis" : 283.470718,
+      "totalMillis" : 332.625718,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 4.24E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "26fccba3e100ea107b382b25a9404ba8fb68bf9bd8c2003878ad6b6cefd87841",
+    "retrievalMillis" : 1.879731,
+    "frameworkOverheadMillis" : 0.2821969999999965,
+    "endToEndMillis" : 556.228068,
+    "generation" : {
+      "text" : "You must report an auto glass claim through the Aurora portal within 30 calendar days, and the windshield repair deductible is $75. [claims-auto-glass]",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 35,
+      "ttftMillis" : 271.327381,
+      "totalMillis" : 554.06614,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.755000000000001E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f2e9484289b45da144075a3f3a6c3f85781e8c8d35340d4e0e12a44ee419c8a5",
+    "retrievalMillis" : 1.811627,
+    "frameworkOverheadMillis" : 0.2883470000000443,
+    "endToEndMillis" : 505.575016,
+    "generation" : {
+      "text" : "Trip interruption claims use form T-19, and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 31,
+      "ttftMillis" : 291.372102,
+      "totalMillis" : 503.475042,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.095E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bca08a841d647e8cb50dee7c9643e1b42933af157e15bd54e39d1a6acaa601f4",
+    "retrievalMillis" : 1.865298,
+    "frameworkOverheadMillis" : 0.2992339999999558,
+    "endToEndMillis" : 559.253737,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral and the copay is 15 dollars per visit. [health-telemedicine]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 32,
+      "ttftMillis" : 354.641037,
+      "totalMillis" : 557.089205,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.259999999999999E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "67ee2c65a6f0530e9bed3f0d2677d62c8aa20dcad66705d85b878660d635680f",
+    "retrievalMillis" : 5.530076,
+    "frameworkOverheadMillis" : 0.2835209999999506,
+    "endToEndMillis" : 596.284018,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days. [payments-settlement]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 30,
+      "ttftMillis" : 405.135881,
+      "totalMillis" : 590.470421,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 6.890000000000001E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "881bd997b237794a2a495df8edc1ee23102d129b533291797bd4331a33926a98",
+    "retrievalMillis" : 1.008069,
+    "frameworkOverheadMillis" : 0.28784600000005867,
+    "endToEndMillis" : 966.634101,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification and upload it as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 39,
+      "ttftMillis" : 488.435413,
+      "totalMillis" : 965.338186,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 8.075E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8b7d59aab68b9e33ed03fc6be8e0ad4b0c5dec1d536acd3b7d6bcb48269461b1",
+    "retrievalMillis" : 1.151787,
+    "frameworkOverheadMillis" : 0.25557800000001407,
+    "endToEndMillis" : 587.855176,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 31,
+      "ttftMillis" : 335.846162,
+      "totalMillis" : 586.447811,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.135E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "2e178c9b9007497e1cb18e0cbec9fa4484de01c2f7bde1b9f286b6b400accaa0",
+    "retrievalMillis" : 1.060228,
+    "frameworkOverheadMillis" : 0.2515899999999647,
+    "endToEndMillis" : 687.565437,
+    "generation" : {
+      "text" : "The Idempotency-Key header makes Claims API creates idempotent, and the key can be replayed for 24 hours. [api-idempotency]",
+      "inputTokens" : 175,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 35,
+      "ttftMillis" : 339.152817,
+      "totalMillis" : 686.253619,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.875E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0ffd68ca7e4aecf2251db9196eb844ec646e230c0bd7fe14cec4dd4319c9e803",
+    "retrievalMillis" : 1.065496,
+    "frameworkOverheadMillis" : 0.2443389999999681,
+    "endToEndMillis" : 521.709407,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes it should be escalated by routing NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 44,
+      "ttftMillis" : 271.680057,
+      "totalMillis" : 520.399572,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 8.7E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ff5b1795fe17b95e6f47d8b7019a34352efef568a1f0710ee0fd93d7838c8d1a",
+    "retrievalMillis" : 0.886654,
+    "frameworkOverheadMillis" : 0.23269199999992907,
+    "endToEndMillis" : 350.205769,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 8,
+      "ttftMillis" : 291.763076,
+      "totalMillis" : 349.086423,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 4.24E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "26fccba3e100ea107b382b25a9404ba8fb68bf9bd8c2003878ad6b6cefd87841",
+    "retrievalMillis" : 1.300153,
+    "frameworkOverheadMillis" : 0.2381510000000162,
+    "endToEndMillis" : 512.295151,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim through the Aurora portal, and windshield repair has a 75 dollar deductible. [claims-auto-glass]",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 36,
+      "ttftMillis" : 252.834955,
+      "totalMillis" : 510.756847,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.880000000000002E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f2e9484289b45da144075a3f3a6c3f85781e8c8d35340d4e0e12a44ee419c8a5",
+    "retrievalMillis" : 1.25918,
+    "frameworkOverheadMillis" : 0.2276839999999538,
+    "endToEndMillis" : 444.836618,
+    "generation" : {
+      "text" : "Trip interruption claims use form T-19, and the reimbursement limit is $3,500 per covered traveler. [claims-travel]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 30,
+      "ttftMillis" : 253.244737,
+      "totalMillis" : 443.349754,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 6.97E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bca08a841d647e8cb50dee7c9643e1b42933af157e15bd54e39d1a6acaa601f4",
+    "retrievalMillis" : 1.19307,
+    "frameworkOverheadMillis" : 0.22851600000001326,
+    "endToEndMillis" : 507.800393,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral and the member copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 32,
+      "ttftMillis" : 288.152299,
+      "totalMillis" : 506.378807,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.259999999999999E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "67ee2c65a6f0530e9bed3f0d2677d62c8aa20dcad66705d85b878660d635680f",
+    "retrievalMillis" : 1.105326,
+    "frameworkOverheadMillis" : 0.23210200000005443,
+    "endToEndMillis" : 677.452842,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days (and may incur an intermediary bank fee). [payments-settlement]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 38,
+      "ttftMillis" : 299.986369,
+      "totalMillis" : 676.115414,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.890000000000001E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "881bd997b237794a2a495df8edc1ee23102d129b533291797bd4331a33926a98",
+    "retrievalMillis" : 1.105375,
+    "frameworkOverheadMillis" : 0.25732299999992847,
+    "endToEndMillis" : 595.554634,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 38,
+      "ttftMillis" : 338.496893,
+      "totalMillis" : 594.191936,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.95E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8b7d59aab68b9e33ed03fc6be8e0ad4b0c5dec1d536acd3b7d6bcb48269461b1",
+    "retrievalMillis" : 1.187001,
+    "frameworkOverheadMillis" : 0.24586299999998573,
+    "endToEndMillis" : 459.915079,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 31,
+      "ttftMillis" : 271.897898,
+      "totalMillis" : 458.482215,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.135E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "2e178c9b9007497e1cb18e0cbec9fa4484de01c2f7bde1b9f286b6b400accaa0",
+    "retrievalMillis" : 0.934808,
+    "frameworkOverheadMillis" : 0.26957900000002155,
+    "endToEndMillis" : 607.542205,
+    "generation" : {
+      "text" : "Claims API create requests use the `Idempotency-Key` header, and a key can be replayed for 24 hours. [api-idempotency]",
+      "inputTokens" : 175,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 35,
+      "ttftMillis" : 279.051026,
+      "totalMillis" : 606.337818,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 7.875E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0ffd68ca7e4aecf2251db9196eb844ec646e230c0bd7fe14cec4dd4319c9e803",
+    "retrievalMillis" : 0.912795,
+    "frameworkOverheadMillis" : 0.24234599999999773,
+    "endToEndMillis" : 574.570117,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes it is escalated by routing NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 43,
+      "ttftMillis" : 282.216746,
+      "totalMillis" : 573.414976,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 8.575E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "openai",
+    "model" : "gpt-5.4-nano-2026-03-17",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ff5b1795fe17b95e6f47d8b7019a34352efef568a1f0710ee0fd93d7838c8d1a",
+    "retrievalMillis" : 0.810179,
+    "frameworkOverheadMillis" : 0.2456720000000132,
+    "endToEndMillis" : 376.644659,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 8,
+      "ttftMillis" : 316.079694,
+      "totalMillis" : 375.588808,
+      "prefillTokensPerSecond" : 0.0,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : 4.24E-5
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

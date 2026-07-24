@@ -194,6 +194,101 @@ class GenerationLoopTest {
     }
 
     @Test
+    void generatesUntilAnyEndOfGenerationToken() {
+      Tokenizer tokenizer =
+          new Tokenizer() {
+            @Override
+            public int[] encode(String text) {
+              return new int[] {2};
+            }
+
+            @Override
+            public String decode(int[] tokens) {
+              StringBuilder decoded = new StringBuilder();
+              for (int token : tokens) {
+                decoded.append(decode(token));
+              }
+              return decoded.toString();
+            }
+
+            @Override
+            public String decode(int token) {
+              return switch (token) {
+                case 2 -> "hello";
+                case 3 -> " world";
+                case 4 -> "<|im_end|>";
+                case 5 -> " leaked";
+                default -> "";
+              };
+            }
+
+            @Override
+            public int vocabSize() {
+              return 6;
+            }
+
+            @Override
+            public int bosToken() {
+              return 0;
+            }
+
+            @Override
+            public int eosToken() {
+              return 1;
+            }
+
+            @Override
+            public boolean isEndOfGeneration(int token) {
+              return token == 1 || token == 4;
+            }
+          };
+      InferenceBackend backend =
+          new InferenceBackend() {
+            private int generated;
+
+            @Override
+            public String name() {
+              return "multi-eog";
+            }
+
+            @Override
+            public ModelMetadata metadata() {
+              return new ModelMetadata("mock", "MultiEog", 64, 6, 16, 1, 1, 1);
+            }
+
+            @Override
+            public Tokenizer tokenizer() {
+              return tokenizer;
+            }
+
+            @Override
+            public float[] prefill(int[] tokens, int startPosition) {
+              return logitsFor(3);
+            }
+
+            @Override
+            public float[] forward(int token, int position) {
+              return logitsFor(++generated == 1 ? 4 : 5);
+            }
+
+            @Override
+            public void close() {}
+
+            private float[] logitsFor(int token) {
+              float[] logits = new float[6];
+              logits[token] = 100.0f;
+              return logits;
+            }
+          };
+
+      String result =
+          new GenerationLoop(backend)
+              .generate("hello", SamplingOptions.builder().temperature(0.0f).maxTokens(5).build());
+
+      assertThat(result).isEqualTo(" world");
+    }
+
+    @Test
     void generatesUntilMaxTokens() {
       // Will generate "!!!!..." until maxTokens
       InferenceBackend backend = mockBackend(new int[] {5, 5, 5, 5, 5, 5, 5, 5, 5, 5});

@@ -27,7 +27,7 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    jvmArgs("--add-modules", "jdk.incubator.vector")
+    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
 }
 
 tasks.named("spotbugsTest") {
@@ -36,16 +36,21 @@ tasks.named("spotbugsTest") {
 
 application {
     mainClass = "com.integrallis.models.bench.InferenceBenchmarkCli"
-    applicationDefaultJvmArgs = listOf("--add-modules", "jdk.incubator.vector")
+    applicationDefaultJvmArgs =
+        listOf("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
 }
 
 tasks.withType<JavaExec>().configureEach {
-    jvmArgs("--add-modules", "jdk.incubator.vector")
+    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    System.getProperty("models.native.kernels.library")?.let {
+        systemProperty("models.native.kernels.library", it)
+    }
 }
 
 dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":models-backend-purejava"))
+    implementation(project(":models-backend-native"))
     implementation("com.integrallis:vectors-core:0.1.0-SNAPSHOT")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     runtimeOnly("org.modeljars:modeljars-catalog:0.1.0-SNAPSHOT")

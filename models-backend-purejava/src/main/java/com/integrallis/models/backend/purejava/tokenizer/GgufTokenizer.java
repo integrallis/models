@@ -57,6 +57,37 @@ public final class GgufTokenizer implements Tokenizer {
           "lfm2",
           "jina-v5-nano",
           "smaug-bpe");
+  private static final Set<String> END_OF_GENERATION_TOKEN_TEXTS =
+      Set.of(
+          "<|eot_id|>",
+          "<|im_end|>",
+          "<|end|>",
+          "<|return|>",
+          "<|call|>",
+          "<|flush|>",
+          "<|calls|>",
+          "<end_of_turn>",
+          "<|endoftext|>",
+          "</s>",
+          "<|eom_id|>",
+          "<EOT>",
+          "_<EOT>",
+          "[EOT]",
+          "[EOS]",
+          "<|end_of_text|>",
+          "<end_of_utterance>",
+          "<eos>",
+          "<turn|>",
+          "<|tool_response>",
+          "<｜end▁of▁sentence｜>");
+  private static final List<String> END_OF_GENERATION_METADATA_KEYS =
+      List.of(
+          "tokenizer.ggml.eos_token_id",
+          "tokenizer.ggml.eot_token_id",
+          "tokenizer.ggml.eom_token_id",
+          "tokenizer.ggml.fim_pad_token_id",
+          "tokenizer.ggml.fim_rep_token_id",
+          "tokenizer.ggml.fim_sep_token_id");
 
   private final String[] vocab;
   private final float[] scores;
@@ -64,6 +95,8 @@ public final class GgufTokenizer implements Tokenizer {
   private final Map<String, Integer> mergeRanks;
   private final int bosTokenId;
   private final int eosTokenId;
+  private final boolean[] endOfGenerationTokens;
+  private final List<SpecialToken> specialTokens;
   private final boolean useByteLevel;
   private final boolean useSentencePiece;
   private final boolean addBosToken;
@@ -81,6 +114,8 @@ public final class GgufTokenizer implements Tokenizer {
       Map<String, Integer> mergeRanks,
       int bosTokenId,
       int eosTokenId,
+      boolean[] endOfGenerationTokens,
+      List<SpecialToken> specialTokens,
       boolean useByteLevel,
       boolean useSentencePiece,
       boolean addBosToken,
@@ -94,6 +129,8 @@ public final class GgufTokenizer implements Tokenizer {
     this.mergeRanks = mergeRanks;
     this.bosTokenId = bosTokenId;
     this.eosTokenId = eosTokenId;
+    this.endOfGenerationTokens = endOfGenerationTokens;
+    this.specialTokens = specialTokens;
     this.useByteLevel = useByteLevel;
     this.useSentencePiece = useSentencePiece;
     this.addBosToken = addBosToken;
@@ -177,6 +214,9 @@ public final class GgufTokenizer implements Tokenizer {
 
     int bosTokenId = metadata.getUint32("tokenizer.ggml.bos_token_id").orElse(1);
     int eosTokenId = metadata.getUint32("tokenizer.ggml.eos_token_id").orElse(2);
+    boolean[] endOfGenerationTokens =
+        buildEndOfGenerationTokens(metadata, vocab, tokenToId, eosTokenId);
+    List<SpecialToken> specialTokens = buildSpecialTokens(metadata, vocab);
 
     // Detect GPT-2 style byte-level BPE: check if the model uses "gpt2" or "bpe" tokenizer type,
     // or if the vocabulary contains the characteristic Ġ (U+0120) characters that indicate
@@ -199,6 +239,8 @@ public final class GgufTokenizer implements Tokenizer {
         mergeRanks,
         bosTokenId,
         eosTokenId,
+        endOfGenerationTokens,
+        specialTokens,
         useByteLevel,
         useSentencePiece,
         addBosToken,
@@ -206,6 +248,71 @@ public final class GgufTokenizer implements Tokenizer {
         addSpacePrefix,
         useLlama3PreTokenizer,
         unknownTokenId);
+  }
+
+  private static boolean[] buildEndOfGenerationTokens(
+      GgufMetadata metadata, String[] vocab, Map<String, Integer> tokenToId, int eosTokenId) {
+    boolean[] result = new boolean[vocab.length];
+    markEndOfGeneration(result, eosTokenId);
+    for (String key : END_OF_GENERATION_METADATA_KEYS) {
+      metadata.getUint32(key).ifPresent(token -> markEndOfGeneration(result, token));
+    }
+    for (int token = 0; token < vocab.length; token++) {
+      if (END_OF_GENERATION_TOKEN_TEXTS.contains(vocab[token])) {
+        result[token] = true;
+      }
+    }
+
+    boolean harmonyOrSolar =
+        (tokenToId.containsKey("<|return|>") && tokenToId.containsKey("<|call|>"))
+            || (tokenToId.containsKey("<|calls|>") && tokenToId.containsKey("<|flush|>"));
+    if (harmonyOrSolar) {
+      clearEndOfGeneration(result, tokenToId.get("<|end|>"));
+    }
+    if (tokenToId.containsKey("<|tool_response>")) {
+      clearEndOfGeneration(result, tokenToId.get("</s>"));
+    }
+    return result;
+  }
+
+  private static List<SpecialToken> buildSpecialTokens(GgufMetadata metadata, String[] vocab) {
+    boolean[] special = new boolean[vocab.length];
+    for (int token = 0; token < vocab.length; token++) {
+      special[token] = END_OF_GENERATION_TOKEN_TEXTS.contains(vocab[token]);
+    }
+    metadata
+        .getInt32Array("tokenizer.ggml.token_type")
+        .ifPresent(
+            tokenTypes -> {
+              int count = Math.min(tokenTypes.size(), special.length);
+              for (int token = 0; token < count; token++) {
+                int type = tokenTypes.get(token);
+                if (type == 2 || type == 3 || type == 4) {
+                  special[token] = true;
+                }
+              }
+            });
+
+    List<SpecialToken> result = new ArrayList<>();
+    for (int token = 0; token < special.length; token++) {
+      if (special[token] && !vocab[token].isEmpty()) {
+        result.add(new SpecialToken(vocab[token], token));
+      }
+    }
+    result.sort(Comparator.comparingInt((SpecialToken token) -> token.text().length()).reversed());
+    return List.copyOf(result);
+  }
+
+  private static void markEndOfGeneration(boolean[] tokens, int token) {
+    if (token >= 0 && token < tokens.length) {
+      tokens[token] = true;
+    }
+  }
+
+  private static void clearEndOfGeneration(boolean[] tokens, Integer token) {
+    if (token != null && token >= 0 && token < tokens.length) {
+      tokens[token] = false;
+    }
   }
 
   /**
@@ -232,16 +339,58 @@ public final class GgufTokenizer implements Tokenizer {
       return new int[0];
     }
 
+    int[] encoded;
+    if (text.isEmpty()) {
+      encoded = new int[0];
+    } else if (specialTokens.isEmpty()) {
+      encoded = encodeOrdinaryText(text);
+    } else {
+      encoded = encodeWithSpecialTokens(text);
+    }
+    return addConfiguredBoundaryTokens(encoded);
+  }
+
+  private int[] encodeWithSpecialTokens(String text) {
+    List<Integer> encoded = new ArrayList<>();
+    int position = 0;
+    while (position < text.length()) {
+      SpecialToken nextSpecial = null;
+      int nextSpecialIndex = -1;
+      for (SpecialToken candidate : specialTokens) {
+        int candidateIndex = text.indexOf(candidate.text(), position);
+        if (candidateIndex >= 0 && (nextSpecialIndex < 0 || candidateIndex < nextSpecialIndex)) {
+          nextSpecial = candidate;
+          nextSpecialIndex = candidateIndex;
+        }
+      }
+
+      if (nextSpecial == null) {
+        append(encoded, encodeOrdinaryText(text.substring(position)));
+        break;
+      }
+      if (nextSpecialIndex > position) {
+        append(encoded, encodeOrdinaryText(text.substring(position, nextSpecialIndex)));
+      }
+      encoded.add(nextSpecial.id());
+      position = nextSpecialIndex + nextSpecial.text().length();
+    }
+    return encoded.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  private int[] encodeOrdinaryText(String text) {
+    if (text.isEmpty()) {
+      return new int[0];
+    }
     if (useSentencePiece) {
       return encodeSentencePiece(text);
     }
-    int[] encoded;
-    if (useByteLevel) {
-      encoded = text.isEmpty() ? new int[0] : encodeByteLevelBpe(text);
-    } else {
-      encoded = text.isEmpty() ? new int[0] : encodePlainBpe(text);
+    return useByteLevel ? encodeByteLevelBpe(text) : encodePlainBpe(text);
+  }
+
+  private static void append(List<Integer> destination, int[] source) {
+    for (int token : source) {
+      destination.add(token);
     }
-    return addConfiguredBoundaryTokens(encoded);
   }
 
   private int[] addConfiguredBoundaryTokens(int[] encoded) {
@@ -264,9 +413,6 @@ public final class GgufTokenizer implements Tokenizer {
 
   private int[] encodeSentencePiece(String text) {
     List<Integer> tokens = new ArrayList<>();
-    if (addBosToken) {
-      tokens.add(bosTokenId);
-    }
 
     if (!text.isEmpty()) {
       String normalized = (addSpacePrefix ? " " : "") + text;
@@ -289,9 +435,6 @@ public final class GgufTokenizer implements Tokenizer {
       }
     }
 
-    if (addEosToken) {
-      tokens.add(eosTokenId);
-    }
     return tokens.stream().mapToInt(Integer::intValue).toArray();
   }
 
@@ -527,7 +670,7 @@ public final class GgufTokenizer implements Tokenizer {
     if (!useByteLevel) {
       StringBuilder sb = new StringBuilder();
       for (int token : tokens) {
-        if (token != bosTokenId && token != eosTokenId) {
+        if (token != bosTokenId && !isEndOfGeneration(token)) {
           sb.append(decode(token));
         }
       }
@@ -537,7 +680,7 @@ public final class GgufTokenizer implements Tokenizer {
     // For byte-level BPE, we need to collect all bytes first and then decode as UTF-8
     List<Byte> byteList = new ArrayList<>();
     for (int token : tokens) {
-      if (token < 0 || token >= vocab.length || token == bosTokenId || token == eosTokenId) {
+      if (token < 0 || token >= vocab.length || token == bosTokenId || isEndOfGeneration(token)) {
         continue;
       }
       String piece = vocab[token];
@@ -578,7 +721,7 @@ public final class GgufTokenizer implements Tokenizer {
   private String decodeSentencePiece(int[] tokens) {
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     for (int token : tokens) {
-      if (token < 0 || token >= vocab.length || token == bosTokenId || token == eosTokenId) {
+      if (token < 0 || token >= vocab.length || token == bosTokenId || isEndOfGeneration(token)) {
         continue;
       }
       String piece = vocab[token];
@@ -599,10 +742,7 @@ public final class GgufTokenizer implements Tokenizer {
 
   @Override
   public String decode(int token) {
-    if (token < 0 || token >= vocab.length) {
-      return "";
-    }
-    if (useSentencePiece && (token == bosTokenId || token == eosTokenId)) {
+    if (token < 0 || token >= vocab.length || token == bosTokenId || isEndOfGeneration(token)) {
       return "";
     }
     String piece = vocab[token];
@@ -669,6 +809,8 @@ public final class GgufTokenizer implements Tokenizer {
   private record SentencePieceBigram(
       int left, int right, float score, int leftVersion, int rightVersion) {}
 
+  private record SpecialToken(String text, int id) {}
+
   @Override
   public int vocabSize() {
     return vocab.length;
@@ -682,5 +824,10 @@ public final class GgufTokenizer implements Tokenizer {
   @Override
   public int eosToken() {
     return eosTokenId;
+  }
+
+  @Override
+  public boolean isEndOfGeneration(int token) {
+    return token >= 0 && token < endOfGenerationTokens.length && endOfGenerationTokens[token];
   }
 }

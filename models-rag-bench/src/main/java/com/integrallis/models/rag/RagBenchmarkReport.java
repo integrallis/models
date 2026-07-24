@@ -33,11 +33,12 @@ public record RagBenchmarkReport(
     RagBenchmarkSettings settings,
     RagBenchmarkEnvironment environment,
     BackendDiagnostics backendDiagnostics,
+    HostedApiPricing hostedApiPricing,
     RagBenchmarkSummary summary,
     RagPerformanceTier performanceTier,
     List<RagRun> runs,
     List<RagBenchmarkFailure> failures) {
-  public static final int CURRENT_SCHEMA_VERSION = 3;
+  public static final int CURRENT_SCHEMA_VERSION = 5;
 
   public RagBenchmarkReport {
     backendDiagnostics = Objects.requireNonNull(backendDiagnostics, "backendDiagnostics");

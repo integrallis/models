@@ -42,7 +42,8 @@ public final class RagEvaluator {
 
     double retrievalRecall = expected.isEmpty() ? 1.0 : fractionPresent(expected, retrievedIds);
     double reciprocalRank = reciprocalRank(expected, retrieved);
-    double factCoverage = factCoverage(testCase.requiredFacts(), answer);
+    double factCoverage =
+        factCoverage(testCase.requiredFacts(), testCase.factAlternatives(), answer);
     double citationRecall =
         expected.isEmpty()
             ? (citations.isEmpty() ? 1.0 : 0.0)
@@ -78,14 +79,28 @@ public final class RagEvaluator {
     return 0.0;
   }
 
-  private static double factCoverage(List<String> facts, String answer) {
+  private static double factCoverage(
+      List<String> facts, List<RagFactAlternative> alternatives, String answer) {
     if (facts.isEmpty()) {
       return 1.0;
     }
     String normalizedAnswer = normalizeText(answer);
     long present =
-        facts.stream().map(RagEvaluator::normalizeText).filter(normalizedAnswer::contains).count();
+        facts.stream()
+            .filter(
+                fact ->
+                    matches(normalizedAnswer, fact)
+                        || alternatives.stream()
+                            .filter(alternative -> alternative.fact().equals(fact))
+                            .anyMatch(
+                                alternative ->
+                                    matches(normalizedAnswer, alternative.alternative())))
+            .count();
     return (double) present / facts.size();
+  }
+
+  private static boolean matches(String normalizedAnswer, String fact) {
+    return normalizedAnswer.contains(normalizeText(fact));
   }
 
   private static Set<String> citations(String answer) {

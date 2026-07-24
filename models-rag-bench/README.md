@@ -96,6 +96,37 @@ For Ollama, use `--backend ollama`, the Ollama model tag for `--model`, port
 `11434`, and the `ollama serve` PID. Both HTTP modes send the canonical prompt
 raw with temperature 0, top-k 1, top-p 1, repetition penalty 1, and seed 42.
 
+## Hosted API comparison
+
+The same plain Java application can measure economical hosted controls. API
+keys are read only from `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or
+`DEEPSEEK_API_KEY`; keys are not accepted as CLI options and are never written
+to reports.
+
+```shell
+models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+  --framework plain-java \
+  --backend openai \
+  --backend-version hosted-api-2026-07-23 \
+  --model gpt-5.4-nano-2026-03-17 \
+  --prompt-template raw \
+  --max-tokens 64 \
+  --warmups 1 \
+  --iterations 3
+```
+
+The certified hosted controls are OpenAI `gpt-5.4-nano-2026-03-17`, Anthropic
+`claude-haiku-4-5-20251001`, and DeepSeek `deepseek-v4-flash` with thinking
+disabled. Reports embed the exact pricing snapshot and source URL, normalized
+input/cache/output usage, measured request cost, and a projected API cost per
+1,000 requests. Pricing is intentionally pinned: adding another provider model
+requires an explicit reviewed pricing profile instead of silently applying an
+unverified rate.
+
+Hosted results are a developer-experience comparison, not an engine
+microbenchmark. They include Internet transport, provider queueing, and
+provider-side serving, while local Models, llama.cpp, and Ollama runs do not.
+
 ## Python baselines
 
 Install the locked baseline and run its tests:

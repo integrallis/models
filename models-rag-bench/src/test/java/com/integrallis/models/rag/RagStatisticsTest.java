@@ -33,7 +33,8 @@ class RagStatisticsTest {
         run(
             answerable,
             List.of(hit),
-            new GenerationResult("fact [source]", 100, 11, 200, 1_200, 500, 20, 1_000, 30),
+            new GenerationResult(
+                "fact [source]", 100, 20, 10, 11, 200, 1_200, 500, 20, 1_000, 30, 0.001),
             10,
             1_250,
             new RagEvaluation(1, 1, 1, 1, 1, false, true));
@@ -41,7 +42,8 @@ class RagStatisticsTest {
         run(
             unknown,
             List.of(hit),
-            new GenerationResult("INSUFFICIENT_CONTEXT", 90, 6, 400, 1_400, 300, 20, 2_000, 40),
+            new GenerationResult(
+                "INSUFFICIENT_CONTEXT", 90, 0, 0, 6, 400, 1_400, 300, 20, 2_000, 40, 0.002),
             30,
             1_500,
             new RagEvaluation(1, 1, 1, 1, 1, true, true));
@@ -58,6 +60,12 @@ class RagStatisticsTest {
     assertThat(summary.p50DecodeTokensPerSecond()).isEqualTo(7.5);
     assertThat(summary.peakRssBytes()).isEqualTo(2_000);
     assertThat(summary.totalCpuMillis()).isEqualTo(70);
+    assertThat(summary.totalInputTokens()).isEqualTo(190);
+    assertThat(summary.totalCacheReadInputTokens()).isEqualTo(20);
+    assertThat(summary.totalCacheWriteInputTokens()).isEqualTo(10);
+    assertThat(summary.totalOutputTokens()).isEqualTo(17);
+    assertThat(summary.totalEstimatedApiCostUsd()).isEqualTo(0.003);
+    assertThat(summary.projectedApiCostPer1kRequestsUsd()).isEqualTo(1.5);
     assertThat(summary.abstentionAccuracy()).isEqualTo(1);
     assertThat(summary.policyMetrics().successfulCases()).isEqualTo(2);
   }

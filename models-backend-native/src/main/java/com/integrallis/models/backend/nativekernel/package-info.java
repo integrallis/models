@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 
-/** Native inference backend via llama.cpp + FFM (Phase 2+). */
-package com.integrallis.models.backend.nativellm;
+/** Models-owned Rust inference kernels exposed through Java FFM. */
+package com.integrallis.models.backend.nativekernel;

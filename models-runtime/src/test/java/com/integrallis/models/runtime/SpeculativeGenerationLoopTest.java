@@ -59,6 +59,26 @@ class SpeculativeGenerationLoopTest {
   }
 
   @Test
+  void stopsAtAnAlternateEndOfGenerationTokenDuringVerification() {
+    int[] promptTokens = {2, 3, 4, 5, 2, 3, 4};
+    SequenceBackend backend = new SequenceBackend(promptTokens, new int[] {5, 2, 10, 7, 1});
+    GenerationLoop loop = new GenerationLoop(backend, threeTokenDraftOptions());
+
+    String result =
+        loop.generate(
+            "prompt",
+            SamplingOptions.builder()
+                .temperature(0.0f)
+                .repetitionPenalty(1.0f)
+                .maxTokens(8)
+                .build());
+
+    assertThat(result).isEqualTo("[5][2]");
+    assertThat(backend.verifiedBatches).containsExactly(new int[] {5, 2, 3, 4});
+    assertThat(backend.forwardTokens).isEmpty();
+  }
+
+  @Test
   void rejectsDraftTailWithoutLeakingTokensOrResamplingTheMismatch() {
     int[] promptTokens = {2, 3, 4, 5, 2, 3, 4};
     SequenceBackend backend = new SequenceBackend(promptTokens, new int[] {5, 2, 9, 7, 1});
@@ -347,6 +367,11 @@ class SpeculativeGenerationLoopTest {
             @Override
             public int eosToken() {
               return 1;
+            }
+
+            @Override
+            public boolean isEndOfGeneration(int token) {
+              return token == 1 || token == 10;
             }
           };
     }

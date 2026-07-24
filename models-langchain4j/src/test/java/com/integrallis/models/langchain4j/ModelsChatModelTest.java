@@ -16,13 +16,23 @@
 package com.integrallis.models.langchain4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.CustomMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.request.ChatRequest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.modeljars.ModelJarDescriptor;
@@ -42,6 +52,84 @@ class ModelsChatModelTest {
     assertThat(model.chat("hello")).isEqualTo(" world");
     assertThat(model.diagnostics().backend()).isEqualTo("test");
     assertThat(model.diagnostics().planVersion()).isEqualTo("unavailable");
+  }
+
+  @Test
+  void langChain4jChatModelAcceptsTheSharedLocalEngineContract() {
+    ModelsChatModel model = new ModelsChatModel(highLevelModel("local answer"));
+
+    assertThat(model.chat("hello")).isEqualTo("local answer");
+    assertThat(model.diagnostics().backend()).isEqualTo("local-test");
+  }
+
+  @Test
+  void langChain4jChatModelMapsMessagesAndRequestOptions() {
+    RecordingModel delegate = new RecordingModel("mapped answer");
+    ModelsChatModel model =
+        new ModelsChatModel(
+            delegate,
+            SamplingOptions.builder()
+                .temperature(0.9f)
+                .topP(0.8f)
+                .topK(40)
+                .maxTokens(200)
+                .repetitionPenalty(1.2f)
+                .seed(42L)
+                .build());
+    CustomMessage custom = CustomMessage.from(Map.of("source", "tool"));
+    ChatRequest request =
+        ChatRequest.builder()
+            .messages(
+                List.of(
+                    SystemMessage.from("system"),
+                    UserMessage.from("question"),
+                    AiMessage.from("prior answer"),
+                    custom))
+            .temperature(0.2)
+            .topP(0.3)
+            .topK(7)
+            .maxOutputTokens(19)
+            .build();
+
+    var response = model.doChat(request);
+
+    assertThat(delegate.prompt).isEqualTo("system\nquestion\nprior answer\n" + custom);
+    assertThat(delegate.options.temperature()).isEqualTo(0.2f);
+    assertThat(delegate.options.topP()).isEqualTo(0.3f);
+    assertThat(delegate.options.topK()).isEqualTo(7);
+    assertThat(delegate.options.maxTokens()).isEqualTo(19);
+    assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
+    assertThat(delegate.options.seed()).isEqualTo(42L);
+    assertThat(response.aiMessage().text()).isEqualTo("mapped answer");
+    assertThat(response.modelName()).isEqualTo("RecordingModel");
+  }
+
+  @Test
+  void langChain4jChatModelRetainsDefaultsWhenRequestHasNoOverrides() {
+    RecordingModel delegate = new RecordingModel("answer");
+    SamplingOptions defaults =
+        SamplingOptions.builder()
+            .temperature(0.4f)
+            .topP(0.7f)
+            .topK(12)
+            .maxTokens(31)
+            .repetitionPenalty(1.1f)
+            .build();
+    ModelsChatModel model = new ModelsChatModel(delegate, defaults);
+
+    model.doChat(ChatRequest.builder().messages(UserMessage.from("question")).build());
+
+    assertThat(delegate.options).isEqualTo(defaults);
+  }
+
+  @Test
+  void langChain4jChatModelRejectsNullDependenciesAndRequests() {
+    assertThatNullPointerException()
+        .isThrownBy(() -> new ModelsChatModel((TextGenerationModel) null));
+    assertThatNullPointerException()
+        .isThrownBy(() -> new ModelsChatModel(highLevelModel("answer"), null));
+    ModelsChatModel model = new ModelsChatModel(highLevelModel("answer"));
+    assertThatNullPointerException().isThrownBy(() -> model.doChat(null));
   }
 
   @Test
@@ -93,6 +181,54 @@ class ModelsChatModelTest {
       @Override
       public void close() {}
     };
+  }
+
+  private static TextGenerationModel highLevelModel(String answer) {
+    return new TextGenerationModel() {
+      @Override
+      public String modelName() {
+        return "LocalEngineModel";
+      }
+
+      @Override
+      public BackendDiagnostics diagnostics() {
+        return BackendDiagnostics.unavailable("local-test");
+      }
+
+      @Override
+      public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+        stream.onToken(answer);
+        stream.onComplete();
+      }
+    };
+  }
+
+  private static final class RecordingModel implements TextGenerationModel {
+    private final String answer;
+    private String prompt;
+    private SamplingOptions options;
+
+    private RecordingModel(String answer) {
+      this.answer = answer;
+    }
+
+    @Override
+    public String modelName() {
+      return "RecordingModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("recording");
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      this.prompt = prompt;
+      this.options = options;
+      stream.onToken(answer);
+      stream.onComplete();
+    }
   }
 
   private static Tokenizer testTokenizer() {

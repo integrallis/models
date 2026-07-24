@@ -23,7 +23,15 @@ val libraryProjects = subprojects.filterNot { it.name in benchmarkProjectNames }
 val benchmarkProjects = subprojects.filter { it.name in benchmarkProjectNames }
 val libraryModuleNames = libraryProjects.map { it.name }.toSet()
 val publishedModuleNames =
-    setOf("models-api", "models-runtime", "models-semantic-order", "models-backend-purejava")
+    setOf(
+        "models-api",
+        "models-runtime",
+        "models-rag",
+        "models-semantic-order",
+        "models-backend-purejava",
+        "models-langchain4j",
+        "models-spring-ai"
+    )
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
 val scaffoldProjects = libraryProjects.filterNot { it.name in publishedModuleNames }
 
@@ -454,7 +462,13 @@ tasks.register("verifyGithubWorkflows") {
     description = "Verify GitHub Actions workflow files exist"
     doLast {
         val workflowDir = rootProject.file(".github/workflows")
-        listOf("ci.yml", "scorecard.yml", "codeql.yml", "release.yml").forEach { name ->
+        listOf(
+            "ci.yml",
+            "scorecard.yml",
+            "codeql.yml",
+            "release.yml",
+            "native-kernels.yml"
+        ).forEach { name ->
             val f = workflowDir.resolve(name)
             require(f.exists()) { "Missing workflow: ${f.absolutePath}" }
             require(f.readText().contains("jobs:")) { "$name missing 'jobs:' section" }
