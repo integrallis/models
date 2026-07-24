@@ -48,6 +48,18 @@ public enum RagPromptTemplate {
     };
   }
 
+  /** Applies a role-aware envelope while retaining legacy prompt bytes for single-turn profiles. */
+  public String apply(String systemPrompt, String userPrompt) {
+    if (this == ZEPHYR) {
+      return "<|system|>\n"
+          + systemPrompt.stripTrailing()
+          + "</s>\n<|user|>\n"
+          + userPrompt
+          + "</s>\n<|assistant|>";
+    }
+    return apply(systemPrompt + userPrompt);
+  }
+
   /** Resolves a CLI identifier. */
   public static RagPromptTemplate parse(String value) {
     for (RagPromptTemplate template : values()) {

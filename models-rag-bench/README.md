@@ -41,7 +41,8 @@ and is the default so template selection is never hidden. Use
 supports `enable_thinking=false`; it prefills the template's empty reasoning
 block so the measured output budget contains the answer. Use
 `--prompt-template zephyr` for Zephyr-family chat models such as TinyLlama
-1.1B Chat; it emits the model's user turn, EOS, and assistant-generation
+1.1B Chat; it places the grounding policy in the model's system turn and the
+evidence plus question in its user turn, then emits EOS and assistant-generation
 markers explicitly.
 
 The report records:

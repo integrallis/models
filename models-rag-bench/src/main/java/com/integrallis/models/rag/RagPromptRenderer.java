@@ -45,7 +45,7 @@ public final class RagPromptRenderer {
       throw new IllegalArgumentException("question must not be blank");
     }
 
-    StringBuilder prompt = new StringBuilder(INSTRUCTIONS).append("CONTEXT\n");
+    StringBuilder prompt = new StringBuilder("CONTEXT\n");
     for (RetrievedDocument hit : retrieved) {
       RagDocument document = hit.document();
       prompt
@@ -57,8 +57,7 @@ public final class RagPromptRenderer {
           .append(document.text())
           .append("\n\n");
     }
-    String canonical =
-        prompt.append("QUESTION\n").append(question).append("\n\nANSWER\n").toString();
-    return template.apply(canonical);
+    String request = prompt.append("QUESTION\n").append(question).append("\n\nANSWER\n").toString();
+    return template.apply(INSTRUCTIONS, request);
   }
 }

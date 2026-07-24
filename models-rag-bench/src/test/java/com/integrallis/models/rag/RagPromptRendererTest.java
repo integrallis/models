@@ -71,7 +71,7 @@ class RagPromptRendererTest {
   }
 
   @Test
-  void zephyrProfileWrapsTheCanonicalPromptAsAUserTurn() {
+  void zephyrProfileUsesNativeSystemAndUserTurns() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 
     String prompt =
@@ -81,8 +81,8 @@ class RagPromptRendererTest {
             RagPromptTemplate.ZEPHYR);
 
     assertThat(prompt)
-        .startsWith("<|user|>\nYou answer questions")
-        .contains("[source-1] Policy")
+        .startsWith("<|system|>\nYou answer questions")
+        .contains("</s>\n<|user|>\nCONTEXT\n[source-1] Policy")
         .endsWith("ANSWER\n</s>\n<|assistant|>");
   }
 }
