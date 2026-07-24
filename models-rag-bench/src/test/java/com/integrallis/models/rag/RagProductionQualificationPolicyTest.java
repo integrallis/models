@@ -102,6 +102,39 @@ class RagProductionQualificationPolicyTest {
     assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.FAILED_RELATIVE_GATE);
   }
 
+  @Test
+  void acceptsEquivalentSamplingWithBackendSpecificPromptCacheMetadata() {
+    RagBenchmarkReport candidate =
+        withSettings(
+            report("rust-ffm", "sha", 100, 1_000),
+            settings(
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1",
+                    "promptCache", "longest-common-prefix")));
+    RagBenchmarkReport ollama =
+        withSettings(
+            report("ollama", "sha", 100, 1_000),
+            settings(
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1",
+                    "rawPrompt", "true")));
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+  }
+
   private static RagBenchmarkReport report(
       String backend,
       String artifactSha256,
@@ -167,6 +200,16 @@ class RagProductionQualificationPolicyTest {
   }
 
   private static RagBenchmarkSettings settings() {
+    return settings(
+        Map.of(
+            "temperature", "0",
+            "topK", "1",
+            "topP", "1",
+            "seed", "42",
+            "repetitionPenalty", "1"));
+  }
+
+  private static RagBenchmarkSettings settings(Map<String, String> generationControls) {
     return new RagBenchmarkSettings(
         "corpus-sha",
         List.of("case-one", "case-two"),
@@ -179,7 +222,7 @@ class RagProductionQualificationPolicyTest {
         8,
         GroundedAnswerPolicy.POLICY_ID,
         2.0f,
-        Map.of("temperature", "0"));
+        generationControls);
   }
 
   private static RagBenchmarkEnvironment environment(String hostname) {
@@ -237,6 +280,28 @@ class RagProductionQualificationPolicyTest {
         report.hostedApiPricing(),
         summary,
         RagPerformancePolicy.classify(summary.policyMetrics()),
+        report.runs(),
+        report.failures());
+  }
+
+  private static RagBenchmarkReport withSettings(
+      RagBenchmarkReport report, RagBenchmarkSettings settings) {
+    return new RagBenchmarkReport(
+        report.schemaVersion(),
+        report.generatedAt(),
+        report.framework(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        settings,
+        report.environment(),
+        report.backendDiagnostics(),
+        report.hostedApiPricing(),
+        report.summary(),
+        report.performanceTier(),
         report.runs(),
         report.failures());
   }

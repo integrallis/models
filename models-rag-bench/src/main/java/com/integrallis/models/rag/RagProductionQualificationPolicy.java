@@ -23,6 +23,8 @@ import java.util.Objects;
 
 /** Production gate combining grounded RAG SLOs with same-host local-engine comparisons. */
 public final class RagProductionQualificationPolicy {
+  private static final List<String> MATCHED_GENERATION_CONTROLS =
+      List.of("temperature", "topK", "topP", "seed", "repetitionPenalty");
   private static final Map<String, RelativeThreshold> THRESHOLDS =
       Map.of(
           "llama.cpp", new RelativeThreshold(0.45, 2.0),
@@ -121,7 +123,7 @@ public final class RagProductionQualificationPolicy {
     if (!sameHardware(candidate.environment(), baseline.environment())) {
       return "host hardware differs";
     }
-    if (!candidate.settings().equals(baseline.settings())) {
+    if (!sameWorkload(candidate.settings(), baseline.settings())) {
       return "benchmark workload differs";
     }
     RagPerformanceTier baselineTier =
@@ -131,6 +133,27 @@ public final class RagProductionQualificationPolicy {
       return "baseline failed runtime or quality gate";
     }
     return null;
+  }
+
+  private static boolean sameWorkload(RagBenchmarkSettings left, RagBenchmarkSettings right) {
+    return left.corpusSha256().equals(right.corpusSha256())
+        && left.caseIds().equals(right.caseIds())
+        && left.promptTemplate().equals(right.promptTemplate())
+        && left.retrievalTopK() == right.retrievalTopK()
+        && left.maxOutputTokens() == right.maxOutputTokens()
+        && left.warmups() == right.warmups()
+        && left.iterations() == right.iterations()
+        && left.contextLength() == right.contextLength()
+        && left.threads() == right.threads()
+        && left.groundingPolicy().equals(right.groundingPolicy())
+        && Float.compare(left.minimumRetrievalScore(), right.minimumRetrievalScore()) == 0
+        && MATCHED_GENERATION_CONTROLS.stream()
+            .allMatch(
+                control ->
+                    left.generationControls().containsKey(control)
+                        && Objects.equals(
+                            left.generationControls().get(control),
+                            right.generationControls().get(control)));
   }
 
   private static boolean sameHardware(RagBenchmarkEnvironment left, RagBenchmarkEnvironment right) {
