@@ -38,6 +38,7 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
   private final String model;
   private final URI endpoint;
   private final PromptMode promptMode;
+  private final boolean thinking;
   private final int contextLength;
   private final int threads;
   private final Duration requestTimeout;
@@ -49,6 +50,7 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
     model = builder.model;
     endpoint = builder.endpoint;
     promptMode = builder.promptMode;
+    thinking = builder.thinking;
     contextLength = builder.contextLength;
     threads = builder.threads;
     requestTimeout = builder.requestTimeout;
@@ -78,6 +80,7 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
         Map.of(
             "endpoint", endpoint.toString(),
             "promptMode", promptMode.name(),
+            "thinking", Boolean.toString(thinking),
             "contextLength", Integer.toString(contextLength),
             "threads", Integer.toString(threads)),
         java.util.List.of());
@@ -137,6 +140,9 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
     body.put("prompt", prompt);
     body.put("stream", true);
     body.put("raw", promptMode == PromptMode.RAW);
+    if (promptMode == PromptMode.NATIVE_CHAT) {
+      body.put("think", thinking);
+    }
     body.put("keep_alive", "5m");
     ObjectNode controls = body.putObject("options");
     controls.put("temperature", options.temperature());
@@ -165,6 +171,7 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
     if (promptMode == PromptMode.NATIVE_CHAT) {
       body.put("model", model);
       body.put("max_tokens", options.maxTokens());
+      body.putObject("chat_template_kwargs").put("enable_thinking", thinking);
       ObjectNode message = body.putArray("messages").addObject();
       message.put("role", "user");
       message.put("content", prompt);
@@ -258,7 +265,11 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
       }
       JsonNode event = mapper.readTree(payload);
       JsonNode choice = event.path("choices").path(0);
-      observation.emit(choice.path("delta").path("content").asText(""));
+      JsonNode delta = choice.path("delta");
+      if (!delta.path("reasoning_content").asText("").isEmpty()) {
+        observation.observeToken();
+      }
+      observation.emit(delta.path("content").asText(""));
       JsonNode finishReason = choice.path("finish_reason");
       complete |= !finishReason.isMissingNode() && !finishReason.isNull();
       recordLlamaMetrics(event, observation);
@@ -331,6 +342,7 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
     private final String model;
     private final URI endpoint;
     private PromptMode promptMode = PromptMode.NATIVE_CHAT;
+    private boolean thinking;
     private int contextLength = 2_048;
     private int threads = Runtime.getRuntime().availableProcessors();
     private Duration connectTimeout = Duration.ofSeconds(30);
@@ -348,6 +360,12 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
 
     public Builder promptMode(PromptMode promptMode) {
       this.promptMode = Objects.requireNonNull(promptMode, "promptMode");
+      return this;
+    }
+
+    /** Enables or disables model-native reasoning for chat requests. */
+    public Builder thinking(boolean thinking) {
+      this.thinking = thinking;
       return this;
     }
 
@@ -443,6 +461,12 @@ public final class LocalEngineGenerationModel implements TextGenerationModel {
       }
       text.append(token);
       stream.onToken(token);
+    }
+
+    private void observeToken() {
+      if (firstTokenMillis < 0) {
+        firstTokenMillis = elapsedMillis();
+      }
     }
 
     private void recordMetrics(

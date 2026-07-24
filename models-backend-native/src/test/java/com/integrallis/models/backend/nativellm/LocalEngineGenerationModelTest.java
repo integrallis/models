@@ -74,6 +74,9 @@ class LocalEngineGenerationModelTest {
         assertThat(requestBody.get().path("max_tokens").asInt()).isEqualTo(32);
         assertThat(requestBody.get().path("top_k").asInt()).isEqualTo(1);
         assertThat(requestBody.get().path("seed").asLong()).isEqualTo(42);
+        assertThat(
+                requestBody.get().path("chat_template_kwargs").path("enable_thinking").asBoolean())
+            .isFalse();
       }
     } finally {
       server.stop(0);
@@ -97,6 +100,7 @@ class LocalEngineGenerationModelTest {
         assertThat(result.prefillTokensPerSecond()).isEqualTo(200);
         assertThat(result.loadMillis()).isEqualTo(7);
         assertThat(requestBody.get().path("raw").asBoolean()).isFalse();
+        assertThat(requestBody.get().path("think").asBoolean()).isFalse();
         assertThat(requestBody.get().path("options").path("num_predict").asInt()).isEqualTo(16);
         assertThat(requestBody.get().path("options").path("seed").asLong()).isEqualTo(7);
       }
@@ -135,6 +139,21 @@ class LocalEngineGenerationModelTest {
       }
     } finally {
       server.stop(0);
+    }
+  }
+
+  @Test
+  void canExplicitlyEnableNativeModelThinking() {
+    try (LocalEngineGenerationModel model =
+        LocalEngineGenerationModel.llamaCpp("thinking-model", URI.create("http://127.0.0.1:8080"))
+            .thinking(true)
+            .build()) {
+      JsonNode body =
+          model.requestBody(
+              "prompt", SamplingOptions.builder().temperature(0).maxTokens(8).build());
+
+      assertThat(body.path("chat_template_kwargs").path("enable_thinking").asBoolean()).isTrue();
+      assertThat(model.diagnostics().environment()).containsEntry("thinking", "true");
     }
   }
 
