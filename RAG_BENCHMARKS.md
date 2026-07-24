@@ -4,7 +4,11 @@ Last updated: 2026-07-24
 
 ## Result
 
-No measured path is ready for a production RAG claim.
+No measured **local Qwen3 1.7B path** is ready for a production RAG claim.
+The hosted control changes the broader developer-facing result: OpenAI
+GPT-5.4 nano passes every latency and strict-quality gate on this workload.
+Anthropic Claude Haiku 4.5 and DeepSeek V4 Flash pass the latency gates, but
+their deterministic exact-phrase score is 88.9%.
 
 Ollama has acceptable single-request latency on this workload: p95 TTFT is
 693.6 ms and p95 end-to-end latency is 4.03 seconds. llama.cpp is usable but
@@ -140,6 +144,11 @@ application calling local Ollama experiences Ollama's engine speed, not the
 pure-Java backend's speed. The framework choice is therefore an ergonomics and
 integration decision, not an inference-performance decision.
 
+The hosted comparison runs the same Lucene retrieval, canonical RAG text, case
+order, output cap, and evaluator from the same controlled VPS. The provider
+applies its private chat template and tokenizer, so this is a user-experience
+comparison rather than a same-GGUF engine benchmark.
+
 The plain native paths produce the same answers and quality failures. Ollama
 cuts p95 TTFT by 46.4% relative to the pinned llama.cpp server but decodes
 27.4% fewer tokens per second. Ollama satisfies the latency part of the
@@ -191,37 +200,50 @@ telemedicine referral is required even though the retrieved passage explicitly
 says no referral is required. This is exactly why token throughput cannot stand
 in for RAG viability.
 
-## Remote API Context
+## Hosted API Comparison
 
-The controlled host does not have OpenAI or Anthropic API credentials, so this
-study does not claim a same-prompt, same-time remote API benchmark. The current
-external context is useful but not interchangeable with the local p95 results:
+Each hosted row covers one warmup over all nine cases followed by three
+measured iterations, or 27 measured requests. TTFT and end-to-end latency are
+p95; decode is the median. Cost is calculated from provider-reported token
+usage and the pricing snapshot embedded in each schema-v4 report.
 
-- Artificial Analysis reports median P50 measurements over the preceding 72
-  hours. Its current OpenAI data shows low-latency non-reasoning paths around
-  0.64 to 0.70 seconds to first answer token and 147 to 161 output tok/s.
-- Its current Anthropic data reports a 0.87-second latency floor and 91 to 94
-  output tok/s for Claude 4.5 Haiku, with Claude Sonnet 5 non-reasoning at
-  1.42 seconds.
-- Those measurements use different prompts, models, service load, percentiles,
-  and quality levels. They are an external service baseline, not a score in
-  this benchmark.
+| Provider model | p95 TTFT | Median decode | p95 end to end | Strict quality | Audited semantic quality | Measured API cost / 1K |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| OpenAI GPT-5.4 nano, `2026-03-17` | 440.9 ms | 141.29 tok/s | 727.9 ms | 100.0% | 100.0% | $0.0724 |
+| Anthropic Claude Haiku 4.5, `20251001` | 1,086.1 ms | 139.30 tok/s | 1,581.5 ms | 88.9% | 100.0% | $0.3666 |
+| DeepSeek V4 Flash, non-thinking | 758.6 ms | 102.43 tok/s | 1,118.8 ms | 88.9% | 100.0% | $0.0134 measured |
 
-Sources:
+OpenAI is the only row that passes the automated `PRODUCTION_READY` policy.
+The Haiku and DeepSeek failures are three repetitions of one semantically
+correct telemedicine answer. Haiku says “does not require a referral” and
+DeepSeek says “No referral is needed”; the deliberately simple evaluator
+requires the literal substring “do not require a referral.” The raw answers
+are retained, and the table keeps the strict score instead of changing the
+evaluator after seeing results. “Audited semantic quality” is a transparent
+human review of those three false negatives, not an LLM-judge score.
 
-- [Artificial Analysis OpenAI performance](https://artificialanalysis.ai/providers/openai)
-- [Artificial Analysis Anthropic performance](https://artificialanalysis.ai/providers/anthropic)
-- [OpenAI latency optimization](https://developers.openai.com/api/docs/guides/latency-optimization)
-- [Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+DeepSeek automatically served 3,456 of 4,440 measured input tokens from its
+context cache. Its displayed $0.0134 per 1,000 requests is therefore the
+observed repeated-workload cost; applying the pinned cache-miss rate to the
+same average input/output counts gives approximately $0.031 per 1,000 unique
+requests. OpenAI and Anthropic reported no cache-read tokens.
 
-The defensible broad comparison is that local Ollama's 0.69-second p95 TTFT is
-in the same user-perceived range as the fastest observed cloud P50, and
-llama.cpp's 1.29-second p95 remains plausible for interactive use. Pure Java's
-5.35-second p95 TTFT is not competitive with either. Its 18.39 tok/s RAG decode
-rate is also well below the cited cloud throughput range. Remote APIs add
-network, variable service latency, data-governance constraints, and recurring
-cost; local execution removes those dependencies but does not excuse a slow or
-incorrect answer.
+These API costs exclude client compute, retrieval, network transit, warmups,
+retries, storage, and provider price changes. Local execution has no
+per-request provider charge, but it still consumes owned or rented hardware.
+More importantly, the local path keeps retrieved documents, questions, and
+generated text in the application process and works offline. Hosted requests
+send that material across the network to a third party and require credentials
+and provider availability. This is a deployment and data-governance
+distinction, not a claim that a particular provider is insecure.
+
+The measured result developers care about is direct: GPT-5.4 nano and DeepSeek
+V4 Flash return this short RAG workload faster than the tested local Qwen3 1.7B
+paths. Ollama remains in the same interactive TTFT range without data egress,
+while pure Java is not yet competitive on long-prompt TTFT. Models' local value
+proposition is privacy, offline operation, predictable marginal cost, and
+in-process deployment; it cannot presently be marketed as faster than these
+hosted controls.
 
 ## Required Before A Production Claim
 
@@ -250,9 +272,9 @@ incorrect answer.
    native engine. TTFT needs about a 4.1x reduction to match llama.cpp.
 8. Repeat the matrix on Apple Silicon and a production-shaped x86 server. These
    results describe one controlled AVX2 CPU host, not every deployment target.
-9. Add optional OpenAI and Anthropic controls using the identical rendered
-   prompts, streamed first-token timestamps, and explicit model revisions.
-   Keep cloud P50/P95 separate from local results and record network region.
+9. Repeat the hosted matrix from multiple regions and at concurrency 1, 2, 4,
+   and 8. Preserve provider-reported cache usage and exact model revisions so
+   queueing, routing, and cache effects remain visible.
 
 ## Reproduction
 
