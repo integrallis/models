@@ -55,6 +55,37 @@ prefill tok/s but matched only three of five and was rejected. The retained
 row candidate was then run through the full ten-trial comparison and RAG
 matrix. It must pass the full profile gate before catalog activation.
 
+### Models-owned native Q8_0 checkpoint
+
+The first controlled Models Rust/FFM Q8_0 gate used the same pinned SmolLM2
+360M bytes, 157-token prompt, 64-token generation, Java 25 runtime, fixed
+1 GiB heap, and eight workers. Five warmups and five measurements in each of
+six fresh processes produced 30 measurements per backend. Pure Java and Rust
+were counterbalanced. llama.cpp disabled prompt caching, and the Ollama model
+was stopped between processes so its persistent runner could not reuse the
+repeated prompt series.
+
+| Backend | p95 TTFT ms | p50 prefill tok/s | p50 decode tok/s | p50 E2E ms | Max RSS GiB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Pure Java | 1,207.41 | 139.58 | 45.57 | 2,506.35 | 0.983 |
+| Models Rust/FFM | 910.61 | 189.33 | 45.44 | 2,231.19 | 0.932 |
+| Ollama | 339.26 | 586.42 | 51.84 | 1,540.21 | 0.615 |
+| llama.cpp | 294.82 | 583.81 | 97.60 | 917.57 | 0.568 |
+
+The native Q8 projection path improves median pure-Java TTFT by 24.91%,
+prefill by 35.64%, and end-to-end latency by 10.98%. It reaches 87.65% of
+Ollama and 46.55% of llama.cpp decode throughput, but only 37.26% and 32.38%
+of their p95 TTFT performance. Median end-to-end performance is 69.03% of
+Ollama and 41.12% of llama.cpp.
+
+All backends were deterministic across their six fresh-process repeats.
+Ollama and llama.cpp matched all 30 corresponding complete outputs. Pure Java
+matched llama.cpp in 12 of 30, while Rust matched llama.cpp in 6 of 30 and
+pure Java in 12 of 30. The pinned eight-token native integration oracle still
+passes, but the longer-output drift requires the RAG quality gate before a
+ModelJar may select this path. The raw reports and complete protocol are under
+`benchmark-results/certified-20260724/native-q8/smollm2-360m-q8_0`.
+
 Pure Java maps and parses GGUF in-process, while native load measurements
 include server or request readiness, so load values are directional rather
 than equivalent lifecycle costs. Ollama RSS observes the service process and

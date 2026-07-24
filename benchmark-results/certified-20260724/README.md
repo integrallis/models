@@ -21,6 +21,12 @@ generations per backend. Each backend receives the same GGUF bytes and
 deterministic nonce-prefixed prompt sequence. The comparison reports verify the
 artifact, prompt, controls, host, and trial count before calculating ratios.
 
+The `native-q8/` reports are a later Models commit-specific implementation
+gate. They contain six fresh-process repetitions per backend and explicitly
+reset Ollama between processes to prevent its persistent prompt cache from
+reusing the repeated measurement series. See the nested README for its
+separate controls, aggregate values, and non-qualification finding.
+
 The `rag/` reports contain a 12-document synthetic corpus and nine cases. Plain
 Java uses one warmup and three measured iterations, for 27 requests per
 backend. LangChain4j and Spring AI use one warmup and one measured iteration,
