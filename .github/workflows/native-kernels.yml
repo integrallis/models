@@ -77,6 +77,12 @@ jobs:
           ref: main
           path: model-jars
 
+      - name: Exclude unrelated non-portable Vectors demo
+        shell: bash
+        run: |
+          sed -i.bak '/include("demos:rag-multimodal")/d' vectors/settings.gradle.kts
+          rm vectors/settings.gradle.kts.bak
+
       - name: Upload portable composite sources
         uses: actions/upload-artifact@v7
         with:
