@@ -43,7 +43,9 @@ import org.modeljars.ModelJarRegistry;
 /** Runs controlled plain Java, LangChain4j, and Spring AI RAG workloads. */
 public final class RagBenchmarkCli {
   private static final Set<String> FRAMEWORKS = Set.of("plain-java", "langchain4j", "spring-ai");
-  private static final Set<String> BACKENDS = Set.of("pure-java", "ollama", "llama.cpp");
+  private static final Set<String> HOSTED_BACKENDS = Set.of("openai", "anthropic", "deepseek");
+  private static final Set<String> BACKENDS =
+      Set.of("pure-java", "ollama", "llama.cpp", "openai", "anthropic", "deepseek");
   private static final Set<String> OPTIONS =
       Set.of(
           "framework",
@@ -119,6 +121,16 @@ public final class RagBenchmarkCli {
                             "ModelJar has no local artifact: " + descriptor.alias()));
         modelJarDescriptor = Optional.of(descriptor);
       }
+    } else if (HOSTED_BACKENDS.contains(backend)) {
+      if (values.containsKey("modeljar")) {
+        throw new IllegalArgumentException("--modeljar is supported only by pure-java");
+      }
+      if (values.containsKey("artifact")) {
+        throw new IllegalArgumentException("--artifact is not supported by hosted providers");
+      }
+      model = required(values, "model");
+      artifact = null;
+      modelJarDescriptor = Optional.empty();
     } else {
       if (values.containsKey("modeljar")) {
         throw new IllegalArgumentException("--modeljar is supported only by pure-java");
@@ -131,11 +143,7 @@ public final class RagBenchmarkCli {
       throw new IllegalArgumentException("artifact does not exist: " + artifact);
     }
     String modelId = values.getOrDefault("model-id", safeId(model));
-    URI endpoint =
-        URI.create(
-            values.getOrDefault(
-                "endpoint",
-                "ollama".equals(backend) ? "http://127.0.0.1:11434" : "http://127.0.0.1:8080"));
+    URI endpoint = URI.create(values.getOrDefault("endpoint", defaultEndpoint(backend)));
     RagPromptTemplate promptTemplate =
         RagPromptTemplate.parse(values.getOrDefault("prompt-template", "raw"));
     int context = positiveInteger(values, "context", 2_048);
@@ -242,14 +250,10 @@ public final class RagBenchmarkCli {
             configuration.iterations(),
             configuration.contextLength(),
             configuration.threads(),
-            0,
-            1,
-            1,
-            1,
-            42,
-            false),
+            generation.generationControls()),
         RagBenchmarkEnvironment.capture(),
         backendDiagnostics,
+        generation.hostedApiPricing(),
         summary,
         RagPerformancePolicy.classify(summary.policyMetrics()),
         runs,
@@ -267,6 +271,10 @@ public final class RagBenchmarkCli {
               () ->
                   PureJavaGenerationClient.load(
                       configuration.artifact(), configuration.contextLength()));
+    }
+    if (HOSTED_BACKENDS.contains(configuration.backend())) {
+      return new HostedGenerationClient(
+          configuration.backend(), configuration.model(), configuration.endpoint());
     }
     return new HttpGenerationClient(
         configuration.backend(),
@@ -443,6 +451,17 @@ public final class RagBenchmarkCli {
     Path fileName = modelPath.getFileName();
     String name = fileName == null ? model : fileName.toString();
     return name.replaceAll("(?i)\\.gguf$", "").replaceAll("[^A-Za-z0-9._-]", "-");
+  }
+
+  private static String defaultEndpoint(String backend) {
+    return switch (backend) {
+      case "ollama" -> "http://127.0.0.1:11434";
+      case "llama.cpp" -> "http://127.0.0.1:8080";
+      case "openai" -> "https://api.openai.com/v1";
+      case "anthropic" -> "https://api.anthropic.com/v1";
+      case "deepseek" -> "https://api.deepseek.com";
+      default -> "http://127.0.0.1:8080";
+    };
   }
 
   private static String sha256(Path path) throws IOException {

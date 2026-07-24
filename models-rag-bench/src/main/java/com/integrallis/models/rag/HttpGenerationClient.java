@@ -23,6 +23,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -68,6 +69,23 @@ public final class HttpGenerationClient implements GenerationClient {
   @Override
   public String model() {
     return model;
+  }
+
+  @Override
+  public Map<String, String> generationControls() {
+    Map<String, String> common =
+        Map.of(
+            "temperature", "0",
+            "topK", "1",
+            "topP", "1",
+            "seed", "42",
+            "repetitionPenalty", "1");
+    if ("ollama".equals(backend)) {
+      return common;
+    }
+    java.util.LinkedHashMap<String, String> controls = new java.util.LinkedHashMap<>(common);
+    controls.put("promptCache", "false");
+    return Map.copyOf(controls);
   }
 
   @Override

@@ -124,6 +124,37 @@ class RagBenchmarkCliTest {
         .hasMessageContaining("framework");
   }
 
+  @Test
+  void parsesAHostedOpenAiRunWithTheProviderEndpoint() {
+    RagBenchmarkConfiguration configuration =
+        RagBenchmarkCli.parse(
+            new String[] {
+              "--framework", "plain-java",
+              "--backend", "openai",
+              "--model", "gpt-5.4-nano-2026-03-17"
+            });
+
+    assertThat(configuration.endpoint())
+        .isEqualTo(java.net.URI.create("https://api.openai.com/v1"));
+    assertThat(configuration.artifact()).isNull();
+    assertThat(configuration.promptTemplate()).isEqualTo(RagPromptTemplate.RAW);
+  }
+
+  @Test
+  void rejectsArtifactsForHostedProviders() {
+    assertThatThrownBy(
+            () ->
+                RagBenchmarkCli.parse(
+                    new String[] {
+                      "--framework", "plain-java",
+                      "--backend", "anthropic",
+                      "--model", "claude-haiku-4-5-20251001",
+                      "--artifact", temporaryDirectory.resolve("model.gguf").toString()
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("--artifact");
+  }
+
   private static ModelJarRegistry registry(Path model) {
     Properties properties = new Properties();
     properties.setProperty("model.fixture_q4.sourceId", "hf://example/fixture");

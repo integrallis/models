@@ -36,6 +36,7 @@ public final class RagStatistics {
         runs.stream().filter(run -> caseFor(run, casesById).answerable()).toList();
     List<RagRun> unanswerable =
         runs.stream().filter(run -> !caseFor(run, casesById).answerable()).toList();
+    Double totalEstimatedApiCostUsd = totalEstimatedApiCost(runs);
 
     return new RagBenchmarkSummary(
         totalAttempts,
@@ -50,6 +51,14 @@ public final class RagStatistics {
         percentile(runs, run -> run.generation().decodeTokensPerSecond(), 0.50),
         runs.stream().mapToLong(run -> run.generation().peakRssBytes()).max().orElse(0),
         runs.stream().mapToDouble(run -> run.generation().cpuMillis()).sum(),
+        runs.stream().mapToLong(run -> run.generation().inputTokens()).sum(),
+        runs.stream().mapToLong(run -> run.generation().cacheReadInputTokens()).sum(),
+        runs.stream().mapToLong(run -> run.generation().cacheWriteInputTokens()).sum(),
+        runs.stream().mapToLong(run -> run.generation().outputTokens()).sum(),
+        totalEstimatedApiCostUsd,
+        totalEstimatedApiCostUsd == null || runs.isEmpty()
+            ? null
+            : totalEstimatedApiCostUsd * 1_000 / runs.size(),
         average(answerable, run -> run.evaluation().retrievalRecall()),
         average(answerable, run -> run.evaluation().reciprocalRank()),
         average(answerable, run -> run.evaluation().factCoverage()),
@@ -57,6 +66,19 @@ public final class RagStatistics {
         average(answerable, run -> run.evaluation().citationPrecision()),
         average(unanswerable, run -> run.evaluation().correct() ? 1 : 0),
         average(runs, run -> run.evaluation().correct() ? 1 : 0));
+  }
+
+  private static Double totalEstimatedApiCost(List<RagRun> runs) {
+    long pricedRuns =
+        runs.stream().filter(run -> run.generation().estimatedApiCostUsd() != null).count();
+    if (pricedRuns == 0) {
+      return null;
+    }
+    if (pricedRuns != runs.size()) {
+      throw new IllegalArgumentException(
+          "API cost must be present for either every run or no runs");
+    }
+    return runs.stream().mapToDouble(run -> run.generation().estimatedApiCostUsd()).sum();
   }
 
   private static RagCase caseFor(RagRun run, Map<String, RagCase> casesById) {

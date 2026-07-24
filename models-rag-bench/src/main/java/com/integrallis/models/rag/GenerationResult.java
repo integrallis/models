@@ -21,13 +21,16 @@ import java.util.Objects;
 public record GenerationResult(
     String text,
     int inputTokens,
+    int cacheReadInputTokens,
+    int cacheWriteInputTokens,
     int outputTokens,
     double ttftMillis,
     double totalMillis,
     double prefillTokensPerSecond,
     double loadMillis,
     long peakRssBytes,
-    double cpuMillis) {
+    double cpuMillis,
+    Double estimatedApiCostUsd) {
   public GenerationResult(
       String text,
       int inputTokens,
@@ -39,19 +42,53 @@ public record GenerationResult(
     this(
         text,
         inputTokens,
+        0,
+        0,
         outputTokens,
         ttftMillis,
         totalMillis,
         prefillTokensPerSecond,
         loadMillis,
         0,
-        0);
+        0,
+        null);
+  }
+
+  public GenerationResult(
+      String text,
+      int inputTokens,
+      int outputTokens,
+      double ttftMillis,
+      double totalMillis,
+      double prefillTokensPerSecond,
+      double loadMillis,
+      long peakRssBytes,
+      double cpuMillis) {
+    this(
+        text,
+        inputTokens,
+        0,
+        0,
+        outputTokens,
+        ttftMillis,
+        totalMillis,
+        prefillTokensPerSecond,
+        loadMillis,
+        peakRssBytes,
+        cpuMillis,
+        null);
   }
 
   public GenerationResult {
     text = Objects.requireNonNull(text, "text");
     if (inputTokens < 0 || outputTokens < 1) {
       throw new IllegalArgumentException("token counts must be non-negative with outputTokens > 0");
+    }
+    if (cacheReadInputTokens < 0
+        || cacheWriteInputTokens < 0
+        || cacheReadInputTokens + cacheWriteInputTokens > inputTokens) {
+      throw new IllegalArgumentException(
+          "cache token counts must be non-negative and not exceed inputTokens");
     }
     requireNonNegative(ttftMillis, "ttftMillis");
     requireNonNegative(totalMillis, "totalMillis");
@@ -61,6 +98,9 @@ public record GenerationResult(
       throw new IllegalArgumentException("peakRssBytes must be non-negative");
     }
     requireNonNegative(cpuMillis, "cpuMillis");
+    if (estimatedApiCostUsd != null) {
+      requireNonNegative(estimatedApiCostUsd, "estimatedApiCostUsd");
+    }
     if (totalMillis < ttftMillis) {
       throw new IllegalArgumentException("totalMillis must be >= ttftMillis");
     }
