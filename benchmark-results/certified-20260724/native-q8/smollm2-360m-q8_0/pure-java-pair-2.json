@@ -1,0 +1,368 @@
+{
+  "schemaVersion" : 5,
+  "createdAt" : "2026-07-24T17:59:43.860512406Z",
+  "backend" : "pure-java",
+  "backendVersion" : "development",
+  "modelId" : "smollm2-q8-pair-2",
+  "model" : "/root/.jvllm/models/smollm2-360m-instruct-q8_0.gguf",
+  "artifactSha256" : "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201",
+  "artifactSizeBytes" : 386404992,
+  "run" : {
+    "promptSha256" : "2db2d875631cc7e3af3f6e4471ae4c9b2b7dfdb31ab561a41ef78182a31532e6",
+    "promptStrategy" : "sha256-nonce-prefix-v1",
+    "maxTokens" : 64,
+    "warmups" : 5,
+    "iterations" : 5,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "temperature" : 0.0,
+    "topK" : 1,
+    "topP" : 1.0,
+    "repetitionPenalty" : 1.0,
+    "rawPrompt" : true,
+    "seed" : 42
+  },
+  "environment" : {
+    "host" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "processors" : 8,
+    "physicalMemoryBytes" : 32857444352,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "GraalVM Community",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "pure-java",
+    "planVersion" : "pure-java-v16",
+    "environment" : {
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "architecture" : "amd64",
+      "gguf-chunks-per-thread" : "2",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "vm-vendor" : "GraalVM Community",
+      "model-architecture" : "llama",
+      "projection-layers" : "32",
+      "os" : "Linux",
+      "vm-version" : "25.0.3+9-jvmci-25.1-b19",
+      "gguf-executor" : "persistent",
+      "preferred-vector-bits" : "256",
+      "compiler" : "graal-jvmci",
+      "active-vector-bits" : "256",
+      "processors" : "8",
+      "fast-vector-fma" : "true",
+      "java-feature" : "25",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "vector-api" : "true",
+      "fast-scalar-fma" : "true",
+      "q4-short-pairwise-supported" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "sve" : "false",
+      "java-version" : "25.0.3",
+      "gguf-parallel" : "true",
+      "gguf-threads" : "8"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "independent",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "eligible-layers" : "0",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "graal-jvmci",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "formats" : "Q8_0,Q8_0,Q8_0",
+        "output-rows" : "requested"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "unused-rows" : "kv-only",
+        "formats" : "Q8_0,Q8_0,Q8_0,Q8_0"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedFfn",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "32",
+        "executor" : "persistent",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedLayer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "32",
+        "executor" : "persistent",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.blockMajorQ8Activations",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q8BlockMajorKernel selects scattered accumulation",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "graal-jvmci",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.parallelQ8FfnPreparation",
+      "settings" : {
+        "eligible-layers" : "32",
+        "partitions" : "8",
+        "partition" : "batch-rows",
+        "staged-layers" : "32"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "chunks-per-thread" : "2",
+        "threads" : "8",
+        "executor" : "persistent"
+      }
+    } ]
+  },
+  "speculativeOptions" : {
+    "enabled" : false,
+    "ngramSize" : 4,
+    "confidenceProbeTokens" : 1,
+    "minimumDraftTokens" : 3,
+    "maximumDraftTokens" : 7,
+    "historyWindow" : 2048,
+    "adaptationWindow" : 1,
+    "minimumAcceptanceRate" : 0.8,
+    "cooldownTokens" : 256
+  },
+  "summary" : {
+    "loadMillis" : 206.185138,
+    "p50TtftMillis" : 1147.219567,
+    "p95TtftMillis" : 1208.616575,
+    "p50TpotMillis" : 21.95698953968254,
+    "p95TpotMillis" : 22.04121515873016,
+    "p50PrefillTokensPerSecond" : 136.91257572716842,
+    "p50DecodeTokensPerSecond" : 45.543584114421286,
+    "peakRssBytes" : 1027641344,
+    "successfulTrials" : 5,
+    "totalTrials" : 5
+  },
+  "performanceTier" : "FAILED",
+  "trials" : [ {
+    "successful" : true,
+    "ttftMillis" : 1192.447638,
+    "totalMillis" : 2574.907411,
+    "prefillTokensPerSecond" : 132.5372639872007,
+    "decodeTokensPerSecond" : 45.570946244090095,
+    "inputTokens" : 157,
+    "outputTokens" : 64,
+    "peakRssBytes" : 1021161472,
+    "cpuMillis" : 11530.0,
+    "outputSha256" : "14ce4eac8d8649c0061a40da50aff29ecbe931eab268c12d2375f68c63678f51",
+    "speculation" : {
+      "active" : false,
+      "draftAttempts" : 0,
+      "proposedTokens" : 0,
+      "acceptedTokens" : 0,
+      "rollbacks" : 0,
+      "suppressedSteps" : 0,
+      "ordinaryForwardCalls" : 0,
+      "proposedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "acceptedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "verificationBatchHistogram" : [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+      "draftSearchNanos" : 0,
+      "verificationNanos" : 0,
+      "ordinaryForwardNanos" : 0
+    },
+    "error" : null
+  }, {
+    "successful" : true,
+    "ttftMillis" : 1147.219567,
+    "totalMillis" : 2530.509908,
+    "prefillTokensPerSecond" : 136.91257572716842,
+    "decodeTokensPerSecond" : 45.543584114421286,
+    "inputTokens" : 156,
+    "outputTokens" : 64,
+    "peakRssBytes" : 1027641344,
+    "cpuMillis" : 11300.0,
+    "outputSha256" : "9369e8b25f531b8c31ccfb836618f440ebd176367409dc5e851a06b11c509b26",
+    "speculation" : {
+      "active" : false,
+      "draftAttempts" : 0,
+      "proposedTokens" : 0,
+      "acceptedTokens" : 0,
+      "rollbacks" : 0,
+      "suppressedSteps" : 0,
+      "ordinaryForwardCalls" : 0,
+      "proposedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "acceptedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "verificationBatchHistogram" : [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+      "draftSearchNanos" : 0,
+      "verificationNanos" : 0,
+      "ordinaryForwardNanos" : 0
+    },
+    "error" : null
+  }, {
+    "successful" : true,
+    "ttftMillis" : 1208.616575,
+    "totalMillis" : 2594.504395,
+    "prefillTokensPerSecond" : 130.7536699165544,
+    "decodeTokensPerSecond" : 45.458224750110006,
+    "inputTokens" : 157,
+    "outputTokens" : 64,
+    "peakRssBytes" : 1026854912,
+    "cpuMillis" : 11590.0,
+    "outputSha256" : "14ce4eac8d8649c0061a40da50aff29ecbe931eab268c12d2375f68c63678f51",
+    "speculation" : {
+      "active" : false,
+      "draftAttempts" : 0,
+      "proposedTokens" : 0,
+      "acceptedTokens" : 0,
+      "rollbacks" : 0,
+      "suppressedSteps" : 0,
+      "ordinaryForwardCalls" : 0,
+      "proposedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "acceptedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "verificationBatchHistogram" : [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+      "draftSearchNanos" : 0,
+      "verificationNanos" : 0,
+      "ordinaryForwardNanos" : 0
+    },
+    "error" : null
+  }, {
+    "successful" : true,
+    "ttftMillis" : 1125.508278,
+    "totalMillis" : 2507.843102,
+    "prefillTokensPerSecond" : 139.57871505801546,
+    "decodeTokensPerSecond" : 45.5750653938528,
+    "inputTokens" : 156,
+    "outputTokens" : 64,
+    "peakRssBytes" : 1026854912,
+    "cpuMillis" : 11160.0,
+    "outputSha256" : "9369e8b25f531b8c31ccfb836618f440ebd176367409dc5e851a06b11c509b26",
+    "speculation" : {
+      "active" : false,
+      "draftAttempts" : 0,
+      "proposedTokens" : 0,
+      "acceptedTokens" : 0,
+      "rollbacks" : 0,
+      "suppressedSteps" : 0,
+      "ordinaryForwardCalls" : 0,
+      "proposedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "acceptedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "verificationBatchHistogram" : [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+      "draftSearchNanos" : 0,
+      "verificationNanos" : 0,
+      "ordinaryForwardNanos" : 0
+    },
+    "error" : null
+  }, {
+    "successful" : true,
+    "ttftMillis" : 1108.606271,
+    "totalMillis" : 2497.202826,
+    "prefillTokensPerSecond" : 141.72341845443225,
+    "decodeTokensPerSecond" : 45.36954940090572,
+    "inputTokens" : 156,
+    "outputTokens" : 64,
+    "peakRssBytes" : 1026854912,
+    "cpuMillis" : 11090.0,
+    "outputSha256" : "9f2aced3d46b38b9bbe69cdc3a4f68e7e79a07b81d79b19025307a70e5549c95",
+    "speculation" : {
+      "active" : false,
+      "draftAttempts" : 0,
+      "proposedTokens" : 0,
+      "acceptedTokens" : 0,
+      "rollbacks" : 0,
+      "suppressedSteps" : 0,
+      "ordinaryForwardCalls" : 0,
+      "proposedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "acceptedByPosition" : [ 0, 0, 0, 0, 0, 0, 0 ],
+      "verificationBatchHistogram" : [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+      "draftSearchNanos" : 0,
+      "verificationNanos" : 0,
+      "ordinaryForwardNanos" : 0
+    },
+    "error" : null
+  } ]
+}
