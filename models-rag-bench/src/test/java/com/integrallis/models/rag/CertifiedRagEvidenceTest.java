@@ -24,19 +24,21 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CertifiedRagEvidenceTest {
-  private static final Path EVIDENCE_DIRECTORY =
+  private static final Path EVIDENCE_ROOT =
       Path.of(System.getProperty("models.repositoryRoot"))
-          .resolve(
-              "benchmark-results/certified-20260724/rag/"
-                  + "native-q8-prefix-cache/smollm2-360m-q8_0");
+          .resolve("benchmark-results/certified-20260724/rag/native-q8-prefix-cache");
+  private static final Path SMOLLM2_EVIDENCE = EVIDENCE_ROOT.resolve("smollm2-360m-q8_0");
+  private static final Path QWEN3_1_7B_EVIDENCE = EVIDENCE_ROOT.resolve("qwen3-1.7b-q8_0");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
   @Test
   void cachedRustFfmQualifiesAgainstTheSameHostOllamaControl() throws Exception {
-    RagBenchmarkReport candidate = report("smollm2-360m-rust-ffm-prefix-cache-grounded.json");
-    RagBenchmarkReport ollama = report("smollm2-360m-ollama-current-grounded.json");
-    RagBenchmarkReport llama = report("smollm2-360m-llama-current-grounded.json");
+    RagBenchmarkReport candidate =
+        report(SMOLLM2_EVIDENCE, "smollm2-360m-rust-ffm-prefix-cache-grounded.json");
+    RagBenchmarkReport ollama =
+        report(SMOLLM2_EVIDENCE, "smollm2-360m-ollama-current-grounded.json");
+    RagBenchmarkReport llama = report(SMOLLM2_EVIDENCE, "smollm2-360m-llama-current-grounded.json");
 
     RagProductionQualification qualification =
         RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
@@ -59,13 +61,50 @@ class CertifiedRagEvidenceTest {
   }
 
   @Test
+  void qwen3RustFfmQualifiesAgainstBothExactArtifactControls() throws Exception {
+    RagBenchmarkReport candidate =
+        report(QWEN3_1_7B_EVIDENCE, "qwen3-1.7b-rust-ffm-prefix-cache-grounded.json");
+    RagBenchmarkReport ollama = report(QWEN3_1_7B_EVIDENCE, "qwen3-1.7b-ollama-grounded.json");
+    RagBenchmarkReport llama = report(QWEN3_1_7B_EVIDENCE, "qwen3-1.7b-llama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a");
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(12);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(12.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.70, 0.71);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.26, 1.27);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(1.00, 1.01);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.15, 1.16);
+            });
+  }
+
+  @Test
   void prefixReusePreservesOutputsAndFrameworkContracts() throws Exception {
-    RagBenchmarkReport uncached = report("smollm2-360m-rust-ffm-grounded.json");
-    RagBenchmarkReport plain = report("smollm2-360m-rust-ffm-prefix-cache-grounded.json");
+    RagBenchmarkReport uncached = report(SMOLLM2_EVIDENCE, "smollm2-360m-rust-ffm-grounded.json");
+    RagBenchmarkReport plain =
+        report(SMOLLM2_EVIDENCE, "smollm2-360m-rust-ffm-prefix-cache-grounded.json");
     RagBenchmarkReport langChain4j =
-        report("smollm2-360m-langchain4j-rust-ffm-prefix-cache-grounded.json");
+        report(SMOLLM2_EVIDENCE, "smollm2-360m-langchain4j-rust-ffm-prefix-cache-grounded.json");
     RagBenchmarkReport springAi =
-        report("smollm2-360m-spring-ai-rust-ffm-prefix-cache-grounded.json");
+        report(SMOLLM2_EVIDENCE, "smollm2-360m-spring-ai-rust-ffm-prefix-cache-grounded.json");
 
     assertThat(plain.summary().totalCacheReadInputTokens()).isEqualTo(3_153);
     assertThat(plain.summary().totalCacheWriteInputTokens()).isEqualTo(1_911);
@@ -88,8 +127,7 @@ class CertifiedRagEvidenceTest {
     }
   }
 
-  private RagBenchmarkReport report(String filename) throws IOException {
-    return mapper.readValue(
-        EVIDENCE_DIRECTORY.resolve(filename).toFile(), RagBenchmarkReport.class);
+  private RagBenchmarkReport report(Path directory, String filename) throws IOException {
+    return mapper.readValue(directory.resolve(filename).toFile(), RagBenchmarkReport.class);
   }
 }
