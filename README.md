@@ -50,8 +50,9 @@ same-host Ollama gates:
 | Qwen3 1.7B Q8_0 | Rust/FFM | General guarded RAG | 1,747.6 ms | 17.99 tok/s | 4,785.1 ms | 100.1% |
 | Qwen2.5-Coder 0.5B Q8_0 | Rust/FFM | Coding guarded RAG | 434.6 ms | 53.01 tok/s | 980.4 ms | 132.8% |
 | Qwen2.5-Coder 0.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 390.3 ms | 39.50 tok/s | 1,941.2 ms | 80.7% |
+| Qwen2.5-Coder 1.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 1,162.1 ms | 23.72 tok/s | 2,545.6 ms | 80.2% |
 
-This is currently **5 of the required 25 launch-qualified artifacts**. Each
+This is currently **6 of the required 25 launch-qualified artifacts**. Each
 row is SHA-bound to its model bytes, benchmark report, runtime selector, and
 backend plan. llama.cpp and Ollama appear only as controlled comparators; they
 are not Models runtime dependencies.
