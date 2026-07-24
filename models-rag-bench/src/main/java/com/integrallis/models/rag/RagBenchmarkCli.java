@@ -250,6 +250,8 @@ public final class RagBenchmarkCli {
             configuration.iterations(),
             configuration.contextLength(),
             configuration.threads(),
+            "trusted-citation-extractive-fallback-v1",
+            GroundedAnswerPolicy.DEFAULT_MINIMUM_RETRIEVAL_SCORE,
             generation.generationControls()),
         RagBenchmarkEnvironment.capture(),
         backendDiagnostics,

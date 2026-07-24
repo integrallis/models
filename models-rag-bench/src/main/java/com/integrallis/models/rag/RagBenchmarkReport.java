@@ -38,7 +38,7 @@ public record RagBenchmarkReport(
     RagPerformanceTier performanceTier,
     List<RagRun> runs,
     List<RagBenchmarkFailure> failures) {
-  public static final int CURRENT_SCHEMA_VERSION = 4;
+  public static final int CURRENT_SCHEMA_VERSION = 5;
 
   public RagBenchmarkReport {
     backendDiagnostics = Objects.requireNonNull(backendDiagnostics, "backendDiagnostics");

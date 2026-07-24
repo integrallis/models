@@ -26,7 +26,7 @@
 ---
 
 > **Project status: pre-alpha.** The first publishable scope is
-> `models-api`, `models-runtime`, `models-semantic-order`, and
+> `models-api`, `models-runtime`, `models-rag`, `models-semantic-order`, and
 > `models-backend-purejava`. Framework,
 > Apple, ONNX, native, embedding, test, and benchmark modules remain experimental
 > or scaffolded and are not part of release `0.1.x`.
@@ -162,6 +162,13 @@ starter resolves ModelJars descriptors and performance profiles and is the
 foundation for Spring AI auto-configuration. `ModelsChatModel.diagnostics()`
 returns the same backend plan used by plain Java generation; framework adapters
 do not select a separate kernel path.
+
+`models-rag` provides a framework-neutral grounding policy for small local
+models. It rejects retrieval below a configured score, accepts generated text
+only when all citations name retrieved sources, and otherwise returns the
+retrieved evidence with trusted citations. Its result records whether the
+final answer came from the model, retrieval abstention, or extractive fallback,
+and retains the raw model text for audit.
 
 `models-rag-bench` is a controlled, executable RAG application with plain Java,
 LangChain4j, and Spring AI entry points plus revision-matched Python/Ollama and

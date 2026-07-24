@@ -92,6 +92,28 @@ class RagFrameworkParityTest {
   }
 
   @Test
+  void reportSeparatesRawModelQualityFromTheGroundedApplicationAnswer() throws Exception {
+    RagCorpus corpus = RagCorpus.loadDefault();
+    RagCase testCase = corpus.cases().getFirst();
+
+    try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents());
+        RagApplication application =
+            new PlainJavaRagApplication(
+                retriever,
+                new RecordingGenerationClient(
+                    "The deadline is 30 days and the deductible is 75 dollars."),
+                1)) {
+      RagRun run = application.run(testCase, 32);
+
+      assertThat(run.rawEvaluation().correct()).isFalse();
+      assertThat(run.evaluation().correct()).isTrue();
+      assertThat(run.grounding().decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+      assertThat(run.grounding().rawText()).doesNotContain("[claims-auto-glass]");
+      assertThat(run.generation().text()).endsWith("[claims-auto-glass]");
+    }
+  }
+
+  @Test
   void springAiApplicationClosesItsAdvisorExecutor() throws Exception {
     RagCorpus corpus = RagCorpus.loadDefault();
     ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -126,7 +148,18 @@ class RagFrameworkParityTest {
   }
 
   private static final class RecordingGenerationClient implements GenerationClient {
+    private final String answer;
     private String lastPrompt;
+
+    private RecordingGenerationClient() {
+      this(
+          "The report deadline is 30 calendar days and the deductible is 75 dollars "
+              + "[claims-auto-glass].");
+    }
+
+    private RecordingGenerationClient(String answer) {
+      this.answer = answer;
+    }
 
     @Override
     public String backend() {
@@ -141,15 +174,7 @@ class RagFrameworkParityTest {
     @Override
     public GenerationResult generate(String prompt, int maxTokens) {
       lastPrompt = prompt;
-      return new GenerationResult(
-          "The report deadline is 30 calendar days and the deductible is 75 dollars "
-              + "[claims-auto-glass].",
-          100,
-          18,
-          5,
-          25,
-          1_000,
-          0);
+      return new GenerationResult(answer, 100, 18, 5, 25, 1_000, 0);
     }
 
     @Override

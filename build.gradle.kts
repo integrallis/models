@@ -23,7 +23,13 @@ val libraryProjects = subprojects.filterNot { it.name in benchmarkProjectNames }
 val benchmarkProjects = subprojects.filter { it.name in benchmarkProjectNames }
 val libraryModuleNames = libraryProjects.map { it.name }.toSet()
 val publishedModuleNames =
-    setOf("models-api", "models-runtime", "models-semantic-order", "models-backend-purejava")
+    setOf(
+        "models-api",
+        "models-runtime",
+        "models-rag",
+        "models-semantic-order",
+        "models-backend-purejava"
+    )
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
 val scaffoldProjects = libraryProjects.filterNot { it.name in publishedModuleNames }
 

@@ -115,6 +115,22 @@ public record GenerationResult(
     return tpot > 0 ? 1_000.0 / tpot : 0;
   }
 
+  public GenerationResult withText(String replacement) {
+    return new GenerationResult(
+        replacement,
+        inputTokens,
+        cacheReadInputTokens,
+        cacheWriteInputTokens,
+        outputTokens,
+        ttftMillis,
+        totalMillis,
+        prefillTokensPerSecond,
+        loadMillis,
+        peakRssBytes,
+        cpuMillis,
+        estimatedApiCostUsd);
+  }
+
   private static void requireNonNegative(double value, String name) {
     if (!Double.isFinite(value) || value < 0) {
       throw new IllegalArgumentException(name + " must be finite and non-negative");

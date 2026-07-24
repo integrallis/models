@@ -33,6 +33,22 @@ final class RagRunFactory {
       double retrievalMillis,
       double endToEndMillis,
       GenerationResult generation) {
+    RagEvaluation rawEvaluation = RagEvaluator.evaluate(testCase, retrieved, generation.text());
+    GroundedAnswer grounding =
+        GroundedAnswerPolicy.productionDefault()
+            .apply(
+                testCase.question(),
+                retrieved.stream()
+                    .map(
+                        hit ->
+                            new GroundingDocument(
+                                hit.document().id(),
+                                hit.document().text(),
+                                hit.score(),
+                                hit.rank()))
+                    .toList(),
+                generation.text());
+    GenerationResult groundedGeneration = generation.withText(grounding.text());
     double frameworkOverhead =
         Math.max(0, endToEndMillis - retrievalMillis - generation.totalMillis());
     return new RagRun(
@@ -45,8 +61,10 @@ final class RagRunFactory {
         retrievalMillis,
         frameworkOverhead,
         endToEndMillis,
-        generation,
-        RagEvaluator.evaluate(testCase, retrieved, generation.text()));
+        groundedGeneration,
+        grounding,
+        rawEvaluation,
+        RagEvaluator.evaluate(testCase, retrieved, groundedGeneration.text()));
   }
 
   private static String sha256(String value) {

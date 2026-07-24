@@ -29,9 +29,14 @@ public record RagBenchmarkSettings(
     int iterations,
     int contextLength,
     int threads,
+    String groundingPolicy,
+    float minimumRetrievalScore,
     Map<String, String> generationControls) {
   public RagBenchmarkSettings {
     caseIds = List.copyOf(caseIds);
     generationControls = Map.copyOf(generationControls);
+    if (!Float.isFinite(minimumRetrievalScore) || minimumRetrievalScore < 0) {
+      throw new IllegalArgumentException("minimumRetrievalScore must be finite and non-negative");
+    }
   }
 }
