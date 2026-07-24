@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
@@ -140,7 +141,7 @@ final class BundledNativeKernelLibrary {
 
   private static Properties loadMetadata(URL metadataUrl) {
     Properties metadata = new Properties();
-    try (InputStream input = metadataUrl.openStream();
+    try (InputStream input = openUncachedStream(metadataUrl);
         Reader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
       metadata.load(reader);
       return metadata;
@@ -190,11 +191,17 @@ final class BundledNativeKernelLibrary {
   }
 
   private static byte[] readBytes(URL resource, String description) {
-    try (InputStream input = resource.openStream()) {
+    try (InputStream input = openUncachedStream(resource)) {
       return input.readAllBytes();
     } catch (IOException failure) {
       throw new IllegalStateException("failed to read " + description + " " + resource, failure);
     }
+  }
+
+  private static InputStream openUncachedStream(URL resource) throws IOException {
+    URLConnection connection = resource.openConnection();
+    connection.setUseCaches(false);
+    return connection.getInputStream();
   }
 
   private static void extractOnce(Path target, byte[] libraryBytes, String expectedDigest) {

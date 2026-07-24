@@ -54,6 +54,9 @@ class BundledNativeKernelLibraryTest {
           .startsWith(
               cache.resolve("abi-" + NativeKernelLibrary.ABI_VERSION).resolve(platform.id()));
     }
+
+    Files.delete(artifact);
+    assertThat(artifact).doesNotExist();
   }
 
   @Test
@@ -69,6 +72,9 @@ class BundledNativeKernelLibraryTest {
           .isInstanceOf(SecurityException.class)
           .hasMessageContaining("SHA-256");
     }
+
+    Files.delete(artifact);
+    assertThat(artifact).doesNotExist();
   }
 
   @Test
