@@ -87,6 +87,11 @@ jobs:
             cacheKey: smollm3-3b-q4_k_m-fixture-v1
             gradleTask: ":models-backend-purejava:smolLm33BSlowTest"
             reportName: smollm3-3b-slow-test-reports
+          - name: Fin-R1 7B
+            cachePath: ~/.jvllm/models/SUFE-AIFLM-Lab_Fin-R1-Q4_K_M.gguf
+            cacheKey: fin-r1-7b-q4_k_m-fixture-v1
+            gradleTask: ":models-backend-purejava:finR17BSlowTest"
+            reportName: fin-r1-7b-slow-test-reports
     steps:
       - name: Checkout models
         uses: actions/checkout@v5
