@@ -38,6 +38,7 @@ public record RagBenchmarkConfiguration(
     int threads,
     long backendPid,
     int topK,
+    RagSamplingProfile sampling,
     int maxTokens,
     int warmups,
     int iterations,
@@ -47,5 +48,6 @@ public record RagBenchmarkConfiguration(
     caseIds = List.copyOf(caseIds);
     modelJarDescriptor = Objects.requireNonNull(modelJarDescriptor, "modelJarDescriptor");
     workload = Objects.requireNonNull(workload, "workload");
+    sampling = Objects.requireNonNull(sampling, "sampling");
   }
 }

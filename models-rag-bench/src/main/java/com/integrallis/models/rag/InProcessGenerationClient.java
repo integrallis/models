@@ -41,8 +41,13 @@ public final class InProcessGenerationClient implements GenerationClient {
   private final TimingBackend backend;
   private final GenerationLoop generationLoop;
   private final double loadMillis;
+  private final RagSamplingProfile sampling;
 
-  InProcessGenerationClient(String backendName, InferenceBackend backend, double loadMillis) {
+  InProcessGenerationClient(
+      String backendName,
+      InferenceBackend backend,
+      double loadMillis,
+      RagSamplingProfile sampling) {
     if (backendName == null || backendName.isBlank()) {
       throw new IllegalArgumentException("backendName must not be blank");
     }
@@ -50,33 +55,37 @@ public final class InProcessGenerationClient implements GenerationClient {
     this.backend = instrument(Objects.requireNonNull(backend, "backend"));
     this.generationLoop = new GenerationLoop(this.backend);
     this.loadMillis = loadMillis;
-  }
-
-  public static InProcessGenerationClient loadPureJava(Path model, int contextLength) {
-    Objects.requireNonNull(model, "model");
-    return load("pure-java", contextLength, () -> PureJavaBackend.load(model));
+    this.sampling = Objects.requireNonNull(sampling, "sampling");
   }
 
   public static InProcessGenerationClient loadPureJava(
-      ModelJarDescriptor descriptor, int contextLength) {
-    Objects.requireNonNull(descriptor, "descriptor");
-    return load("pure-java", contextLength, () -> PureJavaBackend.load(descriptor));
+      Path model, int contextLength, RagSamplingProfile sampling) {
+    Objects.requireNonNull(model, "model");
+    return load("pure-java", contextLength, sampling, () -> PureJavaBackend.load(model));
   }
 
-  public static InProcessGenerationClient loadRustFfm(Path model, int contextLength) {
-    Objects.requireNonNull(model, "model");
-    return load("rust-ffm", contextLength, () -> RustFfmBackend.load(model));
+  public static InProcessGenerationClient loadPureJava(
+      ModelJarDescriptor descriptor, int contextLength, RagSamplingProfile sampling) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    return load("pure-java", contextLength, sampling, () -> PureJavaBackend.load(descriptor));
   }
 
   public static InProcessGenerationClient loadRustFfm(
-      ModelJarDescriptor descriptor, int contextLength) {
+      Path model, int contextLength, RagSamplingProfile sampling) {
+    Objects.requireNonNull(model, "model");
+    return load("rust-ffm", contextLength, sampling, () -> RustFfmBackend.load(model));
+  }
+
+  public static InProcessGenerationClient loadRustFfm(
+      ModelJarDescriptor descriptor, int contextLength, RagSamplingProfile sampling) {
     Objects.requireNonNull(descriptor, "descriptor");
-    return load("rust-ffm", contextLength, () -> RustFfmBackend.load(descriptor));
+    return load("rust-ffm", contextLength, sampling, () -> RustFfmBackend.load(descriptor));
   }
 
   private static InProcessGenerationClient load(
       String backendName,
       int contextLength,
+      RagSamplingProfile sampling,
       java.util.function.Supplier<? extends InferenceBackend> backendLoader) {
     if (contextLength < 1) {
       throw new IllegalArgumentException("contextLength must be positive");
@@ -84,7 +93,7 @@ public final class InProcessGenerationClient implements GenerationClient {
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
     InferenceBackend backend = backendLoader.get();
-    return new InProcessGenerationClient(backendName, backend, elapsedMillis(start));
+    return new InProcessGenerationClient(backendName, backend, elapsedMillis(start), sampling);
   }
 
   @Override
@@ -104,28 +113,16 @@ public final class InProcessGenerationClient implements GenerationClient {
 
   @Override
   public Map<String, String> generationControls() {
-    return Map.of(
-        "temperature", "0",
-        "topK", "1",
-        "topP", "1",
-        "seed", "42",
-        "repetitionPenalty", "1",
-        "promptCache", "longest-common-prefix");
+    Map<String, String> controls = new java.util.LinkedHashMap<>(sampling.controls());
+    controls.put("promptCache", "longest-common-prefix");
+    return Map.copyOf(controls);
   }
 
   @Override
   public GenerationResult generate(String prompt, int maxTokens) {
     int inputTokens = backend.tokenizer().encode(prompt).length;
     backend.begin();
-    SamplingOptions options =
-        SamplingOptions.builder()
-            .temperature(0)
-            .topP(1)
-            .topK(1)
-            .seed(42)
-            .repetitionPenalty(1)
-            .maxTokens(maxTokens)
-            .build();
+    SamplingOptions options = sampling.toSamplingOptions(maxTokens);
     StringBuilder output = new StringBuilder();
     long[] firstTokenNanos = {0};
     int[] outputTokens = {0};

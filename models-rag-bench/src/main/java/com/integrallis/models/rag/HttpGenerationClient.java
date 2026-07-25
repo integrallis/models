@@ -38,12 +38,19 @@ public final class HttpGenerationClient implements GenerationClient {
   private final int contextLength;
   private final int threads;
   private final long backendPid;
+  private final RagSamplingProfile sampling;
   private final HttpClient httpClient;
   private final ObjectMapper mapper;
   private double observedLoadMillis;
 
   public HttpGenerationClient(
-      String backend, String model, URI endpoint, int contextLength, int threads, long backendPid) {
+      String backend,
+      String model,
+      URI endpoint,
+      int contextLength,
+      int threads,
+      long backendPid,
+      RagSamplingProfile sampling) {
     if (!BACKENDS.contains(backend)) {
       throw new IllegalArgumentException("backend must be one of " + BACKENDS);
     }
@@ -57,6 +64,7 @@ public final class HttpGenerationClient implements GenerationClient {
     this.contextLength = contextLength;
     this.threads = threads;
     this.backendPid = backendPid;
+    this.sampling = Objects.requireNonNull(sampling, "sampling");
     this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build();
     this.mapper = new ObjectMapper();
   }
@@ -73,21 +81,13 @@ public final class HttpGenerationClient implements GenerationClient {
 
   @Override
   public Map<String, String> generationControls() {
-    return "llama.cpp".equals(backend)
-        ? Map.of(
-            "temperature", "0",
-            "topK", "1",
-            "topP", "1",
-            "seed", "42",
-            "repetitionPenalty", "1",
-            "promptCache", "false")
-        : Map.of(
-            "temperature", "0",
-            "topK", "1",
-            "topP", "1",
-            "seed", "42",
-            "repetitionPenalty", "1",
-            "rawPrompt", "true");
+    Map<String, String> controls = new java.util.LinkedHashMap<>(sampling.controls());
+    if ("llama.cpp".equals(backend)) {
+      controls.put("promptCache", "false");
+    } else {
+      controls.put("rawPrompt", "true");
+    }
+    return Map.copyOf(controls);
   }
 
   @Override
@@ -150,22 +150,22 @@ public final class HttpGenerationClient implements GenerationClient {
       body.put("raw", true);
       body.put("keep_alive", "5m");
       ObjectNode options = body.putObject("options");
-      options.put("temperature", 0);
-      options.put("top_k", 1);
-      options.put("top_p", 1);
-      options.put("seed", 42);
+      options.put("temperature", sampling.temperature());
+      options.put("top_k", sampling.topK());
+      options.put("top_p", sampling.topP());
+      options.put("seed", sampling.seed());
       options.put("num_predict", maxTokens);
       options.put("num_ctx", contextLength);
       options.put("num_thread", threads);
-      options.put("repeat_penalty", 1);
+      options.put("repeat_penalty", sampling.repetitionPenalty());
     } else {
       body.put("n_predict", maxTokens);
-      body.put("temperature", 0);
-      body.put("top_k", 1);
-      body.put("top_p", 1);
-      body.put("seed", 42);
+      body.put("temperature", sampling.temperature());
+      body.put("top_k", sampling.topK());
+      body.put("top_p", sampling.topP());
+      body.put("seed", sampling.seed());
       body.put("n_threads", threads);
-      body.put("repeat_penalty", 1);
+      body.put("repeat_penalty", sampling.repetitionPenalty());
       body.put("cache_prompt", false);
     }
     return body;

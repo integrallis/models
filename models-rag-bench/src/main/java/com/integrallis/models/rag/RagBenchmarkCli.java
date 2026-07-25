@@ -63,6 +63,11 @@ public final class RagBenchmarkCli {
           "threads",
           "pid",
           "top-k",
+          "temperature",
+          "top-p",
+          "sampling-top-k",
+          "seed",
+          "repetition-penalty",
           "max-tokens",
           "warmups",
           "iterations",
@@ -160,6 +165,13 @@ public final class RagBenchmarkCli {
     int threads = positiveInteger(values, "threads", Runtime.getRuntime().availableProcessors());
     long backendPid = nonNegativeLong(values, "pid", 0);
     int topK = positiveInteger(values, "top-k", 1);
+    RagSamplingProfile sampling =
+        new RagSamplingProfile(
+            nonNegativeFloat(values, "temperature", 0),
+            positiveUnitFloat(values, "top-p", 1),
+            positiveInteger(values, "sampling-top-k", 1),
+            nonNegativeLong(values, "seed", 42),
+            positiveFloat(values, "repetition-penalty", 1));
     int maxTokens = positiveInteger(values, "max-tokens", 64);
     int warmups = nonNegativeInteger(values, "warmups", 1);
     int iterations = positiveInteger(values, "iterations", 3);
@@ -191,6 +203,7 @@ public final class RagBenchmarkCli {
         threads,
         backendPid,
         topK,
+        sampling,
         maxTokens,
         warmups,
         iterations,
@@ -280,22 +293,28 @@ public final class RagBenchmarkCli {
           .modelJarDescriptor()
           .<GenerationClient>map(
               descriptor ->
-                  InProcessGenerationClient.loadPureJava(descriptor, configuration.contextLength()))
+                  InProcessGenerationClient.loadPureJava(
+                      descriptor, configuration.contextLength(), configuration.sampling()))
           .orElseGet(
               () ->
                   InProcessGenerationClient.loadPureJava(
-                      configuration.artifact(), configuration.contextLength()));
+                      configuration.artifact(),
+                      configuration.contextLength(),
+                      configuration.sampling()));
     }
     if ("rust-ffm".equals(configuration.backend())) {
       return configuration
           .modelJarDescriptor()
           .<GenerationClient>map(
               descriptor ->
-                  InProcessGenerationClient.loadRustFfm(descriptor, configuration.contextLength()))
+                  InProcessGenerationClient.loadRustFfm(
+                      descriptor, configuration.contextLength(), configuration.sampling()))
           .orElseGet(
               () ->
                   InProcessGenerationClient.loadRustFfm(
-                      configuration.artifact(), configuration.contextLength()));
+                      configuration.artifact(),
+                      configuration.contextLength(),
+                      configuration.sampling()));
     }
     if (HOSTED_BACKENDS.contains(configuration.backend())) {
       return new HostedGenerationClient(
@@ -307,7 +326,8 @@ public final class RagBenchmarkCli {
         configuration.endpoint(),
         configuration.contextLength(),
         configuration.threads(),
-        configuration.backendPid());
+        configuration.backendPid(),
+        configuration.sampling());
   }
 
   private static RagApplication application(
@@ -468,6 +488,40 @@ public final class RagBenchmarkCli {
       return value;
     } catch (NumberFormatException failure) {
       throw new IllegalArgumentException("--" + option + " must be an integer", failure);
+    }
+  }
+
+  private static double nonNegativeFloat(
+      Map<String, String> values, String option, double fallback) {
+    double value = decimal(values, option, fallback);
+    if (!Double.isFinite(value) || value < 0) {
+      throw new IllegalArgumentException("--" + option + " must be finite and non-negative");
+    }
+    return value;
+  }
+
+  private static double positiveFloat(Map<String, String> values, String option, double fallback) {
+    double value = decimal(values, option, fallback);
+    if (!Double.isFinite(value) || value <= 0) {
+      throw new IllegalArgumentException("--" + option + " must be finite and positive");
+    }
+    return value;
+  }
+
+  private static double positiveUnitFloat(
+      Map<String, String> values, String option, double fallback) {
+    double value = positiveFloat(values, option, fallback);
+    if (value > 1) {
+      throw new IllegalArgumentException("--" + option + " must be at most 1");
+    }
+    return value;
+  }
+
+  private static double decimal(Map<String, String> values, String option, double fallback) {
+    try {
+      return values.containsKey(option) ? Double.parseDouble(values.get(option)) : fallback;
+    } catch (NumberFormatException failure) {
+      throw new IllegalArgumentException("--" + option + " must be a decimal number", failure);
     }
   }
 

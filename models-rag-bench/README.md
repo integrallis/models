@@ -153,8 +153,33 @@ models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
 ```
 
 For Ollama, use `--backend ollama`, the Ollama model tag for `--model`, port
-`11434`, and the `ollama serve` PID. Both HTTP modes send the canonical prompt
-raw with temperature 0, top-k 1, top-p 1, repetition penalty 1, and seed 42.
+`11434`, and the `ollama serve` PID. Local runs default to greedy generation:
+temperature 0, sampling top-k 1, top-p 1, repetition penalty 1, and seed 42.
+The benchmark passes those controls identically to Models, Ollama, and
+llama.cpp and records them in every report.
+
+Models that require their published sampling profile can override the local
+controls explicitly. For example, MiniCPM5 no-think mode recommends temperature
+0.7 and top-p 0.95:
+
+```shell
+models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+  --framework plain-java \
+  --backend rust-ffm \
+  --model ~/.jvllm/models/MiniCPM5-1B-Q4_K_M.gguf \
+  --model-id minicpm5-1b-q4_k_m \
+  --prompt-template chatml-no-think \
+  --temperature 0.7 \
+  --top-p 0.95 \
+  --sampling-top-k 40 \
+  --seed 42 \
+  --repetition-penalty 1 \
+  --threads 8
+```
+
+Use the same values for the corresponding Ollama and llama.cpp runs.
+Qualification rejects reports whose generation controls differ, so a faster
+but semantically different comparator cannot pass the relative gate.
 
 ## Hosted API comparison
 

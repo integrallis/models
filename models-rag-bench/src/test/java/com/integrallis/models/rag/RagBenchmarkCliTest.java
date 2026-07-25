@@ -44,6 +44,11 @@ class RagBenchmarkCliTest {
               "--workload", "coding",
               "--prompt-template", "chatml",
               "--case", "auto-glass-deadline,idempotency",
+              "--temperature", "0.7",
+              "--top-p", "0.95",
+              "--sampling-top-k", "40",
+              "--seed", "1729",
+              "--repetition-penalty", "1.05",
               "--max-tokens", "48",
               "--iterations", "2"
             });
@@ -54,8 +59,25 @@ class RagBenchmarkCliTest {
     assertThat(configuration.workload()).isEqualTo(RagWorkload.CODING);
     assertThat(configuration.promptTemplate()).isEqualTo(RagPromptTemplate.CHATML);
     assertThat(configuration.caseIds()).containsExactly("auto-glass-deadline", "idempotency");
+    assertThat(configuration.sampling())
+        .isEqualTo(new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05));
     assertThat(configuration.maxTokens()).isEqualTo(48);
     assertThat(configuration.iterations()).isEqualTo(2);
+  }
+
+  @Test
+  void rejectsInvalidSamplingControlsBeforeLoadingTheBackend() {
+    assertThatThrownBy(
+            () ->
+                RagBenchmarkCli.parse(
+                    new String[] {
+                      "--framework", "plain-java",
+                      "--backend", "ollama",
+                      "--model", "qwen",
+                      "--temperature", "-0.1"
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("--temperature");
   }
 
   @Test

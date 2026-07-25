@@ -29,12 +29,19 @@ class InProcessGenerationClientTest {
 
   @Test
   void measuresInProcessModelsGeneration() {
+    RagSamplingProfile sampling = new RagSamplingProfile(0.7, 0.95, 4, 1729L, 1.05);
     try (InProcessGenerationClient client =
-        new InProcessGenerationClient("rust-ffm", backend(), 12.5)) {
+        new InProcessGenerationClient("rust-ffm", backend(), 12.5, sampling)) {
       GenerationResult result = client.generate("hello", 8);
 
       assertThat(client.backend()).isEqualTo("rust-ffm");
       assertThat(client.diagnostics().planVersion()).isEqualTo("fixture-v1");
+      assertThat(client.generationControls())
+          .containsEntry("temperature", "0.7")
+          .containsEntry("topP", "0.95")
+          .containsEntry("topK", "4")
+          .containsEntry("seed", "1729")
+          .containsEntry("repetitionPenalty", "1.05");
       assertThat(result.text()).isEqualTo(" world");
       assertThat(result.inputTokens()).isEqualTo(1);
       assertThat(result.outputTokens()).isEqualTo(2);
@@ -48,7 +55,8 @@ class InProcessGenerationClientTest {
   void preservesAndReportsPromptCacheReuseThroughTimingInstrumentation() {
     PrefixBackend backend = new PrefixBackend();
     try (InProcessGenerationClient client =
-        new InProcessGenerationClient("rust-ffm", backend, 12.5)) {
+        new InProcessGenerationClient(
+            "rust-ffm", backend, 12.5, RagSamplingProfile.deterministic())) {
       client.generate("first", 1);
       GenerationResult result = client.generate("second", 1);
 
