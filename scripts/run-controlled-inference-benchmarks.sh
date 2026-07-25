@@ -23,7 +23,7 @@ PROMPT_FILE=${BENCH_PROMPT_FILE:-"$ROOT_DIR/models-bench/prompts/completion.txt"
 BENCH_MODELJAR_ALIAS=${BENCH_MODELJAR_ALIAS:-}
 MODELS_BACKEND=${BENCH_MODELS_BACKEND:-rust-ffm}
 
-for command in awk curl git java jq nproc ollama realpath sha256sum sync "$LLAMA_SERVER"; do
+for command in awk curl git java jq nproc ollama ps realpath sha256sum sync "$LLAMA_SERVER"; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "required command not found: $command" >&2
     exit 1
@@ -98,8 +98,31 @@ drop_file_cache() {
   fi
 }
 
+assert_no_competing_inference_processes() {
+  local competitors
+  competitors=$(
+    ps -eo pid=,comm=,args= | awk -v self_pid="$$" '
+      {
+        is_llama = $2 ~ /^(llama-cli|llama-server|llama-bench)$/
+        is_ollama_runner = $2 == "ollama" && $0 ~ /(^|[[:space:]])runner([[:space:]]|$)/
+        is_models_java = $2 == "java" && $0 ~ /com\.integrallis\.models\.(bench|rag)/
+        if ($1 != self_pid && (is_llama || is_ollama_runner || is_models_java)) {
+          print
+        }
+      }
+    '
+  )
+  if [[ -n "$competitors" ]]; then
+    echo "competing inference processes make benchmark evidence invalid:" >&2
+    printf '%s\n' "$competitors" >&2
+    exit 1
+  fi
+}
+
 "$ROOT_DIR/gradlew" --no-daemon -p "$ROOT_DIR" :models-bench:installDist
 BENCHMARK_CLI="$ROOT_DIR/models-bench/build/install/models-bench/bin/models-bench"
+assert_no_competing_inference_processes
+
 MODEL_SHA=$(sha256sum "$MODEL_PATH" | awk '{print $1}')
 SAFE_MODEL_ID=$(printf '%s' "$MODEL_ID" | tr -cs '[:alnum:]._-' '-')
 OLLAMA_MODEL="modeljars-bench-${SAFE_MODEL_ID}:${MODEL_SHA:0:12}"

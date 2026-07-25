@@ -57,6 +57,25 @@ class ControlledInferenceBenchmarkScriptTest {
   }
 
   @Test
+  void rejectsCompetingInferenceProcessesBeforeMeasurement() throws IOException {
+    String script = Files.readString(benchmarkScript());
+
+    assertThat(script)
+        .contains("assert_no_competing_inference_processes()")
+        .contains("ps -eo pid=,comm=,args=")
+        .contains("llama-cli|llama-server|llama-bench")
+        .contains("com\\.integrallis\\.models\\.(bench|rag)");
+
+    int functionDefinition = script.indexOf("assert_no_competing_inference_processes()");
+    int guardCall =
+        script.indexOf("\nassert_no_competing_inference_processes\n", functionDefinition);
+    int firstMeasurement = script.indexOf("drop_file_cache\n\"$BENCHMARK_CLI\"", guardCall);
+
+    assertThat(guardCall).isGreaterThan(functionDefinition);
+    assertThat(firstMeasurement).isGreaterThan(guardCall);
+  }
+
+  @Test
   void bootstrapRequiresTheJsonToolUsedByTheRunner() throws IOException {
     String bootstrap =
         Files.readString(benchmarkScript().resolveSibling("bootstrap-inference-bench-host.sh"));
