@@ -144,6 +144,18 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void profiledSettingsConfigureDecodeGroupingAndWorkerCountTogether() {
+    NativeKernelSettings settings = new NativeKernelSettings(true, true, 4);
+
+    try (RustGgufBatchedMatrixKernel kernel =
+        RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
+      assertThat(kernel.nativeDecodeEnabled()).isTrue();
+      assertThat(kernel.q5_0GroupedEnabled()).isTrue();
+      assertThat(kernel.threadCount()).isEqualTo(4);
+    }
+  }
+
+  @Test
   void unprofiledQ5_0GroupingIsNotEligible() {
     try (RustGgufBatchedMatrixKernel kernel =
         RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {

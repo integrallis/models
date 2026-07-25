@@ -100,6 +100,8 @@ class EuroLlmModelJarsIntegrationTest {
     try (PureJavaBackend backend = PureJavaBackend.load(descriptor)) {
       assertThat(backend.metadata().modelFamily()).isEqualTo("llama");
       assertThat(backend.metadata().contextLength()).isEqualTo(8_192);
+      assertThat(backend.executionPlan().finalLayerPrefillPruning()).isTrue();
+      assertThat(backend.executionPlan().finalLayerKvOnlyPrefill()).isTrue();
 
       int[] promptTokens = backend.tokenizer().encode(TRANSLATION_PROMPT);
       assertThat(promptTokens)

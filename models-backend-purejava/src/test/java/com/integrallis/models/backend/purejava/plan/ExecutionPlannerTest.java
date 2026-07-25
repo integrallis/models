@@ -40,7 +40,7 @@ class ExecutionPlannerTest {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
-    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v17");
+    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v18");
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
@@ -88,6 +88,24 @@ class ExecutionPlannerTest {
                   .containsEntry("threads", "8")
                   .containsEntry("chunks-per-thread", "2");
             });
+  }
+
+  @Test
+  void plansFinalLayerPromptPruningForUniformQ4KTopology() {
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"),
+            uniformTopology(GgufTensorType.Q4_K),
+            PureJavaPlanConfiguration.defaults());
+
+    assertThat(plan.finalLayerPrefillPruning()).isTrue();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isTrue();
+    assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
   }
 
   @Test

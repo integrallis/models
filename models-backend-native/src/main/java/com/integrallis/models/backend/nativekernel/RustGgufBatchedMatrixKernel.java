@@ -64,10 +64,15 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   /** Opens a Rust kernel provider from an explicit platform library. */
   public static RustGgufBatchedMatrixKernel open(Path libraryPath) {
-    return open(
-        libraryPath,
-        Boolean.getBoolean(NATIVE_DECODE_PROPERTY),
-        Boolean.getBoolean(Q5_0_GROUPED_PROPERTY));
+    return open(libraryPath, NativeKernelSettings.fromSystemProperties(Map.of()));
+  }
+
+  static RustGgufBatchedMatrixKernel open(Path libraryPath, NativeKernelSettings settings) {
+    Objects.requireNonNull(settings, "settings");
+    return new RustGgufBatchedMatrixKernel(
+        NativeKernelLibrary.open(libraryPath, settings.threadCount()),
+        settings.nativeDecode(),
+        settings.q5_0Grouped());
   }
 
   static RustGgufBatchedMatrixKernel open(Path libraryPath, boolean nativeDecode) {
@@ -96,6 +101,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   boolean q5_0GroupedEnabled() {
     return q5_0Grouped;
+  }
+
+  int threadCount() {
+    return library.threadCount();
   }
 
   @Override

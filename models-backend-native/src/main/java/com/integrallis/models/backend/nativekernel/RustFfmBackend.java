@@ -40,7 +40,7 @@ import org.modeljars.ModelJarException;
 public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String PLAN_VERSION = "rust-ffm-v8";
+  public static final String PLAN_VERSION = "rust-ffm-v9";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -91,7 +91,11 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
       throw new ModelJarException(
           "ModelJars descriptor does not support rust-ffm backend: " + descriptor.alias());
     }
-    RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath);
+    Map<String, String> recommendations =
+        PureJavaBackend.performanceRecommendations(descriptor, "rust-ffm");
+    RustGgufBatchedMatrixKernel kernel =
+        RustGgufBatchedMatrixKernel.open(
+            libraryPath, NativeKernelSettings.fromSystemProperties(recommendations));
     PureJavaBackend engine = PureJavaBackend.load(descriptor, "rust-ffm", kernel);
     return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel));
   }
@@ -173,6 +177,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     environment.put("kernel-runtime", "rust-ffm");
     environment.put("kernel-implementation", kernel.implementation());
     environment.put("native-kernel-abi", Integer.toString(NativeKernelLibrary.ABI_VERSION));
+    environment.put("native-kernel-threads", Integer.toString(kernel.threadCount()));
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
     environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());

@@ -31,7 +31,7 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v17";
+  public static final String PLAN_VERSION = "pure-java-v18";
 
   private ExecutionPlanner() {}
 

@@ -15,12 +15,22 @@
  */
 package com.integrallis.models.rag;
 
+import java.util.Arrays;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 /** Versioned RAG workloads available to the controlled benchmark. */
 public enum RagWorkload {
   GENERAL("general", "/rag/documents.json", "/rag/cases.json"),
-  CODING("coding", "/rag/coding/documents.json", "/rag/coding/cases.json");
+  CODING("coding", "/rag/coding/documents.json", "/rag/coding/cases.json"),
+  FINANCE("finance", "/rag/finance/documents.json", "/rag/finance/cases.json"),
+  HEALTHCARE("healthcare", "/rag/healthcare/documents.json", "/rag/healthcare/cases.json"),
+  LEGAL("legal", "/rag/legal/documents.json", "/rag/legal/cases.json"),
+  MATH("math", "/rag/math/documents.json", "/rag/math/cases.json"),
+  MULTILINGUAL("multilingual", "/rag/multilingual/documents.json", "/rag/multilingual/cases.json"),
+  SQL("sql", "/rag/sql/documents.json", "/rag/sql/cases.json"),
+  TRANSPORTATION(
+      "transportation", "/rag/transportation/documents.json", "/rag/transportation/cases.json");
 
   private final String id;
   private final String documentsResource;
@@ -52,6 +62,8 @@ public enum RagWorkload {
         return workload;
       }
     }
-    throw new IllegalArgumentException("workload must be one of general, coding");
+    String supported =
+        Arrays.stream(values()).map(RagWorkload::id).collect(Collectors.joining(", "));
+    throw new IllegalArgumentException("workload must be one of " + supported);
   }
 }

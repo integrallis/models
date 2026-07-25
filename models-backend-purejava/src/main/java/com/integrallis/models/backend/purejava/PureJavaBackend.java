@@ -39,6 +39,7 @@ import java.lang.foreign.Arena;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -64,6 +65,32 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   private final PureJavaExecutionPlan executionPlan;
   private final BackendDiagnostics diagnostics;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
+
+  /**
+   * Resolves safe recommendations for an exact ModelJar, backend, and running JVM before a kernel
+   * provider is constructed.
+   */
+  public static Map<String, String> performanceRecommendations(
+      ModelJarDescriptor descriptor, String backend) {
+    RuntimeFingerprint runtime = RuntimeFingerprint.capture();
+    return performanceRecommendations(
+        descriptor,
+        backend,
+        ModelPerformanceProfileRegistry.fromClasspath(),
+        runtime.asEnvironment(),
+        ManagementFactory.getRuntimeMXBean().getInputArguments());
+  }
+
+  static Map<String, String> performanceRecommendations(
+      ModelJarDescriptor descriptor,
+      String backend,
+      ModelPerformanceProfileRegistry registry,
+      Map<String, String> runtime,
+      List<String> inputArguments) {
+    return ModelJarPerformanceSelection.evaluate(
+            descriptor, registry, runtime, inputArguments, backend)
+        .recommendations();
+  }
 
   private PureJavaBackend(
       Arena arena,

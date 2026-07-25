@@ -84,6 +84,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle contextDestroyHandle;
   private final MethodHandle quantizedBatchedHandle;
   private final MethodHandle quantizedGroupedBatchedHandle;
+  private final int threadCount;
   private boolean closed;
 
   private NativeKernelLibrary(
@@ -92,18 +93,25 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MemorySegment context,
       MethodHandle contextDestroyHandle,
       MethodHandle quantizedBatchedHandle,
-      MethodHandle quantizedGroupedBatchedHandle) {
+      MethodHandle quantizedGroupedBatchedHandle,
+      int threadCount) {
     this.libraryArena = libraryArena;
     this.capabilities = capabilities;
     this.context = context;
     this.contextDestroyHandle = contextDestroyHandle;
     this.quantizedBatchedHandle = quantizedBatchedHandle;
     this.quantizedGroupedBatchedHandle = quantizedGroupedBatchedHandle;
+    this.threadCount = threadCount;
   }
 
   /** Opens a platform library and rejects incompatible ABI versions immediately. */
   public static NativeKernelLibrary open(Path libraryPath) {
+    return open(libraryPath, configuredThreadCount());
+  }
+
+  static NativeKernelLibrary open(Path libraryPath, int threadCount) {
     Objects.requireNonNull(libraryPath, "libraryPath");
+    validateThreadCount(threadCount, Integer.toString(threadCount));
     Path normalized = libraryPath.toAbsolutePath().normalize();
     if (!Files.isRegularFile(normalized)) {
       throw new IllegalArgumentException("native kernel library does not exist: " + normalized);
@@ -140,8 +148,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
               lookup,
               "jmodels_quantized_f32_grouped_batched_matmul_with_context",
               QUANTIZED_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
-      MemorySegment context =
-          invokeAddress(contextCreate, configuredThreadCount(), "create worker context");
+      MemorySegment context = invokeAddress(contextCreate, threadCount, "create worker context");
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
       }
@@ -151,7 +158,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
           context,
           contextDestroy,
           quantizedBatched,
-          quantizedGroupedBatched);
+          quantizedGroupedBatched,
+          threadCount);
     } catch (RuntimeException | LinkageError failure) {
       arena.close();
       throw failure;
@@ -161,6 +169,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
   /** Returns the ABI version accepted by this Java binding. */
   public int abiVersion() {
     return ABI_VERSION;
+  }
+
+  int threadCount() {
+    return threadCount;
   }
 
   /** Returns whether the loaded library advertises the given operation. */
@@ -674,14 +686,18 @@ public final class NativeKernelLibrary implements AutoCloseable {
     }
     try {
       int threadCount = Integer.parseInt(configured);
-      if (threadCount < 1 || threadCount > 256) {
-        throw new IllegalArgumentException(
-            THREAD_COUNT_PROPERTY + " must be between 1 and 256: " + configured);
-      }
+      validateThreadCount(threadCount, configured);
       return threadCount;
     } catch (NumberFormatException failure) {
       throw new IllegalArgumentException(
           THREAD_COUNT_PROPERTY + " must be an integer: " + configured, failure);
+    }
+  }
+
+  private static void validateThreadCount(int threadCount, String configured) {
+    if (threadCount < 1 || threadCount > 256) {
+      throw new IllegalArgumentException(
+          THREAD_COUNT_PROPERTY + " must be between 1 and 256: " + configured);
     }
   }
 

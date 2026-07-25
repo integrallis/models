@@ -1,0 +1,1853 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-25T17:21:40.800981867Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@180fae9+modeljars@06da6f6+vectors@c298a0b",
+  "modelId" : "eurollm-1.7b-q4-k-m",
+  "model" : "eurollm_1_7b_instruct_q4_k_m",
+  "artifactSha256" : "1cade17f491ea46a686dbee51fbd52442e0f001f102380c3b9d66b4a77f84093",
+  "artifactSizeBytes" : 1045157088,
+  "settings" : {
+    "corpusSha256" : "d1d0889113c2d2f3e6c6fe3e551bdeecfb2d0324454d75d7ac55462619c88178",
+    "workload" : "multilingual",
+    "caseIds" : [ "lisboa-horario", "madrid-linea", "lyon-code-livraison", "berlin-sicherung", "roma-museo", "utrecht-kanaal", "krakow-location", "bucuresti-support", "unsupported-oslo-office" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-provenance-clause-anchors-extractive-fallback-v4",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42",
+      "topK" : "1",
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "GraalVM Community",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v9",
+    "environment" : {
+      "active-vector-bits" : "256",
+      "compiler" : "graal-jvmci",
+      "gguf-parallel" : "true",
+      "native-kernel-threads" : "8",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "fast-vector-fma" : "true",
+      "kernel-implementation" : "rust-ffm-quantized-v8",
+      "processors" : "8",
+      "q4-unsigned-pairwise-supported" : "true",
+      "modeljar-alias" : "eurollm_1_7b_instruct_q4_k_m",
+      "fast-scalar-fma" : "true",
+      "native-q5-0-grouped" : "false",
+      "java-feature" : "25",
+      "os" : "Linux",
+      "preferred-vector-bits" : "256",
+      "modeljar-coordinate" : "org.modeljars.huggingface:mradermacher.eurollm-1.7b-instruct-gguf.q4_k_m:1.0.0-q4_k_m.1",
+      "vector-api" : "true",
+      "modeljar-sha256" : "1cade17f491ea46a686dbee51fbd52442e0f001f102380c3b9d66b4a77f84093",
+      "kernel-runtime" : "rust-ffm",
+      "architecture" : "amd64",
+      "vm-version" : "25.0.3+9-jvmci-25.1-b19",
+      "q4-short-pairwise-supported" : "true",
+      "model-architecture" : "llama",
+      "gguf-executor" : "persistent",
+      "vm-vendor" : "GraalVM Community",
+      "java-version" : "25.0.3",
+      "native-kernel-abi" : "2",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "sve" : "false",
+      "projection-layers" : "24",
+      "transformer-runtime" : "java",
+      "gguf-threads" : "8",
+      "gguf-chunks-per-thread" : "2",
+      "native-quantized-decode" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "rust-ffm-quantized-v8",
+        "gate-up" : "grouped",
+        "qkv" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "12"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "compiler" : "graal-jvmci",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "64"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "output-rows" : "requested",
+        "formats" : "Q4_K,Q4_K,Q4_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q4_K,Q4_K",
+        "unused-rows" : "kv-only"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "7",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "64",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "graal-jvmci"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "8"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "8",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "modeljars.profile.eurollm.1.7b.q4.k.m.epyc.milan.jdk25.rust.ffm",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "required-jvm-arguments" : "--enable-native-access=ALL-UNNAMED",
+        "selector-mismatches" : "",
+        "missing-jvm-arguments" : "",
+        "recommendations" : "models.native.quantizedDecode=true\nmodels.purejava.batchedAttentionScores=true\nmodels.purejava.batchedAttentionValues=true\nmodels.purejava.prefillBatchSize=64",
+        "benchmark-id" : "eurollm-rust-ffm-multilingual-rag-20260725",
+        "recommended-java-feature" : "25",
+        "marker-coordinate" : "org.modeljars.huggingface:mradermacher.eurollm-1.7b-instruct-gguf.q4_k_m:1.0.0-q4_k_m.1",
+        "profile-id" : "eurollm_1_7b_q4_k_m_epyc_milan_jdk25_rust_ffm",
+        "recommended-runtime" : "graal-jvmci"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "transformer" : "java",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "transformer" : "java",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "transformer" : "java",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "transformer" : "java",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "transformer" : "java",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "transformer" : "java",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "abi" : "2",
+        "transformer" : "java",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "qualification" : "model-and-platform-specific",
+        "property" : "models.native.q5_0.grouped"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "property" : "models.native.quantizedDecode"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 384.655015,
+    "retrievalMillis" : {
+      "p50" : 1.190146,
+      "p95" : 1.8498675999999998
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.6130889999999454,
+      "p95" : 2.0757948999999596
+    },
+    "ttftMillis" : {
+      "p50" : 1228.057723,
+      "p95" : 1514.3263955
+    },
+    "tpotMillis" : {
+      "p50" : 31.387501999999998,
+      "p95" : 34.23031044285713
+    },
+    "endToEndMillis" : {
+      "p50" : 1902.134775,
+      "p95" : 2548.3661885
+    },
+    "p50PrefillTokensPerSecond" : 53.11555275977131,
+    "p50DecodeTokensPerSecond" : 31.85981477595764,
+    "peakRssBytes" : 1456971776,
+    "totalCpuMillis" : 361270.0,
+    "totalInputTokens" : 5280,
+    "totalCacheReadInputTokens" : 3483,
+    "totalCacheWriteInputTokens" : 1797,
+    "totalOutputTokens" : 567,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "USABLE",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "lisboa-horario",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lisboa-hours",
+        "title" : "Horário de Lisboa",
+        "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. O atendimento ocorre de terça a sábado."
+      },
+      "score" : 6.5103536,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5008a5f8149506bdfa82b56b53d29a0730fbc01da11cdee5a31f7d28ae7df24d",
+    "retrievalMillis" : 1.959654,
+    "frameworkOverheadMillis" : 2.764705999999933,
+    "endToEndMillis" : 1931.29532,
+    "generation" : {
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "inputTokens" : 196,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 21,
+      "ttftMillis" : 1260.251387,
+      "totalMillis" : 1926.57096,
+      "prefillTokensPerSecond" : 53.222463348048755,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 13540.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "O escritório Lisboa abre às 08:30 e fecha às 17:00.",
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "madrid-linea",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-madrid-route",
+        "title" : "Ruta de Madrid",
+        "text" : "La línea Azul de Madrid para en Sol y Retiro. El servicio termina a las 23:15."
+      },
+      "score" : 5.1040816,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1e1d40648d7d4d1f934ef2b09a64379a8af468fcc871f24c88dfc4782bf27f2d",
+    "retrievalMillis" : 1.55528,
+    "frameworkOverheadMillis" : 2.1661269999999604,
+    "endToEndMillis" : 1594.86595,
+    "generation" : {
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 12,
+      "ttftMillis" : 1228.057723,
+      "totalMillis" : 1591.144543,
+      "prefillTokensPerSecond" : 52.98325312345366,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 11140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "La línea Azul de Madrid para en Sol y Retiro.",
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "lyon-code-livraison",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lyon-project",
+        "title" : "Projet de Lyon",
+        "text" : "Le projet de Lyon porte le code LUMIERE-42. La livraison est prévue le 15 octobre."
+      },
+      "score" : 7.840103,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b1aede2830db748182a0762fb04abaf582791dd0d8d599734ae45e3d3e650bb",
+    "retrievalMillis" : 1.487538,
+    "frameworkOverheadMillis" : 1.771226000000297,
+    "endToEndMillis" : 2211.68357,
+    "generation" : {
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre. [multi-lyon-project]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 28,
+      "ttftMillis" : 1360.962252,
+      "totalMillis" : 2208.424806,
+      "prefillTokensPerSecond" : 52.93763081706535,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 15610.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre.",
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre. [multi-lyon-project]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "berlin-sicherung",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-berlin-backup",
+        "title" : "Sicherung in Berlin",
+        "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert."
+      },
+      "score" : 8.781244,
+      "rank" : 1
+    } ],
+    "promptSha256" : "30f5af2e5fbf378e5411197dbea1b73557521cf9c3c86ecf6853f2b2ddaf2dc8",
+    "retrievalMillis" : 1.814393,
+    "frameworkOverheadMillis" : 1.798649999999725,
+    "endToEndMillis" : 2025.243558,
+    "generation" : {
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "inputTokens" : 198,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 24,
+      "ttftMillis" : 1295.621396,
+      "totalMillis" : 2021.630515,
+      "prefillTokensPerSecond" : 53.29561968445999,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 14320.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert.",
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "roma-museo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-roma-museum",
+        "title" : "Museo di Roma",
+        "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro."
+      },
+      "score" : 10.869781,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9627a716a5bb2d2068bf3774602d0c9f010528d1a5117a09377e336fe4465a4c",
+    "retrievalMillis" : 1.424672,
+    "frameworkOverheadMillis" : 1.8650199999999586,
+    "endToEndMillis" : 1684.262982,
+    "generation" : {
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "inputTokens" : 188,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 59,
+      "outputTokens" : 19,
+      "ttftMillis" : 1119.947092,
+      "totalMillis" : 1680.97329,
+      "prefillTokensPerSecond" : 52.717176028301324,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 11850.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro.",
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "utrecht-kanaal",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-utrecht-team",
+        "title" : "Team Utrecht",
+        "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag."
+      },
+      "score" : 7.388952,
+      "rank" : 1
+    } ],
+    "promptSha256" : "944e001905bd152e11ebd0cd0f65738e93126e72c2354ae89bc58ddfd1b0d4f8",
+    "retrievalMillis" : 1.368757,
+    "frameworkOverheadMillis" : 1.6810700000000907,
+    "endToEndMillis" : 1734.048559,
+    "generation" : {
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 20,
+      "ttftMillis" : 1138.653527,
+      "totalMillis" : 1730.998732,
+      "prefillTokensPerSecond" : 53.60680334943884,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 12300.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag.",
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "krakow-location",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 7.432128,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e0e1ca84ac4921fb3affae376eb8848b09463db5d4fea53377c37d92e3924a6e",
+    "retrievalMillis" : 1.189215,
+    "frameworkOverheadMillis" : 1.7058989999998175,
+    "endToEndMillis" : 1909.282863,
+    "generation" : {
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 23,
+      "ttftMillis" : 1226.291887,
+      "totalMillis" : 1906.387749,
+      "prefillTokensPerSecond" : 53.04061667312299,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 13550.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Magazyn w Krakowie używa alejki K-9 и półki 14 для części zamiennych.",
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "bucuresti-support",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-bucuresti-support",
+        "title" : "Asistență București",
+        "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00."
+      },
+      "score" : 3.6840134,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b152c1d64a11eeacd5fe938223ed1135e2d920815bfa313622be7a9fdddcad2",
+    "retrievalMillis" : 1.229586,
+    "frameworkOverheadMillis" : 1.6558430000000044,
+    "endToEndMillis" : 2554.935125,
+    "generation" : {
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 34,
+      "ttftMillis" : 1515.874211,
+      "totalMillis" : 2552.049696,
+      "prefillTokensPerSecond" : 52.80153364060917,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 17960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00.",
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "unsupported-oslo-office",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 1.009398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e686b65b8f5327cef5316a21c69aed77367c16393535768db991816a224f06dd",
+    "retrievalMillis" : 0.867016,
+    "frameworkOverheadMillis" : 1.6787269999999808,
+    "endToEndMillis" : 1392.994941,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 8,
+      "ttftMillis" : 1145.667857,
+      "totalMillis" : 1390.449198,
+      "prefillTokensPerSecond" : 53.280830088919465,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 9660.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "When does the office in Oslo open?",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "lisboa-horario",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lisboa-hours",
+        "title" : "Horário de Lisboa",
+        "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. O atendimento ocorre de terça a sábado."
+      },
+      "score" : 6.5103536,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5008a5f8149506bdfa82b56b53d29a0730fbc01da11cdee5a31f7d28ae7df24d",
+    "retrievalMillis" : 1.190146,
+    "frameworkOverheadMillis" : 1.7501750000001266,
+    "endToEndMillis" : 1918.501774,
+    "generation" : {
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "inputTokens" : 196,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 21,
+      "ttftMillis" : 1275.863995,
+      "totalMillis" : 1915.561453,
+      "prefillTokensPerSecond" : 52.54266466527422,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 13490.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "O escritório Lisboa abre às 08:30 e fecha às 17:00.",
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "madrid-linea",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-madrid-route",
+        "title" : "Ruta de Madrid",
+        "text" : "La línea Azul de Madrid para en Sol y Retiro. El servicio termina a las 23:15."
+      },
+      "score" : 5.1040816,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1e1d40648d7d4d1f934ef2b09a64379a8af468fcc871f24c88dfc4782bf27f2d",
+    "retrievalMillis" : 1.422959,
+    "frameworkOverheadMillis" : 1.6691130000001522,
+    "endToEndMillis" : 1632.898437,
+    "generation" : {
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 12,
+      "ttftMillis" : 1261.093312,
+      "totalMillis" : 1629.806365,
+      "prefillTokensPerSecond" : 51.59564849381114,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 11250.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "La línea Azul de Madrid para en Sol y Retiro.",
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "lyon-code-livraison",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lyon-project",
+        "title" : "Projet de Lyon",
+        "text" : "Le projet de Lyon porte le code LUMIERE-42. La livraison est prévue le 15 octobre."
+      },
+      "score" : 7.840103,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b1aede2830db748182a0762fb04abaf582791dd0d8d599734ae45e3d3e650bb",
+    "retrievalMillis" : 1.273793,
+    "frameworkOverheadMillis" : 1.586819000000105,
+    "endToEndMillis" : 2206.58463,
+    "generation" : {
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre. [multi-lyon-project]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 28,
+      "ttftMillis" : 1360.070895,
+      "totalMillis" : 2203.724018,
+      "prefillTokensPerSecond" : 52.96178467985694,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 15700.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre.",
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre. [multi-lyon-project]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "berlin-sicherung",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-berlin-backup",
+        "title" : "Sicherung in Berlin",
+        "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert."
+      },
+      "score" : 8.781244,
+      "rank" : 1
+    } ],
+    "promptSha256" : "30f5af2e5fbf378e5411197dbea1b73557521cf9c3c86ecf6853f2b2ddaf2dc8",
+    "retrievalMillis" : 1.242295,
+    "frameworkOverheadMillis" : 1.6540099999997437,
+    "endToEndMillis" : 2092.354476,
+    "generation" : {
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "inputTokens" : 198,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 24,
+      "ttftMillis" : 1369.977187,
+      "totalMillis" : 2089.458171,
+      "prefillTokensPerSecond" : 50.385020272347184,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 14590.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert.",
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "roma-museo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-roma-museum",
+        "title" : "Museo di Roma",
+        "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro."
+      },
+      "score" : 10.869781,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9627a716a5bb2d2068bf3774602d0c9f010528d1a5117a09377e336fe4465a4c",
+    "retrievalMillis" : 1.865071,
+    "frameworkOverheadMillis" : 1.4671559999999317,
+    "endToEndMillis" : 1675.646229,
+    "generation" : {
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "inputTokens" : 188,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 59,
+      "outputTokens" : 19,
+      "ttftMillis" : 1104.259574,
+      "totalMillis" : 1672.314002,
+      "prefillTokensPerSecond" : 53.456781943640735,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 11930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro.",
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "utrecht-kanaal",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-utrecht-team",
+        "title" : "Team Utrecht",
+        "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag."
+      },
+      "score" : 7.388952,
+      "rank" : 1
+    } ],
+    "promptSha256" : "944e001905bd152e11ebd0cd0f65738e93126e72c2354ae89bc58ddfd1b0d4f8",
+    "retrievalMillis" : 1.181353,
+    "frameworkOverheadMillis" : 1.4360690000000886,
+    "endToEndMillis" : 1731.255423,
+    "generation" : {
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 20,
+      "ttftMillis" : 1138.321712,
+      "totalMillis" : 1728.638001,
+      "prefillTokensPerSecond" : 53.61232568882828,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 12360.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag.",
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "krakow-location",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 7.432128,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e0e1ca84ac4921fb3affae376eb8848b09463db5d4fea53377c37d92e3924a6e",
+    "retrievalMillis" : 1.120821,
+    "frameworkOverheadMillis" : 1.510782000000063,
+    "endToEndMillis" : 1902.134775,
+    "generation" : {
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 23,
+      "ttftMillis" : 1222.057819,
+      "totalMillis" : 1899.503172,
+      "prefillTokensPerSecond" : 53.214954282410574,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 13600.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Magazyn w Krakowie używa alejki K-9 и półki 14 для części zamiennych.",
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "bucuresti-support",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-bucuresti-support",
+        "title" : "Asistență București",
+        "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00."
+      },
+      "score" : 3.6840134,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b152c1d64a11eeacd5fe938223ed1135e2d920815bfa313622be7a9fdddcad2",
+    "retrievalMillis" : 0.990944,
+    "frameworkOverheadMillis" : 1.4539549999999508,
+    "endToEndMillis" : 2533.03867,
+    "generation" : {
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 34,
+      "ttftMillis" : 1510.714826,
+      "totalMillis" : 2530.593771,
+      "prefillTokensPerSecond" : 52.97682076752138,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 18100.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00.",
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "unsupported-oslo-office",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 1.009398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e686b65b8f5327cef5316a21c69aed77367c16393535768db991816a224f06dd",
+    "retrievalMillis" : 0.772072,
+    "frameworkOverheadMillis" : 1.3745340000000397,
+    "endToEndMillis" : 1378.34117,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 8,
+      "ttftMillis" : 1137.110942,
+      "totalMillis" : 1376.194564,
+      "prefillTokensPerSecond" : 53.66674880817126,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 9660.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "When does the office in Oslo open?",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "lisboa-horario",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lisboa-hours",
+        "title" : "Horário de Lisboa",
+        "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. O atendimento ocorre de terça a sábado."
+      },
+      "score" : 6.5103536,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5008a5f8149506bdfa82b56b53d29a0730fbc01da11cdee5a31f7d28ae7df24d",
+    "retrievalMillis" : 1.006017,
+    "frameworkOverheadMillis" : 1.5366930000000139,
+    "endToEndMillis" : 1886.324548,
+    "generation" : {
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "inputTokens" : 196,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 21,
+      "ttftMillis" : 1261.945903,
+      "totalMillis" : 1883.781838,
+      "prefillTokensPerSecond" : 53.11555275977131,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 13470.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "O escritório Lisboa abre às 08:30 e fecha às 17:00.",
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "madrid-linea",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-madrid-route",
+        "title" : "Ruta de Madrid",
+        "text" : "La línea Azul de Madrid para en Sol y Retiro. El servicio termina a las 23:15."
+      },
+      "score" : 5.1040816,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1e1d40648d7d4d1f934ef2b09a64379a8af468fcc871f24c88dfc4782bf27f2d",
+    "retrievalMillis" : 1.237658,
+    "frameworkOverheadMillis" : 1.6722889999998642,
+    "endToEndMillis" : 1587.74452,
+    "generation" : {
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 12,
+      "ttftMillis" : 1227.585169,
+      "totalMillis" : 1584.834573,
+      "prefillTokensPerSecond" : 52.98223606372543,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 11140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "La línea Azul de Madrid para en Sol y Retiro.",
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "lyon-code-livraison",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lyon-project",
+        "title" : "Projet de Lyon",
+        "text" : "Le projet de Lyon porte le code LUMIERE-42. La livraison est prévue le 15 octobre."
+      },
+      "score" : 7.840103,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b1aede2830db748182a0762fb04abaf582791dd0d8d599734ae45e3d3e650bb",
+    "retrievalMillis" : 1.144275,
+    "frameworkOverheadMillis" : 1.3726619999997638,
+    "endToEndMillis" : 2205.217111,
+    "generation" : {
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre. [multi-lyon-project]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 28,
+      "ttftMillis" : 1360.823123,
+      "totalMillis" : 2202.700174,
+      "prefillTokensPerSecond" : 52.92779091551322,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 15680.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre.",
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est le 15 octobre. [multi-lyon-project]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "berlin-sicherung",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-berlin-backup",
+        "title" : "Sicherung in Berlin",
+        "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert."
+      },
+      "score" : 8.781244,
+      "rank" : 1
+    } ],
+    "promptSha256" : "30f5af2e5fbf378e5411197dbea1b73557521cf9c3c86ecf6853f2b2ddaf2dc8",
+    "retrievalMillis" : 1.063082,
+    "frameworkOverheadMillis" : 1.3754570000000967,
+    "endToEndMillis" : 2010.582887,
+    "generation" : {
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "inputTokens" : 198,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 24,
+      "ttftMillis" : 1298.624097,
+      "totalMillis" : 2008.144348,
+      "prefillTokensPerSecond" : 53.15263311511928,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 14380.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert.",
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "roma-museo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-roma-museum",
+        "title" : "Museo di Roma",
+        "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro."
+      },
+      "score" : 10.869781,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9627a716a5bb2d2068bf3774602d0c9f010528d1a5117a09377e336fe4465a4c",
+    "retrievalMillis" : 1.074872,
+    "frameworkOverheadMillis" : 1.3605740000002697,
+    "endToEndMillis" : 1667.021705,
+    "generation" : {
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "inputTokens" : 188,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 59,
+      "outputTokens" : 19,
+      "ttftMillis" : 1099.50577,
+      "totalMillis" : 1664.586259,
+      "prefillTokensPerSecond" : 53.68474989666277,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 11930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro.",
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "utrecht-kanaal",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-utrecht-team",
+        "title" : "Team Utrecht",
+        "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag."
+      },
+      "score" : 7.388952,
+      "rank" : 1
+    } ],
+    "promptSha256" : "944e001905bd152e11ebd0cd0f65738e93126e72c2354ae89bc58ddfd1b0d4f8",
+    "retrievalMillis" : 0.996383,
+    "frameworkOverheadMillis" : 1.5399380000001202,
+    "endToEndMillis" : 1785.795498,
+    "generation" : {
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 20,
+      "ttftMillis" : 1140.187401,
+      "totalMillis" : 1783.259177,
+      "prefillTokensPerSecond" : 53.526972556051646,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 12580.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag.",
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "krakow-location",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 7.432128,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e0e1ca84ac4921fb3affae376eb8848b09463db5d4fea53377c37d92e3924a6e",
+    "retrievalMillis" : 0.959665,
+    "frameworkOverheadMillis" : 1.435738999999785,
+    "endToEndMillis" : 1912.52406,
+    "generation" : {
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 23,
+      "ttftMillis" : 1223.645955,
+      "totalMillis" : 1910.128656,
+      "prefillTokensPerSecond" : 53.14380293155476,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 13580.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Magazyn w Krakowie używa alejki K-9 и półki 14 для części zamiennych.",
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "bucuresti-support",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-bucuresti-support",
+        "title" : "Asistență București",
+        "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00."
+      },
+      "score" : 3.6840134,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b152c1d64a11eeacd5fe938223ed1135e2d920815bfa313622be7a9fdddcad2",
+    "retrievalMillis" : 1.241663,
+    "frameworkOverheadMillis" : 1.6130889999999454,
+    "endToEndMillis" : 2580.194772,
+    "generation" : {
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 34,
+      "ttftMillis" : 1552.370871,
+      "totalMillis" : 2577.34002,
+      "prefillTokensPerSecond" : 51.55866786475176,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 18190.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00.",
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "EuroLLM 1B Annealed Fw",
+    "caseId" : "unsupported-oslo-office",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 1.009398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e686b65b8f5327cef5316a21c69aed77367c16393535768db991816a224f06dd",
+    "retrievalMillis" : 0.853484,
+    "frameworkOverheadMillis" : 1.3971420000000307,
+    "endToEndMillis" : 1382.805631,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 129,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 8,
+      "ttftMillis" : 1140.71631,
+      "totalMillis" : 1380.555005,
+      "prefillTokensPerSecond" : 53.49379047763315,
+      "loadMillis" : 384.655015,
+      "peakRssBytes" : 1456971776,
+      "cpuMillis" : 9710.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "When does the office in Oslo open?",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

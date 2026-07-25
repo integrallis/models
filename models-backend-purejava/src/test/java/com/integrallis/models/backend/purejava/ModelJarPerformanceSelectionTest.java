@@ -66,6 +66,22 @@ class ModelJarPerformanceSelectionTest {
   }
 
   @Test
+  void exposesExactBackendRecommendationsToKernelProvidersBeforeModelLoading() {
+    Fixture fixture = fixture();
+    ModelPerformanceProfileRegistry registry = ModelPerformanceProfileRegistry.fromClasspath();
+
+    Map<String, String> recommendations =
+        PureJavaBackend.performanceRecommendations(
+            fixture.descriptor(),
+            "pure-java",
+            registry,
+            fixture.profile().runtimeSelector(),
+            fixture.profile().javaLaunch().orElseThrow().jvmArguments());
+
+    assertThat(recommendations).containsEntry(Q4_KERNEL, "unsigned-pairwise");
+  }
+
+  @Test
   void mergesNonConflictingRecommendationsFromMatchingProfiles() {
     Fixture fixture = fixture();
     ModelPerformanceProfile q4Profile = fixture.profile();

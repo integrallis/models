@@ -267,7 +267,7 @@ public record ModelTopology(
     GgufTensorType type = finalLayer.gate();
     return type == finalLayer.up()
         && type == finalLayer.down()
-        && (type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0);
+        && supportsFinalLayerPromptPruning(type);
   }
 
   boolean supportsFinalLayerKvOnlyPrefill() {
@@ -278,7 +278,13 @@ public record ModelTopology(
         && type == finalLayer.key()
         && type == finalLayer.value()
         && type == finalLayer.attentionOutput()
-        && (type == GgufTensorType.Q4_0 || type == GgufTensorType.Q8_0);
+        && supportsFinalLayerPromptPruning(type);
+  }
+
+  private static boolean supportsFinalLayerPromptPruning(GgufTensorType type) {
+    return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q8_0
+        || type == GgufTensorType.Q4_K;
   }
 
   String finalLayerFfnFormats() {

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "sql-orders-status",
+    "title": "Orders table",
+    "text": "Table orders has primary key order_id. Paid rows use status = 'PAID', and created_at stores UTC timestamps."
+  },
+  {
+    "id": "sql-customers-email",
+    "title": "Customers table",
+    "text": "Table customers has primary key customer_id. Column email_normalized is unique and stores lowercase email addresses."
+  },
+  {
+    "id": "sql-line-items",
+    "title": "Line items table",
+    "text": "Table line_item joins orders through order_id. Extended price is quantity * unit_price."
+  },
+  {
+    "id": "sql-refunds",
+    "title": "Refunds table",
+    "text": "Table refund references order_id and stores amount_cents. Completed refunds have completed_at set to a non-null value."
+  },
+  {
+    "id": "sql-inventory",
+    "title": "Inventory table",
+    "text": "Table inventory is keyed by sku and warehouse_id. Available units equal on_hand - reserved."
+  },
+  {
+    "id": "sql-events",
+    "title": "Events table",
+    "text": "Table event_log is partitioned by event_date. Its payload column uses JSONB."
+  },
+  {
+    "id": "sql-subscriptions",
+    "title": "Subscriptions table",
+    "text": "Table subscription marks active records with canceled_at IS NULL. Plan code is stored in plan_code."
+  },
+  {
+    "id": "sql-sessions",
+    "title": "Sessions table",
+    "text": "Table user_session expires rows using expires_at. Session tokens are stored only as token_hash."
+  },
+  {
+    "id": "sql-products",
+    "title": "Products table",
+    "text": "Table product uses product_id and has a unique sku. Soft-deleted products set deleted_at."
+  },
+  {
+    "id": "sql-audit",
+    "title": "Audit table",
+    "text": "Table audit_entry records actor_id and action. Rows are ordered chronologically by occurred_at."
+  },
+  {
+    "id": "sql-warehouses",
+    "title": "Warehouses table",
+    "text": "Table warehouse stores region_code and capacity_units. Only rows with enabled = true accept allocations."
+  },
+  {
+    "id": "sql-payments",
+    "title": "Payments table",
+    "text": "Table payment references order_id. Successful captures use state = 'CAPTURED'."
+  }
+]

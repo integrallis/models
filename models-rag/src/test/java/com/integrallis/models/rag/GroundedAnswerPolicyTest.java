@@ -134,6 +134,53 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void requiresAClauseSpecificQuestionTermForEveryConjunct() {
+    GroundingDocument settlement =
+        new GroundingDocument(
+            "payments-settlement",
+            "Approved domestic claims paid by ACH settle within 2 business days. "
+                + "International claim wires settle within 5 business days and may incur an "
+                + "intermediary bank fee.",
+            8.4f,
+            1);
+    GroundedAnswer answer =
+        policy.apply(
+            "When do approved domestic ACH claims and international claim wires settle?",
+            List.of(settlement),
+            "Approved domestic claims paid by ACH settle within 2 business days. "
+                + "[payments-settlement]");
+
+    assertThat(answer.text())
+        .contains("2 business days")
+        .contains("5 business days")
+        .endsWith("[payments-settlement]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
+  void acceptsConjunctsWithDistinctEvidenceDespiteInflection() {
+    GroundingDocument idempotency =
+        new GroundingDocument(
+            "api-idempotency",
+            "Claims API clients send the Idempotency-Key header on create requests. "
+                + "Keys remain valid for a 24 hour replay window.",
+            8.0f,
+            1);
+    String generated =
+        "Claims API clients send the Idempotency-Key header on create requests. "
+            + "Keys remain valid for a 24 hour replay window. [api-idempotency]";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which header makes Claims API creates idempotent and how long can a key be replayed?",
+            List.of(idempotency),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated);
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER);
+  }
+
+  @Test
   void usesExtractiveEvidenceForAnUnsupportedCitation() {
     GroundedAnswer answer =
         policy.apply(
@@ -170,14 +217,15 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
-  void usesExtractiveEvidenceWhenAConfidentRetrievalIsFollowedByARefusal() {
+  void preservesAnExplicitModelAbstentionDespiteAConfidentRetrieval() {
     GroundedAnswer answer =
         policy.apply(
             "How long do both payment types take?",
             List.of(HIGH_CONFIDENCE),
             "INSUFFICIENT_CONTEXT.");
 
-    assertThat(answer.text()).contains("5 business days").endsWith("[payments-settlement]");
-    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+    assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
+    assertThat(answer.rawText()).isEqualTo("INSUFFICIENT_CONTEXT.");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
   }
 }
