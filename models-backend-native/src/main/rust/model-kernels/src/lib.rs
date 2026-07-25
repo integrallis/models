@@ -38,16 +38,16 @@ const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 
 #[derive(Clone, Copy)]
 enum DotKernel {
-    Q4Scalar,
+    Q4,
     #[cfg(target_arch = "x86_64")]
     Q4Avx2,
-    Q8Scalar,
+    Q8,
     #[cfg(target_arch = "x86_64")]
     Q8Avx2,
-    Q4KScalar,
+    Q4K,
     #[cfg(target_arch = "x86_64")]
     Q4KAvx2,
-    Q6KScalar,
+    Q6K,
     #[cfg(target_arch = "x86_64")]
     Q6KAvx2,
 }
@@ -1214,7 +1214,7 @@ unsafe fn compute_batched_row_range(
     kernel: DotKernel,
 ) {
     match kernel {
-        DotKernel::Q4Scalar => {
+        DotKernel::Q4 => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
                 compute_q4_batched_row_range_scalar(
@@ -1247,7 +1247,7 @@ unsafe fn compute_batched_row_range(
                 );
             }
         }
-        DotKernel::Q8Scalar => {
+        DotKernel::Q8 => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
                 compute_q8_batched_row_range_scalar(
@@ -1280,7 +1280,7 @@ unsafe fn compute_batched_row_range(
                 );
             }
         }
-        DotKernel::Q4KScalar => {
+        DotKernel::Q4K => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
                 compute_q4_k_batched_row_range_scalar(
@@ -1315,7 +1315,7 @@ unsafe fn compute_batched_row_range(
                 );
             }
         }
-        DotKernel::Q6KScalar => {
+        DotKernel::Q6K => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
                 compute_q6_k_batched_row_range_scalar(
@@ -1666,7 +1666,7 @@ fn compute_output_range(
         let batch = output_index / rows;
         let row = output_index % rows;
         *slot = match kernel {
-            DotKernel::Q4Scalar => {
+            DotKernel::Q4 => {
                 dot_q4_0_q8_0_row_scalar(weights, quantized, activation_scales, batch, row, cols)
             }
             #[cfg(target_arch = "x86_64")]
@@ -1676,7 +1676,7 @@ fn compute_output_range(
                     dot_q4_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
             }
-            DotKernel::Q8Scalar => {
+            DotKernel::Q8 => {
                 dot_q8_0_q8_0_row_scalar(weights, quantized, activation_scales, batch, row, cols)
             }
             #[cfg(target_arch = "x86_64")]
@@ -1686,7 +1686,7 @@ fn compute_output_range(
                     dot_q8_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
             }
-            DotKernel::Q4KScalar => dot_q4_k_q8_k_row_scalar(
+            DotKernel::Q4K => dot_q4_k_q8_k_row_scalar(
                 weights,
                 quantized,
                 activation_scales,
@@ -1710,7 +1710,7 @@ fn compute_output_range(
                     )
                 }
             }
-            DotKernel::Q6KScalar => {
+            DotKernel::Q6K => {
                 dot_q6_k_q8_k_row_scalar(weights, quantized, activation_scales, batch, row, cols)
             }
             #[cfg(target_arch = "x86_64")]
@@ -1729,7 +1729,7 @@ fn selected_q4_kernel() -> DotKernel {
     if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
         return DotKernel::Q4Avx2;
     }
-    DotKernel::Q4Scalar
+    DotKernel::Q4
 }
 
 fn selected_q8_kernel() -> DotKernel {
@@ -1737,7 +1737,7 @@ fn selected_q8_kernel() -> DotKernel {
     if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
         return DotKernel::Q8Avx2;
     }
-    DotKernel::Q8Scalar
+    DotKernel::Q8
 }
 
 fn selected_q4_k_kernel() -> DotKernel {
@@ -1745,7 +1745,7 @@ fn selected_q4_k_kernel() -> DotKernel {
     if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
         return DotKernel::Q4KAvx2;
     }
-    DotKernel::Q4KScalar
+    DotKernel::Q4K
 }
 
 fn selected_q6_k_kernel() -> DotKernel {
@@ -1753,7 +1753,7 @@ fn selected_q6_k_kernel() -> DotKernel {
     if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
         return DotKernel::Q6KAvx2;
     }
-    DotKernel::Q6KScalar
+    DotKernel::Q6K
 }
 
 fn dot_q4_0_q8_0_row_scalar(

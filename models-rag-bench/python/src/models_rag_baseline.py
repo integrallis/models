@@ -204,14 +204,19 @@ def render_prompt(
         f"[{hit.document.id}] {hit.document.title}\n{hit.document.text}\n\n"
         for hit in hits
     )
-    canonical = f"{INSTRUCTIONS}CONTEXT\n{context}QUESTION\n{question}\n\nANSWER\n"
+    request = f"CONTEXT\n{context}QUESTION\n{question}\n\nANSWER\n"
+    canonical = f"{INSTRUCTIONS}{request}"
     if prompt_template == "raw":
         return canonical
     if prompt_template == "chatml":
-        return f"<|im_start|>user\n{canonical}<|im_end|>\n<|im_start|>assistant\n"
+        return (
+            f"<|im_start|>system\n{INSTRUCTIONS.rstrip()}<|im_end|>\n"
+            f"<|im_start|>user\n{request}<|im_end|>\n<|im_start|>assistant\n"
+        )
     if prompt_template == "chatml-no-think":
         return (
-            f"<|im_start|>user\n{canonical}<|im_end|>\n<|im_start|>assistant\n"
+            f"<|im_start|>system\n{INSTRUCTIONS.rstrip()}<|im_end|>\n"
+            f"<|im_start|>user\n{request}<|im_end|>\n<|im_start|>assistant\n"
             "<think>\n\n</think>\n\n"
         )
     raise ValueError(f"unsupported prompt template: {prompt_template}")

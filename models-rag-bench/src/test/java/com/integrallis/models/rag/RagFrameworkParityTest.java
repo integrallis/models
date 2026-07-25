@@ -81,13 +81,14 @@ class RagFrameworkParityTest {
 
     assertThat(runs)
         .extracting(RagRun::promptSha256)
-        .containsOnly("adeb518c096c5bbe124b3c8d60ab2001e6754d192938465f6bedea5ca5a62bad");
+        .containsOnly("4c98b1a9e299af5dab1c81fb866ce891f5288532eba56984b2263e55e87f367a");
     assertThat(clients)
         .extracting(RecordingGenerationClient::lastPrompt)
         .allSatisfy(
             prompt ->
                 assertThat(prompt)
-                    .startsWith("<|im_start|>user\n")
+                    .startsWith("<|im_start|>system\n")
+                    .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n")
                     .endsWith("<|im_end|>\n<|im_start|>assistant\n"));
   }
 

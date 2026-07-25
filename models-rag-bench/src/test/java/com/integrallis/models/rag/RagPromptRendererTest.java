@@ -41,7 +41,7 @@ class RagPromptRendererTest {
   }
 
   @Test
-  void chatmlProfileWrapsTheCanonicalPromptAsAUserTurn() {
+  void chatmlProfileUsesNativeSystemAndUserTurns() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 
     String prompt =
@@ -51,8 +51,8 @@ class RagPromptRendererTest {
             RagPromptTemplate.CHATML);
 
     assertThat(prompt)
-        .startsWith("<|im_start|>user\nYou answer questions")
-        .contains("[source-1] Policy")
+        .startsWith("<|im_start|>system\nYou answer questions")
+        .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n[source-1] Policy")
         .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n");
   }
 
@@ -67,6 +67,8 @@ class RagPromptRendererTest {
             RagPromptTemplate.CHATML_NO_THINK);
 
     assertThat(prompt)
+        .startsWith("<|im_start|>system\nYou answer questions")
+        .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n[source-1] Policy")
         .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n");
   }
 

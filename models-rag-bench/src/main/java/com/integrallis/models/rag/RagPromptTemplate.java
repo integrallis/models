@@ -50,14 +50,27 @@ public enum RagPromptTemplate {
 
   /** Applies a role-aware envelope while retaining legacy prompt bytes for single-turn profiles. */
   public String apply(String systemPrompt, String userPrompt) {
-    if (this == ZEPHYR) {
-      return "<|system|>\n"
-          + systemPrompt.stripTrailing()
-          + "</s>\n<|user|>\n"
-          + userPrompt
-          + "</s>\n<|assistant|>";
-    }
-    return apply(systemPrompt + userPrompt);
+    return switch (this) {
+      case RAW -> systemPrompt + userPrompt;
+      case CHATML ->
+          "<|im_start|>system\n"
+              + systemPrompt.stripTrailing()
+              + "<|im_end|>\n<|im_start|>user\n"
+              + userPrompt
+              + "<|im_end|>\n<|im_start|>assistant\n";
+      case CHATML_NO_THINK ->
+          "<|im_start|>system\n"
+              + systemPrompt.stripTrailing()
+              + "<|im_end|>\n<|im_start|>user\n"
+              + userPrompt
+              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+      case ZEPHYR ->
+          "<|system|>\n"
+              + systemPrompt.stripTrailing()
+              + "</s>\n<|user|>\n"
+              + userPrompt
+              + "</s>\n<|assistant|>";
+    };
   }
 
   /** Resolves a CLI identifier. */

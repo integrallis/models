@@ -54,18 +54,21 @@ def test_prompt_and_deterministic_quality_match_java_contract():
     )
 
     chatml_prompt = rag.render_prompt(case.question, hits, "chatml")
-    assert chatml_prompt.startswith("<|im_start|>user\nYou answer questions")
+    assert chatml_prompt.startswith("<|im_start|>system\nYou answer questions")
+    assert "<|im_end|>\n<|im_start|>user\nCONTEXT\n" in chatml_prompt
     assert chatml_prompt.endswith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n")
     assert hashlib.sha256(chatml_prompt.encode()).hexdigest() == (
-        "adeb518c096c5bbe124b3c8d60ab2001e6754d192938465f6bedea5ca5a62bad"
+        "4c98b1a9e299af5dab1c81fb866ce891f5288532eba56984b2263e55e87f367a"
     )
 
     no_think_prompt = rag.render_prompt(case.question, hits, "chatml-no-think")
+    assert no_think_prompt.startswith("<|im_start|>system\nYou answer questions")
+    assert "<|im_end|>\n<|im_start|>user\nCONTEXT\n" in no_think_prompt
     assert no_think_prompt.endswith(
         "ANSWER\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
     )
     assert hashlib.sha256(no_think_prompt.encode()).hexdigest() == (
-        "959555745e05099d76fd4af53d470399d4cabdaf0ed86bb9b7505b0d08c1cc4a"
+        "8d76a0ae2e75d3a34eca4c126f3d9f47a5db14a0cac54bb40497a0f936ca81ee"
     )
 
 
