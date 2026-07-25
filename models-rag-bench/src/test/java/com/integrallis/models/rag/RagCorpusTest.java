@@ -52,6 +52,41 @@ class RagCorpusTest {
   }
 
   @Test
+  void domainWorkloadsHaveIndependentDocumentsAndEvaluationCases() {
+    List<RagWorkload> workloads =
+        List.of(
+            RagWorkload.FINANCE,
+            RagWorkload.HEALTHCARE,
+            RagWorkload.LEGAL,
+            RagWorkload.MATH,
+            RagWorkload.MULTILINGUAL,
+            RagWorkload.SQL,
+            RagWorkload.TRANSPORTATION);
+
+    assertThat(workloads).extracting(RagWorkload::id).doesNotHaveDuplicates();
+    assertThat(workloads)
+        .extracting(workload -> RagCorpus.load(workload).fingerprint())
+        .doesNotHaveDuplicates();
+    for (RagWorkload workload : workloads) {
+      RagCorpus corpus = RagCorpus.load(workload);
+      assertThat(corpus.documents()).as("%s documents", workload.id()).hasSize(12);
+      assertThat(corpus.documents())
+          .as("%s document IDs", workload.id())
+          .extracting(RagDocument::id)
+          .doesNotHaveDuplicates();
+      assertThat(corpus.cases()).as("%s cases", workload.id()).hasSize(9);
+      assertThat(corpus.cases())
+          .as("%s case IDs", workload.id())
+          .extracting(RagCase::id)
+          .doesNotHaveDuplicates();
+      assertThat(corpus.cases())
+          .as("%s answerable cases", workload.id())
+          .filteredOn(RagCase::answerable)
+          .hasSize(8);
+    }
+  }
+
+  @Test
   void breakGlassOracleAcceptsTheNumberOfApprovingManagersAskedFor() {
     RagCorpus corpus = RagCorpus.loadDefault();
     RagCase testCase =

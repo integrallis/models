@@ -1,0 +1,65 @@
+[
+  {
+    "id": "orders-paid-primary-key",
+    "question": "Which column is the orders primary key, and which status identifies paid rows?",
+    "relevantDocumentIds": ["sql-orders-status"],
+    "requiredFacts": ["order_id", "PAID"],
+    "answerable": true
+  },
+  {
+    "id": "customers-email-constraint",
+    "question": "Which customers column stores normalized email, and what constraint does it have?",
+    "relevantDocumentIds": ["sql-customers-email"],
+    "requiredFacts": ["email_normalized", "unique"],
+    "answerable": true
+  },
+  {
+    "id": "line-item-price",
+    "question": "How does line_item join orders, and how is extended price calculated?",
+    "relevantDocumentIds": ["sql-line-items"],
+    "requiredFacts": ["order_id", "quantity * unit_price"],
+    "answerable": true
+  },
+  {
+    "id": "refund-completion",
+    "question": "Which refund column stores value, and how is a completed refund identified?",
+    "relevantDocumentIds": ["sql-refunds"],
+    "requiredFacts": ["amount_cents", "completed_at"],
+    "answerable": true
+  },
+  {
+    "id": "inventory-availability",
+    "question": "Which columns key inventory, and how are available units computed?",
+    "relevantDocumentIds": ["sql-inventory"],
+    "requiredFacts": ["sku and warehouse_id", "on_hand - reserved"],
+    "answerable": true
+  },
+  {
+    "id": "event-partition-payload",
+    "question": "Which column partitions event_log, and which type stores its payload?",
+    "relevantDocumentIds": ["sql-events"],
+    "requiredFacts": ["event_date", "JSONB"],
+    "answerable": true
+  },
+  {
+    "id": "active-subscription",
+    "question": "How is an active subscription identified, and which column stores its plan?",
+    "relevantDocumentIds": ["sql-subscriptions"],
+    "requiredFacts": ["canceled_at IS NULL", "plan_code"],
+    "answerable": true
+  },
+  {
+    "id": "session-expiry-token",
+    "question": "Which column expires user_session rows, and how are tokens stored?",
+    "relevantDocumentIds": ["sql-sessions"],
+    "requiredFacts": ["expires_at", "token_hash"],
+    "answerable": true
+  },
+  {
+    "id": "unsupported-coupon-table",
+    "question": "Which column stores the redemption limit in the coupon table?",
+    "relevantDocumentIds": [],
+    "requiredFacts": [],
+    "answerable": false
+  }
+]

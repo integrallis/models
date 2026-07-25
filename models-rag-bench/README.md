@@ -21,6 +21,13 @@ answerable case declares its required facts and source IDs, while the
 unanswerable case must return exactly `INSUFFICIENT_CONTEXT`. `general` remains
 the default.
 
+The versioned domain workloads are `finance`, `healthcare`, `legal`, `math`,
+`multilingual`, `sql`, and `transportation`. They use the same 12-document,
+nine-case contract and synthetic facts, so they measure retrieval, grounding,
+abstention, model contribution, and latency without presenting benchmark
+content as professional advice. Qualification reports pin each corpus SHA-256;
+reports from different workloads or corpus revisions are not comparable.
+
 Models are encouraged to emit source IDs, but source formatting is not treated
 as generation quality. When an otherwise supported answer omits citations, the
 grounding layer retains the model text, appends retrieved provenance, and records

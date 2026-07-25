@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class LuceneRagRetrieverTest {
@@ -62,6 +63,31 @@ class LuceneRagRetrieverTest {
           .extracting(RetrievedDocument::score)
           .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.FLOAT)
           .isLessThan(GroundedAnswerPolicy.DEFAULT_MINIMUM_RETRIEVAL_SCORE);
+    }
+  }
+
+  @Test
+  void bm25RanksEveryDomainSourceFirst() throws Exception {
+    List<RagWorkload> workloads =
+        List.of(
+            RagWorkload.FINANCE,
+            RagWorkload.HEALTHCARE,
+            RagWorkload.LEGAL,
+            RagWorkload.MATH,
+            RagWorkload.MULTILINGUAL,
+            RagWorkload.SQL,
+            RagWorkload.TRANSPORTATION);
+
+    for (RagWorkload workload : workloads) {
+      RagCorpus corpus = RagCorpus.load(workload);
+      try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
+        for (RagCase testCase : corpus.cases().stream().filter(RagCase::answerable).toList()) {
+          assertThat(retriever.retrieve(testCase.question(), 1))
+              .as("%s/%s", workload.id(), testCase.id())
+              .extracting(hit -> hit.document().id())
+              .containsExactly(testCase.relevantDocumentIds().getFirst());
+        }
+      }
     }
   }
 
