@@ -189,18 +189,22 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
             "eligible Q4_K batched and grouped projections execute in the Models Rust kernel"));
     optimizations.add(
         nativeQuantizedDecision(
+            "rust-q5-k-batched-matmul",
+            "eligible Q5_K batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        nativeQuantizedDecision(
             "rust-q6-k-batched-matmul",
             "eligible Q6_K batched and grouped projections execute in the Models Rust kernel"));
     optimizations.add(
         nativeQuantizedDecision(
             "rust-mixed-k-grouped-matmul",
-            "mixed Q4_K and Q6_K projections share one Q8_K activation quantization"));
+            "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization"));
     optimizations.add(
         new OptimizationDecision(
             "rust-quantized-decode",
             kernel.nativeDecodeEnabled() ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
             kernel.nativeDecodeEnabled()
-                ? "single-token Q4_0, Q8_0, Q4_K, and Q6_K projections execute in the Models Rust kernel"
+                ? "single-token Q4_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel"
                 : "disabled by " + RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
             Map.of(
                 "property",

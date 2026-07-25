@@ -6,8 +6,8 @@ the transformer graph, KV-cache ownership, sampling, and generation remain in Ja
 The native boundary is a versioned C ABI implemented by the Models-owned
 `jmodels-kernels` Rust crate.
 
-ABI 2 supports Q4_0, Q8_0, Q4_K, and Q6_K batched and grouped projections,
-including mixed Q4_K/Q4_K/Q6_K groups over one shared Q8_K activation
+ABI 2 supports Q4_0, Q8_0, Q4_K, Q5_K, and Q6_K batched and grouped projections,
+including mixed Q4_K/Q5_K/Q6_K groups over one shared Q8_K activation
 quantization. Its x86-64 path uses format-specialized AVX2/FMA integer dots,
 vectorized Q8_0 activation preparation, batched weight reuse, reusable activation
 scratch, and an explicitly owned persistent worker context. Scalar kernels remain
@@ -19,13 +19,17 @@ available as cross-platform conformance fallbacks.
 ./gradlew :models-backend-native:check
 ./gradlew :models-backend-native:nativePlatformJar
 ./gradlew :models-backend-native:integrationTest
+./gradlew :models-backend-native:slowTest \
+  --tests com.integrallis.models.backend.nativekernel.RustFfmQ5KLargeModelTest
 ```
 
 Gradle builds the host library with Cargo under
 `models-backend-native/build/rust-target`. Native Java tests run with
 `--enable-native-access=ALL-UNNAMED`. The real-model integration test requires
-`~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf` and
-`~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf`.
+`~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf`,
+`~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf`, and
+`~/.jvllm/models/MiniCPM5-1B-Q4_K_M.gguf`. The Q5_K slow test requires
+`~/.jvllm/models/sqlcoder-7b-q5_k_m.gguf`.
 
 ## Load
 

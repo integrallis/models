@@ -246,6 +246,7 @@ val verifyNativePlatformJar by tasks.registering {
 
 tasks.withType<Test>().configureEach {
     dependsOn(cargoBuildRelease, nativePlatformJar)
+    inputs.file(nativeLibrary)
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("models.native.kernels.library", nativeLibrary.get().asFile.absolutePath)
     systemProperty(

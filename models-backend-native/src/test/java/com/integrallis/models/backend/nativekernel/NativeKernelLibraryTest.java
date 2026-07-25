@@ -44,6 +44,8 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q5_K_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q6_K_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL))
@@ -170,14 +172,19 @@ class NativeKernelLibraryTest {
     try (Arena arena = Arena.ofConfined();
         RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       MemorySegment q4Weights = arena.allocate((long) rows * cols / 256 * 144);
+      MemorySegment q5Weights = arena.allocate((long) rows * cols / 256 * 176);
       MemorySegment q6Weights = arena.allocate((long) rows * cols / 256 * 210);
       fillQ4KWeights(q4Weights, rows, cols);
+      fillQ5KWeights(q5Weights, rows, cols);
       fillQ6KWeights(q6Weights, rows, cols);
 
       assertThat(kernel.supports(GgufTensorType.Q4_K)).isTrue();
+      assertThat(kernel.supports(GgufTensorType.Q5_K)).isTrue();
       assertThat(kernel.supports(GgufTensorType.Q6_K)).isTrue();
       assertKQuantizedProjectionMatches(
           kernel, q4Weights, GgufTensorType.Q4_K, input, batchSize, rows, cols);
+      assertKQuantizedProjectionMatches(
+          kernel, q5Weights, GgufTensorType.Q5_K, input, batchSize, rows, cols);
       assertKQuantizedProjectionMatches(
           kernel, q6Weights, GgufTensorType.Q6_K, input, batchSize, rows, cols);
     }
@@ -332,7 +339,7 @@ class NativeKernelLibraryTest {
   }
 
   @Test
-  void groupedKernelMatchesVectorSemanticsForMixedQ4_KQ4_KQ6_KProjections() {
+  void groupedKernelMatchesVectorSemanticsForMixedQ4_KQ5_KQ6_KProjections() {
     int batchSize = 3;
     int cols = 512;
     int[] rowCounts = {3, 5, 7};
@@ -341,10 +348,10 @@ class NativeKernelLibraryTest {
     try (Arena arena = Arena.ofConfined();
         RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       MemorySegment firstWeights = arena.allocate((long) rowCounts[0] * cols / 256 * 144);
-      MemorySegment secondWeights = arena.allocate((long) rowCounts[1] * cols / 256 * 144);
+      MemorySegment secondWeights = arena.allocate((long) rowCounts[1] * cols / 256 * 176);
       MemorySegment thirdWeights = arena.allocate((long) rowCounts[2] * cols / 256 * 210);
       fillQ4KWeights(firstWeights, rowCounts[0], cols);
-      fillQ4KWeights(secondWeights, rowCounts[1], cols);
+      fillQ5KWeights(secondWeights, rowCounts[1], cols);
       fillQ6KWeights(thirdWeights, rowCounts[2], cols);
 
       float[] expectedFirst =
@@ -352,7 +359,7 @@ class NativeKernelLibraryTest {
               firstWeights, GgufTensorType.Q4_K, input, batchSize, rowCounts[0], cols);
       float[] expectedSecond =
           tensorOpsReference(
-              secondWeights, GgufTensorType.Q4_K, input, batchSize, rowCounts[1], cols);
+              secondWeights, GgufTensorType.Q5_K, input, batchSize, rowCounts[1], cols);
       float[] expectedThird =
           tensorOpsReference(
               thirdWeights, GgufTensorType.Q6_K, input, batchSize, rowCounts[2], cols);
@@ -364,7 +371,7 @@ class NativeKernelLibraryTest {
               kernel.isTripleEligible(
                   GgufTensorType.Q4_K,
                   rowCounts[0],
-                  GgufTensorType.Q4_K,
+                  GgufTensorType.Q5_K,
                   rowCounts[1],
                   GgufTensorType.Q6_K,
                   rowCounts[2],
@@ -378,7 +385,7 @@ class NativeKernelLibraryTest {
           rowCounts[0],
           actualSecond,
           secondWeights,
-          GgufTensorType.Q4_K,
+          GgufTensorType.Q5_K,
           rowCounts[1],
           actualThird,
           thirdWeights,
@@ -496,6 +503,53 @@ class NativeKernelLibraryTest {
             bytes.length);
       }
     }
+  }
+
+  private static void fillQ5KWeights(MemorySegment weights, int rows, int cols) {
+    int blocksPerRow = cols / 256;
+    for (int row = 0; row < rows; row++) {
+      for (int block = 0; block < blocksPerRow; block++) {
+        byte[] bytes = q5KBlock((row + 1) * 0.03125f, (block + 1) * 0.015625f, row, block);
+        MemorySegment.copy(
+            bytes,
+            0,
+            weights,
+            ValueLayout.JAVA_BYTE,
+            ((long) row * blocksPerRow + block) * bytes.length,
+            bytes.length);
+      }
+    }
+  }
+
+  private static byte[] q5KBlock(float scale, float minScale, int row, int block) {
+    byte[] bytes = new byte[176];
+    ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+    buffer.putShort(0, Float.floatToFloat16(scale));
+    buffer.putShort(2, Float.floatToFloat16(minScale));
+    int[] scales = {5, 12, 30, 60, 7, 15, 31, 63};
+    int[] mins = {3, 8, 20, 45, 1, 10, 25, 50};
+    for (int group = 0; group < 4; group++) {
+      bytes[4 + group] = (byte) scales[group];
+      bytes[8 + group] = (byte) mins[group];
+    }
+    for (int group = 4; group < 8; group++) {
+      bytes[8 + group] = (byte) ((scales[group] & 0x0f) | ((mins[group] & 0x0f) << 4));
+      bytes[group] |= (byte) ((scales[group] >>> 4) << 6);
+      bytes[4 + group] |= (byte) ((mins[group] >>> 4) << 6);
+    }
+    for (int group = 0; group < 8; group++) {
+      int packedOffset = 48 + (group >>> 1) * 32;
+      int shift = (group & 1) * 4;
+      int highBit = 1 << group;
+      for (int index = 0; index < 32; index++) {
+        int quant = (row * 17 + block * 11 + group * 7 + index * 5) & 0x1f;
+        bytes[packedOffset + index] |= (byte) ((quant & 0x0f) << shift);
+        if ((quant & 0x10) != 0) {
+          bytes[16 + index] |= (byte) highBit;
+        }
+      }
+    }
+    return bytes;
   }
 
   private static byte[] q6KBlock(float scale, int row, int block) {

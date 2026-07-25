@@ -112,6 +112,7 @@ class RustFfmBackendIntegrationTest {
 
     try (RustFfmBackend backend = RustFfmBackend.load(MINICPM5_MODEL_PATH, library)) {
       assertThat(backend.diagnostics().optimization("rust-q4-k-batched-matmul")).isPresent();
+      assertThat(backend.diagnostics().optimization("rust-q5-k-batched-matmul")).isPresent();
       assertThat(backend.diagnostics().optimization("rust-q6-k-batched-matmul")).isPresent();
       assertThat(backend.diagnostics().optimization("rust-mixed-k-grouped-matmul")).isPresent();
 

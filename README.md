@@ -16,7 +16,7 @@
 > **Experimental in-JVM small-language-model inference for JDK 25.**
 >
 > Pure-Java core backend. Optional platform bridge modules are isolated. JDK 25+.
-> GGUF parsing, vectors-backed F32/Q4_0/Q5_0/Q8_0/Q4_K/Q6_K kernels, tokenization,
+> GGUF parsing, vectors-backed F32/Q4_0/Q5_0/Q8_0/Q4_K/Q5_K/Q6_K kernels, tokenization,
 > sampling, and a Llama-family forward path are implemented.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -88,7 +88,7 @@ application
     ▼
 models-runtime ──► models-api ──► models-backend-purejava
                                       │
-                                      └── GGUF / F32 / Q4_0 / Q5_0 / Q8_0 / Q4_K / Q6_K
+                                      └── GGUF / F32 / Q4_0 / Q5_0 / Q8_0 / Q4_K / Q5_K / Q6_K
 ```
 
 ## Why it exists
@@ -217,7 +217,7 @@ try (PureJavaBackend backend = PureJavaBackend.load(model)) {
 ```
 
 Diagnostics identify enabled, disabled, and unsupported choices, including the
-resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, Q4_0
+resolved tensor grouping, mixed Q4_K/Q5_K/Q6_K projection eligibility, Q4_0
 arithmetic kernel, prefill batch size, final-layer output-row policy, mapped
 weights, Vector FMA policy, final-layer K/V-only policy, and persistent row
 executor, including the staged Q4_0/Q8_0 layer schedule when selected.
@@ -566,7 +566,7 @@ without changing the model metadata reported to callers.
 - Additional ModelJars catalog entries and repository providers
 - Micrometer metrics (tok/s, latency histograms)
 - JFR events for profiling
-- Additional K-quant support beyond mixed Q4_K_M files
+- Remaining quantized formats and AArch64-native SIMD kernels
 
 ### Phase 3 — Performance & scale
 
