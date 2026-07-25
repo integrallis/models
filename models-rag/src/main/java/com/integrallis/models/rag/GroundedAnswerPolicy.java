@@ -35,13 +35,15 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-clause-anchors-safe-discourse-explicit-abstention-v8";
+      "trusted-title-provenance-conjunct-anchors-safe-discourse-explicit-abstention-v9";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^INSUFFICIENT_CONTEXT[.!]?$");
   private static final Pattern CLAUSE_BOUNDARY =
       Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
+  private static final Pattern EVIDENCE_CLAUSE_BOUNDARY =
+      Pattern.compile("(?i)(?:[;?!]\\s*|\\.\\s+)");
   private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
   private static final Set<String> FUNCTION_WORDS =
       Set.of(
@@ -193,7 +195,7 @@ public final class GroundedAnswerPolicy {
 
     List<Set<String>> evidenceClauses =
         retrieved.stream()
-            .flatMap(hit -> clauses(hit.title() + "\n" + hit.text()).stream())
+            .flatMap(hit -> evidenceClauses(hit.title() + "\n" + hit.text()).stream())
             .toList();
     List<Set<String>> matchingEvidenceClauses =
         questionClauses.stream()
@@ -233,6 +235,14 @@ public final class GroundedAnswerPolicy {
 
   private static List<Set<String>> clauses(String text) {
     return CLAUSE_BOUNDARY
+        .splitAsStream(text)
+        .map(GroundedAnswerPolicy::words)
+        .filter(clause -> !clause.isEmpty())
+        .toList();
+  }
+
+  private static List<Set<String>> evidenceClauses(String text) {
+    return EVIDENCE_CLAUSE_BOUNDARY
         .splitAsStream(text)
         .map(GroundedAnswerPolicy::words)
         .filter(clause -> !clause.isEmpty())

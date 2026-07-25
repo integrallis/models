@@ -216,6 +216,32 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void acceptsSupportedParaphrasesForEveryQuestionConjunct() {
+    GroundingDocument compute =
+        new GroundingDocument(
+            "java-map-compute",
+            "Atomic session cache initialization",
+            "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. "
+                + "If the mapping function returns null, computeIfAbsent returns null and records "
+                + "no mapping for that key.",
+            8.0f,
+            1);
+    String generated =
+        "The map operation is ConcurrentHashMap.computeIfAbsent which initializes SessionCache "
+            + "entries. When the mapping function returns null, it records no mapping for that key.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which map operation initializes SessionCache entries, and what happens when its "
+                + "mapping function returns null?",
+            List.of(compute),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [java-map-compute]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
   void usesExtractiveEvidenceForAnUnsupportedCitation() {
     GroundedAnswer answer =
         policy.apply(
