@@ -164,6 +164,13 @@ public final class LlamaForwardPass {
     if (!executionPlan.topology().equals(actualTopology)) {
       throw new IllegalArgumentException("execution plan topology does not match loaded weights");
     }
+    GgufBatchedMatrixKernel loadedMatrixKernel =
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
+    if (executionPlan.injectedGroupedProjections()
+        && !actualTopology.hasInjectedGroupedProjection(loadedMatrixKernel)) {
+      throw new IllegalArgumentException(
+          "execution plan grouped projections do not match the injected matrix kernel");
+    }
     this.groupedProjections = executionPlan.groupedProjections();
     this.mixedKProjections = executionPlan.mixedKProjections();
     this.q4Kernel = executionPlan.q4Kernel();
@@ -176,7 +183,7 @@ public final class LlamaForwardPass {
     this.blockMajorQ8Activations = executionPlan.blockMajorQ8Activations();
     this.q8BlockMajorKernel = executionPlan.q8BlockMajorKernel();
     this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
-    this.batchedMatrixKernel = Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
+    this.batchedMatrixKernel = loadedMatrixKernel;
     this.ropeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
 

@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +70,10 @@ public record ModelTopology(
       return gate == up && TensorOps.supportsGroupedMatmul(gate);
     }
 
+    boolean groupsGateUp(GgufBatchedMatrixKernel kernel) {
+      return groupsGateUp() || kernel.supportsDual(gate, up);
+    }
+
     boolean groupsMixedKQkv() {
       return query == GgufTensorType.Q4_K
           && key == GgufTensorType.Q4_K
@@ -105,6 +110,10 @@ public record ModelTopology(
         return "partial";
       }
       return "independent";
+    }
+
+    String qkvMode(GgufBatchedMatrixKernel kernel) {
+      return kernel.supportsTriple(query, key, value) ? "grouped" : qkvMode();
     }
   }
 
@@ -153,6 +162,20 @@ public record ModelTopology(
   boolean hasGroupedProjection() {
     return layers.stream()
         .anyMatch(layer -> layer.groupsGateUp() || !"independent".equals(layer.qkvMode()));
+  }
+
+  boolean hasGroupedProjection(GgufBatchedMatrixKernel kernel) {
+    return hasGroupedProjection() || hasInjectedGroupedProjection(kernel);
+  }
+
+  /** Returns whether an injected kernel can group at least one loaded projection set. */
+  public boolean hasInjectedGroupedProjection(GgufBatchedMatrixKernel kernel) {
+    Objects.requireNonNull(kernel, "kernel");
+    return layers.stream()
+        .anyMatch(
+            layer ->
+                kernel.supportsDual(layer.gate(), layer.up())
+                    || kernel.supportsTriple(layer.query(), layer.key(), layer.value()));
   }
 
   int mixedKProjectionLayers() {
@@ -283,8 +306,28 @@ public record ModelTopology(
     return anyGrouped ? "partial" : "independent";
   }
 
+  String qkvMode(GgufBatchedMatrixKernel kernel) {
+    Objects.requireNonNull(kernel, "kernel");
+    boolean anyGrouped =
+        layers.stream().anyMatch(layer -> !"independent".equals(layer.qkvMode(kernel)));
+    boolean allGrouped = layers.stream().allMatch(layer -> "grouped".equals(layer.qkvMode(kernel)));
+    if (allGrouped) {
+      return "grouped";
+    }
+    return anyGrouped ? "partial" : "independent";
+  }
+
   String gateUpMode() {
     long grouped = layers.stream().filter(LayerTopology::groupsGateUp).count();
+    if (grouped == layers.size()) {
+      return "grouped";
+    }
+    return grouped > 0 ? "partial" : "independent";
+  }
+
+  String gateUpMode(GgufBatchedMatrixKernel kernel) {
+    Objects.requireNonNull(kernel, "kernel");
+    long grouped = layers.stream().filter(layer -> layer.groupsGateUp(kernel)).count();
     if (grouped == layers.size()) {
       return "grouped";
     }

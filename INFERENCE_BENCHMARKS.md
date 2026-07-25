@@ -220,7 +220,7 @@ activations, and at least two row partitions.
 The next gate replaced the block-by-block scattered output updates with one row-local batch
 accumulator. Vectors keeps this as an explicit kernel strategy because local Java 25 HotSpot/C2 was
 neutral, while the controlled EPYC/GraalVM batch-32 JMH improved from 20.571 to 4.335 ms/op
-(-78.9%). Models plan schema `pure-java-v16` requires an exact recommendation, Graal JVMCI, and
+(-78.9%). Models plan schema `pure-java-v17` requires an exact recommendation, Graal JVMCI, and
 eligible staged block-major Q8 topology before selecting
 `models.purejava.q8BlockMajorKernel=row-accumulated`.
 

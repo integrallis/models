@@ -182,6 +182,10 @@ class NativeKernelLibraryTest {
       referenceQ5_0F32BatchedMatmul(weights, input, batchSize, rows, cols, expected);
 
       assertThat(kernel.supports(GgufTensorType.Q5_0)).isTrue();
+      assertThat(kernel.supportsDual(GgufTensorType.Q5_0, GgufTensorType.Q5_0)).isTrue();
+      assertThat(
+              kernel.supportsTriple(GgufTensorType.Q5_0, GgufTensorType.Q5_0, GgufTensorType.Q5_0))
+          .isTrue();
       assertThat(kernel.isEligible(GgufTensorType.Q5_0, batchSize, rows, cols)).isTrue();
       kernel.multiply(actual, input, weights, GgufTensorType.Q5_0, batchSize, rows, cols);
 

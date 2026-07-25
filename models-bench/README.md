@@ -353,7 +353,7 @@ an explicit `GgufQ8BlockMajorKernel` choice; the existing scattered strategy rem
 
 Local Java 25 HotSpot/C2 was neutral at 17.713 versus 17.480 ms/op. Controlled EPYC/GraalVM Java
 25 improved the 1,024x2,048 batch-32 JMH kernel from 20.571 to 4.335 ms/op (-78.9%). Models plan
-schema `pure-java-v16` therefore selects the row accumulator only when an exact profile recommends
+schema `pure-java-v17` therefore selects the row accumulator only when an exact profile recommends
 `models.purejava.q8BlockMajorKernel=row-accumulated`, the compiler is Graal JVMCI, and staged
 block-major Q8 topology is active. Other runtimes and models retain the scattered kernel.
 

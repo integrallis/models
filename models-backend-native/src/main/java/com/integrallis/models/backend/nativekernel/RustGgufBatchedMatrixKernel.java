@@ -103,6 +103,13 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
+    return supportsGrouped(firstType)
+        && supportsGrouped(secondType)
+        && compatibleGroup(firstType, secondType);
+  }
+
+  @Override
   public boolean isDualEligible(
       GgufTensorType firstType,
       int firstRows,
@@ -110,10 +117,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int secondRows,
       int batchSize,
       int cols) {
-    return eligibleBatch(batchSize)
-        && supportsGrouped(firstType)
-        && supportsGrouped(secondType)
-        && compatibleGroup(firstType, secondType);
+    return eligibleBatch(batchSize) && supportsDual(firstType, secondType);
   }
 
   @Override
@@ -146,6 +150,15 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public boolean supportsTriple(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return supportsGrouped(firstType)
+        && supportsGrouped(secondType)
+        && supportsGrouped(thirdType)
+        && compatibleGroup(firstType, secondType, thirdType);
+  }
+
+  @Override
   public boolean isTripleEligible(
       GgufTensorType firstType,
       int firstRows,
@@ -155,11 +168,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int thirdRows,
       int batchSize,
       int cols) {
-    return eligibleBatch(batchSize)
-        && supportsGrouped(firstType)
-        && supportsGrouped(secondType)
-        && supportsGrouped(thirdType)
-        && compatibleGroup(firstType, secondType, thirdType);
+    return eligibleBatch(batchSize) && supportsTriple(firstType, secondType, thirdType);
   }
 
   @Override
