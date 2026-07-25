@@ -56,6 +56,9 @@ class CertifiedRagEvidenceTest {
   private static final Path UMARTRANSIT_1B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260725/rag/umartransit-1b-q4_k_m");
+  private static final Path MINICPM5_1B_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260725/rag/minicpm5-1b-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -664,6 +667,60 @@ class CertifiedRagEvidenceTest {
         .isLessThan(baseline.summary().endToEndMillis().p95());
     assertThat(candidate.summary().endToEndMillis().p95())
         .isLessThan(ollama.summary().endToEndMillis().p95() * 1.5);
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().rawText())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.grounding().rawText()).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::evaluation).toList());
+  }
+
+  @Test
+  void miniCpm5MarkerProfileQualifiesCodingRag() throws Exception {
+    RagBenchmarkReport baseline =
+        report(MINICPM5_1B_Q4_K_M_EVIDENCE, "models-rust-ffm-baseline.json");
+    RagBenchmarkReport candidate = report(MINICPM5_1B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport ollama = report(MINICPM5_1B_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(MINICPM5_1B_Q4_K_M_EVIDENCE, "llama.cpp.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa");
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.modelAnswerCount()).isEqualTo(12);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(candidate.backendDiagnostics().optimizations())
+        .filteredOn(optimization -> optimization.id().startsWith("modeljars.profile."))
+        .singleElement()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings())
+                  .containsEntry("profile-id", "minicpm5_1b_q4_k_m_epyc_milan_jdk25_rust_ffm");
+            });
+    assertThat(candidate.backendDiagnostics().optimization("batched-attention-scores"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.backendDiagnostics().optimization("batched-attention-values"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(baseline.summary().p50DecodeTokensPerSecond() * 1.1);
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(baseline.summary().endToEndMillis().p95());
     assertThat(candidate.runs())
         .extracting(run -> run.grounding().rawText())
         .containsExactlyElementsOf(
