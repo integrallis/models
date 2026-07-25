@@ -198,6 +198,16 @@ val nativePlatformJar by tasks.registering(Jar::class) {
     }
 }
 
+val hostNativeRuntimeElements by configurations.creating {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+    description = "Host platform native-kernel artifact for local runtime consumers"
+}
+
+artifacts {
+    add(hostNativeRuntimeElements.name, nativePlatformJar)
+}
+
 fun verifyNativeArtifact(artifact: File, platform: NativePlatformSpec) {
     require(artifact.isFile) { "Missing native artifact: ${artifact.absolutePath}" }
     JarFile(artifact).use { jar ->
