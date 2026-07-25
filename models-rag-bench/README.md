@@ -190,6 +190,29 @@ Use the same values for the corresponding Ollama and llama.cpp runs.
 Qualification rejects reports whose generation controls differ, so a faster
 but semantically different comparator cannot pass the relative gate.
 
+Apply the production policy to retained reports and emit file-hashed evidence:
+
+```shell
+models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench qualify \
+  --candidate build/reports/rag/models-rust-ffm.json \
+  --comparator build/reports/rag/llama.cpp.json \
+  --comparator build/reports/rag/ollama.json \
+  --output build/reports/rag/qualification.json \
+  --require-qualified
+```
+
+On the controlled Linux host, the repository driver builds the Models-owned
+native library, runs the three backends sequentially against the same artifact
+and workload, verifies every artifact digest, and applies that gate:
+
+```shell
+scripts/run-controlled-rag-qualification.sh \
+  ~/.jvllm/models/EuroLLM-1.7B-Instruct.Q4_K_M.gguf \
+  eurollm-1.7b-q4-k-m \
+  multilingual \
+  chatml
+```
+
 ## Hosted API comparison
 
 The same plain Java application can measure economical hosted controls. API
