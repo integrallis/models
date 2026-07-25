@@ -32,6 +32,8 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 class NativeKernelLibraryTest {
+  private static final ValueLayout.OfInt LE_INT =
+      ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
   private static final ValueLayout.OfShort LE_SHORT =
       ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
@@ -40,6 +42,8 @@ class NativeKernelLibraryTest {
     try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath())) {
       assertThat(kernels.abiVersion()).isEqualTo(NativeKernelLibrary.ABI_VERSION);
       assertThat(kernels.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL)).isTrue();
@@ -107,7 +111,7 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v2");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v3");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
@@ -157,6 +161,29 @@ class NativeKernelLibraryTest {
       assertThat(kernel.supports(GgufTensorType.Q8_0)).isTrue();
       assertThat(kernel.isEligible(GgufTensorType.Q8_0, batchSize, rows, cols)).isTrue();
       kernel.multiply(actual, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
+
+      assertThat(actual).containsExactly(expected);
+    }
+  }
+
+  @Test
+  void reusableGgufKernelComputesExactQ5_0BatchedMatrixMultiplication() {
+    int batchSize = 3;
+    int rows = 5;
+    int cols = 64;
+    float[] input = inputs(batchSize, cols);
+    float[] expected = new float[batchSize * rows];
+    float[] actual = new float[batchSize * rows];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment weights = arena.allocate(rows * cols / 32L * 22L);
+      fillQ5_0Weights(weights, rows, cols);
+      referenceQ5_0F32BatchedMatmul(weights, input, batchSize, rows, cols, expected);
+
+      assertThat(kernel.supports(GgufTensorType.Q5_0)).isTrue();
+      assertThat(kernel.isEligible(GgufTensorType.Q5_0, batchSize, rows, cols)).isTrue();
+      kernel.multiply(actual, input, weights, GgufTensorType.Q5_0, batchSize, rows, cols);
 
       assertThat(actual).containsExactly(expected);
     }
@@ -339,6 +366,62 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void groupedKernelSharesInputAcrossThreeExactQ5_0Projections() {
+    int batchSize = 4;
+    int cols = 64;
+    int[] rowCounts = {3, 5, 7};
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment[] weights = new MemorySegment[rowCounts.length];
+      float[][] expected = new float[rowCounts.length][];
+      float[][] actual = new float[rowCounts.length][];
+      for (int index = 0; index < rowCounts.length; index++) {
+        int rows = rowCounts[index];
+        weights[index] = arena.allocate(rows * cols / 32L * 22L);
+        fillQ5_0Weights(weights[index], rows, cols);
+        expected[index] = new float[batchSize * rows];
+        actual[index] = new float[batchSize * rows];
+        referenceQ5_0F32BatchedMatmul(
+            weights[index], input, batchSize, rows, cols, expected[index]);
+      }
+
+      assertThat(
+              kernel.isTripleEligible(
+                  GgufTensorType.Q5_0,
+                  rowCounts[0],
+                  GgufTensorType.Q5_0,
+                  rowCounts[1],
+                  GgufTensorType.Q5_0,
+                  rowCounts[2],
+                  batchSize,
+                  cols))
+          .isTrue();
+      kernel.multiplyTriple(
+          actual[0],
+          weights[0],
+          GgufTensorType.Q5_0,
+          rowCounts[0],
+          actual[1],
+          weights[1],
+          GgufTensorType.Q5_0,
+          rowCounts[1],
+          actual[2],
+          weights[2],
+          GgufTensorType.Q5_0,
+          rowCounts[2],
+          input,
+          batchSize,
+          cols);
+
+      assertThat(actual[0]).containsExactly(expected[0]);
+      assertThat(actual[1]).containsExactly(expected[1]);
+      assertThat(actual[2]).containsExactly(expected[2]);
+    }
+  }
+
+  @Test
   void groupedKernelMatchesVectorSemanticsForMixedQ4_KQ5_KQ6_KProjections() {
     int batchSize = 3;
     int cols = 512;
@@ -442,6 +525,29 @@ class NativeKernelLibraryTest {
           int quantized = ((row * 37 + block * 19 + lane * 11) & 0xff) - 128;
           weights.set(ValueLayout.JAVA_BYTE, offset + 2 + lane, (byte) quantized);
         }
+      }
+    }
+  }
+
+  private static void fillQ5_0Weights(MemorySegment weights, int rows, int cols) {
+    int blocksPerRow = cols / 32;
+    for (int row = 0; row < rows; row++) {
+      for (int block = 0; block < blocksPerRow; block++) {
+        long offset = ((long) row * blocksPerRow + block) * 22;
+        float scale = (row + block + 1) * 0.0625f;
+        int highBits = 0;
+        weights.set(LE_SHORT, offset, Float.floatToFloat16(scale));
+        for (int lane = 0; lane < 16; lane++) {
+          int low = (row * 17 + block * 11 + lane * 5) & 0x1f;
+          int high = (row * 13 + block * 7 + lane * 9) & 0x1f;
+          weights.set(
+              ValueLayout.JAVA_BYTE,
+              offset + 6 + lane,
+              (byte) ((low & 0x0f) | ((high & 0x0f) << 4)));
+          highBits |= ((low >>> 4) & 1) << lane;
+          highBits |= ((high >>> 4) & 1) << (lane + 16);
+        }
+        weights.set(LE_INT, offset + 2, highBits);
       }
     }
   }
@@ -673,6 +779,38 @@ class NativeKernelLibraryTest {
             integerSum +=
                 weights.get(ValueLayout.JAVA_BYTE, weightOffset + 2 + lane)
                     * quantized[inputOffset + lane];
+          }
+          float scale = weightScale * scales[batch * blocksPerRow + block];
+          sum = Math.fma(scale, integerSum, sum);
+        }
+        output[batch * rows + row] = sum;
+      }
+    }
+  }
+
+  private static void referenceQ5_0F32BatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    int blocksPerRow = cols / 32;
+    byte[] quantized = new byte[batchSize * cols];
+    float[] scales = new float[batchSize * blocksPerRow];
+    quantizeInputs(input, batchSize, cols, quantized, scales);
+
+    for (int batch = 0; batch < batchSize; batch++) {
+      for (int row = 0; row < rows; row++) {
+        float sum = 0;
+        for (int block = 0; block < blocksPerRow; block++) {
+          long weightOffset = ((long) row * blocksPerRow + block) * 22;
+          float weightScale = Float.float16ToFloat(weights.get(LE_SHORT, weightOffset));
+          int highBits = weights.get(LE_INT, weightOffset + 2);
+          int inputOffset = batch * cols + block * 32;
+          int integerSum = 0;
+          for (int lane = 0; lane < 16; lane++) {
+            int packed =
+                Byte.toUnsignedInt(weights.get(ValueLayout.JAVA_BYTE, weightOffset + 6 + lane));
+            int low = ((packed & 0x0f) | (((highBits >>> lane) & 1) << 4)) - 16;
+            int high = ((packed >>> 4) | (((highBits >>> (lane + 16)) & 1) << 4)) - 16;
+            integerSum += low * quantized[inputOffset + lane];
+            integerSum += high * quantized[inputOffset + lane + 16];
           }
           float scale = weightScale * scales[batch * blocksPerRow + block];
           sum = Math.fma(scale, integerSum, sum);

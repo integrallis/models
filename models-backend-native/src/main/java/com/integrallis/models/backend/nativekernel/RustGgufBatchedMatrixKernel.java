@@ -69,7 +69,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public String implementation() {
-    return "rust-ffm-quantized-v2";
+    return "rust-ffm-quantized-v3";
   }
 
   @Override
@@ -88,6 +88,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     }
     return switch (type) {
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL);
+      case Q5_0 -> library.supports(NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL);
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL);
       case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL);
@@ -249,6 +250,17 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               batchSize,
               rows,
               cols);
+      case Q5_0 ->
+          library.q5_0F32BatchedMatmul(
+              weights,
+              weightBytes,
+              nativeInput,
+              inputElements,
+              nativeOutput,
+              outputElements,
+              batchSize,
+              rows,
+              cols);
       case Q8_0 ->
           library.q8_0F32BatchedMatmul(
               weights,
@@ -358,6 +370,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     }
     return switch (type) {
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL);
+      case Q5_0 -> library.supports(NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL);
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL);
       case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_GROUPED_BATCHED_MATMUL);
@@ -456,6 +469,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     long blockBytes =
         switch (type) {
           case Q4_0 -> 18L;
+          case Q5_0 -> 22L;
           case Q8_0 -> 34L;
           case Q4_K -> 144L;
           case Q5_K -> 176L;
@@ -491,6 +505,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private static NativeKernelCapability groupedCapability(GgufTensorType type) {
     return switch (type) {
       case Q4_0 -> NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL;
+      case Q5_0 -> NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL;
       case Q8_0 -> NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL;
       case Q4_K -> NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL;
       case Q5_K -> NativeKernelCapability.Q5_K_F32_GROUPED_BATCHED_MATMUL;
@@ -506,13 +521,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       case Q4_K -> 2;
       case Q6_K -> 3;
       case Q5_K -> 4;
+      case Q5_0 -> 5;
       default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
     };
   }
 
   private static int blockElements(GgufTensorType type) {
     return switch (type) {
-      case Q4_0, Q8_0 -> 32;
+      case Q4_0, Q5_0, Q8_0 -> 32;
       case Q4_K, Q5_K, Q6_K -> 256;
       default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
     };

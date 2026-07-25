@@ -6,12 +6,12 @@ the transformer graph, KV-cache ownership, sampling, and generation remain in Ja
 The native boundary is a versioned C ABI implemented by the Models-owned
 `jmodels-kernels` Rust crate.
 
-ABI 2 supports Q4_0, Q8_0, Q4_K, Q5_K, and Q6_K batched and grouped projections,
-including mixed Q4_K/Q5_K/Q6_K groups over one shared Q8_K activation
-quantization. Its x86-64 path uses format-specialized AVX2/FMA integer dots,
-vectorized Q8_0 activation preparation, batched weight reuse, reusable activation
-scratch, and an explicitly owned persistent worker context. Scalar kernels remain
-available as cross-platform conformance fallbacks.
+ABI 2 supports Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K batched and grouped
+projections, including mixed Q4_K/Q5_K/Q6_K groups over one shared Q8_K
+activation quantization. Its x86-64 path uses format-specialized AVX2/FMA integer
+dots, vectorized Q8_0 activation preparation, batched weight reuse, reusable
+activation scratch, and an explicitly owned persistent worker context. Scalar
+kernels remain available as cross-platform conformance fallbacks.
 
 ## Build and test
 
