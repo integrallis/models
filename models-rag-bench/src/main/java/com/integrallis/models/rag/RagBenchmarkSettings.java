@@ -21,6 +21,7 @@ import java.util.Map;
 /** Workload and deterministic generation controls embedded in every report. */
 public record RagBenchmarkSettings(
     String corpusSha256,
+    String workload,
     List<String> caseIds,
     String promptTemplate,
     int retrievalTopK,
@@ -33,6 +34,10 @@ public record RagBenchmarkSettings(
     float minimumRetrievalScore,
     Map<String, String> generationControls) {
   public RagBenchmarkSettings {
+    workload =
+        workload == null || workload.isBlank()
+            ? RagWorkload.GENERAL.id()
+            : RagWorkload.parse(workload).id();
     caseIds = List.copyOf(caseIds);
     generationControls = Map.copyOf(generationControls);
     if (!Float.isFinite(minimumRetrievalScore) || minimumRetrievalScore < 0) {

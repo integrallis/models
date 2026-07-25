@@ -36,6 +36,22 @@ class RagCorpusTest {
   }
 
   @Test
+  void codingWorkloadHasIndependentDocumentsAndEvaluationCases() {
+    RagCorpus corpus = RagCorpus.load(RagWorkload.CODING);
+
+    assertThat(corpus.documents()).hasSize(12);
+    assertThat(corpus.documents()).extracting(RagDocument::id).doesNotHaveDuplicates();
+    assertThat(corpus.cases()).hasSize(9);
+    assertThat(corpus.cases()).extracting(RagCase::id).doesNotHaveDuplicates();
+    assertThat(corpus.cases()).filteredOn(RagCase::answerable).hasSize(8);
+    assertThat(corpus.cases())
+        .extracting(RagCase::id)
+        .contains("list-copy-null-handling", "virtual-thread-executor", "unsupported-cuda-kernel");
+    assertThat(corpus.fingerprint())
+        .isEqualTo("6841c286837b4c45c06fe8d103b2e044b61a1bfe75a61b64fa04c7ca31b20e45");
+  }
+
+  @Test
   void breakGlassOracleAcceptsTheNumberOfApprovingManagersAskedFor() {
     RagCorpus corpus = RagCorpus.loadDefault();
     RagCase testCase =

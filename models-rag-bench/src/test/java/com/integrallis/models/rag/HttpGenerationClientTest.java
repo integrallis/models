@@ -26,31 +26,37 @@ import org.junit.jupiter.api.Test;
 class HttpGenerationClientTest {
 
   @Test
-  void ollamaRequestUsesRawDeterministicGeneration() {
+  void ollamaRequestUsesRawConfiguredGeneration() {
+    RagSamplingProfile sampling = new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05);
     try (HttpGenerationClient client =
         new HttpGenerationClient(
-            "ollama", "qwen:test", URI.create("http://localhost:11434"), 2_048, 8, 0)) {
+            "ollama", "qwen:test", URI.create("http://localhost:11434"), 2_048, 8, 0, sampling)) {
       var body = client.requestBody("prompt", 32);
 
       assertThat(body.path("raw").asBoolean()).isTrue();
-      assertThat(body.path("options").path("temperature").asDouble()).isZero();
-      assertThat(body.path("options").path("top_k").asInt()).isEqualTo(1);
-      assertThat(body.path("options").path("seed").asInt()).isEqualTo(42);
+      assertThat(body.path("options").path("temperature").asDouble()).isEqualTo(0.7);
+      assertThat(body.path("options").path("top_k").asInt()).isEqualTo(40);
+      assertThat(body.path("options").path("top_p").asDouble()).isEqualTo(0.95);
+      assertThat(body.path("options").path("seed").asLong()).isEqualTo(1729);
+      assertThat(body.path("options").path("repeat_penalty").asDouble()).isEqualTo(1.05);
       assertThat(body.path("options").path("num_predict").asInt()).isEqualTo(32);
     }
   }
 
   @Test
   void llamaCppRequestDisablesPromptCacheAndUsesSameSampling() {
+    RagSamplingProfile sampling = new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05);
     try (HttpGenerationClient client =
         new HttpGenerationClient(
-            "llama.cpp", "qwen.gguf", URI.create("http://localhost:8080"), 2_048, 8, 0)) {
+            "llama.cpp", "qwen.gguf", URI.create("http://localhost:8080"), 2_048, 8, 0, sampling)) {
       var body = client.requestBody("prompt", 32);
 
       assertThat(body.path("cache_prompt").asBoolean()).isFalse();
-      assertThat(body.path("temperature").asDouble()).isZero();
-      assertThat(body.path("top_k").asInt()).isEqualTo(1);
-      assertThat(body.path("seed").asInt()).isEqualTo(42);
+      assertThat(body.path("temperature").asDouble()).isEqualTo(0.7);
+      assertThat(body.path("top_k").asInt()).isEqualTo(40);
+      assertThat(body.path("top_p").asDouble()).isEqualTo(0.95);
+      assertThat(body.path("seed").asLong()).isEqualTo(1729);
+      assertThat(body.path("repeat_penalty").asDouble()).isEqualTo(1.05);
       assertThat(body.path("n_predict").asInt()).isEqualTo(32);
     }
   }

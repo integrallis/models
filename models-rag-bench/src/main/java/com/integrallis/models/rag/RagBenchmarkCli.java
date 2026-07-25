@@ -43,9 +43,10 @@ import org.modeljars.ModelJarRegistry;
 /** Runs controlled plain Java, LangChain4j, and Spring AI RAG workloads. */
 public final class RagBenchmarkCli {
   private static final Set<String> FRAMEWORKS = Set.of("plain-java", "langchain4j", "spring-ai");
+  private static final Set<String> IN_PROCESS_BACKENDS = Set.of("pure-java", "rust-ffm");
   private static final Set<String> HOSTED_BACKENDS = Set.of("openai", "anthropic", "deepseek");
   private static final Set<String> BACKENDS =
-      Set.of("pure-java", "ollama", "llama.cpp", "openai", "anthropic", "deepseek");
+      Set.of("pure-java", "rust-ffm", "ollama", "llama.cpp", "openai", "anthropic", "deepseek");
   private static final Set<String> OPTIONS =
       Set.of(
           "framework",
@@ -56,11 +57,17 @@ public final class RagBenchmarkCli {
           "model-id",
           "artifact",
           "endpoint",
+          "workload",
           "prompt-template",
           "context",
           "threads",
           "pid",
           "top-k",
+          "temperature",
+          "top-p",
+          "sampling-top-k",
+          "seed",
+          "repetition-penalty",
           "max-tokens",
           "warmups",
           "iterations",
@@ -94,15 +101,18 @@ public final class RagBenchmarkCli {
     String model;
     Path artifact;
     Optional<ModelJarDescriptor> modelJarDescriptor;
-    if ("pure-java".equals(backend)) {
+    if (IN_PROCESS_BACKENDS.contains(backend)) {
       if (values.containsKey("artifact")) {
-        throw new IllegalArgumentException("--artifact cannot override a pure-java model source");
+        throw new IllegalArgumentException("--artifact cannot override an in-process model source");
+      }
+      if (values.containsKey("endpoint")) {
+        throw new IllegalArgumentException("--endpoint is not used by an in-process backend");
       }
       boolean hasModel = hasText(values.get("model"));
       boolean hasModelJar = hasText(values.get("modeljar"));
       if (hasModel == hasModelJar) {
         throw new IllegalArgumentException(
-            "pure-java requires exactly one of --model or --modeljar");
+            backend + " requires exactly one of --model or --modeljar");
       }
       if (hasModel) {
         model = values.get("model");
@@ -110,7 +120,7 @@ public final class RagBenchmarkCli {
         modelJarDescriptor = Optional.empty();
       } else {
         ModelJarDescriptor descriptor =
-            resolveModelJar(values.get("modeljar").trim(), modelJarRegistry);
+            resolveModelJar(values.get("modeljar").trim(), backend, modelJarRegistry);
         model = descriptor.alias();
         artifact =
             descriptor
@@ -123,7 +133,7 @@ public final class RagBenchmarkCli {
       }
     } else if (HOSTED_BACKENDS.contains(backend)) {
       if (values.containsKey("modeljar")) {
-        throw new IllegalArgumentException("--modeljar is supported only by pure-java");
+        throw new IllegalArgumentException("--modeljar is supported only by in-process backends");
       }
       if (values.containsKey("artifact")) {
         throw new IllegalArgumentException("--artifact is not supported by hosted providers");
@@ -133,7 +143,7 @@ public final class RagBenchmarkCli {
       modelJarDescriptor = Optional.empty();
     } else {
       if (values.containsKey("modeljar")) {
-        throw new IllegalArgumentException("--modeljar is supported only by pure-java");
+        throw new IllegalArgumentException("--modeljar is supported only by in-process backends");
       }
       model = required(values, "model");
       artifact = values.containsKey("artifact") ? Path.of(values.get("artifact")) : null;
@@ -143,13 +153,25 @@ public final class RagBenchmarkCli {
       throw new IllegalArgumentException("artifact does not exist: " + artifact);
     }
     String modelId = values.getOrDefault("model-id", safeId(model));
-    URI endpoint = URI.create(values.getOrDefault("endpoint", defaultEndpoint(backend)));
+    URI endpoint =
+        values.containsKey("endpoint")
+            ? URI.create(values.get("endpoint"))
+            : defaultEndpoint(backend);
+    RagWorkload workload =
+        RagWorkload.parse(values.getOrDefault("workload", RagWorkload.GENERAL.id()));
     RagPromptTemplate promptTemplate =
         RagPromptTemplate.parse(values.getOrDefault("prompt-template", "raw"));
     int context = positiveInteger(values, "context", 2_048);
     int threads = positiveInteger(values, "threads", Runtime.getRuntime().availableProcessors());
     long backendPid = nonNegativeLong(values, "pid", 0);
     int topK = positiveInteger(values, "top-k", 1);
+    RagSamplingProfile sampling =
+        new RagSamplingProfile(
+            nonNegativeFloat(values, "temperature", 0),
+            positiveUnitFloat(values, "top-p", 1),
+            positiveInteger(values, "sampling-top-k", 1),
+            nonNegativeLong(values, "seed", 42),
+            positiveFloat(values, "repetition-penalty", 1));
     int maxTokens = positiveInteger(values, "max-tokens", 64);
     int warmups = nonNegativeInteger(values, "warmups", 1);
     int iterations = positiveInteger(values, "iterations", 3);
@@ -169,17 +191,19 @@ public final class RagBenchmarkCli {
         framework,
         backend,
         values.getOrDefault(
-            "backend-version", "pure-java".equals(backend) ? "development" : "unknown"),
+            "backend-version", IN_PROCESS_BACKENDS.contains(backend) ? "development" : "unknown"),
         modelId,
         model,
         artifact,
         modelJarDescriptor,
         endpoint,
+        workload,
         promptTemplate,
         context,
         threads,
         backendPid,
         topK,
+        sampling,
         maxTokens,
         warmups,
         iterations,
@@ -188,7 +212,7 @@ public final class RagBenchmarkCli {
   }
 
   private static RagBenchmarkReport run(RagBenchmarkConfiguration configuration) throws Exception {
-    RagCorpus corpus = RagCorpus.loadDefault();
+    RagCorpus corpus = RagCorpus.load(configuration.workload());
     List<RagCase> cases = selectedCases(corpus, configuration.caseIds());
     Map<String, RagCase> casesById = new LinkedHashMap<>();
     cases.forEach(testCase -> casesById.put(testCase.id(), testCase));
@@ -242,6 +266,7 @@ public final class RagBenchmarkCli {
         artifact == null ? 0 : Files.size(artifact),
         new RagBenchmarkSettings(
             corpus.fingerprint(),
+            configuration.workload().id(),
             cases.stream().map(RagCase::id).toList(),
             configuration.promptTemplate().id(),
             configuration.topK(),
@@ -268,11 +293,28 @@ public final class RagBenchmarkCli {
           .modelJarDescriptor()
           .<GenerationClient>map(
               descriptor ->
-                  PureJavaGenerationClient.load(descriptor, configuration.contextLength()))
+                  InProcessGenerationClient.loadPureJava(
+                      descriptor, configuration.contextLength(), configuration.sampling()))
           .orElseGet(
               () ->
-                  PureJavaGenerationClient.load(
-                      configuration.artifact(), configuration.contextLength()));
+                  InProcessGenerationClient.loadPureJava(
+                      configuration.artifact(),
+                      configuration.contextLength(),
+                      configuration.sampling()));
+    }
+    if ("rust-ffm".equals(configuration.backend())) {
+      return configuration
+          .modelJarDescriptor()
+          .<GenerationClient>map(
+              descriptor ->
+                  InProcessGenerationClient.loadRustFfm(
+                      descriptor, configuration.contextLength(), configuration.sampling()))
+          .orElseGet(
+              () ->
+                  InProcessGenerationClient.loadRustFfm(
+                      configuration.artifact(),
+                      configuration.contextLength(),
+                      configuration.sampling()));
     }
     if (HOSTED_BACKENDS.contains(configuration.backend())) {
       return new HostedGenerationClient(
@@ -284,7 +326,8 @@ public final class RagBenchmarkCli {
         configuration.endpoint(),
         configuration.contextLength(),
         configuration.threads(),
-        configuration.backendPid());
+        configuration.backendPid(),
+        configuration.sampling());
   }
 
   private static RagApplication application(
@@ -394,7 +437,7 @@ public final class RagBenchmarkCli {
   }
 
   private static ModelJarDescriptor resolveModelJar(
-      String alias, ModelJarRegistry modelJarRegistry) {
+      String alias, String backend, ModelJarRegistry modelJarRegistry) {
     List<ModelJarDescriptor> matches =
         modelJarRegistry.descriptors().stream()
             .filter(descriptor -> alias.equals(descriptor.alias()))
@@ -406,8 +449,8 @@ public final class RagBenchmarkCli {
       throw new IllegalArgumentException("ambiguous ModelJar alias: " + alias);
     }
     ModelJarDescriptor descriptor = matches.getFirst();
-    if (!descriptor.supportsBackend("pure-java")) {
-      throw new IllegalArgumentException("ModelJar does not support pure-java: " + alias);
+    if (!descriptor.supportsBackend(backend)) {
+      throw new IllegalArgumentException("ModelJar does not support " + backend + ": " + alias);
     }
     return descriptor;
   }
@@ -448,6 +491,40 @@ public final class RagBenchmarkCli {
     }
   }
 
+  private static double nonNegativeFloat(
+      Map<String, String> values, String option, double fallback) {
+    double value = decimal(values, option, fallback);
+    if (!Double.isFinite(value) || value < 0) {
+      throw new IllegalArgumentException("--" + option + " must be finite and non-negative");
+    }
+    return value;
+  }
+
+  private static double positiveFloat(Map<String, String> values, String option, double fallback) {
+    double value = decimal(values, option, fallback);
+    if (!Double.isFinite(value) || value <= 0) {
+      throw new IllegalArgumentException("--" + option + " must be finite and positive");
+    }
+    return value;
+  }
+
+  private static double positiveUnitFloat(
+      Map<String, String> values, String option, double fallback) {
+    double value = positiveFloat(values, option, fallback);
+    if (value > 1) {
+      throw new IllegalArgumentException("--" + option + " must be at most 1");
+    }
+    return value;
+  }
+
+  private static double decimal(Map<String, String> values, String option, double fallback) {
+    try {
+      return values.containsKey(option) ? Double.parseDouble(values.get(option)) : fallback;
+    } catch (NumberFormatException failure) {
+      throw new IllegalArgumentException("--" + option + " must be a decimal number", failure);
+    }
+  }
+
   private static String safeId(String model) {
     Path modelPath = Path.of(model);
     Path fileName = modelPath.getFileName();
@@ -455,14 +532,14 @@ public final class RagBenchmarkCli {
     return name.replaceAll("(?i)\\.gguf$", "").replaceAll("[^A-Za-z0-9._-]", "-");
   }
 
-  private static String defaultEndpoint(String backend) {
+  private static URI defaultEndpoint(String backend) {
     return switch (backend) {
-      case "ollama" -> "http://127.0.0.1:11434";
-      case "llama.cpp" -> "http://127.0.0.1:8080";
-      case "openai" -> "https://api.openai.com/v1";
-      case "anthropic" -> "https://api.anthropic.com/v1";
-      case "deepseek" -> "https://api.deepseek.com";
-      default -> "http://127.0.0.1:8080";
+      case "ollama" -> URI.create("http://127.0.0.1:11434");
+      case "llama.cpp" -> URI.create("http://127.0.0.1:8080");
+      case "openai" -> URI.create("https://api.openai.com/v1");
+      case "anthropic" -> URI.create("https://api.anthropic.com/v1");
+      case "deepseek" -> URI.create("https://api.deepseek.com");
+      default -> null;
     };
   }
 

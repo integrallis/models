@@ -16,7 +16,7 @@
 > **Experimental in-JVM small-language-model inference for JDK 25.**
 >
 > Pure-Java core backend. Optional platform bridge modules are isolated. JDK 25+.
-> GGUF parsing, vectors-backed F32/Q4_0/Q5_0/Q8_0/Q4_K/Q6_K kernels, tokenization,
+> GGUF parsing, vectors-backed F32/Q4_0/Q5_0/Q8_0/Q4_K/Q5_K/Q6_K kernels, tokenization,
 > sampling, and a Llama-family forward path are implemented.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -37,6 +37,26 @@
 The [controlled inference study](INFERENCE_BENCHMARKS.md) compares the same GGUF
 bytes through pure Java, llama.cpp, and Ollama and records the current
 performance gap and optimization results.
+
+The [production RAG qualification ledger](RAG_BENCHMARKS.md) is the
+frequently updated, report-backed availability table. It distinguishes models
+that merely load from artifacts that clear the workload, quality, latency, and
+same-host Ollama gates:
+
+| Qualified artifact | Best Models path | Scope | p95 TTFT | Decode | p95 end to end | Ollama decode |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| SmolLM2 360M Q8_0 | Rust/FFM | General guarded RAG | 552.8 ms | 43.92 tok/s | 1,935.0 ms | 100.4% |
+| Qwen3 0.6B Q4_0 | Pure Java | Coding guarded RAG | 555.2 ms | 51.02 tok/s | 1,416.1 ms | 99.7% |
+| Qwen3 1.7B Q8_0 | Rust/FFM | General guarded RAG | 1,747.6 ms | 17.99 tok/s | 4,785.1 ms | 100.1% |
+| Qwen2.5-Coder 0.5B Q8_0 | Rust/FFM | Coding guarded RAG | 434.6 ms | 53.01 tok/s | 980.4 ms | 132.8% |
+| Qwen2.5-Coder 0.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 390.3 ms | 39.50 tok/s | 1,941.2 ms | 80.7% |
+| Qwen2.5-Coder 1.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 1,162.1 ms | 23.72 tok/s | 2,545.6 ms | 80.2% |
+| Qwen2.5-Coder 1.5B Q8_0 | Rust/FFM | Coding guarded RAG | 1,288.0 ms | 19.70 tok/s | 3,003.5 ms | 89.9% |
+
+This is currently **7 of the required 25 launch-qualified artifacts**. Each
+row is SHA-bound to its model bytes, benchmark report, runtime selector, and
+backend plan. llama.cpp and Ollama appear only as controlled comparators; they
+are not Models runtime dependencies.
 
 ## The pitch in 60 seconds
 
@@ -68,7 +88,7 @@ application
     ▼
 models-runtime ──► models-api ──► models-backend-purejava
                                       │
-                                      └── GGUF / F32 / Q4_0 / Q5_0 / Q8_0 / Q4_K / Q6_K
+                                      └── GGUF / F32 / Q4_0 / Q5_0 / Q8_0 / Q4_K / Q5_K / Q6_K
 ```
 
 ## Why it exists
@@ -197,7 +217,7 @@ try (PureJavaBackend backend = PureJavaBackend.load(model)) {
 ```
 
 Diagnostics identify enabled, disabled, and unsupported choices, including the
-resolved tensor grouping, mixed Q4_K/Q4_K/Q6_K projection eligibility, Q4_0
+resolved tensor grouping, mixed Q4_K/Q5_K/Q6_K projection eligibility, Q4_0
 arithmetic kernel, prefill batch size, final-layer output-row policy, mapped
 weights, Vector FMA policy, final-layer K/V-only policy, and persistent row
 executor, including the staged Q4_0/Q8_0 layer schedule when selected.
@@ -546,7 +566,7 @@ without changing the model metadata reported to callers.
 - Additional ModelJars catalog entries and repository providers
 - Micrometer metrics (tok/s, latency histograms)
 - JFR events for profiling
-- Additional K-quant support beyond mixed Q4_K_M files
+- Remaining quantized formats and AArch64-native SIMD kernels
 
 ### Phase 3 — Performance & scale
 

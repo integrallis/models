@@ -62,18 +62,74 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
-  void usesExtractiveEvidenceWhenTheModelOmitsCitations() {
+  void derivesTrustedCitationsWhenTheModelAnswerIsOtherwiseSupported() {
+    String generated = "Domestic claims settle within 2 business days.";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+    assertThat(answer.rawText()).isEqualTo(generated);
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void doesNotDeriveCitationsForAnUnsupportedUncitedClaim() {
     GroundedAnswer answer =
         policy.apply(
             "How long do both payment types take?",
             List.of(HIGH_CONFIDENCE),
-            "Both payment types settle within 2 days.");
+            "Both payment types settle instantly.");
+
+    assertThat(answer.text()).contains("2 business days").endsWith("[payments-settlement]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
+  void doesNotDeriveCitationsForAQuestionRestatement() {
+    GroundingDocument toolchain =
+        new GroundingDocument(
+            "gradle-java-toolchain",
+            "The build selects JDK 25 with "
+                + "java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). "
+                + "Java compilation also sets options.release to 25.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which expression selects the Gradle Java toolchain, and which release does "
+                + "compilation target?",
+            List.of(toolchain),
+            "The expression selects the Gradle Java toolchain, and which release does "
+                + "compilation target?");
 
     assertThat(answer.text())
-        .isEqualTo(
-            "Approved domestic ACH claims settle within 2 business days. "
-                + "International claim wires settle within 5 business days. "
-                + "[payments-settlement]");
+        .contains("JavaLanguageVersion.of(25)")
+        .endsWith("[gradle-java-toolchain]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
+  void doesNotDeriveCitationsWhenOneQuestionClauseHasNoEvidenceAnchor() {
+    GroundingDocument mapper =
+        new GroundingDocument(
+            "jackson-wire-format",
+            "The wire mapper calls findAndRegisterModules so Java time values use registered "
+                + "modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which mapper method registers Java time support, and which deserialization feature "
+                + "is disabled?",
+            List.of(mapper),
+            "The wire mapper registers Java time support, and "
+                + "DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES is disabled.");
+
+    assertThat(answer.text()).contains("findAndRegisterModules").endsWith("[jackson-wire-format]");
     assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
   }
 

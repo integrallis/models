@@ -32,11 +32,13 @@ public record RagBenchmarkConfiguration(
     Path artifact,
     Optional<ModelJarDescriptor> modelJarDescriptor,
     URI endpoint,
+    RagWorkload workload,
     RagPromptTemplate promptTemplate,
     int contextLength,
     int threads,
     long backendPid,
     int topK,
+    RagSamplingProfile sampling,
     int maxTokens,
     int warmups,
     int iterations,
@@ -45,5 +47,7 @@ public record RagBenchmarkConfiguration(
   public RagBenchmarkConfiguration {
     caseIds = List.copyOf(caseIds);
     modelJarDescriptor = Objects.requireNonNull(modelJarDescriptor, "modelJarDescriptor");
+    workload = Objects.requireNonNull(workload, "workload");
+    sampling = Objects.requireNonNull(sampling, "sampling");
   }
 }

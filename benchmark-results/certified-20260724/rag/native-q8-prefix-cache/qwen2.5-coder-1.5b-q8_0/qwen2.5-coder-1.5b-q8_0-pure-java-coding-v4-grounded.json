@@ -1,0 +1,1748 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-24T23:02:14.235191865Z",
+  "framework" : "plain-java",
+  "backend" : "pure-java",
+  "backendVersion" : "models-purejava-3e759cc-q8",
+  "modelId" : "qwen2.5-coder-1.5b-instruct-q8_0",
+  "model" : "/root/.jvllm/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf",
+  "artifactSha256" : "507de59046601282ba768a9789900e6ccf60ed93ddf346730b7c68eb0715bc47",
+  "artifactSizeBytes" : 1894532160,
+  "settings" : {
+    "corpusSha256" : "6841c286837b4c45c06fe8d103b2e044b61a1bfe75a61b64fa04c7ca31b20e45",
+    "workload" : "coding",
+    "caseIds" : [ "list-copy-null-handling", "compute-if-absent-null", "virtual-thread-executor", "record-compact-validation", "gradle-java-25", "http-retry-rules", "migration-lock-expiry", "jackson-module-and-feature", "unsupported-cuda-kernel" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-provenance-clause-anchors-extractive-fallback-v4",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0",
+      "repetitionPenalty" : "1",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 1073741824,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "GraalVM Community",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "pure-java",
+    "planVersion" : "pure-java-v16",
+    "environment" : {
+      "vm-version" : "25.0.3+9-jvmci-25.1-b19",
+      "compiler" : "graal-jvmci",
+      "active-vector-bits" : "256",
+      "preferred-vector-bits" : "256",
+      "gguf-executor" : "persistent",
+      "fast-vector-fma" : "true",
+      "processors" : "8",
+      "java-feature" : "25",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "q4-short-pairwise-supported" : "true",
+      "vector-api" : "true",
+      "fast-scalar-fma" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "sve" : "false",
+      "java-version" : "25.0.3",
+      "gguf-threads" : "8",
+      "gguf-parallel" : "true",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "architecture" : "amd64",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "gguf-chunks-per-thread" : "2",
+      "vm-vendor" : "GraalVM Community",
+      "model-architecture" : "qwen2",
+      "projection-layers" : "28",
+      "os" : "Linux"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "independent"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "graal-jvmci",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "output-rows" : "requested",
+        "formats" : "Q8_0,Q8_0,Q8_0"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "formats" : "Q8_0,Q8_0,Q8_0,Q8_0",
+        "unused-rows" : "kv-only"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedFfn",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "28"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedLayer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "28"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.blockMajorQ8Activations",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q8BlockMajorKernel selects scattered accumulation",
+      "settings" : {
+        "compiler" : "graal-jvmci",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.parallelQ8FfnPreparation",
+      "settings" : {
+        "partition" : "batch-rows",
+        "staged-layers" : "28",
+        "eligible-layers" : "28",
+        "partitions" : "8"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "8"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 304.381387,
+    "retrievalMillis" : {
+      "p50" : 1.223956,
+      "p95" : 1.6898014000000001
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 10.141474000000017,
+      "p95" : 15.988365000000021
+    },
+    "ttftMillis" : {
+      "p50" : 1611.549243,
+      "p95" : 1883.9663105
+    },
+    "tpotMillis" : {
+      "p50" : 50.586997136363635,
+      "p95" : 53.21155635963488
+    },
+    "endToEndMillis" : {
+      "p50" : 2935.18841,
+      "p95" : 3588.7713193
+    },
+    "p50PrefillTokensPerSecond" : 38.9874456136505,
+    "p50DecodeTokensPerSecond" : 19.767925684625514,
+    "peakRssBytes" : 2559590400,
+    "totalCpuMillis" : 482780.0,
+    "totalInputTokens" : 4344,
+    "totalCacheReadInputTokens" : 2721,
+    "totalCacheWriteInputTokens" : 1623,
+    "totalOutputTokens" : 702,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "USABLE",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a81bf3964de79b68e9e4835bdb03f9b4c207597eec54a81766664648d9be8066",
+    "retrievalMillis" : 1.896527,
+    "frameworkOverheadMillis" : 10.621528999999782,
+    "endToEndMillis" : 1833.008112,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null. [java-list-copy]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 138,
+      "cacheWriteInputTokens" : 27,
+      "outputTokens" : 23,
+      "ttftMillis" : 702.100597,
+      "totalMillis" : 1820.490056,
+      "prefillTokensPerSecond" : 38.9874456136505,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2427109376,
+      "cpuMillis" : 11070.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null.",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null. [java-list-copy]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "77bc48f09528cd59e5f8eccd2b2f7cde891fbffdc66728062f1ed2e239018783",
+    "retrievalMillis" : 1.674651,
+    "frameworkOverheadMillis" : 11.175518000000466,
+    "endToEndMillis" : 3242.29543,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 30,
+      "ttftMillis" : 1765.438562,
+      "totalMillis" : 3229.445261,
+      "prefillTokensPerSecond" : 38.177377360275045,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2427109376,
+      "cpuMillis" : 20390.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key.",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "70140f26e4fc50b05adca60c15b45c002f9ff042cab120800cfbab607f5927c2",
+    "retrievalMillis" : 1.623071,
+    "frameworkOverheadMillis" : 10.141474000000017,
+    "endToEndMillis" : 2744.587476,
+    "generation" : {
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 23,
+      "ttftMillis" : 1587.365349,
+      "totalMillis" : 2732.822931,
+      "prefillTokensPerSecond" : 39.916759819342495,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2427109376,
+      "cpuMillis" : 17430.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish.",
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "21d757ff8c2db9a35ad327a5322deaca5c4a61b513beec6235a3491e599495f7",
+    "retrievalMillis" : 1.440676,
+    "frameworkOverheadMillis" : 9.903218999999808,
+    "endToEndMillis" : 2256.050969,
+    "generation" : {
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 149,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 52,
+      "outputTokens" : 18,
+      "ttftMillis" : 1340.761269,
+      "totalMillis" : 2244.707074,
+      "prefillTokensPerSecond" : 39.22013734600964,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2427109376,
+      "cpuMillis" : 14400.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.",
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7dbe419cbe01dfd5fcd2d52411713308571b33fded9ec5632d389baa007a24fd",
+    "retrievalMillis" : 1.679888,
+    "frameworkOverheadMillis" : 16.581708000000162,
+    "endToEndMillis" : 3625.470181,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 95,
+      "cacheWriteInputTokens" : 73,
+      "outputTokens" : 35,
+      "ttftMillis" : 1896.647931,
+      "totalMillis" : 3607.208585,
+      "prefillTokensPerSecond" : 38.804502797958804,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2427109376,
+      "cpuMillis" : 22700.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain, and compilation targets release 25.",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "405012124f162cb48dd5e0057e3c58ad3519b7e2d114068830287259b1052f17",
+    "retrievalMillis" : 1.570562,
+    "frameworkOverheadMillis" : 15.99397799999997,
+    "endToEndMillis" : 3398.371744,
+    "generation" : {
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 31,
+      "ttftMillis" : 1845.609665,
+      "totalMillis" : 3380.807204,
+      "prefillTokensPerSecond" : 38.230255853425874,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2445070336,
+      "cpuMillis" : 21290.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "GET, HEAD, and POST are retried up to three attempts. A POST is retried only when it carries an Idempotency-Key header.",
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f8ad6bfd507862b76c65830658c91fe25872bb2ec71ac45131d9008ade967997",
+    "retrievalMillis" : 1.365561,
+    "frameworkOverheadMillis" : 15.975268000000142,
+    "endToEndMillis" : 2935.18841,
+    "generation" : {
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 28,
+      "ttftMillis" : 1565.151721,
+      "totalMillis" : 2917.847581,
+      "prefillTokensPerSecond" : 39.77725242054966,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2497277952,
+      "cpuMillis" : 18420.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it.",
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "330247c442b1652d8d744ab596314fb9ddcd9b821f6ad2d522e3c3dbf770a24c",
+    "retrievalMillis" : 1.406773,
+    "frameworkOverheadMillis" : 10.812889999999697,
+    "endToEndMillis" : 3256.421648,
+    "generation" : {
+      "text" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 95,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 31,
+      "ttftMillis" : 1731.748208,
+      "totalMillis" : 3244.201985,
+      "prefillTokensPerSecond" : 38.328947619966236,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2497277952,
+      "cpuMillis" : 20530.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.",
+      "text" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "71de7944c9998cccd456d00e219bcc94f9c9da41b9f8defa80e5d1b56a1d8517",
+    "retrievalMillis" : 1.2072,
+    "frameworkOverheadMillis" : 9.818850999999995,
+    "endToEndMillis" : 2422.058345,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 15,
+      "ttftMillis" : 1667.487168,
+      "totalMillis" : 2411.032294,
+      "prefillTokensPerSecond" : 37.37888511730847,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2529574912,
+      "cpuMillis" : 15360.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The photon shader kernel uses a CUDA block size of 128.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a81bf3964de79b68e9e4835bdb03f9b4c207597eec54a81766664648d9be8066",
+    "retrievalMillis" : 1.349867,
+    "frameworkOverheadMillis" : 10.65813500000013,
+    "endToEndMillis" : 1828.533328,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null. [java-list-copy]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 138,
+      "cacheWriteInputTokens" : 27,
+      "outputTokens" : 23,
+      "ttftMillis" : 698.695174,
+      "totalMillis" : 1816.525326,
+      "prefillTokensPerSecond" : 39.17905906109074,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2529726464,
+      "cpuMillis" : 11070.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null.",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null. [java-list-copy]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "77bc48f09528cd59e5f8eccd2b2f7cde891fbffdc66728062f1ed2e239018783",
+    "retrievalMillis" : 1.345671,
+    "frameworkOverheadMillis" : 11.105433000000176,
+    "endToEndMillis" : 3413.816662,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 30,
+      "ttftMillis" : 1857.754736,
+      "totalMillis" : 3401.365558,
+      "prefillTokensPerSecond" : 36.25919494556953,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2545758208,
+      "cpuMillis" : 21160.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key.",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "70140f26e4fc50b05adca60c15b45c002f9ff042cab120800cfbab607f5927c2",
+    "retrievalMillis" : 1.223956,
+    "frameworkOverheadMillis" : 9.799441999999999,
+    "endToEndMillis" : 2703.389076,
+    "generation" : {
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 23,
+      "ttftMillis" : 1579.451741,
+      "totalMillis" : 2692.365678,
+      "prefillTokensPerSecond" : 40.11194050697837,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 17150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish.",
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "21d757ff8c2db9a35ad327a5322deaca5c4a61b513beec6235a3491e599495f7",
+    "retrievalMillis" : 1.149464,
+    "frameworkOverheadMillis" : 9.633679999999913,
+    "endToEndMillis" : 2247.655409,
+    "generation" : {
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 149,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 52,
+      "outputTokens" : 18,
+      "ttftMillis" : 1370.616941,
+      "totalMillis" : 2236.872265,
+      "prefillTokensPerSecond" : 38.17846544376162,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 14280.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.",
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7dbe419cbe01dfd5fcd2d52411713308571b33fded9ec5632d389baa007a24fd",
+    "retrievalMillis" : 1.151807,
+    "frameworkOverheadMillis" : 9.607782000000043,
+    "endToEndMillis" : 3581.135979,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 95,
+      "cacheWriteInputTokens" : 73,
+      "outputTokens" : 35,
+      "ttftMillis" : 1879.437293,
+      "totalMillis" : 3570.37639,
+      "prefillTokensPerSecond" : 39.02067915698401,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 22450.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain, and compilation targets release 25.",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "405012124f162cb48dd5e0057e3c58ad3519b7e2d114068830287259b1052f17",
+    "retrievalMillis" : 1.229935,
+    "frameworkOverheadMillis" : 9.112689000000046,
+    "endToEndMillis" : 3325.283891,
+    "generation" : {
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 31,
+      "ttftMillis" : 1815.872539,
+      "totalMillis" : 3314.941267,
+      "prefillTokensPerSecond" : 38.72110402072012,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 20960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "GET, HEAD, and POST are retried up to three attempts. A POST is retried only when it carries an Idempotency-Key header.",
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f8ad6bfd507862b76c65830658c91fe25872bb2ec71ac45131d9008ade967997",
+    "retrievalMillis" : 1.131326,
+    "frameworkOverheadMillis" : 9.174873999999818,
+    "endToEndMillis" : 2889.549637,
+    "generation" : {
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 28,
+      "ttftMillis" : 1526.588537,
+      "totalMillis" : 2879.243437,
+      "prefillTokensPerSecond" : 40.167053379033675,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 18160.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it.",
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "330247c442b1652d8d744ab596314fb9ddcd9b821f6ad2d522e3c3dbf770a24c",
+    "retrievalMillis" : 1.286521,
+    "frameworkOverheadMillis" : 10.34793499999978,
+    "endToEndMillis" : 3226.481825,
+    "generation" : {
+      "text" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 95,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 31,
+      "ttftMillis" : 1725.764356,
+      "totalMillis" : 3214.847369,
+      "prefillTokensPerSecond" : 38.457359943878686,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 20320.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.",
+      "text" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "71de7944c9998cccd456d00e219bcc94f9c9da41b9f8defa80e5d1b56a1d8517",
+    "retrievalMillis" : 1.033368,
+    "frameworkOverheadMillis" : 9.772821999999906,
+    "endToEndMillis" : 2288.798812,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 15,
+      "ttftMillis" : 1553.098083,
+      "totalMillis" : 2277.992622,
+      "prefillTokensPerSecond" : 40.13588519224813,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 14810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The photon shader kernel uses a CUDA block size of 128.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a81bf3964de79b68e9e4835bdb03f9b4c207597eec54a81766664648d9be8066",
+    "retrievalMillis" : 1.69405,
+    "frameworkOverheadMillis" : 10.361484999999902,
+    "endToEndMillis" : 1815.654559,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null. [java-list-copy]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 138,
+      "cacheWriteInputTokens" : 27,
+      "outputTokens" : 23,
+      "ttftMillis" : 696.955686,
+      "totalMillis" : 1803.599024,
+      "prefillTokensPerSecond" : 39.27288487838455,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 10980.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null.",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException if any element is null. [java-list-copy]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "77bc48f09528cd59e5f8eccd2b2f7cde891fbffdc66728062f1ed2e239018783",
+    "retrievalMillis" : 1.201904,
+    "frameworkOverheadMillis" : 10.973743000000013,
+    "endToEndMillis" : 3214.069302,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 30,
+      "ttftMillis" : 1753.25414,
+      "totalMillis" : 3201.893655,
+      "prefillTokensPerSecond" : 38.43469670193577,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 20250.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key.",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "70140f26e4fc50b05adca60c15b45c002f9ff042cab120800cfbab607f5927c2",
+    "retrievalMillis" : 1.139748,
+    "frameworkOverheadMillis" : 10.013356999999814,
+    "endToEndMillis" : 2726.468904,
+    "generation" : {
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 23,
+      "ttftMillis" : 1611.549243,
+      "totalMillis" : 2715.315799,
+      "prefillTokensPerSecond" : 39.30257522862567,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 17220.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish.",
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "21d757ff8c2db9a35ad327a5322deaca5c4a61b513beec6235a3491e599495f7",
+    "retrievalMillis" : 1.21302,
+    "frameworkOverheadMillis" : 9.492795999999998,
+    "endToEndMillis" : 2207.38092,
+    "generation" : {
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 149,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 52,
+      "outputTokens" : 18,
+      "ttftMillis" : 1330.295541,
+      "totalMillis" : 2196.675104,
+      "prefillTokensPerSecond" : 39.3368163169223,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 14140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.",
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7dbe419cbe01dfd5fcd2d52411713308571b33fded9ec5632d389baa007a24fd",
+    "retrievalMillis" : 1.007469,
+    "frameworkOverheadMillis" : 9.577013999999963,
+    "endToEndMillis" : 3592.043608,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 95,
+      "cacheWriteInputTokens" : 73,
+      "outputTokens" : 35,
+      "ttftMillis" : 1885.907318,
+      "totalMillis" : 3581.459125,
+      "prefillTokensPerSecond" : 38.88103779834417,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 22480.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain, and compilation targets release 25.",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "405012124f162cb48dd5e0057e3c58ad3519b7e2d114068830287259b1052f17",
+    "retrievalMillis" : 1.105346,
+    "frameworkOverheadMillis" : 10.005547000000206,
+    "endToEndMillis" : 3358.862905,
+    "generation" : {
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 31,
+      "ttftMillis" : 1834.3473,
+      "totalMillis" : 3347.752012,
+      "prefillTokensPerSecond" : 38.327520347981995,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 21110.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "GET, HEAD, and POST are retried up to three attempts. A POST is retried only when it carries an Idempotency-Key header.",
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f8ad6bfd507862b76c65830658c91fe25872bb2ec71ac45131d9008ade967997",
+    "retrievalMillis" : 1.185288,
+    "frameworkOverheadMillis" : 9.38557499999979,
+    "endToEndMillis" : 2979.70817,
+    "generation" : {
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 28,
+      "ttftMillis" : 1534.027941,
+      "totalMillis" : 2969.137307,
+      "prefillTokensPerSecond" : 39.97543516062729,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 18670.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it.",
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "330247c442b1652d8d744ab596314fb9ddcd9b821f6ad2d522e3c3dbf770a24c",
+    "retrievalMillis" : 1.105636,
+    "frameworkOverheadMillis" : 10.417758999999933,
+    "endToEndMillis" : 3386.081135,
+    "generation" : {
+      "text" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 95,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 31,
+      "ttftMillis" : 1733.512621,
+      "totalMillis" : 3374.55774,
+      "prefillTokensPerSecond" : 38.28892942402482,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2544963584,
+      "cpuMillis" : 21150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.",
+      "text" : "The wire mapper method that registers Java time support is `findAndRegisterModules`, and the deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "pure-java",
+    "model" : "Qwen2.5 Coder 1.5B Instruct GGUF",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "71de7944c9998cccd456d00e219bcc94f9c9da41b9f8defa80e5d1b56a1d8517",
+    "retrievalMillis" : 0.906504,
+    "frameworkOverheadMillis" : 14.733566999999766,
+    "endToEndMillis" : 2302.403759,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 96,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 15,
+      "ttftMillis" : 1560.474071,
+      "totalMillis" : 2286.763688,
+      "prefillTokensPerSecond" : 40.110108665905294,
+      "loadMillis" : 304.381387,
+      "peakRssBytes" : 2559590400,
+      "cpuMillis" : 14830.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The photon shader kernel uses a CUDA block size of 128.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

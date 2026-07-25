@@ -13,6 +13,8 @@ on:
       - "models-api/**"
       - "models-runtime/**"
       - "models-backend-purejava/**"
+      - "models-backend-native/**"
+      - "rust-toolchain.toml"
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +27,8 @@ on:
       - "models-api/**"
       - "models-runtime/**"
       - "models-backend-purejava/**"
+      - "models-backend-native/**"
+      - "rust-toolchain.toml"
   workflow_dispatch:
     inputs:
       modeljars-ref:
@@ -125,10 +129,28 @@ jobs:
           --no-daemon
           --stacktrace
 
+      - name: Install pinned Rust toolchain for SQLCoder native gate
+        if: matrix.name == 'SQLCoder-7B-2'
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --no-self-update
+          rustup component add --toolchain 1.96.0 clippy rustfmt
+
+      - name: Run SQLCoder real-weight Q5_K native gate
+        if: matrix.name == 'SQLCoder-7B-2'
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-backend-native:slowTest
+          --tests com.integrallis.models.backend.nativekernel.RustFfmQ5KLargeModelTest
+          --no-daemon
+          --stacktrace
+
       - name: Upload large-model integration reports
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.reportName }}
-          path: models/models-backend-purejava/build/reports/tests/
+          path: |
+            models/models-backend-purejava/build/reports/tests/
+            models/models-backend-native/build/reports/tests/
           retention-days: 30

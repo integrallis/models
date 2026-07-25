@@ -94,6 +94,36 @@ class ModelJarPerformanceSelectionTest {
   }
 
   @Test
+  void selectsOnlyProfilesForTheRequestedBackend() {
+    Fixture fixture = fixture();
+    ModelPerformanceProfile pureJavaProfile = fixture.profile();
+    ModelPerformanceProfile rustProfile =
+        new ModelPerformanceProfile(
+            "qwen3_0_6b_q4_0_epyc_milan_jdk25_rust",
+            pureJavaProfile.modelAlias(),
+            pureJavaProfile.markerCoordinate(),
+            pureJavaProfile.artifactSha256(),
+            "rust-ffm",
+            pureJavaProfile.runtimeSelector(),
+            Map.of(Q4_KERNEL, "widened"),
+            pureJavaProfile.javaLaunch(),
+            pureJavaProfile.evidence());
+
+    ModelJarPerformanceSelection selection =
+        ModelJarPerformanceSelection.evaluate(
+            fixture.descriptor(),
+            List.of(pureJavaProfile, rustProfile),
+            rustProfile.runtimeSelector(),
+            rustProfile.javaLaunch().orElseThrow().jvmArguments(),
+            "rust-ffm");
+
+    assertThat(selection.recommendations()).containsExactly(Map.entry(Q4_KERNEL, "widened"));
+    assertThat(selection.decisions())
+        .extracting(decision -> decision.settings().get("profile-id"))
+        .containsExactly(rustProfile.id());
+  }
+
+  @Test
   void rejectsConflictingRecommendationsFromMatchingProfiles() {
     Fixture fixture = fixture();
     ModelPerformanceProfile q4Profile = fixture.profile();

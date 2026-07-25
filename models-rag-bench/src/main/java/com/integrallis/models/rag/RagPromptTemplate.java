@@ -21,7 +21,8 @@ import java.util.Locale;
 public enum RagPromptTemplate {
   RAW("raw"),
   CHATML("chatml"),
-  CHATML_NO_THINK("chatml-no-think");
+  CHATML_NO_THINK("chatml-no-think"),
+  ZEPHYR("zephyr");
 
   private final String id;
 
@@ -43,6 +44,32 @@ public enum RagPromptTemplate {
           "<|im_start|>user\n"
               + prompt
               + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+      case ZEPHYR -> "<|user|>\n" + prompt + "</s>\n<|assistant|>";
+    };
+  }
+
+  /** Applies a role-aware envelope while retaining legacy prompt bytes for single-turn profiles. */
+  public String apply(String systemPrompt, String userPrompt) {
+    return switch (this) {
+      case RAW -> systemPrompt + userPrompt;
+      case CHATML ->
+          "<|im_start|>system\n"
+              + systemPrompt.stripTrailing()
+              + "<|im_end|>\n<|im_start|>user\n"
+              + userPrompt
+              + "<|im_end|>\n<|im_start|>assistant\n";
+      case CHATML_NO_THINK ->
+          "<|im_start|>system\n"
+              + systemPrompt.stripTrailing()
+              + "<|im_end|>\n<|im_start|>user\n"
+              + userPrompt
+              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+      case ZEPHYR ->
+          "<|system|>\n"
+              + systemPrompt.stripTrailing()
+              + "</s>\n<|user|>\n"
+              + userPrompt
+              + "</s>\n<|assistant|>";
     };
   }
 
@@ -54,6 +81,6 @@ public enum RagPromptTemplate {
       }
     }
     throw new IllegalArgumentException(
-        "prompt-template must be one of raw, chatml, chatml-no-think");
+        "prompt-template must be one of raw, chatml, chatml-no-think, zephyr");
   }
 }

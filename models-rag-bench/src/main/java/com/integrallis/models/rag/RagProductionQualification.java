@@ -26,6 +26,11 @@ public record RagProductionQualification(
     RagPerformanceTier absoluteTier,
     RagQualificationVerdict verdict,
     boolean qualified,
+    int modelAnswerCount,
+    double modelAnswerRate,
+    double modelAnswerCorrectRate,
+    double minimumModelAnswerRate,
+    double minimumModelAnswerCorrectRate,
     List<String> qualifyingComparators,
     List<RagComparatorAssessment> comparisons,
     Map<String, String> exclusions) {

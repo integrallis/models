@@ -25,6 +25,7 @@ tasks.withType<JavaCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
     jvmArgs("--add-modules", "jdk.incubator.vector")
+    systemProperty("models.repositoryRoot", rootProject.projectDir.absolutePath)
 }
 
 tasks.named("spotbugsTest") {
@@ -44,6 +45,7 @@ dependencies {
     implementation(project(":models-rag"))
     implementation(project(":models-runtime"))
     implementation(project(":models-backend-purejava"))
+    implementation(project(":models-backend-native"))
     implementation(project(":models-langchain4j"))
     implementation(project(":models-spring-ai"))
     implementation("org.apache.lucene:lucene-core:10.4.0")

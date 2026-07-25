@@ -20,10 +20,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Nested;
@@ -385,6 +387,62 @@ class GenerationLoopTest {
   }
 
   @Nested
+  class PromptCaching {
+
+    @Test
+    void reusesTheLongestSharedPrefixAndPrefillsOnlyTheNewSuffix() {
+      PrefixCachingBackend backend = new PrefixCachingBackend();
+      GenerationLoop loop = new GenerationLoop(backend);
+      SamplingOptions options = SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
+
+      String first = loop.generate("hello world", options);
+      String second = loop.generate("hello world!", options);
+
+      assertThat(first).isEqualTo("!");
+      assertThat(second).isEqualTo("!");
+      assertThat(backend.prefills)
+          .containsExactly(
+              new PrefillCall(0, new int[] {2, 3, 4}), new PrefillCall(3, new int[] {5}));
+      assertThat(backend.rewindCheckpoints).containsExactly(3);
+      assertThat(backend.resetCalls).isEqualTo(1);
+      assertThat(loop.lastPromptCacheMetrics()).isEqualTo(new PromptCacheMetrics(true, 4, 3, 1));
+    }
+
+    @Test
+    void resetsWhenTheNextPromptHasNoSharedPrefix() {
+      PrefixCachingBackend backend = new PrefixCachingBackend();
+      GenerationLoop loop = new GenerationLoop(backend);
+      SamplingOptions options = SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
+
+      loop.generate("hello world", options);
+      loop.generate("!", options);
+
+      assertThat(backend.prefills)
+          .containsExactly(
+              new PrefillCall(0, new int[] {2, 3, 4}), new PrefillCall(0, new int[] {5}));
+      assertThat(backend.rewindCheckpoints).isEmpty();
+      assertThat(backend.resetCalls).isEqualTo(2);
+      assertThat(loop.lastPromptCacheMetrics()).isEqualTo(new PromptCacheMetrics(true, 1, 0, 1));
+    }
+
+    @Test
+    void replaysTheFinalTokenWhenThePromptIsIdentical() {
+      PrefixCachingBackend backend = new PrefixCachingBackend();
+      GenerationLoop loop = new GenerationLoop(backend);
+      SamplingOptions options = SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
+
+      loop.generate("hello world", options);
+      loop.generate("hello world", options);
+
+      assertThat(backend.prefills)
+          .containsExactly(
+              new PrefillCall(0, new int[] {2, 3, 4}), new PrefillCall(2, new int[] {4}));
+      assertThat(backend.rewindCheckpoints).containsExactly(2);
+      assertThat(loop.lastPromptCacheMetrics()).isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+    }
+  }
+
+  @Nested
   class ErrorHandling {
 
     @Test
@@ -398,6 +456,88 @@ class GenerationLoopTest {
                       "", SamplingOptions.builder().temperature(0.0f).maxTokens(10).build()))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("prompt");
+    }
+  }
+
+  private record PrefillCall(int startPosition, int[] tokens) {
+    private PrefillCall {
+      tokens = tokens.clone();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof PrefillCall call
+          && startPosition == call.startPosition
+          && Arrays.equals(tokens, call.tokens);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * startPosition + Arrays.hashCode(tokens);
+    }
+  }
+
+  private static final class PrefixCachingBackend implements RewindableInferenceBackend {
+    private final List<PrefillCall> prefills = new ArrayList<>();
+    private final List<Integer> rewindCheckpoints = new ArrayList<>();
+    private int resetCalls;
+    private int nextPosition;
+
+    @Override
+    public String name() {
+      return "prefix-caching-stub";
+    }
+
+    @Override
+    public ModelMetadata metadata() {
+      return new ModelMetadata("stub", "PrefixCachingStub", 64, 6, 16, 1, 1, 1);
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return MOCK_TOKENIZER;
+    }
+
+    @Override
+    public float[] prefill(int[] tokens, int startPosition) {
+      assertThat(startPosition).isEqualTo(nextPosition);
+      prefills.add(new PrefillCall(startPosition, tokens));
+      nextPosition += tokens.length;
+      return logitsFor(5);
+    }
+
+    @Override
+    public float[] forward(int token, int position) {
+      assertThat(position).isEqualTo(nextPosition);
+      nextPosition++;
+      return logitsFor(1);
+    }
+
+    @Override
+    public int checkpoint() {
+      return nextPosition;
+    }
+
+    @Override
+    public void rewind(int checkpoint) {
+      assertThat(checkpoint).isBetween(0, nextPosition);
+      rewindCheckpoints.add(checkpoint);
+      nextPosition = checkpoint;
+    }
+
+    @Override
+    public void reset() {
+      resetCalls++;
+      nextPosition = 0;
+    }
+
+    @Override
+    public void close() {}
+
+    private static float[] logitsFor(int token) {
+      float[] logits = new float[6];
+      logits[token] = 100;
+      return logits;
     }
   }
 }

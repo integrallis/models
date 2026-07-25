@@ -30,6 +30,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.modeljars.ModelJarDescriptor;
+import org.modeljars.ModelJarException;
 
 /**
  * GGUF backend that keeps transformer execution in Java and delegates qualified matrix kernels to
@@ -38,7 +40,7 @@ import java.util.Objects;
 public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String PLAN_VERSION = "rust-ffm-v2";
+  public static final String PLAN_VERSION = "rust-ffm-v4";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -66,7 +68,32 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     Objects.requireNonNull(libraryPath, "libraryPath");
     RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath);
     PureJavaBackend engine = PureJavaBackend.load(modelPath, kernel);
-    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel.implementation()));
+    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel));
+  }
+
+  /** Loads a ModelJar descriptor using its exact Rust/FFM performance profile. */
+  public static RustFfmBackend load(ModelJarDescriptor descriptor) {
+    String configured = System.getProperty(LIBRARY_PATH_PROPERTY);
+    if (configured == null || configured.isBlank()) {
+      configured = System.getenv(LIBRARY_PATH_ENV);
+    }
+    if (configured == null || configured.isBlank()) {
+      return load(descriptor, BundledNativeKernelLibrary.resolve());
+    }
+    return load(descriptor, Path.of(configured));
+  }
+
+  /** Loads a ModelJar descriptor with an explicit Models native-kernel platform library. */
+  public static RustFfmBackend load(ModelJarDescriptor descriptor, Path libraryPath) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    Objects.requireNonNull(libraryPath, "libraryPath");
+    if (!descriptor.supportsBackend("rust-ffm")) {
+      throw new ModelJarException(
+          "ModelJars descriptor does not support rust-ffm backend: " + descriptor.alias());
+    }
+    RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath);
+    PureJavaBackend engine = PureJavaBackend.load(descriptor, "rust-ffm", kernel);
+    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel));
   }
 
   @Override
@@ -140,12 +167,13 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
   }
 
   private static BackendDiagnostics diagnostics(
-      BackendDiagnostics javaDiagnostics, String kernelImplementation) {
+      BackendDiagnostics javaDiagnostics, RustGgufBatchedMatrixKernel kernel) {
     Map<String, String> environment = new LinkedHashMap<>(javaDiagnostics.environment());
     environment.put("transformer-runtime", "java");
     environment.put("kernel-runtime", "rust-ffm");
-    environment.put("kernel-implementation", kernelImplementation);
+    environment.put("kernel-implementation", kernel.implementation());
     environment.put("native-kernel-abi", Integer.toString(NativeKernelLibrary.ABI_VERSION));
+    environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
     optimizations.add(
         nativeQuantizedDecision(
@@ -155,6 +183,34 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
         nativeQuantizedDecision(
             "rust-q8-0-batched-matmul",
             "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        nativeQuantizedDecision(
+            "rust-q4-k-batched-matmul",
+            "eligible Q4_K batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        nativeQuantizedDecision(
+            "rust-q5-k-batched-matmul",
+            "eligible Q5_K batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        nativeQuantizedDecision(
+            "rust-q6-k-batched-matmul",
+            "eligible Q6_K batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        nativeQuantizedDecision(
+            "rust-mixed-k-grouped-matmul",
+            "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization"));
+    optimizations.add(
+        new OptimizationDecision(
+            "rust-quantized-decode",
+            kernel.nativeDecodeEnabled() ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            kernel.nativeDecodeEnabled()
+                ? "single-token Q4_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel"
+                : "disabled by " + RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
+            Map.of(
+                "property",
+                RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
+                "transformer",
+                "java")));
     return new BackendDiagnostics("rust-ffm", PLAN_VERSION, environment, optimizations);
   }
 

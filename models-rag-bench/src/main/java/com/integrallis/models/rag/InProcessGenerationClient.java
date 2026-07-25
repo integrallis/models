@@ -17,12 +17,17 @@ package com.integrallis.models.rag;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.nativekernel.RustFfmBackend;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.PromptCacheMetrics;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
@@ -31,41 +36,69 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.modeljars.ModelJarDescriptor;
 
 /** In-process Models generation client with production timing measurements. */
-public final class PureJavaGenerationClient implements GenerationClient {
+public final class InProcessGenerationClient implements GenerationClient {
+  private final String backendName;
   private final TimingBackend backend;
   private final GenerationLoop generationLoop;
   private final double loadMillis;
+  private final RagSamplingProfile sampling;
 
-  PureJavaGenerationClient(InferenceBackend backend, double loadMillis) {
-    this.backend = new TimingBackend(Objects.requireNonNull(backend, "backend"));
+  InProcessGenerationClient(
+      String backendName,
+      InferenceBackend backend,
+      double loadMillis,
+      RagSamplingProfile sampling) {
+    if (backendName == null || backendName.isBlank()) {
+      throw new IllegalArgumentException("backendName must not be blank");
+    }
+    this.backendName = backendName;
+    this.backend = instrument(Objects.requireNonNull(backend, "backend"));
     this.generationLoop = new GenerationLoop(this.backend);
     this.loadMillis = loadMillis;
+    this.sampling = Objects.requireNonNull(sampling, "sampling");
   }
 
-  public static PureJavaGenerationClient load(Path model, int contextLength) {
+  public static InProcessGenerationClient loadPureJava(
+      Path model, int contextLength, RagSamplingProfile sampling) {
     Objects.requireNonNull(model, "model");
-    return load(contextLength, () -> PureJavaBackend.load(model));
+    return load("pure-java", contextLength, sampling, () -> PureJavaBackend.load(model));
   }
 
-  public static PureJavaGenerationClient load(ModelJarDescriptor descriptor, int contextLength) {
+  public static InProcessGenerationClient loadPureJava(
+      ModelJarDescriptor descriptor, int contextLength, RagSamplingProfile sampling) {
     Objects.requireNonNull(descriptor, "descriptor");
-    return load(contextLength, () -> PureJavaBackend.load(descriptor));
+    return load("pure-java", contextLength, sampling, () -> PureJavaBackend.load(descriptor));
   }
 
-  private static PureJavaGenerationClient load(
-      int contextLength, java.util.function.Supplier<PureJavaBackend> backendLoader) {
+  public static InProcessGenerationClient loadRustFfm(
+      Path model, int contextLength, RagSamplingProfile sampling) {
+    Objects.requireNonNull(model, "model");
+    return load("rust-ffm", contextLength, sampling, () -> RustFfmBackend.load(model));
+  }
+
+  public static InProcessGenerationClient loadRustFfm(
+      ModelJarDescriptor descriptor, int contextLength, RagSamplingProfile sampling) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    return load("rust-ffm", contextLength, sampling, () -> RustFfmBackend.load(descriptor));
+  }
+
+  private static InProcessGenerationClient load(
+      String backendName,
+      int contextLength,
+      RagSamplingProfile sampling,
+      java.util.function.Supplier<? extends InferenceBackend> backendLoader) {
     if (contextLength < 1) {
       throw new IllegalArgumentException("contextLength must be positive");
     }
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
-    PureJavaBackend backend = backendLoader.get();
-    return new PureJavaGenerationClient(backend, elapsedMillis(start));
+    InferenceBackend backend = backendLoader.get();
+    return new InProcessGenerationClient(backendName, backend, elapsedMillis(start), sampling);
   }
 
   @Override
   public String backend() {
-    return "pure-java";
+    return backendName;
   }
 
   @Override
@@ -80,28 +113,16 @@ public final class PureJavaGenerationClient implements GenerationClient {
 
   @Override
   public Map<String, String> generationControls() {
-    return Map.of(
-        "temperature", "0",
-        "topK", "1",
-        "topP", "1",
-        "seed", "42",
-        "repetitionPenalty", "1",
-        "promptCache", "false");
+    Map<String, String> controls = new java.util.LinkedHashMap<>(sampling.controls());
+    controls.put("promptCache", "longest-common-prefix");
+    return Map.copyOf(controls);
   }
 
   @Override
   public GenerationResult generate(String prompt, int maxTokens) {
     int inputTokens = backend.tokenizer().encode(prompt).length;
     backend.begin();
-    SamplingOptions options =
-        SamplingOptions.builder()
-            .temperature(0)
-            .topP(1)
-            .topK(1)
-            .seed(42)
-            .repetitionPenalty(1)
-            .maxTokens(maxTokens)
-            .build();
+    SamplingOptions options = sampling.toSamplingOptions(maxTokens);
     StringBuilder output = new StringBuilder();
     long[] firstTokenNanos = {0};
     int[] outputTokens = {0};
@@ -132,22 +153,28 @@ public final class PureJavaGenerationClient implements GenerationClient {
         });
     long end = System.nanoTime();
     if (failure.get() != null) {
-      throw new IllegalStateException("pure-Java generation failed", failure.get());
+      throw new IllegalStateException(backendName + " generation failed", failure.get());
     }
     if (firstTokenNanos[0] == 0 || outputTokens[0] == 0) {
-      throw new IllegalStateException("pure-Java generation produced no output token");
+      throw new IllegalStateException(backendName + " generation produced no output token");
     }
+    PromptCacheMetrics promptCache = generationLoop.lastPromptCacheMetrics();
+    int evaluatedInputTokens =
+        promptCache.supported() ? promptCache.cacheWriteInputTokens() : inputTokens;
     Duration cpuAfter = ProcessResourceProbe.cpuDuration(pid);
     return new GenerationResult(
         output.toString(),
         inputTokens,
+        promptCache.cacheReadInputTokens(),
+        promptCache.cacheWriteInputTokens(),
         outputTokens[0],
         nanosToMillis(firstTokenNanos[0] - start),
         nanosToMillis(end - start),
-        tokenRate(inputTokens, backend.prefillNanos()),
+        tokenRate(evaluatedInputTokens, backend.prefillNanos()),
         loadMillis,
         ProcessResourceProbe.highWaterBytes(pid),
-        nanosToMillis(cpuAfter.minus(cpuBefore).toNanos()));
+        nanosToMillis(cpuAfter.minus(cpuBefore).toNanos()),
+        null);
   }
 
   @Override
@@ -167,7 +194,17 @@ public final class PureJavaGenerationClient implements GenerationClient {
     return nanos / 1_000_000.0;
   }
 
-  private static final class TimingBackend implements InferenceBackend {
+  private static TimingBackend instrument(InferenceBackend backend) {
+    if (backend instanceof SpeculativeInferenceBackend speculative) {
+      return new TimingSpeculativeBackend(speculative);
+    }
+    if (backend instanceof RewindableInferenceBackend rewindable) {
+      return new TimingRewindableBackend(rewindable);
+    }
+    return new TimingBackend(backend);
+  }
+
+  private static class TimingBackend implements InferenceBackend {
     private final InferenceBackend delegate;
     private long prefillNanos;
 
@@ -229,6 +266,46 @@ public final class PureJavaGenerationClient implements GenerationClient {
     @Override
     public void close() {
       delegate.close();
+    }
+  }
+
+  private static class TimingRewindableBackend extends TimingBackend
+      implements RewindableInferenceBackend {
+    private final RewindableInferenceBackend delegate;
+
+    private TimingRewindableBackend(RewindableInferenceBackend delegate) {
+      super(delegate);
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int checkpoint() {
+      return delegate.checkpoint();
+    }
+
+    @Override
+    public void rewind(int checkpoint) {
+      delegate.rewind(checkpoint);
+    }
+  }
+
+  private static final class TimingSpeculativeBackend extends TimingRewindableBackend
+      implements SpeculativeInferenceBackend {
+    private final SpeculativeInferenceBackend delegate;
+
+    private TimingSpeculativeBackend(SpeculativeInferenceBackend delegate) {
+      super(delegate);
+      this.delegate = delegate;
+    }
+
+    @Override
+    public LogitBatch verify(int[] tokens, int startPosition) {
+      return delegate.verify(tokens, startPosition);
+    }
+
+    @Override
+    public LogitBatch verifyTransient(int[] tokens, int startPosition) {
+      return delegate.verifyTransient(tokens, startPosition);
     }
   }
 }

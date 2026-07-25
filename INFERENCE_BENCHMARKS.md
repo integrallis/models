@@ -86,6 +86,41 @@ passes, but the longer-output drift requires the RAG quality gate before a
 ModelJar may select this path. The raw reports and complete protocol are under
 `benchmark-results/certified-20260724/native-q8/smollm2-360m-q8_0`.
 
+### Native Q8 RAG and prompt-prefix checkpoint
+
+The required quality gate was subsequently run through the current guarded RAG
+workload. The runtime now retains the longest exact token prefix between
+sequential requests through a generic checkpoint/rewind capability and
+prefills only the changed suffix. The report records cache-read and cache-write
+token counts; at least the final prompt token is always replayed.
+
+On the same EPYC host, exact SmolLM2 artifact, GraalVM Java 25.0.3, fixed 1 GiB
+heap, and 27 measured requests per row:
+
+| Java path | Backend | Prefix reuse | Tier | p95 TTFT | p50 decode | p95 E2E | Grounded quality |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| Plain Java | pure Java | no | USABLE | 1,621.9 ms | 44.12 tok/s | 3,007.3 ms | 100% |
+| Plain Java | Rust/FFM | no | USABLE | 1,082.3 ms | 44.15 tok/s | 2,466.9 ms | 100% |
+| Plain Java | pure Java | yes | PRODUCTION_READY | 756.6 ms | 43.69 tok/s | 2,145.5 ms | 100% |
+| Plain Java | Rust/FFM | yes | PRODUCTION_READY | 552.8 ms | 43.92 tok/s | 1,935.0 ms | 100% |
+| LangChain4j | Rust/FFM | yes | PRODUCTION_READY | 552.2 ms | 43.93 tok/s | 1,943.9 ms | 100% |
+| Spring AI | Rust/FFM | yes | PRODUCTION_READY | 550.9 ms | 43.96 tok/s | 1,944.2 ms | 100% |
+| Plain Java | Ollama | engine-managed | PRODUCTION_READY | 197.2 ms | 43.73 tok/s | 2,485.7 ms | 100% |
+| Plain Java | llama.cpp | disabled | PRODUCTION_READY | 365.5 ms | 102.23 tok/s | 1,004.4 ms | 100% |
+
+The cache reused 3,153 of 5,064 prompt tokens. Relative to uncached Rust/FFM,
+p95 TTFT improved 48.9%, p95 end-to-end improved 21.6%, and total CPU time
+improved 40.7%. All 27 cached raw outputs match the uncached Rust outputs
+exactly. Cached Rust/FFM reaches 91.4% of Ollama's median end-to-end
+performance and 100.4% of its median decode throughput. It remains at 66.1% of
+llama.cpp p95 TTFT performance and 43.0% of llama.cpp decode throughput.
+
+The grounding policy produced 9 accepted model answers, 15 validated
+extractive fallbacks, and 3 retrieval abstentions. Raw model-only correctness
+was 18 of 27, so this is a production qualification for the guarded RAG policy,
+not unguarded general question answering. Reports and protocol are under
+`benchmark-results/certified-20260724/rag/native-q8-prefix-cache/`.
+
 Pure Java maps and parses GGUF in-process, while native load measurements
 include server or request readiness, so load values are directional rather
 than equivalent lifecycle costs. Ollama RSS observes the service process and

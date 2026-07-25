@@ -41,8 +41,14 @@ class RagBenchmarkCliTest {
               "--backend", "pure-java",
               "--model", model.toString(),
               "--model-id", "fixture-q4",
+              "--workload", "coding",
               "--prompt-template", "chatml",
               "--case", "auto-glass-deadline,idempotency",
+              "--temperature", "0.7",
+              "--top-p", "0.95",
+              "--sampling-top-k", "40",
+              "--seed", "1729",
+              "--repetition-penalty", "1.05",
               "--max-tokens", "48",
               "--iterations", "2"
             });
@@ -50,10 +56,50 @@ class RagBenchmarkCliTest {
     assertThat(configuration.framework()).isEqualTo("spring-ai");
     assertThat(configuration.artifact()).isEqualTo(model);
     assertThat(configuration.modelId()).isEqualTo("fixture-q4");
+    assertThat(configuration.workload()).isEqualTo(RagWorkload.CODING);
     assertThat(configuration.promptTemplate()).isEqualTo(RagPromptTemplate.CHATML);
     assertThat(configuration.caseIds()).containsExactly("auto-glass-deadline", "idempotency");
+    assertThat(configuration.sampling())
+        .isEqualTo(new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05));
     assertThat(configuration.maxTokens()).isEqualTo(48);
     assertThat(configuration.iterations()).isEqualTo(2);
+  }
+
+  @Test
+  void rejectsInvalidSamplingControlsBeforeLoadingTheBackend() {
+    assertThatThrownBy(
+            () ->
+                RagBenchmarkCli.parse(
+                    new String[] {
+                      "--framework", "plain-java",
+                      "--backend", "ollama",
+                      "--model", "qwen",
+                      "--temperature", "-0.1"
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("--temperature");
+  }
+
+  @Test
+  void parsesAReproducibleRustFfmRun() throws Exception {
+    Path model = Files.writeString(temporaryDirectory.resolve("model-q8.gguf"), "fixture");
+
+    RagBenchmarkConfiguration configuration =
+        RagBenchmarkCli.parse(
+            new String[] {
+              "--framework", "plain-java",
+              "--backend", "rust-ffm",
+              "--model", model.toString(),
+              "--model-id", "fixture-q8",
+              "--prompt-template", "chatml"
+            });
+
+    assertThat(configuration.backend()).isEqualTo("rust-ffm");
+    assertThat(configuration.model()).isEqualTo(model.toString());
+    assertThat(configuration.artifact()).isEqualTo(model);
+    assertThat(configuration.modelId()).isEqualTo("fixture-q8");
+    assertThat(configuration.endpoint()).isNull();
+    assertThat(configuration.promptTemplate()).isEqualTo(RagPromptTemplate.CHATML);
   }
 
   @Test
@@ -75,6 +121,30 @@ class RagBenchmarkCliTest {
     assertThat(configuration.artifact()).isEqualTo(model);
     assertThat(configuration.modelJarDescriptor())
         .hasValueSatisfying(descriptor -> assertThat(descriptor.alias()).isEqualTo("fixture_q4"));
+  }
+
+  @Test
+  void resolvesAModelJarForTheProfiledRustFfmPath() throws Exception {
+    Path model = Files.writeString(temporaryDirectory.resolve("model.gguf"), "fixture");
+
+    RagBenchmarkConfiguration configuration =
+        RagBenchmarkCli.parse(
+            new String[] {
+              "--framework", "langchain4j",
+              "--backend", "rust-ffm",
+              "--modeljar", "fixture_q4",
+              "--prompt-template", "chatml"
+            },
+            registry(model));
+
+    assertThat(configuration.backend()).isEqualTo("rust-ffm");
+    assertThat(configuration.artifact()).isEqualTo(model);
+    assertThat(configuration.modelJarDescriptor())
+        .hasValueSatisfying(
+            descriptor -> {
+              assertThat(descriptor.alias()).isEqualTo("fixture_q4");
+              assertThat(descriptor.supportsBackend("rust-ffm")).isTrue();
+            });
   }
 
   @Test
@@ -109,7 +179,7 @@ class RagBenchmarkCliTest {
                     },
                     registry(model)))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("only by pure-java");
+        .hasMessageContaining("only by in-process backends");
   }
 
   @Test
@@ -122,6 +192,21 @@ class RagBenchmarkCliTest {
                     }))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("framework");
+  }
+
+  @Test
+  void rejectsAnUnknownWorkloadBeforeRunningInference() {
+    assertThatThrownBy(
+            () ->
+                RagBenchmarkCli.parse(
+                    new String[] {
+                      "--framework", "plain-java",
+                      "--backend", "ollama",
+                      "--model", "qwen",
+                      "--workload", "invented"
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("workload");
   }
 
   @Test
@@ -167,6 +252,7 @@ class RagBenchmarkCliTest {
     properties.setProperty("model.fixture_q4.quantization", "Q4_0");
     properties.setProperty("model.fixture_q4.path", model.toString());
     properties.setProperty("model.fixture_q4.backend.pure-java", "true");
+    properties.setProperty("model.fixture_q4.backend.rust-ffm", "true");
     return PropertiesModelJarRegistry.fromProperties(properties);
   }
 }

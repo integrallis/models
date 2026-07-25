@@ -18,6 +18,7 @@ package com.integrallis.models.rag;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,28 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
+  void rejectsComparatorsFromADifferentRagWorkload() {
+    RagBenchmarkReport candidate = report("rust-ffm", "sha", 100, 1_000);
+    RagBenchmarkReport codingComparator =
+        withSettings(
+            report("ollama", "sha", 100, 1_000),
+            settings(
+                RagWorkload.CODING.id(),
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1")));
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(codingComparator));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.exclusions()).containsEntry("ollama", "benchmark workload differs");
+  }
+
+  @Test
   void absoluteRagFailureCannotBeOverriddenByFastRelativePerformance() {
     RagBenchmarkReport candidate =
         withSummary(
@@ -102,6 +125,99 @@ class RagProductionQualificationPolicyTest {
     assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.FAILED_RELATIVE_GATE);
   }
 
+  @Test
+  void acceptsEquivalentSamplingWithBackendSpecificPromptCacheMetadata() {
+    RagBenchmarkReport candidate =
+        withSettings(
+            report("rust-ffm", "sha", 100, 1_000),
+            settings(
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1",
+                    "promptCache", "longest-common-prefix")));
+    RagBenchmarkReport ollama =
+        withSettings(
+            report("ollama", "sha", 100, 1_000),
+            settings(
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1",
+                    "rawPrompt", "true")));
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+  }
+
+  @Test
+  void rejectsQualityProducedEntirelyByExtractiveFallback() {
+    RagBenchmarkReport candidate =
+        withGroundingDecisions(report("rust-ffm", "sha", 100, 1_000), 0, 24, 3, 0);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.verdict())
+        .isEqualTo(RagQualificationVerdict.FAILED_MODEL_CONTRIBUTION_GATE);
+    assertThat(qualification.modelAnswerRate()).isZero();
+  }
+
+  @Test
+  void rejectsAcceptedModelAnswersBelowTheCorrectnessFloor() {
+    RagBenchmarkReport candidate =
+        withGroundingDecisions(report("rust-ffm", "sha", 100, 1_000), 9, 15, 3, 1);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.verdict())
+        .isEqualTo(RagQualificationVerdict.FAILED_MODEL_CONTRIBUTION_GATE);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(8.0 / 9.0);
+  }
+
+  @Test
+  void acceptsOneThirdCorrectModelAnswersWithFallbackGuardrails() {
+    RagBenchmarkReport candidate =
+        withGroundingDecisions(report("rust-ffm", "sha", 100, 1_000), 9, 15, 3, 0);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+  }
+
+  @Test
+  void countsModelAnswersWithDerivedCitationsAsModelContribution() {
+    RagBenchmarkReport candidate =
+        withDerivedCitationAnswers(report("rust-ffm", "sha", 100, 1_000), 9, 15, 3);
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(9);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+  }
+
   private static RagBenchmarkReport report(
       String backend,
       String artifactSha256,
@@ -128,8 +244,123 @@ class RagProductionQualificationPolicyTest {
             1.0,
             RagPerformanceTier.PRODUCTION_READY),
         RagPerformanceTier.PRODUCTION_READY,
-        List.of(),
+        runs(backend, 27, 0, 0, 0),
         List.of());
+  }
+
+  private static RagBenchmarkReport withGroundingDecisions(
+      RagBenchmarkReport report,
+      int modelAnswers,
+      int extractiveFallbacks,
+      int retrievalAbstentions,
+      int incorrectModelAnswers) {
+    return new RagBenchmarkReport(
+        report.schemaVersion(),
+        report.generatedAt(),
+        report.framework(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        report.settings(),
+        report.environment(),
+        report.backendDiagnostics(),
+        report.hostedApiPricing(),
+        report.summary(),
+        report.performanceTier(),
+        runs(
+            report.backend(),
+            modelAnswers,
+            extractiveFallbacks,
+            retrievalAbstentions,
+            incorrectModelAnswers),
+        report.failures());
+  }
+
+  private static List<RagRun> runs(
+      String backend,
+      int modelAnswers,
+      int extractiveFallbacks,
+      int retrievalAbstentions,
+      int incorrectModelAnswers) {
+    ArrayList<RagRun> runs = new ArrayList<>();
+    for (int index = 0; index < modelAnswers; index++) {
+      runs.add(
+          run(
+              backend,
+              runs.size(),
+              GroundingDecision.MODEL_ANSWER,
+              index >= incorrectModelAnswers));
+    }
+    for (int index = 0; index < extractiveFallbacks; index++) {
+      runs.add(run(backend, runs.size(), GroundingDecision.EXTRACTIVE_FALLBACK, true));
+    }
+    for (int index = 0; index < retrievalAbstentions; index++) {
+      runs.add(run(backend, runs.size(), GroundingDecision.RETRIEVAL_ABSTENTION, true));
+    }
+    return List.copyOf(runs);
+  }
+
+  private static RagBenchmarkReport withDerivedCitationAnswers(
+      RagBenchmarkReport report,
+      int modelAnswers,
+      int extractiveFallbacks,
+      int retrievalAbstentions) {
+    ArrayList<RagRun> runs = new ArrayList<>();
+    for (int index = 0; index < modelAnswers; index++) {
+      runs.add(
+          run(
+              report.backend(),
+              runs.size(),
+              GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS,
+              true));
+    }
+    for (int index = 0; index < extractiveFallbacks; index++) {
+      runs.add(run(report.backend(), runs.size(), GroundingDecision.EXTRACTIVE_FALLBACK, true));
+    }
+    for (int index = 0; index < retrievalAbstentions; index++) {
+      runs.add(run(report.backend(), runs.size(), GroundingDecision.RETRIEVAL_ABSTENTION, true));
+    }
+    return new RagBenchmarkReport(
+        report.schemaVersion(),
+        report.generatedAt(),
+        report.framework(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        report.settings(),
+        report.environment(),
+        report.backendDiagnostics(),
+        report.hostedApiPricing(),
+        report.summary(),
+        report.performanceTier(),
+        runs,
+        report.failures());
+  }
+
+  private static RagRun run(
+      String backend, int index, GroundingDecision decision, boolean correct) {
+    GenerationResult generation = new GenerationResult("answer", 100, 2, 100, 120, 200, 0);
+    RagEvaluation evaluation = new RagEvaluation(1, 1, 1, 1, 1, false, correct);
+    return new RagRun(
+        "plain-java",
+        backend,
+        "model",
+        "case-" + index,
+        List.of(),
+        "prompt-" + index,
+        1,
+        1,
+        125,
+        generation,
+        new GroundedAnswer("answer", "answer", decision),
+        evaluation,
+        evaluation);
   }
 
   private static RagBenchmarkSummary summary(
@@ -167,8 +398,24 @@ class RagProductionQualificationPolicyTest {
   }
 
   private static RagBenchmarkSettings settings() {
+    return settings(
+        Map.of(
+            "temperature", "0",
+            "topK", "1",
+            "topP", "1",
+            "seed", "42",
+            "repetitionPenalty", "1"));
+  }
+
+  private static RagBenchmarkSettings settings(Map<String, String> generationControls) {
+    return settings(RagWorkload.GENERAL.id(), generationControls);
+  }
+
+  private static RagBenchmarkSettings settings(
+      String workload, Map<String, String> generationControls) {
     return new RagBenchmarkSettings(
         "corpus-sha",
+        workload,
         List.of("case-one", "case-two"),
         "chatml-no-think",
         1,
@@ -179,7 +426,7 @@ class RagProductionQualificationPolicyTest {
         8,
         GroundedAnswerPolicy.POLICY_ID,
         2.0f,
-        Map.of("temperature", "0"));
+        generationControls);
   }
 
   private static RagBenchmarkEnvironment environment(String hostname) {
@@ -237,6 +484,28 @@ class RagProductionQualificationPolicyTest {
         report.hostedApiPricing(),
         summary,
         RagPerformancePolicy.classify(summary.policyMetrics()),
+        report.runs(),
+        report.failures());
+  }
+
+  private static RagBenchmarkReport withSettings(
+      RagBenchmarkReport report, RagBenchmarkSettings settings) {
+    return new RagBenchmarkReport(
+        report.schemaVersion(),
+        report.generatedAt(),
+        report.framework(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        settings,
+        report.environment(),
+        report.backendDiagnostics(),
+        report.hostedApiPricing(),
+        report.summary(),
+        report.performanceTier(),
         report.runs(),
         report.failures());
   }

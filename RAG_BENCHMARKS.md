@@ -4,30 +4,140 @@ Last updated: 2026-07-24
 
 ## Result
 
-No measured **local Qwen3 1.7B path** is ready for a production RAG claim.
-The hosted control changes the broader developer-facing result: OpenAI
-GPT-5.4 nano passes every latency and strict-quality gate on this workload.
-Anthropic Claude Haiku 4.5 and DeepSeek V4 Flash pass the latency gates, but
-their deterministic exact-phrase score is 88.9%.
+Seven exact artifacts now clear the current absolute RAG SLOs, minimum model
+contribution, and same-host Ollama comparison:
 
-Ollama has acceptable single-request latency on this workload: p95 TTFT is
-693.6 ms and p95 end-to-end latency is 4.03 seconds. llama.cpp is usable but
-misses the project's 1-second production TTFT gate at 1.29 seconds. Both
-produce seven of nine exact contract-compliant answers, or 77.8%. Treating a
-trailing period after `INSUFFICIENT_CONTEXT` as semantically equivalent raises
-both native paths to eight of nine, or 88.9%, which still misses the 90%
-quality gate.
+- **SmolLM2 360M Q8_0** is `PRODUCTION_READY` for the general guarded-RAG
+  workload through plain Java, LangChain4j, and Spring AI.
+- **Qwen3 0.6B Q4_0** is `PRODUCTION_READY` for the coding guarded-RAG workload
+  through pure Java. Its profiled unsigned-pairwise Q4 kernel reaches 99.7% of
+  Ollama and 46.7% of llama.cpp median decode throughput.
+- **Qwen3 1.7B Q8_0** is `USABLE` for the general guarded-RAG workload. Its
+  Models Rust/FFM path reaches 100.1% of Ollama and 70.6% of llama.cpp median
+  decode throughput, with p95 end-to-end latency 1.15x and 1.26x respectively.
+- **Qwen2.5-Coder 0.5B Q8_0** is `PRODUCTION_READY` for the coding workload
+  through both pure Java and Rust/FFM. Rust/FFM reaches 132.8% of Ollama and
+  67.0% of llama.cpp median decode throughput while preserving 15 correct model
+  answers across 27 trials.
+- **Qwen2.5-Coder 0.5B Q4_0** is `PRODUCTION_READY` for the coding workload
+  through its measured hybrid profile. Rust/FFM prefill, the unsigned-pairwise
+  Java Q4 decode kernel, and four row workers reach 80.7% of Ollama median
+  decode throughput while preserving 12 correct model answers.
+- **Qwen2.5-Coder 1.5B Q4_0** is `USABLE` for the coding workload through its
+  measured hybrid profile. It reaches 80.2% of Ollama and 48.9% of llama.cpp
+  median decode throughput while preserving 15 correct model answers.
+- **Qwen2.5-Coder 1.5B Q8_0** is `USABLE` for the coding workload through
+  Rust/FFM prefill. It reaches 89.9% of Ollama and 69.4% of llama.cpp median
+  decode throughput while preserving 15 correct model answers.
 
-The tuned pure-Java Qwen3 1.7B candidate decodes at 18.39 tok/s, essentially
-the same as Ollama's 18.60 tok/s and 71.8% of llama.cpp's 25.62 tok/s. Its
-prompt path is not competitive: p95 TTFT is 5.35 seconds, 4.13x llama.cpp and
-7.71x Ollama. It also produces only six of nine exact answers and leaks Qwen
-control tokens or continues beyond an end marker in the failed cases.
+These are guarded, workload-specific qualifications, not claims of unrestricted
+question-answering quality. Every report preserves raw output, final grounded
+output, decision type, artifact SHA-256, corpus SHA-256, workload ID, runtime
+controls, and same-host comparator evidence. Exact reports are under
+`benchmark-results/certified-20260724/rag/native-q8-prefix-cache/` and
+`benchmark-results/certified-20260724/rag/native-q4-profiled/`.
 
-LangChain4j and Spring AI do not materially change these results. Their
-measured adapter overhead remains below 24 ms at p95, while inference consumes
-hundreds or thousands of milliseconds. The remaining blockers are pure-Java
-prefill, correct chat/stop-token behavior, and model instruction adherence.
+The older Qwen3 framework and hosted-provider tables below remain useful
+historical diagnostics, but they predate cross-request KV reuse and the current
+grounding/model-contribution policies. The certified sections and executable
+`CertifiedRagEvidenceTest` are authoritative when the results differ.
+
+## SmolLM2 Q8_0 Launch Qualification
+
+The current-schema SmolLM2 matrix uses an 8-vCPU EPYC Milan host, GraalVM Java
+25.0.3, a fixed 1 GiB heap, the exact 386,404,992-byte artifact, one complete
+warmup, and 27 measured requests per row. All engines receive the same 27
+prompt hashes.
+
+| Java path | Backend | Prefix cache | Tier | p95 TTFT | Median decode | p95 end to end | Grounded quality |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| Plain Java | pure Java | no | USABLE | 1,621.9 ms | 44.12 tok/s | 3,007.3 ms | 100% |
+| Plain Java | Rust/FFM | no | USABLE | 1,082.3 ms | 44.15 tok/s | 2,466.9 ms | 100% |
+| Plain Java | pure Java | yes | PRODUCTION_READY | 756.6 ms | 43.69 tok/s | 2,145.5 ms | 100% |
+| Plain Java | Rust/FFM | yes | PRODUCTION_READY | 552.8 ms | 43.92 tok/s | 1,935.0 ms | 100% |
+| LangChain4j | Rust/FFM | yes | PRODUCTION_READY | 552.2 ms | 43.93 tok/s | 1,943.9 ms | 100% |
+| Spring AI | Rust/FFM | yes | PRODUCTION_READY | 550.9 ms | 43.96 tok/s | 1,944.2 ms | 100% |
+| Plain Java | Ollama | engine-managed | PRODUCTION_READY | 197.2 ms | 43.73 tok/s | 2,485.7 ms | 100% |
+| Plain Java | llama.cpp | disabled | PRODUCTION_READY | 365.5 ms | 102.23 tok/s | 1,004.4 ms | 100% |
+
+Models retained 3,153 of 5,064 input tokens as an exact cross-request KV
+prefix. Rust/FFM p95 TTFT fell 48.9%, p95 end-to-end latency fell 21.6%, and
+CPU time fell 40.7% without changing one raw output. Cached Rust/FFM reaches
+91.4% of Ollama's median end-to-end performance and exceeds Ollama at p95 for
+this response mix. It remains behind on TTFT and behind llama.cpp decode, so
+the broader optimization work is not complete.
+
+## Qwen Qualifications
+
+All rows use the exact named artifact on the same 8-vCPU EPYC Milan host, one
+complete warmup, 27 measured requests, 2,048-token context, 64-token output
+cap, and deterministic sampling.
+
+| Model and workload | Backend | Tier | p95 TTFT | Median decode | p95 end to end | Grounded quality |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Qwen3 0.6B Q4_0, coding | Models pure Java | PRODUCTION_READY | 555.2 ms | 51.02 tok/s | 1,416.1 ms | 100% |
+| Qwen3 0.6B Q4_0, coding | Models Rust/FFM | PRODUCTION_READY | 568.0 ms | 50.56 tok/s | 1,379.3 ms | 100% |
+| Qwen3 0.6B Q4_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 336.2 ms | 51.16 tok/s | 1,381.0 ms | 100% |
+| Qwen3 0.6B Q4_0, coding | llama.cpp b10012 | PRODUCTION_READY | 388.8 ms | 109.28 tok/s | 795.8 ms | 100% |
+| Qwen3 1.7B Q8_0, general | Models pure Java | OFFLINE | 4,736.8 ms | 18.11 tok/s | 7,336.4 ms | 100% |
+| Qwen3 1.7B Q8_0, general | Models Rust/FFM | USABLE | 1,747.6 ms | 17.99 tok/s | 4,785.1 ms | 100% |
+| Qwen3 1.7B Q8_0, general | Ollama 0.32.0 | PRODUCTION_READY | 697.7 ms | 17.97 tok/s | 4,155.5 ms | 100% |
+| Qwen3 1.7B Q8_0, general | llama.cpp b10012 | USABLE | 1,308.3 ms | 25.48 tok/s | 3,795.2 ms | 100% |
+| Qwen2.5-Coder 0.5B Q8_0, coding | Models pure Java | PRODUCTION_READY | 617.0 ms | 51.63 tok/s | 1,173.2 ms | 100% |
+| Qwen2.5-Coder 0.5B Q8_0, coding | Models Rust/FFM | PRODUCTION_READY | 434.6 ms | 53.01 tok/s | 980.4 ms | 100% |
+| Qwen2.5-Coder 0.5B Q8_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 301.6 ms | 39.93 tok/s | 1,164.1 ms | 100% |
+| Qwen2.5-Coder 0.5B Q8_0, coding | llama.cpp b10012 | PRODUCTION_READY | 336.9 ms | 79.19 tok/s | 733.4 ms | 100% |
+| Qwen2.5-Coder 0.5B Q4_0, coding | Models pure Java | PRODUCTION_READY | 982.9 ms | 38.95 tok/s | 2,509.9 ms | 100% |
+| Qwen2.5-Coder 0.5B Q4_0, coding | Models Rust/FFM, 4 workers | PRODUCTION_READY | 390.3 ms | 39.50 tok/s | 1,941.2 ms | 100% |
+| Qwen2.5-Coder 0.5B Q4_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 283.4 ms | 48.95 tok/s | 1,592.8 ms | 100% |
+| Qwen2.5-Coder 0.5B Q4_0, coding | llama.cpp b10012 | PRODUCTION_READY | 298.2 ms | 112.46 tok/s | 837.1 ms | 100% |
+| Qwen2.5-Coder 1.5B Q4_0, coding | Models Rust/FFM, default Java Q4 | USABLE | 1,163.6 ms | 13.06 tok/s | 3,677.1 ms | 100% |
+| Qwen2.5-Coder 1.5B Q4_0, coding | Models Rust/FFM, profiled Java Q4 | USABLE | 1,162.1 ms | 23.72 tok/s | 2,545.6 ms | 100% |
+| Qwen2.5-Coder 1.5B Q4_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 584.0 ms | 29.58 tok/s | 1,830.0 ms | 100% |
+| Qwen2.5-Coder 1.5B Q4_0, coding | llama.cpp b10012 | PRODUCTION_READY | 943.3 ms | 48.46 tok/s | 1,659.5 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | Models pure Java | USABLE | 1,884.0 ms | 19.77 tok/s | 3,588.8 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | Models Rust/FFM | USABLE | 1,288.0 ms | 19.70 tok/s | 3,003.5 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | Ollama 0.32.0 | PRODUCTION_READY | 660.3 ms | 21.92 tok/s | 2,325.8 ms | 100% |
+| Qwen2.5-Coder 1.5B Q8_0, coding | llama.cpp b10012 | USABLE | 1,083.3 ms | 28.37 tok/s | 2,317.3 ms | 100% |
+
+Each Qwen3 artifact contributes 12 correct model answers, uses 12 extractive
+fallbacks, and abstains for 3 unsupported requests. Qwen2.5-Coder preserves 15
+correct model answers with deterministically derived source IDs, uses 9
+conservative fallbacks for incomplete answers, and abstains for 3 unsupported
+requests. The latter clears both relative gates: its p95 end-to-end latency is
+0.84x Ollama and 1.34x llama.cpp. Pure Java independently clears both gates at
+129.3% of Ollama and 65.2% of llama.cpp decode; Rust/FFM remains the recommended
+profile because it improves prefill by 45.5%, p95 TTFT by 29.6%, p95
+end-to-end latency by 16.4%, and measured CPU by 20.8% on the same workload.
+
+The Qwen2.5-Coder Q4_0 artifact contributes 12 correct model answers, uses 12
+extractive fallbacks, and abstains for 3 unsupported requests. Its selected
+hybrid reaches 80.7% of Ollama and 35.1% of llama.cpp decode, with p95
+end-to-end ratios of 1.22 and 2.32. Only Ollama clears the relative policy, as
+required for qualification. The pure-Java control misses both Ollama relative
+limits at 79.6% decode and 1.58x p95 end-to-end latency. Rust prefill plus four
+row workers improves prefill throughput 2.59x, p95 TTFT 60.3%, p95 end-to-end
+22.7%, and measured CPU 49.3% relative to that control.
+
+The 1.5B Q4_0 artifact contributes 15 correct model answers, uses 9 extractive
+fallbacks, and abstains for 3 unsupported requests. Its selected hybrid reaches
+80.2% of Ollama and 48.9% of llama.cpp decode, with p95 end-to-end ratios of
+1.39 and 1.53; both comparators clear the relative policy. It is classified
+`USABLE` because p95 TTFT is 1.16 seconds, above the stricter 1-second
+`PRODUCTION_READY` target but below the 2-second interactive ceiling. Relative
+to the unprofiled Rust/FFM path, the exact unsigned-Q4/four-worker profile
+improves decode 1.82x, reduces p95 end-to-end latency 30.8%, and reduces
+measured CPU 50.3%. All 27 raw generations are byte-identical.
+
+The 1.5B Q8_0 artifact also contributes 15 correct model answers, uses 9
+extractive fallbacks, and abstains for 3 unsupported requests. Rust/FFM reaches
+89.9% of Ollama and 69.4% of llama.cpp decode, with p95 end-to-end ratios of
+1.29 against both controls. Pure Java independently remains `USABLE` but
+narrowly misses Ollama's relative end-to-end ceiling at 1.54x. Rust prefill
+improves prefill throughput 1.46x, p95 TTFT 31.6%, p95 end-to-end latency
+16.3%, and measured CPU 20.2%. Pure Java and Rust/FFM both produce 27 correct
+grounded answers, but their raw generations and contribution decisions differ;
+this is semantic parity, not byte-identical output.
 
 ## What Acceptable Means
 
@@ -81,13 +191,15 @@ The executable `models-rag-bench` module runs the same workload through:
 - Python against a revision-matched llama.cpp server; and
 - optionally, the direct `llama-cpp-python` binding.
 
-The committed synthetic Northstar corpus contains 12 short policy documents,
+The committed `general` and `coding` corpora each contain 12 short documents,
 eight answerable questions, and one deliberately unanswerable question. Lucene
 BM25 and Python BM25S use top-1 retrieval and agree on all retrieved documents
 and rendered prompt hashes. The evaluator checks required facts, source IDs,
 unsupported citations, and exact `INSUFFICIENT_CONTEXT` abstention without an
-LLM judge. Temperature is zero, top-k is one, prompt caching is disabled, and
-every measured Qwen3 1.7B path receives the same ChatML-no-think prompt bytes.
+LLM judge. Temperature is zero and top-k is one. The historical Qwen3 1.7B
+matrix disables prompt caching and sends the same ChatML-no-think prompt bytes.
+The current qualification matrices include longest-common-prefix KV reuse and
+retain cache read/write token counts in every report.
 
 The strict abstention contract intentionally counts `INSUFFICIENT_CONTEXT.` as
 instruction noncompliance. Normalizing that trailing period raises each native
@@ -98,7 +210,11 @@ its extra citation and control-token failures remain. Production applications
 should use schema-constrained output rather than punctuation-sensitive control
 text.
 
-## Environment
+## Historical Qwen3 1.7B Baseline
+
+This section records the pre-prefix-cache diagnostic matrix. It explains the
+bottlenecks that motivated the retained runtime changes but is superseded for
+qualification purposes by the current tables above.
 
 | Property | Controlled value |
 | --- | --- |
@@ -112,7 +228,7 @@ text.
 | llama.cpp | `b10012`, commit `c71854292` |
 | llama-cpp-python | `0.3.34` bundled native revision |
 | Ollama | `0.32.0` |
-| Main qualified artifact | Qwen3 1.7B Q8_0, 1,834,426,016 bytes |
+| Measured artifact | Qwen3 1.7B Q8_0, 1,834,426,016 bytes |
 | Artifact SHA-256 | `061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a` |
 | Context / threads / output cap | 2,048 / 8 / 64 tokens |
 
@@ -189,16 +305,21 @@ end-of-generation metadata correctly and stop before exposing control tokens.
 
 | Model | Scope | Best measured behavior | Production finding |
 | --- | --- | --- | --- |
-| SmolLM2 360M Q8_0 | Engine diagnostics plus historical full suite | Pure Java reaches 44.86 tok/s; llama.cpp reaches 98.31 tok/s | Historical full-suite quality was poor. The current speedup does not qualify answer quality. |
-| Qwen3 0.6B Q4_0 | Engine and prompt diagnostics | Pure Java reaches 60.34 tok/s, 125.7% of Ollama and 59.4% of llama.cpp | It is responsive, but the current study does not quality-qualify it for RAG. |
+| SmolLM2 360M Q8_0 | Current guarded RAG suite across plain Java, LangChain4j, and Spring AI | Rust/FFM reaches 43.92 tok/s and about 0.55 seconds p95 TTFT with prefix reuse | `PRODUCTION_READY` for the committed trusted-retrieval policy; raw model-only correctness is 66.7%, so unguarded QA is not qualified. |
+| Qwen3 0.6B Q4_0 | Current coding guarded-RAG suite | Profiled pure Java reaches 51.02 tok/s, 99.7% of Ollama and 46.7% of llama.cpp | `PRODUCTION_READY`; 12 of 27 accepted answers retain model text and all 12 are correct. |
 | MiniCPM5 1B Q4_K_M | Prompt diagnostics | Pure Java reaches 15.87 tok/s, but p95 TTFT is 7.17 seconds | Its prompt/template profile and pure-Java K-quant prefill remain unresolved. |
-| Qwen3 1.7B Q8_0 | Full suite across plain Java, LangChain4j, and Spring AI | Pure-Java decode is near Ollama; Ollama meets the latency gate at concurrency one | Native exact/tolerant quality is 77.8%/88.9%. Pure Java is 66.7%/77.8%, leaks control tokens, and misses usable TTFT. |
+| Qwen3 1.7B Q8_0 | Current general guarded-RAG suite | Rust/FFM reaches 17.99 tok/s, 100.1% of Ollama and 70.6% of llama.cpp, at 1.15x Ollama p95 end-to-end latency | `USABLE`; 12 of 27 accepted answers come from the model and all 12 are correct. |
+| Qwen2.5-Coder 0.5B Q8_0 | Current coding guarded-RAG suite | Pure Java and Rust/FFM both qualify; Rust/FFM reaches 53.01 tok/s, 132.8% of Ollama and 67.0% of llama.cpp, with lower p95 end-to-end latency than Ollama | `PRODUCTION_READY`; 15 of 27 accepted answers retain model text and all 15 are correct. |
+| Qwen2.5-Coder 0.5B Q4_0 | Current coding guarded-RAG suite | Profiled Rust/FFM reaches 39.50 tok/s, 80.7% of Ollama and 35.1% of llama.cpp, at 1.22x Ollama p95 end-to-end latency | `PRODUCTION_READY`; 12 of 27 accepted answers retain model text and all 12 are correct. Pure Java remains a nonqualifying control. |
+| Qwen2.5-Coder 1.5B Q4_0 | Current coding guarded-RAG suite | Profiled Rust/FFM reaches 23.72 tok/s, 80.2% of Ollama and 48.9% of llama.cpp, at 1.39x Ollama p95 end-to-end latency | `USABLE`; 15 of 27 accepted answers retain model text and all 15 are correct. |
+| Qwen2.5-Coder 1.5B Q8_0 | Current coding guarded-RAG suite | Rust/FFM reaches 19.70 tok/s, 89.9% of Ollama and 69.4% of llama.cpp, at 1.29x Ollama p95 end-to-end latency | `USABLE`; 15 of 27 accepted answers retain model text and all 15 are correct. Pure Java narrowly misses the relative end-to-end gate. |
 
-Retrieval is perfect in every full run. The failed answerable case is therefore
-generation, not search: Qwen3 1.7B says the context does not state whether a
-telemedicine referral is required even though the retrieved passage explicitly
-says no referral is required. This is exactly why token throughput cannot stand
-in for RAG viability.
+Retrieval is perfect in every full run. The historical failed answerable case
+was therefore generation, not search: Qwen3 1.7B said the context did not state
+whether a telemedicine referral was required even though the retrieved passage
+explicitly said no referral was required. The current grounding policy
+conservatively replaces that incomplete output. This is exactly why token
+throughput cannot stand in for RAG viability.
 
 ## Hosted API Comparison
 
@@ -245,7 +366,7 @@ proposition is privacy, offline operation, predictable marginal cost, and
 in-process deployment; it cannot presently be marketed as faster than these
 hosted controls.
 
-## Required Before A Production Claim
+## Required Before A Broad Production Claim
 
 1. Qualify stronger 3B, 7B, and 8B instruction models. The sub-1B catalog is
    valuable for compatibility and constrained tasks, but it is not a credible
@@ -266,10 +387,10 @@ hosted controls.
 6. Measure the Ollama runner process tree rather than only `ollama serve`; the
    current Ollama RSS field covers the parent service and understates model
    memory.
-7. Continue pure-Java prefill optimization without surrendering the decode
-   gains. Qwen3 1.7B decode is now 71.8% of llama.cpp and 98.8% of Ollama on
-   the RAG workload, while controlled prefill remains only 26.7% of either
-   native engine. TTFT needs about a 4.1x reduction to match llama.cpp.
+7. Continue prefill and decode optimization without surrendering exact output
+   behavior. Prefix reuse moved SmolLM2 Q8_0 into the production latency gate,
+   but cached Rust/FFM still reaches only 66.1% of llama.cpp p95 TTFT
+   performance and 43.0% of its median decode throughput.
 8. Repeat the matrix on Apple Silicon and a production-shaped x86 server. These
    results describe one controlled AVX2 CPU host, not every deployment target.
 9. Repeat the hosted matrix from multiple regions and at concurrency 1, 2, 4,

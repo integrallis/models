@@ -27,6 +27,13 @@ reset Ollama between processes to prevent its persistent prompt cache from
 reusing the repeated measurement series. See the nested README for its
 separate controls, aggregate values, and non-qualification finding.
 
+The `native-q5-decode/` reports retain the SQLCoder-7B-2 Q5_K_M native-decode
+dispatch qualification. The strict same-GGUF comparator uses two warmups, ten
+four-token trials, four workers, and exact output-hash agreement. A separate
+max-64-token early-stop screen is explicitly diagnostic because SQLCoder emits
+EOS before the limit and the HTTP engines include the terminal token in their
+reported token count.
+
 The `rag/` reports contain a 12-document synthetic corpus and nine cases. Plain
 Java uses one warmup and three measured iterations, for 27 requests per
 backend. LangChain4j and Spring AI use one warmup and one measured iteration,

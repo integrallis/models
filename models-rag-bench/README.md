@@ -1,22 +1,31 @@
 # Production RAG benchmark
 
-`models-rag-bench` is one controlled RAG workload with three Java application
-paths:
+`models-rag-bench` provides versioned controlled RAG workloads through three
+Java application paths:
 
 - plain Java using the Models runtime directly
 - LangChain4j using `DefaultRetrievalAugmentor`
 - Spring AI using `RetrievalAugmentationAdvisor`
 
-The Python baseline uses the same committed corpus and prompt contract with
-BM25S, the official Ollama client, revision-matched llama.cpp server HTTP, or an
-optional direct `llama-cpp-python` binding.
+The Python general-workload baseline uses the same committed corpus and prompt
+contract with BM25S, the official Ollama client, revision-matched llama.cpp
+server HTTP, or an optional direct `llama-cpp-python` binding.
 
 ## Workload contract
 
-The synthetic Northstar policy corpus has 12 documents, eight answerable
-questions, and one unanswerable question. Every answerable case declares its
-required facts and source IDs. Answers must cite the source, while the
-unanswerable case must return exactly `INSUFFICIENT_CONTEXT`.
+`--workload general` selects the synthetic Northstar policy corpus.
+`--workload coding` selects Java, Gradle, HTTP, database, and JSON implementation
+notes intended to evaluate coding-specialized models. Each workload has 12
+documents, eight answerable questions, and one unanswerable question. Every
+answerable case declares its required facts and source IDs, while the
+unanswerable case must return exactly `INSUFFICIENT_CONTEXT`. `general` remains
+the default.
+
+Models are encouraged to emit source IDs, but source formatting is not treated
+as generation quality. When an otherwise supported answer omits citations, the
+grounding layer retains the model text, appends retrieved provenance, and records
+`MODEL_ANSWER_WITH_DERIVED_CITATIONS`. Unsupported output still uses an
+extractive fallback.
 
 The controlled comparison uses top-1 BM25 retrieval because each case has one
 relevant source. Lucene and BM25S agree on every top result and all nine
@@ -26,15 +35,21 @@ but reports with different prompt hashes are not directly comparable.
 Use `--prompt-template chatml` for ChatML-family instruction models such as
 Qwen3, SmolLM2, and MiniCPM5. The benchmark applies the envelope itself and
 sends raw requests to native servers, ensuring every backend receives the same
-model-facing bytes. `--prompt-template raw` remains available for base models
-and is the default so template selection is never hidden. Use
+model-facing bytes. The grounding policy is a native system turn and the
+retrieved evidence plus question is a native user turn. `--prompt-template raw`
+remains available for base models and is the default so template selection is
+never hidden. Use
 `--prompt-template chatml-no-think` for reasoning models whose GGUF template
 supports `enable_thinking=false`; it prefills the template's empty reasoning
-block so the measured output budget contains the answer.
+block so the measured output budget contains the answer. Use
+`--prompt-template zephyr` for Zephyr-family chat models such as TinyLlama
+1.1B Chat; it places the grounding policy in the model's system turn and the
+evidence plus question in its user turn, then emits EOS and assistant-generation
+markers explicitly.
 
 The report records:
 
-- artifact and corpus SHA-256
+- artifact and corpus SHA-256 plus the workload ID
 - retrieval and framework overhead p50/p95
 - model load, TTFT, TPOT, end-to-end p50/p95, prefill and decode throughput
 - process CPU and Linux peak RSS when `--pid` is supplied
@@ -69,6 +84,53 @@ for framework in plain-java langchain4j spring-ai; do
 done
 ```
 
+Run the Models-owned Rust/FFM projection backend through the same application
+paths:
+
+```shell
+export JAVA_OPTS="--enable-native-access=ALL-UNNAMED \
+  -Dmodels.native.kernels.library=/absolute/path/to/libjmodels_kernels"
+
+for framework in plain-java langchain4j spring-ai; do
+  models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+    --framework "$framework" \
+    --backend rust-ffm \
+    --model ~/.jvllm/models/smollm2-360m-instruct-q8_0.gguf \
+    --model-id smollm2-360m-instruct-q8_0 \
+    --workload general \
+    --prompt-template chatml \
+    --context 2048 \
+    --threads 8 \
+    --max-tokens 64 \
+    --warmups 1 \
+    --iterations 3 \
+    --output "build/reports/rag/smollm2-${framework}-rust-ffm.json"
+done
+```
+
+Use the coding workload for a coding-specialized model:
+
+```shell
+models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+  --framework plain-java \
+  --backend rust-ffm \
+  --model ~/.jvllm/models/qwen2.5-coder-0.5b-instruct-q8_0.gguf \
+  --model-id qwen2.5-coder-0.5b-instruct-q8_0 \
+  --workload coding \
+  --prompt-template chatml \
+  --context 2048 \
+  --threads 8 \
+  --max-tokens 64 \
+  --warmups 1 \
+  --iterations 3
+```
+
+In-process backends retain the longest exact token prefix between sequential
+requests and report the reused and newly evaluated token counts separately.
+The final prompt token is always replayed, so an identical prompt never relies
+on a stale logits buffer. Backends without checkpoint/rewind support continue
+to reset and prefill the complete prompt.
+
 `--modeljar` resolves the exact artifact and applies only performance profiles
 whose artifact, processor, JVM, vector width, and required launch arguments all
 match. Use the catalog's recommended Java runtime and startup arguments before
@@ -93,8 +155,33 @@ models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
 ```
 
 For Ollama, use `--backend ollama`, the Ollama model tag for `--model`, port
-`11434`, and the `ollama serve` PID. Both HTTP modes send the canonical prompt
-raw with temperature 0, top-k 1, top-p 1, repetition penalty 1, and seed 42.
+`11434`, and the `ollama serve` PID. Local runs default to greedy generation:
+temperature 0, sampling top-k 1, top-p 1, repetition penalty 1, and seed 42.
+The benchmark passes those controls identically to Models, Ollama, and
+llama.cpp and records them in every report.
+
+Models that require their published sampling profile can override the local
+controls explicitly. For example, MiniCPM5 no-think mode recommends temperature
+0.7 and top-p 0.95:
+
+```shell
+models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+  --framework plain-java \
+  --backend rust-ffm \
+  --model ~/.jvllm/models/MiniCPM5-1B-Q4_K_M.gguf \
+  --model-id minicpm5-1b-q4_k_m \
+  --prompt-template chatml-no-think \
+  --temperature 0.7 \
+  --top-p 0.95 \
+  --sampling-top-k 40 \
+  --seed 42 \
+  --repetition-penalty 1 \
+  --threads 8
+```
+
+Use the same values for the corresponding Ollama and llama.cpp runs.
+Qualification rejects reports whose generation controls differ, so a faster
+but semantically different comparator cannot pass the relative gate.
 
 ## Hosted API comparison
 

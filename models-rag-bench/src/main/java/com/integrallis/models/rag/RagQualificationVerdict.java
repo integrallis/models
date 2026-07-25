@@ -19,6 +19,7 @@ package com.integrallis.models.rag;
 public enum RagQualificationVerdict {
   QUALIFIED,
   FAILED_ABSOLUTE_GATE,
+  FAILED_MODEL_CONTRIBUTION_GATE,
   NO_COMPARABLE_BASELINE,
   FAILED_RELATIVE_GATE
 }
