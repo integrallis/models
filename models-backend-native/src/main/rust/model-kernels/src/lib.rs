@@ -3,6 +3,7 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 
@@ -50,6 +51,7 @@ const Q4_K_BLOCK_BYTES: usize = 144;
 const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
+const WORKER_SPIN_ITERS: usize = 4_000;
 
 #[derive(Clone, Copy)]
 enum DotKernel {
@@ -166,14 +168,17 @@ struct WorkerPool {
     execution: Mutex<()>,
 }
 
+#[repr(align(128))]
+struct CachePadded<T>(T);
+
 struct WorkerShared {
+    generation: CachePadded<AtomicU64>,
     state: Mutex<WorkerState>,
     work_available: Condvar,
     work_complete: Condvar,
 }
 
 struct WorkerState {
-    generation: u64,
     shutdown: bool,
     job: Option<ParallelJob>,
     remaining: usize,
@@ -208,8 +213,8 @@ impl WorkerPool {
     fn new(requested_threads: usize) -> Result<Self, ()> {
         let total_threads = requested_threads.max(1);
         let shared = Arc::new(WorkerShared {
+            generation: CachePadded(AtomicU64::new(0)),
             state: Mutex::new(WorkerState {
-                generation: 0,
                 shutdown: false,
                 job: None,
                 remaining: 0,
@@ -250,7 +255,7 @@ impl WorkerPool {
             state.job = Some(job);
             state.remaining = self.workers.len();
             state.failed = false;
-            state.generation = state.generation.wrapping_add(1);
+            self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
         }
 
@@ -273,7 +278,7 @@ impl Drop for WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.shutdown = true;
-            state.generation = state.generation.wrapping_add(1);
+            self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
         }
         for worker in self.workers.drain(..) {
@@ -286,14 +291,22 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
     let mut observed_generation = 0;
     loop {
         let job = {
+            let mut next_generation =
+                poll_generation(&shared.generation.0, observed_generation, WORKER_SPIN_ITERS);
             let mut state = lock(&shared.state);
-            while !state.shutdown && state.generation == observed_generation {
+            while !state.shutdown && next_generation.is_none() {
+                let published_generation = shared.generation.0.load(Ordering::Acquire);
+                if published_generation != observed_generation {
+                    next_generation = Some(published_generation);
+                    break;
+                }
                 state = wait(&shared.work_available, state);
             }
             if state.shutdown {
                 return;
             }
-            observed_generation = state.generation;
+            observed_generation =
+                next_generation.unwrap_or_else(|| shared.generation.0.load(Ordering::Acquire));
             state.job.expect("worker generation must provide a job")
         };
         let succeeded = catch_unwind(AssertUnwindSafe(|| {
@@ -308,6 +321,21 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
             shared.work_complete.notify_one();
         }
     }
+}
+
+fn poll_generation(
+    generation: &AtomicU64,
+    observed_generation: u64,
+    iterations: usize,
+) -> Option<u64> {
+    for _ in 0..iterations {
+        let published_generation = generation.load(Ordering::Acquire);
+        if published_generation != observed_generation {
+            return Some(published_generation);
+        }
+        std::hint::spin_loop();
+    }
+    None
 }
 
 unsafe fn execute_job_partition(job: ParallelJob, worker_index: usize, total_threads: usize) {
@@ -1658,14 +1686,7 @@ unsafe fn compute_q5_batched_row_range_avx2(
         for row in start_row..end_row {
             // SAFETY: AVX2, FMA, and F16C are enabled and all buffers were validated.
             let sum = unsafe {
-                dot_q5_0_q8_0_row_avx2(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    0,
-                    row,
-                    cols,
-                )
+                dot_q5_0_q8_0_row_avx2(weights, quantized, activation_scales, 0, row, cols)
             };
             // SAFETY: each worker owns this output row.
             unsafe {
@@ -2256,8 +2277,7 @@ unsafe fn unpack_q4_0_avx2(packed_weights: *const u8) -> __m256i {
 #[target_feature(enable = "avx2")]
 unsafe fn q4_0_q8_0_signed_block_sum_avx2(signed_weights: __m256i, quantized: *const i8) -> i32 {
     // SAFETY: callers provide one complete Q8_0 block.
-    let pair_sums =
-        unsafe { q4_0_q8_0_signed_pair_sums_avx2(signed_weights, quantized) };
+    let pair_sums = unsafe { q4_0_q8_0_signed_pair_sums_avx2(signed_weights, quantized) };
     horizontal_sum_i32_avx2(pair_sums)
 }
 
@@ -2310,17 +2330,12 @@ fn dot_q5_0_q8_0_row_scalar(
 }
 
 #[inline(always)]
-fn q5_0_q8_0_block_sum_scalar(
-    high_bits: u32,
-    packed_weights: &[u8],
-    quantized: &[i8],
-) -> i32 {
+fn q5_0_q8_0_block_sum_scalar(high_bits: u32, packed_weights: &[u8], quantized: &[i8]) -> i32 {
     let mut integer_sum = 0_i32;
     for lane in 0..16 {
         let packed = packed_weights[lane];
         let low = ((packed & 0x0f) | (((high_bits >> lane) as u8 & 1) << 4)) as i32 - 16;
-        let high =
-            ((packed >> 4) | (((high_bits >> (lane + 16)) as u8 & 1) << 4)) as i32 - 16;
+        let high = ((packed >> 4) | (((high_bits >> (lane + 16)) as u8 & 1) << 4)) as i32 - 16;
         integer_sum += low * quantized[lane] as i32;
         integer_sum += high * quantized[lane + 16] as i32;
     }
@@ -2351,21 +2366,14 @@ unsafe fn dot_q5_0_q8_0_row_avx2(
             )
         };
         let pair_sums = unsafe {
-            q4_0_q8_0_signed_pair_sums_avx2(
-                signed_weights,
-                quantized.as_ptr().add(input_offset),
-            )
+            q4_0_q8_0_signed_pair_sums_avx2(signed_weights, quantized.as_ptr().add(input_offset))
         };
         let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset],
             weights[weight_offset + 1],
         ]));
         let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
-        sums = _mm256_fmadd_ps(
-            _mm256_set1_ps(scale),
-            _mm256_cvtepi32_ps(pair_sums),
-            sums,
-        );
+        sums = _mm256_fmadd_ps(_mm256_set1_ps(scale), _mm256_cvtepi32_ps(pair_sums), sums);
     }
     #[cfg(test)]
     Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
@@ -3270,6 +3278,14 @@ mod tests {
     }
 
     #[test]
+    fn worker_poll_observes_a_published_generation_without_parking() {
+        let generation = std::sync::atomic::AtomicU64::new(7);
+
+        assert_eq!(poll_generation(&generation, 6, 1), Some(7));
+        assert_eq!(poll_generation(&generation, 7, 1), None);
+    }
+
+    #[test]
     fn persistent_context_reuses_activation_workspace() {
         let context = jmodels_kernels_context_create(2);
         assert!(!context.is_null());
@@ -3333,8 +3349,7 @@ mod tests {
     fn grouped_projection_uses_one_worker_generation() {
         let context = jmodels_kernels_context_create(2);
         assert!(!context.is_null());
-        let weights: [Vec<u8>; 3] =
-            std::array::from_fn(|_| vec![0_u8; 64 * Q5_0_BLOCK_BYTES]);
+        let weights: [Vec<u8>; 3] = std::array::from_fn(|_| vec![0_u8; 64 * Q5_0_BLOCK_BYTES]);
         let weight_pointers = [
             weights[0].as_ptr(),
             weights[1].as_ptr(),
@@ -3347,7 +3362,12 @@ mod tests {
         let mut output = [0_f32; 64 * 3];
         // SAFETY: the test owns the live context until the final destroy call.
         let context_ref = unsafe { &*context };
-        let before = lock(&context_ref.workers.shared.state).generation;
+        let before = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
 
         // SAFETY: the context and every test buffer remain live and non-aliasing for the call.
         assert_eq!(
@@ -3370,7 +3390,12 @@ mod tests {
             STATUS_OK
         );
         // SAFETY: the call completed synchronously and the context remains live.
-        let after = lock(&context_ref.workers.shared.state).generation;
+        let after = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
 
         assert_eq!(after.wrapping_sub(before), 1);
         // SAFETY: the test consumes the unique context pointer exactly once.
@@ -3534,17 +3559,16 @@ mod tests {
         for (index, quant) in quantized.iter_mut().enumerate() {
             *quant = (((index * 17 + 5) % 255) as i32 - 127) as i8;
         }
-        let activation_scales: Vec<f32> =
-            (0..BLOCKS).map(|block| 0.0078125 * (block + 1) as f32).collect();
+        let activation_scales: Vec<f32> = (0..BLOCKS)
+            .map(|block| 0.0078125 * (block + 1) as f32)
+            .collect();
 
-        let scalar =
-            dot_q5_0_q8_0_row_scalar(&weights, &quantized, &activation_scales, 0, 0, cols);
+        let scalar = dot_q5_0_q8_0_row_scalar(&weights, &quantized, &activation_scales, 0, 0, cols);
         Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(0));
         F16C_CONVERSIONS.with(|count| count.set(0));
         // SAFETY: AVX2 was detected and each buffer contains eight complete validated blocks.
-        let avx2 = unsafe {
-            dot_q5_0_q8_0_row_avx2(&weights, &quantized, &activation_scales, 0, 0, cols)
-        };
+        let avx2 =
+            unsafe { dot_q5_0_q8_0_row_avx2(&weights, &quantized, &activation_scales, 0, 0, cols) };
 
         assert!((avx2 - scalar).abs() <= 1e-3);
         Q5_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 1));
