@@ -1,0 +1,1583 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-25T19:42:42.575672638Z",
+  "framework" : "plain-java",
+  "backend" : "llama.cpp",
+  "backendVersion" : "version: 10012 (c71854292)",
+  "modelId" : "umartransit-1b-q4-k-m",
+  "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+  "artifactSha256" : "db1a4489626110145274f508b3fa30439516a47b4e721fe02d67df4679db5b9a",
+  "artifactSizeBytes" : 986048096,
+  "settings" : {
+    "corpusSha256" : "367a1e35ea2449ba2abeb29c1fbbf911bb5130f14a3955c649b1f23afe35ceb2",
+    "workload" : "transportation",
+    "caseIds" : [ "amber-route-frequency", "bravo-fare-transfer", "cobalt-platform-departure", "delta-battery-charging", "ember-wheelchair-boarding", "fjord-inspection", "grove-delay-alert", "harbor-ferry-bicycles", "unsupported-orchid-airport" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-provenance-clause-anchors-explicit-abstention-v6",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "promptCache" : "false",
+      "topP" : "1.0",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topK" : "1",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "GraalVM Community",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "llama.cpp",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 0.0,
+    "retrievalMillis" : {
+      "p50" : 1.616733,
+      "p95" : 5.6911423999999995
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.913836000000174,
+      "p95" : 2.8161605999999653
+    },
+    "ttftMillis" : {
+      "p50" : 978.551728,
+      "p95" : 1008.7354584
+    },
+    "tpotMillis" : {
+      "p50" : 22.236499652173915,
+      "p95" : 23.162948042424244
+    },
+    "endToEndMillis" : {
+      "p50" : 1463.927485,
+      "p95" : 1569.654308
+    },
+    "p50PrefillTokensPerSecond" : 164.33273739738854,
+    "p50DecodeTokensPerSecond" : 44.971106767797274,
+    "peakRssBytes" : 1754562560,
+    "totalCpuMillis" : 307270.0,
+    "totalInputTokens" : 4302,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 576,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "USABLE",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "amber-route-frequency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-amber-route",
+        "title" : "Amber bus route",
+        "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes."
+      },
+      "score" : 4.1694164,
+      "rank" : 1
+    } ],
+    "promptSha256" : "6fc721070a12d42e396052294556a8118a6515ef93bc8381aba0ab60d4d1ae59",
+    "retrievalMillis" : 3.363643,
+    "frameworkOverheadMillis" : 1.1948130000000674,
+    "endToEndMillis" : 1534.729733,
+    "generation" : {
+      "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes. [transit-amber-route]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 24,
+      "ttftMillis" : 1008.787281,
+      "totalMillis" : 1530.171277,
+      "prefillTokensPerSecond" : 162.5580047849896,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754451968,
+      "cpuMillis" : 12140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Amber route A12 connects Central Station and River Park. It runs every 12 minutes at peak.",
+      "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes. [transit-amber-route]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "bravo-fare-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-bravo-fare",
+        "title" : "Bravo fare policy",
+        "text" : "Bravo local fare is 2.40 dollars. A transfer remains valid for 90 minutes."
+      },
+      "score" : 8.051776,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cbb2cae29d8f9abe5cfb9abc99049d7e37d45b2eee9d19c33c91aca88d8d3482",
+    "retrievalMillis" : 4.659678,
+    "frameworkOverheadMillis" : 0.8318820000001779,
+    "endToEndMillis" : 1477.519111,
+    "generation" : {
+      "text" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes. [transit-bravo-fare]",
+      "inputTokens" : 159,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 981.616917,
+      "totalMillis" : 1472.027551,
+      "prefillTokensPerSecond" : 163.77704896418743,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754460160,
+      "cpuMillis" : 11690.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes.",
+      "text" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes. [transit-bravo-fare]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "cobalt-platform-departure",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-cobalt-platform",
+        "title" : "Cobalt rail platform",
+        "text" : "Cobalt express C7 departs from platform 4. Its first weekday departure is 05:45."
+      },
+      "score" : 7.957191,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4eea3e6428466338469c789c41ebc0ac8fa2d14a853f901be1a711778e3579cc",
+    "retrievalMillis" : 2.462175,
+    "frameworkOverheadMillis" : 0.903501000000233,
+    "endToEndMillis" : 1499.927243,
+    "generation" : {
+      "text" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45. [transit-cobalt-platform]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 1000.178633,
+      "totalMillis" : 1496.561567,
+      "prefillTokensPerSecond" : 166.24098898275628,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754460160,
+      "cpuMillis" : 11930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45.",
+      "text" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45. [transit-cobalt-platform]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "delta-battery-charging",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-delta-battery",
+        "title" : "Delta electric fleet",
+        "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3."
+      },
+      "score" : 6.245858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "946eb719fadffd4e1f7f8c333756b97dc9189f126357f975d9df74076523d144",
+    "retrievalMillis" : 1.915557,
+    "frameworkOverheadMillis" : 0.8774899999998524,
+    "endToEndMillis" : 1420.066204,
+    "generation" : {
+      "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3. [transit-delta-battery]",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 21,
+      "ttftMillis" : 971.506,
+      "totalMillis" : 1417.273157,
+      "prefillTokensPerSecond" : 163.74855683629497,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754460160,
+      "cpuMillis" : 11300.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Delta buses return to depot below 18 percent battery, using bay E3 for fast charging.",
+      "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3. [transit-delta-battery]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "ember-wheelchair-boarding",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-ember-access",
+        "title" : "Ember accessibility",
+        "text" : "Ember route E5 uses low-floor vehicles. Wheelchair boarding occurs at the front door."
+      },
+      "score" : 5.38591,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f576ac1a97878e2466b3a6d56f30650383622a377591b43a3a22e2021be6b306",
+    "retrievalMillis" : 6.624829,
+    "frameworkOverheadMillis" : 0.9213569999999436,
+    "endToEndMillis" : 1313.979154,
+    "generation" : {
+      "text" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door. [transit-ember-access]",
+      "inputTokens" : 154,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 18,
+      "ttftMillis" : 942.39916,
+      "totalMillis" : 1306.432968,
+      "prefillTokensPerSecond" : 165.30362734121996,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754468352,
+      "cpuMillis" : 10400.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door.",
+      "text" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door. [transit-ember-access]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "fjord-inspection",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-fjord-maintenance",
+        "title" : "Fjord maintenance interval",
+        "text" : "Fjord trams receive inspection every 7500 kilometers. Brake measurements are recorded in system FMX."
+      },
+      "score" : 6.762015,
+      "rank" : 1
+    } ],
+    "promptSha256" : "336f43b0911c1996c27b03b447ff466ef1a0e1a73afb115cf8ea7bf2f8fb5e52",
+    "retrievalMillis" : 1.616733,
+    "frameworkOverheadMillis" : 0.9346169999998892,
+    "endToEndMillis" : 1589.682619,
+    "generation" : {
+      "text" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX. [transit-fjord-maintenance]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 26,
+      "ttftMillis" : 1026.274266,
+      "totalMillis" : 1587.131269,
+      "prefillTokensPerSecond" : 163.01118983438653,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754476544,
+      "cpuMillis" : 12610.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX.",
+      "text" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX. [transit-fjord-maintenance]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "grove-delay-alert",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-grove-alert",
+        "title" : "Grove disruption alerts",
+        "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice."
+      },
+      "score" : 8.446402,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1b97d2a3566a3c08dbadac35e4f0926c89ec9a0138b82ccf4064e816560b5645",
+    "retrievalMillis" : 1.435057,
+    "frameworkOverheadMillis" : 0.8810450000000856,
+    "endToEndMillis" : 1463.927485,
+    "generation" : {
+      "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice. [transit-grove-alert]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 976.147531,
+      "totalMillis" : 1461.611383,
+      "prefillTokensPerSecond" : 161.70113716067223,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754488832,
+      "cpuMillis" : 11610.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice.",
+      "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice. [transit-grove-alert]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "harbor-ferry-bicycles",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-harbor-ferry",
+        "title" : "Harbor ferry schedule",
+        "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00."
+      },
+      "score" : 5.1484528,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1695ddad30378a6ecf39b95661da12b11b644abcca20d7bce19ab627ae1cdb6a",
+    "retrievalMillis" : 1.386603,
+    "frameworkOverheadMillis" : 0.8513720000000831,
+    "endToEndMillis" : 1485.739372,
+    "generation" : {
+      "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00. [transit-harbor-ferry]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 988.258722,
+      "totalMillis" : 1483.501397,
+      "prefillTokensPerSecond" : 165.62297099159386,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754492928,
+      "cpuMillis" : 11810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Harbor H2 crossing takes 28 minutes and bicycles are allowed after 09:00.",
+      "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00. [transit-harbor-ferry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "unsupported-orchid-airport",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-ember-access",
+        "title" : "Ember accessibility",
+        "text" : "Ember route E5 uses low-floor vehicles. Wheelchair boarding occurs at the front door."
+      },
+      "score" : 1.0038362,
+      "rank" : 1
+    } ],
+    "promptSha256" : "95e95b760625dd3e1f5553a324493fad8d4a68f631f05c716d22d99d61125d87",
+    "retrievalMillis" : 0.918233,
+    "frameworkOverheadMillis" : 0.9072149999997237,
+    "endToEndMillis" : 1198.536154,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 149,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 12,
+      "ttftMillis" : 924.497785,
+      "totalMillis" : 1196.710706,
+      "prefillTokensPerSecond" : 162.24803913988939,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754492928,
+      "cpuMillis" : 9490.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Orchid airport shuttle serves the E5 route.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "amber-route-frequency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-amber-route",
+        "title" : "Amber bus route",
+        "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes."
+      },
+      "score" : 4.1694164,
+      "rank" : 1
+    } ],
+    "promptSha256" : "6fc721070a12d42e396052294556a8118a6515ef93bc8381aba0ab60d4d1ae59",
+    "retrievalMillis" : 3.226513,
+    "frameworkOverheadMillis" : 1.385473999999931,
+    "endToEndMillis" : 1510.134845,
+    "generation" : {
+      "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes. [transit-amber-route]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 24,
+      "ttftMillis" : 994.083366,
+      "totalMillis" : 1505.522858,
+      "prefillTokensPerSecond" : 165.56913628777744,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754497024,
+      "cpuMillis" : 11980.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Amber route A12 connects Central Station and River Park. It runs every 12 minutes at peak.",
+      "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes. [transit-amber-route]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "bravo-fare-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-bravo-fare",
+        "title" : "Bravo fare policy",
+        "text" : "Bravo local fare is 2.40 dollars. A transfer remains valid for 90 minutes."
+      },
+      "score" : 8.051776,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cbb2cae29d8f9abe5cfb9abc99049d7e37d45b2eee9d19c33c91aca88d8d3482",
+    "retrievalMillis" : 5.739095,
+    "frameworkOverheadMillis" : 0.9368710000001101,
+    "endToEndMillis" : 1437.485566,
+    "generation" : {
+      "text" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes. [transit-bravo-fare]",
+      "inputTokens" : 159,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 978.551728,
+      "totalMillis" : 1430.8096,
+      "prefillTokensPerSecond" : 164.4969961193193,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754505216,
+      "cpuMillis" : 11410.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes.",
+      "text" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes. [transit-bravo-fare]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "cobalt-platform-departure",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-cobalt-platform",
+        "title" : "Cobalt rail platform",
+        "text" : "Cobalt express C7 departs from platform 4. Its first weekday departure is 05:45."
+      },
+      "score" : 7.957191,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4eea3e6428466338469c789c41ebc0ac8fa2d14a853f901be1a711778e3579cc",
+    "retrievalMillis" : 3.449782,
+    "frameworkOverheadMillis" : 0.9387040000001434,
+    "endToEndMillis" : 1494.26343,
+    "generation" : {
+      "text" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45. [transit-cobalt-platform]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 1001.826352,
+      "totalMillis" : 1489.874944,
+      "prefillTokensPerSecond" : 165.41204139511524,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754509312,
+      "cpuMillis" : 11880.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45.",
+      "text" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45. [transit-cobalt-platform]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "delta-battery-charging",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-delta-battery",
+        "title" : "Delta electric fleet",
+        "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3."
+      },
+      "score" : 6.245858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "946eb719fadffd4e1f7f8c333756b97dc9189f126357f975d9df74076523d144",
+    "retrievalMillis" : 5.579253,
+    "frameworkOverheadMillis" : 0.8882979999998497,
+    "endToEndMillis" : 1413.29915,
+    "generation" : {
+      "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3. [transit-delta-battery]",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 21,
+      "ttftMillis" : 975.684449,
+      "totalMillis" : 1406.831599,
+      "prefillTokensPerSecond" : 163.70359702391005,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754509312,
+      "cpuMillis" : 11200.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Delta buses return to depot below 18 percent battery, using bay E3 for fast charging.",
+      "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3. [transit-delta-battery]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "ember-wheelchair-boarding",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-ember-access",
+        "title" : "Ember accessibility",
+        "text" : "Ember route E5 uses low-floor vehicles. Wheelchair boarding occurs at the front door."
+      },
+      "score" : 5.38591,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f576ac1a97878e2466b3a6d56f30650383622a377591b43a3a22e2021be6b306",
+    "retrievalMillis" : 1.317439,
+    "frameworkOverheadMillis" : 0.913836000000174,
+    "endToEndMillis" : 1348.246804,
+    "generation" : {
+      "text" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door. [transit-ember-access]",
+      "inputTokens" : 154,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 18,
+      "ttftMillis" : 965.717259,
+      "totalMillis" : 1346.015529,
+      "prefillTokensPerSecond" : 160.78194314374636,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754513408,
+      "cpuMillis" : 10700.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door.",
+      "text" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door. [transit-ember-access]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "fjord-inspection",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-fjord-maintenance",
+        "title" : "Fjord maintenance interval",
+        "text" : "Fjord trams receive inspection every 7500 kilometers. Brake measurements are recorded in system FMX."
+      },
+      "score" : 6.762015,
+      "rank" : 1
+    } ],
+    "promptSha256" : "336f43b0911c1996c27b03b447ff466ef1a0e1a73afb115cf8ea7bf2f8fb5e52",
+    "retrievalMillis" : 3.083937,
+    "frameworkOverheadMillis" : 0.8617279999998573,
+    "endToEndMillis" : 1572.092738,
+    "generation" : {
+      "text" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX. [transit-fjord-maintenance]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 26,
+      "ttftMillis" : 1005.717385,
+      "totalMillis" : 1568.147073,
+      "prefillTokensPerSecond" : 165.67726069616387,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754517504,
+      "cpuMillis" : 12490.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX.",
+      "text" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX. [transit-fjord-maintenance]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "grove-delay-alert",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-grove-alert",
+        "title" : "Grove disruption alerts",
+        "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice."
+      },
+      "score" : 8.446402,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1b97d2a3566a3c08dbadac35e4f0926c89ec9a0138b82ccf4064e816560b5645",
+    "retrievalMillis" : 1.397069,
+    "frameworkOverheadMillis" : 0.915990999999849,
+    "endToEndMillis" : 1463.081893,
+    "generation" : {
+      "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice. [transit-grove-alert]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 968.340759,
+      "totalMillis" : 1460.768833,
+      "prefillTokensPerSecond" : 163.26734351553065,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754521600,
+      "cpuMillis" : 11630.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice.",
+      "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice. [transit-grove-alert]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "harbor-ferry-bicycles",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-harbor-ferry",
+        "title" : "Harbor ferry schedule",
+        "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00."
+      },
+      "score" : 5.1484528,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1695ddad30378a6ecf39b95661da12b11b644abcca20d7bce19ab627ae1cdb6a",
+    "retrievalMillis" : 1.649021,
+    "frameworkOverheadMillis" : 3.4293119999999817,
+    "endToEndMillis" : 1484.65104,
+    "generation" : {
+      "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00. [transit-harbor-ferry]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 990.044069,
+      "totalMillis" : 1479.572707,
+      "prefillTokensPerSecond" : 166.31940263784614,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754525696,
+      "cpuMillis" : 11800.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Harbor H2 crossing takes 28 minutes and bicycles are allowed after 09:00.",
+      "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00. [transit-harbor-ferry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "unsupported-orchid-airport",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-ember-access",
+        "title" : "Ember accessibility",
+        "text" : "Ember route E5 uses low-floor vehicles. Wheelchair boarding occurs at the front door."
+      },
+      "score" : 1.0038362,
+      "rank" : 1
+    } ],
+    "promptSha256" : "95e95b760625dd3e1f5553a324493fad8d4a68f631f05c716d22d99d61125d87",
+    "retrievalMillis" : 0.933024,
+    "frameworkOverheadMillis" : 0.8816380000000663,
+    "endToEndMillis" : 1161.255413,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 149,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 12,
+      "ttftMillis" : 909.523431,
+      "totalMillis" : 1159.440751,
+      "prefillTokensPerSecond" : 164.33273739738854,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754529792,
+      "cpuMillis" : 9250.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Orchid airport shuttle serves the E5 route.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "amber-route-frequency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-amber-route",
+        "title" : "Amber bus route",
+        "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes."
+      },
+      "score" : 4.1694164,
+      "rank" : 1
+    } ],
+    "promptSha256" : "6fc721070a12d42e396052294556a8118a6515ef93bc8381aba0ab60d4d1ae59",
+    "retrievalMillis" : 1.436609,
+    "frameworkOverheadMillis" : 0.9657059999999547,
+    "endToEndMillis" : 1499.613517,
+    "generation" : {
+      "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes. [transit-amber-route]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 24,
+      "ttftMillis" : 987.415814,
+      "totalMillis" : 1497.211202,
+      "prefillTokensPerSecond" : 166.08316792944217,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754533888,
+      "cpuMillis" : 11930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Amber route A12 connects Central Station and River Park. It runs every 12 minutes at peak.",
+      "text" : "Amber route A12 runs from Central Station to River Park. Peak service operates every 12 minutes. [transit-amber-route]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "bravo-fare-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-bravo-fare",
+        "title" : "Bravo fare policy",
+        "text" : "Bravo local fare is 2.40 dollars. A transfer remains valid for 90 minutes."
+      },
+      "score" : 8.051776,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cbb2cae29d8f9abe5cfb9abc99049d7e37d45b2eee9d19c33c91aca88d8d3482",
+    "retrievalMillis" : 1.283607,
+    "frameworkOverheadMillis" : 0.8557379999999739,
+    "endToEndMillis" : 1441.673168,
+    "generation" : {
+      "text" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes. [transit-bravo-fare]",
+      "inputTokens" : 159,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 974.879496,
+      "totalMillis" : 1439.533823,
+      "prefillTokensPerSecond" : 163.96536309046866,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754542080,
+      "cpuMillis" : 11470.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes.",
+      "text" : "Bravo fare is 2.40 dollars and a transfer is valid for 90 minutes. [transit-bravo-fare]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "cobalt-platform-departure",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-cobalt-platform",
+        "title" : "Cobalt rail platform",
+        "text" : "Cobalt express C7 departs from platform 4. Its first weekday departure is 05:45."
+      },
+      "score" : 7.957191,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4eea3e6428466338469c789c41ebc0ac8fa2d14a853f901be1a711778e3579cc",
+    "retrievalMillis" : 3.026562,
+    "frameworkOverheadMillis" : 0.8533439999998791,
+    "endToEndMillis" : 1490.506533,
+    "generation" : {
+      "text" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45. [transit-cobalt-platform]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 1008.614539,
+      "totalMillis" : 1486.626627,
+      "prefillTokensPerSecond" : 165.38319285785164,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754542080,
+      "cpuMillis" : 11850.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45.",
+      "text" : "Cobalt C7 uses platform 4 and its first weekday departure is 05:45. [transit-cobalt-platform]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "delta-battery-charging",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-delta-battery",
+        "title" : "Delta electric fleet",
+        "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3."
+      },
+      "score" : 6.245858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "946eb719fadffd4e1f7f8c333756b97dc9189f126357f975d9df74076523d144",
+    "retrievalMillis" : 1.5236,
+    "frameworkOverheadMillis" : 0.9443029999999908,
+    "endToEndMillis" : 1424.884042,
+    "generation" : {
+      "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3. [transit-delta-battery]",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 21,
+      "ttftMillis" : 976.400495,
+      "totalMillis" : 1422.416139,
+      "prefillTokensPerSecond" : 162.39839821731783,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754542080,
+      "cpuMillis" : 11340.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Delta buses return to depot below 18 percent battery, using bay E3 for fast charging.",
+      "text" : "Delta buses return to depot below 18 percent battery. Fast charging uses bay E3. [transit-delta-battery]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "ember-wheelchair-boarding",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-ember-access",
+        "title" : "Ember accessibility",
+        "text" : "Ember route E5 uses low-floor vehicles. Wheelchair boarding occurs at the front door."
+      },
+      "score" : 5.38591,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f576ac1a97878e2466b3a6d56f30650383622a377591b43a3a22e2021be6b306",
+    "retrievalMillis" : 1.284209,
+    "frameworkOverheadMillis" : 1.2734290000000783,
+    "endToEndMillis" : 1306.163819,
+    "generation" : {
+      "text" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door. [transit-ember-access]",
+      "inputTokens" : 154,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 18,
+      "ttftMillis" : 937.905965,
+      "totalMillis" : 1303.606181,
+      "prefillTokensPerSecond" : 165.28482116504333,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754546176,
+      "cpuMillis" : 10400.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door.",
+      "text" : "Ember E5 uses low-floor vehicles and wheelchair boarding occurs at the front door. [transit-ember-access]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "fjord-inspection",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-fjord-maintenance",
+        "title" : "Fjord maintenance interval",
+        "text" : "Fjord trams receive inspection every 7500 kilometers. Brake measurements are recorded in system FMX."
+      },
+      "score" : 6.762015,
+      "rank" : 1
+    } ],
+    "promptSha256" : "336f43b0911c1996c27b03b447ff466ef1a0e1a73afb115cf8ea7bf2f8fb5e52",
+    "retrievalMillis" : 2.008897,
+    "frameworkOverheadMillis" : 0.8093380000000252,
+    "endToEndMillis" : 1563.964638,
+    "generation" : {
+      "text" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX. [transit-fjord-maintenance]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 26,
+      "ttftMillis" : 1005.758167,
+      "totalMillis" : 1561.146403,
+      "prefillTokensPerSecond" : 166.0524725813357,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754550272,
+      "cpuMillis" : 12420.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX.",
+      "text" : "Fjord trams are inspected every 7500 kilometers, and brake measurements are recorded in system FMX. [transit-fjord-maintenance]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "grove-delay-alert",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-grove-alert",
+        "title" : "Grove disruption alerts",
+        "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice."
+      },
+      "score" : 8.446402,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1b97d2a3566a3c08dbadac35e4f0926c89ec9a0138b82ccf4064e816560b5645",
+    "retrievalMillis" : 1.101991,
+    "frameworkOverheadMillis" : 0.8030589999998483,
+    "endToEndMillis" : 1435.393975,
+    "generation" : {
+      "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice. [transit-grove-alert]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 963.721021,
+      "totalMillis" : 1433.488925,
+      "prefillTokensPerSecond" : 164.52590863886775,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754554368,
+      "cpuMillis" : 11440.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice.",
+      "text" : "Grove alerts use channel TRANSIT-OPS. A delay above 15 minutes triggers a passenger notice. [transit-grove-alert]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "harbor-ferry-bicycles",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-harbor-ferry",
+        "title" : "Harbor ferry schedule",
+        "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00."
+      },
+      "score" : 5.1484528,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1695ddad30378a6ecf39b95661da12b11b644abcca20d7bce19ab627ae1cdb6a",
+    "retrievalMillis" : 1.343378,
+    "frameworkOverheadMillis" : 5.481131999999889,
+    "endToEndMillis" : 1490.716199,
+    "generation" : {
+      "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00. [transit-harbor-ferry]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 23,
+      "ttftMillis" : 1001.653121,
+      "totalMillis" : 1483.891689,
+      "prefillTokensPerSecond" : 163.65281106333163,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754558464,
+      "cpuMillis" : 11840.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Harbor H2 crossing takes 28 minutes and bicycles are allowed after 09:00.",
+      "text" : "Harbor ferry H2 crosses in 28 minutes. Bicycles are allowed after 09:00. [transit-harbor-ferry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "/root/.jvllm/models/UmarTransit-1B.Q4_K_M.gguf",
+    "caseId" : "unsupported-orchid-airport",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "transit-ember-access",
+        "title" : "Ember accessibility",
+        "text" : "Ember route E5 uses low-floor vehicles. Wheelchair boarding occurs at the front door."
+      },
+      "score" : 1.0038362,
+      "rank" : 1
+    } ],
+    "promptSha256" : "95e95b760625dd3e1f5553a324493fad8d4a68f631f05c716d22d99d61125d87",
+    "retrievalMillis" : 0.929319,
+    "frameworkOverheadMillis" : 0.9821519999998145,
+    "endToEndMillis" : 1168.063682,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 149,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 12,
+      "ttftMillis" : 927.023396,
+      "totalMillis" : 1166.152211,
+      "prefillTokensPerSecond" : 161.74958775566475,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 1754562560,
+      "cpuMillis" : 9260.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Orchid airport shuttle serves the E5 route.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
