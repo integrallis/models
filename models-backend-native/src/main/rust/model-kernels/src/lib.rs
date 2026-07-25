@@ -15,7 +15,7 @@ use std::arch::x86_64::*;
 #[cfg(all(test, target_arch = "x86_64"))]
 std::thread_local! {
     static Q5_0_HORIZONTAL_REDUCTIONS: Cell<usize> = const { Cell::new(0) };
-    static Q5_0_F16C_CONVERSIONS: Cell<usize> = const { Cell::new(0) };
+    static F16C_CONVERSIONS: Cell<usize> = const { Cell::new(0) };
 }
 
 const ABI_VERSION: u32 = 2;
@@ -1892,7 +1892,7 @@ unsafe fn compute_q6_k_batched_row_range_scalar(
 
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q4_k_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -1929,7 +1929,7 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
 
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q5_k_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -1966,7 +1966,7 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
 
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q6_k_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2130,7 +2130,10 @@ fn selected_q5_kernel() -> DotKernel {
 
 fn selected_q4_k_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
         return DotKernel::Q4KAvx2;
     }
     DotKernel::Q4K
@@ -2138,7 +2141,10 @@ fn selected_q4_k_kernel() -> DotKernel {
 
 fn selected_q5_k_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
         return DotKernel::Q5KAvx2;
     }
     DotKernel::Q5K
@@ -2146,7 +2152,10 @@ fn selected_q5_k_kernel() -> DotKernel {
 
 fn selected_q6_k_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
         return DotKernel::Q6KAvx2;
     }
     DotKernel::Q6K
@@ -2367,7 +2376,7 @@ unsafe fn dot_q5_0_q8_0_row_avx2(
 #[target_feature(enable = "f16c")]
 fn f16_to_f32_f16c(value: u16) -> f32 {
     #[cfg(test)]
-    Q5_0_F16C_CONVERSIONS.with(|count| count.set(count.get() + 1));
+    F16C_CONVERSIONS.with(|count| count.set(count.get() + 1));
     _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(value as i32)))
 }
 
@@ -2650,7 +2659,7 @@ fn dot_q6_k_q8_k_row_scalar(
 }
 
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn dot_q4_k_q8_k_row_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2668,11 +2677,11 @@ unsafe fn dot_q4_k_q8_k_row_avx2(
         let activation_offset = batch * cols + block * QK_K;
         let scale_offset = batch * blocks_per_row + block;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-        let d = f16_to_f32(u16::from_le_bytes([
+        let d = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset],
             weights[weight_offset + 1],
         ])) * activation_scales[scale_offset];
-        let d_min = f16_to_f32(u16::from_le_bytes([
+        let d_min = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset + 2],
             weights[weight_offset + 3],
         ])) * activation_scales[scale_offset];
@@ -2708,7 +2717,7 @@ unsafe fn dot_q4_k_q8_k_row_avx2(
 }
 
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn dot_q5_k_q8_k_row_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2727,11 +2736,11 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
         let activation_offset = batch * cols + block * QK_K;
         let scale_offset = batch * blocks_per_row + block;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-        let d = f16_to_f32(u16::from_le_bytes([
+        let d = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset],
             weights[weight_offset + 1],
         ])) * activation_scales[scale_offset];
-        let d_min = f16_to_f32(u16::from_le_bytes([
+        let d_min = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset + 2],
             weights[weight_offset + 3],
         ])) * activation_scales[scale_offset];
@@ -2800,7 +2809,7 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
 }
 
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn dot_q6_k_q8_k_row_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2817,7 +2826,7 @@ unsafe fn dot_q6_k_q8_k_row_avx2(
     for block in 0..blocks_per_row {
         let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
         let activation_offset = batch * cols + block * QK_K;
-        let d = f16_to_f32(u16::from_le_bytes([
+        let d = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset + 208],
             weights[weight_offset + 209],
         ])) * activation_scales[batch * blocks_per_row + block];
@@ -3374,9 +3383,13 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     #[test]
     fn avx2_k_quantized_rows_match_scalar_kernels() {
-        if !std::arch::is_x86_feature_detected!("avx2") {
+        if !std::arch::is_x86_feature_detected!("avx2")
+            || !std::arch::is_x86_feature_detected!("fma")
+            || !std::arch::is_x86_feature_detected!("f16c")
+        {
             return;
         }
+        F16C_CONVERSIONS.with(|count| count.set(0));
         let mut quantized = [0_i8; QK_K];
         let mut activation_sums = [0_i16; QK_K / Q8_K_SUM_BLOCK];
         for (index, quant) in quantized.iter_mut().enumerate() {
@@ -3460,6 +3473,7 @@ mod tests {
             dot_q6_k_q8_k_row_avx2(&q6_weights, &quantized, &activation_scales, 0, 0, QK_K)
         };
         assert!((q6_avx2 - q6_scalar).abs() <= 1e-4);
+        F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), 5));
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -3526,7 +3540,7 @@ mod tests {
         let scalar =
             dot_q5_0_q8_0_row_scalar(&weights, &quantized, &activation_scales, 0, 0, cols);
         Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(0));
-        Q5_0_F16C_CONVERSIONS.with(|count| count.set(0));
+        F16C_CONVERSIONS.with(|count| count.set(0));
         // SAFETY: AVX2 was detected and each buffer contains eight complete validated blocks.
         let avx2 = unsafe {
             dot_q5_0_q8_0_row_avx2(&weights, &quantized, &activation_scales, 0, 0, cols)
@@ -3534,7 +3548,7 @@ mod tests {
 
         assert!((avx2 - scalar).abs() <= 1e-3);
         Q5_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 1));
-        Q5_0_F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), BLOCKS));
+        F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), BLOCKS));
     }
 
     #[test]
