@@ -98,18 +98,18 @@ class BenchmarkComparisonTest {
   @Test
   void compareCommandWritesJsonAndMarkdownEvidence() throws Exception {
     ObjectMapper mapper = new ObjectMapper();
-    Path pureJava = directory.resolve("pure-java.json");
+    Path models = directory.resolve("models.json");
     Path llamaCpp = directory.resolve("llama.cpp.json");
     Path json = directory.resolve("comparison.json");
     Path markdown = directory.resolve("comparison.md");
-    mapper.writeValue(pureJava.toFile(), report("pure-java", "sha", 10));
+    mapper.writeValue(models.toFile(), report("rust-ffm", "sha", 16));
     mapper.writeValue(llamaCpp.toFile(), report("llama.cpp", "sha", 20));
 
     InferenceBenchmarkCli.main(
         new String[] {
           "compare",
-          "--pure-java",
-          pureJava.toString(),
+          "--models",
+          models.toString(),
           "--llama-cpp",
           llamaCpp.toString(),
           "--json",
@@ -119,7 +119,7 @@ class BenchmarkComparisonTest {
         });
 
     assertThat(json).isRegularFile();
-    assertThat(Files.readString(markdown)).contains("| pure-java |");
+    assertThat(Files.readString(markdown)).contains("| rust-ffm |").contains("80.0%");
   }
 
   private static BenchmarkReport report(String backend, String sha, double decodeTokensPerSecond) {

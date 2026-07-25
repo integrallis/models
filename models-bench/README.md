@@ -507,3 +507,19 @@ models-bench/build/install/models-bench/bin/models-bench \
 Benchmark schema 5 records `backendDiagnostics`, including the pure-Java plan version, runtime
 fingerprint, optimization decisions, and any enabled ModelJar performance profile. External
 Ollama and llama.cpp reports record explicit `unavailable` diagnostics.
+
+For release qualification, the repository runner uses the Models-owned Rust/FFM backend by
+default and compares it with the same GGUF bytes through llama.cpp and Ollama:
+
+```shell
+BENCH_THREADS=4 \
+BENCH_MAX_TOKENS=64 \
+scripts/run-controlled-inference-benchmarks.sh \
+  ~/.jvllm/models/model.gguf \
+  catalog-model-id
+```
+
+The runner sets `models.native.quantizedDecode=true`, uses the requested thread count for native
+workers, pins `ActiveProcessorCount` for every Java benchmark process, and emits `models.json`,
+`llama.cpp.json`, `ollama.json`, `comparison.json`, and `comparison.md`. Set
+`BENCH_MODELS_BACKEND=pure-java` to measure the pure-Java ceiling instead.

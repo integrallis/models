@@ -420,15 +420,20 @@ Run all three backends and produce raw JSON plus Markdown comparison evidence:
 
 ```bash
 BENCH_DROP_CACHES=1 \
-BENCH_MODELJAR_ALIAS=qwen3_0_6b_q4_0 \
 scripts/run-controlled-inference-benchmarks.sh \
   ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   qwen3-0.6b-q4_0
 ```
 
-The script records exact `models` and `vectors` commits in the pure-Java backend
-version and rejects a ModelJar artifact whose SHA differs from the native
-artifact. Run it under the Java runtime and startup arguments required by the
-selected ModelJars profile. Omitting `BENCH_MODELJAR_ALIAS` deliberately runs
-the unprofiled path control. Do not publish comparisons from dirty checkouts or
-mixed hosts.
+The release qualification path defaults to `BENCH_MODELS_BACKEND=rust-ffm`,
+enables quantized native decode, pins native workers to `BENCH_THREADS`, and
+writes the in-process result to `models.json`. Set
+`BENCH_MODELS_BACKEND=pure-java` for a pure-Java ceiling control. A pure-Java
+run may also set `BENCH_MODELJAR_ALIAS` to apply an exact model-scoped profile;
+the script then rejects a resolved artifact whose SHA differs from the
+comparator artifact.
+
+Every benchmark process receives `-XX:ActiveProcessorCount=$BENCH_THREADS`, so
+the in-process and HTTP-client reports retain the same environment fingerprint.
+The script records exact `models` and `vectors` commits, and refuses dirty
+Models or Vectors checkouts. Do not publish comparisons from mixed hosts.
