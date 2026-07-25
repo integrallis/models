@@ -19,6 +19,7 @@ package com.integrallis.models.rag;
 public enum GroundingDecision {
   MODEL_ANSWER(true),
   MODEL_ANSWER_WITH_DERIVED_CITATIONS(true),
+  MODEL_ABSTENTION(false),
   RETRIEVAL_ABSTENTION(false),
   EXTRACTIVE_FALLBACK(false);
 

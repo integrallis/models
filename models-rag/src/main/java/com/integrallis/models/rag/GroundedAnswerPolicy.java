@@ -28,12 +28,13 @@ import java.util.regex.Pattern;
  *
  * <p>A weak retrieval abstains. A high-confidence answer is accepted only when every bracketed
  * citation names a retrieved source and every substantive answer token is supported by the question
- * or retrieved evidence. When a supported answer omits citations, retrieved provenance is attached
- * deterministically. Otherwise the exact retrieved evidence is returned with trusted source IDs.
+ * or retrieved evidence. Explicit model abstentions are preserved. When a supported answer omits
+ * citations, retrieved provenance is attached deterministically. Otherwise the exact retrieved
+ * evidence is returned with trusted source IDs.
  */
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
-  public static final String POLICY_ID = "trusted-provenance-clause-anchors-extractive-fallback-v5";
+  public static final String POLICY_ID = "trusted-provenance-clause-anchors-explicit-abstention-v6";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -81,8 +82,10 @@ public final class GroundedAnswerPolicy {
     }
 
     String candidate = generatedText.strip();
+    if (ABSTENTION_PATTERN.matcher(candidate).matches()) {
+      return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.MODEL_ABSTENTION);
+    }
     if (candidate.isBlank()
-        || ABSTENTION_PATTERN.matcher(candidate).matches()
         || !hasOnlySupportedClaims(question, candidate, retrieved)
         || !hasEvidenceAnchorsForEveryQuestionClause(question, candidate, retrieved)) {
       return new GroundedAnswer(

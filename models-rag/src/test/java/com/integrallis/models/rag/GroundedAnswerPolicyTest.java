@@ -217,14 +217,15 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
-  void usesExtractiveEvidenceWhenAConfidentRetrievalIsFollowedByARefusal() {
+  void preservesAnExplicitModelAbstentionDespiteAConfidentRetrieval() {
     GroundedAnswer answer =
         policy.apply(
             "How long do both payment types take?",
             List.of(HIGH_CONFIDENCE),
             "INSUFFICIENT_CONTEXT.");
 
-    assertThat(answer.text()).contains("5 business days").endsWith("[payments-settlement]");
-    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+    assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
+    assertThat(answer.rawText()).isEqualTo("INSUFFICIENT_CONTEXT.");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
   }
 }
