@@ -1150,6 +1150,10 @@ public final class LlamaForwardPass {
 
   private void matmulDispatch(
       float[] out, float[] input, MemorySegment weight, GgufTensorType type, int rows, int cols) {
+    if (batchedMatrixKernel.isEligible(type, 1, rows, cols)) {
+      batchedMatrixKernel.multiply(out, input, weight, type, 1, rows, cols);
+      return;
+    }
     TensorOps.ggufMatmul(
         out,
         input,
@@ -1175,6 +1179,21 @@ public final class LlamaForwardPass {
       int secondRows,
       float[] input,
       int cols) {
+    if (batchedMatrixKernel.isDualEligible(firstType, firstRows, secondType, secondRows, 1, cols)) {
+      batchedMatrixKernel.multiplyDual(
+          firstOut,
+          firstWeight,
+          firstType,
+          firstRows,
+          secondOut,
+          secondWeight,
+          secondType,
+          secondRows,
+          input,
+          1,
+          cols);
+      return;
+    }
     TensorOps.ggufDualMatmul(
         firstOut,
         firstWeight,
@@ -1208,6 +1227,26 @@ public final class LlamaForwardPass {
       int thirdRows,
       float[] input,
       int cols) {
+    if (batchedMatrixKernel.isTripleEligible(
+        firstType, firstRows, secondType, secondRows, thirdType, thirdRows, 1, cols)) {
+      batchedMatrixKernel.multiplyTriple(
+          firstOut,
+          firstWeight,
+          firstType,
+          firstRows,
+          secondOut,
+          secondWeight,
+          secondType,
+          secondRows,
+          thirdOut,
+          thirdWeight,
+          thirdType,
+          thirdRows,
+          input,
+          1,
+          cols);
+      return;
+    }
     TensorOps.ggufTripleMatmul(
         firstOut,
         firstWeight,

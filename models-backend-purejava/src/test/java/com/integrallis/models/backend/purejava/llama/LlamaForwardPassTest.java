@@ -514,6 +514,133 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void injectedKernelExecutesEligibleSingleTokenProjectionGroups() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      PureJavaExecutionPlan plan = executionPlan(config, weights, 1, false);
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan);
+      float[] expected = baseline.forward(5, 0).clone();
+      AtomicInteger singleInvocations = new AtomicInteger();
+      AtomicInteger dualInvocations = new AtomicInteger();
+      AtomicInteger tripleInvocations = new AtomicInteger();
+      GgufBatchedMatrixKernel kernel =
+          new GgufBatchedMatrixKernel() {
+            @Override
+            public boolean supports(GgufTensorType type) {
+              return type == GgufTensorType.Q4_0;
+            }
+
+            @Override
+            public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
+              return batchSize == 1 && supports(type);
+            }
+
+            @Override
+            public boolean isDualEligible(
+                GgufTensorType firstType,
+                int firstRows,
+                GgufTensorType secondType,
+                int secondRows,
+                int batchSize,
+                int cols) {
+              return batchSize == 1 && supports(firstType) && supports(secondType);
+            }
+
+            @Override
+            public boolean isTripleEligible(
+                GgufTensorType firstType,
+                int firstRows,
+                GgufTensorType secondType,
+                int secondRows,
+                GgufTensorType thirdType,
+                int thirdRows,
+                int batchSize,
+                int cols) {
+              return batchSize == 1
+                  && supports(firstType)
+                  && supports(secondType)
+                  && supports(thirdType);
+            }
+
+            @Override
+            public void multiply(
+                float[] output,
+                float[] input,
+                MemorySegment weights,
+                GgufTensorType type,
+                int batchSize,
+                int rows,
+                int cols) {
+              singleInvocations.incrementAndGet();
+              multiplyQ4(output, input, weights, batchSize, rows, cols);
+            }
+
+            @Override
+            public void multiplyDual(
+                float[] firstOutput,
+                MemorySegment firstWeights,
+                GgufTensorType firstType,
+                int firstRows,
+                float[] secondOutput,
+                MemorySegment secondWeights,
+                GgufTensorType secondType,
+                int secondRows,
+                float[] input,
+                int batchSize,
+                int cols) {
+              dualInvocations.incrementAndGet();
+              multiplyQ4(firstOutput, input, firstWeights, batchSize, firstRows, cols);
+              multiplyQ4(secondOutput, input, secondWeights, batchSize, secondRows, cols);
+            }
+
+            @Override
+            public void multiplyTriple(
+                float[] firstOutput,
+                MemorySegment firstWeights,
+                GgufTensorType firstType,
+                int firstRows,
+                float[] secondOutput,
+                MemorySegment secondWeights,
+                GgufTensorType secondType,
+                int secondRows,
+                float[] thirdOutput,
+                MemorySegment thirdWeights,
+                GgufTensorType thirdType,
+                int thirdRows,
+                float[] input,
+                int batchSize,
+                int cols) {
+              tripleInvocations.incrementAndGet();
+              multiplyQ4(firstOutput, input, firstWeights, batchSize, firstRows, cols);
+              multiplyQ4(secondOutput, input, secondWeights, batchSize, secondRows, cols);
+              multiplyQ4(thirdOutput, input, thirdWeights, batchSize, thirdRows, cols);
+            }
+          };
+      LlamaForwardPass accelerated =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan,
+              kernel);
+
+      float[] actual = accelerated.forward(5, 0);
+
+      assertThat(actual).containsExactly(expected);
+      assertThat(singleInvocations).hasValue(LAYERS * 2);
+      assertThat(dualInvocations).hasValue(LAYERS);
+      assertThat(tripleInvocations).hasValue(LAYERS);
+    }
+
+    @Test
     void stagedQ4FfnPreservesPrefillCacheAndAutoregressiveStateExactly() {
       try (Arena arena = Arena.ofShared()) {
         GgufFile file = copyToSharedArena(buildQ4NanoModel(new Random(42)), arena);
@@ -1380,6 +1507,24 @@ class LlamaForwardPassTest {
       logits = forwardPass.forward(tokens[position], position);
     }
     return logits;
+  }
+
+  private static void multiplyQ4(
+      float[] output, float[] input, MemorySegment weights, int batchSize, int rows, int cols) {
+    TensorOps.ggufBatchedMatmul(
+        output,
+        input,
+        weights,
+        GgufTensorType.Q4_0,
+        batchSize,
+        rows,
+        cols,
+        new byte[batchSize * cols],
+        new float[batchSize * cols / 32],
+        new int[batchSize * cols / 4],
+        new short[batchSize * cols / 16],
+        new float[batchSize * rows * 8],
+        GgufQ4Kernel.WIDENED);
   }
 
   private static PureJavaExecutionPlan executionPlan(
