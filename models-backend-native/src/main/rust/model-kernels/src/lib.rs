@@ -2003,7 +2003,7 @@ fn dot_q6_k_q8_k_row_scalar(
     cols: usize,
 ) -> f32 {
     let blocks_per_row = cols / QK_K;
-    let mut sum = 0_f32;
+    let mut lane_sums = [0_f32; 8];
     for block in 0..blocks_per_row {
         let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
         let activation_offset = batch * cols + block * QK_K;
@@ -2014,7 +2014,7 @@ fn dot_q6_k_q8_k_row_scalar(
         let ql = &weights[weight_offset..weight_offset + 128];
         let qh = &weights[weight_offset + 128..weight_offset + 192];
         let scales = &weights[weight_offset + 192..weight_offset + 208];
-        let mut integer_sum = 0_i32;
+        let mut integer_sums = [0_i32; 8];
         for super_block in 0..2 {
             let ql_base = super_block * 64;
             let qh_base = super_block * 32;
@@ -2033,13 +2033,20 @@ fn dot_q6_k_q8_k_row_scalar(
                 let s2 = scales[scale_base + scale_index + 2] as i8 as i32;
                 let s3 = scales[scale_base + scale_index + 4] as i8 as i32;
                 let s4 = scales[scale_base + scale_index + 6] as i8 as i32;
-                integer_sum += s1 * q1 * quantized[quant_base + index] as i32;
-                integer_sum += s2 * q2 * quantized[quant_base + index + 32] as i32;
-                integer_sum += s3 * q3 * quantized[quant_base + index + 64] as i32;
-                integer_sum += s4 * q4 * quantized[quant_base + index + 96] as i32;
+                let lane = index & 7;
+                integer_sums[lane] += s1 * q1 * quantized[quant_base + index] as i32;
+                integer_sums[lane] += s2 * q2 * quantized[quant_base + index + 32] as i32;
+                integer_sums[lane] += s3 * q3 * quantized[quant_base + index + 64] as i32;
+                integer_sums[lane] += s4 * q4 * quantized[quant_base + index + 96] as i32;
             }
         }
-        sum = d.mul_add(integer_sum as f32, sum);
+        for lane in 0..lane_sums.len() {
+            lane_sums[lane] = d.mul_add(integer_sums[lane] as f32, lane_sums[lane]);
+        }
+    }
+    let mut sum = 0_f32;
+    for lane_sum in lane_sums {
+        sum += lane_sum;
     }
     sum
 }
@@ -2449,14 +2456,14 @@ fn f16_to_f32(value: u16) -> f32 {
     let sign = ((value & 0x8000) as u32) << 16;
     let exponent = ((value >> 10) & 0x1f) as i32;
     let significand = (value & 0x03ff) as u32;
-    let bits = match exponent {
-        0 if significand == 0 => sign,
-        0 => {
-            let leading = significand.leading_zeros() - 22;
-            let normalized = (significand << leading) & 0x03ff;
-            let adjusted_exponent = (127 - 14 - leading as i32) as u32;
-            sign | (adjusted_exponent << 23) | (normalized << 13)
+    if exponent == 0 {
+        if significand == 0 {
+            return f32::from_bits(sign);
         }
+        let magnitude = significand as f32 * f32::from_bits(0x3380_0000);
+        return if sign == 0 { magnitude } else { -magnitude };
+    }
+    let bits = match exponent {
         31 => sign | 0x7f80_0000 | (significand << 13),
         _ => sign | (((exponent - 15 + 127) as u32) << 23) | (significand << 13),
     };
@@ -2705,5 +2712,13 @@ mod tests {
             assert_eq!(f32_to_f16(value), encoded);
             assert_eq!(f16_to_f32(encoded), value);
         }
+    }
+
+    #[test]
+    fn half_conversion_preserves_subnormal_boundaries() {
+        assert_eq!(f16_to_f32(0x0001).to_bits(), 0x3380_0000);
+        assert_eq!(f16_to_f32(0x03ff).to_bits(), 0x387f_c000);
+        assert_eq!(f16_to_f32(0x8001).to_bits(), 0xb380_0000);
+        assert_eq!(f16_to_f32(0x83ff).to_bits(), 0xb87f_c000);
     }
 }
