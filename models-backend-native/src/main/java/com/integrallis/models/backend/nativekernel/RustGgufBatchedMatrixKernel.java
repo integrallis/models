@@ -34,7 +34,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY,
           "true",
           PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
-          "false",
+          "true",
           PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
           "false",
           PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
@@ -45,6 +45,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
+  private MemorySegment nativeFormats = MemorySegment.NULL;
   private MemorySegment nativeWeightPointers = MemorySegment.NULL;
   private MemorySegment nativeWeightBytes = MemorySegment.NULL;
   private MemorySegment nativeRows = MemorySegment.NULL;
@@ -68,7 +69,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public String implementation() {
-    return "rust-ffm-q4_0-q8_0-v1";
+    return "rust-ffm-quantized-v2";
   }
 
   @Override
@@ -88,6 +89,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return switch (type) {
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL);
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL);
+      case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL);
+      case Q6_K -> library.supports(NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL);
       default -> false;
     };
   }
@@ -106,9 +109,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int batchSize,
       int cols) {
     return eligibleBatch(batchSize)
-        && firstType == secondType
         && supportsGrouped(firstType)
-        && supportsGrouped(secondType);
+        && supportsGrouped(secondType)
+        && compatibleGroup(firstType, secondType);
   }
 
   @Override
@@ -134,7 +137,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     int inputElements = prepareGroupedWorkspace(input, batchSize, cols, totalOutputElements);
     configureGroupedProjection(0, firstWeights, firstType, firstRows, cols);
     configureGroupedProjection(1, secondWeights, secondType, secondRows, cols);
-    invokeGrouped(firstType, inputElements, batchSize, cols, 2, totalOutputElements);
+    invokeGrouped(
+        firstType, secondType, null, inputElements, batchSize, cols, 2, totalOutputElements);
     copyOutput(firstOutput, 0, firstElements);
     copyOutput(secondOutput, firstElements, secondElements);
   }
@@ -150,11 +154,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int batchSize,
       int cols) {
     return eligibleBatch(batchSize)
-        && firstType == secondType
-        && firstType == thirdType
         && supportsGrouped(firstType)
         && supportsGrouped(secondType)
-        && supportsGrouped(thirdType);
+        && supportsGrouped(thirdType)
+        && compatibleGroup(firstType, secondType, thirdType);
   }
 
   @Override
@@ -188,7 +191,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     configureGroupedProjection(0, firstWeights, firstType, firstRows, cols);
     configureGroupedProjection(1, secondWeights, secondType, secondRows, cols);
     configureGroupedProjection(2, thirdWeights, thirdType, thirdRows, cols);
-    invokeGrouped(firstType, inputElements, batchSize, cols, 3, totalOutputElements);
+    invokeGrouped(
+        firstType, secondType, thirdType, inputElements, batchSize, cols, 3, totalOutputElements);
     copyOutput(firstOutput, 0, firstElements);
     copyOutput(secondOutput, firstElements, secondElements);
     copyOutput(thirdOutput, firstTwoElements, thirdElements);
@@ -211,9 +215,12 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     Objects.requireNonNull(output, "output");
     Objects.requireNonNull(input, "input");
     Objects.requireNonNull(weights, "weights");
-    if (batchSize < 1 || rows < 1 || cols < 1 || cols % 32 != 0) {
+    int blockElements = blockElements(type);
+    if (batchSize < 1 || rows < 1 || cols < 1 || cols % blockElements != 0) {
       throw new IllegalArgumentException(
-          type + " batch and rows must be positive and cols must be a multiple of 32");
+          type
+              + " batch and rows must be positive and cols must be a multiple of "
+              + blockElements);
     }
     int inputElements = Math.multiplyExact(batchSize, cols);
     int outputElements = Math.multiplyExact(batchSize, rows);
@@ -243,6 +250,28 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               cols);
       case Q8_0 ->
           library.q8_0F32BatchedMatmul(
+              weights,
+              weightBytes,
+              nativeInput,
+              inputElements,
+              nativeOutput,
+              outputElements,
+              batchSize,
+              rows,
+              cols);
+      case Q4_K ->
+          library.q4_KF32BatchedMatmul(
+              weights,
+              weightBytes,
+              nativeInput,
+              inputElements,
+              nativeOutput,
+              outputElements,
+              batchSize,
+              rows,
+              cols);
+      case Q6_K ->
+          library.q6_KF32BatchedMatmul(
               weights,
               weightBytes,
               nativeInput,
@@ -297,6 +326,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     scratchArena = Arena.ofShared();
     nativeInput = scratchArena.allocate(ValueLayout.JAVA_FLOAT, newInputCapacity);
     nativeOutput = scratchArena.allocate(ValueLayout.JAVA_FLOAT, newOutputCapacity);
+    nativeFormats = scratchArena.allocate(ValueLayout.JAVA_INT, 3);
     nativeWeightPointers = scratchArena.allocate(ValueLayout.ADDRESS, 3);
     nativeWeightBytes = scratchArena.allocate(ValueLayout.JAVA_LONG, 3);
     nativeRows = scratchArena.allocate(ValueLayout.JAVA_INT, 3);
@@ -317,6 +347,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return switch (type) {
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL);
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL);
+      case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL);
+      case Q6_K -> library.supports(NativeKernelCapability.Q6_K_F32_GROUPED_BATCHED_MATMUL);
       default -> false;
     };
   }
@@ -338,9 +370,12 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     if (!supportsGrouped(type)) {
       throw new UnsupportedOperationException("Rust grouped kernel does not support GGUF " + type);
     }
-    if (batchSize < 1 || rows < 1 || cols < 1 || cols % 32 != 0) {
+    int blockElements = blockElements(type);
+    if (batchSize < 1 || rows < 1 || cols < 1 || cols % blockElements != 0) {
       throw new IllegalArgumentException(
-          type + " batch and rows must be positive and cols must be a multiple of 32");
+          type
+              + " batch and rows must be positive and cols must be a multiple of "
+              + blockElements);
     }
     int outputElements = Math.multiplyExact(batchSize, rows);
     long requiredWeightBytes = requiredWeightBytes(type, rows, cols);
@@ -356,6 +391,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private void configureGroupedProjection(
       int index, MemorySegment weights, GgufTensorType type, int rows, int cols) {
     long requiredWeightBytes = requiredWeightBytes(type, rows, cols);
+    nativeFormats.setAtIndex(ValueLayout.JAVA_INT, index, formatCode(type));
     nativeWeightPointers.setAtIndex(ValueLayout.ADDRESS, index, weights);
     nativeWeightBytes.setAtIndex(ValueLayout.JAVA_LONG, index, requiredWeightBytes);
     nativeRows.setAtIndex(ValueLayout.JAVA_INT, index, rows);
@@ -373,39 +409,34 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   private void invokeGrouped(
-      GgufTensorType type,
+      GgufTensorType firstType,
+      GgufTensorType secondType,
+      GgufTensorType thirdType,
       int inputElements,
       int batchSize,
       int cols,
       int matrixCount,
       int outputElements) {
-    switch (type) {
-      case Q4_0 ->
-          library.q4_0F32GroupedBatchedMatmul(
-              nativeWeightPointers,
-              nativeWeightBytes,
-              nativeRows,
-              matrixCount,
-              nativeInput,
-              inputElements,
-              nativeOutput,
-              outputElements,
-              batchSize,
-              cols);
-      case Q8_0 ->
-          library.q8_0F32GroupedBatchedMatmul(
-              nativeWeightPointers,
-              nativeWeightBytes,
-              nativeRows,
-              matrixCount,
-              nativeInput,
-              inputElements,
-              nativeOutput,
-              outputElements,
-              batchSize,
-              cols);
-      default -> throw new AssertionError("validated unsupported GGUF type " + type);
-    }
+    boolean mixed = firstType != secondType || (thirdType != null && firstType != thirdType);
+    NativeKernelCapability capability =
+        mixed
+            ? NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL
+            : groupedCapability(firstType);
+    String type = mixed ? "mixed K-quant" : firstType.toString();
+    library.quantizedF32GroupedBatchedMatmul(
+        type,
+        capability,
+        nativeFormats,
+        nativeWeightPointers,
+        nativeWeightBytes,
+        nativeRows,
+        matrixCount,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        cols);
   }
 
   private static long requiredWeightBytes(GgufTensorType type, int rows, int cols) {
@@ -413,9 +444,60 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         switch (type) {
           case Q4_0 -> 18L;
           case Q8_0 -> 34L;
+          case Q4_K -> 144L;
+          case Q6_K -> 210L;
           default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
         };
-    return Math.multiplyExact(Math.multiplyExact((long) rows, cols / 32L), blockBytes);
+    return Math.multiplyExact(
+        Math.multiplyExact((long) rows, cols / blockElements(type)), blockBytes);
+  }
+
+  private boolean compatibleGroup(GgufTensorType firstType, GgufTensorType secondType) {
+    return firstType == secondType
+        || (isKQuant(firstType)
+            && isKQuant(secondType)
+            && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
+  }
+
+  private boolean compatibleGroup(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return (firstType == secondType && firstType == thirdType)
+        || (isKQuant(firstType)
+            && isKQuant(secondType)
+            && isKQuant(thirdType)
+            && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
+  }
+
+  private static boolean isKQuant(GgufTensorType type) {
+    return type == GgufTensorType.Q4_K || type == GgufTensorType.Q6_K;
+  }
+
+  private static NativeKernelCapability groupedCapability(GgufTensorType type) {
+    return switch (type) {
+      case Q4_0 -> NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL;
+      case Q8_0 -> NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL;
+      case Q4_K -> NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL;
+      case Q6_K -> NativeKernelCapability.Q6_K_F32_GROUPED_BATCHED_MATMUL;
+      default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
+    };
+  }
+
+  private static int formatCode(GgufTensorType type) {
+    return switch (type) {
+      case Q4_0 -> 0;
+      case Q8_0 -> 1;
+      case Q4_K -> 2;
+      case Q6_K -> 3;
+      default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
+    };
+  }
+
+  private static int blockElements(GgufTensorType type) {
+    return switch (type) {
+      case Q4_0, Q8_0 -> 32;
+      case Q4_K, Q6_K -> 256;
+      default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
+    };
   }
 
   private void copyOutput(float[] output, int nativeOffset, int outputElements) {

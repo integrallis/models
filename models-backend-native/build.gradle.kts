@@ -12,6 +12,8 @@ import org.gradle.jvm.tasks.Jar
 
 apply(plugin = "maven-publish")
 
+val nativeAbi = 2
+
 dependencies {
     api(project(":models-api"))
     implementation(project(":models-backend-purejava"))
@@ -152,7 +154,7 @@ val prepareNativePlatformResources by tasks.registering {
     description = "Prepare the host library and integrity metadata for its platform JAR"
     dependsOn(cargoBuildRelease, verifyNativeBuildPlatform)
     inputs.file(nativeLibrary)
-    inputs.property("abi", 1)
+    inputs.property("abi", nativeAbi)
     inputs.property("platform", nativePlatform.id)
     outputs.dir(nativeResourceRoot)
     doLast {
@@ -169,7 +171,7 @@ val prepareNativePlatformResources by tasks.registering {
                 .formatHex(MessageDigest.getInstance("SHA-256").digest(outputLibrary.readBytes()))
         outputDirectory.resolve("native.properties").writeText(
             """
-            abi=1
+            abi=$nativeAbi
             platform=${nativePlatform.id}
             library=${nativePlatform.libraryFileName}
             sha256=$digest
@@ -190,7 +192,7 @@ val nativePlatformJar by tasks.registering(Jar::class) {
     isReproducibleFileOrder = true
     manifest {
         attributes(
-            "Models-Native-ABI" to "1",
+            "Models-Native-ABI" to nativeAbi.toString(),
             "Models-Native-Platform" to nativePlatform.id,
         )
     }
@@ -209,8 +211,8 @@ fun verifyNativeArtifact(artifact: File, platform: NativePlatformSpec) {
                     InputStreamReader(input, StandardCharsets.UTF_8).use(::load)
                 }
             }
-        require(metadata.getProperty("abi") == "1") {
-            "${artifact.name} does not declare native ABI 1"
+        require(metadata.getProperty("abi") == nativeAbi.toString()) {
+            "${artifact.name} does not declare native ABI $nativeAbi"
         }
         require(metadata.getProperty("platform") == platform.id) {
             "${artifact.name} declares the wrong platform: ${metadata.getProperty("platform")}"
@@ -306,7 +308,7 @@ val privateTestBundleJar =
             )
             manifest {
                 attributes(
-                    "Models-Native-ABI" to "1",
+                    "Models-Native-ABI" to nativeAbi.toString(),
                     "Models-Native-Platforms" to
                         nativePlatforms.joinToString(",") { it.id },
                     "Models-Private-Test-Bundle" to "true",

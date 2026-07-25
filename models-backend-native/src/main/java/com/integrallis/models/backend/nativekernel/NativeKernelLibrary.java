@@ -29,10 +29,14 @@ import java.util.Objects;
 /** Versioned FFM access to Models-owned native inference kernels. */
 @SuppressWarnings("restricted")
 public final class NativeKernelLibrary implements AutoCloseable {
-  public static final int ABI_VERSION = 1;
+  public static final int ABI_VERSION = 2;
   public static final String THREAD_COUNT_PROPERTY = "models.native.kernels.threads";
 
   private static final int STATUS_OK = 0;
+  private static final int FORMAT_Q4_0 = 0;
+  private static final int FORMAT_Q8_0 = 1;
+  private static final int FORMAT_Q4_K = 2;
+  private static final int FORMAT_Q6_K = 3;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final FunctionDescriptor ABI_VERSION_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT);
@@ -42,10 +46,11 @@ public final class NativeKernelLibrary implements AutoCloseable {
       FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
   private static final FunctionDescriptor CONTEXT_DESTROY_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
-  private static final FunctionDescriptor Q4_0_BATCHED_WITH_CONTEXT_DESCRIPTOR =
+  private static final FunctionDescriptor QUANTIZED_BATCHED_WITH_CONTEXT_DESCRIPTOR =
       FunctionDescriptor.of(
           ValueLayout.JAVA_INT,
           ValueLayout.ADDRESS,
+          ValueLayout.JAVA_INT,
           ValueLayout.ADDRESS,
           ValueLayout.JAVA_LONG,
           ValueLayout.ADDRESS,
@@ -55,9 +60,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
           ValueLayout.JAVA_INT,
           ValueLayout.JAVA_INT,
           ValueLayout.JAVA_INT);
-  private static final FunctionDescriptor Q4_0_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR =
+  private static final FunctionDescriptor QUANTIZED_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR =
       FunctionDescriptor.of(
           ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
           ValueLayout.ADDRESS,
           ValueLayout.ADDRESS,
           ValueLayout.ADDRESS,
@@ -74,10 +80,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final long capabilities;
   private final MemorySegment context;
   private final MethodHandle contextDestroyHandle;
-  private final MethodHandle q4BatchedHandle;
-  private final MethodHandle q4GroupedBatchedHandle;
-  private final MethodHandle q8BatchedHandle;
-  private final MethodHandle q8GroupedBatchedHandle;
+  private final MethodHandle quantizedBatchedHandle;
+  private final MethodHandle quantizedGroupedBatchedHandle;
   private boolean closed;
 
   private NativeKernelLibrary(
@@ -85,18 +89,14 @@ public final class NativeKernelLibrary implements AutoCloseable {
       long capabilities,
       MemorySegment context,
       MethodHandle contextDestroyHandle,
-      MethodHandle q4BatchedHandle,
-      MethodHandle q4GroupedBatchedHandle,
-      MethodHandle q8BatchedHandle,
-      MethodHandle q8GroupedBatchedHandle) {
+      MethodHandle quantizedBatchedHandle,
+      MethodHandle quantizedGroupedBatchedHandle) {
     this.libraryArena = libraryArena;
     this.capabilities = capabilities;
     this.context = context;
     this.contextDestroyHandle = contextDestroyHandle;
-    this.q4BatchedHandle = q4BatchedHandle;
-    this.q4GroupedBatchedHandle = q4GroupedBatchedHandle;
-    this.q8BatchedHandle = q8BatchedHandle;
-    this.q8GroupedBatchedHandle = q8GroupedBatchedHandle;
+    this.quantizedBatchedHandle = quantizedBatchedHandle;
+    this.quantizedGroupedBatchedHandle = quantizedGroupedBatchedHandle;
   }
 
   /** Opens a platform library and rejects incompatible ABI versions immediately. */
@@ -128,26 +128,16 @@ public final class NativeKernelLibrary implements AutoCloseable {
           downcall(lookup, "jmodels_kernels_context_create", CONTEXT_CREATE_DESCRIPTOR);
       MethodHandle contextDestroy =
           downcall(lookup, "jmodels_kernels_context_destroy", CONTEXT_DESTROY_DESCRIPTOR);
-      MethodHandle q4Batched =
+      MethodHandle quantizedBatched =
           downcall(
               lookup,
-              "jmodels_q4_0_f32_batched_matmul_with_context",
-              Q4_0_BATCHED_WITH_CONTEXT_DESCRIPTOR);
-      MethodHandle q4GroupedBatched =
+              "jmodels_quantized_f32_batched_matmul_with_context",
+              QUANTIZED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
+      MethodHandle quantizedGroupedBatched =
           downcall(
               lookup,
-              "jmodels_q4_0_f32_grouped_batched_matmul_with_context",
-              Q4_0_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
-      MethodHandle q8Batched =
-          downcall(
-              lookup,
-              "jmodels_q8_0_f32_batched_matmul_with_context",
-              Q4_0_BATCHED_WITH_CONTEXT_DESCRIPTOR);
-      MethodHandle q8GroupedBatched =
-          downcall(
-              lookup,
-              "jmodels_q8_0_f32_grouped_batched_matmul_with_context",
-              Q4_0_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
+              "jmodels_quantized_f32_grouped_batched_matmul_with_context",
+              QUANTIZED_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
       MemorySegment context =
           invokeAddress(contextCreate, configuredThreadCount(), "create worker context");
       if (context.address() == 0) {
@@ -158,10 +148,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
           capabilityMask,
           context,
           contextDestroy,
-          q4Batched,
-          q4GroupedBatched,
-          q8Batched,
-          q8GroupedBatched);
+          quantizedBatched,
+          quantizedGroupedBatched);
     } catch (RuntimeException | LinkageError failure) {
       arena.close();
       throw failure;
@@ -184,9 +172,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
     f32BatchedMatmul(
         "Q4_0",
+        FORMAT_Q4_0,
+        32,
         18L,
         NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL,
-        q4BatchedHandle,
         weights,
         input,
         batchSize,
@@ -200,9 +189,44 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
     f32BatchedMatmul(
         "Q8_0",
+        FORMAT_Q8_0,
+        32,
         34L,
         NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL,
-        q8BatchedHandle,
+        weights,
+        input,
+        batchSize,
+        rows,
+        cols,
+        output);
+  }
+
+  /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q4_K projection. */
+  public void q4_KF32BatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    f32BatchedMatmul(
+        "Q4_K",
+        FORMAT_Q4_K,
+        256,
+        144L,
+        NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL,
+        weights,
+        input,
+        batchSize,
+        rows,
+        cols,
+        output);
+  }
+
+  /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q6_K projection. */
+  public void q6_KF32BatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    f32BatchedMatmul(
+        "Q6_K",
+        FORMAT_Q6_K,
+        256,
+        210L,
+        NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL,
         weights,
         input,
         batchSize,
@@ -223,8 +247,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       int cols) {
     invokeBatched(
         "Q4_0",
+        FORMAT_Q4_0,
         NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL,
-        q4BatchedHandle,
         weights,
         weightBytes,
         nativeInput,
@@ -248,8 +272,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       int cols) {
     invokeBatched(
         "Q8_0",
+        FORMAT_Q8_0,
         NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL,
-        q8BatchedHandle,
         weights,
         weightBytes,
         nativeInput,
@@ -261,34 +285,60 @@ public final class NativeKernelLibrary implements AutoCloseable {
         cols);
   }
 
-  void q4_0F32GroupedBatchedMatmul(
-      MemorySegment weightPointers,
-      MemorySegment weightBytes,
-      MemorySegment rows,
-      int matrixCount,
+  void q4_KF32BatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
       MemorySegment nativeInput,
       long inputElements,
       MemorySegment nativeOutput,
       long outputElements,
       int batchSize,
+      int rows,
       int cols) {
-    invokeGrouped(
-        "Q4_0",
-        NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL,
-        q4GroupedBatchedHandle,
-        weightPointers,
+    invokeBatched(
+        "Q4_K",
+        FORMAT_Q4_K,
+        NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL,
+        weights,
         weightBytes,
-        rows,
-        matrixCount,
         nativeInput,
         inputElements,
         nativeOutput,
         outputElements,
         batchSize,
+        rows,
         cols);
   }
 
-  void q8_0F32GroupedBatchedMatmul(
+  void q6_KF32BatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "Q6_K",
+        FORMAT_Q6_K,
+        NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void quantizedF32GroupedBatchedMatmul(
+      String type,
+      NativeKernelCapability capability,
+      MemorySegment formats,
       MemorySegment weightPointers,
       MemorySegment weightBytes,
       MemorySegment rows,
@@ -300,9 +350,9 @@ public final class NativeKernelLibrary implements AutoCloseable {
       int batchSize,
       int cols) {
     invokeGrouped(
-        "Q8_0",
-        NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL,
-        q8GroupedBatchedHandle,
+        type,
+        capability,
+        formats,
         weightPointers,
         weightBytes,
         rows,
@@ -317,9 +367,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
 
   private void f32BatchedMatmul(
       String type,
+      int format,
+      int blockElements,
       long blockBytes,
       NativeKernelCapability capability,
-      MethodHandle handle,
       MemorySegment weights,
       float[] input,
       int batchSize,
@@ -336,13 +387,15 @@ public final class NativeKernelLibrary implements AutoCloseable {
     if (batchSize < 1 || rows < 1 || cols < 1) {
       throw new IllegalArgumentException("batchSize, rows, and cols must be positive");
     }
-    if (cols % 32 != 0) {
-      throw new IllegalArgumentException(type + " column count must be a multiple of 32: " + cols);
+    if (cols % blockElements != 0) {
+      throw new IllegalArgumentException(
+          type + " column count must be a multiple of " + blockElements + ": " + cols);
     }
 
     int inputElements = Math.multiplyExact(batchSize, cols);
     int outputElements = Math.multiplyExact(batchSize, rows);
-    long weightBytes = Math.multiplyExact(Math.multiplyExact((long) rows, cols / 32L), blockBytes);
+    long weightBytes =
+        Math.multiplyExact(Math.multiplyExact((long) rows, cols / blockElements), blockBytes);
     if (input.length < inputElements) {
       throw new IllegalArgumentException(
           "input requires " + inputElements + " elements but has " + input.length);
@@ -365,8 +418,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MemorySegment.copy(input, 0, nativeInput, ValueLayout.JAVA_FLOAT, 0, inputElements);
       invokeBatched(
           type,
+          format,
           capability,
-          handle,
           weights,
           weightBytes,
           nativeInput,
@@ -382,8 +435,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
 
   private void invokeBatched(
       String type,
+      int format,
       NativeKernelCapability capability,
-      MethodHandle handle,
       MemorySegment weights,
       long weightBytes,
       MemorySegment nativeInput,
@@ -400,8 +453,9 @@ public final class NativeKernelLibrary implements AutoCloseable {
     try {
       int status =
           (int)
-              handle.invokeExact(
+              quantizedBatchedHandle.invokeExact(
                   context,
+                  format,
                   weights,
                   weightBytes,
                   nativeInput,
@@ -425,7 +479,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private void invokeGrouped(
       String type,
       NativeKernelCapability capability,
-      MethodHandle handle,
+      MemorySegment formats,
       MemorySegment weightPointers,
       MemorySegment weightBytes,
       MemorySegment rows,
@@ -443,8 +497,9 @@ public final class NativeKernelLibrary implements AutoCloseable {
     try {
       int status =
           (int)
-              handle.invokeExact(
+              quantizedGroupedBatchedHandle.invokeExact(
                   context,
+                  formats,
                   weightPointers,
                   weightBytes,
                   rows,

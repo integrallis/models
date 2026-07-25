@@ -17,14 +17,18 @@ package com.integrallis.models.backend.nativekernel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 class NativeKernelLibraryTest {
@@ -38,6 +42,12 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q6_K_F32_GROUPED_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL))
+          .isTrue();
       assertThat(kernels.supports(NativeKernelCapability.PERSISTENT_WORKER_CONTEXT)).isTrue();
     }
   }
@@ -95,11 +105,12 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-q4_0-q8_0-v1");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v2");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
           .containsEntry(PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY, "true")
+          .containsEntry(PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY, "true")
           .containsEntry(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "false");
     }
   }
@@ -146,6 +157,29 @@ class NativeKernelLibraryTest {
       kernel.multiply(actual, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
 
       assertThat(actual).containsExactly(expected);
+    }
+  }
+
+  @Test
+  void reusableGgufKernelMatchesVectorSemanticsForKQuantizedBatchedMultiplication() {
+    int batchSize = 3;
+    int rows = 5;
+    int cols = 512;
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment q4Weights = arena.allocate((long) rows * cols / 256 * 144);
+      MemorySegment q6Weights = arena.allocate((long) rows * cols / 256 * 210);
+      fillQ4KWeights(q4Weights, rows, cols);
+      fillQ6KWeights(q6Weights, rows, cols);
+
+      assertThat(kernel.supports(GgufTensorType.Q4_K)).isTrue();
+      assertThat(kernel.supports(GgufTensorType.Q6_K)).isTrue();
+      assertKQuantizedProjectionMatches(
+          kernel, q4Weights, GgufTensorType.Q4_K, input, batchSize, rows, cols);
+      assertKQuantizedProjectionMatches(
+          kernel, q6Weights, GgufTensorType.Q6_K, input, batchSize, rows, cols);
     }
   }
 
@@ -297,6 +331,69 @@ class NativeKernelLibraryTest {
     }
   }
 
+  @Test
+  void groupedKernelMatchesVectorSemanticsForMixedQ4_KQ4_KQ6_KProjections() {
+    int batchSize = 3;
+    int cols = 512;
+    int[] rowCounts = {3, 5, 7};
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment firstWeights = arena.allocate((long) rowCounts[0] * cols / 256 * 144);
+      MemorySegment secondWeights = arena.allocate((long) rowCounts[1] * cols / 256 * 144);
+      MemorySegment thirdWeights = arena.allocate((long) rowCounts[2] * cols / 256 * 210);
+      fillQ4KWeights(firstWeights, rowCounts[0], cols);
+      fillQ4KWeights(secondWeights, rowCounts[1], cols);
+      fillQ6KWeights(thirdWeights, rowCounts[2], cols);
+
+      float[] expectedFirst =
+          tensorOpsReference(
+              firstWeights, GgufTensorType.Q4_K, input, batchSize, rowCounts[0], cols);
+      float[] expectedSecond =
+          tensorOpsReference(
+              secondWeights, GgufTensorType.Q4_K, input, batchSize, rowCounts[1], cols);
+      float[] expectedThird =
+          tensorOpsReference(
+              thirdWeights, GgufTensorType.Q6_K, input, batchSize, rowCounts[2], cols);
+      float[] actualFirst = new float[expectedFirst.length];
+      float[] actualSecond = new float[expectedSecond.length];
+      float[] actualThird = new float[expectedThird.length];
+
+      assertThat(
+              kernel.isTripleEligible(
+                  GgufTensorType.Q4_K,
+                  rowCounts[0],
+                  GgufTensorType.Q4_K,
+                  rowCounts[1],
+                  GgufTensorType.Q6_K,
+                  rowCounts[2],
+                  batchSize,
+                  cols))
+          .isTrue();
+      kernel.multiplyTriple(
+          actualFirst,
+          firstWeights,
+          GgufTensorType.Q4_K,
+          rowCounts[0],
+          actualSecond,
+          secondWeights,
+          GgufTensorType.Q4_K,
+          rowCounts[1],
+          actualThird,
+          thirdWeights,
+          GgufTensorType.Q6_K,
+          rowCounts[2],
+          input,
+          batchSize,
+          cols);
+
+      assertClose(actualFirst, expectedFirst);
+      assertClose(actualSecond, expectedSecond);
+      assertClose(actualThird, expectedThird);
+    }
+  }
+
   private static Path libraryPath() {
     return Path.of(System.getProperty("models.native.kernels.library"));
   }
@@ -339,6 +436,138 @@ class NativeKernelLibraryTest {
           weights.set(ValueLayout.JAVA_BYTE, offset + 2 + lane, (byte) quantized);
         }
       }
+    }
+  }
+
+  private static void fillQ4KWeights(MemorySegment weights, int rows, int cols) {
+    int blocksPerRow = cols / 256;
+    for (int row = 0; row < rows; row++) {
+      for (int block = 0; block < blocksPerRow; block++) {
+        byte[] bytes = q4KBlock((row + 1) * 0.03125f, (block + 1) * 0.015625f, row, block);
+        MemorySegment.copy(
+            bytes,
+            0,
+            weights,
+            ValueLayout.JAVA_BYTE,
+            ((long) row * blocksPerRow + block) * bytes.length,
+            bytes.length);
+      }
+    }
+  }
+
+  private static byte[] q4KBlock(float scale, float minScale, int row, int block) {
+    byte[] bytes = new byte[144];
+    ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+    buffer.putShort(0, Float.floatToFloat16(scale));
+    buffer.putShort(2, Float.floatToFloat16(minScale));
+    int[] scales = {5, 12, 30, 60, 7, 15, 31, 63};
+    int[] mins = {3, 8, 20, 45, 1, 10, 25, 50};
+    for (int group = 0; group < 4; group++) {
+      bytes[4 + group] = (byte) scales[group];
+      bytes[8 + group] = (byte) mins[group];
+    }
+    for (int group = 4; group < 8; group++) {
+      bytes[8 + group] = (byte) ((scales[group] & 0x0f) | ((mins[group] & 0x0f) << 4));
+      bytes[group] |= (byte) ((scales[group] >>> 4) << 6);
+      bytes[4 + group] |= (byte) ((mins[group] >>> 4) << 6);
+    }
+    for (int group = 0; group < 8; group++) {
+      int packedOffset = 16 + (group >>> 1) * 32;
+      int shift = (group & 1) * 4;
+      for (int index = 0; index < 32; index++) {
+        int quant = (row * 13 + block * 7 + group * 5 + index * 3) & 0x0f;
+        bytes[packedOffset + index] |= (byte) (quant << shift);
+      }
+    }
+    return bytes;
+  }
+
+  private static void fillQ6KWeights(MemorySegment weights, int rows, int cols) {
+    int blocksPerRow = cols / 256;
+    for (int row = 0; row < rows; row++) {
+      for (int block = 0; block < blocksPerRow; block++) {
+        byte[] bytes = q6KBlock((row + block + 1) * 0.015625f, row, block);
+        MemorySegment.copy(
+            bytes,
+            0,
+            weights,
+            ValueLayout.JAVA_BYTE,
+            ((long) row * blocksPerRow + block) * bytes.length,
+            bytes.length);
+      }
+    }
+  }
+
+  private static byte[] q6KBlock(float scale, int row, int block) {
+    byte[] bytes = new byte[210];
+    for (int index = 0; index < 16; index++) {
+      bytes[192 + index] = (byte) ((row * 5 + block * 3 + index * 7) % 17 - 8);
+    }
+    ByteBuffer.wrap(bytes)
+        .order(ByteOrder.LITTLE_ENDIAN)
+        .putShort(208, Float.floatToFloat16(scale));
+    for (int superBlock = 0; superBlock < 2; superBlock++) {
+      int positionBase = superBlock * 128;
+      int qlBase = superBlock * 64;
+      int qhBase = 128 + superBlock * 32;
+      for (int index = 0; index < 32; index++) {
+        int q1 = q6Quant(row, block, positionBase + index) + 32;
+        int q2 = q6Quant(row, block, positionBase + index + 32) + 32;
+        int q3 = q6Quant(row, block, positionBase + index + 64) + 32;
+        int q4 = q6Quant(row, block, positionBase + index + 96) + 32;
+        bytes[qlBase + index] = (byte) ((q1 & 0x0f) | ((q3 & 0x0f) << 4));
+        bytes[qlBase + 32 + index] = (byte) ((q2 & 0x0f) | ((q4 & 0x0f) << 4));
+        bytes[qhBase + index] =
+            (byte)
+                (((q1 >>> 4) & 0x03)
+                    | (((q2 >>> 4) & 0x03) << 2)
+                    | (((q3 >>> 4) & 0x03) << 4)
+                    | (((q4 >>> 4) & 0x03) << 6));
+      }
+    }
+    return bytes;
+  }
+
+  private static int q6Quant(int row, int block, int index) {
+    return (row * 19 + block * 11 + index * 7) % 64 - 32;
+  }
+
+  private static void assertKQuantizedProjectionMatches(
+      RustGgufBatchedMatrixKernel kernel,
+      MemorySegment weights,
+      GgufTensorType type,
+      float[] input,
+      int batchSize,
+      int rows,
+      int cols) {
+    float[] expected = tensorOpsReference(weights, type, input, batchSize, rows, cols);
+    float[] actual = new float[expected.length];
+    assertThat(kernel.isEligible(type, batchSize, rows, cols)).isTrue();
+    kernel.multiply(actual, input, weights, type, batchSize, rows, cols);
+    assertClose(actual, expected);
+  }
+
+  private static float[] tensorOpsReference(
+      MemorySegment weights,
+      GgufTensorType type,
+      float[] input,
+      int batchSize,
+      int rows,
+      int cols) {
+    float[] output = new float[batchSize * rows];
+    for (int batch = 0; batch < batchSize; batch++) {
+      float[] query = Arrays.copyOfRange(input, batch * cols, (batch + 1) * cols);
+      float[] projection = new float[rows];
+      TensorOps.ggufMatmul(projection, query, weights, type, rows, cols);
+      System.arraycopy(projection, 0, output, batch * rows, rows);
+    }
+    return output;
+  }
+
+  private static void assertClose(float[] actual, float[] expected) {
+    assertThat(actual).hasSameSizeAs(expected);
+    for (int index = 0; index < actual.length; index++) {
+      assertThat(actual[index]).as("output[%s]", index).isCloseTo(expected[index], within(1e-4f));
     }
   }
 
