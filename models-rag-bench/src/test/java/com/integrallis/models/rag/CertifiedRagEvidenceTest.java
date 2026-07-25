@@ -47,6 +47,9 @@ class CertifiedRagEvidenceTest {
           .resolve(
               "benchmark-results/certified-20260724/rag/native-q4-profiled/"
                   + "qwen2.5-coder-1.5b-q4_0");
+  private static final Path QWEN2_5_GENERAL_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260725/rag/qwen2.5-0.5b-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -509,6 +512,55 @@ class CertifiedRagEvidenceTest {
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.29, 1.30);
               assertThat(comparison.qualified()).isTrue();
             });
+  }
+
+  @Test
+  void qwen25GeneralMarkerProfileQualifiesWithIdenticalBaselineOutputs() throws Exception {
+    RagBenchmarkReport baseline =
+        report(QWEN2_5_GENERAL_Q4_K_M_EVIDENCE, "models-rust-ffm-baseline.json");
+    RagBenchmarkReport candidate = report(QWEN2_5_GENERAL_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport ollama = report(QWEN2_5_GENERAL_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(QWEN2_5_GENERAL_Q4_K_M_EVIDENCE, "llama.cpp.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db");
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.modelAnswerCount()).isEqualTo(12);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(candidate.backendDiagnostics().optimization("rust-quantized-decode"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(baseline.backendDiagnostics().optimization("rust-quantized-decode"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.DISABLED));
+    assertThat(candidate.backendDiagnostics().optimizations())
+        .filteredOn(optimization -> optimization.id().startsWith("modeljars.profile."))
+        .singleElement()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings())
+                  .containsEntry("profile-id", "qwen2_5_0_5b_q4_k_m_epyc_milan_jdk25_rust_ffm");
+            });
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(baseline.summary().p50DecodeTokensPerSecond() * 2.9);
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().rawText())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.grounding().rawText()).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.grounding().decision()).toList());
   }
 
   @Test

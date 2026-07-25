@@ -1,0 +1,47 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v4",
+  "candidate" : {
+    "path" : "/opt/native-q8-gate/qualification-wave-4/qwen2.5-0.5b-q4-k-m/models-rust-ffm-marker.json",
+    "sha256" : "621093bc1e6b8199c326d724ee6a0b1bb8e179b3fcd28f6c8a69879af7098869"
+  },
+  "comparators" : [ {
+    "path" : "/opt/native-q8-gate/qualification-wave-4/qwen2.5-0.5b-q4-k-m/llama.cpp.json",
+    "sha256" : "acfbe1d2da3ff2d1395d6c0f3c7e0e4f91833012638c8755faec8094960b7242"
+  }, {
+    "path" : "/opt/native-q8-gate/qualification-wave-4/qwen2.5-0.5b-q4-k-m/ollama.json",
+    "sha256" : "c07496ff3a0d5a86b36648522d8b20bdda566dde3e54c92d74fee124b4c1d252"
+  } ],
+  "qualification" : {
+    "modelId" : "qwen2.5-0.5b-q4-k-m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 12,
+    "modelAnswerRate" : 0.4444444444444444,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "llama.cpp", "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "llama.cpp",
+      "decodeThroughputRatio" : 0.6887787450151601,
+      "endToEndLatencyRatio" : 1.1918408996398773,
+      "minimumDecodeThroughputRatio" : 0.45,
+      "maximumEndToEndLatencyRatio" : 2.0,
+      "qualified" : true,
+      "failures" : [ ]
+    }, {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 1.466491961193893,
+      "endToEndLatencyRatio" : 0.8581285896323735,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}
