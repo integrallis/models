@@ -8,6 +8,7 @@ data class ModelFixture(
     val variant: String,
     val capability: String,
     val slow: Boolean = false,
+    val backend: String = "pure-java",
 )
 
 val modelFixtures =
@@ -172,6 +173,15 @@ val modelFixtures =
             "text-generation",
         ),
         ModelFixture(
+            "downloadGemma31BQ4KMModel",
+            "Gemma 3 1B Instruct Q4_K_M",
+            "hf://bartowski/google_gemma-3-1b-it-GGUF",
+            "[3.0.0,4.0.0)",
+            "q4_k_m",
+            "chat",
+            backend = "llama.cpp",
+        ),
+        ModelFixture(
             "downloadEuroLlm17BQ4KMModel",
             "EuroLLM 1.7B Instruct Q4_K_M",
             "hf://mradermacher/EuroLLM-1.7B-Instruct-GGUF",
@@ -215,7 +225,7 @@ modelFixtures.forEach { fixture ->
             "--variant",
             fixture.variant,
             "--backend",
-            "pure-java",
+            fixture.backend,
             "--capability",
             fixture.capability,
         )

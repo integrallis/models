@@ -170,6 +170,39 @@ class LlamaConfigTest {
     }
 
     @Test
+    void extractsGemma3DecoderSemantics() {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("gemma3"));
+      entries.put("gemma3.embedding_length", new GgufMetadataValue.Uint32Value(1152));
+      entries.put("gemma3.block_count", new GgufMetadataValue.Uint32Value(26));
+      entries.put("gemma3.attention.head_count", new GgufMetadataValue.Uint32Value(4));
+      entries.put("gemma3.attention.head_count_kv", new GgufMetadataValue.Uint32Value(1));
+      entries.put("gemma3.attention.key_length", new GgufMetadataValue.Uint32Value(256));
+      entries.put("gemma3.attention.value_length", new GgufMetadataValue.Uint32Value(256));
+      entries.put("gemma3.attention.sliding_window", new GgufMetadataValue.Uint32Value(512));
+      entries.put("gemma3.rope.freq_base", new GgufMetadataValue.Float32Value(1_000_000.0f));
+      entries.put("gemma3.final_logit_softcapping", new GgufMetadataValue.Float32Value(30.0f));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.architecture()).isEqualTo(DecoderArchitecture.GEMMA3);
+      assertThat(config.embeddingScale()).isEqualTo((float) Math.sqrt(1152));
+      assertThat(config.usesGeluFfn()).isTrue();
+      assertThat(config.usesPostAttentionNorm()).isTrue();
+      assertThat(config.usesPostFfnNorm()).isTrue();
+      assertThat(config.usesNeoxRope()).isTrue();
+      assertThat(config.slidingWindow()).isEqualTo(512);
+      assertThat(config.usesSlidingWindow(0)).isTrue();
+      assertThat(config.usesSlidingWindow(4)).isTrue();
+      assertThat(config.usesSlidingWindow(5)).isFalse();
+      assertThat(config.ropeTheta(0)).isEqualTo(10_000.0f);
+      assertThat(config.ropeTheta(5)).isEqualTo(1_000_000.0f);
+      assertThat(config.attentionStartPosition(0, 600)).isEqualTo(89);
+      assertThat(config.attentionStartPosition(5, 600)).isZero();
+      assertThat(config.finalLogitSoftcap()).isEqualTo(30.0f);
+    }
+
+    @Test
     void derivesVocabSizeFromTokenizerTokensWhenArchitectureKeyIsMissing() {
       Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
       entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));

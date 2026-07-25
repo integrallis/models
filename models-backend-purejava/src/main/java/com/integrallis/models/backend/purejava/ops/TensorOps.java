@@ -1259,6 +1259,32 @@ public final class TensorOps {
     }
   }
 
+  /** GELU-gated activation using llama.cpp's tanh approximation. */
+  public static void geluGlu(float[] out, float[] gate, float[] up, int size) {
+    geluGlu(out, 0, gate, 0, up, 0, size);
+  }
+
+  /** Offset-aware GELU-gated activation over flat batch buffers. */
+  public static void geluGlu(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size) {
+    for (int i = 0; i < size; i++) {
+      float value = gate[gateOffset + i];
+      float gelu =
+          0.5f
+              * value
+              * (1.0f
+                  + (float)
+                      Math.tanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
+      out[outOffset + i] = gelu * up[upOffset + i];
+    }
+  }
+
   private static void rotatePair(float[] vector, int offset, float cos, float sin) {
     float x0 = vector[offset];
     float x1 = vector[offset + 1];

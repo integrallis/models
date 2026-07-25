@@ -183,7 +183,7 @@ public record ModelTopology(
   }
 
   int stagedQuantizedFfnLayers() {
-    if (!threadShareableProjectionWeights) {
+    if (!supportsStandardLlamaLayerSemantics() || !threadShareableProjectionWeights) {
       return 0;
     }
     return Math.toIntExact(
@@ -191,7 +191,7 @@ public record ModelTopology(
   }
 
   int stagedQuantizedLayerLayers() {
-    if (!threadShareableProjectionWeights) {
+    if (!supportsStandardLlamaLayerSemantics() || !threadShareableProjectionWeights) {
       return 0;
     }
     return Math.toIntExact(
@@ -199,7 +199,7 @@ public record ModelTopology(
   }
 
   int parallelQ8FfnPreparationLayers() {
-    if (!threadShareableProjectionWeights) {
+    if (!supportsStandardLlamaLayerSemantics() || !threadShareableProjectionWeights) {
       return 0;
     }
     return Math.toIntExact(
@@ -212,7 +212,7 @@ public record ModelTopology(
   }
 
   boolean hasStagedQ8Projection(boolean includeAttentionOutput) {
-    if (!threadShareableProjectionWeights) {
+    if (!supportsStandardLlamaLayerSemantics() || !threadShareableProjectionWeights) {
       return false;
     }
     return layers.stream()
@@ -263,6 +263,9 @@ public record ModelTopology(
   }
 
   boolean supportsFinalLayerPrefillPruning() {
+    if (!supportsStandardLlamaLayerSemantics()) {
+      return false;
+    }
     LayerTopology finalLayer = layers.getLast();
     GgufTensorType type = finalLayer.gate();
     return type == finalLayer.up()
@@ -271,6 +274,9 @@ public record ModelTopology(
   }
 
   boolean supportsFinalLayerKvOnlyPrefill() {
+    if (!supportsStandardLlamaLayerSemantics()) {
+      return false;
+    }
     LayerTopology finalLayer = layers.getLast();
     GgufTensorType type = finalLayer.query();
     return supportsFinalLayerPrefillPruning()
@@ -285,6 +291,10 @@ public record ModelTopology(
     return type == GgufTensorType.Q4_0
         || type == GgufTensorType.Q8_0
         || type == GgufTensorType.Q4_K;
+  }
+
+  private boolean supportsStandardLlamaLayerSemantics() {
+    return !"gemma3".equals(architecture);
   }
 
   String finalLayerFfnFormats() {

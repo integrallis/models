@@ -47,7 +47,8 @@ public final class LlamaForwardPass {
   private final LlamaConfig config;
   private final LlamaWeights weights;
   private final KvCache cache;
-  private final RopeTable ropeTable;
+  private final RopeTable globalRopeTable;
+  private final RopeTable slidingWindowRopeTable;
   private final LayerObserver layerObserver;
   private final boolean groupedProjections;
   private final boolean mixedKProjections;
@@ -184,8 +185,20 @@ public final class LlamaForwardPass {
     this.q8BlockMajorKernel = executionPlan.q8BlockMajorKernel();
     this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
     this.batchedMatrixKernel = loadedMatrixKernel;
-    this.ropeTable =
+    if (!config.usesStandardLlamaLayerSemantics()
+        && (finalLayerPrefillPruning
+            || finalLayerKvOnlyPrefill
+            || stagedQuantizedFfn
+            || stagedQuantizedLayer)) {
+      throw new IllegalArgumentException(
+          "execution plan selected Llama-only layer shortcuts for " + config.architecture());
+    }
+    this.globalRopeTable =
         new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
+    this.slidingWindowRopeTable =
+        config.slidingWindow() > 0
+            ? new RopeTable(config.keyLength(), config.slidingWindowRopeTheta(), 1.0f)
+            : globalRopeTable;
 
     int dim = config.embeddingDim();
     int hiddenDim = config.hiddenDim();
@@ -349,10 +362,11 @@ public final class LlamaForwardPass {
     int valueDim = config.valueDim();
     int attentionOutputDim = config.attentionOutputDim();
     int hiddenDim = config.hiddenDim();
-    ropeTable.prepareBatch(startPosition, batchSize);
+    prepareRopeBatch(startPosition, batchSize);
 
     for (int batch = 0; batch < batchSize; batch++) {
       weights.embedToken(tokens[tokenOffset + batch], x);
+      scaleActive(x, 0, dim, config.embeddingScale());
       System.arraycopy(x, 0, batchX, batch * dim, dim);
     }
 
@@ -421,6 +435,7 @@ public final class LlamaForwardPass {
             lw.woType(),
             dim,
             attentionOutputDim);
+        normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
         addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
 
         if (pruneFinalLayer) {
@@ -467,7 +482,7 @@ public final class LlamaForwardPass {
           }
           for (int batch = 0; batch < batchSize; batch++) {
             int hiddenOffset = batch * hiddenDim;
-            TensorOps.swiGlu(
+            activateFfn(
                 batchFfnOut,
                 hiddenOffset,
                 batchFfnGate,
@@ -486,6 +501,7 @@ public final class LlamaForwardPass {
               hiddenDim);
         }
       }
+      normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
       addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
       if (layerObserver != null) {
         for (int batch = 0; batch < batchSize; batch++) {
@@ -502,6 +518,7 @@ public final class LlamaForwardPass {
             xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
         matmulDispatch(
             logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+        softcapLogits(logits);
         System.arraycopy(logits, 0, batchLogits, batchLogitsOffset + batch * vocabSize, vocabSize);
       }
     } else if (computeFinalLogits) {
@@ -510,6 +527,7 @@ public final class LlamaForwardPass {
           xNorm, 0, batchX, finalOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
       matmulDispatch(
           logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+      softcapLogits(logits);
     }
   }
 
@@ -527,10 +545,11 @@ public final class LlamaForwardPass {
     int valueLength = config.valueLength();
     int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads();
-    ropeTable.prepare(position);
+    prepareRope(position);
 
     // Token embedding (dequantizes only the single row for this token)
     weights.embedToken(token, x);
+    scaleActive(x, 0, dim, config.embeddingScale());
 
     // Process each transformer layer
     for (int layer = 0; layer < config.numLayers(); layer++) {
@@ -579,14 +598,14 @@ public final class LlamaForwardPass {
         int offset = h * keyLength;
         normalizeHead(q, offset, lw.qNorm(), keyLength);
         if (config.usesRope(layer)) {
-          applyRope(q, offset);
+          applyRope(q, offset, layer);
         }
       }
       for (int h = 0; h < numKvHeads; h++) {
         int offset = h * keyLength;
         normalizeHead(k, offset, lw.kNorm(), keyLength);
         if (config.usesRope(layer)) {
-          applyRope(k, offset);
+          applyRope(k, offset, layer);
         }
       }
 
@@ -604,12 +623,13 @@ public final class LlamaForwardPass {
         int kvHead = h / groupSize;
         int qOff = h * keyLength;
         int outputOffset = h * valueLength;
+        int firstPosition = config.attentionStartPosition(layer, position);
 
         computeAttentionScores(
             q, qOff, layer, position, kvHead, keyCache, keyLength, scale, attentionScores, 0);
 
         // Softmax over scores
-        TensorOps.softmax(attentionScores, 0, position + 1);
+        TensorOps.softmax(attentionScores, firstPosition, position - firstPosition + 1);
 
         accumulateAttentionValues(
             attnOut,
@@ -626,6 +646,7 @@ public final class LlamaForwardPass {
       // Output projection
       matmulDispatch(
           attnProjected, attnOut, lw.wo(), lw.woType(), dim, config.attentionOutputDim());
+      normalizeProjection(attnProjected, lw.attentionPostNorm(), dim);
 
       // Residual connection
       for (int i = 0; i < dim; i++) {
@@ -660,10 +681,11 @@ public final class LlamaForwardPass {
         matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
         matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
       }
-      TensorOps.swiGlu(ffnOut, ffnGate, ffnUp, config.hiddenDim());
+      activateFfn(ffnOut, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
 
       // Down projection
       matmulDispatch(ffnProjected, ffnOut, lw.ffnDown(), lw.ffnDownType(), dim, config.hiddenDim());
+      normalizeProjection(ffnProjected, lw.ffnPostNorm(), dim);
 
       // Residual connection
       for (int i = 0; i < dim; i++) {
@@ -678,6 +700,7 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
       matmulDispatch(
           logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+      softcapLogits(logits);
     }
 
     nextPosition++;
@@ -842,7 +865,7 @@ public final class LlamaForwardPass {
         int offset = keyOffset + head * keyLength;
         normalizeHead(batchK, offset, layer.kNorm(), keyLength);
         if (config.usesRope(layerIndex)) {
-          ropeTable.applyBatch(batchK, offset, batch, config.usesNeoxRope());
+          applyRopeBatch(batchK, offset, batch, layerIndex);
         }
       }
       cache.store(layerIndex, startPosition + batch, batchK, keyOffset, batchV, valueOffset);
@@ -861,7 +884,7 @@ public final class LlamaForwardPass {
       int offset = head * keyLength;
       normalizeHead(q, offset, layer.qNorm(), keyLength);
       if (config.usesRope(layerIndex)) {
-        ropeTable.applyBatch(q, offset, finalBatch, config.usesNeoxRope());
+        applyRopeBatch(q, offset, finalBatch, layerIndex);
       }
     }
 
@@ -878,6 +901,7 @@ public final class LlamaForwardPass {
         0);
     matmulDispatch(
         attnProjected, attnOut, layer.wo(), layer.woType(), dim, config.attentionOutputDim());
+    normalizeProjection(attnProjected, layer.attentionPostNorm(), dim);
     for (int index = 0; index < dim; index++) {
       batchX[stateOffset + index] += attnProjected[index];
     }
@@ -913,7 +937,7 @@ public final class LlamaForwardPass {
       int offset = head * keyLength;
       normalizeHead(k, offset, layer.kNorm(), keyLength);
       if (config.usesRope(layerIndex)) {
-        applyRope(k, offset);
+        applyRope(k, offset, layerIndex);
       }
     }
     cache.store(layerIndex, position, k, v);
@@ -938,8 +962,9 @@ public final class LlamaForwardPass {
       matmulDispatch(ffnGate, xNorm, layer.ffnGate(), layer.ffnGateType(), hiddenDim, dim);
       matmulDispatch(ffnUp, xNorm, layer.ffnUp(), layer.ffnUpType(), hiddenDim, dim);
     }
-    TensorOps.swiGlu(ffnOut, ffnGate, ffnUp, hiddenDim);
+    activateFfn(ffnOut, 0, ffnGate, 0, ffnUp, 0, hiddenDim);
     matmulDispatch(ffnProjected, ffnOut, layer.ffnDown(), layer.ffnDownType(), dim, hiddenDim);
+    normalizeProjection(ffnProjected, layer.ffnPostNorm(), dim);
     for (int index = 0; index < dim; index++) {
       batchX[stateOffset + index] += ffnProjected[index];
     }
@@ -967,14 +992,14 @@ public final class LlamaForwardPass {
         int offset = qBase + head * keyLength;
         normalizeHead(batchQ, offset, layer.qNorm(), keyLength);
         if (config.usesRope(layerIndex)) {
-          ropeTable.applyBatch(batchQ, offset, batch, config.usesNeoxRope());
+          applyRopeBatch(batchQ, offset, batch, layerIndex);
         }
       }
       for (int head = 0; head < config.numKvHeads(); head++) {
         int offset = kBase + head * keyLength;
         normalizeHead(batchK, offset, layer.kNorm(), keyLength);
         if (config.usesRope(layerIndex)) {
-          ropeTable.applyBatch(batchK, offset, batch, config.usesNeoxRope());
+          applyRopeBatch(batchK, offset, batch, layerIndex);
         }
       }
       cache.store(layerIndex, startPosition + batch, batchK, kBase, batchV, vBase);
@@ -1030,6 +1055,7 @@ public final class LlamaForwardPass {
       int kvHead = head / groupSize;
       int qOffset = queryOffset + head * keyLength;
       int headOutputOffset = outputOffset + head * valueLength;
+      int firstPosition = config.attentionStartPosition(layer, position);
       computeAttentionScores(
           query,
           qOffset,
@@ -1042,7 +1068,7 @@ public final class LlamaForwardPass {
           scores,
           scoresOffset);
 
-      TensorOps.softmax(scores, scoresOffset, position + 1);
+      TensorOps.softmax(scores, scoresOffset + firstPosition, position - firstPosition + 1);
       accumulateAttentionValues(
           output,
           headOutputOffset,
@@ -1067,7 +1093,9 @@ public final class LlamaForwardPass {
       float scale,
       float[] scores,
       int scoresOffset) {
-    int firstKeyOffset = cache.keyOffset(layer, 0) + kvHead * keyLength;
+    int firstPosition = config.attentionStartPosition(layer, position);
+    int visiblePositions = position - firstPosition + 1;
+    int firstKeyOffset = cache.keyOffset(layer, firstPosition) + kvHead * keyLength;
     if (batchedAttentionScores) {
       VectorUtil.batchDotProductExact(
           query,
@@ -1075,17 +1103,17 @@ public final class LlamaForwardPass {
           keyCache,
           firstKeyOffset,
           cache.keyDim(),
-          position + 1,
+          visiblePositions,
           keyLength,
           scores,
-          scoresOffset);
-      for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
+          scoresOffset + firstPosition);
+      for (int cachedPosition = firstPosition; cachedPosition <= position; cachedPosition++) {
         scores[scoresOffset + cachedPosition] *= scale;
       }
       return;
     }
-    for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
-      int cacheOffset = firstKeyOffset + cachedPosition * cache.keyDim();
+    for (int cachedPosition = firstPosition; cachedPosition <= position; cachedPosition++) {
+      int cacheOffset = firstKeyOffset + (cachedPosition - firstPosition) * cache.keyDim();
       float dot = VectorUtil.dotProduct(query, queryOffset, keyCache, cacheOffset, keyLength);
       scores[scoresOffset + cachedPosition] = dot * scale;
     }
@@ -1101,8 +1129,10 @@ public final class LlamaForwardPass {
       int valueLength,
       float[] scores,
       int scoresOffset) {
+    int firstPosition = config.attentionStartPosition(layer, position);
+    int visiblePositions = position - firstPosition + 1;
     if (batchedAttentionValues) {
-      int firstValueOffset = cache.valueOffset(layer, 0) + kvHead * valueLength;
+      int firstValueOffset = cache.valueOffset(layer, firstPosition) + kvHead * valueLength;
       VectorUtil.addWeightedRowsInPlace(
           output,
           outputOffset,
@@ -1110,12 +1140,12 @@ public final class LlamaForwardPass {
           firstValueOffset,
           cache.valueDim(),
           scores,
-          scoresOffset,
-          position + 1,
+          scoresOffset + firstPosition,
+          visiblePositions,
           valueLength);
       return;
     }
-    for (int cachedPosition = 0; cachedPosition <= position; cachedPosition++) {
+    for (int cachedPosition = firstPosition; cachedPosition <= position; cachedPosition++) {
       int cacheOffset = cache.valueOffset(layer, cachedPosition) + kvHead * valueLength;
       VectorUtil.addScaledInPlace(
           output,
@@ -1133,8 +1163,80 @@ public final class LlamaForwardPass {
     }
   }
 
-  private void applyRope(float[] vector, int offset) {
-    ropeTable.apply(vector, offset, config.usesNeoxRope());
+  private void prepareRope(int position) {
+    globalRopeTable.prepare(position);
+    if (slidingWindowRopeTable != globalRopeTable) {
+      slidingWindowRopeTable.prepare(position);
+    }
+  }
+
+  private void prepareRopeBatch(int startPosition, int batchSize) {
+    globalRopeTable.prepareBatch(startPosition, batchSize);
+    if (slidingWindowRopeTable != globalRopeTable) {
+      slidingWindowRopeTable.prepareBatch(startPosition, batchSize);
+    }
+  }
+
+  private RopeTable ropeTable(int layer) {
+    return config.usesSlidingWindow(layer) ? slidingWindowRopeTable : globalRopeTable;
+  }
+
+  private void applyRope(float[] vector, int offset, int layer) {
+    ropeTable(layer).apply(vector, offset, config.usesNeoxRope());
+  }
+
+  private void applyRopeBatch(float[] vector, int offset, int batch, int layer) {
+    ropeTable(layer).applyBatch(vector, offset, batch, config.usesNeoxRope());
+  }
+
+  private void normalizeProjection(float[] projection, float[] norm, int size) {
+    if (norm.length != 0) {
+      TensorOps.rmsNorm(projection, projection, norm, size, config.rmsNormEps());
+    }
+  }
+
+  private void normalizeProjectionBatch(float[] projection, int batchSize, int size, float[] norm) {
+    if (norm.length == 0) {
+      return;
+    }
+    for (int batch = 0; batch < batchSize; batch++) {
+      int offset = batch * size;
+      TensorOps.rmsNorm(projection, offset, projection, offset, norm, size, config.rmsNormEps());
+    }
+  }
+
+  private void activateFfn(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size) {
+    if (config.usesGeluFfn()) {
+      TensorOps.geluGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+    } else {
+      TensorOps.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+    }
+  }
+
+  private static void scaleActive(float[] values, int offset, int length, float scale) {
+    if (scale == 1.0f) {
+      return;
+    }
+    for (int index = 0; index < length; index++) {
+      values[offset + index] *= scale;
+    }
+  }
+
+  private void softcapLogits(float[] values) {
+    float softcap = config.finalLogitSoftcap();
+    if (softcap == 0.0f) {
+      return;
+    }
+    for (int index = 0; index < values.length; index++) {
+      values[index] = softcap * (float) Math.tanh(values[index] / softcap);
+    }
   }
 
   private static void addOptionalBias(float[] vector, float[] bias) {
@@ -1496,7 +1598,7 @@ public final class LlamaForwardPass {
   private static PureJavaExecutionPlan defaultPlan(LlamaConfig config, LlamaWeights weights) {
     return ExecutionPlanner.plan(
         RuntimeFingerprint.capture(),
-        ModelTopology.from("llama", config, weights),
+        ModelTopology.from(config.architecture().metadataId(), config, weights),
         PureJavaPlanConfiguration.fromSystemProperties(Map.of()));
   }
 }

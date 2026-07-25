@@ -53,13 +53,15 @@ public final class LlamaWeights {
       float[] vBias,
       MemorySegment wo,
       GgufTensorType woType,
+      float[] attentionPostNorm,
       float[] ffnNorm,
       MemorySegment ffnGate,
       GgufTensorType ffnGateType,
       MemorySegment ffnUp,
       GgufTensorType ffnUpType,
       MemorySegment ffnDown,
-      GgufTensorType ffnDownType) {}
+      GgufTensorType ffnDownType,
+      float[] ffnPostNorm) {}
 
   private LlamaWeights(
       MemorySegment tokenEmbeddingSegment,
@@ -104,10 +106,18 @@ public final class LlamaWeights {
       float[] kNorm = loadOptionalF32Tensor(file, prefix + "attn_k_norm.weight", config.headDim());
       float[] vBias = loadOptionalF32Tensor(file, prefix + "attn_v.bias", config.valueDim());
       GgufTensorData wo = file.getTensor(prefix + "attn_output.weight");
+      float[] attentionPostNorm =
+          config.usesPostAttentionNorm()
+              ? loadF32Tensor(file, prefix + "post_attention_norm.weight")
+              : new float[0];
       float[] ffnNorm = loadF32Tensor(file, prefix + "ffn_norm.weight");
       GgufTensorData ffnGate = file.getTensor(prefix + "ffn_gate.weight");
       GgufTensorData ffnUp = file.getTensor(prefix + "ffn_up.weight");
       GgufTensorData ffnDown = file.getTensor(prefix + "ffn_down.weight");
+      float[] ffnPostNorm =
+          config.usesPostFfnNorm()
+              ? loadF32Tensor(file, prefix + "post_ffw_norm.weight")
+              : new float[0];
 
       layers[i] =
           new LayerWeights(
@@ -125,13 +135,15 @@ public final class LlamaWeights {
               vBias,
               wo.dataSegment(),
               wo.type(),
+              attentionPostNorm,
               ffnNorm,
               ffnGate.dataSegment(),
               ffnGate.type(),
               ffnUp.dataSegment(),
               ffnUp.type(),
               ffnDown.dataSegment(),
-              ffnDown.type());
+              ffnDown.type(),
+              ffnPostNorm);
     }
 
     return new LlamaWeights(

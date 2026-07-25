@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 
 /** Configuration for a Llama-family model, extracted from GGUF metadata. */
 public record LlamaConfig(
+    DecoderArchitecture architecture,
     int embeddingDim,
     int numLayers,
     int numHeads,
@@ -30,11 +31,14 @@ public record LlamaConfig(
     int hiddenDim,
     float ropeTheta,
     float ropeFrequencyScale,
+    float slidingWindowRopeTheta,
     float rmsNormEps,
-    boolean archUsesNeoxRope,
-    int noRopeLayerStep) {
+    int slidingWindow,
+    int slidingWindowPattern,
+    float finalLogitSoftcap) {
 
   public LlamaConfig {
+    if (architecture == null) throw new IllegalArgumentException("architecture must not be null");
     if (embeddingDim <= 0) throw new IllegalArgumentException("embeddingDim must be > 0");
     if (numLayers <= 0) throw new IllegalArgumentException("numLayers must be > 0");
     if (numHeads <= 0) throw new IllegalArgumentException("numHeads must be > 0");
@@ -49,8 +53,19 @@ public record LlamaConfig(
       throw new IllegalArgumentException(
           "ropeFrequencyScale must be finite and > 0: " + ropeFrequencyScale);
     }
-    if (noRopeLayerStep < 0) {
-      throw new IllegalArgumentException("noRopeLayerStep must be >= 0");
+    if (!(slidingWindowRopeTheta > 0.0f) || !Float.isFinite(slidingWindowRopeTheta)) {
+      throw new IllegalArgumentException(
+          "slidingWindowRopeTheta must be finite and > 0: " + slidingWindowRopeTheta);
+    }
+    if (slidingWindow < 0) {
+      throw new IllegalArgumentException("slidingWindow must be >= 0");
+    }
+    if (slidingWindowPattern <= 0) {
+      throw new IllegalArgumentException("slidingWindowPattern must be > 0");
+    }
+    if (finalLogitSoftcap < 0.0f || !Float.isFinite(finalLogitSoftcap)) {
+      throw new IllegalArgumentException(
+          "finalLogitSoftcap must be finite and >= 0: " + finalLogitSoftcap);
     }
   }
 
@@ -79,9 +94,11 @@ public record LlamaConfig(
     return valueLength * numHeads;
   }
 
-  /** Qwen-family GGUF models use NeoX split-half rotary layout. */
+  /** Whether the GGUF architecture uses the NeoX split-half rotary layout. */
   public boolean usesNeoxRope() {
-    return archUsesNeoxRope;
+    return architecture == DecoderArchitecture.QWEN2
+        || architecture == DecoderArchitecture.QWEN3
+        || architecture == DecoderArchitecture.GEMMA3;
   }
 
   /** Whether the zero-based transformer layer applies rotary position embeddings. */
@@ -89,7 +106,66 @@ public record LlamaConfig(
     if (layer < 0 || layer >= numLayers) {
       throw new IllegalArgumentException("layer out of range: " + layer);
     }
-    return noRopeLayerStep == 0 || (layer + 1) % noRopeLayerStep != 0;
+    return architecture != DecoderArchitecture.SMOLLM3 || (layer + 1) % 4 != 0;
+  }
+
+  /** Model-specific token embedding multiplier. */
+  public float embeddingScale() {
+    return architecture == DecoderArchitecture.GEMMA3 ? (float) Math.sqrt(embeddingDim) : 1.0f;
+  }
+
+  /** Whether this decoder uses GELU-gated rather than SiLU-gated feed-forward layers. */
+  public boolean usesGeluFfn() {
+    return architecture == DecoderArchitecture.GEMMA3;
+  }
+
+  /** Whether attention output is normalized before its residual addition. */
+  public boolean usesPostAttentionNorm() {
+    return architecture == DecoderArchitecture.GEMMA3;
+  }
+
+  /** Whether feed-forward output is normalized before its residual addition. */
+  public boolean usesPostFfnNorm() {
+    return architecture == DecoderArchitecture.GEMMA3;
+  }
+
+  /** Whether this layer uses bounded sliding-window attention. */
+  public boolean usesSlidingWindow(int layer) {
+    requireLayer(layer);
+    return slidingWindow > 0
+        && architecture == DecoderArchitecture.GEMMA3
+        && layer % slidingWindowPattern < slidingWindowPattern - 1;
+  }
+
+  /** RoPE base for the selected layer. */
+  public float ropeTheta(int layer) {
+    return usesSlidingWindow(layer) ? slidingWindowRopeTheta : ropeTheta;
+  }
+
+  /** RoPE frequency scale for the selected layer. */
+  public float ropeFrequencyScale(int layer) {
+    requireLayer(layer);
+    return usesSlidingWindow(layer) ? 1.0f : ropeFrequencyScale;
+  }
+
+  /** First cache position visible to the selected attention layer. */
+  public int attentionStartPosition(int layer, int position) {
+    requireLayer(layer);
+    if (position < 0) {
+      throw new IllegalArgumentException("position must be >= 0");
+    }
+    return usesSlidingWindow(layer) ? Math.max(0, position - slidingWindow + 1) : 0;
+  }
+
+  /** Whether Llama-only staged/pruned layer implementations preserve this architecture. */
+  public boolean usesStandardLlamaLayerSemantics() {
+    return architecture != DecoderArchitecture.GEMMA3;
+  }
+
+  private void requireLayer(int layer) {
+    if (layer < 0 || layer >= numLayers) {
+      throw new IllegalArgumentException("layer out of range: " + layer);
+    }
   }
 
   /**
@@ -101,6 +177,7 @@ public record LlamaConfig(
     // Determine the architecture prefix from general.architecture (e.g., "llama", "qwen2",
     // "qwen3")
     String arch = metadata.getString("general.architecture").orElse("llama");
+    DecoderArchitecture architecture = DecoderArchitecture.parse(arch);
 
     int embeddingDim =
         getArchKey(metadata, arch, "embedding_length")
@@ -129,10 +206,18 @@ public record LlamaConfig(
     int hiddenDim = getArchKey(metadata, arch, "feed_forward_length").orElse(embeddingDim * 4);
     float ropeTheta = getArchFloatKey(metadata, arch, "rope.freq_base").orElse(10000.0f);
     float ropeFrequencyScale = ropeFrequencyScale(metadata, arch);
+    float slidingWindowRopeTheta =
+        getArchFloatKey(metadata, arch, "rope.freq_base_swa").orElse(10_000.0f);
     float rmsNormEps =
         getArchFloatKey(metadata, arch, "attention.layer_norm_rms_epsilon").orElse(1e-5f);
+    int slidingWindow = getArchKey(metadata, arch, "attention.sliding_window").orElse(0);
+    int slidingWindowPattern =
+        getArchKey(metadata, arch, "attention.sliding_window_pattern").orElse(6);
+    float finalLogitSoftcap =
+        getArchFloatKey(metadata, arch, "final_logit_softcapping").orElse(0.0f);
 
     return new LlamaConfig(
+        architecture,
         embeddingDim,
         numLayers,
         numHeads,
@@ -144,9 +229,11 @@ public record LlamaConfig(
         hiddenDim,
         ropeTheta,
         ropeFrequencyScale,
+        slidingWindowRopeTheta,
         rmsNormEps,
-        arch.equals("qwen2") || arch.equals("qwen3"),
-        arch.equals("smollm3") ? 4 : 0);
+        slidingWindow,
+        slidingWindowPattern,
+        finalLogitSoftcap);
   }
 
   private static float ropeFrequencyScale(GgufMetadata metadata, String arch) {
