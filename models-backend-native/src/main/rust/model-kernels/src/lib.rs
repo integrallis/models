@@ -15,6 +15,7 @@ use std::arch::x86_64::*;
 #[cfg(all(test, target_arch = "x86_64"))]
 std::thread_local! {
     static Q5_0_HORIZONTAL_REDUCTIONS: Cell<usize> = const { Cell::new(0) };
+    static Q5_0_F16C_CONVERSIONS: Cell<usize> = const { Cell::new(0) };
 }
 
 const ABI_VERSION: u32 = 2;
@@ -1641,7 +1642,7 @@ unsafe fn compute_q5_batched_row_range_scalar(
 
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q5_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -1655,7 +1656,7 @@ unsafe fn compute_q5_batched_row_range_avx2(
 ) {
     if batch_size == 1 {
         for row in start_row..end_row {
-            // SAFETY: AVX2 and FMA are enabled for this function and all buffers were validated.
+            // SAFETY: AVX2, FMA, and F16C are enabled and all buffers were validated.
             let sum = unsafe {
                 dot_q5_0_q8_0_row_avx2(
                     weights,
@@ -1688,7 +1689,7 @@ unsafe fn compute_q5_batched_row_range_avx2(
                     weights.as_ptr().add(weight_offset + 6),
                 )
             };
-            let weight_scale = f16_to_f32(u16::from_le_bytes([
+            let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
                 weights[weight_offset],
                 weights[weight_offset + 1],
             ]));
@@ -2118,7 +2119,10 @@ fn selected_q8_kernel() -> DotKernel {
 
 fn selected_q5_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
         return DotKernel::Q5Avx2;
     }
     DotKernel::Q5
@@ -2315,7 +2319,7 @@ fn q5_0_q8_0_block_sum_scalar(
 }
 
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn dot_q5_0_q8_0_row_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2343,7 +2347,7 @@ unsafe fn dot_q5_0_q8_0_row_avx2(
                 quantized.as_ptr().add(input_offset),
             )
         };
-        let weight_scale = f16_to_f32(u16::from_le_bytes([
+        let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset],
             weights[weight_offset + 1],
         ]));
@@ -2357,6 +2361,14 @@ unsafe fn dot_q5_0_q8_0_row_avx2(
     #[cfg(test)]
     Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
     horizontal_sum_f32_avx2(sums)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "f16c")]
+fn f16_to_f32_f16c(value: u16) -> f32 {
+    #[cfg(test)]
+    Q5_0_F16C_CONVERSIONS.with(|count| count.set(count.get() + 1));
+    _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(value as i32)))
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -3482,7 +3494,10 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     #[test]
     fn avx2_q5_0_row_reduces_simd_lanes_once() {
-        if !std::arch::is_x86_feature_detected!("avx2") {
+        if !std::arch::is_x86_feature_detected!("avx2")
+            || !std::arch::is_x86_feature_detected!("fma")
+            || !std::arch::is_x86_feature_detected!("f16c")
+        {
             return;
         }
         const BLOCKS: usize = 8;
@@ -3511,6 +3526,7 @@ mod tests {
         let scalar =
             dot_q5_0_q8_0_row_scalar(&weights, &quantized, &activation_scales, 0, 0, cols);
         Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(0));
+        Q5_0_F16C_CONVERSIONS.with(|count| count.set(0));
         // SAFETY: AVX2 was detected and each buffer contains eight complete validated blocks.
         let avx2 = unsafe {
             dot_q5_0_q8_0_row_avx2(&weights, &quantized, &activation_scales, 0, 0, cols)
@@ -3518,6 +3534,7 @@ mod tests {
 
         assert!((avx2 - scalar).abs() <= 1e-3);
         Q5_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 1));
+        Q5_0_F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), BLOCKS));
     }
 
     #[test]

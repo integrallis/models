@@ -82,7 +82,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public String implementation() {
-    return "rust-ffm-quantized-v4";
+    return "rust-ffm-quantized-v5";
   }
 
   @Override

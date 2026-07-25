@@ -111,7 +111,7 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v4");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v5");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
