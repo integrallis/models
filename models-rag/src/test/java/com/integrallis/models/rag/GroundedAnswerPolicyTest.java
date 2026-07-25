@@ -181,6 +181,30 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void acceptsSafeProvenanceDiscourseAndIrregularThrowInflection() {
+    GroundingDocument listCopy =
+        new GroundingDocument(
+            "java-list-copy",
+            "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). "
+                + "The method throws NullPointerException when any element is null.",
+            8.0f,
+            1);
+    String generated =
+        "The method that freezes parsed SKU values is List.copyOf(values), and the exception "
+            + "thrown for a null element is NullPointerException. The source context for this "
+            + "information is [java-list-copy].";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which method freezes parsed SKU values and what exception does a null element cause?",
+            List.of(listCopy),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated);
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER);
+  }
+
+  @Test
   void usesExtractiveEvidenceForAnUnsupportedCitation() {
     GroundedAnswer answer =
         policy.apply(

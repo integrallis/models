@@ -34,7 +34,8 @@ import java.util.regex.Pattern;
  */
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
-  public static final String POLICY_ID = "trusted-provenance-clause-anchors-explicit-abstention-v6";
+  public static final String POLICY_ID =
+      "trusted-provenance-clause-anchors-safe-discourse-explicit-abstention-v7";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -44,10 +45,48 @@ public final class GroundedAnswerPolicy {
   private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
   private static final Set<String> FUNCTION_WORDS =
       Set.of(
-          "a", "an", "and", "are", "as", "at", "be", "been", "being", "but", "by", "did", "do",
-          "does", "for", "from", "how", "in", "is", "it", "its", "of", "on", "or", "that", "the",
-          "these", "this", "those", "to", "was", "were", "what", "when", "where", "which", "who",
-          "why", "with");
+          "a",
+          "an",
+          "and",
+          "are",
+          "as",
+          "at",
+          "be",
+          "been",
+          "being",
+          "but",
+          "by",
+          "did",
+          "do",
+          "context",
+          "does",
+          "for",
+          "from",
+          "how",
+          "in",
+          "information",
+          "is",
+          "it",
+          "its",
+          "of",
+          "on",
+          "or",
+          "source",
+          "that",
+          "the",
+          "these",
+          "this",
+          "those",
+          "to",
+          "was",
+          "were",
+          "what",
+          "when",
+          "where",
+          "which",
+          "who",
+          "why",
+          "with");
 
   private final float minimumRetrievalScore;
 
@@ -117,7 +156,11 @@ public final class GroundedAnswerPolicy {
     Set<String> words = new HashSet<>();
     Matcher matcher = WORD.matcher(text.toLowerCase(Locale.ROOT));
     while (matcher.find()) {
-      String word = normalizeWord(matcher.group());
+      String rawWord = matcher.group();
+      if (FUNCTION_WORDS.contains(rawWord)) {
+        continue;
+      }
+      String word = normalizeWord(rawWord);
       if (!FUNCTION_WORDS.contains(word)) {
         words.add(word);
       }
@@ -208,6 +251,9 @@ public final class GroundedAnswerPolicy {
   }
 
   private static String normalizeWord(String word) {
+    if (word.equals("thrown")) {
+      return "throw";
+    }
     if (word.length() > 4 && word.endsWith("ies")) {
       return word.substring(0, word.length() - 3) + "y";
     }
