@@ -172,21 +172,27 @@ struct WorkerState {
 }
 
 #[derive(Clone, Copy)]
-struct ParallelJob {
+struct MatrixJob {
     weights: usize,
     weight_bytes: usize,
+    output: usize,
+    rows: usize,
+    kernel: DotKernel,
+}
+
+#[derive(Clone, Copy)]
+struct ParallelJob {
+    matrices: [Option<MatrixJob>; 3],
+    matrix_count: usize,
     quantized: usize,
     quantized_elements: usize,
     activation_scales: usize,
     scale_elements: usize,
     activation_sums: usize,
     sum_elements: usize,
-    output: usize,
     output_elements: usize,
     batch_size: usize,
-    rows: usize,
     cols: usize,
-    kernel: DotKernel,
 }
 
 impl WorkerPool {
@@ -296,33 +302,36 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
 }
 
 unsafe fn execute_job_partition(job: ParallelJob, worker_index: usize, total_threads: usize) {
-    let start_row = job.rows * worker_index / total_threads;
-    let end_row = job.rows * (worker_index + 1) / total_threads;
-    if start_row == end_row {
-        return;
-    }
-    // SAFETY: KernelContext::execute is synchronous and partitions output by matrix row.
-    let weights = unsafe { slice::from_raw_parts(job.weights as *const u8, job.weight_bytes) };
     let quantized =
         unsafe { slice::from_raw_parts(job.quantized as *const i8, job.quantized_elements) };
     let activation_scales =
         unsafe { slice::from_raw_parts(job.activation_scales as *const f32, job.scale_elements) };
     let activation_sums =
         unsafe { slice::from_raw_parts(job.activation_sums as *const i16, job.sum_elements) };
-    unsafe {
-        compute_batched_row_range(
-            weights,
-            quantized,
-            activation_scales,
-            activation_sums,
-            job.output as *mut f32,
-            job.batch_size,
-            job.rows,
-            job.cols,
-            start_row,
-            end_row,
-            job.kernel,
-        );
+    for matrix in job.matrices[..job.matrix_count].iter().flatten() {
+        let start_row = matrix.rows * worker_index / total_threads;
+        let end_row = matrix.rows * (worker_index + 1) / total_threads;
+        if start_row == end_row {
+            continue;
+        }
+        // SAFETY: KernelContext::execute is synchronous and partitions every output matrix by row.
+        let weights =
+            unsafe { slice::from_raw_parts(matrix.weights as *const u8, matrix.weight_bytes) };
+        unsafe {
+            compute_batched_row_range(
+                weights,
+                quantized,
+                activation_scales,
+                activation_sums,
+                matrix.output as *mut f32,
+                job.batch_size,
+                matrix.rows,
+                job.cols,
+                start_row,
+                end_row,
+                matrix.kernel,
+            );
+        }
     }
 }
 
@@ -1122,6 +1131,40 @@ fn compute_grouped_with_scratch(
         &mut scratch.sums,
     );
 
+    if let Some(context) = context {
+        let mut matrices = [None; 3];
+        let mut output_offset = 0;
+        for matrix in 0..formats.len() {
+            let format = formats[matrix];
+            let matrix_rows = rows[matrix] as usize;
+            let blocks_per_row = cols / format.block_elements();
+            let required_weight_bytes = matrix_rows * blocks_per_row * format.block_bytes();
+            let matrix_output_elements = batch_size * matrix_rows;
+            matrices[matrix] = Some(MatrixJob {
+                weights: weight_pointers[matrix] as usize,
+                weight_bytes: required_weight_bytes,
+                // SAFETY: output_offset was validated from the sum of every matrix output above.
+                output: unsafe { output.as_mut_ptr().add(output_offset) } as usize,
+                rows: matrix_rows,
+                kernel: format.selected_kernel(),
+            });
+            output_offset += matrix_output_elements;
+        }
+        return context.workers.execute(ParallelJob {
+            matrices,
+            matrix_count: formats.len(),
+            quantized: scratch.quantized.as_ptr() as usize,
+            quantized_elements: scratch.quantized.len(),
+            activation_scales: scratch.scales.as_ptr() as usize,
+            scale_elements: scratch.scales.len(),
+            activation_sums: scratch.sums.as_ptr() as usize,
+            sum_elements: scratch.sums.len(),
+            output_elements: output.len(),
+            batch_size,
+            cols,
+        });
+    }
+
     let mut output_offset = 0;
     for matrix in 0..formats.len() {
         let format = formats[matrix];
@@ -1133,7 +1176,7 @@ fn compute_grouped_with_scratch(
         let weights =
             unsafe { slice::from_raw_parts(weight_pointers[matrix], required_weight_bytes) };
         if !compute_outputs(
-            context,
+            None,
             weights,
             &scratch.quantized,
             &scratch.scales,
@@ -1166,20 +1209,27 @@ fn compute_outputs(
 ) -> bool {
     if let Some(context) = context {
         return context.workers.execute(ParallelJob {
-            weights: weights.as_ptr() as usize,
-            weight_bytes: weights.len(),
+            matrices: [
+                Some(MatrixJob {
+                    weights: weights.as_ptr() as usize,
+                    weight_bytes: weights.len(),
+                    output: output.as_mut_ptr() as usize,
+                    rows,
+                    kernel,
+                }),
+                None,
+                None,
+            ],
+            matrix_count: 1,
             quantized: quantized.as_ptr() as usize,
             quantized_elements: quantized.len(),
             activation_scales: activation_scales.as_ptr() as usize,
             scale_elements: activation_scales.len(),
             activation_sums: activation_sums.as_ptr() as usize,
             sum_elements: activation_sums.len(),
-            output: output.as_mut_ptr() as usize,
             output_elements: output.len(),
             batch_size,
-            rows,
             cols,
-            kernel,
         });
     }
 
@@ -3197,6 +3247,57 @@ mod tests {
         let second_pointer = unsafe { lock(&(*context).scratch).quantized.as_ptr() };
         assert_eq!(first_pointer, second_pointer);
 
+        // SAFETY: the test consumes the unique context pointer exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
+    }
+
+    #[test]
+    fn grouped_projection_uses_one_worker_generation() {
+        let context = jmodels_kernels_context_create(2);
+        assert!(!context.is_null());
+        let weights: [Vec<u8>; 3] =
+            std::array::from_fn(|_| vec![0_u8; 64 * Q5_0_BLOCK_BYTES]);
+        let weight_pointers = [
+            weights[0].as_ptr(),
+            weights[1].as_ptr(),
+            weights[2].as_ptr(),
+        ];
+        let weight_bytes = [(64 * Q5_0_BLOCK_BYTES) as u64; 3];
+        let formats = [5_u32; 3];
+        let rows = [64_u32; 3];
+        let input = [0.25_f32; QK_0];
+        let mut output = [0_f32; 64 * 3];
+        // SAFETY: the test owns the live context until the final destroy call.
+        let context_ref = unsafe { &*context };
+        let before = lock(&context_ref.workers.shared.state).generation;
+
+        // SAFETY: the context and every test buffer remain live and non-aliasing for the call.
+        assert_eq!(
+            unsafe {
+                jmodels_quantized_f32_grouped_batched_matmul_with_context(
+                    context,
+                    formats.as_ptr(),
+                    weight_pointers.as_ptr(),
+                    weight_bytes.as_ptr(),
+                    rows.as_ptr(),
+                    3,
+                    input.as_ptr(),
+                    input.len() as u64,
+                    output.as_mut_ptr(),
+                    output.len() as u64,
+                    1,
+                    QK_0 as u32,
+                )
+            },
+            STATUS_OK
+        );
+        // SAFETY: the call completed synchronously and the context remains live.
+        let after = lock(&context_ref.workers.shared.state).generation;
+
+        assert_eq!(after.wrapping_sub(before), 1);
         // SAFETY: the test consumes the unique context pointer exactly once.
         assert_eq!(
             unsafe { jmodels_kernels_context_destroy(context) },
