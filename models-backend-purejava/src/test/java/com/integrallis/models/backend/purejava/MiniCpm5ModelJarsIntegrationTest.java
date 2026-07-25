@@ -73,6 +73,15 @@ class MiniCpm5ModelJarsIntegrationTest {
           .containsExactly(5645, 38, 89, 1096, 90, 7373, 3161, 1096, 220, 2311);
       assertThat(tokenizer.encode("168037df5d951dc1\nYou"))
           .containsExactly(7018, 15571, 4865, 42, 89, 18491, 13920, 38, 220, 2311);
+      assertThat(
+              tokenizer.encode(
+                  "<s><|im_start|>system\nYou<|im_end|>\n"
+                      + "<|im_start|>user\nHi<|im_end|>\n"
+                      + "<|im_start|>assistant\n<think>\n\n</think>\n\n"))
+          .as("MiniCPM5 chat templates own BOS because tokenizer metadata disables automatic BOS")
+          .containsExactly(
+              0, 130072, 17261, 220, 2311, 130073, 220, 130072, 8448, 220, 19301, 130073, 220,
+              130072, 130071, 220, 8, 130063, 9, 130063);
 
       assertThat(file.tensorInfos()).hasSize(219);
       assertThat(file.tensorInfos())

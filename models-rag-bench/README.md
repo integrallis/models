@@ -40,7 +40,7 @@ rendered prompt hashes. Higher `--top-k` values are supported for experiments,
 but reports with different prompt hashes are not directly comparable.
 
 Use `--prompt-template chatml` for ChatML-family instruction models such as
-Qwen3, SmolLM2, and MiniCPM5. The benchmark applies the envelope itself and
+Qwen3 and SmolLM2. The benchmark applies the envelope itself and
 sends raw requests to native servers, ensuring every backend receives the same
 model-facing bytes. The grounding policy is a native system turn and the
 retrieved evidence plus question is a native user turn. `--prompt-template raw`
@@ -52,7 +52,13 @@ block so the measured output budget contains the answer. Use
 `--prompt-template zephyr` for Zephyr-family chat models such as TinyLlama
 1.1B Chat; it places the grounding policy in the model's system turn and the
 evidence plus question in its user turn, then emits EOS and assistant-generation
-markers explicitly.
+markers explicitly. The source-compatible `llama3`, `gemma`, `phi3`, and
+`deepseek` templates cover Llama 3 Instruct, Gemma Instruct, Phi-3/3.5, and
+DeepSeek-Coder models respectively. Gemma merges the system instructions into
+its first user turn, as required by its chat format. Prompt rendering does not
+emit BOS markers when the GGUF tokenizer owns that setting. MiniCPM5 is the
+exception: use `--prompt-template minicpm5-no-think`, which emits its
+template-owned `<s>` marker before the ChatML turns and suppresses reasoning.
 
 The report records:
 
