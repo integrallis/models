@@ -88,7 +88,8 @@ jobs:
             ~/.jvllm/models/deepseek-coder-1.3b-instruct.Q4_K_M.gguf
             ~/.jvllm/models/MiniCPM5-1B-Q4_K_M.gguf
             ~/.jvllm/models/Qwen2.5-Math-1.5B-Instruct-Q4_K_M.gguf
-          key: purejava-model-fixtures-v4
+            ~/.jvllm/models/EuroLLM-1.7B-Instruct.Q4_K_M.gguf
+          key: purejava-model-fixtures-v5
 
       - name: Download pure-Java model fixtures
         working-directory: models
@@ -106,6 +107,7 @@ jobs:
           :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
           :models-backend-purejava:downloadMiniCpm51BQ4KMModel
           :models-backend-purejava:downloadQwen25Math15BQ4KMModel
+          :models-backend-purejava:downloadEuroLlm17BQ4KMModel
           --no-daemon
           --stacktrace
 
@@ -120,6 +122,8 @@ jobs:
           --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.DeepSeekCoderModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.MiniCpm5ModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.Qwen25MathModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.EuroLlmModelJarsIntegrationTest
           --no-daemon
           --stacktrace
 

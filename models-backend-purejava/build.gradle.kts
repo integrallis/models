@@ -171,6 +171,23 @@ val modelFixtures =
             "q4_k_m",
             "text-generation",
         ),
+        ModelFixture(
+            "downloadEuroLlm17BQ4KMModel",
+            "EuroLLM 1.7B Instruct Q4_K_M",
+            "hf://mradermacher/EuroLLM-1.7B-Instruct-GGUF",
+            "[1.0.0,2.0.0)",
+            "q4_k_m",
+            "translation",
+        ),
+        ModelFixture(
+            "downloadFinR17BQ4KMModel",
+            "Fin-R1 7B Q4_K_M",
+            "hf://bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF",
+            "[1.0.0,2.0.0)",
+            "q4_k_m",
+            "financial-reasoning",
+            slow = true,
+        ),
     )
 
 dependencies {
@@ -238,6 +255,25 @@ tasks.register<Test>("qwen306BQ40IntegrationTest") {
     maxHeapSize = "4g"
 }
 
+tasks.register<Test>("euroLlm17BIntegrationTest") {
+    description = "Run the pinned EuroLLM 1.7B pure-Java integration tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.EuroLlmModelJarsIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadEuroLlm17BQ4KMModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
 tasks.named<Test>("slowTest") {
     dependsOn(
         modelFixtures
@@ -297,6 +333,12 @@ listOf(
         "SmolLM3 3B",
         "downloadSmolLm33BQ4KMModel",
         "com.integrallis.models.backend.purejava.SmolLm3ModelJarsSlowTest",
+    ),
+    LargeModelTest(
+        "finR17BSlowTest",
+        "Fin-R1 7B",
+        "downloadFinR17BQ4KMModel",
+        "com.integrallis.models.backend.purejava.FinR1LargeModelJarsSlowTest",
     ),
 ).forEach { largeModelTest ->
     tasks.register<Test>(largeModelTest.taskName) {
