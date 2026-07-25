@@ -150,7 +150,7 @@ class LlamaForwardPassTest {
 
   private GgufFile buildQ5NanoModel(Random rng) {
     return buildQuantizedNanoModel(
-        rng, GgufTensorType.Q5_0, 32, 64, valueCount -> randomQ5(rng, valueCount));
+        rng, GgufTensorType.Q5_0, 32, 64, valueCount -> randomQ5(rng, valueCount), true);
   }
 
   private GgufFile buildQ4KNanoModel(Random rng) {
@@ -186,8 +186,25 @@ class LlamaForwardPassTest {
       int dim,
       int hiddenDim,
       IntFunction<byte[]> quantizedData) {
+    return buildQuantizedNanoModel(rng, quantizedType, dim, hiddenDim, quantizedData, false);
+  }
+
+  private GgufFile buildQuantizedNanoModel(
+      Random rng,
+      GgufTensorType quantizedType,
+      int dim,
+      int hiddenDim,
+      IntFunction<byte[]> quantizedData,
+      boolean quantizedEmbedding) {
     return buildQuantizedNanoModel(
-        rng, quantizedType, dim, hiddenDim, quantizedData, quantizedType, quantizedData);
+        rng,
+        quantizedType,
+        dim,
+        hiddenDim,
+        quantizedData,
+        quantizedType,
+        quantizedData,
+        quantizedEmbedding);
   }
 
   private GgufFile buildQuantizedNanoModel(
@@ -198,6 +215,19 @@ class LlamaForwardPassTest {
       IntFunction<byte[]> quantizedData,
       GgufTensorType secondaryType,
       IntFunction<byte[]> secondaryData) {
+    return buildQuantizedNanoModel(
+        rng, quantizedType, dim, hiddenDim, quantizedData, secondaryType, secondaryData, false);
+  }
+
+  private GgufFile buildQuantizedNanoModel(
+      Random rng,
+      GgufTensorType quantizedType,
+      int dim,
+      int hiddenDim,
+      IntFunction<byte[]> quantizedData,
+      GgufTensorType secondaryType,
+      IntFunction<byte[]> secondaryData,
+      boolean quantizedEmbedding) {
     int headDim = dim / HEADS;
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -211,9 +241,11 @@ class LlamaForwardPassTest {
             .addUint32("llama.feed_forward_length", hiddenDim)
             .addTensor(
                 "token_embd.weight",
-                GgufTensorType.F32,
+                quantizedEmbedding ? quantizedType : GgufTensorType.F32,
                 new long[] {dim, VOCAB_SIZE},
-                randomF32(rng, VOCAB_SIZE * dim))
+                quantizedEmbedding
+                    ? quantizedData.apply(VOCAB_SIZE * dim)
+                    : randomF32(rng, VOCAB_SIZE * dim))
             .addTensor("output_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
             .addTensor(
                 "output.weight",

@@ -197,6 +197,12 @@ public final class LlamaWeights {
         long offset = (long) row * bytesPerRow;
         new Q4_0Dequantizer().dequantize(segment, offset, out, 0, cols);
       }
+      case Q5_0 -> {
+        int blocksPerRow = cols / type.blockSize();
+        long bytesPerRow = (long) blocksPerRow * type.typeSize();
+        long offset = (long) row * bytesPerRow;
+        VectorUtil.ggufQ5_0Dequantize(segment, offset, out, 0, cols);
+      }
       case Q4_K -> {
         int blocksPerRow = cols / type.blockSize();
         long bytesPerRow = (long) blocksPerRow * type.typeSize();
