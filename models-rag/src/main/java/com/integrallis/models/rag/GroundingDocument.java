@@ -17,10 +17,11 @@ package com.integrallis.models.rag;
 
 import java.util.Objects;
 
-/** Trusted text and retrieval evidence used to ground a generated answer. */
-public record GroundingDocument(String id, String text, float score, int rank) {
+/** Trusted prompt-visible document and retrieval evidence used to ground a generated answer. */
+public record GroundingDocument(String id, String title, String text, float score, int rank) {
   public GroundingDocument {
     id = requireText(id, "id");
+    title = requireText(title, "title");
     text = requireText(text, "text");
     if (!Float.isFinite(score)) {
       throw new IllegalArgumentException("score must be finite");

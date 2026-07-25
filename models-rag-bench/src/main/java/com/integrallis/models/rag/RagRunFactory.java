@@ -43,6 +43,7 @@ final class RagRunFactory {
                         hit ->
                             new GroundingDocument(
                                 hit.document().id(),
+                                hit.document().title(),
                                 hit.document().text(),
                                 hit.score(),
                                 hit.rank()))

@@ -26,13 +26,18 @@ class GroundedAnswerPolicyTest {
   private static final GroundingDocument HIGH_CONFIDENCE =
       new GroundingDocument(
           "payments-settlement",
+          "Payment settlement",
           "Approved domestic ACH claims settle within 2 business days. "
               + "International claim wires settle within 5 business days.",
           8.4f,
           1);
   private static final GroundingDocument LOW_CONFIDENCE =
       new GroundingDocument(
-          "claims-auto-glass", "Windshield repair has a 75 dollar deductible.", 1.2f, 1);
+          "claims-auto-glass",
+          "Auto glass claims",
+          "Windshield repair has a 75 dollar deductible.",
+          1.2f,
+          1);
   private final GroundedAnswerPolicy policy = new GroundedAnswerPolicy(2.0f);
 
   @Test
@@ -91,6 +96,7 @@ class GroundedAnswerPolicyTest {
     GroundingDocument toolchain =
         new GroundingDocument(
             "gradle-java-toolchain",
+            "Java build toolchain",
             "The build selects JDK 25 with "
                 + "java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). "
                 + "Java compilation also sets options.release to 25.",
@@ -116,6 +122,7 @@ class GroundedAnswerPolicyTest {
     GroundingDocument mapper =
         new GroundingDocument(
             "jackson-wire-format",
+            "JSON wire mapper",
             "The wire mapper calls findAndRegisterModules so Java time values use registered "
                 + "modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES.",
             8.0f,
@@ -138,6 +145,7 @@ class GroundedAnswerPolicyTest {
     GroundingDocument settlement =
         new GroundingDocument(
             "payments-settlement",
+            "Payment settlement",
             "Approved domestic claims paid by ACH settle within 2 business days. "
                 + "International claim wires settle within 5 business days and may incur an "
                 + "intermediary bank fee.",
@@ -162,6 +170,7 @@ class GroundedAnswerPolicyTest {
     GroundingDocument idempotency =
         new GroundingDocument(
             "api-idempotency",
+            "Claims API idempotency",
             "Claims API clients send the Idempotency-Key header on create requests. "
                 + "Keys remain valid for a 24 hour replay window.",
             8.0f,
@@ -185,18 +194,20 @@ class GroundedAnswerPolicyTest {
     GroundingDocument listCopy =
         new GroundingDocument(
             "java-list-copy",
+            "Freezing parsed values",
             "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). "
                 + "The method throws NullPointerException when any element is null.",
             8.0f,
             1);
     String generated =
-        "The method that freezes parsed SKU values is List.copyOf(values), and the exception "
-            + "thrown for a null element is NullPointerException. The source context for this "
-            + "information is [java-list-copy].";
+        "The Java method that freezes parsed SKU values is List.copyOf(values), and the exception "
+            + "thrown when an element is null is NullPointerException. The source context for this "
+            + "information is \"[java-list-copy] Freezing parsed values\".";
 
     GroundedAnswer answer =
         policy.apply(
-            "Which method freezes parsed SKU values and what exception does a null element cause?",
+            "Which Java method freezes parsed SKU values, and what exception is thrown if an "
+                + "element is null?",
             List.of(listCopy),
             generated);
 
@@ -221,6 +232,7 @@ class GroundedAnswerPolicyTest {
     GroundingDocument telemedicine =
         new GroundingDocument(
             "health-telemedicine",
+            "Behavioral telemedicine",
             "Behavioral health telemedicine has a 15 dollar copay and allows 20 visits each year.",
             8.0f,
             1);

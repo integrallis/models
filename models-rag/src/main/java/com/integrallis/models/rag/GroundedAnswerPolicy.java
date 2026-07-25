@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-provenance-clause-anchors-safe-discourse-explicit-abstention-v7";
+      "trusted-title-provenance-clause-anchors-safe-discourse-explicit-abstention-v8";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -146,7 +146,11 @@ public final class GroundedAnswerPolicy {
   private static boolean hasOnlySupportedClaims(
       String question, String candidate, List<GroundingDocument> retrieved) {
     Set<String> supported = words(question);
-    retrieved.forEach(hit -> supported.addAll(words(hit.text())));
+    retrieved.forEach(
+        hit -> {
+          supported.addAll(words(hit.title()));
+          supported.addAll(words(hit.text()));
+        });
 
     String uncited = BRACKETED_TEXT.matcher(candidate).replaceAll(" ");
     return words(uncited).stream().allMatch(supported::contains);
@@ -172,7 +176,11 @@ public final class GroundedAnswerPolicy {
       String question, String candidate, List<GroundingDocument> retrieved) {
     Set<String> questionWords = words(question);
     Set<String> evidenceWords = new HashSet<>();
-    retrieved.forEach(hit -> evidenceWords.addAll(words(hit.text())));
+    retrieved.forEach(
+        hit -> {
+          evidenceWords.addAll(words(hit.title()));
+          evidenceWords.addAll(words(hit.text()));
+        });
     evidenceWords.removeAll(questionWords);
 
     List<Set<String>> questionClauses = clauses(question);
@@ -184,7 +192,9 @@ public final class GroundedAnswerPolicy {
     }
 
     List<Set<String>> evidenceClauses =
-        retrieved.stream().flatMap(hit -> clauses(hit.text()).stream()).toList();
+        retrieved.stream()
+            .flatMap(hit -> clauses(hit.title() + "\n" + hit.text()).stream())
+            .toList();
     List<Set<String>> matchingEvidenceClauses =
         questionClauses.stream()
             .map(questionClause -> bestMatchingClause(questionClause, evidenceClauses))
