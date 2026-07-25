@@ -76,4 +76,25 @@ class RagEvaluatorTest {
     assertThat(evaluation.factCoverage()).isEqualTo(1.0);
     assertThat(evaluation.correct()).isTrue();
   }
+
+  @Test
+  void normalizesAuxiliaryVerbAgreementInRequiredFacts() {
+    RagDocument expected = new RagDocument("health-telemedicine", "Telemedicine", "irrelevant");
+    RagCase testCase =
+        new RagCase(
+            "telemedicine",
+            "question",
+            List.of("health-telemedicine"),
+            List.of("do not require a referral", "15 dollar"),
+            true);
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(expected, 1.0f, 1)),
+            "Telemedicine does not require a referral and costs $15 " + "[health-telemedicine].");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
 }
