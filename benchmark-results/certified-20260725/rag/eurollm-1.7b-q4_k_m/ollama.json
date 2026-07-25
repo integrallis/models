@@ -1,0 +1,1583 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-25T16:36:11.560036168Z",
+  "framework" : "plain-java",
+  "backend" : "ollama",
+  "backendVersion" : "ollama version is 0.32.0",
+  "modelId" : "eurollm-1.7b-q4-k-m",
+  "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+  "artifactSha256" : "1cade17f491ea46a686dbee51fbd52442e0f001f102380c3b9d66b4a77f84093",
+  "artifactSizeBytes" : 1045157088,
+  "settings" : {
+    "corpusSha256" : "d1d0889113c2d2f3e6c6fe3e551bdeecfb2d0324454d75d7ac55462619c88178",
+    "workload" : "multilingual",
+    "caseIds" : [ "lisboa-horario", "madrid-linea", "lyon-code-livraison", "berlin-sicherung", "roma-museo", "utrecht-kanaal", "krakow-location", "bucuresti-support", "unsupported-oslo-office" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-provenance-clause-anchors-extractive-fallback-v4",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "seed" : "42",
+      "rawPrompt" : "true",
+      "topK" : "1",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "GraalVM Community",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "ollama",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 1397.534774,
+    "retrievalMillis" : {
+      "p50" : 1.218969,
+      "p95" : 1.5877348
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.8873080000000755,
+      "p95" : 1.0045319000000517
+    },
+    "ttftMillis" : {
+      "p50" : 478.545803,
+      "p95" : 537.9010276
+    },
+    "tpotMillis" : {
+      "p50" : 34.46001358823529,
+      "p95" : 47.69534743642856
+    },
+    "endToEndMillis" : {
+      "p50" : 1204.946061,
+      "p95" : 1709.5661833
+    },
+    "p50PrefillTokensPerSecond" : 526.1915934112133,
+    "p50DecodeTokensPerSecond" : 29.019141197942005,
+    "peakRssBytes" : 64323584,
+    "totalCpuMillis" : 3670.0,
+    "totalInputTokens" : 5280,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 585,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "PRODUCTION_READY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "lisboa-horario",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lisboa-hours",
+        "title" : "Horário de Lisboa",
+        "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. O atendimento ocorre de terça a sábado."
+      },
+      "score" : 6.5103536,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5008a5f8149506bdfa82b56b53d29a0730fbc01da11cdee5a31f7d28ae7df24d",
+    "retrievalMillis" : 1.427386,
+    "frameworkOverheadMillis" : 0.8211149999999634,
+    "endToEndMillis" : 1157.707109,
+    "generation" : {
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "inputTokens" : 196,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 482.621333,
+      "totalMillis" : 1155.458608,
+      "prefillTokensPerSecond" : 517.3292087766484,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "O escritório Lisboa abre às 08:30 e fecha às 17:00.",
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "madrid-linea",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-madrid-route",
+        "title" : "Ruta de Madrid",
+        "text" : "La línea Azul de Madrid para en Sol y Retiro. El servicio termina a las 23:15."
+      },
+      "score" : 5.1040816,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1e1d40648d7d4d1f934ef2b09a64379a8af468fcc871f24c88dfc4782bf27f2d",
+    "retrievalMillis" : 1.467447,
+    "frameworkOverheadMillis" : 0.8336450000000468,
+    "endToEndMillis" : 879.545732,
+    "generation" : {
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 13,
+      "ttftMillis" : 475.530762,
+      "totalMillis" : 877.24464,
+      "prefillTokensPerSecond" : 526.1915934112133,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "La línea Azul de Madrid para en Sol y Retiro.",
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "lyon-code-livraison",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lyon-project",
+        "title" : "Projet de Lyon",
+        "text" : "Le projet de Lyon porte le code LUMIERE-42. La livraison est prévue le 15 octobre."
+      },
+      "score" : 7.840103,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b1aede2830db748182a0762fb04abaf582791dd0d8d599734ae45e3d3e650bb",
+    "retrievalMillis" : 1.466545,
+    "frameworkOverheadMillis" : 0.8798650000001089,
+    "endToEndMillis" : 1535.860053,
+    "generation" : {
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre. [multi-lyon-project]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 30,
+      "ttftMillis" : 504.134053,
+      "totalMillis" : 1533.513643,
+      "prefillTokensPerSecond" : 503.6091992613732,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre.",
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre. [multi-lyon-project]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "berlin-sicherung",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-berlin-backup",
+        "title" : "Sicherung in Berlin",
+        "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert."
+      },
+      "score" : 8.781244,
+      "rank" : 1
+    } ],
+    "promptSha256" : "30f5af2e5fbf378e5411197dbea1b73557521cf9c3c86ecf6853f2b2ddaf2dc8",
+    "retrievalMillis" : 1.33755,
+    "frameworkOverheadMillis" : 0.8988330000001952,
+    "endToEndMillis" : 1466.450444,
+    "generation" : {
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "inputTokens" : 198,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 25,
+      "ttftMillis" : 497.263157,
+      "totalMillis" : 1464.214061,
+      "prefillTokensPerSecond" : 506.6283880773453,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert.",
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "roma-museo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-roma-museum",
+        "title" : "Museo di Roma",
+        "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro."
+      },
+      "score" : 10.869781,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9627a716a5bb2d2068bf3774602d0c9f010528d1a5117a09377e336fe4465a4c",
+    "retrievalMillis" : 1.511533,
+    "frameworkOverheadMillis" : 0.8778110000000652,
+    "endToEndMillis" : 922.32583,
+    "generation" : {
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "inputTokens" : 188,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 20,
+      "ttftMillis" : 433.913434,
+      "totalMillis" : 919.936486,
+      "prefillTokensPerSecond" : 570.6948209445,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro.",
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "utrecht-kanaal",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-utrecht-team",
+        "title" : "Team Utrecht",
+        "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag."
+      },
+      "score" : 7.388952,
+      "rank" : 1
+    } ],
+    "promptSha256" : "944e001905bd152e11ebd0cd0f65738e93126e72c2354ae89bc58ddfd1b0d4f8",
+    "retrievalMillis" : 1.571856,
+    "frameworkOverheadMillis" : 0.8872960000001058,
+    "endToEndMillis" : 1204.946061,
+    "generation" : {
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 21,
+      "ttftMillis" : 446.13677,
+      "totalMillis" : 1202.486909,
+      "prefillTokensPerSecond" : 556.2109737497694,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag.",
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "krakow-location",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 7.432128,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e0e1ca84ac4921fb3affae376eb8848b09463db5d4fea53377c37d92e3924a6e",
+    "retrievalMillis" : 1.59454,
+    "frameworkOverheadMillis" : 1.0678209999999808,
+    "endToEndMillis" : 670.383227,
+    "generation" : {
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 7,
+      "ttftMillis" : 476.204523,
+      "totalMillis" : 667.720866,
+      "prefillTokensPerSecond" : 527.7992404043922,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Królewskiej Alejki",
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "bucuresti-support",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-bucuresti-support",
+        "title" : "Asistență București",
+        "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00."
+      },
+      "score" : 3.6840134,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b152c1d64a11eeacd5fe938223ed1135e2d920815bfa313622be7a9fdddcad2",
+    "retrievalMillis" : 1.15946,
+    "frameworkOverheadMillis" : 0.9255639999998948,
+    "endToEndMillis" : 1849.148851,
+    "generation" : {
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 35,
+      "ttftMillis" : 540.237082,
+      "totalMillis" : 1847.063827,
+      "prefillTokensPerSecond" : 483.73806856582075,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00.",
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "unsupported-oslo-office",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 1.009398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e686b65b8f5327cef5316a21c69aed77367c16393535768db991816a224f06dd",
+    "retrievalMillis" : 0.85092,
+    "frameworkOverheadMillis" : 0.942730999999867,
+    "endToEndMillis" : 1327.463968,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 450.477805,
+      "totalMillis" : 1325.670317,
+      "prefillTokensPerSecond" : 549.6540072670045,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Magazyn Kraków bruker K-9-veien og hylla 14 for reservedeler.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "lisboa-horario",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lisboa-hours",
+        "title" : "Horário de Lisboa",
+        "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. O atendimento ocorre de terça a sábado."
+      },
+      "score" : 6.5103536,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5008a5f8149506bdfa82b56b53d29a0730fbc01da11cdee5a31f7d28ae7df24d",
+    "retrievalMillis" : 1.48357,
+    "frameworkOverheadMillis" : 0.8446039999998902,
+    "endToEndMillis" : 1703.243189,
+    "generation" : {
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "inputTokens" : 196,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 484.312664,
+      "totalMillis" : 1700.915015,
+      "prefillTokensPerSecond" : 517.6913080685888,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "O escritório Lisboa abre às 08:30 e fecha às 17:00.",
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "madrid-linea",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-madrid-route",
+        "title" : "Ruta de Madrid",
+        "text" : "La línea Azul de Madrid para en Sol y Retiro. El servicio termina a las 23:15."
+      },
+      "score" : 5.1040816,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1e1d40648d7d4d1f934ef2b09a64379a8af468fcc871f24c88dfc4782bf27f2d",
+    "retrievalMillis" : 1.303738,
+    "frameworkOverheadMillis" : 0.8890089999999873,
+    "endToEndMillis" : 854.465619,
+    "generation" : {
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 13,
+      "ttftMillis" : 478.545803,
+      "totalMillis" : 852.272872,
+      "prefillTokensPerSecond" : 526.4943347581248,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "La línea Azul de Madrid para en Sol y Retiro.",
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "lyon-code-livraison",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lyon-project",
+        "title" : "Projet de Lyon",
+        "text" : "Le projet de Lyon porte le code LUMIERE-42. La livraison est prévue le 15 octobre."
+      },
+      "score" : 7.840103,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b1aede2830db748182a0762fb04abaf582791dd0d8d599734ae45e3d3e650bb",
+    "retrievalMillis" : 1.773071,
+    "frameworkOverheadMillis" : 0.9261449999999058,
+    "endToEndMillis" : 1396.590842,
+    "generation" : {
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre. [multi-lyon-project]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 30,
+      "ttftMillis" : 510.590485,
+      "totalMillis" : 1393.891626,
+      "prefillTokensPerSecond" : 503.215824510366,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre.",
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre. [multi-lyon-project]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "berlin-sicherung",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-berlin-backup",
+        "title" : "Sicherung in Berlin",
+        "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert."
+      },
+      "score" : 8.781244,
+      "rank" : 1
+    } ],
+    "promptSha256" : "30f5af2e5fbf378e5411197dbea1b73557521cf9c3c86ecf6853f2b2ddaf2dc8",
+    "retrievalMillis" : 1.243657,
+    "frameworkOverheadMillis" : 0.8445730000000822,
+    "endToEndMillis" : 1056.277073,
+    "generation" : {
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "inputTokens" : 198,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 25,
+      "ttftMillis" : 495.708304,
+      "totalMillis" : 1054.188843,
+      "prefillTokensPerSecond" : 507.09679402138,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert.",
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "roma-museo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-roma-museum",
+        "title" : "Museo di Roma",
+        "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro."
+      },
+      "score" : 10.869781,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9627a716a5bb2d2068bf3774602d0c9f010528d1a5117a09377e336fe4465a4c",
+    "retrievalMillis" : 1.348876,
+    "frameworkOverheadMillis" : 0.8223889999999301,
+    "endToEndMillis" : 1050.66133,
+    "generation" : {
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "inputTokens" : 188,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 20,
+      "ttftMillis" : 436.242022,
+      "totalMillis" : 1048.490065,
+      "prefillTokensPerSecond" : 568.1285904669231,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro.",
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "utrecht-kanaal",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-utrecht-team",
+        "title" : "Team Utrecht",
+        "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag."
+      },
+      "score" : 7.388952,
+      "rank" : 1
+    } ],
+    "promptSha256" : "944e001905bd152e11ebd0cd0f65738e93126e72c2354ae89bc58ddfd1b0d4f8",
+    "retrievalMillis" : 1.13956,
+    "frameworkOverheadMillis" : 0.7760749999999916,
+    "endToEndMillis" : 1453.262567,
+    "generation" : {
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 21,
+      "ttftMillis" : 445.844153,
+      "totalMillis" : 1451.346932,
+      "prefillTokensPerSecond" : 555.6692890357675,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag.",
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "krakow-location",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 7.432128,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e0e1ca84ac4921fb3affae376eb8848b09463db5d4fea53377c37d92e3924a6e",
+    "retrievalMillis" : 1.123324,
+    "frameworkOverheadMillis" : 0.8443510000000742,
+    "endToEndMillis" : 666.327518,
+    "generation" : {
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 7,
+      "ttftMillis" : 472.96286,
+      "totalMillis" : 664.359843,
+      "prefillTokensPerSecond" : 527.3200724113749,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Królewskiej Alejki",
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "bucuresti-support",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-bucuresti-support",
+        "title" : "Asistență București",
+        "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00."
+      },
+      "score" : 3.6840134,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b152c1d64a11eeacd5fe938223ed1135e2d920815bfa313622be7a9fdddcad2",
+    "retrievalMillis" : 1.04199,
+    "frameworkOverheadMillis" : 0.8873080000000755,
+    "endToEndMillis" : 1603.238288,
+    "generation" : {
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 35,
+      "ttftMillis" : 535.956863,
+      "totalMillis" : 1601.30899,
+      "prefillTokensPerSecond" : 481.17101830982347,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00.",
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "unsupported-oslo-office",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 1.009398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e686b65b8f5327cef5316a21c69aed77367c16393535768db991816a224f06dd",
+    "retrievalMillis" : 0.851562,
+    "frameworkOverheadMillis" : 0.9613600000000133,
+    "endToEndMillis" : 1257.321678,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 447.582618,
+      "totalMillis" : 1255.508756,
+      "prefillTokensPerSecond" : 554.4482801889793,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Magazyn Kraków bruker K-9-veien og hylla 14 for reservedeler.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "lisboa-horario",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lisboa-hours",
+        "title" : "Horário de Lisboa",
+        "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. O atendimento ocorre de terça a sábado."
+      },
+      "score" : 6.5103536,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5008a5f8149506bdfa82b56b53d29a0730fbc01da11cdee5a31f7d28ae7df24d",
+    "retrievalMillis" : 1.111086,
+    "frameworkOverheadMillis" : 0.9023680000002514,
+    "endToEndMillis" : 1289.237863,
+    "generation" : {
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "inputTokens" : 196,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 489.619993,
+      "totalMillis" : 1287.224409,
+      "prefillTokensPerSecond" : 509.5991846413046,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "O escritório Lisboa abre às 08:30 e fecha às 17:00.",
+      "text" : "O escritório Lisboa abre às 08:30 e fecha às 17:00. [multi-lisboa-hours]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "madrid-linea",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-madrid-route",
+        "title" : "Ruta de Madrid",
+        "text" : "La línea Azul de Madrid para en Sol y Retiro. El servicio termina a las 23:15."
+      },
+      "score" : 5.1040816,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1e1d40648d7d4d1f934ef2b09a64379a8af468fcc871f24c88dfc4782bf27f2d",
+    "retrievalMillis" : 1.122273,
+    "frameworkOverheadMillis" : 0.8756389999999783,
+    "endToEndMillis" : 850.216955,
+    "generation" : {
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 13,
+      "ttftMillis" : 487.557524,
+      "totalMillis" : 848.219043,
+      "prefillTokensPerSecond" : 518.6056458511548,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "La línea Azul de Madrid para en Sol y Retiro.",
+      "text" : "La línea Azul de Madrid para en Sol y Retiro. [multi-madrid-route]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "lyon-code-livraison",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-lyon-project",
+        "title" : "Projet de Lyon",
+        "text" : "Le projet de Lyon porte le code LUMIERE-42. La livraison est prévue le 15 octobre."
+      },
+      "score" : 7.840103,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b1aede2830db748182a0762fb04abaf582791dd0d8d599734ae45e3d3e650bb",
+    "retrievalMillis" : 1.21236,
+    "frameworkOverheadMillis" : 0.8982130000001689,
+    "endToEndMillis" : 1674.702426,
+    "generation" : {
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre. [multi-lyon-project]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 30,
+      "ttftMillis" : 509.65389,
+      "totalMillis" : 1672.591853,
+      "prefillTokensPerSecond" : 494.69495041975233,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre.",
+      "text" : "Le projet de Lyon porte le code LUMIERE-42 et sa date de livraison est prévue le 15 octobre. [multi-lyon-project]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "berlin-sicherung",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-berlin-backup",
+        "title" : "Sicherung in Berlin",
+        "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert."
+      },
+      "score" : 8.781244,
+      "rank" : 1
+    } ],
+    "promptSha256" : "30f5af2e5fbf378e5411197dbea1b73557521cf9c3c86ecf6853f2b2ddaf2dc8",
+    "retrievalMillis" : 1.218969,
+    "frameworkOverheadMillis" : 0.9401749999999538,
+    "endToEndMillis" : 1368.796264,
+    "generation" : {
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "inputTokens" : 198,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 25,
+      "ttftMillis" : 500.694857,
+      "totalMillis" : 1366.63712,
+      "prefillTokensPerSecond" : 501.65444622923076,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert.",
+      "text" : "Die Berliner Sicherung startet um 02:00 Uhr. Die Daten bleiben 14 Tage gespeichert. [multi-berlin-backup]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "roma-museo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-roma-museum",
+        "title" : "Museo di Roma",
+        "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro."
+      },
+      "score" : 10.869781,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9627a716a5bb2d2068bf3774602d0c9f010528d1a5117a09377e336fe4465a4c",
+    "retrievalMillis" : 1.282756,
+    "frameworkOverheadMillis" : 0.9776540000000296,
+    "endToEndMillis" : 1156.314971,
+    "generation" : {
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "inputTokens" : 188,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 20,
+      "ttftMillis" : 438.895455,
+      "totalMillis" : 1154.054561,
+      "prefillTokensPerSecond" : 564.4171042400334,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro.",
+      "text" : "Il museo di Roma è chiuso il lunedì. Il biglietto standard costa 12 euro. [multi-roma-museum]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "utrecht-kanaal",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-utrecht-team",
+        "title" : "Team Utrecht",
+        "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag."
+      },
+      "score" : 7.388952,
+      "rank" : 1
+    } ],
+    "promptSha256" : "944e001905bd152e11ebd0cd0f65738e93126e72c2354ae89bc58ddfd1b0d4f8",
+    "retrievalMillis" : 1.115192,
+    "frameworkOverheadMillis" : 0.8707299999998668,
+    "endToEndMillis" : 1078.269981,
+    "generation" : {
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 21,
+      "ttftMillis" : 447.748038,
+      "totalMillis" : 1076.284059,
+      "prefillTokensPerSecond" : 554.7736815365479,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag.",
+      "text" : "Het team in Utrecht gebruikt kanaal CANAL-7. De wekelijkse vergadering is op donderdag. [multi-utrecht-team]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "krakow-location",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 7.432128,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e0e1ca84ac4921fb3affae376eb8848b09463db5d4fea53377c37d92e3924a6e",
+    "retrievalMillis" : 1.057314,
+    "frameworkOverheadMillis" : 0.90295100000003,
+    "endToEndMillis" : 630.487061,
+    "generation" : {
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "inputTokens" : 194,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 7,
+      "ttftMillis" : 471.251308,
+      "totalMillis" : 628.526796,
+      "prefillTokensPerSecond" : 528.2231824629904,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Królewskiej Alejki",
+      "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych. [multi-krakow-warehouse]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "bucuresti-support",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-bucuresti-support",
+        "title" : "Asistență București",
+        "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00."
+      },
+      "score" : 3.6840134,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5b152c1d64a11eeacd5fe938223ed1135e2d920815bfa313622be7a9fdddcad2",
+    "retrievalMillis" : 1.029511,
+    "frameworkOverheadMillis" : 0.8718240000000606,
+    "endToEndMillis" : 1712.276038,
+    "generation" : {
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 35,
+      "ttftMillis" : 538.734241,
+      "totalMillis" : 1710.374703,
+      "prefillTokensPerSecond" : 482.63105511461913,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00.",
+      "text" : "Centrul București folosește numărul 0800-44-22. Programul se încheie la ora 18:00. [multi-bucuresti-support]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "modeljars-rag-eurollm-1.7b-q4-k-m:1cade17f491e",
+    "caseId" : "unsupported-oslo-office",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "multi-krakow-warehouse",
+        "title" : "Magazyn Kraków",
+        "text" : "Magazyn w Krakowie używa alejki K-9 i półki 14 dla części zamiennych."
+      },
+      "score" : 1.009398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e686b65b8f5327cef5316a21c69aed77367c16393535768db991816a224f06dd",
+    "retrievalMillis" : 1.015822,
+    "frameworkOverheadMillis" : 1.0160510000000613,
+    "endToEndMillis" : 1204.577496,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 22,
+      "ttftMillis" : 452.193372,
+      "totalMillis" : 1202.545623,
+      "prefillTokensPerSecond" : 554.7024167508451,
+      "loadMillis" : 1397.534774,
+      "peakRssBytes" : 64323584,
+      "cpuMillis" : 140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Magazyn Kraków bruker K-9-veien og hylla 14 for reservedeler.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
