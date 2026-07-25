@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  */
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
-  public static final String POLICY_ID = "trusted-provenance-clause-anchors-extractive-fallback-v4";
+  public static final String POLICY_ID = "trusted-provenance-clause-anchors-extractive-fallback-v5";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -137,13 +137,35 @@ public final class GroundedAnswerPolicy {
       return hasConcreteEvidenceAnchor(anchors);
     }
 
-    for (Set<String> questionClause : questionClauses) {
-      int requiredOverlap = Math.min(2, questionClause.size());
+    List<Set<String>> evidenceClauses =
+        retrieved.stream().flatMap(hit -> clauses(hit.text()).stream()).toList();
+    List<Set<String>> matchingEvidenceClauses =
+        questionClauses.stream()
+            .map(questionClause -> bestMatchingClause(questionClause, evidenceClauses))
+            .toList();
+    for (int clauseIndex = 0; clauseIndex < questionClauses.size(); clauseIndex++) {
+      Set<String> questionClause = questionClauses.get(clauseIndex);
+      Set<String> clauseSpecificWords = new HashSet<>(questionClause);
+      Set<String> clauseEvidenceWords = new HashSet<>(matchingEvidenceClauses.get(clauseIndex));
+      for (int otherIndex = 0; otherIndex < questionClauses.size(); otherIndex++) {
+        if (otherIndex != clauseIndex) {
+          clauseSpecificWords.removeAll(questionClauses.get(otherIndex));
+          clauseEvidenceWords.removeAll(matchingEvidenceClauses.get(otherIndex));
+        }
+      }
+      clauseEvidenceWords.removeAll(questionWords);
+      if (clauseEvidenceWords.isEmpty()) {
+        clauseEvidenceWords.addAll(matchingEvidenceClauses.get(clauseIndex));
+        clauseEvidenceWords.removeAll(questionWords);
+      }
       Set<String> anchors = new HashSet<>();
       for (Set<String> candidateClause : candidateClauses) {
         long overlap = candidateClause.stream().filter(questionClause::contains).count();
-        if (overlap >= requiredOverlap) {
-          candidateClause.stream().filter(evidenceWords::contains).forEach(anchors::add);
+        long clauseSpecificOverlap =
+            candidateClause.stream().filter(clauseSpecificWords::contains).count();
+        int requiredClauseSpecificOverlap = Math.min(1, clauseSpecificWords.size());
+        if (overlap >= 1 && clauseSpecificOverlap >= requiredClauseSpecificOverlap) {
+          candidateClause.stream().filter(clauseEvidenceWords::contains).forEach(anchors::add);
         }
       }
       if (!hasConcreteEvidenceAnchor(anchors)) {
@@ -161,8 +183,25 @@ public final class GroundedAnswerPolicy {
         .toList();
   }
 
+  private static Set<String> bestMatchingClause(
+      Set<String> questionClause, List<Set<String>> evidenceClauses) {
+    Set<String> best = Set.of();
+    long bestOverlap = -1;
+    for (Set<String> evidenceClause : evidenceClauses) {
+      long overlap = evidenceClause.stream().filter(questionClause::contains).count();
+      if (overlap > bestOverlap) {
+        best = evidenceClause;
+        bestOverlap = overlap;
+      }
+    }
+    return best;
+  }
+
   private static boolean hasConcreteEvidenceAnchor(Set<String> anchors) {
-    return anchors.size() >= 2 || anchors.stream().anyMatch(anchor -> anchor.length() >= 8);
+    return anchors.size() >= 2
+        || anchors.stream()
+            .anyMatch(
+                anchor -> anchor.length() >= 8 || anchor.codePoints().allMatch(Character::isDigit));
   }
 
   private static String normalizeWord(String word) {
