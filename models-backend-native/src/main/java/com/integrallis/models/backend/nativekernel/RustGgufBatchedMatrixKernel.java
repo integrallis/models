@@ -28,6 +28,7 @@ import java.util.Objects;
 /** Reusable off-heap workspace for Models-owned Rust quantized projection kernels. */
 public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   public static final String NATIVE_DECODE_PROPERTY = "models.native.quantizedDecode";
+  public static final String Q5_0_GROUPED_PROPERTY = "models.native.q5_0.grouped";
 
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
@@ -42,6 +43,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   private final NativeKernelLibrary library;
   private final boolean nativeDecode;
+  private final boolean q5_0Grouped;
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
@@ -53,18 +55,29 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private int outputCapacity;
   private boolean closed;
 
-  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library, boolean nativeDecode) {
+  private RustGgufBatchedMatrixKernel(
+      NativeKernelLibrary library, boolean nativeDecode, boolean q5_0Grouped) {
     this.library = Objects.requireNonNull(library, "library");
     this.nativeDecode = nativeDecode;
+    this.q5_0Grouped = q5_0Grouped;
   }
 
   /** Opens a Rust kernel provider from an explicit platform library. */
   public static RustGgufBatchedMatrixKernel open(Path libraryPath) {
-    return open(libraryPath, Boolean.getBoolean(NATIVE_DECODE_PROPERTY));
+    return open(
+        libraryPath,
+        Boolean.getBoolean(NATIVE_DECODE_PROPERTY),
+        Boolean.getBoolean(Q5_0_GROUPED_PROPERTY));
   }
 
   static RustGgufBatchedMatrixKernel open(Path libraryPath, boolean nativeDecode) {
-    return new RustGgufBatchedMatrixKernel(NativeKernelLibrary.open(libraryPath), nativeDecode);
+    return open(libraryPath, nativeDecode, false);
+  }
+
+  static RustGgufBatchedMatrixKernel open(
+      Path libraryPath, boolean nativeDecode, boolean q5_0Grouped) {
+    return new RustGgufBatchedMatrixKernel(
+        NativeKernelLibrary.open(libraryPath), nativeDecode, q5_0Grouped);
   }
 
   @Override
@@ -79,6 +92,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   boolean nativeDecodeEnabled() {
     return nativeDecode;
+  }
+
+  boolean q5_0GroupedEnabled() {
+    return q5_0Grouped;
   }
 
   @Override
@@ -104,7 +121,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
-    return supportsGrouped(firstType)
+    return q5_0GroupEligible(firstType, secondType)
+        && supportsGrouped(firstType)
         && supportsGrouped(secondType)
         && compatibleGroup(firstType, secondType);
   }
@@ -152,7 +170,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   @Override
   public boolean supportsTriple(
       GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
-    return supportsGrouped(firstType)
+    return q5_0GroupEligible(firstType, secondType, thirdType)
+        && supportsGrouped(firstType)
         && supportsGrouped(secondType)
         && supportsGrouped(thirdType)
         && compatibleGroup(firstType, secondType, thirdType);
@@ -494,6 +513,18 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         || (isKQuant(firstType)
             && isKQuant(secondType)
             && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
+  }
+
+  private boolean q5_0GroupEligible(GgufTensorType firstType, GgufTensorType secondType) {
+    return q5_0Grouped || (firstType != GgufTensorType.Q5_0 && secondType != GgufTensorType.Q5_0);
+  }
+
+  private boolean q5_0GroupEligible(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return q5_0Grouped
+        || (firstType != GgufTensorType.Q5_0
+            && secondType != GgufTensorType.Q5_0
+            && thirdType != GgufTensorType.Q5_0);
   }
 
   private boolean compatibleGroup(

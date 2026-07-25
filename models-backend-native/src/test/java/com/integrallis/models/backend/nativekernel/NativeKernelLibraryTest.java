@@ -144,6 +144,18 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void unprofiledQ5_0GroupingIsNotEligible() {
+    try (RustGgufBatchedMatrixKernel kernel =
+        RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+      assertThat(kernel.supports(GgufTensorType.Q5_0)).isTrue();
+      assertThat(kernel.supportsDual(GgufTensorType.Q5_0, GgufTensorType.Q5_0)).isFalse();
+      assertThat(
+              kernel.supportsTriple(GgufTensorType.Q5_0, GgufTensorType.Q5_0, GgufTensorType.Q5_0))
+          .isFalse();
+    }
+  }
+
+  @Test
   void reusableGgufKernelComputesExactQ8_0BatchedMatrixMultiplication() {
     int batchSize = 3;
     int rows = 5;
@@ -182,10 +194,6 @@ class NativeKernelLibraryTest {
       referenceQ5_0F32BatchedMatmul(weights, input, batchSize, rows, cols, expected);
 
       assertThat(kernel.supports(GgufTensorType.Q5_0)).isTrue();
-      assertThat(kernel.supportsDual(GgufTensorType.Q5_0, GgufTensorType.Q5_0)).isTrue();
-      assertThat(
-              kernel.supportsTriple(GgufTensorType.Q5_0, GgufTensorType.Q5_0, GgufTensorType.Q5_0))
-          .isTrue();
       assertThat(kernel.isEligible(GgufTensorType.Q5_0, batchSize, rows, cols)).isTrue();
       kernel.multiply(actual, input, weights, GgufTensorType.Q5_0, batchSize, rows, cols);
 
@@ -377,7 +385,8 @@ class NativeKernelLibraryTest {
     float[] input = inputs(batchSize, cols);
 
     try (Arena arena = Arena.ofConfined();
-        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+        RustGgufBatchedMatrixKernel kernel =
+            RustGgufBatchedMatrixKernel.open(libraryPath(), false, true)) {
       MemorySegment[] weights = new MemorySegment[rowCounts.length];
       float[][] expected = new float[rowCounts.length][];
       float[][] actual = new float[rowCounts.length][];
