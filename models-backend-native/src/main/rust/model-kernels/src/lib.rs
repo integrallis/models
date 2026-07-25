@@ -3,7 +3,7 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 
@@ -52,6 +52,7 @@ const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 const WORKER_SPIN_ITERS: usize = 4_000;
+const COMPLETION_SPIN_ITERS: usize = 4_000;
 
 #[derive(Clone, Copy)]
 enum DotKernel {
@@ -173,6 +174,7 @@ struct CachePadded<T>(T);
 
 struct WorkerShared {
     generation: CachePadded<AtomicU64>,
+    remaining: CachePadded<AtomicUsize>,
     state: Mutex<WorkerState>,
     work_available: Condvar,
     work_complete: Condvar,
@@ -181,7 +183,6 @@ struct WorkerShared {
 struct WorkerState {
     shutdown: bool,
     job: Option<ParallelJob>,
-    remaining: usize,
     failed: bool,
 }
 
@@ -214,10 +215,10 @@ impl WorkerPool {
         let total_threads = requested_threads.max(1);
         let shared = Arc::new(WorkerShared {
             generation: CachePadded(AtomicU64::new(0)),
+            remaining: CachePadded(AtomicUsize::new(0)),
             state: Mutex::new(WorkerState {
                 shutdown: false,
                 job: None,
-                remaining: 0,
                 failed: false,
             }),
             work_available: Condvar::new(),
@@ -253,8 +254,11 @@ impl WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(job);
-            state.remaining = self.workers.len();
             state.failed = false;
+            self.shared
+                .remaining
+                .0
+                .store(self.workers.len(), Ordering::Relaxed);
             self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
         }
@@ -265,8 +269,9 @@ impl WorkerPool {
         }))
         .is_ok();
 
+        let completed = poll_completion(&self.shared.remaining.0, COMPLETION_SPIN_ITERS);
         let mut state = lock(&self.shared.state);
-        while state.remaining != 0 {
+        while !completed && self.shared.remaining.0.load(Ordering::Acquire) != 0 {
             state = wait(&self.shared.work_complete, state);
         }
         caller_succeeded && !state.failed
@@ -314,10 +319,13 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
             unsafe { execute_job_partition(job, worker_index, total_threads) }
         }))
         .is_ok();
-        let mut state = lock(&shared.state);
-        state.failed |= !succeeded;
-        state.remaining -= 1;
-        if state.remaining == 0 {
+        if !succeeded {
+            lock(&shared.state).failed = true;
+        }
+        let previous_remaining = shared.remaining.0.fetch_sub(1, Ordering::AcqRel);
+        debug_assert!(previous_remaining > 0);
+        if previous_remaining == 1 {
+            let _state = lock(&shared.state);
             shared.work_complete.notify_one();
         }
     }
@@ -336,6 +344,16 @@ fn poll_generation(
         std::hint::spin_loop();
     }
     None
+}
+
+fn poll_completion(remaining: &AtomicUsize, iterations: usize) -> bool {
+    for _ in 0..iterations {
+        if remaining.load(Ordering::Acquire) == 0 {
+            return true;
+        }
+        std::hint::spin_loop();
+    }
+    false
 }
 
 unsafe fn execute_job_partition(job: ParallelJob, worker_index: usize, total_threads: usize) {
@@ -3286,6 +3304,15 @@ mod tests {
     }
 
     #[test]
+    fn completion_poll_observes_finished_workers_without_parking() {
+        let remaining = std::sync::atomic::AtomicUsize::new(1);
+
+        assert!(!poll_completion(&remaining, 1));
+        remaining.store(0, Ordering::Release);
+        assert!(poll_completion(&remaining, 1));
+    }
+
+    #[test]
     fn persistent_context_reuses_activation_workspace() {
         let context = jmodels_kernels_context_create(2);
         assert!(!context.is_null());
@@ -3398,6 +3425,62 @@ mod tests {
             .load(Ordering::Acquire);
 
         assert_eq!(after.wrapping_sub(before), 1);
+        // SAFETY: the test consumes the unique context pointer exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
+    }
+
+    #[test]
+    fn persistent_workers_complete_repeated_generations() {
+        const GENERATIONS: u64 = 256;
+
+        let context = jmodels_kernels_context_create(4);
+        assert!(!context.is_null());
+        let weights = vec![0_u8; 64 * Q5_0_BLOCK_BYTES];
+        let input = [0.25_f32; QK_0];
+        let mut output = [0_f32; 64];
+        // SAFETY: the test owns the live context until the final destroy call.
+        let context_ref = unsafe { &*context };
+        let before = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
+
+        for _ in 0..GENERATIONS {
+            output.fill(f32::NAN);
+            // SAFETY: the context and every test buffer remain live and non-aliasing for the call.
+            assert_eq!(
+                unsafe {
+                    jmodels_quantized_f32_batched_matmul_with_context(
+                        context,
+                        5,
+                        weights.as_ptr(),
+                        weights.len() as u64,
+                        input.as_ptr(),
+                        input.len() as u64,
+                        output.as_mut_ptr(),
+                        output.len() as u64,
+                        1,
+                        64,
+                        QK_0 as u32,
+                    )
+                },
+                STATUS_OK
+            );
+            assert!(output.iter().all(|value| *value == 0.0));
+        }
+
+        let after = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
+        assert_eq!(after.wrapping_sub(before), GENERATIONS);
         // SAFETY: the test consumes the unique context pointer exactly once.
         assert_eq!(
             unsafe { jmodels_kernels_context_destroy(context) },
