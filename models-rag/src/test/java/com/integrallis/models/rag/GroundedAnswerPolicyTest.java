@@ -242,6 +242,31 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void preservesConjunctionsInsideSupportedAnswerLists() {
+    GroundingDocument retries =
+        new GroundingDocument(
+            "http-retry-idempotency",
+            "HTTP retry rules",
+            "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only "
+                + "when it carries an Idempotency-Key header.",
+            8.0f,
+            1);
+    String generated =
+        "The HTTP methods retried up to three attempts are GET and HEAD. The header that permits "
+            + "retrying POST is the Idempotency-Key header.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which HTTP methods are retried up to three attempts, and what header permits retrying "
+                + "POST?",
+            List.of(retries),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [http-retry-idempotency]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
   void usesExtractiveEvidenceForAnUnsupportedCitation() {
     GroundedAnswer answer =
         policy.apply(
