@@ -15,6 +15,7 @@ use std::arch::x86_64::*;
 #[cfg(all(test, target_arch = "x86_64"))]
 std::thread_local! {
     static Q5_0_HORIZONTAL_REDUCTIONS: Cell<usize> = const { Cell::new(0) };
+    static Q5_0_ACTIVATION_LOADS: Cell<usize> = const { Cell::new(0) };
 }
 
 const ABI_VERSION: u32 = 2;
@@ -1654,7 +1655,27 @@ unsafe fn compute_q5_batched_row_range_avx2(
     end_row: usize,
 ) {
     if batch_size == 1 {
-        for row in start_row..end_row {
+        let mut row = start_row;
+        while row + 4 <= end_row {
+            // SAFETY: AVX2 and FMA are enabled and four complete rows remain in this partition.
+            let sums = unsafe {
+                dot_q5_0_q8_0_four_rows_avx2(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    row,
+                    cols,
+                )
+            };
+            for (offset, sum) in sums.into_iter().enumerate() {
+                // SAFETY: each worker owns these four consecutive output rows.
+                unsafe {
+                    output.add(row + offset).write(sum);
+                }
+            }
+            row += 4;
+        }
+        while row < end_row {
             // SAFETY: AVX2 and FMA are enabled for this function and all buffers were validated.
             let sum = unsafe {
                 dot_q5_0_q8_0_row_avx2(
@@ -1670,6 +1691,7 @@ unsafe fn compute_q5_batched_row_range_avx2(
             unsafe {
                 output.add(row).write(sum);
             }
+            row += 1;
         }
         return;
     }
@@ -2255,7 +2277,25 @@ unsafe fn q4_0_q8_0_signed_pair_sums_avx2(
     quantized: *const i8,
 ) -> __m256i {
     // SAFETY: callers provide one complete Q8_0 block.
-    let activations = unsafe { _mm256_loadu_si256(quantized.cast()) };
+    let activations = unsafe { load_q8_0_activations_avx2(quantized) };
+    q4_0_q8_0_signed_pair_sums_loaded_avx2(signed_weights, activations)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn load_q8_0_activations_avx2(quantized: *const i8) -> __m256i {
+    #[cfg(test)]
+    Q5_0_ACTIVATION_LOADS.with(|count| count.set(count.get() + 1));
+    // SAFETY: callers provide one complete Q8_0 block.
+    unsafe { _mm256_loadu_si256(quantized.cast()) }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+fn q4_0_q8_0_signed_pair_sums_loaded_avx2(
+    signed_weights: __m256i,
+    activations: __m256i,
+) -> __m256i {
     let absolute_weights = _mm256_sign_epi8(signed_weights, signed_weights);
     let signed_activations = _mm256_sign_epi8(activations, signed_weights);
     let pair_products = _mm256_maddubs_epi16(absolute_weights, signed_activations);
@@ -2357,6 +2397,52 @@ unsafe fn dot_q5_0_q8_0_row_avx2(
     #[cfg(test)]
     Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
     horizontal_sum_f32_avx2(sums)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn dot_q5_0_q8_0_four_rows_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    first_row: usize,
+    cols: usize,
+) -> [f32; 4] {
+    let blocks_per_row = cols / QK_0;
+    let mut sums = [_mm256_setzero_ps(); 4];
+    for (block, &activation_scale) in
+        activation_scales[..blocks_per_row].iter().enumerate()
+    {
+        let input_offset = block * QK_0;
+        // SAFETY: each validated activation block contains 32 signed bytes.
+        let activations =
+            unsafe { load_q8_0_activations_avx2(quantized.as_ptr().add(input_offset)) };
+        for (row_offset, sum) in sums.iter_mut().enumerate() {
+            let weight_offset =
+                ((first_row + row_offset) * blocks_per_row + block) * Q5_0_BLOCK_BYTES;
+            // SAFETY: each validated Q5_0 block provides its complete high-bit and nibble planes.
+            let signed_weights = unsafe {
+                unpack_q5_0_avx2(
+                    weights.as_ptr().add(weight_offset + 2),
+                    weights.as_ptr().add(weight_offset + 6),
+                )
+            };
+            let pair_sums =
+                q4_0_q8_0_signed_pair_sums_loaded_avx2(signed_weights, activations);
+            let weight_scale = f16_to_f32(u16::from_le_bytes([
+                weights[weight_offset],
+                weights[weight_offset + 1],
+            ]));
+            *sum = _mm256_fmadd_ps(
+                _mm256_set1_ps(weight_scale * activation_scale),
+                _mm256_cvtepi32_ps(pair_sums),
+                *sum,
+            );
+        }
+    }
+    #[cfg(test)]
+    Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 4));
+    sums.map(|sum| horizontal_sum_f32_avx2(sum))
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -3518,6 +3604,65 @@ mod tests {
 
         assert!((avx2 - scalar).abs() <= 1e-3);
         Q5_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 1));
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn avx2_q5_0_decode_reuses_activation_loads_across_four_rows() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+        const ROWS: usize = 9;
+        const BLOCKS: usize = 8;
+        let cols = BLOCKS * QK_0;
+        let mut weights = vec![0_u8; ROWS * BLOCKS * Q5_0_BLOCK_BYTES];
+        for row in 0..ROWS {
+            for block in 0..BLOCKS {
+                let offset = (row * BLOCKS + block) * Q5_0_BLOCK_BYTES;
+                weights[offset..offset + 2]
+                    .copy_from_slice(&f32_to_f16(0.0078125 * (block + 1) as f32).to_le_bytes());
+                weights[offset + 2..offset + 6].copy_from_slice(
+                    &(0xa5c3_5a7f_u32.rotate_left((row + block) as u32)).to_le_bytes(),
+                );
+                for (index, packed) in weights[offset + 6..offset + Q5_0_BLOCK_BYTES]
+                    .iter_mut()
+                    .enumerate()
+                {
+                    *packed = (index * 37 + row * 17 + block * 11 + 5) as u8;
+                }
+            }
+        }
+        let mut quantized = vec![0_i8; cols];
+        for (index, quant) in quantized.iter_mut().enumerate() {
+            *quant = (((index * 19 + 7) % 255) as i32 - 127) as i8;
+        }
+        let activation_scales: Vec<f32> =
+            (0..BLOCKS).map(|block| 0.00390625 * (block + 1) as f32).collect();
+        let mut output = [0_f32; ROWS];
+
+        Q5_0_ACTIVATION_LOADS.with(|count| count.set(0));
+        // SAFETY: AVX2 was detected and every buffer contains the complete validated matrix.
+        unsafe {
+            compute_q5_batched_row_range_avx2(
+                &weights,
+                &quantized,
+                &activation_scales,
+                output.as_mut_ptr(),
+                1,
+                ROWS,
+                cols,
+                0,
+                ROWS,
+            );
+        }
+
+        for (row, actual) in output.into_iter().enumerate() {
+            let scalar =
+                dot_q5_0_q8_0_row_scalar(&weights, &quantized, &activation_scales, 0, row, cols);
+            assert!((actual - scalar).abs() <= 1e-3);
+        }
+        let expected_loads = (ROWS / 4 + ROWS % 4) * BLOCKS;
+        Q5_0_ACTIVATION_LOADS.with(|count| assert_eq!(count.get(), expected_loads));
     }
 
     #[test]
