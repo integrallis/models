@@ -373,8 +373,13 @@ quality.
 
 All three backends receive the same prompt bytes and exact GGUF file. The runner
 rejects reports unless model SHA-256, file size, hardware/JDK identity,
-generation controls, input and output token counts, and measured-trial counts
-match. It recalculates summaries from raw trials before producing a comparison.
+generation controls, input token counts, and measured-trial counts match.
+Models and llama.cpp must also report the same output-token series. Ollama may
+exclude a terminal stop token from `eval_count`, so its actual output count is
+retained in the raw evidence and its decoded-text match rate is reported rather
+than incorrectly treating that protocol convention as a different workload.
+The runner recalculates summaries from raw trials before producing a
+comparison.
 
 - Host: Hetzner dedicated-vCPU VM, AMD EPYC Milan, 8 vCPU, 30.6 GiB RAM
 - OS: Ubuntu 24.04, Linux 6.8.0-124, no swap

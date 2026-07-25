@@ -37,6 +37,11 @@ public final class BenchmarkComparison {
             .filter(report -> "llama.cpp".equals(report.backend()))
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("a llama.cpp report is required"));
+    BenchmarkReport models =
+        reports.stream()
+            .filter(report -> Set.of("pure-java", "rust-ffm").contains(report.backend()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("a Models report is required"));
     double llamaDecode = llamaCpp.summary().p50DecodeTokensPerSecond();
     if (!(llamaDecode > 0)) {
       throw new IllegalArgumentException("llama.cpp decode throughput must be positive");
@@ -49,6 +54,10 @@ public final class BenchmarkComparison {
         throw new IllegalArgumentException("duplicate backend report: " + report.backend());
       }
     }
+    requireEqual(
+        "Models and llama.cpp output token series",
+        llamaCpp.trials().stream().map(TrialMeasurement::outputTokens).toList(),
+        models.trials().stream().map(TrialMeasurement::outputTokens).toList());
 
     List<BackendComparison> rows =
         reports.stream()
@@ -101,10 +110,6 @@ public final class BenchmarkComparison {
         "input token series",
         reference.trials().stream().map(TrialMeasurement::inputTokens).toList(),
         candidate.trials().stream().map(TrialMeasurement::inputTokens).toList());
-    requireEqual(
-        "output token series",
-        reference.trials().stream().map(TrialMeasurement::outputTokens).toList(),
-        candidate.trials().stream().map(TrialMeasurement::outputTokens).toList());
     List<TrialMeasurement> trials = candidate.trials();
     PerformanceSummary summary = candidate.summary();
     if (trials.size() < 10
