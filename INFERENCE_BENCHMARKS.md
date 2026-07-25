@@ -220,7 +220,7 @@ activations, and at least two row partitions.
 The next gate replaced the block-by-block scattered output updates with one row-local batch
 accumulator. Vectors keeps this as an explicit kernel strategy because local Java 25 HotSpot/C2 was
 neutral, while the controlled EPYC/GraalVM batch-32 JMH improved from 20.571 to 4.335 ms/op
-(-78.9%). Models plan schema `pure-java-v16` requires an exact recommendation, Graal JVMCI, and
+(-78.9%). Models plan schema `pure-java-v17` requires an exact recommendation, Graal JVMCI, and
 eligible staged block-major Q8 topology before selecting
 `models.purejava.q8BlockMajorKernel=row-accumulated`.
 
@@ -373,8 +373,13 @@ quality.
 
 All three backends receive the same prompt bytes and exact GGUF file. The runner
 rejects reports unless model SHA-256, file size, hardware/JDK identity,
-generation controls, input and output token counts, and measured-trial counts
-match. It recalculates summaries from raw trials before producing a comparison.
+generation controls, input token counts, and measured-trial counts match.
+Models and llama.cpp must also report the same output-token series. Ollama may
+exclude a terminal stop token from `eval_count`, so its actual output count is
+retained in the raw evidence and its decoded-text match rate is reported rather
+than incorrectly treating that protocol convention as a different workload.
+The runner recalculates summaries from raw trials before producing a
+comparison.
 
 - Host: Hetzner dedicated-vCPU VM, AMD EPYC Milan, 8 vCPU, 30.6 GiB RAM
 - OS: Ubuntu 24.04, Linux 6.8.0-124, no swap
@@ -420,15 +425,20 @@ Run all three backends and produce raw JSON plus Markdown comparison evidence:
 
 ```bash
 BENCH_DROP_CACHES=1 \
-BENCH_MODELJAR_ALIAS=qwen3_0_6b_q4_0 \
 scripts/run-controlled-inference-benchmarks.sh \
   ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   qwen3-0.6b-q4_0
 ```
 
-The script records exact `models` and `vectors` commits in the pure-Java backend
-version and rejects a ModelJar artifact whose SHA differs from the native
-artifact. Run it under the Java runtime and startup arguments required by the
-selected ModelJars profile. Omitting `BENCH_MODELJAR_ALIAS` deliberately runs
-the unprofiled path control. Do not publish comparisons from dirty checkouts or
-mixed hosts.
+The release qualification path defaults to `BENCH_MODELS_BACKEND=rust-ffm`,
+enables quantized native decode, pins native workers to `BENCH_THREADS`, and
+writes the in-process result to `models.json`. Set
+`BENCH_MODELS_BACKEND=pure-java` for a pure-Java ceiling control. A pure-Java
+run may also set `BENCH_MODELJAR_ALIAS` to apply an exact model-scoped profile;
+the script then rejects a resolved artifact whose SHA differs from the
+comparator artifact.
+
+Every benchmark process receives `-XX:ActiveProcessorCount=$BENCH_THREADS`, so
+the in-process and HTTP-client reports retain the same environment fingerprint.
+The script records exact `models` and `vectors` commits, and refuses dirty
+Models or Vectors checkouts. Do not publish comparisons from mixed hosts.

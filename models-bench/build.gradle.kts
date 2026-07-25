@@ -51,6 +51,12 @@ dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":models-backend-purejava"))
     implementation(project(":models-backend-native"))
+    runtimeOnly(
+        project(
+            path = ":models-backend-native",
+            configuration = "hostNativeRuntimeElements",
+        )
+    )
     implementation("com.integrallis:vectors-core:0.1.0-SNAPSHOT")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     runtimeOnly("org.modeljars:modeljars-catalog:0.1.0-SNAPSHOT")

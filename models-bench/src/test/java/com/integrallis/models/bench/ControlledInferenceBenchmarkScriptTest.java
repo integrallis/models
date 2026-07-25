@@ -29,25 +29,50 @@ class ControlledInferenceBenchmarkScriptTest {
     String script = Files.readString(benchmarkScript());
 
     String commonArguments = section(script, "COMMON_ARGS=(", "\n)\n\n");
-    String pureJavaInvocation = section(script, "--backend pure-java", "if ! curl");
+    String modelsInvocation = section(script, "--backend \"$MODELS_BACKEND\"", "if ! curl");
     String ollamaInvocation = section(script, "--backend ollama", "ollama stop");
     String llamaCppInvocation =
         section(script, "--backend llama.cpp", "\"$BENCHMARK_CLI\" compare");
 
     assertThat(commonArguments).doesNotContain("--artifact");
-    assertThat(pureJavaInvocation).doesNotContain("--artifact");
+    assertThat(modelsInvocation).doesNotContain("--artifact");
     assertThat(ollamaInvocation).contains("--artifact \"$MODEL_PATH\"");
     assertThat(llamaCppInvocation).contains("--artifact \"$MODEL_PATH\"");
   }
 
   @Test
-  void canSelectTheProfiledModelJarPathForPureJava() throws IOException {
+  void defaultsToNativeModelsAndRetainsAnExplicitPureJavaOverride() throws IOException {
     String script = Files.readString(benchmarkScript());
 
     assertThat(script)
+        .contains("MODELS_BACKEND=${BENCH_MODELS_BACKEND:-rust-ffm}")
+        .contains("pure-java|rust-ffm")
+        .contains("models.native.quantizedDecode=true")
+        .contains("models.native.kernels.threads=$THREADS")
+        .contains("-XX:ActiveProcessorCount=$THREADS")
         .contains("BENCH_MODELJAR_ALIAS=${BENCH_MODELJAR_ALIAS:-}")
-        .contains("PURE_JAVA_MODEL_ARGS=(--modeljar \"$BENCH_MODELJAR_ALIAS\")")
-        .contains("\"${PURE_JAVA_MODEL_ARGS[@]}\"");
+        .contains("MODELS_MODEL_ARGS=(--modeljar \"$BENCH_MODELJAR_ALIAS\")")
+        .contains("\"${MODELS_MODEL_ARGS[@]}\"")
+        .contains("--models \"$OUTPUT_DIR/models.json\"");
+  }
+
+  @Test
+  void rejectsCompetingInferenceProcessesBeforeMeasurement() throws IOException {
+    String script = Files.readString(benchmarkScript());
+
+    assertThat(script)
+        .contains("assert_no_competing_inference_processes()")
+        .contains("ps -eo pid=,comm=,args=")
+        .contains("llama-cli|llama-server|llama-bench")
+        .contains("com\\.integrallis\\.models\\.(bench|rag)");
+
+    int functionDefinition = script.indexOf("assert_no_competing_inference_processes()");
+    int guardCall =
+        script.indexOf("\nassert_no_competing_inference_processes\n", functionDefinition);
+    int firstMeasurement = script.indexOf("drop_file_cache\n\"$BENCHMARK_CLI\"", guardCall);
+
+    assertThat(guardCall).isGreaterThan(functionDefinition);
+    assertThat(firstMeasurement).isGreaterThan(guardCall);
   }
 
   @Test

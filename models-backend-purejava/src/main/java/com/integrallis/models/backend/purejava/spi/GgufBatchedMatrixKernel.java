@@ -45,6 +45,11 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
     return supports(type);
   }
 
+  /** Returns whether two weight formats can share one activation preparation. */
+  default boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
+    return false;
+  }
+
   /** Returns whether two projections can share one native activation preparation. */
   default boolean isDualEligible(
       GgufTensorType firstType,
@@ -70,6 +75,12 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
       int batchSize,
       int cols) {
     throw new UnsupportedOperationException("injected kernel does not support dual projections");
+  }
+
+  /** Returns whether three weight formats can share one activation preparation. */
+  default boolean supportsTriple(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return false;
   }
 
   /** Returns whether three projections can share one native activation preparation. */

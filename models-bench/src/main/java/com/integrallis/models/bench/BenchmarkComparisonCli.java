@@ -30,7 +30,7 @@ import java.util.Set;
 final class BenchmarkComparisonCli {
 
   private static final Set<String> OPTIONS =
-      Set.of("pure-java", "llama-cpp", "ollama", "json", "markdown");
+      Set.of("models", "llama-cpp", "ollama", "json", "markdown");
 
   private BenchmarkComparisonCli() {}
 
@@ -38,7 +38,12 @@ final class BenchmarkComparisonCli {
     Map<String, String> options = parse(args);
     ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     List<BenchmarkReport> reports = new ArrayList<>();
-    reports.add(read(mapper, required(options, "pure-java")));
+    BenchmarkReport models = read(mapper, required(options, "models"));
+    if (!Set.of("pure-java", "rust-ffm").contains(models.backend())) {
+      throw new IllegalArgumentException(
+          "--models report must use the pure-java or rust-ffm backend");
+    }
+    reports.add(models);
     reports.add(read(mapper, required(options, "llama-cpp")));
     if (options.containsKey("ollama")) {
       reports.add(read(mapper, options.get("ollama")));

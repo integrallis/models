@@ -21,8 +21,9 @@ LLAMA_PORT=${LLAMA_PORT:-18080}
 LLAMA_SERVER=${LLAMA_SERVER:-llama-server}
 PROMPT_FILE=${BENCH_PROMPT_FILE:-"$ROOT_DIR/models-bench/prompts/completion.txt"}
 BENCH_MODELJAR_ALIAS=${BENCH_MODELJAR_ALIAS:-}
+MODELS_BACKEND=${BENCH_MODELS_BACKEND:-rust-ffm}
 
-for command in awk curl git java jq nproc ollama realpath sha256sum sync "$LLAMA_SERVER"; do
+for command in awk curl git java jq nproc ollama ps realpath sha256sum sync "$LLAMA_SERVER"; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "required command not found: $command" >&2
     exit 1
@@ -36,6 +37,17 @@ if [[ "$JAVA_FEATURE" != 25 ]]; then
 fi
 if [[ "$DROP_CACHES" != 0 && "$DROP_CACHES" != 1 ]]; then
   echo "BENCH_DROP_CACHES must be 0 or 1" >&2
+  exit 1
+fi
+case "$MODELS_BACKEND" in
+  pure-java|rust-ffm) ;;
+  *)
+    echo "BENCH_MODELS_BACKEND must be pure-java or rust-ffm" >&2
+    exit 1
+    ;;
+esac
+if [[ "$MODELS_BACKEND" == rust-ffm && -n "$BENCH_MODELJAR_ALIAS" ]]; then
+  echo "BENCH_MODELJAR_ALIAS is currently supported only with BENCH_MODELS_BACKEND=pure-java" >&2
   exit 1
 fi
 if [[ "$DROP_CACHES" == 1 && ! -w /proc/sys/vm/drop_caches ]]; then
@@ -86,14 +98,44 @@ drop_file_cache() {
   fi
 }
 
+assert_no_competing_inference_processes() {
+  local competitors
+  competitors=$(
+    ps -eo pid=,comm=,args= | awk -v self_pid="$$" '
+      {
+        is_llama = $2 ~ /^(llama-cli|llama-server|llama-bench)$/
+        is_ollama_runner = $2 == "ollama" && $0 ~ /(^|[[:space:]])runner([[:space:]]|$)/
+        is_models_java = $2 == "java" && $0 ~ /com\.integrallis\.models\.(bench|rag)/
+        if ($1 != self_pid && (is_llama || is_ollama_runner || is_models_java)) {
+          print
+        }
+      }
+    '
+  )
+  if [[ -n "$competitors" ]]; then
+    echo "competing inference processes make benchmark evidence invalid:" >&2
+    printf '%s\n' "$competitors" >&2
+    exit 1
+  fi
+}
+
 "$ROOT_DIR/gradlew" --no-daemon -p "$ROOT_DIR" :models-bench:installDist
 BENCHMARK_CLI="$ROOT_DIR/models-bench/build/install/models-bench/bin/models-bench"
+assert_no_competing_inference_processes
+
 MODEL_SHA=$(sha256sum "$MODEL_PATH" | awk '{print $1}')
 SAFE_MODEL_ID=$(printf '%s' "$MODEL_ID" | tr -cs '[:alnum:]._-' '-')
 OLLAMA_MODEL="modeljars-bench-${SAFE_MODEL_ID}:${MODEL_SHA:0:12}"
 MODELS_COMMIT=$(git -C "$ROOT_DIR" rev-parse HEAD)
 VECTORS_COMMIT=$(git -C "$ROOT_DIR/../vectors" rev-parse HEAD)
-PURE_JAVA_VERSION="models@$MODELS_COMMIT vectors@$VECTORS_COMMIT"
+MODELS_VERSION="models@$MODELS_COMMIT vectors@$VECTORS_COMMIT"
+
+BENCHMARK_JVM_OPTIONS="-XX:ActiveProcessorCount=$THREADS"
+if [[ "$MODELS_BACKEND" == rust-ffm ]]; then
+  BENCHMARK_JVM_OPTIONS="$BENCHMARK_JVM_OPTIONS -Dmodels.native.quantizedDecode=true"
+  BENCHMARK_JVM_OPTIONS="$BENCHMARK_JVM_OPTIONS -Dmodels.native.kernels.threads=$THREADS"
+fi
+export MODELS_BENCH_OPTS="${MODELS_BENCH_OPTS:-} $BENCHMARK_JVM_OPTIONS"
 
 COMMON_ARGS=(
   --model-id "$MODEL_ID"
@@ -105,21 +147,21 @@ COMMON_ARGS=(
   --threads "$THREADS"
 )
 
-PURE_JAVA_MODEL_ARGS=(--model "$MODEL_PATH")
+MODELS_MODEL_ARGS=(--model "$MODEL_PATH")
 if [[ -n "$BENCH_MODELJAR_ALIAS" ]]; then
-  PURE_JAVA_MODEL_ARGS=(--modeljar "$BENCH_MODELJAR_ALIAS")
+  MODELS_MODEL_ARGS=(--modeljar "$BENCH_MODELJAR_ALIAS")
 fi
 
 drop_file_cache
 "$BENCHMARK_CLI" \
-  --backend pure-java \
-  "${PURE_JAVA_MODEL_ARGS[@]}" \
-  --backend-version "$PURE_JAVA_VERSION" \
-  --output "$OUTPUT_DIR/pure-java.json" \
+  --backend "$MODELS_BACKEND" \
+  "${MODELS_MODEL_ARGS[@]}" \
+  --backend-version "$MODELS_VERSION" \
+  --output "$OUTPUT_DIR/models.json" \
   "${COMMON_ARGS[@]}"
-PURE_JAVA_ARTIFACT_SHA=$(jq -r '.artifactSha256' "$OUTPUT_DIR/pure-java.json")
-if [[ "$PURE_JAVA_ARTIFACT_SHA" != "$MODEL_SHA" ]]; then
-  echo "pure-Java and native benchmark artifacts differ" >&2
+MODELS_ARTIFACT_SHA=$(jq -r '.artifactSha256' "$OUTPUT_DIR/models.json")
+if [[ "$MODELS_ARTIFACT_SHA" != "$MODEL_SHA" ]]; then
+  echo "Models and comparator benchmark artifacts differ" >&2
   exit 1
 fi
 
@@ -204,7 +246,7 @@ LLAMA_VERSION=$("$LLAMA_SERVER" --version 2>&1 | head -n 1)
   "${COMMON_ARGS[@]}"
 
 "$BENCHMARK_CLI" compare \
-  --pure-java "$OUTPUT_DIR/pure-java.json" \
+  --models "$OUTPUT_DIR/models.json" \
   --llama-cpp "$OUTPUT_DIR/llama.cpp.json" \
   --ollama "$OUTPUT_DIR/ollama.json" \
   --json "$OUTPUT_DIR/comparison.json" \

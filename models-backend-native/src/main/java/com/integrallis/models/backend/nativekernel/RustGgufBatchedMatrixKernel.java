@@ -28,6 +28,7 @@ import java.util.Objects;
 /** Reusable off-heap workspace for Models-owned Rust quantized projection kernels. */
 public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   public static final String NATIVE_DECODE_PROPERTY = "models.native.quantizedDecode";
+  public static final String Q5_0_GROUPED_PROPERTY = "models.native.q5_0.grouped";
 
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
@@ -42,6 +43,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   private final NativeKernelLibrary library;
   private final boolean nativeDecode;
+  private final boolean q5_0Grouped;
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
@@ -53,23 +55,34 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private int outputCapacity;
   private boolean closed;
 
-  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library, boolean nativeDecode) {
+  private RustGgufBatchedMatrixKernel(
+      NativeKernelLibrary library, boolean nativeDecode, boolean q5_0Grouped) {
     this.library = Objects.requireNonNull(library, "library");
     this.nativeDecode = nativeDecode;
+    this.q5_0Grouped = q5_0Grouped;
   }
 
   /** Opens a Rust kernel provider from an explicit platform library. */
   public static RustGgufBatchedMatrixKernel open(Path libraryPath) {
-    return open(libraryPath, Boolean.getBoolean(NATIVE_DECODE_PROPERTY));
+    return open(
+        libraryPath,
+        Boolean.getBoolean(NATIVE_DECODE_PROPERTY),
+        Boolean.getBoolean(Q5_0_GROUPED_PROPERTY));
   }
 
   static RustGgufBatchedMatrixKernel open(Path libraryPath, boolean nativeDecode) {
-    return new RustGgufBatchedMatrixKernel(NativeKernelLibrary.open(libraryPath), nativeDecode);
+    return open(libraryPath, nativeDecode, false);
+  }
+
+  static RustGgufBatchedMatrixKernel open(
+      Path libraryPath, boolean nativeDecode, boolean q5_0Grouped) {
+    return new RustGgufBatchedMatrixKernel(
+        NativeKernelLibrary.open(libraryPath), nativeDecode, q5_0Grouped);
   }
 
   @Override
   public String implementation() {
-    return "rust-ffm-quantized-v2";
+    return "rust-ffm-quantized-v8";
   }
 
   @Override
@@ -81,6 +94,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return nativeDecode;
   }
 
+  boolean q5_0GroupedEnabled() {
+    return q5_0Grouped;
+  }
+
   @Override
   public boolean supports(GgufTensorType type) {
     if (type == null) {
@@ -88,6 +105,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     }
     return switch (type) {
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL);
+      case Q5_0 -> library.supports(NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL);
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL);
       case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL);
@@ -102,6 +120,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
+    return q5_0GroupEligible(firstType, secondType)
+        && supportsGrouped(firstType)
+        && supportsGrouped(secondType)
+        && compatibleGroup(firstType, secondType);
+  }
+
+  @Override
   public boolean isDualEligible(
       GgufTensorType firstType,
       int firstRows,
@@ -109,10 +135,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int secondRows,
       int batchSize,
       int cols) {
-    return eligibleBatch(batchSize)
-        && supportsGrouped(firstType)
-        && supportsGrouped(secondType)
-        && compatibleGroup(firstType, secondType);
+    return eligibleBatch(batchSize) && supportsDual(firstType, secondType);
   }
 
   @Override
@@ -145,6 +168,16 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public boolean supportsTriple(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return q5_0GroupEligible(firstType, secondType, thirdType)
+        && supportsGrouped(firstType)
+        && supportsGrouped(secondType)
+        && supportsGrouped(thirdType)
+        && compatibleGroup(firstType, secondType, thirdType);
+  }
+
+  @Override
   public boolean isTripleEligible(
       GgufTensorType firstType,
       int firstRows,
@@ -154,11 +187,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int thirdRows,
       int batchSize,
       int cols) {
-    return eligibleBatch(batchSize)
-        && supportsGrouped(firstType)
-        && supportsGrouped(secondType)
-        && supportsGrouped(thirdType)
-        && compatibleGroup(firstType, secondType, thirdType);
+    return eligibleBatch(batchSize) && supportsTriple(firstType, secondType, thirdType);
   }
 
   @Override
@@ -240,6 +269,17 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     switch (type) {
       case Q4_0 ->
           library.q4_0F32BatchedMatmul(
+              weights,
+              weightBytes,
+              nativeInput,
+              inputElements,
+              nativeOutput,
+              outputElements,
+              batchSize,
+              rows,
+              cols);
+      case Q5_0 ->
+          library.q5_0F32BatchedMatmul(
               weights,
               weightBytes,
               nativeInput,
@@ -358,6 +398,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     }
     return switch (type) {
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL);
+      case Q5_0 -> library.supports(NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL);
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL);
       case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_GROUPED_BATCHED_MATMUL);
@@ -456,6 +497,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     long blockBytes =
         switch (type) {
           case Q4_0 -> 18L;
+          case Q5_0 -> 22L;
           case Q8_0 -> 34L;
           case Q4_K -> 144L;
           case Q5_K -> 176L;
@@ -471,6 +513,18 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         || (isKQuant(firstType)
             && isKQuant(secondType)
             && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
+  }
+
+  private boolean q5_0GroupEligible(GgufTensorType firstType, GgufTensorType secondType) {
+    return q5_0Grouped || (firstType != GgufTensorType.Q5_0 && secondType != GgufTensorType.Q5_0);
+  }
+
+  private boolean q5_0GroupEligible(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return q5_0Grouped
+        || (firstType != GgufTensorType.Q5_0
+            && secondType != GgufTensorType.Q5_0
+            && thirdType != GgufTensorType.Q5_0);
   }
 
   private boolean compatibleGroup(
@@ -491,6 +545,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private static NativeKernelCapability groupedCapability(GgufTensorType type) {
     return switch (type) {
       case Q4_0 -> NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL;
+      case Q5_0 -> NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL;
       case Q8_0 -> NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL;
       case Q4_K -> NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL;
       case Q5_K -> NativeKernelCapability.Q5_K_F32_GROUPED_BATCHED_MATMUL;
@@ -506,13 +561,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       case Q4_K -> 2;
       case Q6_K -> 3;
       case Q5_K -> 4;
+      case Q5_0 -> 5;
       default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
     };
   }
 
   private static int blockElements(GgufTensorType type) {
     return switch (type) {
-      case Q4_0, Q8_0 -> 32;
+      case Q4_0, Q5_0, Q8_0 -> 32;
       case Q4_K, Q5_K, Q6_K -> 256;
       default -> throw new UnsupportedOperationException("unsupported GGUF type " + type);
     };

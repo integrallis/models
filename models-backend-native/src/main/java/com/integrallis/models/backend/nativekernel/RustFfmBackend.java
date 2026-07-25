@@ -40,7 +40,7 @@ import org.modeljars.ModelJarException;
 public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String PLAN_VERSION = "rust-ffm-v4";
+  public static final String PLAN_VERSION = "rust-ffm-v8";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -174,11 +174,16 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     environment.put("kernel-implementation", kernel.implementation());
     environment.put("native-kernel-abi", Integer.toString(NativeKernelLibrary.ABI_VERSION));
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
+    environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
     optimizations.add(
         nativeQuantizedDecision(
             "rust-q4-0-batched-matmul",
             "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel"));
+    optimizations.add(
+        nativeQuantizedDecision(
+            "rust-q5-0-batched-matmul",
+            "eligible Q5_0 batched projections execute in the Models Rust kernel"));
     optimizations.add(
         nativeQuantizedDecision(
             "rust-q8-0-batched-matmul",
@@ -201,10 +206,22 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
             "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization"));
     optimizations.add(
         new OptimizationDecision(
+            "rust-q5-0-grouped-matmul",
+            kernel.q5_0GroupedEnabled() ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            kernel.q5_0GroupedEnabled()
+                ? "explicitly enabled for profile qualification"
+                : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+            Map.of(
+                "property",
+                RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
+                "qualification",
+                "model-and-platform-specific")));
+    optimizations.add(
+        new OptimizationDecision(
             "rust-quantized-decode",
             kernel.nativeDecodeEnabled() ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
             kernel.nativeDecodeEnabled()
-                ? "single-token Q4_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel"
+                ? "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel"
                 : "disabled by " + RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
             Map.of(
                 "property",

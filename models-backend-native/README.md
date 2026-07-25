@@ -6,12 +6,12 @@ the transformer graph, KV-cache ownership, sampling, and generation remain in Ja
 The native boundary is a versioned C ABI implemented by the Models-owned
 `jmodels-kernels` Rust crate.
 
-ABI 2 supports Q4_0, Q8_0, Q4_K, Q5_K, and Q6_K batched and grouped projections,
-including mixed Q4_K/Q5_K/Q6_K groups over one shared Q8_K activation
+ABI 2 supports Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K batched projections and
+grouped dispatch. Mixed Q4_K/Q5_K/Q6_K groups share one Q8_K activation
 quantization. Its x86-64 path uses format-specialized AVX2/FMA integer dots,
 vectorized Q8_0 activation preparation, batched weight reuse, reusable activation
-scratch, and an explicitly owned persistent worker context. Scalar kernels remain
-available as cross-platform conformance fallbacks.
+scratch, and an explicitly owned persistent worker context. Scalar kernels
+remain available as cross-platform conformance fallbacks.
 
 ## Build and test
 
@@ -59,6 +59,12 @@ java \
 
 `models.native.kernels.threads` controls the worker-context size and defaults to
 the JVM-reported processor count.
+
+Q5_0 grouped projection dispatch is not enabled by default. On the controlled
+Qwen2.5-0.5B x86-64 profile, fused grouping recovered worker-barrier overhead but
+still decoded at 37.33 tokens/second versus 38.94 tokens/second for independent
+Q5_0 projections. `-Dmodels.native.q5_0.grouped=true` is therefore an
+experimental qualification override, not a release recommendation.
 
 ## CI artifacts and private packages
 

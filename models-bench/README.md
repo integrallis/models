@@ -353,7 +353,7 @@ an explicit `GgufQ8BlockMajorKernel` choice; the existing scattered strategy rem
 
 Local Java 25 HotSpot/C2 was neutral at 17.713 versus 17.480 ms/op. Controlled EPYC/GraalVM Java
 25 improved the 1,024x2,048 batch-32 JMH kernel from 20.571 to 4.335 ms/op (-78.9%). Models plan
-schema `pure-java-v16` therefore selects the row accumulator only when an exact profile recommends
+schema `pure-java-v17` therefore selects the row accumulator only when an exact profile recommends
 `models.purejava.q8BlockMajorKernel=row-accumulated`, the compiler is Graal JVMCI, and staged
 block-major Q8 topology is active. Other runtimes and models retain the scattered kernel.
 
@@ -507,3 +507,19 @@ models-bench/build/install/models-bench/bin/models-bench \
 Benchmark schema 5 records `backendDiagnostics`, including the pure-Java plan version, runtime
 fingerprint, optimization decisions, and any enabled ModelJar performance profile. External
 Ollama and llama.cpp reports record explicit `unavailable` diagnostics.
+
+For release qualification, the repository runner uses the Models-owned Rust/FFM backend by
+default and compares it with the same GGUF bytes through llama.cpp and Ollama:
+
+```shell
+BENCH_THREADS=4 \
+BENCH_MAX_TOKENS=64 \
+scripts/run-controlled-inference-benchmarks.sh \
+  ~/.jvllm/models/model.gguf \
+  catalog-model-id
+```
+
+The runner sets `models.native.quantizedDecode=true`, uses the requested thread count for native
+workers, pins `ActiveProcessorCount` for every Java benchmark process, and emits `models.json`,
+`llama.cpp.json`, `ollama.json`, `comparison.json`, and `comparison.md`. Set
+`BENCH_MODELS_BACKEND=pure-java` to measure the pure-Java ceiling instead.

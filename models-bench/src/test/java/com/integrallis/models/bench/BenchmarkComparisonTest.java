@@ -58,6 +58,19 @@ class BenchmarkComparisonTest {
   }
 
   @Test
+  void allowsOllamaToExcludeTerminalStopTokensFromItsOutputCount() {
+    BenchmarkReport models = report("rust-ffm", "sha", 16);
+    BenchmarkReport llamaCpp = report("llama.cpp", "sha", 20);
+    BenchmarkReport ollama = withOutputTokens(report("ollama", "sha", 18), 63);
+
+    ComparisonReport comparison = BenchmarkComparison.compare(List.of(models, llamaCpp, ollama));
+
+    BackendComparison ollamaComparison = comparison.backends().get(2);
+    assertThat(ollamaComparison.backend()).isEqualTo("ollama");
+    assertThat(ollamaComparison.outputMatchRateToLlamaCpp()).isEqualTo(1.0);
+  }
+
+  @Test
   void rejectsDifferentModelBytes() {
     assertThatThrownBy(
             () ->
@@ -98,18 +111,18 @@ class BenchmarkComparisonTest {
   @Test
   void compareCommandWritesJsonAndMarkdownEvidence() throws Exception {
     ObjectMapper mapper = new ObjectMapper();
-    Path pureJava = directory.resolve("pure-java.json");
+    Path models = directory.resolve("models.json");
     Path llamaCpp = directory.resolve("llama.cpp.json");
     Path json = directory.resolve("comparison.json");
     Path markdown = directory.resolve("comparison.md");
-    mapper.writeValue(pureJava.toFile(), report("pure-java", "sha", 10));
+    mapper.writeValue(models.toFile(), report("rust-ffm", "sha", 16));
     mapper.writeValue(llamaCpp.toFile(), report("llama.cpp", "sha", 20));
 
     InferenceBenchmarkCli.main(
         new String[] {
           "compare",
-          "--pure-java",
-          pureJava.toString(),
+          "--models",
+          models.toString(),
           "--llama-cpp",
           llamaCpp.toString(),
           "--json",
@@ -119,7 +132,7 @@ class BenchmarkComparisonTest {
         });
 
     assertThat(json).isRegularFile();
-    assertThat(Files.readString(markdown)).contains("| pure-java |");
+    assertThat(Files.readString(markdown)).contains("| rust-ffm |").contains("80.0%");
   }
 
   private static BenchmarkReport report(String backend, String sha, double decodeTokensPerSecond) {
@@ -168,6 +181,41 @@ class BenchmarkComparisonTest {
         SpeculativeGenerationOptions.disabled(),
         summary,
         PerformanceTier.RESPONSIVE,
+        trials);
+  }
+
+  private static BenchmarkReport withOutputTokens(BenchmarkReport report, int outputTokens) {
+    List<TrialMeasurement> trials =
+        report.trials().stream()
+            .map(
+                trial ->
+                    TrialMeasurement.success(
+                        trial.ttftMillis(),
+                        trial.totalMillis(),
+                        trial.prefillTokensPerSecond(),
+                        trial.inputTokens(),
+                        outputTokens,
+                        trial.peakRssBytes(),
+                        trial.cpuMillis(),
+                        trial.outputSha256()))
+            .toList();
+    PerformanceSummary summary =
+        BenchmarkStatistics.summarize(report.summary().loadMillis(), trials);
+    return new BenchmarkReport(
+        report.schemaVersion(),
+        report.createdAt(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        report.run(),
+        report.environment(),
+        report.backendDiagnostics(),
+        report.speculativeOptions(),
+        summary,
+        BenchmarkPolicy.classify(summary),
         trials);
   }
 }

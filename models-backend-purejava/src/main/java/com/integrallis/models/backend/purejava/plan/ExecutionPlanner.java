@@ -19,6 +19,7 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.util.ArrayList;
@@ -30,18 +31,29 @@ import java.util.Objects;
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v16";
+  public static final String PLAN_VERSION = "pure-java-v17";
 
   private ExecutionPlanner() {}
 
   public static PureJavaExecutionPlan plan(
       RuntimeFingerprint runtime, ModelTopology topology, PureJavaPlanConfiguration configuration) {
+    return plan(runtime, topology, configuration, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Selects a plan that can retain grouped operations supplied by an injected matrix kernel. */
+  public static PureJavaExecutionPlan plan(
+      RuntimeFingerprint runtime,
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      GgufBatchedMatrixKernel matrixKernel) {
     Objects.requireNonNull(runtime, "runtime");
     Objects.requireNonNull(topology, "topology");
     Objects.requireNonNull(configuration, "configuration");
+    Objects.requireNonNull(matrixKernel, "matrixKernel");
 
     List<OptimizationDecision> decisions = new ArrayList<>();
-    boolean grouped = groupedProjections(topology, configuration, decisions);
+    boolean grouped = groupedProjections(topology, configuration, matrixKernel, decisions);
+    boolean injectedGrouped = grouped && topology.hasInjectedGroupedProjection(matrixKernel);
     boolean mixedK = mixedKProjections(topology, configuration, grouped, decisions);
     GgufQ4Kernel q4Kernel = q4Kernel(runtime, topology, configuration, decisions);
     int prefillBatchSize = batchedPrefill(topology, configuration, decisions);
@@ -96,6 +108,7 @@ public final class ExecutionPlanner {
         runtime,
         topology,
         grouped,
+        injectedGrouped,
         mixedK,
         q4Kernel,
         prefillBatchSize,
@@ -576,10 +589,22 @@ public final class ExecutionPlanner {
   private static boolean groupedProjections(
       ModelTopology topology,
       PureJavaPlanConfiguration configuration,
+      GgufBatchedMatrixKernel matrixKernel,
       List<OptimizationDecision> decisions) {
+    boolean injected = topology.hasInjectedGroupedProjection(matrixKernel);
+    String implementation =
+        injected
+            ? matrixKernel.implementation()
+            : topology.hasGroupedProjection() ? "vector-api" : "none";
     Map<String, String> settings =
-        Map.of("qkv", topology.qkvMode(), "gate-up", topology.gateUpMode());
-    if (!topology.hasGroupedProjection()) {
+        Map.of(
+            "qkv",
+            topology.qkvMode(matrixKernel),
+            "gate-up",
+            topology.gateUpMode(matrixKernel),
+            "implementation",
+            implementation);
+    if (!topology.hasGroupedProjection(matrixKernel)) {
       decisions.add(
           new OptimizationDecision(
               "grouped-projections",

@@ -142,7 +142,8 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
               runtime,
               ModelTopology.from(modelFamily, config, weights),
               PureJavaPlanConfiguration.fromSystemProperties(
-                  recommendations(performanceSelection, batchedMatrixKernel)));
+                  recommendations(performanceSelection, batchedMatrixKernel)),
+              batchedMatrixKernel);
       KvCache cache =
           new KvCache(
               config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());

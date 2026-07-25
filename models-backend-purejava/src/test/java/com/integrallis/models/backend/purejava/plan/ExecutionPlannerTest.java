@@ -20,8 +20,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
+import java.lang.foreign.MemorySegment;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
@@ -38,7 +40,7 @@ class ExecutionPlannerTest {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
-    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v16");
+    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v17");
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
@@ -108,6 +110,61 @@ class ExecutionPlannerTest {
     assertThat(plan.diagnostics().optimization("final-layer-kv-only-prefill"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+  }
+
+  @Test
+  void plansQ5_0GroupingFromInjectedKernelCapabilities() {
+    GgufBatchedMatrixKernel kernel =
+        new GgufBatchedMatrixKernel() {
+          @Override
+          public boolean supports(GgufTensorType type) {
+            return type == GgufTensorType.Q5_0;
+          }
+
+          @Override
+          public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
+            return firstType == GgufTensorType.Q5_0 && secondType == GgufTensorType.Q5_0;
+          }
+
+          @Override
+          public boolean supportsTriple(
+              GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+            return firstType == GgufTensorType.Q5_0
+                && secondType == GgufTensorType.Q5_0
+                && thirdType == GgufTensorType.Q5_0;
+          }
+
+          @Override
+          public void multiply(
+              float[] output,
+              float[] input,
+              MemorySegment weights,
+              GgufTensorType type,
+              int batchSize,
+              int rows,
+              int cols) {
+            throw new AssertionError("planning must not execute the kernel");
+          }
+        };
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"),
+            uniformTopology(GgufTensorType.Q5_0),
+            PureJavaPlanConfiguration.defaults(),
+            kernel);
+
+    assertThat(plan.groupedProjections()).isTrue();
+    assertThat(plan.injectedGroupedProjections()).isTrue();
+    assertThat(plan.diagnostics().optimization("grouped-projections"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(decision.settings())
+                  .containsEntry("qkv", "grouped")
+                  .containsEntry("gate-up", "grouped")
+                  .containsEntry("implementation", "custom");
+            });
   }
 
   @Test
@@ -223,6 +280,7 @@ class ExecutionPlannerTest {
                     runtime,
                     topology,
                     valid.groupedProjections(),
+                    valid.injectedGroupedProjections(),
                     valid.mixedKProjections(),
                     GgufQ4Kernel.UNSIGNED_PAIRWISE,
                     valid.prefillBatchSize(),
@@ -1090,6 +1148,7 @@ class ExecutionPlannerTest {
                     unsupported,
                     true,
                     false,
+                    false,
                     GgufQ4Kernel.WIDENED,
                     32,
                     true,
@@ -1119,6 +1178,7 @@ class ExecutionPlannerTest {
                     runtime,
                     topology,
                     true,
+                    false,
                     false,
                     GgufQ4Kernel.WIDENED,
                     32,

@@ -26,6 +26,7 @@ public record PureJavaExecutionPlan(
     RuntimeFingerprint runtime,
     ModelTopology topology,
     boolean groupedProjections,
+    boolean injectedGroupedProjections,
     boolean mixedKProjections,
     GgufQ4Kernel q4Kernel,
     int prefillBatchSize,
@@ -48,7 +49,11 @@ public record PureJavaExecutionPlan(
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException("prefillBatchSize must be >= 1");
     }
-    if (groupedProjections && !topology.hasGroupedProjection()) {
+    if (injectedGroupedProjections && !groupedProjections) {
+      throw new IllegalArgumentException(
+          "injected grouped projections require grouped projection routing");
+    }
+    if (groupedProjections && !topology.hasGroupedProjection() && !injectedGroupedProjections) {
       throw new IllegalArgumentException(
           "grouped projections contradict the execution plan topology");
     }

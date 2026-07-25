@@ -3,11 +3,21 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 
+#[cfg(all(test, target_arch = "x86_64"))]
+use std::cell::Cell;
+
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+
+#[cfg(all(test, target_arch = "x86_64"))]
+std::thread_local! {
+    static Q5_0_HORIZONTAL_REDUCTIONS: Cell<usize> = const { Cell::new(0) };
+    static F16C_CONVERSIONS: Cell<usize> = const { Cell::new(0) };
+}
 
 const ABI_VERSION: u32 = 2;
 const CAPABILITY_Q4_0_F32_BATCHED_MATMUL: u64 = 1;
@@ -22,6 +32,8 @@ const CAPABILITY_Q6_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 8;
 const CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 9;
 const CAPABILITY_Q5_K_F32_BATCHED_MATMUL: u64 = 1 << 10;
 const CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 11;
+const CAPABILITY_Q5_0_F32_BATCHED_MATMUL: u64 = 1 << 12;
+const CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 13;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -33,17 +45,23 @@ const QK_0: usize = 32;
 const QK_K: usize = 256;
 const Q8_K_SUM_BLOCK: usize = 16;
 const Q4_0_BLOCK_BYTES: usize = 18;
+const Q5_0_BLOCK_BYTES: usize = 22;
 const Q8_0_BLOCK_BYTES: usize = 34;
 const Q4_K_BLOCK_BYTES: usize = 144;
 const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
+const WORKER_SPIN_ITERS: usize = 4_000;
+const COMPLETION_SPIN_ITERS: usize = 4_000;
 
 #[derive(Clone, Copy)]
 enum DotKernel {
     Q4,
     #[cfg(target_arch = "x86_64")]
     Q4Avx2,
+    Q5,
+    #[cfg(target_arch = "x86_64")]
+    Q5Avx2,
     Q8,
     #[cfg(target_arch = "x86_64")]
     Q8Avx2,
@@ -61,6 +79,7 @@ enum DotKernel {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum WeightFormat {
     Q4_0,
+    Q5_0,
     Q8_0,
     Q4K,
     Q5K,
@@ -81,6 +100,7 @@ impl WeightFormat {
             2 => Some(Self::Q4K),
             3 => Some(Self::Q6K),
             4 => Some(Self::Q5K),
+            5 => Some(Self::Q5_0),
             _ => None,
         }
     }
@@ -88,6 +108,7 @@ impl WeightFormat {
     fn block_bytes(self) -> usize {
         match self {
             Self::Q4_0 => Q4_0_BLOCK_BYTES,
+            Self::Q5_0 => Q5_0_BLOCK_BYTES,
             Self::Q8_0 => Q8_0_BLOCK_BYTES,
             Self::Q4K => Q4_K_BLOCK_BYTES,
             Self::Q5K => Q5_K_BLOCK_BYTES,
@@ -97,14 +118,14 @@ impl WeightFormat {
 
     fn block_elements(self) -> usize {
         match self {
-            Self::Q4_0 | Self::Q8_0 => QK_0,
+            Self::Q4_0 | Self::Q5_0 | Self::Q8_0 => QK_0,
             Self::Q4K | Self::Q5K | Self::Q6K => QK_K,
         }
     }
 
     fn activation_format(self) -> ActivationFormat {
         match self {
-            Self::Q4_0 | Self::Q8_0 => ActivationFormat::Q8_0,
+            Self::Q4_0 | Self::Q5_0 | Self::Q8_0 => ActivationFormat::Q8_0,
             Self::Q4K | Self::Q5K | Self::Q6K => ActivationFormat::Q8K,
         }
     }
@@ -112,6 +133,7 @@ impl WeightFormat {
     fn selected_kernel(self) -> DotKernel {
         match self {
             Self::Q4_0 => selected_q4_kernel(),
+            Self::Q5_0 => selected_q5_kernel(),
             Self::Q8_0 => selected_q8_kernel(),
             Self::Q4K => selected_q4_k_kernel(),
             Self::Q5K => selected_q5_k_kernel(),
@@ -147,47 +169,56 @@ struct WorkerPool {
     execution: Mutex<()>,
 }
 
+#[repr(align(128))]
+struct CachePadded<T>(T);
+
 struct WorkerShared {
+    generation: CachePadded<AtomicU64>,
+    remaining: CachePadded<AtomicUsize>,
     state: Mutex<WorkerState>,
     work_available: Condvar,
     work_complete: Condvar,
 }
 
 struct WorkerState {
-    generation: u64,
     shutdown: bool,
     job: Option<ParallelJob>,
-    remaining: usize,
     failed: bool,
 }
 
 #[derive(Clone, Copy)]
-struct ParallelJob {
+struct MatrixJob {
     weights: usize,
     weight_bytes: usize,
+    output: usize,
+    rows: usize,
+    kernel: DotKernel,
+}
+
+#[derive(Clone, Copy)]
+struct ParallelJob {
+    matrices: [Option<MatrixJob>; 3],
+    matrix_count: usize,
     quantized: usize,
     quantized_elements: usize,
     activation_scales: usize,
     scale_elements: usize,
     activation_sums: usize,
     sum_elements: usize,
-    output: usize,
     output_elements: usize,
     batch_size: usize,
-    rows: usize,
     cols: usize,
-    kernel: DotKernel,
 }
 
 impl WorkerPool {
     fn new(requested_threads: usize) -> Result<Self, ()> {
         let total_threads = requested_threads.max(1);
         let shared = Arc::new(WorkerShared {
+            generation: CachePadded(AtomicU64::new(0)),
+            remaining: CachePadded(AtomicUsize::new(0)),
             state: Mutex::new(WorkerState {
-                generation: 0,
                 shutdown: false,
                 job: None,
-                remaining: 0,
                 failed: false,
             }),
             work_available: Condvar::new(),
@@ -223,9 +254,12 @@ impl WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(job);
-            state.remaining = self.workers.len();
             state.failed = false;
-            state.generation = state.generation.wrapping_add(1);
+            self.shared
+                .remaining
+                .0
+                .store(self.workers.len(), Ordering::Relaxed);
+            self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
         }
 
@@ -235,8 +269,9 @@ impl WorkerPool {
         }))
         .is_ok();
 
+        let completed = poll_completion(&self.shared.remaining.0, COMPLETION_SPIN_ITERS);
         let mut state = lock(&self.shared.state);
-        while state.remaining != 0 {
+        while !completed && self.shared.remaining.0.load(Ordering::Acquire) != 0 {
             state = wait(&self.shared.work_complete, state);
         }
         caller_succeeded && !state.failed
@@ -248,7 +283,7 @@ impl Drop for WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.shutdown = true;
-            state.generation = state.generation.wrapping_add(1);
+            self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
         }
         for worker in self.workers.drain(..) {
@@ -261,14 +296,22 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
     let mut observed_generation = 0;
     loop {
         let job = {
+            let mut next_generation =
+                poll_generation(&shared.generation.0, observed_generation, WORKER_SPIN_ITERS);
             let mut state = lock(&shared.state);
-            while !state.shutdown && state.generation == observed_generation {
+            while !state.shutdown && next_generation.is_none() {
+                let published_generation = shared.generation.0.load(Ordering::Acquire);
+                if published_generation != observed_generation {
+                    next_generation = Some(published_generation);
+                    break;
+                }
                 state = wait(&shared.work_available, state);
             }
             if state.shutdown {
                 return;
             }
-            observed_generation = state.generation;
+            observed_generation =
+                next_generation.unwrap_or_else(|| shared.generation.0.load(Ordering::Acquire));
             state.job.expect("worker generation must provide a job")
         };
         let succeeded = catch_unwind(AssertUnwindSafe(|| {
@@ -276,43 +319,74 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
             unsafe { execute_job_partition(job, worker_index, total_threads) }
         }))
         .is_ok();
-        let mut state = lock(&shared.state);
-        state.failed |= !succeeded;
-        state.remaining -= 1;
-        if state.remaining == 0 {
+        if !succeeded {
+            lock(&shared.state).failed = true;
+        }
+        let previous_remaining = shared.remaining.0.fetch_sub(1, Ordering::AcqRel);
+        debug_assert!(previous_remaining > 0);
+        if previous_remaining == 1 {
+            let _state = lock(&shared.state);
             shared.work_complete.notify_one();
         }
     }
 }
 
-unsafe fn execute_job_partition(job: ParallelJob, worker_index: usize, total_threads: usize) {
-    let start_row = job.rows * worker_index / total_threads;
-    let end_row = job.rows * (worker_index + 1) / total_threads;
-    if start_row == end_row {
-        return;
+fn poll_generation(
+    generation: &AtomicU64,
+    observed_generation: u64,
+    iterations: usize,
+) -> Option<u64> {
+    for _ in 0..iterations {
+        let published_generation = generation.load(Ordering::Acquire);
+        if published_generation != observed_generation {
+            return Some(published_generation);
+        }
+        std::hint::spin_loop();
     }
-    // SAFETY: KernelContext::execute is synchronous and partitions output by matrix row.
-    let weights = unsafe { slice::from_raw_parts(job.weights as *const u8, job.weight_bytes) };
+    None
+}
+
+fn poll_completion(remaining: &AtomicUsize, iterations: usize) -> bool {
+    for _ in 0..iterations {
+        if remaining.load(Ordering::Acquire) == 0 {
+            return true;
+        }
+        std::hint::spin_loop();
+    }
+    false
+}
+
+unsafe fn execute_job_partition(job: ParallelJob, worker_index: usize, total_threads: usize) {
     let quantized =
         unsafe { slice::from_raw_parts(job.quantized as *const i8, job.quantized_elements) };
     let activation_scales =
         unsafe { slice::from_raw_parts(job.activation_scales as *const f32, job.scale_elements) };
     let activation_sums =
         unsafe { slice::from_raw_parts(job.activation_sums as *const i16, job.sum_elements) };
-    unsafe {
-        compute_batched_row_range(
-            weights,
-            quantized,
-            activation_scales,
-            activation_sums,
-            job.output as *mut f32,
-            job.batch_size,
-            job.rows,
-            job.cols,
-            start_row,
-            end_row,
-            job.kernel,
-        );
+    for matrix in job.matrices[..job.matrix_count].iter().flatten() {
+        let start_row = matrix.rows * worker_index / total_threads;
+        let end_row = matrix.rows * (worker_index + 1) / total_threads;
+        if start_row == end_row {
+            continue;
+        }
+        // SAFETY: KernelContext::execute is synchronous and partitions every output matrix by row.
+        let weights =
+            unsafe { slice::from_raw_parts(matrix.weights as *const u8, matrix.weight_bytes) };
+        unsafe {
+            compute_batched_row_range(
+                weights,
+                quantized,
+                activation_scales,
+                activation_sums,
+                matrix.output as *mut f32,
+                job.batch_size,
+                matrix.rows,
+                job.cols,
+                start_row,
+                end_row,
+                matrix.kernel,
+            );
+        }
     }
 }
 
@@ -347,6 +421,8 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
+        | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
+        | CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL
 }
 
 #[unsafe(no_mangle)]
@@ -1110,6 +1186,40 @@ fn compute_grouped_with_scratch(
         &mut scratch.sums,
     );
 
+    if let Some(context) = context {
+        let mut matrices = [None; 3];
+        let mut output_offset = 0;
+        for matrix in 0..formats.len() {
+            let format = formats[matrix];
+            let matrix_rows = rows[matrix] as usize;
+            let blocks_per_row = cols / format.block_elements();
+            let required_weight_bytes = matrix_rows * blocks_per_row * format.block_bytes();
+            let matrix_output_elements = batch_size * matrix_rows;
+            matrices[matrix] = Some(MatrixJob {
+                weights: weight_pointers[matrix] as usize,
+                weight_bytes: required_weight_bytes,
+                // SAFETY: output_offset was validated from the sum of every matrix output above.
+                output: unsafe { output.as_mut_ptr().add(output_offset) } as usize,
+                rows: matrix_rows,
+                kernel: format.selected_kernel(),
+            });
+            output_offset += matrix_output_elements;
+        }
+        return context.workers.execute(ParallelJob {
+            matrices,
+            matrix_count: formats.len(),
+            quantized: scratch.quantized.as_ptr() as usize,
+            quantized_elements: scratch.quantized.len(),
+            activation_scales: scratch.scales.as_ptr() as usize,
+            scale_elements: scratch.scales.len(),
+            activation_sums: scratch.sums.as_ptr() as usize,
+            sum_elements: scratch.sums.len(),
+            output_elements: output.len(),
+            batch_size,
+            cols,
+        });
+    }
+
     let mut output_offset = 0;
     for matrix in 0..formats.len() {
         let format = formats[matrix];
@@ -1121,7 +1231,7 @@ fn compute_grouped_with_scratch(
         let weights =
             unsafe { slice::from_raw_parts(weight_pointers[matrix], required_weight_bytes) };
         if !compute_outputs(
-            context,
+            None,
             weights,
             &scratch.quantized,
             &scratch.scales,
@@ -1154,20 +1264,27 @@ fn compute_outputs(
 ) -> bool {
     if let Some(context) = context {
         return context.workers.execute(ParallelJob {
-            weights: weights.as_ptr() as usize,
-            weight_bytes: weights.len(),
+            matrices: [
+                Some(MatrixJob {
+                    weights: weights.as_ptr() as usize,
+                    weight_bytes: weights.len(),
+                    output: output.as_mut_ptr() as usize,
+                    rows,
+                    kernel,
+                }),
+                None,
+                None,
+            ],
+            matrix_count: 1,
             quantized: quantized.as_ptr() as usize,
             quantized_elements: quantized.len(),
             activation_scales: activation_scales.as_ptr() as usize,
             scale_elements: activation_scales.len(),
             activation_sums: activation_sums.as_ptr() as usize,
             sum_elements: activation_sums.len(),
-            output: output.as_mut_ptr() as usize,
             output_elements: output.len(),
             batch_size,
-            rows,
             cols,
-            kernel,
         });
     }
 
@@ -1247,6 +1364,39 @@ unsafe fn compute_batched_row_range(
             // SAFETY: runtime dispatch selected this variant only when AVX2 and FMA are available.
             unsafe {
                 compute_q4_batched_row_range_avx2(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        DotKernel::Q5 => {
+            // SAFETY: the caller assigns this worker an exclusive matrix-row range.
+            unsafe {
+                compute_q5_batched_row_range_scalar(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
+        DotKernel::Q5Avx2 => {
+            // SAFETY: runtime dispatch selected this variant only when AVX2 and FMA are available.
+            unsafe {
+                compute_q5_batched_row_range_avx2(
                     weights,
                     quantized,
                     activation_scales,
@@ -1489,6 +1639,122 @@ unsafe fn compute_q4_batched_row_range_avx2(
 }
 
 #[allow(clippy::too_many_arguments)]
+unsafe fn compute_q5_batched_row_range_scalar(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    let blocks_per_row = cols / QK_0;
+    let mut sums = vec![0_f32; batch_size];
+    for row in start_row..end_row {
+        sums.fill(0.0);
+        for block in 0..blocks_per_row {
+            let weight_offset = (row * blocks_per_row + block) * Q5_0_BLOCK_BYTES;
+            let weight_scale = f16_to_f32(u16::from_le_bytes([
+                weights[weight_offset],
+                weights[weight_offset + 1],
+            ]));
+            let high_bits = u32::from_le_bytes([
+                weights[weight_offset + 2],
+                weights[weight_offset + 3],
+                weights[weight_offset + 4],
+                weights[weight_offset + 5],
+            ]);
+            for batch in 0..batch_size {
+                let input_offset = batch * cols + block * QK_0;
+                let integer_sum = q5_0_q8_0_block_sum_scalar(
+                    high_bits,
+                    &weights[weight_offset + 6..],
+                    &quantized[input_offset..],
+                );
+                let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+                sums[batch] = scale.mul_add(integer_sum as f32, sums[batch]);
+            }
+        }
+        for (batch, &sum) in sums.iter().enumerate() {
+            // SAFETY: each worker owns this row across all batch-major output planes.
+            unsafe {
+                output.add(batch * rows + row).write(sum);
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q5_batched_row_range_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    if batch_size == 1 {
+        for row in start_row..end_row {
+            // SAFETY: AVX2, FMA, and F16C are enabled and all buffers were validated.
+            let sum = unsafe {
+                dot_q5_0_q8_0_row_avx2(weights, quantized, activation_scales, 0, row, cols)
+            };
+            // SAFETY: each worker owns this output row.
+            unsafe {
+                output.add(row).write(sum);
+            }
+        }
+        return;
+    }
+
+    let blocks_per_row = cols / QK_0;
+    let mut sums = vec![0_f32; batch_size];
+    for row in start_row..end_row {
+        sums.fill(0.0);
+        for block in 0..blocks_per_row {
+            let weight_offset = (row * blocks_per_row + block) * Q5_0_BLOCK_BYTES;
+            // SAFETY: every validated Q5_0 block contains a four-byte high-bit plane followed by
+            // 16 packed low-nibble bytes.
+            let signed_weights = unsafe {
+                unpack_q5_0_avx2(
+                    weights.as_ptr().add(weight_offset + 2),
+                    weights.as_ptr().add(weight_offset + 6),
+                )
+            };
+            let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
+                weights[weight_offset],
+                weights[weight_offset + 1],
+            ]));
+            for batch in 0..batch_size {
+                let input_offset = batch * cols + block * QK_0;
+                // SAFETY: every validated Q8_0 activation block contains 32 bytes.
+                let integer_sum = unsafe {
+                    q4_0_q8_0_signed_block_sum_avx2(
+                        signed_weights,
+                        quantized.as_ptr().add(input_offset),
+                    )
+                };
+                let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+                sums[batch] = scale.mul_add(integer_sum as f32, sums[batch]);
+            }
+        }
+        for (batch, &sum) in sums.iter().enumerate() {
+            // SAFETY: each worker owns this row across all batch-major output planes.
+            unsafe {
+                output.add(batch * rows + row).write(sum);
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 unsafe fn compute_q8_batched_row_range_scalar(
     weights: &[u8],
     quantized: &[i8],
@@ -1665,7 +1931,7 @@ unsafe fn compute_q6_k_batched_row_range_scalar(
 
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q4_k_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -1702,7 +1968,7 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
 
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q5_k_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -1739,7 +2005,7 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
 
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q6_k_batched_row_range_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -1790,6 +2056,16 @@ fn compute_output_range(
                 // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
                 unsafe {
                     dot_q4_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
+                }
+            }
+            DotKernel::Q5 => {
+                dot_q5_0_q8_0_row_scalar(weights, quantized, activation_scales, batch, row, cols)
+            }
+            #[cfg(target_arch = "x86_64")]
+            DotKernel::Q5Avx2 => {
+                // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
+                unsafe {
+                    dot_q5_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
             }
             DotKernel::Q8 => {
@@ -1880,9 +2156,23 @@ fn selected_q8_kernel() -> DotKernel {
     DotKernel::Q8
 }
 
+fn selected_q5_kernel() -> DotKernel {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
+        return DotKernel::Q5Avx2;
+    }
+    DotKernel::Q5
+}
+
 fn selected_q4_k_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
         return DotKernel::Q4KAvx2;
     }
     DotKernel::Q4K
@@ -1890,7 +2180,10 @@ fn selected_q4_k_kernel() -> DotKernel {
 
 fn selected_q5_k_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
         return DotKernel::Q5KAvx2;
     }
     DotKernel::Q5K
@@ -1898,7 +2191,10 @@ fn selected_q5_k_kernel() -> DotKernel {
 
 fn selected_q6_k_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
-    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
         return DotKernel::Q6KAvx2;
     }
     DotKernel::Q6K
@@ -1999,14 +2295,146 @@ unsafe fn unpack_q4_0_avx2(packed_weights: *const u8) -> __m256i {
 #[target_feature(enable = "avx2")]
 unsafe fn q4_0_q8_0_signed_block_sum_avx2(signed_weights: __m256i, quantized: *const i8) -> i32 {
     // SAFETY: callers provide one complete Q8_0 block.
+    let pair_sums = unsafe { q4_0_q8_0_signed_pair_sums_avx2(signed_weights, quantized) };
+    horizontal_sum_i32_avx2(pair_sums)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn q4_0_q8_0_signed_pair_sums_avx2(
+    signed_weights: __m256i,
+    quantized: *const i8,
+) -> __m256i {
+    // SAFETY: callers provide one complete Q8_0 block.
     let activations = unsafe { _mm256_loadu_si256(quantized.cast()) };
     let absolute_weights = _mm256_sign_epi8(signed_weights, signed_weights);
     let signed_activations = _mm256_sign_epi8(activations, signed_weights);
     let pair_products = _mm256_maddubs_epi16(absolute_weights, signed_activations);
-    let pair_sums = _mm256_madd_epi16(pair_products, _mm256_set1_epi16(1));
-    let mut lanes = [0_i32; 8];
-    unsafe { _mm256_storeu_si256(lanes.as_mut_ptr().cast(), pair_sums) };
-    lanes.into_iter().sum()
+    _mm256_madd_epi16(pair_products, _mm256_set1_epi16(1))
+}
+
+fn dot_q5_0_q8_0_row_scalar(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK_0;
+    let mut sum = 0_f32;
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q5_0_BLOCK_BYTES;
+        let input_offset = batch * cols + block * QK_0;
+        let high_bits = u32::from_le_bytes([
+            weights[weight_offset + 2],
+            weights[weight_offset + 3],
+            weights[weight_offset + 4],
+            weights[weight_offset + 5],
+        ]);
+        let integer_sum = q5_0_q8_0_block_sum_scalar(
+            high_bits,
+            &weights[weight_offset + 6..],
+            &quantized[input_offset..],
+        );
+        let weight_scale = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ]));
+        let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+        sum = scale.mul_add(integer_sum as f32, sum);
+    }
+    sum
+}
+
+#[inline(always)]
+fn q5_0_q8_0_block_sum_scalar(high_bits: u32, packed_weights: &[u8], quantized: &[i8]) -> i32 {
+    let mut integer_sum = 0_i32;
+    for lane in 0..16 {
+        let packed = packed_weights[lane];
+        let low = ((packed & 0x0f) | (((high_bits >> lane) as u8 & 1) << 4)) as i32 - 16;
+        let high = ((packed >> 4) | (((high_bits >> (lane + 16)) as u8 & 1) << 4)) as i32 - 16;
+        integer_sum += low * quantized[lane] as i32;
+        integer_sum += high * quantized[lane + 16] as i32;
+    }
+    integer_sum
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn dot_q5_0_q8_0_row_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK_0;
+    let mut sums = _mm256_setzero_ps();
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q5_0_BLOCK_BYTES;
+        let input_offset = batch * cols + block * QK_0;
+        // SAFETY: each validated Q5_0 block provides its four-byte high-bit plane and 16 packed
+        // low-nibble bytes, and each Q8 activation block provides 32 bytes.
+        let signed_weights = unsafe {
+            unpack_q5_0_avx2(
+                weights.as_ptr().add(weight_offset + 2),
+                weights.as_ptr().add(weight_offset + 6),
+            )
+        };
+        let pair_sums = unsafe {
+            q4_0_q8_0_signed_pair_sums_avx2(signed_weights, quantized.as_ptr().add(input_offset))
+        };
+        let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ]));
+        let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
+        sums = _mm256_fmadd_ps(_mm256_set1_ps(scale), _mm256_cvtepi32_ps(pair_sums), sums);
+    }
+    #[cfg(test)]
+    Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
+    horizontal_sum_f32_avx2(sums)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "f16c")]
+fn f16_to_f32_f16c(value: u16) -> f32 {
+    #[cfg(test)]
+    F16C_CONVERSIONS.with(|count| count.set(count.get() + 1));
+    _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(value as i32)))
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn unpack_q5_0_avx2(high_bits: *const u8, packed_weights: *const u8) -> __m256i {
+    // SAFETY: callers provide the 16 packed bytes and four-byte bit plane from one Q5_0 block.
+    let packed = unsafe { _mm_loadu_si128(packed_weights.cast()) };
+    let nibbles = _mm256_and_si256(
+        _mm256_inserti128_si256(_mm256_castsi128_si256(packed), _mm_srli_epi16(packed, 4), 1),
+        _mm256_set1_epi8(0x0f),
+    );
+    let bit_plane = u32::from_le(unsafe { high_bits.cast::<u32>().read_unaligned() });
+    let shuffled_bits = _mm256_shuffle_epi8(
+        _mm256_set1_epi32(bit_plane as i32),
+        _mm256_set_epi64x(
+            0x0303_0303_0303_0303,
+            0x0202_0202_0202_0202,
+            0x0101_0101_0101_0101,
+            0,
+        ),
+    );
+    let clear_high_nibble = _mm256_cmpeq_epi8(
+        _mm256_set1_epi64x(-1),
+        _mm256_or_si256(
+            _mm256_set1_epi64x(0x7fbf_dfef_f7fb_fdfe_u64 as i64),
+            shuffled_bits,
+        ),
+    );
+    let signed_high_nibble =
+        _mm256_andnot_si256(clear_high_nibble, _mm256_set1_epi8(0xf0_u8 as i8));
+    _mm256_or_si256(nibbles, signed_high_nibble)
 }
 
 fn dot_q8_0_q8_0_row_scalar(
@@ -2257,7 +2685,7 @@ fn dot_q6_k_q8_k_row_scalar(
 }
 
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn dot_q4_k_q8_k_row_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2275,11 +2703,11 @@ unsafe fn dot_q4_k_q8_k_row_avx2(
         let activation_offset = batch * cols + block * QK_K;
         let scale_offset = batch * blocks_per_row + block;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-        let d = f16_to_f32(u16::from_le_bytes([
+        let d = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset],
             weights[weight_offset + 1],
         ])) * activation_scales[scale_offset];
-        let d_min = f16_to_f32(u16::from_le_bytes([
+        let d_min = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset + 2],
             weights[weight_offset + 3],
         ])) * activation_scales[scale_offset];
@@ -2315,7 +2743,7 @@ unsafe fn dot_q4_k_q8_k_row_avx2(
 }
 
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn dot_q5_k_q8_k_row_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2334,11 +2762,11 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
         let activation_offset = batch * cols + block * QK_K;
         let scale_offset = batch * blocks_per_row + block;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-        let d = f16_to_f32(u16::from_le_bytes([
+        let d = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset],
             weights[weight_offset + 1],
         ])) * activation_scales[scale_offset];
-        let d_min = f16_to_f32(u16::from_le_bytes([
+        let d_min = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset + 2],
             weights[weight_offset + 3],
         ])) * activation_scales[scale_offset];
@@ -2407,7 +2835,7 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
 }
 
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn dot_q6_k_q8_k_row_avx2(
     weights: &[u8],
     quantized: &[i8],
@@ -2424,7 +2852,7 @@ unsafe fn dot_q6_k_q8_k_row_avx2(
     for block in 0..blocks_per_row {
         let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
         let activation_offset = batch * cols + block * QK_K;
-        let d = f16_to_f32(u16::from_le_bytes([
+        let d = f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset + 208],
             weights[weight_offset + 209],
         ])) * activation_scales[batch * blocks_per_row + block];
@@ -2530,6 +2958,16 @@ fn horizontal_sum_i32_avx2(values: __m256i) -> i32 {
     // SAFETY: lanes provides one complete 256-bit destination.
     unsafe { _mm256_storeu_si256(lanes.as_mut_ptr().cast(), values) };
     lanes.into_iter().sum()
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+fn horizontal_sum_f32_avx2(values: __m256) -> f32 {
+    let mut sum = _mm256_extractf128_ps(values, 1);
+    sum = _mm_add_ps(sum, _mm256_castps256_ps128(values));
+    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
+    sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
+    _mm_cvtss_f32(sum)
 }
 
 #[inline(always)]
@@ -2841,6 +3279,8 @@ mod tests {
                 | CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
                 | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
+                | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
+                | CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL
         );
     }
 
@@ -2853,6 +3293,23 @@ mod tests {
             unsafe { jmodels_kernels_context_destroy(context) },
             STATUS_OK
         );
+    }
+
+    #[test]
+    fn worker_poll_observes_a_published_generation_without_parking() {
+        let generation = std::sync::atomic::AtomicU64::new(7);
+
+        assert_eq!(poll_generation(&generation, 6, 1), Some(7));
+        assert_eq!(poll_generation(&generation, 7, 1), None);
+    }
+
+    #[test]
+    fn completion_poll_observes_finished_workers_without_parking() {
+        let remaining = std::sync::atomic::AtomicUsize::new(1);
+
+        assert!(!poll_completion(&remaining, 1));
+        remaining.store(0, Ordering::Release);
+        assert!(poll_completion(&remaining, 1));
     }
 
     #[test]
@@ -2915,12 +3372,132 @@ mod tests {
         );
     }
 
+    #[test]
+    fn grouped_projection_uses_one_worker_generation() {
+        let context = jmodels_kernels_context_create(2);
+        assert!(!context.is_null());
+        let weights: [Vec<u8>; 3] = std::array::from_fn(|_| vec![0_u8; 64 * Q5_0_BLOCK_BYTES]);
+        let weight_pointers = [
+            weights[0].as_ptr(),
+            weights[1].as_ptr(),
+            weights[2].as_ptr(),
+        ];
+        let weight_bytes = [(64 * Q5_0_BLOCK_BYTES) as u64; 3];
+        let formats = [5_u32; 3];
+        let rows = [64_u32; 3];
+        let input = [0.25_f32; QK_0];
+        let mut output = [0_f32; 64 * 3];
+        // SAFETY: the test owns the live context until the final destroy call.
+        let context_ref = unsafe { &*context };
+        let before = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
+
+        // SAFETY: the context and every test buffer remain live and non-aliasing for the call.
+        assert_eq!(
+            unsafe {
+                jmodels_quantized_f32_grouped_batched_matmul_with_context(
+                    context,
+                    formats.as_ptr(),
+                    weight_pointers.as_ptr(),
+                    weight_bytes.as_ptr(),
+                    rows.as_ptr(),
+                    3,
+                    input.as_ptr(),
+                    input.len() as u64,
+                    output.as_mut_ptr(),
+                    output.len() as u64,
+                    1,
+                    QK_0 as u32,
+                )
+            },
+            STATUS_OK
+        );
+        // SAFETY: the call completed synchronously and the context remains live.
+        let after = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
+
+        assert_eq!(after.wrapping_sub(before), 1);
+        // SAFETY: the test consumes the unique context pointer exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
+    }
+
+    #[test]
+    fn persistent_workers_complete_repeated_generations() {
+        const GENERATIONS: u64 = 256;
+
+        let context = jmodels_kernels_context_create(4);
+        assert!(!context.is_null());
+        let weights = vec![0_u8; 64 * Q5_0_BLOCK_BYTES];
+        let input = [0.25_f32; QK_0];
+        let mut output = [0_f32; 64];
+        // SAFETY: the test owns the live context until the final destroy call.
+        let context_ref = unsafe { &*context };
+        let before = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
+
+        for _ in 0..GENERATIONS {
+            output.fill(f32::NAN);
+            // SAFETY: the context and every test buffer remain live and non-aliasing for the call.
+            assert_eq!(
+                unsafe {
+                    jmodels_quantized_f32_batched_matmul_with_context(
+                        context,
+                        5,
+                        weights.as_ptr(),
+                        weights.len() as u64,
+                        input.as_ptr(),
+                        input.len() as u64,
+                        output.as_mut_ptr(),
+                        output.len() as u64,
+                        1,
+                        64,
+                        QK_0 as u32,
+                    )
+                },
+                STATUS_OK
+            );
+            assert!(output.iter().all(|value| *value == 0.0));
+        }
+
+        let after = context_ref
+            .workers
+            .shared
+            .generation
+            .0
+            .load(Ordering::Acquire);
+        assert_eq!(after.wrapping_sub(before), GENERATIONS);
+        // SAFETY: the test consumes the unique context pointer exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
+    }
+
     #[cfg(target_arch = "x86_64")]
     #[test]
     fn avx2_k_quantized_rows_match_scalar_kernels() {
-        if !std::arch::is_x86_feature_detected!("avx2") {
+        if !std::arch::is_x86_feature_detected!("avx2")
+            || !std::arch::is_x86_feature_detected!("fma")
+            || !std::arch::is_x86_feature_detected!("f16c")
+        {
             return;
         }
+        F16C_CONVERSIONS.with(|count| count.set(0));
         let mut quantized = [0_i8; QK_K];
         let mut activation_sums = [0_i16; QK_K / Q8_K_SUM_BLOCK];
         for (index, quant) in quantized.iter_mut().enumerate() {
@@ -3004,6 +3581,81 @@ mod tests {
             dot_q6_k_q8_k_row_avx2(&q6_weights, &quantized, &activation_scales, 0, 0, QK_K)
         };
         assert!((q6_avx2 - q6_scalar).abs() <= 1e-4);
+        F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), 5));
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn avx2_q5_0_bit_plane_matches_scalar_kernel() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+        let mut weights = [0_u8; Q5_0_BLOCK_BYTES];
+        let high_bits = 0xa5c3_5a7f_u32;
+        weights[2..6].copy_from_slice(&high_bits.to_le_bytes());
+        for (index, packed) in weights[6..].iter_mut().enumerate() {
+            *packed = (index * 37 + 11) as u8;
+        }
+        let mut quantized = [0_i8; QK_0];
+        for (index, quant) in quantized.iter_mut().enumerate() {
+            *quant = (((index * 17 + 5) % 255) as i32 - 127) as i8;
+        }
+
+        let scalar = q5_0_q8_0_block_sum_scalar(high_bits, &weights[6..], &quantized);
+        // SAFETY: AVX2 was detected and the arrays contain complete Q5_0 and Q8_0 blocks.
+        let avx2 = unsafe {
+            q4_0_q8_0_signed_block_sum_avx2(
+                unpack_q5_0_avx2(weights.as_ptr().add(2), weights.as_ptr().add(6)),
+                quantized.as_ptr(),
+            )
+        };
+
+        assert_eq!(avx2, scalar);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn avx2_q5_0_row_reduces_simd_lanes_once() {
+        if !std::arch::is_x86_feature_detected!("avx2")
+            || !std::arch::is_x86_feature_detected!("fma")
+            || !std::arch::is_x86_feature_detected!("f16c")
+        {
+            return;
+        }
+        const BLOCKS: usize = 8;
+        let cols = BLOCKS * QK_0;
+        let mut weights = vec![0_u8; BLOCKS * Q5_0_BLOCK_BYTES];
+        for block in 0..BLOCKS {
+            let offset = block * Q5_0_BLOCK_BYTES;
+            weights[offset..offset + 2]
+                .copy_from_slice(&f32_to_f16(0.015625 * (block + 1) as f32).to_le_bytes());
+            weights[offset + 2..offset + 6]
+                .copy_from_slice(&(0xa5c3_5a7f_u32.rotate_left(block as u32)).to_le_bytes());
+            for (index, packed) in weights[offset + 6..offset + Q5_0_BLOCK_BYTES]
+                .iter_mut()
+                .enumerate()
+            {
+                *packed = (index * 37 + block * 11 + 5) as u8;
+            }
+        }
+        let mut quantized = vec![0_i8; cols];
+        for (index, quant) in quantized.iter_mut().enumerate() {
+            *quant = (((index * 17 + 5) % 255) as i32 - 127) as i8;
+        }
+        let activation_scales: Vec<f32> = (0..BLOCKS)
+            .map(|block| 0.0078125 * (block + 1) as f32)
+            .collect();
+
+        let scalar = dot_q5_0_q8_0_row_scalar(&weights, &quantized, &activation_scales, 0, 0, cols);
+        Q5_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(0));
+        F16C_CONVERSIONS.with(|count| count.set(0));
+        // SAFETY: AVX2 was detected and each buffer contains eight complete validated blocks.
+        let avx2 =
+            unsafe { dot_q5_0_q8_0_row_avx2(&weights, &quantized, &activation_scales, 0, 0, cols) };
+
+        assert!((avx2 - scalar).abs() <= 1e-3);
+        Q5_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 1));
+        F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), BLOCKS));
     }
 
     #[test]
