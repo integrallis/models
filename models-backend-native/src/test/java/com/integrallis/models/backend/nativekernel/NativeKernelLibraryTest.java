@@ -111,7 +111,7 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v3");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v4");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
@@ -198,6 +198,30 @@ class NativeKernelLibraryTest {
       kernel.multiply(actual, input, weights, GgufTensorType.Q5_0, batchSize, rows, cols);
 
       assertThat(actual).containsExactly(expected);
+    }
+  }
+
+  @Test
+  void reusableGgufKernelComputesQ5_0SingleTokenProjectionWithinQuantizedTolerance() {
+    int batchSize = 1;
+    int rows = 5;
+    int cols = 256;
+    float[] input = inputs(batchSize, cols);
+    float[] expected = new float[rows];
+    float[] actual = new float[rows];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel =
+            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+      MemorySegment weights = arena.allocate(rows * cols / 32L * 22L);
+      fillQ5_0Weights(weights, rows, cols);
+      referenceQ5_0F32BatchedMatmul(weights, input, batchSize, rows, cols, expected);
+
+      kernel.multiply(actual, input, weights, GgufTensorType.Q5_0, batchSize, rows, cols);
+
+      for (int index = 0; index < rows; index++) {
+        assertThat(actual[index]).as("output[%s]", index).isCloseTo(expected[index], within(1e-3f));
+      }
     }
   }
 
