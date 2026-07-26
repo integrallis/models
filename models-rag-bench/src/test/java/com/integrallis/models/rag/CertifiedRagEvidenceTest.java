@@ -75,6 +75,9 @@ class CertifiedRagEvidenceTest {
   private static final Path QWEN2_5_MATH_1_5B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260726/rag/" + "qwen2.5-math-1.5b-q4_k_m");
+  private static final Path LLAMA_3_2_3B_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260726/rag/" + "llama-3.2-3b-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -1131,6 +1134,118 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.runs())
         .extracting(RagRun::rawEvaluation)
         .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::rawEvaluation).toList());
+  }
+
+  @Test
+  void llama32ThreeBillionQualifiesGeneralRag() throws Exception {
+    RagBenchmarkReport baseline = report(LLAMA_3_2_3B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport rejected =
+        report(LLAMA_3_2_3B_Q4_K_M_EVIDENCE, "models-rust-ffm-rejected-attention.json");
+    RagBenchmarkReport candidate =
+        report(LLAMA_3_2_3B_Q4_K_M_EVIDENCE, "models-rust-ffm-marker.json");
+    RagBenchmarkReport ollama = report(LLAMA_3_2_3B_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(LLAMA_3_2_3B_Q4_K_M_EVIDENCE, "llama.cpp.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.modelId()).isEqualTo("llama-3.2-3b-q4_k_m");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff");
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.GENERAL.id());
+    assertThat(candidate.settings().promptTemplate()).isEqualTo("llama3");
+    assertThat(candidate.settings().groundingPolicy())
+        .isEqualTo(
+            "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v13");
+    assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v10");
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("kernel-implementation", "rust-ffm-quantized-v10");
+    assertThat(candidate.backendDiagnostics().optimizations())
+        .filteredOn(optimization -> optimization.id().startsWith("modeljars.profile."))
+        .singleElement()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings())
+                  .containsEntry("profile-id", "llama_3_2_3b_q4_k_m_epyc_milan_jdk25_rust_ffm")
+                  .containsEntry("selector-mismatches", "")
+                  .containsEntry("missing-jvm-arguments", "");
+            });
+    assertThat(candidate.backendDiagnostics().optimization("rust-q4-k-batched-matmul"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.backendDiagnostics().optimization("rust-quantized-decode"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.backendDiagnostics().optimization("batched-attention-scores"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.DISABLED));
+    assertThat(candidate.backendDiagnostics().optimization("batched-attention-values"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.DISABLED));
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(18);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(2.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.89, 0.90);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.15, 1.16);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.67, 0.68);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.98, 0.99);
+            });
+    assertThat(candidate.summary().ttftMillis().p95())
+        .isLessThan(rejected.summary().ttftMillis().p95());
+    assertThat(baseline.summary().endToEndMillis().p95())
+        .isLessThan(rejected.summary().endToEndMillis().p95());
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(rejected.summary().endToEndMillis().p95() * 1.01);
+    assertThat(candidate.summary().p50PrefillTokensPerSecond())
+        .isGreaterThan(rejected.summary().p50PrefillTokensPerSecond());
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isLessThan(rejected.summary().p50DecodeTokensPerSecond());
+    assertThat(candidate.summary().totalCpuMillis())
+        .isLessThan(rejected.summary().totalCpuMillis());
+    assertThat(candidate.runs())
+        .extracting(RagRun::promptSha256)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::promptSha256).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.generation().text())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.generation().text()).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::grounding)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::grounding).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::evaluation).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::rawEvaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::rawEvaluation).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.generation().text())
+        .containsExactlyElementsOf(
+            rejected.runs().stream().map(run -> run.generation().text()).toList());
   }
 
   @Test

@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 ## Result
 
-Seventeen exact artifacts representing fifteen distinct model identities now
+Eighteen exact artifacts representing sixteen distinct model identities now
 clear the current absolute RAG SLOs, minimum model contribution, and same-host
 Ollama comparison:
 
@@ -43,6 +43,9 @@ Ollama comparison:
   of Ollama and 67.6% of llama.cpp decode throughput.
 - **Llama 3.2 1B Q4_K_M** is `USABLE` for general guarded RAG and reaches
   111.4% of Ollama and 67.9% of llama.cpp decode throughput.
+- **Llama 3.2 3B Q4_K_M** is `USABLE` for general guarded RAG. Its
+  marker-selected Rust/FFM profile reaches 89.3% of Ollama and 67.2% of
+  llama.cpp decode throughput, with 18 of 18 retained model answers correct.
 - **Gemma 3 1B Q4_K_M** is `PRODUCTION_READY` for general guarded RAG. Its
   marker-selected native decode reaches 137.3% of Ollama and 84.0% of
   llama.cpp, with 27 of 27 grounded answers correct.
@@ -66,7 +69,7 @@ controls, and same-host comparator evidence. Exact reports are under
 
 Quantization variants are retained as independently qualified artifacts but do
 not increase the distinct-model launch count. The current launch count is
-therefore fifteen, not seventeen.
+therefore sixteen, not eighteen.
 
 The older Qwen3 framework and hosted-provider tables below remain useful
 historical diagnostics, but they predate cross-request KV reuse and the current
@@ -366,6 +369,7 @@ end-of-generation metadata correctly and stop before exposing control tokens.
 | Qwen2.5-Coder 0.5B Q4_0 | Current coding guarded-RAG suite | Profiled Rust/FFM reaches 39.50 tok/s, 80.7% of Ollama and 35.1% of llama.cpp, at 1.22x Ollama p95 end-to-end latency | `PRODUCTION_READY`; 12 of 27 accepted answers retain model text and all 12 are correct. Pure Java remains a nonqualifying control. |
 | Qwen2.5-Coder 1.5B Q4_0 | Current coding guarded-RAG suite | Profiled Rust/FFM reaches 23.72 tok/s, 80.2% of Ollama and 48.9% of llama.cpp, at 1.39x Ollama p95 end-to-end latency | `USABLE`; 15 of 27 accepted answers retain model text and all 15 are correct. |
 | Qwen2.5-Coder 1.5B Q8_0 | Current coding guarded-RAG suite | Rust/FFM reaches 19.70 tok/s, 89.9% of Ollama and 69.4% of llama.cpp, at 1.29x Ollama p95 end-to-end latency | `USABLE`; 15 of 27 accepted answers retain model text and all 15 are correct. Pure Java narrowly misses the relative end-to-end gate. |
+| Llama 3.2 3B Q4_K_M | Current general guarded-RAG suite | Marker-selected Rust/FFM reaches 15.70 tok/s, 89.3% of Ollama and 67.2% of llama.cpp, at 1.16x Ollama p95 end-to-end latency | `USABLE`; 18 of 27 accepted answers retain model text and all 18 are correct. Batched attention remains disabled because its decode gain regressed TTFT, prefill, and CPU without a stable E2E gain. |
 
 Retrieval is perfect in every full run. The historical failed answerable case
 was therefore generation, not search: Qwen3 1.7B said the context did not state
