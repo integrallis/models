@@ -268,6 +268,30 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void acceptsSupportedPassiveStorageInflection() {
+    GroundingDocument migrationLock =
+        new GroundingDocument(
+            "database-migration-lock",
+            "Migration lock lease",
+            "The migration coordinator stores its lease in the schema_history_lock table. "
+                + "A lease expires after 90 seconds unless the owner renews it.",
+            8.0f,
+            1);
+    String generated =
+        "The migration lease is stored in the schema_history_lock table. "
+            + "The lease expires after 90 seconds unless the owner renews it.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which table stores the migration lease, and when does that lease expire?",
+            List.of(migrationLock),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [database-migration-lock]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
   void preservesConjunctionsInsideSupportedAnswerLists() {
     GroundingDocument retries =
         new GroundingDocument(

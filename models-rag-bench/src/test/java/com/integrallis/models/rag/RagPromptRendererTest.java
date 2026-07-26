@@ -168,8 +168,8 @@ class RagPromptRendererTest {
             RagPromptTemplate.DEEPSEEK);
 
     assertThat(prompt)
-        .startsWith("You answer questions")
-        .contains("Do not use prior knowledge.\n\n### Instruction:\nCONTEXT\n[source-1] Policy")
+        .startsWith("### Instruction:\nYou answer questions")
+        .contains("Do not use prior knowledge.\n\nCONTEXT\n[source-1] Policy")
         .endsWith("ANSWER\n\n### Response:\n");
   }
 

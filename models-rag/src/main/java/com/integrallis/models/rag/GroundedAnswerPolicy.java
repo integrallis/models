@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v13";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v14";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -173,7 +173,18 @@ public final class GroundedAnswerPolicy {
         });
 
     String uncited = BRACKETED_TEXT.matcher(candidate).replaceAll(" ");
-    return words(uncited).stream().allMatch(supported::contains);
+    return words(uncited).stream().allMatch(word -> isSupportedClaimWord(word, supported));
+  }
+
+  private static boolean isSupportedClaimWord(String word, Set<String> supported) {
+    if (supported.contains(word)) {
+      return true;
+    }
+    if (word.length() > 4 && word.endsWith("ed")) {
+      return supported.contains(word.substring(0, word.length() - 1))
+          || supported.contains(word.substring(0, word.length() - 2));
+    }
+    return false;
   }
 
   private static Set<String> words(String text) {
