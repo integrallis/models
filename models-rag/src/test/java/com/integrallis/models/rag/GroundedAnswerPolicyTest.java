@@ -318,12 +318,10 @@ class GroundedAnswerPolicyTest {
 
   @Test
   void preservesARepeatedExplicitModelAbstentionWithACitation() {
-    String generated =
-        "INSUFFICIENT_CONTEXT\n[payments-settlement] INSUFFICIENT_CONTEXT";
+    String generated = "INSUFFICIENT_CONTEXT\n[payments-settlement] INSUFFICIENT_CONTEXT";
 
     GroundedAnswer answer =
-        policy.apply(
-            "How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
 
     assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
     assertThat(answer.rawText()).isEqualTo(generated);

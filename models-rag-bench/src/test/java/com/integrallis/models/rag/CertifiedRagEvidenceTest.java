@@ -65,6 +65,9 @@ class CertifiedRagEvidenceTest {
   private static final Path GEMMA_3_1B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260726/rag/gemma-3-1b-q4_k_m");
+  private static final Path INDIAN_LEGAL_QWEN2_5_3B_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260726/rag/" + "indian-legal-qwen2.5-3b-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -863,6 +866,89 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.runs())
         .extracting(RagRun::evaluation)
         .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::evaluation).toList());
+  }
+
+  @Test
+  void indianLegalQwenTwoPointFiveThreeBillionQualifiesLegalRag() throws Exception {
+    RagBenchmarkReport baseline =
+        report(INDIAN_LEGAL_QWEN2_5_3B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport candidate =
+        report(INDIAN_LEGAL_QWEN2_5_3B_Q4_K_M_EVIDENCE, "models-rust-ffm-marker.json");
+    RagBenchmarkReport ollama = report(INDIAN_LEGAL_QWEN2_5_3B_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(INDIAN_LEGAL_QWEN2_5_3B_Q4_K_M_EVIDENCE, "llama.cpp.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.modelId()).isEqualTo("gsms-b.indian-legal-qwen2.5-3b-q4_k_m");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("20e09a60606859d9a5401f4d261d02c1a1c57b75ee322a10b034cdbf2506fcb5");
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.LEGAL.id());
+    assertThat(candidate.settings().groundingPolicy()).isEqualTo(GroundedAnswerPolicy.POLICY_ID);
+    assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v10");
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("kernel-implementation", "rust-ffm-quantized-v10");
+    assertThat(candidate.backendDiagnostics().optimizations())
+        .filteredOn(optimization -> optimization.id().startsWith("modeljars.profile."))
+        .singleElement()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings())
+                  .containsEntry(
+                      "profile-id", "indian_legal_qwen2_5_3b_q4_k_m_epyc_milan_jdk25_rust_ffm")
+                  .containsEntry("selector-mismatches", "")
+                  .containsEntry("missing-jvm-arguments", "");
+            });
+    assertThat(candidate.backendDiagnostics().optimization("rust-q4-k-batched-matmul"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.backendDiagnostics().optimization("rust-quantized-decode"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(12);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(12.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.84, 0.85);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.16, 1.18);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.64, 0.65);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.97, 0.98);
+            });
+    assertThat(candidate.runs())
+        .extracting(RagRun::promptSha256)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::promptSha256).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.generation().text())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.generation().text()).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::grounding)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::grounding).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::evaluation).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::rawEvaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::rawEvaluation).toList());
   }
 
   @Test
