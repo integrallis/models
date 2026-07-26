@@ -1,0 +1,1854 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-26T20:45:52.954835197Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@9b1ae378 vectors@c298a0b7 modeljars@f5e972b",
+  "modelId" : "king3djbl_nexus_legal_gguf_q4_k_m",
+  "model" : "king3djbl_nexus_legal_gguf_q4_k_m",
+  "artifactSha256" : "309437dc5aa980fd7025fc29b3a25740564244e124a0d806967ee05ed01b6d93",
+  "artifactSizeBytes" : 986045472,
+  "settings" : {
+    "corpusSha256" : "a3499a08589094e7cb36299785bf128d5dad4a781fee96651878c267d61d0c2b",
+    "workload" : "legal",
+    "caseIds" : [ "amber-termination-notice", "bravo-data-deletion", "cobalt-liability-cap", "delta-arbitration", "ember-renewal-opt-out", "fjord-audit-frequency", "grove-assignment-exception", "harbor-confidentiality-survival", "unsupported-orchid-governing-law" ],
+    "promptTemplate" : "chatml-direct",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v17",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "repetitionPenalty" : "1.0",
+      "seed" : "42",
+      "topK" : "1",
+      "stopSequences" : " Therefore",
+      "temperature" : "0.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v10",
+    "environment" : {
+      "modeljar-coordinate" : "org.modeljars.huggingface:king3djbl.nexus-legal-gguf.q4_k_m:1.0.0-q4_k_m.1",
+      "preferred-vector-bits" : "256",
+      "os" : "Linux",
+      "java-feature" : "25",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "modeljar-alias" : "king3djbl_nexus_legal_gguf_q4_k_m",
+      "processors" : "8",
+      "kernel-implementation" : "rust-ffm-quantized-v10",
+      "fast-vector-fma" : "true",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-threads" : "8",
+      "gguf-parallel" : "true",
+      "active-vector-bits" : "256",
+      "compiler" : "hotspot-c2",
+      "native-quantized-decode" : "true",
+      "gguf-chunks-per-thread" : "2",
+      "gguf-threads" : "8",
+      "transformer-runtime" : "java",
+      "projection-layers" : "28",
+      "sve" : "false",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "native-kernel-abi" : "2",
+      "java-version" : "25.0.3",
+      "vm-vendor" : "Eclipse Adoptium",
+      "model-architecture" : "qwen2",
+      "gguf-executor" : "persistent",
+      "vm-version" : "25.0.3+9-LTS",
+      "q4-short-pairwise-supported" : "true",
+      "architecture" : "amd64",
+      "kernel-runtime" : "rust-ffm",
+      "modeljar-sha256" : "309437dc5aa980fd7025fc29b3a25740564244e124a0d806967ee05ed01b6d93",
+      "vector-api" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "rust-ffm-quantized-v10",
+        "qkv" : "grouped",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "14",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "8",
+        "partition" : "batch-rows",
+        "staged-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "8",
+        "executor" : "persistent",
+        "chunks-per-thread" : "2"
+      }
+    }, {
+      "id" : "modeljars.profile.king3djbl.nexus.legal.gguf.q4.k.m.epyc.milan.jdk25.rust.ffm",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "required-jvm-arguments" : "--enable-native-access=ALL-UNNAMED",
+        "recommended-runtime" : "hotspot-c2",
+        "profile-id" : "king3djbl_nexus_legal_gguf_q4_k_m_epyc_milan_jdk25_rust_ffm",
+        "marker-coordinate" : "org.modeljars.huggingface:king3djbl.nexus-legal-gguf.q4_k_m:1.0.0-q4_k_m.1",
+        "recommended-java-feature" : "25",
+        "benchmark-id" : "nexus-legal-1.5b-rust-ffm-legal-rag-20260726",
+        "recommendations" : "models.native.kernels.threads=8\nmodels.native.quantizedDecode=true\nmodels.purejava.batchedAttentionScores=false\nmodels.purejava.batchedAttentionValues=false\nmodels.purejava.prefillBatchSize=32",
+        "missing-jvm-arguments" : "",
+        "selector-mismatches" : ""
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "qualification" : "model-and-platform-specific",
+        "property" : "models.native.q5_0.grouped"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel",
+      "settings" : {
+        "property" : "models.native.quantizedDecode",
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 425.504579,
+    "retrievalMillis" : {
+      "p50" : 1.159187,
+      "p95" : 1.6705446000000002
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 5.081070999999611,
+      "p95" : 8.745424199999979
+    },
+    "ttftMillis" : {
+      "p50" : 644.723671,
+      "p95" : 712.61812
+    },
+    "tpotMillis" : {
+      "p50" : 36.02903872222222,
+      "p95" : 36.80350059583334
+    },
+    "endToEndMillis" : {
+      "p50" : 2101.417262,
+      "p95" : 2724.1055593
+    },
+    "p50PrefillTokensPerSecond" : 96.21047981362791,
+    "p50DecodeTokensPerSecond" : 27.75538941546097,
+    "peakRssBytes" : 1478389760,
+    "totalCpuMillis" : 397620.0,
+    "totalInputTokens" : 4419,
+    "totalCacheReadInputTokens" : 2859,
+    "totalCacheWriteInputTokens" : 1560,
+    "totalOutputTokens" : 1125,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "PRODUCTION_READY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "amber-termination-notice",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-amber-notice",
+        "title" : "Amber vendor notice",
+        "text" : "The synthetic Amber vendor agreement requires 30 calendar days of termination notice. Notice must be sent to the contract mailbox."
+      },
+      "score" : 5.483712,
+      "rank" : 1
+    } ],
+    "promptSha256" : "27f3be2d50ad380cb633b12ddbd9f6b18af056db92a8af6418cd9549f7a53c2a",
+    "retrievalMillis" : 1.49141,
+    "frameworkOverheadMillis" : 5.289369000000079,
+    "endToEndMillis" : 2380.134136,
+    "generation" : {
+      "text" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days [legal-amber-notice]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 28,
+      "outputTokens" : 58,
+      "ttftMillis" : 303.746152,
+      "totalMillis" : 2373.353357,
+      "prefillTokensPerSecond" : 93.45660415181965,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1399115776,
+      "cpuMillis" : 17740.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days",
+      "text" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days [legal-amber-notice]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "bravo-data-deletion",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-bravo-retention",
+        "title" : "Bravo data return",
+        "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required."
+      },
+      "score" : 4.8286543,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a08195899f8b451a862c0ad100c3c7a7544e37cd63fe8aa67a1fc1fbbdd14f45",
+    "retrievalMillis" : 1.471519,
+    "frameworkOverheadMillis" : 5.338572999999997,
+    "endToEndMillis" : 2724.214864,
+    "generation" : {
+      "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required. [legal-bravo-retention]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 60,
+      "ttftMillis" : 651.166229,
+      "totalMillis" : 2717.404772,
+      "prefillTokensPerSecond" : 95.79565316253628,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1399263232,
+      "cpuMillis" : 19770.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "45 days after termination, Bravo's data must be returned or deleted. A deletion certificate is required. The answer is: 45 days after termination, deletion certificate required. The sources are: [legal-bravo-retention] Bravo data return, [legal-45-day-retention] 45-day",
+      "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required. [legal-bravo-retention]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.5,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cobalt-liability-cap",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-cobalt-cap",
+        "title" : "Cobalt liability cap",
+        "text" : "Cobalt's liability cap equals fees paid during the prior 12 months. Confidentiality breaches are excluded from the cap."
+      },
+      "score" : 4.728532,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4b7e8ec6b04f33c33443503b013927c42eaaab1aa69afd3b2b476ca7d7e79472",
+    "retrievalMillis" : 1.649239,
+    "frameworkOverheadMillis" : 7.4910339999999,
+    "endToEndMillis" : 1724.665078,
+    "generation" : {
+      "text" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap. [legal-cobalt-cap]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 29,
+      "ttftMillis" : 701.774414,
+      "totalMillis" : 1715.524805,
+      "prefillTokensPerSecond" : 94.72440737396788,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1399308288,
+      "cpuMillis" : 11950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap.",
+      "text" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap. [legal-cobalt-cap]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-arbitration",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-delta-venue",
+        "title" : "Delta dispute venue",
+        "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator."
+      },
+      "score" : 2.5211577,
+      "rank" : 1
+    } ],
+    "promptSha256" : "94a9ad1065151aa8ad129f197d20b1d8c2a04abff2e22ae9ae95e51040c7d824",
+    "retrievalMillis" : 1.573786,
+    "frameworkOverheadMillis" : 6.995379999999841,
+    "endToEndMillis" : 2633.969511,
+    "generation" : {
+      "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. [legal-delta-venue]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 55,
+      "outputTokens" : 58,
+      "ttftMillis" : 575.708867,
+      "totalMillis" : 2625.400345,
+      "prefillTokensPerSecond" : 96.21047981362791,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1399930880,
+      "cpuMillis" : 19330.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1 arbitrator is used in Delta disputes. The proceeding uses one arbitrator. So the answer is 1 arbitrator. The source is [legal-delta-venue] Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. The source ID is legal-delta-venue. The answer is",
+      "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. [legal-delta-venue]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "ember-renewal-opt-out",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-ember-renewal",
+        "title" : "Ember renewal term",
+        "text" : "Ember subscriptions renew for one-year terms. Either party may opt out at least 60 days before renewal."
+      },
+      "score" : 5.4798946,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ea80617a7d5086c90942cda93bdeba45817d4de86b55f578b63698fb85ce0b79",
+    "retrievalMillis" : 1.677963,
+    "frameworkOverheadMillis" : 8.275912999999719,
+    "endToEndMillis" : 1573.512151,
+    "generation" : {
+      "text" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal. [legal-ember-renewal]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 25,
+      "ttftMillis" : 671.524358,
+      "totalMillis" : 1563.558275,
+      "prefillTokensPerSecond" : 96.31682345141762,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1413480448,
+      "cpuMillis" : 10740.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal.",
+      "text" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal. [legal-ember-renewal]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fjord-audit-frequency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-fjord-audit",
+        "title" : "Fjord audit rights",
+        "text" : "Fjord permits one compliance audit per calendar year. The requesting party gives 10 business days of notice."
+      },
+      "score" : 2.0756798,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80bbd55d59a69b4b3d9b382fb44a2b2d60a0ad7435b3b0d47ee97ad94c2d17a0",
+    "retrievalMillis" : 1.840159,
+    "frameworkOverheadMillis" : 17.912407999999914,
+    "endToEndMillis" : 1379.438278,
+    "generation" : {
+      "text" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required. [legal-fjord-audit]",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 19,
+      "ttftMillis" : 708.551848,
+      "totalMillis" : 1359.685711,
+      "prefillTokensPerSecond" : 95.09234172477595,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1447653376,
+      "cpuMillis" : 9210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required.",
+      "text" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required. [legal-fjord-audit]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-assignment-exception",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-grove-assignment",
+        "title" : "Grove assignment rule",
+        "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent."
+      },
+      "score" : 5.121391,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c56c58691db9d48f339aa82ff5efea8f296f1e5b9c49c9ce2161a5a0b574ada3",
+    "retrievalMillis" : 1.653235,
+    "frameworkOverheadMillis" : 7.341098000000102,
+    "endToEndMillis" : 1298.974668,
+    "generation" : {
+      "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent. [legal-grove-assignment]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 55,
+      "outputTokens" : 21,
+      "ttftMillis" : 576.163666,
+      "totalMillis" : 1289.980335,
+      "prefillTokensPerSecond" : 96.51249027974454,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1447706624,
+      "cpuMillis" : 8940.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1. Grove prohibits assignment without written consent. 2. Assignment to an acquiring affiliate is permitted without consent.",
+      "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent. [legal-grove-assignment]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-confidentiality-survival",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-harbor-survival",
+        "title" : "Harbor survival period",
+        "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law."
+      },
+      "score" : 5.1662226,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b47404af6e2823b4260683f77d97b29689ce4ea98ad16bdf5ead6993273395b3",
+    "retrievalMillis" : 1.315113,
+    "frameworkOverheadMillis" : 5.543361999999888,
+    "endToEndMillis" : 2721.640836,
+    "generation" : {
+      "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law. [legal-harbor-survival]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 60,
+      "ttftMillis" : 654.025857,
+      "totalMillis" : 2714.782361,
+      "prefillTokensPerSecond" : 96.9432482776047,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1447731200,
+      "cpuMillis" : 19800.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "3-year Harbor confidentiality obligations survive after termination, while trade-secret duties survive as long as protected by law. The answer is 3 years for Harbor confidentiality and as long as protected by law for trade-secrets. The source is [legal-harbor-survival] Harbor survival period. The source ID is legal-h",
+      "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law. [legal-harbor-survival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-orchid-governing-law",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-amber-notice",
+        "title" : "Amber vendor notice",
+        "text" : "The synthetic Amber vendor agreement requires 30 calendar days of termination notice. Notice must be sent to the contract mailbox."
+      },
+      "score" : 2.017623,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0fabeedfcc3eca5942d87ed435215400b445c1a5af28bd85260dd52c075787e7",
+    "retrievalMillis" : 1.105695,
+    "frameworkOverheadMillis" : 5.081070999999611,
+    "endToEndMillis" : 2101.417262,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 45,
+      "ttftMillis" : 621.648346,
+      "totalMillis" : 2095.230496,
+      "prefillTokensPerSecond" : 97.12426055718981,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1447739392,
+      "cpuMillis" : 15040.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 calendar days of termination notice is required for the synthetic Amber vendor agreement. This is the only information provided about the governing law. Without additional context, I cannot determine which law applies to the Orchid reseller agreement.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "amber-termination-notice",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-amber-notice",
+        "title" : "Amber vendor notice",
+        "text" : "The synthetic Amber vendor agreement requires 30 calendar days of termination notice. Notice must be sent to the contract mailbox."
+      },
+      "score" : 5.483712,
+      "rank" : 1
+    } ],
+    "promptSha256" : "27f3be2d50ad380cb633b12ddbd9f6b18af056db92a8af6418cd9549f7a53c2a",
+    "retrievalMillis" : 1.171636,
+    "frameworkOverheadMillis" : 5.063024000000041,
+    "endToEndMillis" : 2387.964344,
+    "generation" : {
+      "text" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days [legal-amber-notice]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 28,
+      "outputTokens" : 58,
+      "ttftMillis" : 318.186041,
+      "totalMillis" : 2381.729684,
+      "prefillTokensPerSecond" : 89.1129550689107,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1447796736,
+      "cpuMillis" : 17760.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days",
+      "text" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days [legal-amber-notice]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "bravo-data-deletion",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-bravo-retention",
+        "title" : "Bravo data return",
+        "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required."
+      },
+      "score" : 4.8286543,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a08195899f8b451a862c0ad100c3c7a7544e37cd63fe8aa67a1fc1fbbdd14f45",
+    "retrievalMillis" : 1.254271,
+    "frameworkOverheadMillis" : 4.983933000000434,
+    "endToEndMillis" : 2723.850515,
+    "generation" : {
+      "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required. [legal-bravo-retention]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 60,
+      "ttftMillis" : 644.723671,
+      "totalMillis" : 2717.612311,
+      "prefillTokensPerSecond" : 96.74885521448928,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1447833600,
+      "cpuMillis" : 19760.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "45 days after termination, Bravo's data must be returned or deleted. A deletion certificate is required. The answer is: 45 days after termination, deletion certificate required. The sources are: [legal-bravo-retention] Bravo data return, [legal-45-day-retention] 45-day",
+      "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required. [legal-bravo-retention]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.5,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cobalt-liability-cap",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-cobalt-cap",
+        "title" : "Cobalt liability cap",
+        "text" : "Cobalt's liability cap equals fees paid during the prior 12 months. Confidentiality breaches are excluded from the cap."
+      },
+      "score" : 4.728532,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4b7e8ec6b04f33c33443503b013927c42eaaab1aa69afd3b2b476ca7d7e79472",
+    "retrievalMillis" : 1.171627,
+    "frameworkOverheadMillis" : 5.023912999999993,
+    "endToEndMillis" : 1748.345765,
+    "generation" : {
+      "text" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap. [legal-cobalt-cap]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 29,
+      "ttftMillis" : 723.88307,
+      "totalMillis" : 1742.150225,
+      "prefillTokensPerSecond" : 91.66806256755277,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1449213952,
+      "cpuMillis" : 11950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap.",
+      "text" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap. [legal-cobalt-cap]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-arbitration",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-delta-venue",
+        "title" : "Delta dispute venue",
+        "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator."
+      },
+      "score" : 2.5211577,
+      "rank" : 1
+    } ],
+    "promptSha256" : "94a9ad1065151aa8ad129f197d20b1d8c2a04abff2e22ae9ae95e51040c7d824",
+    "retrievalMillis" : 1.159187,
+    "frameworkOverheadMillis" : 5.0312159999998585,
+    "endToEndMillis" : 2678.074462,
+    "generation" : {
+      "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. [legal-delta-venue]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 55,
+      "outputTokens" : 58,
+      "ttftMillis" : 603.067728,
+      "totalMillis" : 2671.884059,
+      "prefillTokensPerSecond" : 91.76228755841692,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451638784,
+      "cpuMillis" : 19530.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1 arbitrator is used in Delta disputes. The proceeding uses one arbitrator. So the answer is 1 arbitrator. The source is [legal-delta-venue] Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. The source ID is legal-delta-venue. The answer is",
+      "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. [legal-delta-venue]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "ember-renewal-opt-out",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-ember-renewal",
+        "title" : "Ember renewal term",
+        "text" : "Ember subscriptions renew for one-year terms. Either party may opt out at least 60 days before renewal."
+      },
+      "score" : 5.4798946,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ea80617a7d5086c90942cda93bdeba45817d4de86b55f578b63698fb85ce0b79",
+    "retrievalMillis" : 1.414282,
+    "frameworkOverheadMillis" : 4.841989999999896,
+    "endToEndMillis" : 1539.977839,
+    "generation" : {
+      "text" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal. [legal-ember-renewal]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 25,
+      "ttftMillis" : 660.765737,
+      "totalMillis" : 1533.721567,
+      "prefillTokensPerSecond" : 97.401928653763,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451671552,
+      "cpuMillis" : 10650.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal.",
+      "text" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal. [legal-ember-renewal]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fjord-audit-frequency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-fjord-audit",
+        "title" : "Fjord audit rights",
+        "text" : "Fjord permits one compliance audit per calendar year. The requesting party gives 10 business days of notice."
+      },
+      "score" : 2.0756798,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80bbd55d59a69b4b3d9b382fb44a2b2d60a0ad7435b3b0d47ee97ad94c2d17a0",
+    "retrievalMillis" : 1.056261,
+    "frameworkOverheadMillis" : 4.790479000000232,
+    "endToEndMillis" : 1369.364782,
+    "generation" : {
+      "text" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required. [legal-fjord-audit]",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 19,
+      "ttftMillis" : 714.360808,
+      "totalMillis" : 1363.518042,
+      "prefillTokensPerSecond" : 94.28136705832057,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451704320,
+      "cpuMillis" : 9220.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required.",
+      "text" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required. [legal-fjord-audit]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-assignment-exception",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-grove-assignment",
+        "title" : "Grove assignment rule",
+        "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent."
+      },
+      "score" : 5.121391,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c56c58691db9d48f339aa82ff5efea8f296f1e5b9c49c9ce2161a5a0b574ada3",
+    "retrievalMillis" : 0.977732,
+    "frameworkOverheadMillis" : 5.023947000000135,
+    "endToEndMillis" : 1287.379286,
+    "generation" : {
+      "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent. [legal-grove-assignment]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 55,
+      "outputTokens" : 21,
+      "ttftMillis" : 569.909914,
+      "totalMillis" : 1281.377607,
+      "prefillTokensPerSecond" : 97.16969603882734,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451720704,
+      "cpuMillis" : 8910.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1. Grove prohibits assignment without written consent. 2. Assignment to an acquiring affiliate is permitted without consent.",
+      "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent. [legal-grove-assignment]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-confidentiality-survival",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-harbor-survival",
+        "title" : "Harbor survival period",
+        "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law."
+      },
+      "score" : 5.1662226,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b47404af6e2823b4260683f77d97b29689ce4ea98ad16bdf5ead6993273395b3",
+    "retrievalMillis" : 1.048069,
+    "frameworkOverheadMillis" : 5.175012000000152,
+    "endToEndMillis" : 2715.872408,
+    "generation" : {
+      "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law. [legal-harbor-survival]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 60,
+      "ttftMillis" : 653.754652,
+      "totalMillis" : 2709.649327,
+      "prefillTokensPerSecond" : 96.99002376472656,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451745280,
+      "cpuMillis" : 19750.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "3-year Harbor confidentiality obligations survive after termination, while trade-secret duties survive as long as protected by law. The answer is 3 years for Harbor confidentiality and as long as protected by law for trade-secrets. The source is [legal-harbor-survival] Harbor survival period. The source ID is legal-h",
+      "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law. [legal-harbor-survival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-orchid-governing-law",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-amber-notice",
+        "title" : "Amber vendor notice",
+        "text" : "The synthetic Amber vendor agreement requires 30 calendar days of termination notice. Notice must be sent to the contract mailbox."
+      },
+      "score" : 2.017623,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0fabeedfcc3eca5942d87ed435215400b445c1a5af28bd85260dd52c075787e7",
+    "retrievalMillis" : 0.908637,
+    "frameworkOverheadMillis" : 5.10102199999983,
+    "endToEndMillis" : 2126.081092,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 45,
+      "ttftMillis" : 629.321491,
+      "totalMillis" : 2120.071433,
+      "prefillTokensPerSecond" : 95.9295220382872,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451761664,
+      "cpuMillis" : 15130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 calendar days of termination notice is required for the synthetic Amber vendor agreement. This is the only information provided about the governing law. Without additional context, I cannot determine which law applies to the Orchid reseller agreement.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "amber-termination-notice",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-amber-notice",
+        "title" : "Amber vendor notice",
+        "text" : "The synthetic Amber vendor agreement requires 30 calendar days of termination notice. Notice must be sent to the contract mailbox."
+      },
+      "score" : 5.483712,
+      "rank" : 1
+    } ],
+    "promptSha256" : "27f3be2d50ad380cb633b12ddbd9f6b18af056db92a8af6418cd9549f7a53c2a",
+    "retrievalMillis" : 1.037072,
+    "frameworkOverheadMillis" : 5.226070000000163,
+    "endToEndMillis" : 2368.632594,
+    "generation" : {
+      "text" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days [legal-amber-notice]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 28,
+      "outputTokens" : 58,
+      "ttftMillis" : 300.126293,
+      "totalMillis" : 2362.369452,
+      "prefillTokensPerSecond" : 94.53428906374168,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451798528,
+      "cpuMillis" : 17720.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days",
+      "text" : "30 calendar days of termination notice is required, and it must be sent to the contract mailbox. The answer is 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days, contract mailbox. 30 calendar days [legal-amber-notice]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "bravo-data-deletion",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-bravo-retention",
+        "title" : "Bravo data return",
+        "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required."
+      },
+      "score" : 4.8286543,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a08195899f8b451a862c0ad100c3c7a7544e37cd63fe8aa67a1fc1fbbdd14f45",
+    "retrievalMillis" : 1.059546,
+    "frameworkOverheadMillis" : 4.926125000000411,
+    "endToEndMillis" : 2711.282129,
+    "generation" : {
+      "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required. [legal-bravo-retention]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 60,
+      "ttftMillis" : 643.432541,
+      "totalMillis" : 2705.296458,
+      "prefillTokensPerSecond" : 96.93593680766293,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451835392,
+      "cpuMillis" : 19730.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "45 days after termination, Bravo's data must be returned or deleted. A deletion certificate is required. The answer is: 45 days after termination, deletion certificate required. The sources are: [legal-bravo-retention] Bravo data return, [legal-45-day-retention] 45-day",
+      "text" : "Bravo's data clause requires return or deletion within 45 days after termination. A deletion certificate is required. [legal-bravo-retention]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.5,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cobalt-liability-cap",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-cobalt-cap",
+        "title" : "Cobalt liability cap",
+        "text" : "Cobalt's liability cap equals fees paid during the prior 12 months. Confidentiality breaches are excluded from the cap."
+      },
+      "score" : 4.728532,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4b7e8ec6b04f33c33443503b013927c42eaaab1aa69afd3b2b476ca7d7e79472",
+    "retrievalMillis" : 1.014137,
+    "frameworkOverheadMillis" : 4.916791999999987,
+    "endToEndMillis" : 1711.709351,
+    "generation" : {
+      "text" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap. [legal-cobalt-cap]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 29,
+      "ttftMillis" : 692.330211,
+      "totalMillis" : 1705.778422,
+      "prefillTokensPerSecond" : 95.85392572780931,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451884544,
+      "cpuMillis" : 11980.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap.",
+      "text" : "1) Cobalt's liability cap equals fees paid during the prior 12 months, and 2) Confidentiality breaches are excluded from the cap. [legal-cobalt-cap]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-arbitration",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-delta-venue",
+        "title" : "Delta dispute venue",
+        "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator."
+      },
+      "score" : 2.5211577,
+      "rank" : 1
+    } ],
+    "promptSha256" : "94a9ad1065151aa8ad129f197d20b1d8c2a04abff2e22ae9ae95e51040c7d824",
+    "retrievalMillis" : 0.905833,
+    "frameworkOverheadMillis" : 4.698160000000371,
+    "endToEndMillis" : 2632.470734,
+    "generation" : {
+      "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. [legal-delta-venue]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 55,
+      "outputTokens" : 58,
+      "ttftMillis" : 570.310455,
+      "totalMillis" : 2626.866741,
+      "prefillTokensPerSecond" : 97.05314346564539,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1451933696,
+      "cpuMillis" : 19350.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1 arbitrator is used in Delta disputes. The proceeding uses one arbitrator. So the answer is 1 arbitrator. The source is [legal-delta-venue] Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. The source ID is legal-delta-venue. The answer is",
+      "text" : "Delta disputes use arbitration in Phoenix, Arizona. The proceeding uses one arbitrator. [legal-delta-venue]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "ember-renewal-opt-out",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-ember-renewal",
+        "title" : "Ember renewal term",
+        "text" : "Ember subscriptions renew for one-year terms. Either party may opt out at least 60 days before renewal."
+      },
+      "score" : 5.4798946,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ea80617a7d5086c90942cda93bdeba45817d4de86b55f578b63698fb85ce0b79",
+    "retrievalMillis" : 1.170104,
+    "frameworkOverheadMillis" : 4.752913999999919,
+    "endToEndMillis" : 1556.705034,
+    "generation" : {
+      "text" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal. [legal-ember-renewal]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 25,
+      "ttftMillis" : 663.071637,
+      "totalMillis" : 1550.782016,
+      "prefillTokensPerSecond" : 97.108070673603,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1452539904,
+      "cpuMillis" : 10700.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal.",
+      "text" : "1) Ember subscriptions renew for one-year terms and 2) either party may opt out at least 60 days before renewal. [legal-ember-renewal]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fjord-audit-frequency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-fjord-audit",
+        "title" : "Fjord audit rights",
+        "text" : "Fjord permits one compliance audit per calendar year. The requesting party gives 10 business days of notice."
+      },
+      "score" : 2.0756798,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80bbd55d59a69b4b3d9b382fb44a2b2d60a0ad7435b3b0d47ee97ad94c2d17a0",
+    "retrievalMillis" : 0.984912,
+    "frameworkOverheadMillis" : 5.024255000000267,
+    "endToEndMillis" : 1355.656167,
+    "generation" : {
+      "text" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required. [legal-fjord-audit]",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 19,
+      "ttftMillis" : 701.124303,
+      "totalMillis" : 1349.647,
+      "prefillTokensPerSecond" : 96.06735534065434,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1452781568,
+      "cpuMillis" : 9150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required.",
+      "text" : "1 compliance audit is permitted per calendar year, and 10 business days of notice is required. [legal-fjord-audit]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-assignment-exception",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-grove-assignment",
+        "title" : "Grove assignment rule",
+        "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent."
+      },
+      "score" : 5.121391,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c56c58691db9d48f339aa82ff5efea8f296f1e5b9c49c9ce2161a5a0b574ada3",
+    "retrievalMillis" : 0.966844,
+    "frameworkOverheadMillis" : 5.025587999999971,
+    "endToEndMillis" : 1295.875802,
+    "generation" : {
+      "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent. [legal-grove-assignment]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 55,
+      "outputTokens" : 21,
+      "ttftMillis" : 579.258237,
+      "totalMillis" : 1289.88337,
+      "prefillTokensPerSecond" : 95.93361527780988,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1457082368,
+      "cpuMillis" : 8940.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1. Grove prohibits assignment without written consent. 2. Assignment to an acquiring affiliate is permitted without consent.",
+      "text" : "Grove prohibits assignment without written consent. Assignment to an acquiring affiliate is permitted without consent. [legal-grove-assignment]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-confidentiality-survival",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-harbor-survival",
+        "title" : "Harbor survival period",
+        "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law."
+      },
+      "score" : 5.1662226,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b47404af6e2823b4260683f77d97b29689ce4ea98ad16bdf5ead6993273395b3",
+    "retrievalMillis" : 1.141961,
+    "frameworkOverheadMillis" : 8.784173999999894,
+    "endToEndMillis" : 2730.136209,
+    "generation" : {
+      "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law. [legal-harbor-survival]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 60,
+      "ttftMillis" : 654.627931,
+      "totalMillis" : 2720.210074,
+      "prefillTokensPerSecond" : 97.37151920775317,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1472200704,
+      "cpuMillis" : 19750.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "3-year Harbor confidentiality obligations survive after termination, while trade-secret duties survive as long as protected by law. The answer is 3 years for Harbor confidentiality and as long as protected by law for trade-secrets. The source is [legal-harbor-survival] Harbor survival period. The source ID is legal-h",
+      "text" : "Harbor confidentiality obligations survive for three years after termination. Trade-secret duties survive as long as protected by law. [legal-harbor-survival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-orchid-governing-law",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "legal-amber-notice",
+        "title" : "Amber vendor notice",
+        "text" : "The synthetic Amber vendor agreement requires 30 calendar days of termination notice. Notice must be sent to the contract mailbox."
+      },
+      "score" : 2.017623,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0fabeedfcc3eca5942d87ed435215400b445c1a5af28bd85260dd52c075787e7",
+    "retrievalMillis" : 0.944642,
+    "frameworkOverheadMillis" : 8.65500800000018,
+    "endToEndMillis" : 2100.523454,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 45,
+      "ttftMillis" : 623.950996,
+      "totalMillis" : 2090.923804,
+      "prefillTokensPerSecond" : 96.76291473818983,
+      "loadMillis" : 425.504579,
+      "peakRssBytes" : 1478389760,
+      "cpuMillis" : 15120.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 calendar days of termination notice is required for the synthetic Amber vendor agreement. This is the only information provided about the governing law. Without additional context, I cannot determine which law applies to the Orchid reseller agreement.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
