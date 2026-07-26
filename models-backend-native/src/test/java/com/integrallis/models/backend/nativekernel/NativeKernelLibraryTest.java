@@ -56,6 +56,7 @@ class NativeKernelLibraryTest {
           .isTrue();
       assertThat(kernels.supports(NativeKernelCapability.PERSISTENT_WORKER_CONTEXT)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.K_QUANT_BATCH_WEIGHT_REUSE)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q4_K_BATCH_VECTOR_ACCUMULATION)).isTrue();
     }
   }
 
@@ -112,7 +113,7 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v9");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v10");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())

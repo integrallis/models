@@ -35,11 +35,11 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v10";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v11";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
-      Pattern.compile("(?i)^INSUFFICIENT_CONTEXT[.!]?$");
+      Pattern.compile("(?i)^(?:INSUFFICIENT_CONTEXT[.!]?\\s*)+$");
   private static final Pattern CLAUSE_BOUNDARY =
       Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
   private static final Pattern STATEMENT_BOUNDARY = Pattern.compile("(?i)(?:[;?!]\\s*|\\.\\s+)");
@@ -122,7 +122,7 @@ public final class GroundedAnswerPolicy {
     }
 
     String candidate = generatedText.strip();
-    if (ABSTENTION_PATTERN.matcher(candidate).matches()) {
+    if (isExplicitAbstention(candidate)) {
       return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.MODEL_ABSTENTION);
     }
     if (candidate.isBlank()
@@ -142,6 +142,11 @@ public final class GroundedAnswerPolicy {
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
     return new GroundedAnswer(generatedText, candidate, GroundingDecision.MODEL_ANSWER);
+  }
+
+  private static boolean isExplicitAbstention(String candidate) {
+    String undecorated = BRACKETED_TEXT.matcher(candidate).replaceAll(" ").strip();
+    return ABSTENTION_PATTERN.matcher(undecorated).matches();
   }
 
   private static boolean hasOnlySupportedClaims(

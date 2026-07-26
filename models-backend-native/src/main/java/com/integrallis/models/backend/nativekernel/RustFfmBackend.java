@@ -40,7 +40,7 @@ import org.modeljars.ModelJarException;
 public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String PLAN_VERSION = "rust-ffm-v9";
+  public static final String PLAN_VERSION = "rust-ffm-v10";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;

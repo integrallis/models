@@ -115,4 +115,29 @@ class RagCorpusTest {
     assertThat(evaluation.correct()).isTrue();
     assertThat(canonicalEvaluation.correct()).isTrue();
   }
+
+  @Test
+  void legalOracleAcceptsAnEquivalentConfidentialityBreachPhrase() {
+    RagCorpus corpus = RagCorpus.load(RagWorkload.LEGAL);
+    RagCase testCase =
+        corpus.cases().stream()
+            .filter(value -> value.id().equals("cobalt-liability-cap"))
+            .findFirst()
+            .orElseThrow();
+    RagDocument document =
+        corpus.documents().stream()
+            .filter(value -> value.id().equals("legal-cobalt-cap"))
+            .findFirst()
+            .orElseThrow();
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(document, 3.0f, 1)),
+            "Cobalt's liability cap equals fees paid during the prior 12 months, and breaches of "
+                + "confidentiality are excluded from this cap. [legal-cobalt-cap]");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
 }

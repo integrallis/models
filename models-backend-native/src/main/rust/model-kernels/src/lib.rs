@@ -16,6 +16,7 @@ use std::arch::x86_64::*;
 #[cfg(all(test, target_arch = "x86_64"))]
 std::thread_local! {
     static Q5_0_HORIZONTAL_REDUCTIONS: Cell<usize> = const { Cell::new(0) };
+    static Q4_K_BATCH_HORIZONTAL_REDUCTIONS: Cell<usize> = const { Cell::new(0) };
     static F16C_CONVERSIONS: Cell<usize> = const { Cell::new(0) };
 }
 
@@ -28,6 +29,13 @@ std::thread_local! {
 fn record_k_quant_weight_block_decode() {
     #[cfg(test)]
     K_QUANT_WEIGHT_BLOCK_DECODES.with(|count| count.set(count.get() + 1));
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline(always)]
+fn record_q4_k_batch_horizontal_reduction() {
+    #[cfg(all(test, target_arch = "x86_64"))]
+    Q4_K_BATCH_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
 }
 
 const ABI_VERSION: u32 = 2;
@@ -46,6 +54,7 @@ const CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 11;
 const CAPABILITY_Q5_0_F32_BATCHED_MATMUL: u64 = 1 << 12;
 const CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 13;
 const CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE: u64 = 1 << 14;
+const CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION: u64 = 1 << 15;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -436,6 +445,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
         | CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
+        | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
 }
 
 #[unsafe(no_mangle)]
@@ -2223,25 +2233,44 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
                 group_scales[group] = qk_scale(scales, group);
                 group_mins[group] = qk_min(scales, group);
             }
+            let minimum_values = _mm256_setr_epi32(
+                group_mins[0],
+                group_mins[1],
+                group_mins[2],
+                group_mins[3],
+                group_mins[4],
+                group_mins[5],
+                group_mins[6],
+                group_mins[7],
+            );
 
             for batch in 0..batch_size {
                 let activation_offset = batch * cols + block * QK_K;
                 let sum_offset = batch * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
-                let mut quantized_sum = 0_i32;
-                let mut minimum_sum = 0_i32;
+                let mut quantized_lanes = _mm256_setzero_si256();
                 for group in 0..8 {
                     // SAFETY: every decoded group and activation group contains 32 bytes.
-                    let group_dot = unsafe {
-                        unsigned_signed_dot_avx2(
-                            decoded[group],
-                            quantized.as_ptr().add(activation_offset + group * 32),
+                    let activation = unsafe {
+                        _mm256_loadu_si256(
+                            quantized
+                                .as_ptr()
+                                .add(activation_offset + group * 32)
+                                .cast(),
                         )
                     };
-                    quantized_sum += group_scales[group] * group_dot;
-                    minimum_sum += group_mins[group]
-                        * (activation_sums[sum_offset + group * 2] as i32
-                            + activation_sums[sum_offset + group * 2 + 1] as i32);
+                    let products = _mm256_maddubs_epi16(decoded[group], activation);
+                    let scale = _mm256_set1_epi16(group_scales[group] as i16);
+                    quantized_lanes =
+                        _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(products, scale));
                 }
+                record_q4_k_batch_horizontal_reduction();
+                let quantized_sum = horizontal_sum_i32_avx2(quantized_lanes);
+                // SAFETY: each Q8_K activation block has sixteen signed group sums.
+                let activation_sum_values =
+                    unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
+                let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
+                let minimum_sum =
+                    horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
                 let activation_scale = activation_scales[batch * blocks_per_row + block];
                 let d = weight_scale * activation_scale;
                 let d_min = weight_min_scale * activation_scale;
@@ -3802,6 +3831,7 @@ mod tests {
                 | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
                 | CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
+                | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
         );
     }
 
@@ -4209,6 +4239,7 @@ mod tests {
 
             let mut actual_q4_avx2 = vec![f32::NAN; BATCH_SIZE * ROWS];
             K_QUANT_WEIGHT_BLOCK_DECODES.with(|count| count.set(0));
+            Q4_K_BATCH_HORIZONTAL_REDUCTIONS.with(|count| count.set(0));
             // SAFETY: runtime detection established every required x86 feature and each fixture
             // buffer contains the complete validated matrix shape.
             unsafe {
@@ -4228,6 +4259,13 @@ mod tests {
             assert_eq!(actual_q4_avx2, expected_q4_avx2);
             K_QUANT_WEIGHT_BLOCK_DECODES.with(|count| {
                 assert_eq!(count.get(), ROWS * BLOCKS, "Q4_K AVX2 weight block decodes");
+            });
+            Q4_K_BATCH_HORIZONTAL_REDUCTIONS.with(|count| {
+                assert_eq!(
+                    count.get(),
+                    BATCH_SIZE * ROWS * BLOCKS,
+                    "Q4_K AVX2 horizontal reductions"
+                );
             });
 
             let mut actual_q5_avx2 = vec![f32::NAN; BATCH_SIZE * ROWS];
