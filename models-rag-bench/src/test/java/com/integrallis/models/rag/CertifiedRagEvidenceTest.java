@@ -975,7 +975,9 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.artifactSha256())
         .isEqualTo("1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f");
     assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.GENERAL.id());
-    assertThat(candidate.settings().groundingPolicy()).isEqualTo(GroundedAnswerPolicy.POLICY_ID);
+    assertThat(candidate.settings().groundingPolicy())
+        .isEqualTo(
+            "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v12");
     assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v10");
     assertThat(candidate.backendDiagnostics().environment())
         .containsEntry("kernel-implementation", "rust-ffm-quantized-v10");

@@ -293,6 +293,46 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void validatesSupportedMatrixAnswersWithoutTreatingLatexDelimitersAsClaims() {
+    GroundingDocument matrix =
+        new GroundingDocument(
+            "math-amber-matrix",
+            "Amber matrix",
+            "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7.",
+            8.0f,
+            1);
+    String generated =
+        "For the Amber matrix \\(\\begin{bmatrix} 3 & 1 \\\\ 2 & 4 \\end{bmatrix}\\), "
+            + "the determinant is 10 and the trace is 7";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "What are the determinant and trace of the Amber matrix?", List.of(matrix), generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [math-amber-matrix]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void doesNotIgnoreArbitraryLatexCommandsDuringClaimValidation() {
+    GroundingDocument matrix =
+        new GroundingDocument(
+            "math-amber-matrix",
+            "Amber matrix",
+            "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "What are the determinant and trace of the Amber matrix?",
+            List.of(matrix),
+            "The determinant is 10 and the trace is 7 \\recommend{unsafe}");
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
   void usesExtractiveEvidenceForAnUnsupportedCitation() {
     GroundedAnswer answer =
         policy.apply(
