@@ -190,6 +190,21 @@ class RagPromptRendererTest {
   }
 
   @Test
+  void h2oDirectProfilePrefillsAConciseAnswerLeadIn() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.parse("h2o-direct"));
+
+    assertThat(prompt)
+        .startsWith("<|prompt|>You answer questions")
+        .endsWith("ANSWER</s><|answer|>The context states that ");
+  }
+
+  @Test
   void miniCpm5NoThinkProfileEmitsTheTemplateOwnedBosToken() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 
