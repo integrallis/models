@@ -116,7 +116,12 @@ public enum RagPromptTemplate {
               + "<|end|>\n<|user|>\n"
               + userPrompt.strip()
               + "<|end|>\n<|assistant|>\n";
-      case DEEPSEEK -> systemPrompt + "### Instruction:\n" + userPrompt + "\n### Response:\n";
+      case DEEPSEEK ->
+          "### Instruction:\n"
+              + systemPrompt.stripTrailing()
+              + "\n\n"
+              + userPrompt
+              + "\n### Response:\n";
       case MINICPM5_NO_THINK ->
           "<s><|im_start|>system\n"
               + systemPrompt.stripTrailing()
