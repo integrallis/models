@@ -85,8 +85,7 @@ class RagPromptRendererTest {
     assertThat(prompt)
         .startsWith("<|im_start|>system\nYou answer questions")
         .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n[source-1] Policy")
-        .endsWith(
-            "ANSWER\n<|im_end|>\n<|im_start|>assistant\n" + "Direct answer from the context: ");
+        .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\nThe context states that ");
   }
 
   @Test

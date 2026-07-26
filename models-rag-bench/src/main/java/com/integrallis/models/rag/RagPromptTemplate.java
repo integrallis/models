@@ -49,7 +49,7 @@ public enum RagPromptTemplate {
       case CHATML_DIRECT ->
           "<|im_start|>user\n"
               + prompt
-              + "<|im_end|>\n<|im_start|>assistant\nDirect answer from the context: ";
+              + "<|im_end|>\n<|im_start|>assistant\nThe context states that ";
       case CHATML_NO_THINK ->
           "<|im_start|>user\n"
               + prompt
@@ -85,7 +85,7 @@ public enum RagPromptTemplate {
               + systemPrompt.stripTrailing()
               + "<|im_end|>\n<|im_start|>user\n"
               + userPrompt
-              + "<|im_end|>\n<|im_start|>assistant\nDirect answer from the context: ";
+              + "<|im_end|>\n<|im_start|>assistant\nThe context states that ";
       case CHATML_NO_THINK ->
           "<|im_start|>system\n"
               + systemPrompt.stripTrailing()
