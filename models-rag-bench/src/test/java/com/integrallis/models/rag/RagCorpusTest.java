@@ -142,6 +142,47 @@ class RagCorpusTest {
   }
 
   @Test
+  void healthcareOracleAcceptsConciseRetentionAndNurseAnswers() {
+    RagCorpus corpus = RagCorpus.load(RagWorkload.HEALTHCARE);
+    RagCase cedar =
+        corpus.cases().stream()
+            .filter(value -> value.id().equals("cedar-storage-retention"))
+            .findFirst()
+            .orElseThrow();
+    RagCase fir =
+        corpus.cases().stream()
+            .filter(value -> value.id().equals("fir-reconciliation-owner"))
+            .findFirst()
+            .orElseThrow();
+    RagDocument cedarDocument =
+        corpus.documents().stream()
+            .filter(value -> value.id().equals("health-cedar-specimens"))
+            .findFirst()
+            .orElseThrow();
+    RagDocument firDocument =
+        corpus.documents().stream()
+            .filter(value -> value.id().equals("health-fir-reconciliation"))
+            .findFirst()
+            .orElseThrow();
+
+    RagEvaluation cedarEvaluation =
+        RagEvaluator.evaluate(
+            cedar,
+            List.of(new RetrievedDocument(cedarDocument, 3.0f, 1)),
+            "7-year retention is after study closure at minus 80 degrees Celsius "
+                + "[health-cedar-specimens].");
+    RagEvaluation firEvaluation =
+        RagEvaluator.evaluate(
+            fir,
+            List.of(new RetrievedDocument(firDocument, 3.0f, 1)),
+            "Fir performs medication reconciliation at every admission and discharge. "
+                + "The nurse records completion. [health-fir-reconciliation]");
+
+    assertThat(cedarEvaluation.correct()).isTrue();
+    assertThat(firEvaluation.correct()).isTrue();
+  }
+
+  @Test
   void mathOracleAcceptsAnEquivalentSequenceStartPhrase() {
     RagCorpus corpus = RagCorpus.load(RagWorkload.MATH);
     RagCase testCase =

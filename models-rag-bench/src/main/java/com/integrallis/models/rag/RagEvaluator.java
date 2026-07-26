@@ -34,6 +34,8 @@ public final class RagEvaluator {
   private static final Pattern OPTIONAL_PLURAL_MARKER = Pattern.compile("\\(s\\)");
   private static final Pattern NUMBER_WORD =
       Pattern.compile("\\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\\b");
+  private static final Pattern PLURAL_TIME_UNIT =
+      Pattern.compile("\\b(years|months|weeks|days|hours|minutes|seconds)\\b");
 
   private RagEvaluator() {}
 
@@ -156,6 +158,10 @@ public final class RagEvaluator {
                       case "ten" -> "10";
                       default -> throw new IllegalStateException("Unexpected number word");
                     });
+    normalized =
+        PLURAL_TIME_UNIT
+            .matcher(normalized)
+            .replaceAll(result -> result.group().substring(0, result.group().length() - 1));
     return normalized.replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
   }
 }
