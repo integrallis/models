@@ -54,6 +54,45 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void abstainsWhenRetrievedEvidenceDoesNotContainAnyNamedQuestionEntity() {
+    GroundingDocument amber =
+        new GroundingDocument(
+            "legal-amber-notice",
+            "Amber vendor notice",
+            "The Amber vendor agreement requires 30 calendar days of termination notice.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which governing law applies to the Orchid reseller agreement?",
+            List.of(amber),
+            "The Amber agreement requires 30 days of notice.");
+
+    assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.RETRIEVAL_ABSTENTION);
+  }
+
+  @Test
+  void retainsEvidenceWhenAnyTokenFromAMultiwordNamedEntityMatches() {
+    GroundingDocument northstar =
+        new GroundingDocument(
+            "claims-northstar",
+            "Northstar claims",
+            "Northstar glass claims must be reported through the Aurora portal.",
+            8.0f,
+            1);
+    String generated = "Northstar glass claims must be reported through the Aurora portal.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Where does Northstar Mutual accept glass claims?", List.of(northstar), generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [claims-northstar]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
   void preservesAnAnswerWithOnlyTrustedCitations() {
     String generated =
         "Domestic claims take 2 days and international wires take 5 days. "
@@ -505,5 +544,76 @@ class GroundedAnswerPolicyTest {
     assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
     assertThat(answer.rawText()).isEqualTo(generated);
     assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
+  }
+
+  @Test
+  void acceptsSupportedClaimsWithNumberedListMarkers() {
+    GroundingDocument liability =
+        new GroundingDocument(
+            "legal-cobalt-cap",
+            "Cobalt liability cap",
+            "Cobalt's liability cap equals fees paid during the prior 12 months. "
+                + "Confidentiality breaches are excluded from the cap.",
+            8.0f,
+            1);
+    String generated =
+        "1) Cobalt's liability cap equals fees paid during the prior 12 months, and "
+            + "2) confidentiality breaches are excluded from the cap.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "How is Cobalt's liability cap calculated and which breach is excluded?",
+            List.of(liability),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [legal-cobalt-cap]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void acceptsEquivalentNumericAndNumberWordClaims() {
+    GroundingDocument audits =
+        new GroundingDocument(
+            "legal-fjord-audit",
+            "Fjord audit rights",
+            "Fjord permits one compliance audit per calendar year with 10 business days of notice.",
+            8.0f,
+            1);
+    String generated =
+        "1 compliance audit is permitted per calendar year, and 10 business days of notice "
+            + "is required.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "How often may Fjord be audited and how much notice is required?",
+            List.of(audits),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [legal-fjord-audit]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void preservesATerminalExplicitAbstentionAfterModelAnalysis() {
+    String generated =
+        "The retrieved agreement discusses termination notice but not the requested governing "
+            + "law. Therefore, the answer is INSUFFICIENT_CONTEXT.";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
+    assertThat(answer.rawText()).isEqualTo(generated);
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
+  }
+
+  @Test
+  void rejectsAnAbstentionTokenFollowedByAnUnsupportedClaim() {
+    String generated = "INSUFFICIENT_CONTEXT. The settlement takes 30 business days.";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
   }
 }

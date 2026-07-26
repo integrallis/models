@@ -35,20 +35,27 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v15";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v17";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^(?:INSUFFICIENT_CONTEXT[.!]?\\s*)+$");
+  private static final Pattern TERMINAL_ABSTENTION_PATTERN =
+      Pattern.compile(
+          "(?i)(?:therefore,?\\s+)?(?:the\\s+)?answer\\s+is\\s+"
+              + "INSUFFICIENT_CONTEXT[.!]?\\s*$");
   private static final Pattern LEADING_CONTEXT_ATTRIBUTION =
       Pattern.compile("(?i)^according to the context provided,?\\s*");
   private static final Pattern LATEX_MATRIX_DELIMITER =
       Pattern.compile("\\\\(?:begin|end)\\{(?:bmatrix|matrix|pmatrix|vmatrix|Vmatrix)}");
   private static final Pattern OPTIONAL_PLURAL_MARKER = Pattern.compile("(?i)\\(s\\)");
+  private static final Pattern NUMBERED_LIST_MARKER = Pattern.compile("(?m)(^|\\s)\\d+[.)]\\s+");
   private static final Pattern CLAUSE_BOUNDARY =
       Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
   private static final Pattern STATEMENT_BOUNDARY = Pattern.compile("(?i)(?:[;?!]\\s*|\\.\\s+)");
   private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
+  private static final Pattern NAMED_ENTITY_TOKEN =
+      Pattern.compile("\\b[\\p{Lu}][\\p{L}\\p{N}_-]{2,}\\b");
   private static final Set<String> FUNCTION_WORDS =
       Set.of(
           "a",
@@ -125,7 +132,8 @@ public final class GroundedAnswerPolicy {
 
     if (retrieved.isEmpty()
         || retrieved.stream().map(GroundingDocument::score).max(Float::compare).orElse(0.0f)
-            < minimumRetrievalScore) {
+            < minimumRetrievalScore
+        || lacksNamedEntityOverlap(question, retrieved)) {
       return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.RETRIEVAL_ABSTENTION);
     }
 
@@ -160,12 +168,15 @@ public final class GroundedAnswerPolicy {
 
   private static String removeValidationOnlyMarkup(String candidate) {
     String withoutMatrixDelimiters = LATEX_MATRIX_DELIMITER.matcher(candidate).replaceAll(" ");
-    return OPTIONAL_PLURAL_MARKER.matcher(withoutMatrixDelimiters).replaceAll("");
+    String withoutPluralMarkers =
+        OPTIONAL_PLURAL_MARKER.matcher(withoutMatrixDelimiters).replaceAll("");
+    return NUMBERED_LIST_MARKER.matcher(withoutPluralMarkers).replaceAll("$1");
   }
 
   private static boolean isExplicitAbstention(String candidate) {
     String undecorated = BRACKETED_TEXT.matcher(candidate).replaceAll(" ").strip();
-    return ABSTENTION_PATTERN.matcher(undecorated).matches();
+    return ABSTENTION_PATTERN.matcher(undecorated).matches()
+        || TERMINAL_ABSTENTION_PATTERN.matcher(undecorated).find();
   }
 
   private static boolean hasOnlySupportedClaims(
@@ -182,14 +193,7 @@ public final class GroundedAnswerPolicy {
   }
 
   private static boolean isSupportedClaimWord(String word, Set<String> supported) {
-    if (supported.contains(word)) {
-      return true;
-    }
-    if (word.length() > 4 && word.endsWith("ed")) {
-      return supported.contains(word.substring(0, word.length() - 1))
-          || supported.contains(word.substring(0, word.length() - 2));
-    }
-    return false;
+    return containsEquivalentWord(supported, word);
   }
 
   private static Set<String> words(String text) {
@@ -208,6 +212,30 @@ public final class GroundedAnswerPolicy {
     return words;
   }
 
+  private static boolean lacksNamedEntityOverlap(
+      String question, List<GroundingDocument> retrieved) {
+    Set<String> questionEntities = new HashSet<>();
+    Matcher matcher = NAMED_ENTITY_TOKEN.matcher(question);
+    while (matcher.find()) {
+      String entity = matcher.group().toLowerCase(Locale.ROOT);
+      if (!FUNCTION_WORDS.contains(entity)) {
+        questionEntities.add(normalizeWord(entity));
+      }
+    }
+    if (questionEntities.isEmpty()) {
+      return false;
+    }
+
+    Set<String> evidenceWords = new HashSet<>();
+    retrieved.forEach(
+        document -> {
+          evidenceWords.addAll(words(document.title()));
+          evidenceWords.addAll(words(document.text()));
+        });
+    return questionEntities.stream()
+        .noneMatch(entity -> containsEquivalentWord(evidenceWords, entity));
+  }
+
   private static boolean hasEvidenceAnchorsForEveryQuestionClause(
       String question, String candidate, List<GroundingDocument> retrieved) {
     Set<String> questionWords = words(question);
@@ -217,7 +245,7 @@ public final class GroundedAnswerPolicy {
           evidenceWords.addAll(words(hit.title()));
           evidenceWords.addAll(words(hit.text()));
         });
-    evidenceWords.removeAll(questionWords);
+    removeEquivalentWords(evidenceWords, questionWords);
 
     List<Set<String>> questionClauses = clauses(question);
     List<Set<String>> candidateClauses =
@@ -242,23 +270,30 @@ public final class GroundedAnswerPolicy {
       Set<String> clauseEvidenceWords = new HashSet<>(matchingEvidenceClauses.get(clauseIndex));
       for (int otherIndex = 0; otherIndex < questionClauses.size(); otherIndex++) {
         if (otherIndex != clauseIndex) {
-          clauseSpecificWords.removeAll(questionClauses.get(otherIndex));
-          clauseEvidenceWords.removeAll(matchingEvidenceClauses.get(otherIndex));
+          removeEquivalentWords(clauseSpecificWords, questionClauses.get(otherIndex));
+          removeEquivalentWords(clauseEvidenceWords, matchingEvidenceClauses.get(otherIndex));
         }
       }
-      clauseEvidenceWords.removeAll(questionWords);
+      removeEquivalentWords(clauseEvidenceWords, questionWords);
       if (clauseEvidenceWords.isEmpty()) {
         clauseEvidenceWords.addAll(matchingEvidenceClauses.get(clauseIndex));
-        clauseEvidenceWords.removeAll(questionWords);
+        removeEquivalentWords(clauseEvidenceWords, questionWords);
       }
       Set<String> anchors = new HashSet<>();
       for (Set<String> candidateClause : candidateClauses) {
-        long overlap = candidateClause.stream().filter(questionClause::contains).count();
+        long overlap =
+            candidateClause.stream()
+                .filter(word -> containsEquivalentWord(questionClause, word))
+                .count();
         long clauseSpecificOverlap =
-            candidateClause.stream().filter(clauseSpecificWords::contains).count();
+            candidateClause.stream()
+                .filter(word -> containsEquivalentWord(clauseSpecificWords, word))
+                .count();
         int requiredClauseSpecificOverlap = Math.min(1, clauseSpecificWords.size());
         if (overlap >= 1 && clauseSpecificOverlap >= requiredClauseSpecificOverlap) {
-          candidateClause.stream().filter(clauseEvidenceWords::contains).forEach(anchors::add);
+          candidateClause.stream()
+              .filter(word -> containsEquivalentWord(clauseEvidenceWords, word))
+              .forEach(anchors::add);
         }
       }
       if (!hasConcreteEvidenceAnchor(anchors)) {
@@ -289,7 +324,10 @@ public final class GroundedAnswerPolicy {
     Set<String> best = Set.of();
     long bestOverlap = -1;
     for (Set<String> evidenceClause : evidenceClauses) {
-      long overlap = evidenceClause.stream().filter(questionClause::contains).count();
+      long overlap =
+          evidenceClause.stream()
+              .filter(word -> containsEquivalentWord(questionClause, word))
+              .count();
       if (overlap > bestOverlap) {
         best = evidenceClause;
         bestOverlap = overlap;
@@ -305,7 +343,43 @@ public final class GroundedAnswerPolicy {
                 anchor -> anchor.length() >= 8 || anchor.codePoints().allMatch(Character::isDigit));
   }
 
+  private static boolean containsEquivalentWord(Set<String> words, String candidate) {
+    if (words.contains(candidate)) {
+      return true;
+    }
+    Set<String> candidateForms = inflectionForms(candidate);
+    for (String word : words) {
+      if (candidateForms.stream().anyMatch(inflectionForms(word)::contains)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static void removeEquivalentWords(Set<String> words, Set<String> removals) {
+    words.removeIf(word -> containsEquivalentWord(removals, word));
+  }
+
+  private static Set<String> inflectionForms(String word) {
+    Set<String> forms = new HashSet<>();
+    forms.add(word);
+    if (word.length() > 4 && word.endsWith("ed")) {
+      forms.add(word.substring(0, word.length() - 1));
+      String withoutEd = word.substring(0, word.length() - 2);
+      forms.add(withoutEd);
+      int stemLength = withoutEd.length();
+      if (stemLength > 1 && withoutEd.charAt(stemLength - 1) == withoutEd.charAt(stemLength - 2)) {
+        forms.add(withoutEd.substring(0, stemLength - 1));
+      }
+    }
+    return forms;
+  }
+
   private static String normalizeWord(String word) {
+    String number = normalizeNumberWord(word);
+    if (!number.equals(word)) {
+      return number;
+    }
     if (word.equals("thrown")) {
       return "throw";
     }
@@ -316,6 +390,23 @@ public final class GroundedAnswerPolicy {
       return word.substring(0, word.length() - 1);
     }
     return word;
+  }
+
+  private static String normalizeNumberWord(String word) {
+    return switch (word) {
+      case "zero" -> "0";
+      case "one" -> "1";
+      case "two" -> "2";
+      case "three" -> "3";
+      case "four" -> "4";
+      case "five" -> "5";
+      case "six" -> "6";
+      case "seven" -> "7";
+      case "eight" -> "8";
+      case "nine" -> "9";
+      case "ten" -> "10";
+      default -> word;
+    };
   }
 
   private static boolean hasOnlyTrustedCitations(
