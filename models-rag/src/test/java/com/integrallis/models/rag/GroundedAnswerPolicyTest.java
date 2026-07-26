@@ -80,6 +80,32 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void acceptsABoundedLeadingContextAttribution() {
+    GroundingDocument autoGlass =
+        new GroundingDocument(
+            "claims-auto-glass",
+            "Auto glass claims",
+            "Northstar Mutual auto glass claims must be reported through the Aurora portal within "
+                + "30 calendar days. Windshield repair has a 75 dollar deductible. A police "
+                + "report is not required.",
+            8.0f,
+            1);
+    String generated =
+        "According to the context provided, Northstar Mutual auto glass claims must be reported "
+            + "through the Aurora portal within 30 calendar days. Windshield repair has a 75 "
+            + "dollar deductible. A police report is not required.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Where and when must Northstar Mutual auto glass claims be reported?",
+            List.of(autoGlass),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [claims-auto-glass]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
   void doesNotDeriveCitationsForAnUnsupportedUncitedClaim() {
     GroundedAnswer answer =
         policy.apply(

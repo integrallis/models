@@ -35,11 +35,13 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v11";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v12";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^(?:INSUFFICIENT_CONTEXT[.!]?\\s*)+$");
+  private static final Pattern LEADING_CONTEXT_ATTRIBUTION =
+      Pattern.compile("(?i)^according to the context provided,?\\s*");
   private static final Pattern CLAUSE_BOUNDARY =
       Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
   private static final Pattern STATEMENT_BOUNDARY = Pattern.compile("(?i)(?:[;?!]\\s*|\\.\\s+)");
@@ -125,9 +127,10 @@ public final class GroundedAnswerPolicy {
     if (isExplicitAbstention(candidate)) {
       return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.MODEL_ABSTENTION);
     }
-    if (candidate.isBlank()
-        || !hasOnlySupportedClaims(question, candidate, retrieved)
-        || !hasEvidenceAnchorsForEveryQuestionClause(question, candidate, retrieved)) {
+    String validationCandidate = removeLeadingContextAttribution(candidate);
+    if (validationCandidate.isBlank()
+        || !hasOnlySupportedClaims(question, validationCandidate, retrieved)
+        || !hasEvidenceAnchorsForEveryQuestionClause(question, validationCandidate, retrieved)) {
       return new GroundedAnswer(
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
@@ -142,6 +145,10 @@ public final class GroundedAnswerPolicy {
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
     return new GroundedAnswer(generatedText, candidate, GroundingDecision.MODEL_ANSWER);
+  }
+
+  private static String removeLeadingContextAttribution(String candidate) {
+    return LEADING_CONTEXT_ATTRIBUTION.matcher(candidate).replaceFirst("");
   }
 
   private static boolean isExplicitAbstention(String candidate) {
