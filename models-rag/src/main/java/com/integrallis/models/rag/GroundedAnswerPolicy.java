@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v17";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v18";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -56,6 +56,10 @@ public final class GroundedAnswerPolicy {
   private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
   private static final Pattern NAMED_ENTITY_TOKEN =
       Pattern.compile("\\b[\\p{Lu}][\\p{L}\\p{N}_-]{2,}\\b");
+  private static final Pattern ATOMIC_IDENTIFIER =
+      Pattern.compile(
+          "(?i)\\b(?=[\\p{L}\\p{N}-]*\\p{L})(?=[\\p{L}\\p{N}-]*\\p{N})"
+              + "[\\p{L}\\p{N}]+(?:-[\\p{L}\\p{N}]+)+\\b");
   private static final Set<String> FUNCTION_WORDS =
       Set.of(
           "a",
@@ -74,6 +78,7 @@ public final class GroundedAnswerPolicy {
           "do",
           "context",
           "does",
+          "frame",
           "for",
           "from",
           "how",
@@ -85,6 +90,7 @@ public final class GroundedAnswerPolicy {
           "of",
           "on",
           "or",
+          "period",
           "provided",
           "question",
           "source",
@@ -93,6 +99,7 @@ public final class GroundedAnswerPolicy {
           "these",
           "this",
           "those",
+          "time",
           "to",
           "was",
           "were",
@@ -144,6 +151,7 @@ public final class GroundedAnswerPolicy {
     String validationCandidate =
         removeValidationOnlyMarkup(removeLeadingContextAttribution(candidate));
     if (validationCandidate.isBlank()
+        || !preservesAtomicIdentifiers(validationCandidate, retrieved)
         || !hasOnlySupportedClaims(question, validationCandidate, retrieved)
         || !hasEvidenceAnchorsForEveryQuestionClause(question, validationCandidate, retrieved)) {
       return new GroundedAnswer(
@@ -279,8 +287,12 @@ public final class GroundedAnswerPolicy {
         clauseEvidenceWords.addAll(matchingEvidenceClauses.get(clauseIndex));
         removeEquivalentWords(clauseEvidenceWords, questionWords);
       }
-      Set<String> anchors = new HashSet<>();
+      boolean clauseSatisfied = false;
       for (Set<String> candidateClause : candidateClauses) {
+        Set<String> candidateEvidenceAnchors = new HashSet<>();
+        candidateClause.stream()
+            .filter(word -> containsEquivalentWord(clauseEvidenceWords, word))
+            .forEach(candidateEvidenceAnchors::add);
         long overlap =
             candidateClause.stream()
                 .filter(word -> containsEquivalentWord(questionClause, word))
@@ -290,13 +302,20 @@ public final class GroundedAnswerPolicy {
                 .filter(word -> containsEquivalentWord(clauseSpecificWords, word))
                 .count();
         int requiredClauseSpecificOverlap = Math.min(1, clauseSpecificWords.size());
-        if (overlap >= 1 && clauseSpecificOverlap >= requiredClauseSpecificOverlap) {
-          candidateClause.stream()
-              .filter(word -> containsEquivalentWord(clauseEvidenceWords, word))
-              .forEach(anchors::add);
+        boolean questionBoundAnchor =
+            overlap >= 2
+                && clauseSpecificOverlap >= requiredClauseSpecificOverlap
+                && candidateEvidenceAnchors.stream()
+                    .anyMatch(
+                        anchor ->
+                            anchor.length() >= 5
+                                || anchor.codePoints().allMatch(Character::isDigit));
+        if (questionBoundAnchor || hasConcreteEvidenceAnchor(candidateEvidenceAnchors)) {
+          clauseSatisfied = true;
+          break;
         }
       }
-      if (!hasConcreteEvidenceAnchor(anchors)) {
+      if (!clauseSatisfied) {
         return false;
       }
     }
@@ -363,6 +382,21 @@ public final class GroundedAnswerPolicy {
   private static Set<String> inflectionForms(String word) {
     Set<String> forms = new HashSet<>();
     forms.add(word);
+    if (word.equals("expiration")) {
+      forms.add("expire");
+    } else if (word.equals("retention")) {
+      forms.add("retain");
+    }
+    if (word.length() > 5 && word.endsWith("ing")) {
+      String withoutIng = word.substring(0, word.length() - 3);
+      forms.add(withoutIng);
+      forms.add(withoutIng + "e");
+      int stemLength = withoutIng.length();
+      if (stemLength > 1
+          && withoutIng.charAt(stemLength - 1) == withoutIng.charAt(stemLength - 2)) {
+        forms.add(withoutIng.substring(0, stemLength - 1));
+      }
+    }
     if (word.length() > 4 && word.endsWith("ed")) {
       forms.add(word.substring(0, word.length() - 1));
       String withoutEd = word.substring(0, word.length() - 2);
@@ -385,6 +419,14 @@ public final class GroundedAnswerPolicy {
     }
     if (word.length() > 4 && word.endsWith("ies")) {
       return word.substring(0, word.length() - 3) + "y";
+    }
+    if (word.length() > 4
+        && (word.endsWith("ses")
+            || word.endsWith("xes")
+            || word.endsWith("zes")
+            || word.endsWith("ches")
+            || word.endsWith("shes"))) {
+      return word.substring(0, word.length() - 2);
     }
     if (word.length() > 3 && word.endsWith("s") && !word.endsWith("ss")) {
       return word.substring(0, word.length() - 1);
@@ -424,6 +466,35 @@ public final class GroundedAnswerPolicy {
       foundTrusted = true;
     }
     return foundTrusted;
+  }
+
+  private static boolean preservesAtomicIdentifiers(
+      String candidate, List<GroundingDocument> retrieved) {
+    Set<String> candidateIdentifiers = atomicIdentifiers(candidate);
+    Set<String> candidateWords = words(candidate);
+    for (GroundingDocument document : retrieved) {
+      for (String identifier : atomicIdentifiers(document.title() + " " + document.text())) {
+        if (candidateIdentifiers.contains(identifier)) {
+          continue;
+        }
+        for (String segment : identifier.split("-")) {
+          String normalizedSegment = normalizeWord(segment);
+          if (candidateWords.contains(normalizedSegment)) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  private static Set<String> atomicIdentifiers(String text) {
+    Set<String> identifiers = new HashSet<>();
+    Matcher matcher = ATOMIC_IDENTIFIER.matcher(text);
+    while (matcher.find()) {
+      identifiers.add(matcher.group().toLowerCase(Locale.ROOT));
+    }
+    return identifiers;
   }
 
   private static boolean hasCitations(String candidate) {

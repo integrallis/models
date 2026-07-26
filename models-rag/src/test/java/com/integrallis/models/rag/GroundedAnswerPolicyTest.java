@@ -616,4 +616,97 @@ class GroundedAnswerPolicyTest {
 
     assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
   }
+
+  @Test
+  void rejectsAnIdentifierWithItsAlphabeticPrefixRemoved() {
+    GroundingDocument protocol =
+        new GroundingDocument(
+            "health-beacon-visits",
+            "Beacon research visits",
+            "The synthetic Beacon study uses protocol BT-204. "
+                + "Follow-up research visits occur every six weeks.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which protocol code does the Beacon study use, and how often are follow-up visits?",
+            List.of(protocol),
+            "204 is the protocol code and follow-up visits occur every six weeks.");
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+    assertThat(answer.text()).contains("BT-204").endsWith("[health-beacon-visits]");
+  }
+
+  @Test
+  void acceptsConciseHealthcareAnswersWithDistinctEvidenceAnchors() {
+    GroundingDocument specimens =
+        new GroundingDocument(
+            "health-cedar-specimens",
+            "Cedar specimen storage",
+            "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. "
+                + "Retention lasts seven years after study closure.",
+            8.0f,
+            1);
+    GroundingDocument reconciliation =
+        new GroundingDocument(
+            "health-fir-reconciliation",
+            "Fir medication reconciliation",
+            "Fir Practice performs medication reconciliation at every admission and discharge. "
+                + "The assigned nurse records completion.",
+            8.0f,
+            1);
+    GroundingDocument portal =
+        new GroundingDocument(
+            "health-elm-portal",
+            "Elm portal routing",
+            "Elm Health routes nonurgent portal messages to the care team within 72 hours. "
+                + "Emergency messages are not accepted through the portal.",
+            8.0f,
+            1);
+    GroundingDocument images =
+        new GroundingDocument(
+            "health-grove-images",
+            "Grove image transfer",
+            "Grove Hospital exchanges diagnostic images in DICOM format. "
+                + "Temporary transfer links expire after 30 days.",
+            8.0f,
+            1);
+
+    assertThat(
+            policy
+                .apply(
+                    "At what temperature does Cedar store specimens and how long are they retained?",
+                    List.of(specimens),
+                    "7-year retention is after study closure at minus 80 degrees Celsius.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+    assertThat(
+            policy
+                .apply(
+                    "When does Fir perform medication reconciliation and who records completion?",
+                    List.of(reconciliation),
+                    "Fir Practice performs medication reconciliation at every admission and discharge. "
+                        + "The nurse records completion.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+    assertThat(
+            policy
+                .apply(
+                    "When does Elm route nonurgent messages and which messages are rejected?",
+                    List.of(portal),
+                    "72 hours is the time frame for Elm Health to route nonurgent portal messages "
+                        + "to the care team. Emergency messages are not accepted through the portal.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+    assertThat(
+            policy
+                .apply(
+                    "Which image format does Grove exchange and when do transfer links expire?",
+                    List.of(images),
+                    "30 days is the expiration period for temporary transfer links. "
+                        + "The format exchanged is DICOM.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
 }
