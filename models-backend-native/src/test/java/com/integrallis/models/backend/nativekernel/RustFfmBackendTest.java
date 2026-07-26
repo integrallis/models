@@ -30,7 +30,7 @@ class RustFfmBackendTest {
 
   @Test
   void versionsAutomaticNativeProfileSelection() {
-    assertThat(RustFfmBackend.PLAN_VERSION).isEqualTo("rust-ffm-v9");
+    assertThat(RustFfmBackend.PLAN_VERSION).isEqualTo("rust-ffm-v10");
   }
 
   @Test
