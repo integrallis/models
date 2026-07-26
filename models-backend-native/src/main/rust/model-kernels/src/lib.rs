@@ -31,6 +31,7 @@ fn record_k_quant_weight_block_decode() {
     K_QUANT_WEIGHT_BLOCK_DECODES.with(|count| count.set(count.get() + 1));
 }
 
+#[cfg(target_arch = "x86_64")]
 #[inline(always)]
 fn record_q4_k_batch_horizontal_reduction() {
     #[cfg(all(test, target_arch = "x86_64"))]
