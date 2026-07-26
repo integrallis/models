@@ -1,0 +1,1835 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-26T17:54:15.990609075Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@9c08ebd866d2c35b5e4695992f6ff62e4b0bf8d8 vectors@c298a0b73970468794c1ba403022e2adc517e57e",
+  "modelId" : "deepseek-coder-1.3b-instruct-q4_k_m",
+  "model" : "/root/.jvllm/models/deepseek-coder-1.3b-instruct.Q4_K_M.gguf",
+  "artifactSha256" : "04cebb6fafa40ae628cf6bfeb76032ec792852f54020c559ad0a56b9f2839118",
+  "artifactSizeBytes" : 873582624,
+  "settings" : {
+    "corpusSha256" : "6841c286837b4c45c06fe8d103b2e044b61a1bfe75a61b64fa04c7ca31b20e45",
+    "workload" : "coding",
+    "caseIds" : [ "list-copy-null-handling", "compute-if-absent-null", "virtual-thread-executor", "record-compact-validation", "gradle-java-25", "http-retry-rules", "migration-lock-expiry", "jackson-module-and-feature", "unsupported-cuda-kernel" ],
+    "promptTemplate" : "deepseek",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v14",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topK" : "1",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "GraalVM Community",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v10",
+    "environment" : {
+      "gguf-executor" : "persistent",
+      "java-version" : "25.0.3",
+      "fast-scalar-fma" : "true",
+      "transformer-runtime" : "java",
+      "gguf-chunks-per-thread" : "2",
+      "os" : "Linux",
+      "processors" : "8",
+      "gguf-parallel" : "true",
+      "sve" : "false",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-quantized-decode" : "true",
+      "compiler" : "graal-jvmci",
+      "vm-vendor" : "GraalVM Community",
+      "architecture" : "amd64",
+      "native-q5-0-grouped" : "false",
+      "native-kernel-threads" : "8",
+      "vector-api" : "true",
+      "native-kernel-abi" : "2",
+      "q4-unsigned-pairwise-supported" : "true",
+      "gguf-threads" : "8",
+      "java-feature" : "25",
+      "active-vector-bits" : "256",
+      "kernel-runtime" : "rust-ffm",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "preferred-vector-bits" : "256",
+      "kernel-implementation" : "rust-ffm-quantized-v10",
+      "vm-version" : "25.0.3+9-jvmci-25.1-b19",
+      "fast-vector-fma" : "true",
+      "projection-layers" : "24",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "q4-short-pairwise-supported" : "true",
+      "model-architecture" : "llama"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v10"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "12"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "graal-jvmci",
+        "requested" : "widened",
+        "short-supported" : "true"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q8_0"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "stages" : "2",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "stages" : "7",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "graal-jvmci",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "8",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "threads" : "8",
+        "chunks-per-thread" : "2"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "2",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "2",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "2",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "2",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "2",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "2",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "2",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "property" : "models.native.q5_0.grouped",
+        "qualification" : "model-and-platform-specific"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "property" : "models.native.quantizedDecode"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 221.198366,
+    "retrievalMillis" : {
+      "p50" : 1.326512,
+      "p95" : 1.9113265
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 10.031213999999636,
+      "p95" : 12.126170000000048
+    },
+    "ttftMillis" : {
+      "p50" : 943.427011,
+      "p95" : 1049.5940048
+    },
+    "tpotMillis" : {
+      "p50" : 33.25631992857143,
+      "p95" : 33.75952860547138
+    },
+    "endToEndMillis" : {
+      "p50" : 2377.522503,
+      "p95" : 3006.100831
+    },
+    "p50PrefillTokensPerSecond" : 87.74375562136595,
+    "p50DecodeTokensPerSecond" : 30.069472573869252,
+    "peakRssBytes" : 1549758464,
+    "totalCpuMillis" : 390360.0,
+    "totalInputTokens" : 5391,
+    "totalCacheReadInputTokens" : 3372,
+    "totalCacheWriteInputTokens" : 2019,
+    "totalOutputTokens" : 1197,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "USABLE",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "474240792e67743e70558ada2009fa4e923c249637cbc05c3d1b7c0f192862c3",
+    "retrievalMillis" : 1.926061,
+    "frameworkOverheadMillis" : 10.815635999999813,
+    "endToEndMillis" : 2122.830379,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "inputTokens" : 206,
+      "cacheReadInputTokens" : 174,
+      "cacheWriteInputTokens" : 32,
+      "outputTokens" : 52,
+      "ttftMillis" : 391.566186,
+      "totalMillis" : 2110.088682,
+      "prefillTokensPerSecond" : 83.76931093021891,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1520721920,
+      "cpuMillis" : 13270.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Java method that freezes parsed SKU values is `List.copyOf(values)`. The method throws a `NullPointerException` if any element in the provided list is `null`. The returned list is also unmodifiable.\n",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "425bbfd89455e698b20cbf6a46e10d214714a864acb8775734f3d834a2d99260",
+    "retrievalMillis" : 2.155338,
+    "frameworkOverheadMillis" : 11.617651999999907,
+    "endToEndMillis" : 2377.522503,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 43,
+      "ttftMillis" : 958.095046,
+      "totalMillis" : 2363.749513,
+      "prefillTokensPerSecond" : 86.50404294103733,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1520721920,
+      "cpuMillis" : 14720.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is `computeIfAbsent`. When the mapping function returns null, `computeIfAbsent` returns null and does not record a mapping for that key.\n",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cc57ee94397fcd8a9afad8407dc823a852301f68114a21c37e153cf79e2386a",
+    "retrievalMillis" : 1.636211,
+    "frameworkOverheadMillis" : 10.079016000000138,
+    "endToEndMillis" : 2662.741156,
+    "generation" : {
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 200,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 53,
+      "ttftMillis" : 925.060103,
+      "totalMillis" : 2651.025929,
+      "prefillTokensPerSecond" : 87.33384009594609,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1520721920,
+      "cpuMillis" : 16670.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses a VirtualThreadPerTaskExecutorFactory. The VirtualThreadPerTaskExecutorFactory creates a new executor for each task, which means it creates a new virtual thread for each task. The executor is closed when all tasks have finished execution.\n",
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0e2e0cd5e6d6f8054102049dc52d8d551231cbd1b676d595ad577924b352fecf",
+    "retrievalMillis" : 1.326512,
+    "frameworkOverheadMillis" : 12.646488999999974,
+    "endToEndMillis" : 1363.159887,
+    "generation" : {
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 21,
+      "ttftMillis" : 696.727267,
+      "totalMillis" : 1349.186886,
+      "prefillTokensPerSecond" : 88.68233161742859,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1520721920,
+      "cpuMillis" : 8500.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.\n",
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "22e1650578555c00edeafce750313dfafeacd6d6d3f8b24b2ff23909079502e4",
+    "retrievalMillis" : 1.313482,
+    "frameworkOverheadMillis" : 9.947365999999874,
+    "endToEndMillis" : 2850.493715,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 207,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 89,
+      "outputTokens" : 55,
+      "ttftMillis" : 1032.049261,
+      "totalMillis" : 2839.232867,
+      "prefillTokensPerSecond" : 86.97745487980761,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1533571072,
+      "cpuMillis" : 17710.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain and `JavaLanguageVersion.of(25)` sets the compilation target release to 25.\n",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9ce67b7e275c71e0389950c409cc2b8a5dd34588d07f9ebe1da0cd8bf1c13e72",
+    "retrievalMillis" : 1.330427,
+    "frameworkOverheadMillis" : 12.173213000000032,
+    "endToEndMillis" : 2107.137197,
+    "generation" : {
+      "text" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 83,
+      "outputTokens" : 35,
+      "ttftMillis" : 964.7771,
+      "totalMillis" : 2093.633557,
+      "prefillTokensPerSecond" : 86.77849037032945,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1533571072,
+      "cpuMillis" : 13010.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header.\n",
+      "text" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7f7a32923ca16e2ed2b4d5429da79b393975f44decd557478ad8a2e5992a5ed0",
+    "retrievalMillis" : 1.283386,
+    "frameworkOverheadMillis" : 9.400346999999783,
+    "endToEndMillis" : 1852.098047,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 192,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 74,
+      "outputTokens" : 31,
+      "ttftMillis" : 851.744558,
+      "totalMillis" : 1841.414314,
+      "prefillTokensPerSecond" : 87.74375562136595,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1533571072,
+      "cpuMillis" : 11580.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it.\n",
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ccf7a8127223c1df80ae217d0b58a44f04aa6af7b0524d68694d5361102472c6",
+    "retrievalMillis" : 1.2991,
+    "frameworkOverheadMillis" : 10.419602999999825,
+    "endToEndMillis" : 2570.257199,
+    "generation" : {
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 45,
+      "ttftMillis" : 1082.246434,
+      "totalMillis" : 2558.538496,
+      "prefillTokensPerSecond" : 84.83462370152078,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1540509696,
+      "cpuMillis" : 15750.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.\n",
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cfe95e787639441c9ad3a201d56b489aee42b6641dc1394c3127dcd117e1552",
+    "retrievalMillis" : 1.171497,
+    "frameworkOverheadMillis" : 9.932785000000422,
+    "endToEndMillis" : 3056.977455,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 81,
+      "outputTokens" : 64,
+      "ttftMillis" : 977.193072,
+      "totalMillis" : 3045.873173,
+      "prefillTokensPerSecond" : 83.64727273530136,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1542504448,
+      "cpuMillis" : 18920.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CUDA block size is determined by the number of threads in a block. The number of threads in a block is determined by the CUDA device architecture and the size of the shared memory. The maximum number of threads that can be launched in a single CUDA thread block is determined by the maximum number of threads that",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "474240792e67743e70558ada2009fa4e923c249637cbc05c3d1b7c0f192862c3",
+    "retrievalMillis" : 1.876946,
+    "frameworkOverheadMillis" : 11.337655000000268,
+    "endToEndMillis" : 2111.071965,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "inputTokens" : 206,
+      "cacheReadInputTokens" : 174,
+      "cacheWriteInputTokens" : 32,
+      "outputTokens" : 52,
+      "ttftMillis" : 393.429284,
+      "totalMillis" : 2097.857364,
+      "prefillTokensPerSecond" : 83.52159208942362,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1542504448,
+      "cpuMillis" : 13180.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Java method that freezes parsed SKU values is `List.copyOf(values)`. The method throws a `NullPointerException` if any element in the provided list is `null`. The returned list is also unmodifiable.\n",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "425bbfd89455e698b20cbf6a46e10d214714a864acb8775734f3d834a2d99260",
+    "retrievalMillis" : 1.860612,
+    "frameworkOverheadMillis" : 12.016403000000082,
+    "endToEndMillis" : 2411.753661,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 43,
+      "ttftMillis" : 1001.111209,
+      "totalMillis" : 2397.876646,
+      "prefillTokensPerSecond" : 82.82058001239876,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1544847360,
+      "cpuMillis" : 14800.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is `computeIfAbsent`. When the mapping function returns null, `computeIfAbsent` returns null and does not record a mapping for that key.\n",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cc57ee94397fcd8a9afad8407dc823a852301f68114a21c37e153cf79e2386a",
+    "retrievalMillis" : 1.437311,
+    "frameworkOverheadMillis" : 10.031213999999636,
+    "endToEndMillis" : 2777.265845,
+    "generation" : {
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 200,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 53,
+      "ttftMillis" : 958.966218,
+      "totalMillis" : 2765.79732,
+      "prefillTokensPerSecond" : 84.19833368803285,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 17000.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses a VirtualThreadPerTaskExecutorFactory. The VirtualThreadPerTaskExecutorFactory creates a new executor for each task, which means it creates a new virtual thread for each task. The executor is closed when all tasks have finished execution.\n",
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0e2e0cd5e6d6f8054102049dc52d8d551231cbd1b676d595ad577924b352fecf",
+    "retrievalMillis" : 1.332832,
+    "frameworkOverheadMillis" : 9.830128999999943,
+    "endToEndMillis" : 1357.89286,
+    "generation" : {
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 21,
+      "ttftMillis" : 689.900383,
+      "totalMillis" : 1346.729899,
+      "prefillTokensPerSecond" : 89.8298204240776,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 8520.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.\n",
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "22e1650578555c00edeafce750313dfafeacd6d6d3f8b24b2ff23909079502e4",
+    "retrievalMillis" : 1.315464,
+    "frameworkOverheadMillis" : 10.646248000000014,
+    "endToEndMillis" : 2857.385711,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 207,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 89,
+      "outputTokens" : 55,
+      "ttftMillis" : 1021.227128,
+      "totalMillis" : 2845.423999,
+      "prefillTokensPerSecond" : 87.89635421507036,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 17710.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain and `JavaLanguageVersion.of(25)` sets the compilation target release to 25.\n",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9ce67b7e275c71e0389950c409cc2b8a5dd34588d07f9ebe1da0cd8bf1c13e72",
+    "retrievalMillis" : 1.447746,
+    "frameworkOverheadMillis" : 9.131839000000582,
+    "endToEndMillis" : 2083.957142,
+    "generation" : {
+      "text" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 83,
+      "outputTokens" : 35,
+      "ttftMillis" : 948.5424,
+      "totalMillis" : 2073.377557,
+      "prefillTokensPerSecond" : 88.2627050984405,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 13000.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header.\n",
+      "text" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7f7a32923ca16e2ed2b4d5429da79b393975f44decd557478ad8a2e5992a5ed0",
+    "retrievalMillis" : 1.413172,
+    "frameworkOverheadMillis" : 9.727414999999837,
+    "endToEndMillis" : 1848.641596,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 192,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 74,
+      "outputTokens" : 31,
+      "ttftMillis" : 846.458752,
+      "totalMillis" : 1837.501009,
+      "prefillTokensPerSecond" : 88.28571894815468,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 11570.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it.\n",
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ccf7a8127223c1df80ae217d0b58a44f04aa6af7b0524d68694d5361102472c6",
+    "retrievalMillis" : 1.368365,
+    "frameworkOverheadMillis" : 10.995395000000372,
+    "endToEndMillis" : 2528.673291,
+    "generation" : {
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 45,
+      "ttftMillis" : 1043.277923,
+      "totalMillis" : 2516.309531,
+      "prefillTokensPerSecond" : 88.03302728312809,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 15650.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.\n",
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cfe95e787639441c9ad3a201d56b489aee42b6641dc1394c3127dcd117e1552",
+    "retrievalMillis" : 1.261053,
+    "frameworkOverheadMillis" : 9.801184999999805,
+    "endToEndMillis" : 3006.470995,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 81,
+      "outputTokens" : 64,
+      "ttftMillis" : 925.104332,
+      "totalMillis" : 2995.408757,
+      "prefillTokensPerSecond" : 88.38711921417304,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 18840.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CUDA block size is determined by the number of threads in a block. The number of threads in a block is determined by the CUDA device architecture and the size of the shared memory. The maximum number of threads that can be launched in a single CUDA thread block is determined by the maximum number of threads that",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "474240792e67743e70558ada2009fa4e923c249637cbc05c3d1b7c0f192862c3",
+    "retrievalMillis" : 1.501708,
+    "frameworkOverheadMillis" : 10.908584000000246,
+    "endToEndMillis" : 2109.403376,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "inputTokens" : 206,
+      "cacheReadInputTokens" : 174,
+      "cacheWriteInputTokens" : 32,
+      "outputTokens" : 52,
+      "ttftMillis" : 389.082071,
+      "totalMillis" : 2096.993084,
+      "prefillTokensPerSecond" : 84.30096838787976,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 13180.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Java method that freezes parsed SKU values is `List.copyOf(values)`. The method throws a `NullPointerException` if any element in the provided list is `null`. The returned list is also unmodifiable.\n",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "425bbfd89455e698b20cbf6a46e10d214714a864acb8775734f3d834a2d99260",
+    "retrievalMillis" : 1.397039,
+    "frameworkOverheadMillis" : 11.441964000000098,
+    "endToEndMillis" : 2350.053475,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 43,
+      "ttftMillis" : 943.427011,
+      "totalMillis" : 2337.214472,
+      "prefillTokensPerSecond" : 87.84718393564002,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 14620.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is `computeIfAbsent`. When the mapping function returns null, `computeIfAbsent` returns null and does not record a mapping for that key.\n",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cc57ee94397fcd8a9afad8407dc823a852301f68114a21c37e153cf79e2386a",
+    "retrievalMillis" : 1.07494,
+    "frameworkOverheadMillis" : 9.797812000000249,
+    "endToEndMillis" : 2669.014345,
+    "generation" : {
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 200,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 53,
+      "ttftMillis" : 919.929352,
+      "totalMillis" : 2658.141593,
+      "prefillTokensPerSecond" : 87.80515724776464,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 16700.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses a VirtualThreadPerTaskExecutorFactory. The VirtualThreadPerTaskExecutorFactory creates a new executor for each task, which means it creates a new virtual thread for each task. The executor is closed when all tasks have finished execution.\n",
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0e2e0cd5e6d6f8054102049dc52d8d551231cbd1b676d595ad577924b352fecf",
+    "retrievalMillis" : 1.058905,
+    "frameworkOverheadMillis" : 9.72544199999993,
+    "endToEndMillis" : 1362.50083,
+    "generation" : {
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 21,
+      "ttftMillis" : 692.362558,
+      "totalMillis" : 1351.716483,
+      "prefillTokensPerSecond" : 89.35300735387555,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 8560.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.\n",
+      "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "22e1650578555c00edeafce750313dfafeacd6d6d3f8b24b2ff23909079502e4",
+    "retrievalMillis" : 0.912564,
+    "frameworkOverheadMillis" : 9.664266999999654,
+    "endToEndMillis" : 2854.822534,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 207,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 89,
+      "outputTokens" : 55,
+      "ttftMillis" : 1025.79739,
+      "totalMillis" : 2844.245703,
+      "prefillTokensPerSecond" : 87.50603759704968,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 17730.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain and `JavaLanguageVersion.of(25)` sets the compilation target release to 25.\n",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9ce67b7e275c71e0389950c409cc2b8a5dd34588d07f9ebe1da0cd8bf1c13e72",
+    "retrievalMillis" : 1.136324,
+    "frameworkOverheadMillis" : 9.129345999999714,
+    "endToEndMillis" : 2091.023221,
+    "generation" : {
+      "text" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 83,
+      "outputTokens" : 35,
+      "ttftMillis" : 949.311376,
+      "totalMillis" : 2080.757551,
+      "prefillTokensPerSecond" : 88.19331222590395,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 12990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header.\n",
+      "text" : "The HTTP methods that are retried up to three attempts are GET and HEAD. The header that permits retrying POST is the Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7f7a32923ca16e2ed2b4d5429da79b393975f44decd557478ad8a2e5992a5ed0",
+    "retrievalMillis" : 1.240252,
+    "frameworkOverheadMillis" : 9.83110899999997,
+    "endToEndMillis" : 1845.979659,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 192,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 74,
+      "outputTokens" : 31,
+      "ttftMillis" : 844.212505,
+      "totalMillis" : 1834.908298,
+      "prefillTokensPerSecond" : 88.53588265882914,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 11580.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it.\n",
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ccf7a8127223c1df80ae217d0b58a44f04aa6af7b0524d68694d5361102472c6",
+    "retrievalMillis" : 1.266351,
+    "frameworkOverheadMillis" : 10.926400999999714,
+    "endToEndMillis" : 2547.665028,
+    "generation" : {
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 45,
+      "ttftMillis" : 1052.300897,
+      "totalMillis" : 2535.472276,
+      "prefillTokensPerSecond" : 87.26927078886756,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 15740.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.\n",
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "deepseek-ai_deepseek-coder-1.3b-instruct",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cfe95e787639441c9ad3a201d56b489aee42b6641dc1394c3127dcd117e1552",
+    "retrievalMillis" : 0.847466,
+    "frameworkOverheadMillis" : 9.79373299999952,
+    "endToEndMillis" : 3005.237115,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 118,
+      "cacheWriteInputTokens" : 81,
+      "outputTokens" : 64,
+      "ttftMillis" : 925.671402,
+      "totalMillis" : 2994.595916,
+      "prefillTokensPerSecond" : 88.33460877602899,
+      "loadMillis" : 221.198366,
+      "peakRssBytes" : 1549758464,
+      "cpuMillis" : 18860.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CUDA block size is determined by the number of threads in a block. The number of threads in a block is determined by the CUDA device architecture and the size of the shared memory. The maximum number of threads that can be launched in a single CUDA thread block is determined by the maximum number of threads that",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
