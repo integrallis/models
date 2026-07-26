@@ -140,4 +140,29 @@ class RagCorpusTest {
     assertThat(evaluation.factCoverage()).isEqualTo(1.0);
     assertThat(evaluation.correct()).isTrue();
   }
+
+  @Test
+  void mathOracleAcceptsAnEquivalentSequenceStartPhrase() {
+    RagCorpus corpus = RagCorpus.load(RagWorkload.MATH);
+    RagCase testCase =
+        corpus.cases().stream()
+            .filter(value -> value.id().equals("delta-sixth-term"))
+            .findFirst()
+            .orElseThrow();
+    RagDocument document =
+        corpus.documents().stream()
+            .filter(value -> value.id().equals("math-delta-sequence"))
+            .findFirst()
+            .orElseThrow();
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(document, 3.0f, 1)),
+            "The start of the Delta sequence is 7, its common difference is 4, and its sixth "
+                + "term is 27. [math-delta-sequence]");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
 }
