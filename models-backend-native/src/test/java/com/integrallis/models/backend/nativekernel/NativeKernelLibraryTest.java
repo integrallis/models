@@ -55,6 +55,7 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL))
           .isTrue();
       assertThat(kernels.supports(NativeKernelCapability.PERSISTENT_WORKER_CONTEXT)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.K_QUANT_BATCH_WEIGHT_REUSE)).isTrue();
     }
   }
 
@@ -111,7 +112,7 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v8");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v9");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
