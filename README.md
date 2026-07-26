@@ -65,8 +65,9 @@ same-host Ollama gates:
 | DeepSeek-R1-Distill-Qwen 1.5B Q4_K_M | Rust/FFM | General guarded RAG | 1,048.9 ms | 29.04 tok/s | 2,820.3 ms | 99.0% |
 | Qwen2.5-Math 1.5B Q4_K_M | Rust/FFM | Math guarded RAG | 754.8 ms | 26.99 tok/s | 2,079.1 ms | 101.2% |
 | DeepSeek-Coder 1.3B Q4_K_M | Rust/FFM | Coding guarded RAG | 1,010.2 ms | 29.95 tok/s | 2,972.0 ms | 91.6% |
+| SmolLM3 3B Q4_K_M | Rust/FFM | General guarded RAG | 1,727.9 ms | 15.93 tok/s | 5,318.9 ms | 91.4% |
 
-This is currently **19 exact qualified artifacts representing 17 distinct model
+This is currently **20 exact qualified artifacts representing 18 distinct model
 identities**, against the required 25 launch-qualified identities. Quantization
 variants do not increase the identity count. Each row is SHA-bound to its model
 bytes, benchmark report, runtime selector, and backend plan. llama.cpp and
@@ -312,7 +313,8 @@ rollback or controlled A/B measurement.
 
 The tested real-model fixtures are **Qwen3 0.6B Q4_0, 1.7B Q8_0, and 8B
 Q4_K_M GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0 GGUF**,
-**SmolLM2 360M Q8_0 GGUF**, **TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
+**SmolLM2 360M Q8_0 GGUF**, **SmolLM3 3B Q4_K_M GGUF**,
+**TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
 **DeepSeek-Coder 1.3B Instruct Q4_K_M GGUF**, **MiniCPM5 1B Q4_K_M GGUF**,
 and **Qwen2.5-Math 1.5B Instruct Q4_K_M GGUF**, resolved through ModelJars
 marker JARs. The DeepSeek fixture validates a mixed Q4_K/Q5_0/Q8_0/Q6_K tensor
@@ -514,7 +516,8 @@ The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, Qwen2.5-Math 1.5B, SmolLM2
 strict: the Gradle `integrationTest` task downloads the model fixtures before
 the tests run, and the tests fail if any real model cannot be loaded. CI runs
 this path in `.github/workflows/model-integration.yml` with the downloaded GGUF
-cached under `~/.jvllm/models`.
+cached under `~/.jvllm/models`. SmolLM3 3B uses the same no-skip contract in its
+dedicated `smolLm33BSlowTest` task.
 Qwen2.5-Coder 7B Q4_0, DeepSeek-Coder 6.7B Q4_K_M, Qwen3 8B Q4_K_M,
 DeepSeek-R1-Distill-Qwen-7B Q4_K_M, and SQLCoder-7B-2 Q5_K_M are strict
 large-model fixtures. Each has a dedicated test task that resolves, downloads,
