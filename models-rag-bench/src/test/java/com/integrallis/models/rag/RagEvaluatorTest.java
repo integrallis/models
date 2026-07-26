@@ -119,4 +119,26 @@ class RagEvaluatorTest {
     assertThat(evaluation.factCoverage()).isEqualTo(1.0);
     assertThat(evaluation.correct()).isTrue();
   }
+
+  @Test
+  void normalizesEquivalentNumericAndNumberWordFacts() {
+    RagDocument expected = new RagDocument("legal-fjord-audit", "Fjord audit rights", "irrelevant");
+    RagCase testCase =
+        new RagCase(
+            "fjord-audit",
+            "question",
+            List.of("legal-fjord-audit"),
+            List.of("one", "10 business days"),
+            true);
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(expected, 1.0f, 1)),
+            "1 compliance audit is permitted per calendar year with 10 business days of notice "
+                + "[legal-fjord-audit].");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
 }
