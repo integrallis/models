@@ -68,6 +68,7 @@ public final class RagBenchmarkCli {
           "sampling-top-k",
           "seed",
           "repetition-penalty",
+          "stop-sequence",
           "max-tokens",
           "warmups",
           "iterations",
@@ -169,13 +170,21 @@ public final class RagBenchmarkCli {
     int threads = positiveInteger(values, "threads", Runtime.getRuntime().availableProcessors());
     long backendPid = nonNegativeLong(values, "pid", 0);
     int topK = positiveInteger(values, "top-k", 1);
+    List<String> stopSequences =
+        values.containsKey("stop-sequence")
+            ? List.of(decodeEscapes(values.get("stop-sequence")))
+            : List.of();
+    if (HOSTED_BACKENDS.contains(backend) && !stopSequences.isEmpty()) {
+      throw new IllegalArgumentException("--stop-sequence is supported only by local backends");
+    }
     RagSamplingProfile sampling =
         new RagSamplingProfile(
             nonNegativeFloat(values, "temperature", 0),
             positiveUnitFloat(values, "top-p", 1),
             positiveInteger(values, "sampling-top-k", 1),
             nonNegativeLong(values, "seed", 42),
-            positiveFloat(values, "repetition-penalty", 1));
+            positiveFloat(values, "repetition-penalty", 1),
+            stopSequences);
     int maxTokens = positiveInteger(values, "max-tokens", 64);
     int warmups = nonNegativeInteger(values, "warmups", 1);
     int iterations = positiveInteger(values, "iterations", 3);
@@ -527,6 +536,33 @@ public final class RagBenchmarkCli {
     } catch (NumberFormatException failure) {
       throw new IllegalArgumentException("--" + option + " must be a decimal number", failure);
     }
+  }
+
+  private static String decodeEscapes(String encoded) {
+    if (encoded.isEmpty()) {
+      throw new IllegalArgumentException("--stop-sequence must not be empty");
+    }
+    StringBuilder decoded = new StringBuilder(encoded.length());
+    for (int index = 0; index < encoded.length(); index++) {
+      char character = encoded.charAt(index);
+      if (character != '\\') {
+        decoded.append(character);
+        continue;
+      }
+      if (++index == encoded.length()) {
+        throw new IllegalArgumentException("--stop-sequence has a trailing escape");
+      }
+      switch (encoded.charAt(index)) {
+        case '\\' -> decoded.append('\\');
+        case 'n' -> decoded.append('\n');
+        case 'r' -> decoded.append('\r');
+        case 't' -> decoded.append('\t');
+        default ->
+            throw new IllegalArgumentException(
+                "--stop-sequence has an unsupported escape: \\" + encoded.charAt(index));
+      }
+    }
+    return decoded.toString();
   }
 
   private static String safeId(String model) {

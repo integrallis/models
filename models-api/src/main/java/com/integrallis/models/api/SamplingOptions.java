@@ -15,11 +15,22 @@
  */
 package com.integrallis.models.api;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 /** Immutable configuration for token sampling strategies. */
 public record SamplingOptions(
-    float temperature, float topP, int topK, int maxTokens, Long seed, float repetitionPenalty) {
+    float temperature,
+    float topP,
+    int topK,
+    int maxTokens,
+    Long seed,
+    float repetitionPenalty,
+    List<String> stopSequences) {
 
   public SamplingOptions {
+    stopSequences = List.copyOf(Objects.requireNonNull(stopSequences, "stopSequences"));
     if (temperature < 0) {
       throw new IllegalArgumentException("temperature must be >= 0, got: " + temperature);
     }
@@ -36,6 +47,11 @@ public record SamplingOptions(
       throw new IllegalArgumentException(
           "repetitionPenalty must be >= 1.0, got: " + repetitionPenalty);
     }
+    for (String stopSequence : stopSequences) {
+      if (stopSequence == null || stopSequence.isEmpty()) {
+        throw new IllegalArgumentException("stop sequence must not be null or empty");
+      }
+    }
   }
 
   /** Returns a new builder with default values. */
@@ -51,6 +67,7 @@ public record SamplingOptions(
     private Integer maxTokens;
     private Long seed;
     private Float repetitionPenalty;
+    private final List<String> stopSequences = new ArrayList<>();
 
     Builder() {}
 
@@ -84,6 +101,17 @@ public record SamplingOptions(
       return this;
     }
 
+    public Builder stopSequence(String stopSequence) {
+      stopSequences.add(stopSequence);
+      return this;
+    }
+
+    public Builder stopSequences(List<String> stopSequences) {
+      this.stopSequences.clear();
+      this.stopSequences.addAll(Objects.requireNonNull(stopSequences, "stopSequences"));
+      return this;
+    }
+
     public SamplingOptions build() {
       return new SamplingOptions(
           temperature != null ? temperature : 1.0f,
@@ -91,7 +119,8 @@ public record SamplingOptions(
           topK != null ? topK : 40,
           maxTokens != null ? maxTokens : 256,
           seed,
-          repetitionPenalty != null ? repetitionPenalty : 1.0f);
+          repetitionPenalty != null ? repetitionPenalty : 1.0f,
+          stopSequences);
     }
   }
 }

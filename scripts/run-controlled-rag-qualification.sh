@@ -16,6 +16,7 @@ OUTPUT_DIR=${5:-"$ROOT_DIR/build/reports/rag/qualification/$MODEL_ID"}
 THREADS=${RAG_THREADS:-$(nproc)}
 CONTEXT=${RAG_CONTEXT:-2048}
 MAX_TOKENS=${RAG_MAX_TOKENS:-64}
+STOP_SEQUENCE=${RAG_STOP_SEQUENCE:-}
 WARMUPS=${RAG_WARMUPS:-1}
 ITERATIONS=${RAG_ITERATIONS:-3}
 DROP_CACHES=${RAG_DROP_CACHES:-0}
@@ -152,6 +153,9 @@ COMMON_ARGS=(
   --warmups "$WARMUPS"
   --iterations "$ITERATIONS"
 )
+if [[ -n "$STOP_SEQUENCE" ]]; then
+  COMMON_ARGS+=(--stop-sequence "$STOP_SEQUENCE")
+fi
 
 assert_no_competing_inference_processes
 drop_file_cache

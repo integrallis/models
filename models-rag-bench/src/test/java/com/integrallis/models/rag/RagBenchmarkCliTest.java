@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,6 +50,7 @@ class RagBenchmarkCliTest {
               "--sampling-top-k", "40",
               "--seed", "1729",
               "--repetition-penalty", "1.05",
+              "--stop-sequence", "\\n\\n",
               "--max-tokens", "48",
               "--iterations", "2"
             });
@@ -60,7 +62,7 @@ class RagBenchmarkCliTest {
     assertThat(configuration.promptTemplate()).isEqualTo(RagPromptTemplate.CHATML);
     assertThat(configuration.caseIds()).containsExactly("auto-glass-deadline", "idempotency");
     assertThat(configuration.sampling())
-        .isEqualTo(new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05));
+        .isEqualTo(new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05, List.of("\n\n")));
     assertThat(configuration.maxTokens()).isEqualTo(48);
     assertThat(configuration.iterations()).isEqualTo(2);
   }

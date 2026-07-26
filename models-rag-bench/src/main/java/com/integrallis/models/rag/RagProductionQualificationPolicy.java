@@ -28,7 +28,7 @@ public final class RagProductionQualificationPolicy {
   public static final double MINIMUM_MODEL_ANSWER_CORRECT_RATE = 0.90;
 
   private static final List<String> MATCHED_GENERATION_CONTROLS =
-      List.of("temperature", "topK", "topP", "seed", "repetitionPenalty");
+      List.of("temperature", "topK", "topP", "seed", "repetitionPenalty", "stopSequences");
   private static final Map<String, RelativeThreshold> THRESHOLDS =
       Map.of(
           "llama.cpp", new RelativeThreshold(0.45, 2.0),
@@ -207,7 +207,9 @@ public final class RagProductionQualificationPolicy {
         && MATCHED_GENERATION_CONTROLS.stream()
             .allMatch(
                 control ->
-                    left.generationControls().containsKey(control)
+                    ("stopSequences".equals(control)
+                            || (left.generationControls().containsKey(control)
+                                && right.generationControls().containsKey(control)))
                         && Objects.equals(
                             left.generationControls().get(control),
                             right.generationControls().get(control)));

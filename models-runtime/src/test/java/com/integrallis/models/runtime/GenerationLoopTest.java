@@ -350,6 +350,103 @@ class GenerationLoopTest {
       assertThat(result).isEqualTo("!!!");
       assertThat(forwardCalls).hasValue(2);
     }
+
+    @Test
+    void stopsBeforeForwardingPastASequenceSplitAcrossTokens() {
+      AtomicInteger forwardCalls = new AtomicInteger();
+      Tokenizer tokenizer =
+          new Tokenizer() {
+            private final String[] vocabulary = {
+              "<s>", "</s>", "prompt", "answer", "\n", "\n", "leaked"
+            };
+
+            @Override
+            public int[] encode(String text) {
+              return new int[] {2};
+            }
+
+            @Override
+            public String decode(int[] tokens) {
+              StringBuilder decoded = new StringBuilder();
+              for (int token : tokens) {
+                decoded.append(decode(token));
+              }
+              return decoded.toString();
+            }
+
+            @Override
+            public String decode(int token) {
+              return vocabulary[token];
+            }
+
+            @Override
+            public int vocabSize() {
+              return vocabulary.length;
+            }
+
+            @Override
+            public int bosToken() {
+              return 0;
+            }
+
+            @Override
+            public int eosToken() {
+              return 1;
+            }
+          };
+      InferenceBackend backend =
+          new InferenceBackend() {
+            private int next = 3;
+
+            @Override
+            public String name() {
+              return "stop-sequence";
+            }
+
+            @Override
+            public ModelMetadata metadata() {
+              return new ModelMetadata("mock", "StopSequence", 64, 7, 16, 1, 1, 1);
+            }
+
+            @Override
+            public Tokenizer tokenizer() {
+              return tokenizer;
+            }
+
+            @Override
+            public float[] prefill(int[] tokens, int startPosition) {
+              return logitsFor(next);
+            }
+
+            @Override
+            public float[] forward(int token, int position) {
+              forwardCalls.incrementAndGet();
+              return logitsFor(++next);
+            }
+
+            @Override
+            public void close() {}
+
+            private float[] logitsFor(int token) {
+              float[] logits = new float[7];
+              logits[token] = 100.0f;
+              return logits;
+            }
+          };
+
+      String result =
+          new GenerationLoop(backend)
+              .generate(
+                  "prompt",
+                  SamplingOptions.builder()
+                      .temperature(0.0f)
+                      .maxTokens(5)
+                      .stopSequence("\n\n")
+                      .build());
+
+      assertThat(result).isEqualTo("answer");
+      assertThat(forwardCalls).hasValue(2);
+    }
   }
 
   @Nested
