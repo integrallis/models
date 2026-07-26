@@ -28,6 +28,7 @@ public enum RagPromptTemplate {
   GEMMA("gemma"),
   PHI3("phi3"),
   DEEPSEEK("deepseek"),
+  H2O("h2o"),
   MINICPM5_NO_THINK("minicpm5-no-think");
 
   private final String id;
@@ -63,6 +64,7 @@ public enum RagPromptTemplate {
           "<start_of_turn>user\n" + prompt.strip() + "<end_of_turn>\n<start_of_turn>model\n";
       case PHI3 -> "<|user|>\n" + prompt.strip() + "<|end|>\n<|assistant|>\n";
       case DEEPSEEK -> "### Instruction:\n" + prompt + "\n### Response:\n";
+      case H2O -> "<|prompt|>" + prompt.strip() + "</s><|answer|>";
       case MINICPM5_NO_THINK ->
           "<s><|im_start|>user\n"
               + prompt
@@ -122,6 +124,8 @@ public enum RagPromptTemplate {
               + "\n\n"
               + userPrompt
               + "\n### Response:\n";
+      case H2O ->
+          "<|prompt|>" + systemPrompt.strip() + "\n\n" + userPrompt.strip() + "</s><|answer|>";
       case MINICPM5_NO_THINK ->
           "<s><|im_start|>system\n"
               + systemPrompt.stripTrailing()
@@ -140,6 +144,6 @@ public enum RagPromptTemplate {
     }
     throw new IllegalArgumentException(
         "prompt-template must be one of raw, chatml, chatml-direct, chatml-no-think, zephyr, "
-            + "llama3, gemma, phi3, deepseek, minicpm5-no-think");
+            + "llama3, gemma, phi3, deepseek, h2o, minicpm5-no-think");
   }
 }

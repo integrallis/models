@@ -174,6 +174,22 @@ class RagPromptRendererTest {
   }
 
   @Test
+  void h2oProfileUsesPromptAndAnswerTokens() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.parse("h2o"));
+
+    assertThat(prompt)
+        .startsWith("<|prompt|>You answer questions")
+        .contains("Do not use prior knowledge.\n\nCONTEXT\n[source-1] Policy")
+        .endsWith("ANSWER</s><|answer|>");
+  }
+
+  @Test
   void miniCpm5NoThinkProfileEmitsTheTemplateOwnedBosToken() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 
