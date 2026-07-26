@@ -93,6 +93,9 @@ class CertifiedRagEvidenceTest {
   private static final Path NEXUS_LEGAL_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260726/rag/" + "nexus-legal-q4_k_m");
+  private static final Path NEXUS_MEDICAL_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260726/rag/" + "nexus-medical-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -1809,6 +1812,113 @@ class CertifiedRagEvidenceTest {
             comparison -> {
               assertThat(comparison.decodeThroughputRatio()).isBetween(0.60, 0.62);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.12, 1.14);
+            });
+    assertThat(candidate.settings()).isEqualTo(baseline.settings());
+    assertThat(candidate.runs())
+        .extracting(RagRun::promptSha256)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::promptSha256).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.generation().text())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.generation().text()).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::grounding)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::grounding).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::evaluation).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::rawEvaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::rawEvaluation).toList());
+  }
+
+  @Test
+  void nexusMedicalOnePointFiveBillionQualifiesHealthcareRag() throws Exception {
+    RagBenchmarkReport baseline = report(NEXUS_MEDICAL_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport candidate =
+        report(NEXUS_MEDICAL_Q4_K_M_EVIDENCE, "models-rust-ffm-marker.json");
+    RagBenchmarkReport ollama = report(NEXUS_MEDICAL_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(NEXUS_MEDICAL_Q4_K_M_EVIDENCE, "llama.cpp.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.modelId()).isEqualTo("king3djbl_nexus_medical_gguf_q4_k_m");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("f26138b8e049e91a3e006f215a3618e3da0fef28755f73fe83bea19f73c700ea");
+    assertThat(candidate.artifactSizeBytes()).isEqualTo(986_045_632L);
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.HEALTHCARE.id());
+    assertThat(candidate.settings().promptTemplate()).isEqualTo("chatml-direct");
+    assertThat(candidate.settings().generationControls())
+        .containsEntry("stopSequences", " So the answer is");
+    assertThat(candidate.settings().groundingPolicy())
+        .isEqualTo(
+            "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v18");
+    for (RagBenchmarkReport comparator : List.of(ollama, llama)) {
+      assertThat(comparator.artifactSha256()).isEqualTo(candidate.artifactSha256());
+      assertThat(comparator.environment()).isEqualTo(candidate.environment());
+      assertThat(comparator.settings().corpusSha256())
+          .isEqualTo(candidate.settings().corpusSha256());
+      assertThat(comparator.settings().workload()).isEqualTo(candidate.settings().workload());
+      assertThat(comparator.settings().caseIds()).isEqualTo(candidate.settings().caseIds());
+      assertThat(comparator.settings().promptTemplate())
+          .isEqualTo(candidate.settings().promptTemplate());
+      assertThat(comparator.settings().retrievalTopK())
+          .isEqualTo(candidate.settings().retrievalTopK());
+      assertThat(comparator.settings().maxOutputTokens())
+          .isEqualTo(candidate.settings().maxOutputTokens());
+      assertThat(comparator.settings().warmups()).isEqualTo(candidate.settings().warmups());
+      assertThat(comparator.settings().iterations()).isEqualTo(candidate.settings().iterations());
+      assertThat(comparator.settings().contextLength())
+          .isEqualTo(candidate.settings().contextLength());
+      assertThat(comparator.settings().threads()).isEqualTo(candidate.settings().threads());
+      assertThat(comparator.settings().groundingPolicy())
+          .isEqualTo(candidate.settings().groundingPolicy());
+    }
+    assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v10");
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("kernel-implementation", "rust-ffm-quantized-v10")
+        .containsEntry("modeljar-alias", "king3djbl_nexus_medical_gguf_q4_k_m")
+        .containsEntry("native-kernel-threads", "8");
+    assertThat(candidate.backendDiagnostics().optimizations())
+        .filteredOn(optimization -> optimization.id().startsWith("modeljars.profile."))
+        .singleElement()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings())
+                  .containsEntry(
+                      "profile-id", "king3djbl_nexus_medical_gguf_q4_k_m_epyc_milan_jdk25_rust_ffm")
+                  .containsEntry("selector-mismatches", "")
+                  .containsEntry("missing-jvm-arguments", "");
+            });
+    assertThat(candidate.backendDiagnostics().optimization("rust-quantized-decode"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(12);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(4.0 / 9.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(1.08, 1.10);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.70, 0.73);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.64, 0.66);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.09, 1.12);
             });
     assertThat(candidate.settings()).isEqualTo(baseline.settings());
     assertThat(candidate.runs())
