@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 ## Result
 
-Fourteen exact artifacts representing twelve distinct model identities now
+Sixteen exact artifacts representing fourteen distinct model identities now
 clear the current absolute RAG SLOs, minimum model contribution, and same-host
 Ollama comparison:
 
@@ -46,6 +46,12 @@ Ollama comparison:
 - **Gemma 3 1B Q4_K_M** is `PRODUCTION_READY` for general guarded RAG. Its
   marker-selected native decode reaches 137.3% of Ollama and 84.0% of
   llama.cpp, with 27 of 27 grounded answers correct.
+- **Indian-Legal-Qwen2.5 3B Q4_K_M** is `USABLE` for legal guarded RAG. Its
+  marker-selected Rust/FFM path reaches 84.3% of Ollama and 64.3% of llama.cpp
+  decode throughput, with 12 of 12 retained model answers correct.
+- **DeepSeek-R1-Distill-Qwen 1.5B Q4_K_M** is `USABLE` for general guarded
+  RAG. Its marker-selected Rust/FFM path reaches 99.0% of Ollama and 64.2% of
+  llama.cpp decode throughput, with 9 of 9 retained model answers correct.
 
 These are guarded, workload-specific qualifications, not claims of unrestricted
 question-answering quality. Every report preserves raw output, final grounded
@@ -57,7 +63,7 @@ controls, and same-host comparator evidence. Exact reports are under
 
 Quantization variants are retained as independently qualified artifacts but do
 not increase the distinct-model launch count. The current launch count is
-therefore twelve, not fourteen.
+therefore fourteen, not sixteen.
 
 The older Qwen3 framework and hosted-provider tables below remain useful
 historical diagnostics, but they predate cross-request KV reuse and the current
