@@ -31,6 +31,7 @@ public final class RagEvaluator {
   private static final Pattern PLURAL_DOLLARS =
       Pattern.compile("\\b(\\d+(?:\\.\\d+)?)\\s+dollars\\b");
   private static final Pattern THIRD_PERSON_DOES = Pattern.compile("\\bdoes\\b");
+  private static final Pattern OPTIONAL_PLURAL_MARKER = Pattern.compile("\\(s\\)");
 
   private RagEvaluator() {}
 
@@ -133,6 +134,7 @@ public final class RagEvaluator {
     normalized = CURRENCY_SYMBOL.matcher(normalized).replaceAll("$1 dollar");
     normalized = PLURAL_DOLLARS.matcher(normalized).replaceAll("$1 dollar");
     normalized = THIRD_PERSON_DOES.matcher(normalized).replaceAll("do");
+    normalized = OPTIONAL_PLURAL_MARKER.matcher(normalized).replaceAll("s");
     return normalized.replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
   }
 }

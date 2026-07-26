@@ -106,12 +106,101 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void acceptsAnswerAndQuestionLabelsAroundSupportedClaims() {
+    GroundingDocument idempotency =
+        new GroundingDocument(
+            "api-idempotency",
+            "Claims API idempotency",
+            "Claims API clients send the Idempotency-Key header on create requests. "
+                + "Keys remain valid for a 24 hour replay window. Reusing a key with a different "
+                + "payload returns HTTP 409.",
+            8.0f,
+            1);
+    String generated =
+        "Question: Which header makes Claims API creates idempotent and how long can a key be "
+            + "replayed?\n\nAnswer: The header that makes Claims API creates idempotency is the "
+            + "\"Idempotency-Key\" header. It remains valid for a 24 hour replay";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which header makes Claims API creates idempotent and how long can a key be replayed?",
+            List.of(idempotency),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [api-idempotency]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void acceptsSupportedClaimsWithSafeProvenanceDiscourse() {
+    GroundingDocument chargeback =
+        new GroundingDocument(
+            "payments-chargeback",
+            "Merchant chargeback evidence",
+            "Merchants must submit chargeback evidence within 7 calendar days of notification. "
+                + "Evidence is uploaded as a PDF under 10 MB in the Disputes console.",
+            8.0f,
+            1);
+    String generated =
+        "The merchant chargeback evidence deadline and upload format are:\n\n"
+            + "- Merchant must submit chargeback evidence within 7 calendar days of notification.\n"
+            + "- Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\n"
+            + "The context provided is the Merchant chargeback evidence";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "What is the merchant chargeback evidence deadline and upload format?",
+            List.of(chargeback),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [payments-chargeback]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void acceptsOptionalPluralNotationInSupportedClaims() {
+    GroundingDocument emergencyAccess =
+        new GroundingDocument(
+            "security-access",
+            "Production emergency access",
+            "The production break-glass procedure is code-named Cobalt-17. It requires approval "
+                + "from two on-call managers and the resulting credentials expire after 60 "
+                + "minutes.",
+            8.0f,
+            1);
+    String generated =
+        "The production break-glass code name is Cobalt-17 and it requires approval from two "
+            + "on-call manager(s) and the resulting credentials expire after 60 minutes.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "What is the production break-glass code name and how many managers approve it?",
+            List.of(emergencyAccess),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [security-access]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
   void doesNotDeriveCitationsForAnUnsupportedUncitedClaim() {
     GroundedAnswer answer =
         policy.apply(
             "How long do both payment types take?",
             List.of(HIGH_CONFIDENCE),
             "Both payment types settle instantly.");
+
+    assertThat(answer.text()).contains("2 business days").endsWith("[payments-settlement]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
+  void doesNotTrustAnUnsupportedClaimBehindAnAnswerLabel() {
+    GroundedAnswer answer =
+        policy.apply(
+            "How long do both payment types take?",
+            List.of(HIGH_CONFIDENCE),
+            "Answer: Both payment types settle instantly.");
 
     assertThat(answer.text()).contains("2 business days").endsWith("[payments-settlement]");
     assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);

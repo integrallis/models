@@ -66,8 +66,9 @@ same-host Ollama gates:
 | Qwen2.5-Math 1.5B Q4_K_M | Rust/FFM | Math guarded RAG | 754.8 ms | 26.99 tok/s | 2,079.1 ms | 101.2% |
 | DeepSeek-Coder 1.3B Q4_K_M | Rust/FFM | Coding guarded RAG | 1,010.2 ms | 29.95 tok/s | 2,972.0 ms | 91.6% |
 | SmolLM3 3B Q4_K_M | Rust/FFM | General guarded RAG | 1,727.9 ms | 15.93 tok/s | 5,318.9 ms | 91.4% |
+| TinyLlama 1.1B Chat Q4_0 | Rust/FFM | General guarded RAG | 1,346.7 ms | 34.26 tok/s | 3,188.5 ms | 108.9% |
 
-This is currently **20 exact qualified artifacts representing 18 distinct model
+This is currently **21 exact qualified artifacts representing 19 distinct model
 identities**, against the required 25 launch-qualified identities. Quantization
 variants do not increase the identity count. Each row is SHA-bound to its model
 bytes, benchmark report, runtime selector, and backend plan. llama.cpp and

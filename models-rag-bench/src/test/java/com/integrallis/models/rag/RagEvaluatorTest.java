@@ -97,4 +97,26 @@ class RagEvaluatorTest {
     assertThat(evaluation.factCoverage()).isEqualTo(1.0);
     assertThat(evaluation.correct()).isTrue();
   }
+
+  @Test
+  void normalizesOptionalPluralNotationInModelAnswers() {
+    RagDocument expected =
+        new RagDocument("security-access", "Production emergency access", "irrelevant");
+    RagCase testCase =
+        new RagCase(
+            "break-glass",
+            "question",
+            List.of("security-access"),
+            List.of("Cobalt-17", "two on-call managers"),
+            true);
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(expected, 1.0f, 1)),
+            "The code is Cobalt-17 and requires two on-call manager(s) [security-access].");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
 }

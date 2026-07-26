@@ -64,6 +64,9 @@ Ollama comparison:
 - **SmolLM3 3B Q4_K_M** is `USABLE` for general guarded RAG. Its
   marker-selected Rust/FFM path reaches 91.4% of Ollama and 65.5% of llama.cpp
   decode throughput, with 12 of 12 retained model answers correct.
+- **TinyLlama 1.1B Chat Q4_0** is `USABLE` for general guarded RAG. Its
+  marker-selected Rust/FFM path reaches 108.9% of Ollama and 53.5% of
+  llama.cpp decode throughput, with 9 of 9 retained model answers correct.
 
 These are guarded, workload-specific qualifications, not claims of unrestricted
 question-answering quality. Every report preserves raw output, final grounded
@@ -75,7 +78,7 @@ controls, and same-host comparator evidence. Exact reports are under
 
 Quantization variants are retained as independently qualified artifacts but do
 not increase the distinct-model launch count. The current launch count is
-therefore eighteen, not twenty.
+therefore nineteen, not twenty-one.
 
 The older Qwen3 framework and hosted-provider tables below remain useful
 historical diagnostics, but they predate cross-request KV reuse and the current
@@ -378,6 +381,7 @@ end-of-generation metadata correctly and stop before exposing control tokens.
 | Llama 3.2 3B Q4_K_M | Current general guarded-RAG suite | Marker-selected Rust/FFM reaches 15.70 tok/s, 89.3% of Ollama and 67.2% of llama.cpp, at 1.16x Ollama p95 end-to-end latency | `USABLE`; 18 of 27 accepted answers retain model text and all 18 are correct. Batched attention remains disabled because its decode gain regressed TTFT, prefill, and CPU without a stable E2E gain. |
 | DeepSeek-Coder 1.3B Q4_K_M | Current coding guarded-RAG suite | Marker-selected Rust/FFM reaches 29.95 tok/s, 91.6% of Ollama and 59.4% of llama.cpp, at 1.31x Ollama p95 end-to-end latency | `USABLE`; 9 of 27 accepted answers retain model text and all 9 are correct. The remaining answerable cases use validated extractive fallback. |
 | SmolLM3 3B Q4_K_M | Current general guarded-RAG suite | Marker-selected Rust/FFM reaches 15.93 tok/s, 91.4% of Ollama and 65.5% of llama.cpp, at 1.37x Ollama p95 end-to-end latency | `USABLE`; 12 of 27 accepted answers retain model text and all 12 are correct. The remaining answerable cases use validated extractive fallback. |
+| TinyLlama 1.1B Chat Q4_0 | Current general guarded-RAG suite | Marker-selected Rust/FFM reaches 34.26 tok/s, 108.9% of Ollama and 53.5% of llama.cpp, at 1.08x Ollama p95 end-to-end latency | `USABLE`; 9 of 27 accepted answers retain model text and all 9 are correct. The remaining answerable cases use validated extractive fallback. |
 
 Retrieval is perfect in every full run. The historical failed answerable case
 was therefore generation, not search: Qwen3 1.7B said the context did not state
