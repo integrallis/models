@@ -315,4 +315,18 @@ class GroundedAnswerPolicyTest {
     assertThat(answer.rawText()).isEqualTo("INSUFFICIENT_CONTEXT.");
     assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
   }
+
+  @Test
+  void preservesARepeatedExplicitModelAbstentionWithACitation() {
+    String generated =
+        "INSUFFICIENT_CONTEXT\n[payments-settlement] INSUFFICIENT_CONTEXT";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
+    assertThat(answer.rawText()).isEqualTo(generated);
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
+  }
 }
