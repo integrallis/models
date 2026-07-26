@@ -173,6 +173,12 @@ temperature 0, sampling top-k 1, top-p 1, repetition penalty 1, and seed 42.
 The benchmark passes those controls identically to Models, Ollama, and
 llama.cpp and records them in every report.
 
+Use `--stop-sequence '\n\n'` to stop at the first paragraph. The CLI decodes
+`\n`, `\r`, `\t`, and `\\` escapes, applies the sequence during in-process
+generation, sends the same stop array to Ollama and llama.cpp, and records the
+escaped value as a matched qualification control. The controlled runner accepts
+the same value through `RAG_STOP_SEQUENCE`.
+
 Models that require their published sampling profile can override the local
 controls explicitly. For example, MiniCPM5 no-think mode recommends temperature
 0.7 and top-p 0.95:

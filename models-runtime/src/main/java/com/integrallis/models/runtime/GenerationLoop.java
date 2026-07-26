@@ -109,6 +109,7 @@ public final class GenerationLoop {
       PromptPrefill promptPrefill = preparePrompt(promptTokens);
 
       Sampler sampler = new Sampler(options);
+      StopSequenceEmitter emitter = new StopSequenceEmitter(stream, options.stopSequences());
       List<Integer> allTokens = new ArrayList<>();
       boolean speculativeActive =
           speculativeOptions.enabled() && backend instanceof SpeculativeInferenceBackend;
@@ -128,7 +129,7 @@ public final class GenerationLoop {
               (SpeculativeInferenceBackend) backend,
               tokenizer,
               sampler,
-              stream,
+              emitter,
               allTokens,
               logits,
               position,
@@ -136,9 +137,10 @@ public final class GenerationLoop {
               speculativeMetrics);
         } else {
           generateSequentially(
-              tokenizer, sampler, stream, allTokens, logits, position, options.maxTokens());
+              tokenizer, sampler, emitter, allTokens, logits, position, options.maxTokens());
         }
 
+        emitter.finish();
         cachedPromptTokens =
             backend instanceof RewindableInferenceBackend ? promptTokens.clone() : null;
         stream.onComplete();
@@ -188,7 +190,7 @@ public final class GenerationLoop {
   private void generateSequentially(
       Tokenizer tokenizer,
       Sampler sampler,
-      TokenStream stream,
+      StopSequenceEmitter emitter,
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
@@ -200,7 +202,9 @@ public final class GenerationLoop {
       if (tokenizer.isEndOfGeneration(nextToken)) {
         return;
       }
-      emit(tokenizer, stream, allTokens, nextToken);
+      if (emit(tokenizer, emitter, allTokens, nextToken)) {
+        return;
+      }
       if (generated + 1 == maxTokens) {
         return;
       }
@@ -213,7 +217,7 @@ public final class GenerationLoop {
       SpeculativeInferenceBackend speculativeBackend,
       Tokenizer tokenizer,
       Sampler sampler,
-      TokenStream stream,
+      StopSequenceEmitter emitter,
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
@@ -254,7 +258,9 @@ public final class GenerationLoop {
         metrics.draftSearchNanos += System.nanoTime() - searchStart;
       }
 
-      emit(tokenizer, stream, allTokens, nextToken);
+      if (emit(tokenizer, emitter, allTokens, nextToken)) {
+        return;
+      }
       generated++;
       if (generated == maxTokens) {
         return;
@@ -293,6 +299,7 @@ public final class GenerationLoop {
 
       int accepted = 0;
       boolean reachedEos = false;
+      boolean reachedStopSequence = false;
       while (accepted < draft.length && generated < maxTokens) {
         int targetToken = sampler.sample(verification, accepted, allTokens);
         if (tokenizer.isEndOfGeneration(targetToken)) {
@@ -303,9 +310,12 @@ public final class GenerationLoop {
           carriedToken = targetToken;
           break;
         }
-        emit(tokenizer, stream, allTokens, targetToken);
+        reachedStopSequence = emit(tokenizer, emitter, allTokens, targetToken);
         accepted++;
         generated++;
+        if (reachedStopSequence) {
+          break;
+        }
       }
       metrics.acceptedTokens += accepted;
       for (int acceptedPosition = 0; acceptedPosition < accepted; acceptedPosition++) {
@@ -320,7 +330,7 @@ public final class GenerationLoop {
       }
       position = retainedCheckpoint;
 
-      if (reachedEos || generated == maxTokens) {
+      if (reachedEos || reachedStopSequence || generated == maxTokens) {
         return;
       }
       if (accepted == draft.length) {
@@ -330,14 +340,84 @@ public final class GenerationLoop {
     }
   }
 
-  private static void emit(
-      Tokenizer tokenizer, TokenStream stream, List<Integer> allTokens, int token) {
-    stream.onToken(tokenizer.decode(token));
+  private static boolean emit(
+      Tokenizer tokenizer, StopSequenceEmitter emitter, List<Integer> allTokens, int token) {
+    boolean stopped = emitter.emit(tokenizer.decode(token));
     allTokens.add(token);
+    return stopped;
   }
 
   private record PromptPrefill(
       int startPosition, int[] tokensToEvaluate, PromptCacheMetrics metrics) {}
+
+  private static final class StopSequenceEmitter {
+    private final TokenStream stream;
+    private final List<String> stopSequences;
+    private final StringBuilder pending = new StringBuilder();
+
+    private StopSequenceEmitter(TokenStream stream, List<String> stopSequences) {
+      this.stream = stream;
+      this.stopSequences = stopSequences;
+    }
+
+    private boolean emit(String token) {
+      if (stopSequences.isEmpty()) {
+        stream.onToken(token);
+        return false;
+      }
+
+      pending.append(token);
+      int stopIndex = earliestStopIndex();
+      if (stopIndex >= 0) {
+        flush(stopIndex);
+        pending.setLength(0);
+        return true;
+      }
+
+      int retainedSuffix = longestPotentialStopPrefix();
+      flush(pending.length() - retainedSuffix);
+      return false;
+    }
+
+    private void finish() {
+      flush(pending.length());
+    }
+
+    private int earliestStopIndex() {
+      int earliest = -1;
+      for (String stopSequence : stopSequences) {
+        int index = pending.indexOf(stopSequence);
+        if (index >= 0 && (earliest < 0 || index < earliest)) {
+          earliest = index;
+        }
+      }
+      return earliest;
+    }
+
+    private int longestPotentialStopPrefix() {
+      int retained = 0;
+      for (String stopSequence : stopSequences) {
+        int limit = Math.min(pending.length(), stopSequence.length() - 1);
+        for (int length = limit; length > retained; length--) {
+          if (pending
+              .substring(pending.length() - length)
+              .equals(stopSequence.substring(0, length))) {
+            retained = length;
+            break;
+          }
+        }
+      }
+      return retained;
+    }
+
+    private void flush(int length) {
+      if (length <= 0) {
+        return;
+      }
+      stream.onToken(pending.substring(0, length));
+      pending.delete(0, length);
+    }
+  }
 
   private static final class MutableSpeculativeMetrics {
     private final boolean active;

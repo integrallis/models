@@ -72,6 +72,9 @@ class CertifiedRagEvidenceTest {
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve(
               "benchmark-results/certified-20260726/rag/" + "deepseek-r1-distill-qwen-1.5b-q4_k_m");
+  private static final Path QWEN2_5_MATH_1_5B_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260726/rag/" + "qwen2.5-math-1.5b-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -975,7 +978,9 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.artifactSha256())
         .isEqualTo("1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f");
     assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.GENERAL.id());
-    assertThat(candidate.settings().groundingPolicy()).isEqualTo(GroundedAnswerPolicy.POLICY_ID);
+    assertThat(candidate.settings().groundingPolicy())
+        .isEqualTo(
+            "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v12");
     assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v10");
     assertThat(candidate.backendDiagnostics().environment())
         .containsEntry("kernel-implementation", "rust-ffm-quantized-v10");
@@ -1024,6 +1029,91 @@ class CertifiedRagEvidenceTest {
             comparison -> {
               assertThat(comparison.decodeThroughputRatio()).isBetween(0.64, 0.65);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.27, 1.28);
+            });
+    assertThat(candidate.runs())
+        .extracting(RagRun::promptSha256)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::promptSha256).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.generation().text())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.generation().text()).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::grounding)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::grounding).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::evaluation).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::rawEvaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::rawEvaluation).toList());
+  }
+
+  @Test
+  void qwen25MathOnePointFiveBillionQualifiesMathRag() throws Exception {
+    RagBenchmarkReport baseline = report(QWEN2_5_MATH_1_5B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport candidate =
+        report(QWEN2_5_MATH_1_5B_Q4_K_M_EVIDENCE, "models-rust-ffm-marker.json");
+    RagBenchmarkReport ollama = report(QWEN2_5_MATH_1_5B_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(QWEN2_5_MATH_1_5B_Q4_K_M_EVIDENCE, "llama.cpp.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.modelId()).isEqualTo("qwen2.5-math-1.5b-q4_k_m");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("9614a50f03c897028920ca0dc4365da570bf587f9ee7768261216fe370b37e8e");
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.MATH.id());
+    assertThat(candidate.settings().promptTemplate()).isEqualTo("chatml-direct");
+    assertThat(candidate.settings().generationControls()).containsEntry("stopSequences", ". ");
+    assertThat(candidate.settings().groundingPolicy())
+        .isEqualTo(
+            "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v13");
+    assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v10");
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("kernel-implementation", "rust-ffm-quantized-v10");
+    assertThat(candidate.backendDiagnostics().optimizations())
+        .filteredOn(optimization -> optimization.id().startsWith("modeljars.profile."))
+        .singleElement()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings())
+                  .containsEntry("profile-id", "qwen2_5_math_1_5b_q4_k_m_epyc_milan_jdk25_rust_ffm")
+                  .containsEntry("selector-mismatches", "")
+                  .containsEntry("missing-jvm-arguments", "");
+            });
+    assertThat(candidate.backendDiagnostics().optimization("rust-q4-k-batched-matmul"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.backendDiagnostics().optimization("rust-quantized-decode"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(9);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(1.0 / 3.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(1.01, 1.02);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.64, 0.65);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.60, 0.61);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.86, 0.87);
             });
     assertThat(candidate.runs())
         .extracting(RagRun::promptSha256)

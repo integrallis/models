@@ -18,6 +18,7 @@ package com.integrallis.models.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ class SamplingOptionsTest {
       assertThat(opts.maxTokens()).isEqualTo(256);
       assertThat(opts.seed()).isNull();
       assertThat(opts.repetitionPenalty()).isEqualTo(1.0f);
+      assertThat(opts.stopSequences()).isEmpty();
     }
   }
 
@@ -54,6 +56,7 @@ class SamplingOptionsTest {
               .maxTokens(100)
               .seed(42L)
               .repetitionPenalty(1.1f)
+              .stopSequences(List.of("\n\n", "<|im_end|>"))
               .build();
 
       assertThat(opts.temperature()).isEqualTo(0.7f);
@@ -62,6 +65,7 @@ class SamplingOptionsTest {
       assertThat(opts.maxTokens()).isEqualTo(100);
       assertThat(opts.seed()).isEqualTo(42L);
       assertThat(opts.repetitionPenalty()).isEqualTo(1.1f);
+      assertThat(opts.stopSequences()).containsExactly("\n\n", "<|im_end|>");
     }
 
     @Test
@@ -121,6 +125,13 @@ class SamplingOptionsTest {
       assertThatThrownBy(() -> SamplingOptions.builder().repetitionPenalty(0.9f).build())
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("repetitionPenalty");
+    }
+
+    @Test
+    void emptyStopSequenceRejected() {
+      assertThatThrownBy(() -> SamplingOptions.builder().stopSequence("").build())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("stop sequence");
     }
   }
 }

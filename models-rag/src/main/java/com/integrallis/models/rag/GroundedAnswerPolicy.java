@@ -35,13 +35,15 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v12";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v13";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^(?:INSUFFICIENT_CONTEXT[.!]?\\s*)+$");
   private static final Pattern LEADING_CONTEXT_ATTRIBUTION =
       Pattern.compile("(?i)^according to the context provided,?\\s*");
+  private static final Pattern LATEX_MATRIX_DELIMITER =
+      Pattern.compile("\\\\(?:begin|end)\\{(?:bmatrix|matrix|pmatrix|vmatrix|Vmatrix)}");
   private static final Pattern CLAUSE_BOUNDARY =
       Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
   private static final Pattern STATEMENT_BOUNDARY = Pattern.compile("(?i)(?:[;?!]\\s*|\\.\\s+)");
@@ -127,7 +129,8 @@ public final class GroundedAnswerPolicy {
     if (isExplicitAbstention(candidate)) {
       return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.MODEL_ABSTENTION);
     }
-    String validationCandidate = removeLeadingContextAttribution(candidate);
+    String validationCandidate =
+        removeValidationOnlyMarkup(removeLeadingContextAttribution(candidate));
     if (validationCandidate.isBlank()
         || !hasOnlySupportedClaims(question, validationCandidate, retrieved)
         || !hasEvidenceAnchorsForEveryQuestionClause(question, validationCandidate, retrieved)) {
@@ -149,6 +152,10 @@ public final class GroundedAnswerPolicy {
 
   private static String removeLeadingContextAttribution(String candidate) {
     return LEADING_CONTEXT_ATTRIBUTION.matcher(candidate).replaceFirst("");
+  }
+
+  private static String removeValidationOnlyMarkup(String candidate) {
+    return LATEX_MATRIX_DELIMITER.matcher(candidate).replaceAll(" ");
   }
 
   private static boolean isExplicitAbstention(String candidate) {

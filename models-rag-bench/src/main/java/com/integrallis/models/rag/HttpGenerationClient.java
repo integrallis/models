@@ -158,6 +158,9 @@ public final class HttpGenerationClient implements GenerationClient {
       options.put("num_ctx", contextLength);
       options.put("num_thread", threads);
       options.put("repeat_penalty", sampling.repetitionPenalty());
+      if (!sampling.stopSequences().isEmpty()) {
+        sampling.stopSequences().forEach(options.putArray("stop")::add);
+      }
     } else {
       body.put("n_predict", maxTokens);
       body.put("temperature", sampling.temperature());
@@ -167,6 +170,9 @@ public final class HttpGenerationClient implements GenerationClient {
       body.put("n_threads", threads);
       body.put("repeat_penalty", sampling.repetitionPenalty());
       body.put("cache_prompt", false);
+      if (!sampling.stopSequences().isEmpty()) {
+        sampling.stopSequences().forEach(body.putArray("stop")::add);
+      }
     }
     return body;
   }

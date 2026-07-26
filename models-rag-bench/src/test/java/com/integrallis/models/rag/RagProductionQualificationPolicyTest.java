@@ -159,6 +159,37 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
+  void rejectsComparatorsWithDifferentStopSequences() {
+    RagBenchmarkReport candidate =
+        withSettings(
+            report("rust-ffm", "sha", 100, 1_000),
+            settings(
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1",
+                    "stopSequences", "\\n\\n")));
+    RagBenchmarkReport ollama =
+        withSettings(
+            report("ollama", "sha", 100, 1_000),
+            settings(
+                Map.of(
+                    "temperature", "0",
+                    "topK", "1",
+                    "topP", "1",
+                    "seed", "42",
+                    "repetitionPenalty", "1")));
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.exclusions()).containsEntry("ollama", "benchmark workload differs");
+  }
+
+  @Test
   void rejectsQualityProducedEntirelyByExtractiveFallback() {
     RagBenchmarkReport candidate =
         withGroundingDecisions(report("rust-ffm", "sha", 100, 1_000), 0, 24, 3, 0);

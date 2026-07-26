@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,8 @@ class HttpGenerationClientTest {
 
   @Test
   void ollamaRequestUsesRawConfiguredGeneration() {
-    RagSamplingProfile sampling = new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05);
+    RagSamplingProfile sampling =
+        new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05, List.of("\n\n"));
     try (HttpGenerationClient client =
         new HttpGenerationClient(
             "ollama", "qwen:test", URI.create("http://localhost:11434"), 2_048, 8, 0, sampling)) {
@@ -40,12 +42,14 @@ class HttpGenerationClientTest {
       assertThat(body.path("options").path("seed").asLong()).isEqualTo(1729);
       assertThat(body.path("options").path("repeat_penalty").asDouble()).isEqualTo(1.05);
       assertThat(body.path("options").path("num_predict").asInt()).isEqualTo(32);
+      assertThat(body.path("options").path("stop").get(0).asText()).isEqualTo("\n\n");
     }
   }
 
   @Test
   void llamaCppRequestDisablesPromptCacheAndUsesSameSampling() {
-    RagSamplingProfile sampling = new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05);
+    RagSamplingProfile sampling =
+        new RagSamplingProfile(0.7, 0.95, 40, 1729L, 1.05, List.of("\n\n"));
     try (HttpGenerationClient client =
         new HttpGenerationClient(
             "llama.cpp", "qwen.gguf", URI.create("http://localhost:8080"), 2_048, 8, 0, sampling)) {
@@ -58,6 +62,7 @@ class HttpGenerationClientTest {
       assertThat(body.path("seed").asLong()).isEqualTo(1729);
       assertThat(body.path("repeat_penalty").asDouble()).isEqualTo(1.05);
       assertThat(body.path("n_predict").asInt()).isEqualTo(32);
+      assertThat(body.path("stop").get(0).asText()).isEqualTo("\n\n");
     }
   }
 
