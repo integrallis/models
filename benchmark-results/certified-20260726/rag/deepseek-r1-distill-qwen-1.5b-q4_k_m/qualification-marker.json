@@ -1,0 +1,47 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v4",
+  "candidate" : {
+    "path" : "/opt/native-q8-gate/screen/deepseek-r1-distill-qwen-1.5b-q4_k_m/v12-qualification/models-rust-ffm-marker.json",
+    "sha256" : "5b1ba2c93ec7ea793fc0e74ed796d06729bf56689d0dc65a293264b5bdc07624"
+  },
+  "comparators" : [ {
+    "path" : "/opt/native-q8-gate/screen/deepseek-r1-distill-qwen-1.5b-q4_k_m/v12-qualification/llama.cpp.json",
+    "sha256" : "c9176799683c5aad4b31c916692f9254f4c76def2f96f7c93a4a79f4e1973ac5"
+  }, {
+    "path" : "/opt/native-q8-gate/screen/deepseek-r1-distill-qwen-1.5b-q4_k_m/v12-qualification/ollama.json",
+    "sha256" : "945d5b28f536e11604c1a295ecf299e2dc22aa501dec361e3c38c1b975d8276e"
+  } ],
+  "qualification" : {
+    "modelId" : "deepseek-r1-distill-qwen-1.5b-q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f",
+    "absoluteTier" : "USABLE",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 9,
+    "modelAnswerRate" : 0.3333333333333333,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "llama.cpp", "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "llama.cpp",
+      "decodeThroughputRatio" : 0.6423260045151079,
+      "endToEndLatencyRatio" : 1.2731650617159385,
+      "minimumDecodeThroughputRatio" : 0.45,
+      "maximumEndToEndLatencyRatio" : 2.0,
+      "qualified" : true,
+      "failures" : [ ]
+    }, {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.9894992519851347,
+      "endToEndLatencyRatio" : 1.10608839567463,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}
