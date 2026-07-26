@@ -21,6 +21,7 @@ import java.util.Locale;
 public enum RagPromptTemplate {
   RAW("raw"),
   CHATML("chatml"),
+  CHATML_DIRECT("chatml-direct"),
   CHATML_NO_THINK("chatml-no-think"),
   ZEPHYR("zephyr"),
   LLAMA3("llama3"),
@@ -45,6 +46,10 @@ public enum RagPromptTemplate {
     return switch (this) {
       case RAW -> prompt;
       case CHATML -> "<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\n";
+      case CHATML_DIRECT ->
+          "<|im_start|>user\n"
+              + prompt
+              + "<|im_end|>\n<|im_start|>assistant\nDirect answer from the context: ";
       case CHATML_NO_THINK ->
           "<|im_start|>user\n"
               + prompt
@@ -75,6 +80,12 @@ public enum RagPromptTemplate {
               + "<|im_end|>\n<|im_start|>user\n"
               + userPrompt
               + "<|im_end|>\n<|im_start|>assistant\n";
+      case CHATML_DIRECT ->
+          "<|im_start|>system\n"
+              + systemPrompt.stripTrailing()
+              + "<|im_end|>\n<|im_start|>user\n"
+              + userPrompt
+              + "<|im_end|>\n<|im_start|>assistant\nDirect answer from the context: ";
       case CHATML_NO_THINK ->
           "<|im_start|>system\n"
               + systemPrompt.stripTrailing()
@@ -123,7 +134,7 @@ public enum RagPromptTemplate {
       }
     }
     throw new IllegalArgumentException(
-        "prompt-template must be one of raw, chatml, chatml-no-think, zephyr, llama3, gemma, "
-            + "phi3, deepseek, minicpm5-no-think");
+        "prompt-template must be one of raw, chatml, chatml-direct, chatml-no-think, zephyr, "
+            + "llama3, gemma, phi3, deepseek, minicpm5-no-think");
   }
 }
