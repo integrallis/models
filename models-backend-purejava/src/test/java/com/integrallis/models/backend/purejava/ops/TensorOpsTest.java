@@ -1558,4 +1558,43 @@ class TensorOpsTest {
       assertThat(out[3]).isEqualTo(94.0f);
     }
   }
+
+  @Nested
+  class GeluGlu {
+
+    @Test
+    void matchesLlamaCppTanhApproximation() {
+      float[] gate = {-1.0f, 0.0f, 2.0f};
+      float[] up = {3.0f, 4.0f, 5.0f};
+      float[] out = new float[3];
+
+      TensorOps.geluGlu(out, gate, up, 3);
+
+      assertThat(out[0]).isCloseTo(gelu(-1.0f) * 3.0f, within(1e-6f));
+      assertThat(out[1]).isZero();
+      assertThat(out[2]).isCloseTo(gelu(2.0f) * 5.0f, within(1e-6f));
+    }
+
+    @Test
+    void operatesOnBatchBufferOffsets() {
+      float[] gate = {99.0f, -1.0f, 2.0f, 98.0f};
+      float[] up = {97.0f, 3.0f, 5.0f, 96.0f};
+      float[] out = {95.0f, 0.0f, 0.0f, 94.0f};
+
+      TensorOps.geluGlu(out, 1, gate, 1, up, 1, 2);
+
+      assertThat(out[0]).isEqualTo(95.0f);
+      assertThat(out[1]).isCloseTo(gelu(-1.0f) * 3.0f, within(1e-6f));
+      assertThat(out[2]).isCloseTo(gelu(2.0f) * 5.0f, within(1e-6f));
+      assertThat(out[3]).isEqualTo(94.0f);
+    }
+
+    private static float gelu(float value) {
+      return 0.5f
+          * value
+          * (1.0f
+              + (float)
+                  Math.tanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
+    }
+  }
 }

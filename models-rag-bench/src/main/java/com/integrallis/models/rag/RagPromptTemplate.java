@@ -22,7 +22,12 @@ public enum RagPromptTemplate {
   RAW("raw"),
   CHATML("chatml"),
   CHATML_NO_THINK("chatml-no-think"),
-  ZEPHYR("zephyr");
+  ZEPHYR("zephyr"),
+  LLAMA3("llama3"),
+  GEMMA("gemma"),
+  PHI3("phi3"),
+  DEEPSEEK("deepseek"),
+  MINICPM5_NO_THINK("minicpm5-no-think");
 
   private final String id;
 
@@ -45,6 +50,18 @@ public enum RagPromptTemplate {
               + prompt
               + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
       case ZEPHYR -> "<|user|>\n" + prompt + "</s>\n<|assistant|>";
+      case LLAMA3 ->
+          "<|start_header_id|>user<|end_header_id|>\n\n"
+              + prompt.strip()
+              + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
+      case GEMMA ->
+          "<start_of_turn>user\n" + prompt.strip() + "<end_of_turn>\n<start_of_turn>model\n";
+      case PHI3 -> "<|user|>\n" + prompt.strip() + "<|end|>\n<|assistant|>\n";
+      case DEEPSEEK -> "### Instruction:\n" + prompt + "\n### Response:\n";
+      case MINICPM5_NO_THINK ->
+          "<s><|im_start|>user\n"
+              + prompt
+              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
     };
   }
 
@@ -70,6 +87,31 @@ public enum RagPromptTemplate {
               + "</s>\n<|user|>\n"
               + userPrompt
               + "</s>\n<|assistant|>";
+      case LLAMA3 ->
+          "<|start_header_id|>system<|end_header_id|>\n\n"
+              + systemPrompt.strip()
+              + "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"
+              + userPrompt.strip()
+              + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
+      case GEMMA ->
+          "<start_of_turn>user\n"
+              + systemPrompt.strip()
+              + "\n\n"
+              + userPrompt.strip()
+              + "<end_of_turn>\n<start_of_turn>model\n";
+      case PHI3 ->
+          "<|system|>\n"
+              + systemPrompt.strip()
+              + "<|end|>\n<|user|>\n"
+              + userPrompt.strip()
+              + "<|end|>\n<|assistant|>\n";
+      case DEEPSEEK -> systemPrompt + "### Instruction:\n" + userPrompt + "\n### Response:\n";
+      case MINICPM5_NO_THINK ->
+          "<s><|im_start|>system\n"
+              + systemPrompt.stripTrailing()
+              + "<|im_end|>\n<|im_start|>user\n"
+              + userPrompt
+              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
     };
   }
 
@@ -81,6 +123,7 @@ public enum RagPromptTemplate {
       }
     }
     throw new IllegalArgumentException(
-        "prompt-template must be one of raw, chatml, chatml-no-think, zephyr");
+        "prompt-template must be one of raw, chatml, chatml-no-think, zephyr, llama3, gemma, "
+            + "phi3, deepseek, minicpm5-no-think");
   }
 }

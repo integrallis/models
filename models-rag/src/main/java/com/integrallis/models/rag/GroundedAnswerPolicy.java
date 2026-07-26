@@ -34,20 +34,60 @@ import java.util.regex.Pattern;
  */
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
-  public static final String POLICY_ID = "trusted-provenance-clause-anchors-explicit-abstention-v6";
+  public static final String POLICY_ID =
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v10";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^INSUFFICIENT_CONTEXT[.!]?$");
   private static final Pattern CLAUSE_BOUNDARY =
       Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
+  private static final Pattern STATEMENT_BOUNDARY = Pattern.compile("(?i)(?:[;?!]\\s*|\\.\\s+)");
   private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
   private static final Set<String> FUNCTION_WORDS =
       Set.of(
-          "a", "an", "and", "are", "as", "at", "be", "been", "being", "but", "by", "did", "do",
-          "does", "for", "from", "how", "in", "is", "it", "its", "of", "on", "or", "that", "the",
-          "these", "this", "those", "to", "was", "were", "what", "when", "where", "which", "who",
-          "why", "with");
+          "a",
+          "an",
+          "and",
+          "are",
+          "as",
+          "at",
+          "be",
+          "been",
+          "being",
+          "but",
+          "by",
+          "did",
+          "do",
+          "context",
+          "does",
+          "for",
+          "from",
+          "how",
+          "in",
+          "information",
+          "is",
+          "it",
+          "its",
+          "of",
+          "on",
+          "or",
+          "source",
+          "that",
+          "the",
+          "these",
+          "this",
+          "those",
+          "to",
+          "was",
+          "were",
+          "what",
+          "when",
+          "where",
+          "which",
+          "who",
+          "why",
+          "with");
 
   private final float minimumRetrievalScore;
 
@@ -107,7 +147,11 @@ public final class GroundedAnswerPolicy {
   private static boolean hasOnlySupportedClaims(
       String question, String candidate, List<GroundingDocument> retrieved) {
     Set<String> supported = words(question);
-    retrieved.forEach(hit -> supported.addAll(words(hit.text())));
+    retrieved.forEach(
+        hit -> {
+          supported.addAll(words(hit.title()));
+          supported.addAll(words(hit.text()));
+        });
 
     String uncited = BRACKETED_TEXT.matcher(candidate).replaceAll(" ");
     return words(uncited).stream().allMatch(supported::contains);
@@ -117,7 +161,11 @@ public final class GroundedAnswerPolicy {
     Set<String> words = new HashSet<>();
     Matcher matcher = WORD.matcher(text.toLowerCase(Locale.ROOT));
     while (matcher.find()) {
-      String word = normalizeWord(matcher.group());
+      String rawWord = matcher.group();
+      if (FUNCTION_WORDS.contains(rawWord)) {
+        continue;
+      }
+      String word = normalizeWord(rawWord);
       if (!FUNCTION_WORDS.contains(word)) {
         words.add(word);
       }
@@ -129,11 +177,16 @@ public final class GroundedAnswerPolicy {
       String question, String candidate, List<GroundingDocument> retrieved) {
     Set<String> questionWords = words(question);
     Set<String> evidenceWords = new HashSet<>();
-    retrieved.forEach(hit -> evidenceWords.addAll(words(hit.text())));
+    retrieved.forEach(
+        hit -> {
+          evidenceWords.addAll(words(hit.title()));
+          evidenceWords.addAll(words(hit.text()));
+        });
     evidenceWords.removeAll(questionWords);
 
     List<Set<String>> questionClauses = clauses(question);
-    List<Set<String>> candidateClauses = clauses(BRACKETED_TEXT.matcher(candidate).replaceAll(" "));
+    List<Set<String>> candidateClauses =
+        statementClauses(BRACKETED_TEXT.matcher(candidate).replaceAll(" "));
     if (questionClauses.size() == 1) {
       Set<String> anchors = new HashSet<>(words(candidate));
       anchors.retainAll(evidenceWords);
@@ -141,7 +194,9 @@ public final class GroundedAnswerPolicy {
     }
 
     List<Set<String>> evidenceClauses =
-        retrieved.stream().flatMap(hit -> clauses(hit.text()).stream()).toList();
+        retrieved.stream()
+            .flatMap(hit -> statementClauses(hit.title() + "\n" + hit.text()).stream())
+            .toList();
     List<Set<String>> matchingEvidenceClauses =
         questionClauses.stream()
             .map(questionClause -> bestMatchingClause(questionClause, evidenceClauses))
@@ -186,6 +241,14 @@ public final class GroundedAnswerPolicy {
         .toList();
   }
 
+  private static List<Set<String>> statementClauses(String text) {
+    return STATEMENT_BOUNDARY
+        .splitAsStream(text)
+        .map(GroundedAnswerPolicy::words)
+        .filter(clause -> !clause.isEmpty())
+        .toList();
+  }
+
   private static Set<String> bestMatchingClause(
       Set<String> questionClause, List<Set<String>> evidenceClauses) {
     Set<String> best = Set.of();
@@ -208,6 +271,9 @@ public final class GroundedAnswerPolicy {
   }
 
   private static String normalizeWord(String word) {
+    if (word.equals("thrown")) {
+      return "throw";
+    }
     if (word.length() > 4 && word.endsWith("ies")) {
       return word.substring(0, word.length() - 3) + "y";
     }

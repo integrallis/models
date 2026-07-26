@@ -109,6 +109,35 @@ class ExecutionPlannerTest {
   }
 
   @Test
+  void rejectsLlamaOnlyLayerShortcutsForGemma3() {
+    ModelTopology.LayerTopology layer =
+        new ModelTopology.LayerTopology(
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0,
+            GgufTensorType.Q4_0);
+    ModelTopology topology = new ModelTopology("gemma3", 1024, 256, 256, List.of(layer), true);
+    PureJavaPlanConfiguration requested =
+        PureJavaPlanConfiguration.from(
+            Map.of(),
+            Map.of(
+                PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
+                "true"));
+
+    PureJavaExecutionPlan plan = ExecutionPlanner.plan(runtime("graal-jvmci"), topology, requested);
+
+    assertThat(plan.finalLayerPrefillPruning()).isFalse();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
+    assertThat(plan.stagedQuantizedFfn()).isFalse();
+    assertThat(plan.stagedQuantizedLayer()).isFalse();
+  }
+
+  @Test
   void plansQ5_0BatchedPrefillFromTopology() {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(

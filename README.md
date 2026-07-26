@@ -27,9 +27,10 @@
 
 > **Project status: pre-alpha.** The first publishable scope is
 > `models-api`, `models-runtime`, `models-rag`, `models-semantic-order`, and
-> `models-backend-purejava`. Framework,
-> Apple, ONNX, Rust FFM, embedding, test, and benchmark modules remain experimental
-> or scaffolded and are not part of release `0.1.x`.
+> `models-backend-purejava`, plus the Models-owned `models-backend-native`
+> Rust/FFM accelerator for artifacts that do not clear the production gate in
+> pure Java. Apple, ONNX, embedding, test, and benchmark modules remain
+> experimental or scaffolded and are not part of release `0.1.x`.
 > Real-model integration tests download and run the configured Qwen,
 > Qwen-Coder, SQLCoder, SmolLM2, TinyLlama, DeepSeek-Coder, and MiniCPM GGUF
 > fixtures before passing.
@@ -52,11 +53,20 @@ same-host Ollama gates:
 | Qwen2.5-Coder 0.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 390.3 ms | 39.50 tok/s | 1,941.2 ms | 80.7% |
 | Qwen2.5-Coder 1.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 1,162.1 ms | 23.72 tok/s | 2,545.6 ms | 80.2% |
 | Qwen2.5-Coder 1.5B Q8_0 | Rust/FFM | Coding guarded RAG | 1,288.0 ms | 19.70 tok/s | 3,003.5 ms | 89.9% |
+| EuroLLM 1.7B Q4_K_M | Rust/FFM | Multilingual guarded RAG | 1,514.3 ms | 31.86 tok/s | 2,548.4 ms | 109.8% |
+| Qwen2.5 0.5B Q4_K_M | Rust/FFM | General guarded RAG | 519.7 ms | 67.53 tok/s | 933.6 ms | 146.6% |
+| Qwen2.5 1.5B Q4_K_M | Rust/FFM | General guarded RAG | 1,874.1 ms | 31.25 tok/s | 2,771.0 ms | 108.7% |
+| UmarTransit 1B Q4_K_M | Rust/FFM | Transportation guarded RAG | 1,402.7 ms | 30.93 tok/s | 2,172.4 ms | 115.2% |
+| MiniCPM5 1B Q4_K_M | Rust/FFM | Coding guarded RAG | 1,042.4 ms | 49.01 tok/s | 2,152.1 ms | 131.2% |
+| Llama 3.2 1B Q4_K_M | Rust/FFM | General guarded RAG | 1,312.6 ms | 38.73 tok/s | 1,962.3 ms | 111.4% |
+| Gemma 3 1B Q4_K_M | Rust/FFM | General guarded RAG | 954.3 ms | 41.06 tok/s | 1,619.7 ms | 137.3% |
 
-This is currently **7 of the required 25 launch-qualified artifacts**. Each
-row is SHA-bound to its model bytes, benchmark report, runtime selector, and
-backend plan. llama.cpp and Ollama appear only as controlled comparators; they
-are not Models runtime dependencies.
+This is currently **14 exact qualified artifacts representing 12 distinct model
+identities**, against the required 25 launch-qualified identities. Quantization
+variants do not increase the identity count. Each row is SHA-bound to its model
+bytes, benchmark report, runtime selector, and backend plan. llama.cpp and
+Ollama appear only as controlled comparators; they are not Models runtime
+dependencies.
 
 ## The pitch in 60 seconds
 
@@ -536,7 +546,8 @@ without changing the model metadata reported to callers.
 | Use case | Recommendation |
 |---|---|
 | Evaluation and development against the tested Qwen3 Q4_0 fixture | Experimental fit |
-| Production inference or framework integration | Not yet supported |
+| Qualified SHA, workload, host profile, and backend | Pre-release production candidate; use the qualification ledger |
+| Unqualified artifact or different deployment profile | Benchmark and qualify before production use |
 | RAG bridge to vectors | Experimental; `models-embedding` provides the optional vectors bridge |
 | Production chat with 70B+ models, multi-turn | Use a hosted LLM API |
 | High-throughput batch inference (>100 req/s) | Use vLLM / TGI with GPU |

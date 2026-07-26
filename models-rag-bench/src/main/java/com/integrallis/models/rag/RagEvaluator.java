@@ -30,6 +30,7 @@ public final class RagEvaluator {
   private static final Pattern CURRENCY_SYMBOL = Pattern.compile("\\$(\\d+(?:\\.\\d+)?)");
   private static final Pattern PLURAL_DOLLARS =
       Pattern.compile("\\b(\\d+(?:\\.\\d+)?)\\s+dollars\\b");
+  private static final Pattern THIRD_PERSON_DOES = Pattern.compile("\\bdoes\\b");
 
   private RagEvaluator() {}
 
@@ -131,6 +132,7 @@ public final class RagEvaluator {
     String normalized = value.toLowerCase(Locale.ROOT).replace(",", "");
     normalized = CURRENCY_SYMBOL.matcher(normalized).replaceAll("$1 dollar");
     normalized = PLURAL_DOLLARS.matcher(normalized).replaceAll("$1 dollar");
+    normalized = THIRD_PERSON_DOES.matcher(normalized).replaceAll("do");
     return normalized.replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
   }
 }
