@@ -1,11 +1,12 @@
 # Production RAG Benchmarks
 
-Last updated: 2026-07-24
+Last updated: 2026-07-26
 
 ## Result
 
-Seven exact artifacts now clear the current absolute RAG SLOs, minimum model
-contribution, and same-host Ollama comparison:
+Fourteen exact artifacts representing twelve distinct model identities now
+clear the current absolute RAG SLOs, minimum model contribution, and same-host
+Ollama comparison:
 
 - **SmolLM2 360M Q8_0** is `PRODUCTION_READY` for the general guarded-RAG
   workload through plain Java, LangChain4j, and Spring AI.
@@ -29,13 +30,34 @@ contribution, and same-host Ollama comparison:
 - **Qwen2.5-Coder 1.5B Q8_0** is `USABLE` for the coding workload through
   Rust/FFM prefill. It reaches 89.9% of Ollama and 69.4% of llama.cpp median
   decode throughput while preserving 15 correct model answers.
+- **EuroLLM 1.7B Q4_K_M** is `USABLE` for the multilingual guarded-RAG
+  workload. Its marker-selected Rust/FFM profile reaches 109.8% of Ollama and
+  68.8% of llama.cpp decode throughput.
+- **Qwen2.5 0.5B Q4_K_M** is `PRODUCTION_READY` for general guarded RAG and
+  reaches 146.6% of Ollama and 87.1% of llama.cpp decode throughput.
+- **Qwen2.5 1.5B Q4_K_M** is `USABLE` for general guarded RAG and reaches
+  108.7% of Ollama and 65.3% of llama.cpp decode throughput.
+- **UmarTransit 1B Q4_K_M** is `USABLE` for transportation guarded RAG and
+  reaches 115.2% of Ollama and 68.8% of llama.cpp decode throughput.
+- **MiniCPM5 1B Q4_K_M** is `USABLE` for coding guarded RAG and reaches 131.2%
+  of Ollama and 67.6% of llama.cpp decode throughput.
+- **Llama 3.2 1B Q4_K_M** is `USABLE` for general guarded RAG and reaches
+  111.4% of Ollama and 67.9% of llama.cpp decode throughput.
+- **Gemma 3 1B Q4_K_M** is `PRODUCTION_READY` for general guarded RAG. Its
+  marker-selected native decode reaches 137.3% of Ollama and 84.0% of
+  llama.cpp, with 27 of 27 grounded answers correct.
 
 These are guarded, workload-specific qualifications, not claims of unrestricted
 question-answering quality. Every report preserves raw output, final grounded
 output, decision type, artifact SHA-256, corpus SHA-256, workload ID, runtime
 controls, and same-host comparator evidence. Exact reports are under
-`benchmark-results/certified-20260724/rag/native-q8-prefix-cache/` and
-`benchmark-results/certified-20260724/rag/native-q4-profiled/`.
+`benchmark-results/certified-20260724/rag/`,
+`benchmark-results/certified-20260725/rag/`, and
+`benchmark-results/certified-20260726/rag/`.
+
+Quantization variants are retained as independently qualified artifacts but do
+not increase the distinct-model launch count. The current launch count is
+therefore twelve, not fourteen.
 
 The older Qwen3 framework and hosted-provider tables below remain useful
 historical diagnostics, but they predate cross-request KV reuse and the current
@@ -138,6 +160,28 @@ improves prefill throughput 1.46x, p95 TTFT 31.6%, p95 end-to-end latency
 16.3%, and measured CPU 20.2%. Pure Java and Rust/FFM both produce 27 correct
 grounded answers, but their raw generations and contribution decisions differ;
 this is semantic parity, not byte-identical output.
+
+## Gemma 3 1B Qualification
+
+The Gemma 3 matrix uses the exact 806,058,496-byte Q4_K_M artifact with SHA-256
+`12bf0fff8815d5f73a3c9b586bd8fee8e7b248c935de70dec367679873d0f29d`.
+All rows ran sequentially on the same 8-vCPU EPYC-Milan host with one complete
+warmup and 27 measured requests.
+
+| Backend | Tier | p95 TTFT | Median decode | p95 end to end | Grounded quality |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Models Rust/FFM, Java decode | PRODUCTION_READY | 976.7 ms | 14.63 tok/s | 3,134.9 ms | 100% |
+| Models Rust/FFM, marker profile | PRODUCTION_READY | 954.3 ms | 41.06 tok/s | 1,619.7 ms | 100% |
+| Ollama 0.32.0 | USABLE | 1,130.8 ms | 29.90 tok/s | 2,101.0 ms | 100% |
+| llama.cpp b10012 | PRODUCTION_READY | 940.3 ms | 48.85 tok/s | 1,524.0 ms | 100% |
+
+The marker profile activates only native quantized decode and eight native
+kernel workers. It improves decode throughput 2.806x and lowers p95 end-to-end
+latency 48.3% over Java decode while preserving all 27 outputs exactly. A
+separately measured 64-token prefill and batched-attention candidate was
+rejected because it was slower. The raw reports and executable evidence test
+are under
+`benchmark-results/certified-20260726/rag/gemma-3-1b-q4_k_m/`.
 
 ## What Acceptable Means
 

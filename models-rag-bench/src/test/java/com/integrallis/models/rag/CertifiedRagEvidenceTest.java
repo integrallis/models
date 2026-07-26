@@ -62,6 +62,9 @@ class CertifiedRagEvidenceTest {
   private static final Path LLAMA_3_2_1B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260725/rag/llama-3.2-1b-q4_k_m");
+  private static final Path GEMMA_3_1B_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260726/rag/gemma-3-1b-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -780,6 +783,75 @@ class CertifiedRagEvidenceTest {
         .isLessThan(baseline.summary().endToEndMillis().p95());
     assertThat(candidate.summary().endToEndMillis().p95())
         .isLessThan(ollama.summary().endToEndMillis().p95() * 1.5);
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().rawText())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.grounding().rawText()).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            baseline.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(candidate.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::evaluation).toList());
+  }
+
+  @Test
+  void gemma3OneBillionMarkerProfileQualifiesGeneralRag() throws Exception {
+    RagBenchmarkReport baseline =
+        report(GEMMA_3_1B_Q4_K_M_EVIDENCE, "models-rust-ffm-baseline.json");
+    RagBenchmarkReport candidate = report(GEMMA_3_1B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport rejected =
+        report(GEMMA_3_1B_Q4_K_M_EVIDENCE, "models-rust-ffm-rejected-batch64.json");
+    RagBenchmarkReport ollama = report(GEMMA_3_1B_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(GEMMA_3_1B_Q4_K_M_EVIDENCE, "llama.cpp.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("12bf0fff8815d5f73a3c9b586bd8fee8e7b248c935de70dec367679873d0f29d");
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.modelAnswerCount()).isEqualTo(9);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(candidate.backendDiagnostics().optimizations())
+        .filteredOn(optimization -> optimization.id().startsWith("modeljars.profile."))
+        .singleElement()
+        .satisfies(
+            optimization -> {
+              assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(optimization.settings())
+                  .containsEntry("profile-id", "gemma_3_1b_q4_k_m_epyc_milan_jdk25_rust_ffm");
+            });
+    assertThat(candidate.backendDiagnostics().optimization("rust-quantized-decode"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(candidate.backendDiagnostics().optimization("batched-attention-scores"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.DISABLED));
+    assertThat(candidate.backendDiagnostics().optimization("batched-attention-values"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.DISABLED));
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(baseline.summary().p50DecodeTokensPerSecond() * 2.7);
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(baseline.summary().endToEndMillis().p95() * 0.55);
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(ollama.summary().p50DecodeTokensPerSecond() * 1.3);
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(llama.summary().p50DecodeTokensPerSecond() * 0.8);
+    assertThat(candidate.summary().p50DecodeTokensPerSecond())
+        .isGreaterThan(rejected.summary().p50DecodeTokensPerSecond());
+    assertThat(candidate.summary().endToEndMillis().p95())
+        .isLessThan(rejected.summary().endToEndMillis().p95());
     assertThat(candidate.runs())
         .extracting(run -> run.grounding().rawText())
         .containsExactlyElementsOf(
