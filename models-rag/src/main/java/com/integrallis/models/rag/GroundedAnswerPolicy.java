@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v14";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v15";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -44,6 +44,7 @@ public final class GroundedAnswerPolicy {
       Pattern.compile("(?i)^according to the context provided,?\\s*");
   private static final Pattern LATEX_MATRIX_DELIMITER =
       Pattern.compile("\\\\(?:begin|end)\\{(?:bmatrix|matrix|pmatrix|vmatrix|Vmatrix)}");
+  private static final Pattern OPTIONAL_PLURAL_MARKER = Pattern.compile("(?i)\\(s\\)");
   private static final Pattern CLAUSE_BOUNDARY =
       Pattern.compile("(?i)(?:\\s*,\\s+and\\s+|\\s+and\\s+|[;?!]\\s*|\\.\\s+)");
   private static final Pattern STATEMENT_BOUNDARY = Pattern.compile("(?i)(?:[;?!]\\s*|\\.\\s+)");
@@ -53,6 +54,7 @@ public final class GroundedAnswerPolicy {
           "a",
           "an",
           "and",
+          "answer",
           "are",
           "as",
           "at",
@@ -76,6 +78,8 @@ public final class GroundedAnswerPolicy {
           "of",
           "on",
           "or",
+          "provided",
+          "question",
           "source",
           "that",
           "the",
@@ -155,7 +159,8 @@ public final class GroundedAnswerPolicy {
   }
 
   private static String removeValidationOnlyMarkup(String candidate) {
-    return LATEX_MATRIX_DELIMITER.matcher(candidate).replaceAll(" ");
+    String withoutMatrixDelimiters = LATEX_MATRIX_DELIMITER.matcher(candidate).replaceAll(" ");
+    return OPTIONAL_PLURAL_MARKER.matcher(withoutMatrixDelimiters).replaceAll("");
   }
 
   private static boolean isExplicitAbstention(String candidate) {
