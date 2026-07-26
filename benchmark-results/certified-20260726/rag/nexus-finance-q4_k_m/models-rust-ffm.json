@@ -1,9 +1,9 @@
 {
   "schemaVersion" : 5,
-  "generatedAt" : "2026-07-26T19:49:11.349208838Z",
+  "generatedAt" : "2026-07-26T20:29:03.811691392Z",
   "framework" : "plain-java",
   "backend" : "rust-ffm",
-  "backendVersion" : "models@5c59bdf30ce29b039dfcce461b490f95b929976a vectors@c298a0b73970468794c1ba403022e2adc517e57e",
+  "backendVersion" : "models@4f38a405d384c0ec496b314709c3fcfb4c67357c vectors@c298a0b73970468794c1ba403022e2adc517e57e",
   "modelId" : "king3djbl_nexus_finance_gguf_q4_k_m",
   "model" : "/root/.jvllm/models/nexus-finance-q4_k_m.gguf",
   "artifactSha256" : "a849ca49f91889b614518e9242ceec6e24034289de0f3f8621784f3e1b77bb60",
@@ -19,16 +19,16 @@
     "iterations" : 3,
     "contextLength" : 2048,
     "threads" : 8,
-    "groundingPolicy" : "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v15",
+    "groundingPolicy" : "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v17",
     "minimumRetrievalScore" : 2.0,
     "generationControls" : {
-      "promptCache" : "longest-common-prefix",
       "repetitionPenalty" : "1.0",
       "topK" : "1",
-      "stopSequences" : "\\n",
-      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0",
       "temperature" : "0.0",
-      "topP" : "1.0"
+      "stopSequences" : "\\n",
+      "seed" : "42"
     }
   },
   "environment" : {
@@ -48,46 +48,46 @@
     "backend" : "rust-ffm",
     "planVersion" : "rust-ffm-v10",
     "environment" : {
-      "model-architecture" : "qwen2",
-      "q4-short-pairwise-supported" : "true",
-      "vector-provider" : "PanamaVectorUtilSupport",
-      "projection-layers" : "28",
-      "fast-vector-fma" : "true",
-      "vm-version" : "25.0.3+9-LTS",
-      "kernel-implementation" : "rust-ffm-quantized-v10",
+      "gguf-parallel" : "true",
+      "gguf-chunks-per-thread" : "2",
+      "os" : "Linux",
+      "processors" : "8",
+      "sve" : "false",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-quantized-decode" : "true",
+      "compiler" : "hotspot-c2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "architecture" : "amd64",
+      "native-q5-0-grouped" : "false",
+      "native-kernel-threads" : "8",
+      "vector-api" : "true",
+      "native-kernel-abi" : "2",
+      "gguf-threads" : "8",
+      "q4-unsigned-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "active-vector-bits" : "256",
+      "kernel-runtime" : "rust-ffm",
       "cpu-model" : "AMD EPYC-Milan Processor",
       "preferred-vector-bits" : "256",
-      "kernel-runtime" : "rust-ffm",
-      "active-vector-bits" : "256",
-      "java-feature" : "25",
-      "q4-unsigned-pairwise-supported" : "true",
-      "gguf-threads" : "8",
-      "native-kernel-abi" : "2",
-      "vector-api" : "true",
-      "native-kernel-threads" : "8",
-      "native-q5-0-grouped" : "false",
-      "architecture" : "amd64",
-      "vm-vendor" : "Eclipse Adoptium",
-      "compiler" : "hotspot-c2",
-      "native-quantized-decode" : "true",
-      "processors" : "8",
-      "vm-name" : "OpenJDK 64-Bit Server VM",
-      "sve" : "false",
-      "os" : "Linux",
-      "gguf-chunks-per-thread" : "2",
-      "gguf-parallel" : "true",
-      "transformer-runtime" : "java",
-      "fast-scalar-fma" : "true",
+      "kernel-implementation" : "rust-ffm-quantized-v10",
+      "vm-version" : "25.0.3+9-LTS",
+      "fast-vector-fma" : "true",
+      "projection-layers" : "28",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "q4-short-pairwise-supported" : "true",
+      "model-architecture" : "qwen2",
+      "gguf-executor" : "persistent",
       "java-version" : "25.0.3",
-      "gguf-executor" : "persistent"
+      "fast-scalar-fma" : "true",
+      "transformer-runtime" : "java"
     },
     "optimizations" : [ {
       "id" : "grouped-projections",
       "status" : "ENABLED",
       "reason" : "loaded tensor topology has a retained grouped projection kernel",
       "settings" : {
-        "implementation" : "rust-ffm-quantized-v10",
         "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v10",
         "gate-up" : "grouped"
       }
     }, {
@@ -95,22 +95,22 @@
       "status" : "ENABLED",
       "reason" : "eligible projections share one Q8_K quantization and row dispatch",
       "settings" : {
-        "eligible-layers" : "14",
-        "formats" : "Q4_K,Q4_K,Q6_K"
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "14"
       }
     }, {
       "id" : "q4-kernel",
       "status" : "UNSUPPORTED",
       "reason" : "the loaded model has no Q4_0 projection tensors",
       "settings" : {
-        "short-supported" : "true",
-        "requested" : "widened",
-        "compiler" : "hotspot-c2",
-        "architecture" : "amd64",
-        "os" : "Linux",
         "unsigned-supported" : "true",
-        "active-vector-bits" : "256",
-        "java-feature" : "25"
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256"
       }
     }, {
       "id" : "batched-prefill",
@@ -124,16 +124,16 @@
       "status" : "UNSUPPORTED",
       "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
       "settings" : {
-        "formats" : "Q4_K,Q4_K,Q6_K",
-        "output-rows" : "all"
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
       }
     }, {
       "id" : "final-layer-kv-only-prefill",
       "status" : "UNSUPPORTED",
       "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
       "settings" : {
-        "unused-rows" : "full-attention",
-        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
       }
     }, {
       "id" : "batched-attention-scores",
@@ -154,9 +154,9 @@
       "status" : "UNSUPPORTED",
       "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
       "settings" : {
-        "parallel" : "true",
-        "eligible-layers" : "0",
         "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
         "stages" : "2"
       }
     }, {
@@ -164,9 +164,9 @@
       "status" : "UNSUPPORTED",
       "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
       "settings" : {
-        "parallel" : "true",
-        "eligible-layers" : "0",
         "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
         "stages" : "7"
       }
     }, {
@@ -174,18 +174,18 @@
       "status" : "UNSUPPORTED",
       "reason" : "loaded staged projection topology has no Q8_0 consumer",
       "settings" : {
-        "layout" : "block-major-bytes",
-        "prefill-batch-size" : "32"
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
       }
     }, {
       "id" : "q8-block-major-kernel",
       "status" : "UNSUPPORTED",
       "reason" : "loaded staged projection topology has no Q8_0 consumer",
       "settings" : {
-        "active-vector-bits" : "256",
-        "compiler" : "hotspot-c2",
-        "floating-point-order" : "scalar-block-order",
         "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256",
         "requested-kernel" : "scattered"
       }
     }, {
@@ -193,10 +193,10 @@
       "status" : "UNSUPPORTED",
       "reason" : "every staged layer requires Q8_0 gate and up projections",
       "settings" : {
-        "eligible-layers" : "0",
-        "partitions" : "8",
+        "staged-layers" : "0",
         "partition" : "batch-rows",
-        "staged-layers" : "0"
+        "partitions" : "8",
+        "eligible-layers" : "0"
       }
     }, {
       "id" : "mapped-model-weights",
@@ -218,71 +218,71 @@
       "reason" : "vectors-core selected reusable GGUF row workers",
       "settings" : {
         "threads" : "8",
-        "executor" : "persistent",
-        "chunks-per-thread" : "2"
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
       }
     }, {
       "id" : "rust-q4-0-batched-matmul",
       "status" : "ENABLED",
       "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
       "settings" : {
-        "transformer" : "java",
+        "boundary" : "panama-ffm",
         "abi" : "2",
-        "boundary" : "panama-ffm"
+        "transformer" : "java"
       }
     }, {
       "id" : "rust-q5-0-batched-matmul",
       "status" : "ENABLED",
       "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
       "settings" : {
-        "transformer" : "java",
+        "boundary" : "panama-ffm",
         "abi" : "2",
-        "boundary" : "panama-ffm"
+        "transformer" : "java"
       }
     }, {
       "id" : "rust-q8-0-batched-matmul",
       "status" : "ENABLED",
       "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
       "settings" : {
-        "transformer" : "java",
+        "boundary" : "panama-ffm",
         "abi" : "2",
-        "boundary" : "panama-ffm"
+        "transformer" : "java"
       }
     }, {
       "id" : "rust-q4-k-batched-matmul",
       "status" : "ENABLED",
       "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
       "settings" : {
-        "transformer" : "java",
+        "boundary" : "panama-ffm",
         "abi" : "2",
-        "boundary" : "panama-ffm"
+        "transformer" : "java"
       }
     }, {
       "id" : "rust-q5-k-batched-matmul",
       "status" : "ENABLED",
       "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
       "settings" : {
-        "transformer" : "java",
+        "boundary" : "panama-ffm",
         "abi" : "2",
-        "boundary" : "panama-ffm"
+        "transformer" : "java"
       }
     }, {
       "id" : "rust-q6-k-batched-matmul",
       "status" : "ENABLED",
       "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
       "settings" : {
-        "transformer" : "java",
+        "boundary" : "panama-ffm",
         "abi" : "2",
-        "boundary" : "panama-ffm"
+        "transformer" : "java"
       }
     }, {
       "id" : "rust-mixed-k-grouped-matmul",
       "status" : "ENABLED",
       "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
       "settings" : {
-        "transformer" : "java",
+        "boundary" : "panama-ffm",
         "abi" : "2",
-        "boundary" : "panama-ffm"
+        "transformer" : "java"
       }
     }, {
       "id" : "rust-q5-0-grouped-matmul",
@@ -306,31 +306,31 @@
   "summary" : {
     "totalAttempts" : 27,
     "successfulAttempts" : 27,
-    "loadMillis" : 290.451721,
+    "loadMillis" : 302.216915,
     "retrievalMillis" : {
-      "p50" : 1.290817,
-      "p95" : 2.2775982999999997
+      "p50" : 1.14926,
+      "p95" : 1.6507832
     },
     "frameworkOverheadMillis" : {
-      "p50" : 4.958337999999912,
-      "p95" : 7.316741599999886
+      "p50" : 4.975243000000091,
+      "p95" : 6.215869999999859
     },
     "ttftMillis" : {
-      "p50" : 703.758113,
-      "p95" : 779.2755533999999
+      "p50" : 711.118375,
+      "p95" : 791.9311604999999
     },
     "tpotMillis" : {
-      "p50" : 32.7464846,
-      "p95" : 33.64301244196429
+      "p50" : 32.830046814814814,
+      "p95" : 33.725914303913044
     },
     "endToEndMillis" : {
-      "p50" : 1472.800049,
-      "p95" : 2228.2687588
+      "p50" : 1491.619736,
+      "p95" : 2258.3109475
     },
-    "p50PrefillTokensPerSecond" : 95.54450574269144,
-    "p50DecodeTokensPerSecond" : 30.53762906812904,
-    "peakRssBytes" : 1437442048,
-    "totalCpuMillis" : 310820.0,
+    "p50PrefillTokensPerSecond" : 94.21272378549911,
+    "p50DecodeTokensPerSecond" : 30.45990173698876,
+    "peakRssBytes" : 1440145408,
+    "totalCpuMillis" : 309990.0,
     "totalInputTokens" : 4428,
     "totalCacheReadInputTokens" : 2742,
     "totalCacheWriteInputTokens" : 1686,
@@ -361,21 +361,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
-    "retrievalMillis" : 2.277144,
-    "frameworkOverheadMillis" : 6.401626999999735,
-    "endToEndMillis" : 2211.126456,
+    "retrievalMillis" : 2.141493,
+    "frameworkOverheadMillis" : 6.499339999999847,
+    "endToEndMillis" : 2332.668274,
     "generation" : {
       "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
       "inputTokens" : 172,
       "cacheReadInputTokens" : 100,
       "cacheWriteInputTokens" : 72,
       "outputTokens" : 45,
-      "ttftMillis" : 761.32093,
-      "totalMillis" : 2202.447685,
-      "prefillTokensPerSecond" : 95.08445284887706,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1401561088,
-      "cpuMillis" : 15650.0,
+      "ttftMillis" : 800.510952,
+      "totalMillis" : 2324.027441,
+      "prefillTokensPerSecond" : 90.40246998833868,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404219392,
+      "cpuMillis" : 15750.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -416,21 +416,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
-    "retrievalMillis" : 2.264423,
-    "frameworkOverheadMillis" : 4.994803999999931,
-    "endToEndMillis" : 1455.737449,
+    "retrievalMillis" : 1.68326,
+    "frameworkOverheadMillis" : 5.108013000000028,
+    "endToEndMillis" : 1501.477688,
     "generation" : {
       "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
       "inputTokens" : 168,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 66,
       "outputTokens" : 24,
-      "ttftMillis" : 698.929894,
-      "totalMillis" : 1448.478222,
-      "prefillTokensPerSecond" : 94.94468888538012,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1401683968,
-      "cpuMillis" : 9970.0,
+      "ttftMillis" : 728.319883,
+      "totalMillis" : 1494.686415,
+      "prefillTokensPerSecond" : 91.11751456778539,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404329984,
+      "cpuMillis" : 9940.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -471,21 +471,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
-    "retrievalMillis" : 2.277793,
-    "frameworkOverheadMillis" : 5.688916999999947,
-    "endToEndMillis" : 1388.836362,
+    "retrievalMillis" : 1.575004,
+    "frameworkOverheadMillis" : 4.932297999999946,
+    "endToEndMillis" : 1441.009496,
     "generation" : {
       "text" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
       "inputTokens" : 171,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 69,
       "outputTokens" : 21,
-      "ttftMillis" : 725.93996,
-      "totalMillis" : 1380.869652,
-      "prefillTokensPerSecond" : 95.54450574269144,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1401769984,
-      "cpuMillis" : 9330.0,
+      "ttftMillis" : 759.276016,
+      "totalMillis" : 1434.502194,
+      "prefillTokensPerSecond" : 91.33612931139392,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404407808,
+      "cpuMillis" : 9350.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -526,21 +526,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
-    "retrievalMillis" : 2.101116,
-    "frameworkOverheadMillis" : 7.6506319999998595,
-    "endToEndMillis" : 1469.763788,
+    "retrievalMillis" : 1.458189,
+    "frameworkOverheadMillis" : 5.246653000000151,
+    "endToEndMillis" : 1491.619736,
     "generation" : {
       "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
       "inputTokens" : 168,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 66,
       "outputTokens" : 24,
-      "ttftMillis" : 703.758113,
-      "totalMillis" : 1460.01204,
-      "prefillTokensPerSecond" : 94.65724681919704,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1401839616,
-      "cpuMillis" : 10010.0,
+      "ttftMillis" : 711.118375,
+      "totalMillis" : 1484.914894,
+      "prefillTokensPerSecond" : 93.35417220998319,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404465152,
+      "cpuMillis" : 9930.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -581,21 +581,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
-    "retrievalMillis" : 1.345581,
-    "frameworkOverheadMillis" : 4.856101999999964,
-    "endToEndMillis" : 1604.069414,
+    "retrievalMillis" : 1.339709,
+    "frameworkOverheadMillis" : 4.825915999999779,
+    "endToEndMillis" : 1619.381944,
     "generation" : {
       "text" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.** [finance-ember-loan]",
       "inputTokens" : 170,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 68,
       "outputTokens" : 28,
-      "ttftMillis" : 715.582195,
-      "totalMillis" : 1597.867731,
-      "prefillTokensPerSecond" : 95.52404620282904,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1401892864,
-      "cpuMillis" : 11080.0,
+      "ttftMillis" : 725.895983,
+      "totalMillis" : 1613.216319,
+      "prefillTokensPerSecond" : 94.17402425697955,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404530688,
+      "cpuMillis" : 11070.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -636,21 +636,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
-    "retrievalMillis" : 1.349807,
-    "frameworkOverheadMillis" : 4.755041000000119,
-    "endToEndMillis" : 1915.579347,
+    "retrievalMillis" : 1.376534,
+    "frameworkOverheadMillis" : 4.885866999999962,
+    "endToEndMillis" : 1920.558951,
     "generation" : {
       "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
       "inputTokens" : 171,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 69,
       "outputTokens" : 37,
-      "ttftMillis" : 727.219038,
-      "totalMillis" : 1909.474499,
-      "prefillTokensPerSecond" : 95.35922580470402,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1401921536,
-      "cpuMillis" : 13490.0,
+      "ttftMillis" : 736.441104,
+      "totalMillis" : 1914.29655,
+      "prefillTokensPerSecond" : 94.18485107350071,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404555264,
+      "cpuMillis" : 13360.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -691,21 +691,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
-    "retrievalMillis" : 1.473093,
-    "frameworkOverheadMillis" : 4.940421000000015,
-    "endToEndMillis" : 1456.619925,
+    "retrievalMillis" : 1.275652,
+    "frameworkOverheadMillis" : 5.02794300000005,
+    "endToEndMillis" : 1461.481456,
     "generation" : {
       "text" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.** [finance-grove-runway]",
       "inputTokens" : 166,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 64,
       "outputTokens" : 25,
-      "ttftMillis" : 667.191816,
-      "totalMillis" : 1450.206411,
-      "prefillTokensPerSecond" : 96.48137170991248,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1401954304,
-      "cpuMillis" : 10020.0,
+      "ttftMillis" : 674.409713,
+      "totalMillis" : 1455.177861,
+      "prefillTokensPerSecond" : 95.44782080306372,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404592128,
+      "cpuMillis" : 9930.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -746,21 +746,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
-    "retrievalMillis" : 1.361335,
-    "frameworkOverheadMillis" : 5.012519999999995,
-    "endToEndMillis" : 1219.724056,
+    "retrievalMillis" : 1.290945,
+    "frameworkOverheadMillis" : 5.017466999999897,
+    "endToEndMillis" : 1216.35424,
     "generation" : {
       "text" : "At 5 percent, Harbor Division escalates. The finance director owns the review. [finance-harbor-variance]",
       "inputTokens" : 165,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 63,
       "outputTokens" : 17,
-      "ttftMillis" : 674.632748,
-      "totalMillis" : 1213.350201,
-      "prefillTokensPerSecond" : 93.93317528306241,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1402482688,
-      "cpuMillis" : 7980.0,
+      "ttftMillis" : 688.854118,
+      "totalMillis" : 1210.045828,
+      "prefillTokensPerSecond" : 91.98202123501031,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404915712,
+      "cpuMillis" : 7950.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -793,20 +793,20 @@
     "caseId" : "unsupported-crypto-allocation",
     "retrieved" : [ ],
     "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
-    "retrievalMillis" : 0.586641,
-    "frameworkOverheadMillis" : 4.103770000000168,
-    "endToEndMillis" : 2113.062601,
+    "retrievalMillis" : 0.539647,
+    "frameworkOverheadMillis" : 4.201121999999941,
+    "endToEndMillis" : 2145.124002,
     "generation" : {
       "text" : "INSUFFICIENT_CONTEXT",
       "inputTokens" : 125,
       "cacheReadInputTokens" : 100,
       "cacheWriteInputTokens" : 25,
       "outputTokens" : 57,
-      "ttftMillis" : 260.481876,
-      "totalMillis" : 2108.37219,
-      "prefillTokensPerSecond" : 97.11921262144504,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1402494976,
+      "ttftMillis" : 265.645352,
+      "totalMillis" : 2140.383233,
+      "prefillTokensPerSecond" : 95.23214440813437,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1404932096,
       "cpuMillis" : 16100.0,
       "estimatedApiCostUsd" : null
     },
@@ -848,21 +848,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
-    "retrievalMillis" : 1.359281,
-    "frameworkOverheadMillis" : 5.083078000000114,
-    "endToEndMillis" : 2264.209024,
+    "retrievalMillis" : 1.277986,
+    "frameworkOverheadMillis" : 5.554439999999886,
+    "endToEndMillis" : 2274.472615,
     "generation" : {
       "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
       "inputTokens" : 172,
       "cacheReadInputTokens" : 100,
       "cacheWriteInputTokens" : 72,
       "outputTokens" : 45,
-      "ttftMillis" : 809.025717,
-      "totalMillis" : 2257.766665,
-      "prefillTokensPerSecond" : 89.7325840006192,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1407819776,
-      "cpuMillis" : 15770.0,
+      "ttftMillis" : 820.935209,
+      "totalMillis" : 2267.640189,
+      "prefillTokensPerSecond" : 88.53023226094561,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1413046272,
+      "cpuMillis" : 15780.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -903,21 +903,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
-    "retrievalMillis" : 1.404119,
-    "frameworkOverheadMillis" : 8.077896999999894,
-    "endToEndMillis" : 1472.800049,
+    "retrievalMillis" : 1.397397,
+    "frameworkOverheadMillis" : 14.540467000000035,
+    "endToEndMillis" : 1467.634268,
     "generation" : {
       "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
       "inputTokens" : 168,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 66,
       "outputTokens" : 24,
-      "ttftMillis" : 703.013394,
-      "totalMillis" : 1463.318033,
-      "prefillTokensPerSecond" : 95.4358330510433,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1436954624,
-      "cpuMillis" : 10000.0,
+      "ttftMillis" : 704.370334,
+      "totalMillis" : 1451.696404,
+      "prefillTokensPerSecond" : 94.21272378549911,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439567872,
+      "cpuMillis" : 9920.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -958,21 +958,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
-    "retrievalMillis" : 1.290817,
-    "frameworkOverheadMillis" : 4.867189999999937,
-    "endToEndMillis" : 1384.579064,
+    "retrievalMillis" : 1.312117,
+    "frameworkOverheadMillis" : 4.781048999999939,
+    "endToEndMillis" : 1406.247353,
     "generation" : {
       "text" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
       "inputTokens" : 171,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 69,
       "outputTokens" : 21,
-      "ttftMillis" : 724.194702,
-      "totalMillis" : 1378.421057,
-      "prefillTokensPerSecond" : 95.7798959999957,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1436999680,
-      "cpuMillis" : 9380.0,
+      "ttftMillis" : 734.646152,
+      "totalMillis" : 1400.154187,
+      "prefillTokensPerSecond" : 94.40967916709471,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439612928,
+      "cpuMillis" : 9350.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -1013,21 +1013,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
-    "retrievalMillis" : 1.143223,
-    "frameworkOverheadMillis" : 5.163527999999815,
-    "endToEndMillis" : 1457.802256,
+    "retrievalMillis" : 1.231354,
+    "frameworkOverheadMillis" : 5.066730000000007,
+    "endToEndMillis" : 1465.068255,
     "generation" : {
       "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
       "inputTokens" : 168,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 66,
       "outputTokens" : 24,
-      "ttftMillis" : 696.908207,
-      "totalMillis" : 1451.495505,
-      "prefillTokensPerSecond" : 95.25509655466472,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437057024,
-      "cpuMillis" : 10010.0,
+      "ttftMillis" : 705.08226,
+      "totalMillis" : 1458.770171,
+      "prefillTokensPerSecond" : 94.13472433952452,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439641600,
+      "cpuMillis" : 9920.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -1068,21 +1068,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
-    "retrievalMillis" : 1.122571,
-    "frameworkOverheadMillis" : 4.816875999999866,
-    "endToEndMillis" : 1597.814015,
+    "retrievalMillis" : 1.09652,
+    "frameworkOverheadMillis" : 4.758806999999933,
+    "endToEndMillis" : 1614.219327,
     "generation" : {
       "text" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.** [finance-ember-loan]",
       "inputTokens" : 170,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 68,
       "outputTokens" : 28,
-      "ttftMillis" : 712.684908,
-      "totalMillis" : 1591.874568,
-      "prefillTokensPerSecond" : 95.9077973578028,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437077504,
-      "cpuMillis" : 11050.0,
+      "ttftMillis" : 725.0318,
+      "totalMillis" : 1608.364,
+      "prefillTokensPerSecond" : 94.27148625074426,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439662080,
+      "cpuMillis" : 11060.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -1123,20 +1123,20 @@
       "rank" : 1
     } ],
     "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
-    "retrievalMillis" : 1.094038,
-    "frameworkOverheadMillis" : 4.712405000000217,
-    "endToEndMillis" : 1907.126093,
+    "retrievalMillis" : 1.086074,
+    "frameworkOverheadMillis" : 4.629772000000003,
+    "endToEndMillis" : 1917.148173,
     "generation" : {
       "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
       "inputTokens" : 171,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 69,
       "outputTokens" : 37,
-      "ttftMillis" : 724.413894,
-      "totalMillis" : 1901.31965,
-      "prefillTokensPerSecond" : 95.7291628526746,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437102080,
+      "ttftMillis" : 735.368296,
+      "totalMillis" : 1911.432327,
+      "prefillTokensPerSecond" : 94.29453221839587,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439678464,
       "cpuMillis" : 13390.0,
       "estimatedApiCostUsd" : null
     },
@@ -1178,20 +1178,507 @@
       "rank" : 1
     } ],
     "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
-    "retrievalMillis" : 1.146158,
-    "frameworkOverheadMillis" : 4.958337999999912,
-    "endToEndMillis" : 1459.225293,
+    "retrievalMillis" : 1.131814,
+    "frameworkOverheadMillis" : 5.024556999999959,
+    "endToEndMillis" : 1469.921528,
     "generation" : {
       "text" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.** [finance-grove-runway]",
       "inputTokens" : 166,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 64,
       "outputTokens" : 25,
-      "ttftMillis" : 673.26314,
-      "totalMillis" : 1453.120797,
-      "prefillTokensPerSecond" : 95.60593123362641,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437122560,
+      "ttftMillis" : 673.473359,
+      "totalMillis" : 1463.765157,
+      "prefillTokensPerSecond" : 95.57533879449028,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439698944,
+      "cpuMillis" : 9950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.**",
+      "text" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.** [finance-grove-runway]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 1.14926,
+    "frameworkOverheadMillis" : 4.975243000000091,
+    "endToEndMillis" : 1187.248627,
+    "generation" : {
+      "text" : "At 5 percent, Harbor Division escalates. The finance director owns the review. [finance-harbor-variance]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 17,
+      "ttftMillis" : 664.499444,
+      "totalMillis" : 1181.124124,
+      "prefillTokensPerSecond" : 95.36953637330613,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439760384,
+      "cpuMillis" : 7830.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "At 5 percent, Harbor Division escalates. The finance director owns the review.",
+      "text" : "At 5 percent, Harbor Division escalates. The finance director owns the review. [finance-harbor-variance]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.528612,
+    "frameworkOverheadMillis" : 4.092914999999721,
+    "endToEndMillis" : 2123.77553,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 57,
+      "ttftMillis" : 262.915661,
+      "totalMillis" : 2119.154003,
+      "prefillTokensPerSecond" : 96.18986962998362,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439764480,
+      "cpuMillis" : 16060.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The question asks about Meridian Treasury's cryptocurrency allocation. I need to find the relevant information in the database. Let me search for \"meridian treasury cryptocurrency allocation and retrieve the exact text. I'll use the exact phrase to ensure I get the right answer without any extraneous information.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 1.09692,
+    "frameworkOverheadMillis" : 5.096868000000086,
+    "endToEndMillis" : 2220.60039,
+    "generation" : {
+      "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 45,
+      "ttftMillis" : 771.911647,
+      "totalMillis" : 2214.406602,
+      "prefillTokensPerSecond" : 93.75354371304745,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439809536,
+      "cpuMillis" : 15670.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Aurora Fund keeps 18 percent of assets in reserve, and it is reviewed on the first business day of each month. The user asked for the percentage and the review frequency, so I'll provide both answers.",
+      "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 1.068608,
+    "frameworkOverheadMillis" : 5.025026999999909,
+    "endToEndMillis" : 1464.14924,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 24,
+      "ttftMillis" : 707.986416,
+      "totalMillis" : 1458.055605,
+      "prefillTokensPerSecond" : 93.72741555378201,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439846400,
+      "cpuMillis" : 9940.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year.",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 1.176541,
+    "frameworkOverheadMillis" : 4.729740999999876,
+    "endToEndMillis" : 1397.836003,
+    "generation" : {
+      "text" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 21,
+      "ttftMillis" : 740.853056,
+      "totalMillis" : 1391.929721,
+      "prefillTokensPerSecond" : 93.60318226401476,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439891456,
+      "cpuMillis" : 9340.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31.",
+      "text" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 1.049289,
+    "frameworkOverheadMillis" : 5.053272000000106,
+    "endToEndMillis" : 1459.916496,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 24,
+      "ttftMillis" : 704.346368,
+      "totalMillis" : 1453.813935,
+      "prefillTokensPerSecond" : 94.2300844784272,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439911936,
+      "cpuMillis" : 9920.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Delta Portfolio's single-issuer limit is 12 percent of net assets, and cash is excluded from that limit.",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 1.053144,
+    "frameworkOverheadMillis" : 4.747389999999996,
+    "endToEndMillis" : 1616.811309,
+    "generation" : {
+      "text" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.** [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 28,
+      "ttftMillis" : 724.599511,
+      "totalMillis" : 1611.010775,
+      "prefillTokensPerSecond" : 94.32315966461165,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1439993856,
+      "cpuMillis" : 11100.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.**",
+      "text" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.** [finance-ember-loan]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 0.956758,
+    "frameworkOverheadMillis" : 4.767057999999906,
+    "endToEndMillis" : 1944.584379,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 37,
+      "ttftMillis" : 741.481348,
+      "totalMillis" : 1938.860563,
+      "prefillTokensPerSecond" : 93.51748985373862,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1440014336,
+      "cpuMillis" : 13420.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user wants to know how much of Fjord Export's euro receipts are hedged, and for what horizon. I need to read the context carefully to find the relevant information.",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 1.132164,
+    "frameworkOverheadMillis" : 5.1236169999999674,
+    "endToEndMillis" : 1465.414833,
+    "generation" : {
+      "text" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.** [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 25,
+      "ttftMillis" : 675.484656,
+      "totalMillis" : 1459.159052,
+      "prefillTokensPerSecond" : 95.29627006572223,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1440071680,
       "cpuMillis" : 10000.0,
       "estimatedApiCostUsd" : null
     },
@@ -1233,21 +1720,21 @@
       "rank" : 1
     } ],
     "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
-    "retrievalMillis" : 2.297723,
-    "frameworkOverheadMillis" : 4.95263100000011,
-    "endToEndMillis" : 1181.78271,
+    "retrievalMillis" : 1.115128,
+    "frameworkOverheadMillis" : 4.9490940000002865,
+    "endToEndMillis" : 1199.810525,
     "generation" : {
       "text" : "At 5 percent, Harbor Division escalates. The finance director owns the review. [finance-harbor-variance]",
       "inputTokens" : 165,
       "cacheReadInputTokens" : 102,
       "cacheWriteInputTokens" : 63,
       "outputTokens" : 17,
-      "ttftMillis" : 653.273159,
-      "totalMillis" : 1174.532356,
-      "prefillTokensPerSecond" : 97.03063269241433,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437188096,
-      "cpuMillis" : 7880.0,
+      "ttftMillis" : 664.707599,
+      "totalMillis" : 1193.746303,
+      "prefillTokensPerSecond" : 95.32749080826233,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1440083968,
+      "cpuMillis" : 7870.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
@@ -1280,508 +1767,21 @@
     "caseId" : "unsupported-crypto-allocation",
     "retrieved" : [ ],
     "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
-    "retrievalMillis" : 0.539568,
-    "frameworkOverheadMillis" : 4.018612999999732,
-    "endToEndMillis" : 2144.762224,
+    "retrievalMillis" : 0.429941,
+    "frameworkOverheadMillis" : 4.051244000000224,
+    "endToEndMillis" : 2128.315375,
     "generation" : {
       "text" : "INSUFFICIENT_CONTEXT",
       "inputTokens" : 125,
       "cacheReadInputTokens" : 100,
       "cacheWriteInputTokens" : 25,
       "outputTokens" : 57,
-      "ttftMillis" : 259.70092,
-      "totalMillis" : 2140.204043,
-      "prefillTokensPerSecond" : 97.3997606661913,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437200384,
-      "cpuMillis" : 16120.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "The question asks about Meridian Treasury's cryptocurrency allocation. I need to find the relevant information in the database. Let me search for \"meridian treasury cryptocurrency allocation and retrieve the exact text. I'll use the exact phrase to ensure I get the right answer without any extraneous information.",
-      "text" : "INSUFFICIENT_CONTEXT",
-      "decision" : "RETRIEVAL_ABSTENTION"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : true,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "aurora-reserve-review",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-aurora-reserve",
-        "title" : "Aurora reserve policy",
-        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
-      },
-      "score" : 5.188199,
-      "rank" : 1
-    } ],
-    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
-    "retrievalMillis" : 1.124895,
-    "frameworkOverheadMillis" : 5.1191029999999955,
-    "endToEndMillis" : 2235.61546,
-    "generation" : {
-      "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
-      "inputTokens" : 172,
-      "cacheReadInputTokens" : 100,
-      "cacheWriteInputTokens" : 72,
-      "outputTokens" : 45,
-      "ttftMillis" : 786.970392,
-      "totalMillis" : 2229.371462,
-      "prefillTokensPerSecond" : 91.95150718117708,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437224960,
-      "cpuMillis" : 15600.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "Aurora Fund keeps 18 percent of assets in reserve, and it is reviewed on the first business day of each month. The user asked for the percentage and the review frequency, so I'll provide both answers.",
-      "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
-      "decision" : "EXTRACTIVE_FALLBACK"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "birch-duration-coupon",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-birch-duration",
-        "title" : "Birch bond profile",
-        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
-      },
-      "score" : 7.3422394,
-      "rank" : 1
-    } ],
-    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
-    "retrievalMillis" : 1.240671,
-    "frameworkOverheadMillis" : 4.8273300000000745,
-    "endToEndMillis" : 1453.236542,
-    "generation" : {
-      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
-      "inputTokens" : 168,
-      "cacheReadInputTokens" : 102,
-      "cacheWriteInputTokens" : 66,
-      "outputTokens" : 24,
-      "ttftMillis" : 694.984237,
-      "totalMillis" : 1447.168541,
-      "prefillTokensPerSecond" : 95.4818473051231,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437245440,
-      "cpuMillis" : 9960.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year.",
-      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
-      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "cobalt-invoice-overdue",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-cobalt-invoices",
-        "title" : "Cobalt receivables",
-        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
-      },
-      "score" : 8.500158,
-      "rank" : 1
-    } ],
-    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
-    "retrievalMillis" : 1.214863,
-    "frameworkOverheadMillis" : 4.728661000000102,
-    "endToEndMillis" : 1569.578127,
-    "generation" : {
-      "text" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
-      "inputTokens" : 171,
-      "cacheReadInputTokens" : 102,
-      "cacheWriteInputTokens" : 69,
-      "outputTokens" : 21,
-      "ttftMillis" : 727.329483,
-      "totalMillis" : 1563.634603,
-      "prefillTokensPerSecond" : 95.34702800024942,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437274112,
-      "cpuMillis" : 9550.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31.",
-      "text" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
-      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "delta-issuer-limit",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-delta-concentration",
-        "title" : "Delta concentration limit",
-        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
-      },
-      "score" : 6.1008873,
-      "rank" : 1
-    } ],
-    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
-    "retrievalMillis" : 1.262064,
-    "frameworkOverheadMillis" : 5.19967500000007,
-    "endToEndMillis" : 1463.334162,
-    "generation" : {
-      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
-      "inputTokens" : 168,
-      "cacheReadInputTokens" : 102,
-      "cacheWriteInputTokens" : 66,
-      "outputTokens" : 24,
-      "ttftMillis" : 707.027759,
-      "totalMillis" : 1456.872423,
-      "prefillTokensPerSecond" : 93.88600775175229,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437282304,
-      "cpuMillis" : 9960.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "Delta Portfolio's single-issuer limit is 12 percent of net assets, and cash is excluded from that limit.",
-      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
-      "decision" : "EXTRACTIVE_FALLBACK"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "ember-loan-terms",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-ember-loan",
-        "title" : "Ember equipment loan",
-        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
-      },
-      "score" : 6.752196,
-      "rank" : 1
-    } ],
-    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
-    "retrievalMillis" : 1.338228,
-    "frameworkOverheadMillis" : 5.143982000000051,
-    "endToEndMillis" : 1606.59057,
-    "generation" : {
-      "text" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.** [finance-ember-loan]",
-      "inputTokens" : 170,
-      "cacheReadInputTokens" : 102,
-      "cacheWriteInputTokens" : 68,
-      "outputTokens" : 28,
-      "ttftMillis" : 715.335275,
-      "totalMillis" : 1600.10836,
-      "prefillTokensPerSecond" : 95.56533100821758,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437343744,
-      "cpuMillis" : 11130.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.**",
-      "text" : "**Ember Manufacturing's loan rate is 6.25 percent, and the loan matures in June 2031.** [finance-ember-loan]",
-      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "fjord-hedge-policy",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-fjord-hedge",
-        "title" : "Fjord currency hedge",
-        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
-      },
-      "score" : 4.780636,
-      "rank" : 1
-    } ],
-    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
-    "retrievalMillis" : 1.084115,
-    "frameworkOverheadMillis" : 4.835289999999986,
-    "endToEndMillis" : 1907.034711,
-    "generation" : {
-      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
-      "inputTokens" : 171,
-      "cacheReadInputTokens" : 102,
-      "cacheWriteInputTokens" : 69,
-      "outputTokens" : 37,
-      "ttftMillis" : 724.490009,
-      "totalMillis" : 1901.115306,
-      "prefillTokensPerSecond" : 95.71800842147846,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437347840,
-      "cpuMillis" : 13400.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "The user wants to know how much of Fjord Export's euro receipts are hedged, and for what horizon. I need to read the context carefully to find the relevant information.",
-      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
-      "decision" : "EXTRACTIVE_FALLBACK"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 0.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "grove-runway-refresh",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-grove-runway",
-        "title" : "Grove cash runway",
-        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
-      },
-      "score" : 5.838581,
-      "rank" : 1
-    } ],
-    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
-    "retrievalMillis" : 1.433754,
-    "frameworkOverheadMillis" : 6.53766399999995,
-    "endToEndMillis" : 1455.312037,
-    "generation" : {
-      "text" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.** [finance-grove-runway]",
-      "inputTokens" : 166,
-      "cacheReadInputTokens" : 102,
-      "cacheWriteInputTokens" : 64,
-      "outputTokens" : 25,
-      "ttftMillis" : 665.276669,
-      "totalMillis" : 1447.340619,
-      "prefillTokensPerSecond" : 96.76439356860236,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437433856,
-      "cpuMillis" : 9990.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.**",
-      "text" : "**Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.** [finance-grove-runway]",
-      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "harbor-variance-escalation",
-    "retrieved" : [ {
-      "document" : {
-        "id" : "finance-harbor-variance",
-        "title" : "Harbor budget escalation",
-        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
-      },
-      "score" : 5.6997347,
-      "rank" : 1
-    } ],
-    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
-    "retrievalMillis" : 1.085506,
-    "frameworkOverheadMillis" : 5.006290999999919,
-    "endToEndMillis" : 1181.553299,
-    "generation" : {
-      "text" : "At 5 percent, Harbor Division escalates. The finance director owns the review. [finance-harbor-variance]",
-      "inputTokens" : 165,
-      "cacheReadInputTokens" : 102,
-      "cacheWriteInputTokens" : 63,
-      "outputTokens" : 17,
-      "ttftMillis" : 653.88196,
-      "totalMillis" : 1175.461502,
-      "prefillTokensPerSecond" : 96.9198955647819,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437433856,
-      "cpuMillis" : 7900.0,
-      "estimatedApiCostUsd" : null
-    },
-    "grounding" : {
-      "rawText" : "At 5 percent, Harbor Division escalates. The finance director owns the review.",
-      "text" : "At 5 percent, Harbor Division escalates. The finance director owns the review. [finance-harbor-variance]",
-      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
-    },
-    "rawEvaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 0.0,
-      "citationPrecision" : 0.0,
-      "abstained" : false,
-      "correct" : false
-    },
-    "evaluation" : {
-      "retrievalRecall" : 1.0,
-      "reciprocalRank" : 1.0,
-      "factCoverage" : 1.0,
-      "citationRecall" : 1.0,
-      "citationPrecision" : 1.0,
-      "abstained" : false,
-      "correct" : true
-    }
-  }, {
-    "framework" : "plain-java",
-    "backend" : "rust-ffm",
-    "model" : "Merged",
-    "caseId" : "unsupported-crypto-allocation",
-    "retrieved" : [ ],
-    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
-    "retrievalMillis" : 0.510784,
-    "frameworkOverheadMillis" : 4.098507000000154,
-    "endToEndMillis" : 2103.278186,
-    "generation" : {
-      "text" : "INSUFFICIENT_CONTEXT",
-      "inputTokens" : 125,
-      "cacheReadInputTokens" : 100,
-      "cacheWriteInputTokens" : 25,
-      "outputTokens" : 57,
-      "ttftMillis" : 259.646427,
-      "totalMillis" : 2098.668895,
-      "prefillTokensPerSecond" : 97.41741788127645,
-      "loadMillis" : 290.451721,
-      "peakRssBytes" : 1437442048,
-      "cpuMillis" : 16100.0,
+      "ttftMillis" : 264.091564,
+      "totalMillis" : 2123.83419,
+      "prefillTokensPerSecond" : 95.76086052455946,
+      "loadMillis" : 302.216915,
+      "peakRssBytes" : 1440145408,
+      "cpuMillis" : 16090.0,
       "estimatedApiCostUsd" : null
     },
     "grounding" : {
