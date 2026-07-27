@@ -89,6 +89,22 @@ class RagPromptRendererTest {
   }
 
   @Test
+  void chatmlAnswerProfilePrefillsOnlyTheAnswerLabel() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.parse("chatml-answer"));
+
+    assertThat(prompt)
+        .startsWith("<|im_start|>system\nYou answer questions")
+        .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n[source-1] Policy")
+        .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\nAnswer: ");
+  }
+
+  @Test
   void zephyrProfileUsesNativeSystemAndUserTurns() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 
