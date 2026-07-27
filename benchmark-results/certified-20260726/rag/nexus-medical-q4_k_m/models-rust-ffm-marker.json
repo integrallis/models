@@ -1,0 +1,1854 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-26T21:25:24.227119025Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@b2156780 vectors@c298a0b7 modeljars@55209ce",
+  "modelId" : "king3djbl_nexus_medical_gguf_q4_k_m",
+  "model" : "king3djbl_nexus_medical_gguf_q4_k_m",
+  "artifactSha256" : "f26138b8e049e91a3e006f215a3618e3da0fef28755f73fe83bea19f73c700ea",
+  "artifactSizeBytes" : 986045632,
+  "settings" : {
+    "corpusSha256" : "50b20fdae13db749bdf1bc029c681d53fff8895fb11aa3a177264ab3e6fd62f0",
+    "workload" : "healthcare",
+    "caseIds" : [ "atlas-consent-form", "beacon-protocol-visits", "cedar-storage-retention", "delta-arrival-desk", "elm-portal-routing", "fir-reconciliation-owner", "grove-image-transfer", "harbor-records-timing", "unsupported-raven-treatment" ],
+    "promptTemplate" : "chatml-direct",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v18",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "promptCache" : "longest-common-prefix",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "stopSequences" : " So the answer is",
+      "seed" : "42",
+      "temperature" : "0.0",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v10",
+    "environment" : {
+      "modeljar-alias" : "king3djbl_nexus_medical_gguf_q4_k_m",
+      "processors" : "8",
+      "kernel-implementation" : "rust-ffm-quantized-v10",
+      "fast-vector-fma" : "true",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-threads" : "8",
+      "gguf-parallel" : "true",
+      "active-vector-bits" : "256",
+      "compiler" : "hotspot-c2",
+      "native-quantized-decode" : "true",
+      "gguf-chunks-per-thread" : "2",
+      "gguf-threads" : "8",
+      "transformer-runtime" : "java",
+      "sve" : "false",
+      "projection-layers" : "28",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "native-kernel-abi" : "2",
+      "java-version" : "25.0.3",
+      "vm-vendor" : "Eclipse Adoptium",
+      "model-architecture" : "qwen2",
+      "gguf-executor" : "persistent",
+      "vm-version" : "25.0.3+9-LTS",
+      "q4-short-pairwise-supported" : "true",
+      "architecture" : "amd64",
+      "kernel-runtime" : "rust-ffm",
+      "modeljar-sha256" : "f26138b8e049e91a3e006f215a3618e3da0fef28755f73fe83bea19f73c700ea",
+      "vector-api" : "true",
+      "modeljar-coordinate" : "org.modeljars.huggingface:king3djbl.nexus-medical-gguf.q4_k_m:1.0.0-q4_k_m.1",
+      "preferred-vector-bits" : "256",
+      "os" : "Linux",
+      "java-feature" : "25",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true",
+      "q4-unsigned-pairwise-supported" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "rust-ffm-quantized-v10",
+        "qkv" : "grouped",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "14",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "8",
+        "partition" : "batch-rows",
+        "staged-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "8"
+      }
+    }, {
+      "id" : "modeljars.profile.king3djbl.nexus.medical.gguf.q4.k.m.epyc.milan.jdk25.rust.ffm",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "required-jvm-arguments" : "--enable-native-access=ALL-UNNAMED",
+        "recommended-runtime" : "hotspot-c2",
+        "profile-id" : "king3djbl_nexus_medical_gguf_q4_k_m_epyc_milan_jdk25_rust_ffm",
+        "marker-coordinate" : "org.modeljars.huggingface:king3djbl.nexus-medical-gguf.q4_k_m:1.0.0-q4_k_m.1",
+        "recommended-java-feature" : "25",
+        "benchmark-id" : "nexus-medical-1.5b-rust-ffm-healthcare-rag-20260726",
+        "recommendations" : "models.native.kernels.threads=8\nmodels.native.quantizedDecode=true\nmodels.purejava.batchedAttentionScores=false\nmodels.purejava.batchedAttentionValues=false\nmodels.purejava.prefillBatchSize=32",
+        "missing-jvm-arguments" : "",
+        "selector-mismatches" : ""
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "2",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "abi" : "2",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "property" : "models.native.q5_0.grouped",
+        "qualification" : "model-and-platform-specific"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel",
+      "settings" : {
+        "property" : "models.native.quantizedDecode",
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 435.543591,
+    "retrievalMillis" : {
+      "p50" : 1.310678,
+      "p95" : 1.746522
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 5.189714999999524,
+      "p95" : 8.479824800000415
+    },
+    "ttftMillis" : {
+      "p50" : 637.268105,
+      "p95" : 713.6483494
+    },
+    "tpotMillis" : {
+      "p50" : 34.03960293442623,
+      "p95" : 45.31464627692307
+    },
+    "endToEndMillis" : {
+      "p50" : 2708.582845,
+      "p95" : 2810.6984552
+    },
+    "p50PrefillTokensPerSecond" : 96.29153682576107,
+    "p50DecodeTokensPerSecond" : 29.37754596980454,
+    "peakRssBytes" : 1492631552,
+    "totalCpuMillis" : 435560.0,
+    "totalInputTokens" : 4380,
+    "totalCacheReadInputTokens" : 2754,
+    "totalCacheWriteInputTokens" : 1626,
+    "totalOutputTokens" : 1272,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "PRODUCTION_READY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "atlas-consent-form",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-atlas-consent",
+        "title" : "Atlas consent workflow",
+        "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent."
+      },
+      "score" : 8.389286,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cdb5e5dfecf678c33ca1652dd70c41d1097a37be804f85cad0cb5b08071875ae",
+    "retrievalMillis" : 1.459664,
+    "frameworkOverheadMillis" : 5.283727999999883,
+    "endToEndMillis" : 2807.486634,
+    "generation" : {
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 63,
+      "ttftMillis" : 640.607312,
+      "totalMillis" : 2800.743242,
+      "prefillTokensPerSecond" : 95.84332902658977,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1412722688,
+      "cpuMillis" : 19920.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Atlas Clinic records consent in form AC-17, and 2) a certified interpreter is required when the patient requests translated consent. Therefore, the form that records Atlas Clinic consent is AC-17, and an interpreter is required when the patient requests translated consent. The answer is AC-17 and",
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "beacon-protocol-visits",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 6.8266687,
+      "rank" : 1
+    } ],
+    "promptSha256" : "eb0d73f449600d8e78f81a3dda0051ffe6c7efef6c23712483c80d5e100c0ade",
+    "retrievalMillis" : 1.473275,
+    "frameworkOverheadMillis" : 5.150222000000213,
+    "endToEndMillis" : 2721.934695,
+    "generation" : {
+      "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks. [health-beacon-visits]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 63,
+      "ttftMillis" : 646.064021,
+      "totalMillis" : 2715.311198,
+      "prefillTokensPerSecond" : 94.99066864616839,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1412833280,
+      "cpuMillis" : 19780.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "204 is the protocol code and that follow-up visits occur every six weeks. The answer is 204 and every six weeks. The source is the synthetic Beacon study. The source ID is BT-204. The source is the synthetic Beacon study. The source ID is BT-204",
+      "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks. [health-beacon-visits]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cedar-storage-retention",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-cedar-specimens",
+        "title" : "Cedar specimen storage",
+        "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure."
+      },
+      "score" : 2.7801502,
+      "rank" : 1
+    } ],
+    "promptSha256" : "73bb93ae9e4c306d41cba40e9aad1d6e49069020e6d583645808c579fcfb96a2",
+    "retrievalMillis" : 1.748622,
+    "frameworkOverheadMillis" : 5.195002999999815,
+    "endToEndMillis" : 1246.317349,
+    "generation" : {
+      "text" : "7-year retention is after study closure at minus 80 degrees Celsius. [health-cedar-specimens]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 14,
+      "ttftMillis" : 651.109223,
+      "totalMillis" : 1239.373724,
+      "prefillTokensPerSecond" : 95.819892577833,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1412857856,
+      "cpuMillis" : 8360.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "7-year retention is after study closure at minus 80 degrees Celsius.",
+      "text" : "7-year retention is after study closure at minus 80 degrees Celsius. [health-cedar-specimens]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-arrival-desk",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-delta-arrival",
+        "title" : "Delta imaging arrival",
+        "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4."
+      },
+      "score" : 4.609287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d3e55aaf173b5afa23ef6fff56b48efe5af16155efb3fade2a0c5a57f8815399",
+    "retrievalMillis" : 1.769204,
+    "frameworkOverheadMillis" : 5.189714999999524,
+    "endToEndMillis" : 2708.582845,
+    "generation" : {
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 62,
+      "ttftMillis" : 629.842429,
+      "totalMillis" : 2701.623926,
+      "prefillTokensPerSecond" : 95.9627863991367,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1414107136,
+      "cpuMillis" : 19770.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "20 minutes before a scheduled scan, patients should arrive at desk D4 for registration. The patient should arrive 20 minutes early. The source is Delta Imaging's own policy. The answer is 20 minutes early. The source is Delta Imaging's own policy. The source is Delta Imaging's own policy.",
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "elm-portal-routing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-elm-portal",
+        "title" : "Elm portal messages",
+        "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal."
+      },
+      "score" : 6.6502957,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fcb523920e2a63afda56a00f7553ad26bf3b5bb220a49a61e8a44621716e4af4",
+    "retrievalMillis" : 1.659437,
+    "frameworkOverheadMillis" : 8.56526600000052,
+    "endToEndMillis" : 2812.07495,
+    "generation" : {
+      "text" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 63,
+      "ttftMillis" : 716.948587,
+      "totalMillis" : 2801.850247,
+      "prefillTokensPerSecond" : 94.43123849413497,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1428807680,
+      "cpuMillis" : 20310.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "text" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fir-reconciliation-owner",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-fir-reconciliation",
+        "title" : "Fir medication reconciliation",
+        "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion."
+      },
+      "score" : 6.4065657,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7cd4c35a957b8e2e73db94899936c7ccf5cee7e7dd37c496320ae4a7f604c7e3",
+    "retrievalMillis" : 1.655121,
+    "frameworkOverheadMillis" : 15.18394699999999,
+    "endToEndMillis" : 1198.998396,
+    "generation" : {
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion. [health-fir-reconciliation]",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 54,
+      "outputTokens" : 16,
+      "ttftMillis" : 564.504421,
+      "totalMillis" : 1182.159328,
+      "prefillTokensPerSecond" : 96.38694517722074,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1461051392,
+      "cpuMillis" : 8140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion.",
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion. [health-fir-reconciliation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-image-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-grove-images",
+        "title" : "Grove image exchange",
+        "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days."
+      },
+      "score" : 7.4368615,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c9611ed2220c3ee144f0e87b5514357b0f9770b201b42466d32c8fa80c6cea65",
+    "retrievalMillis" : 1.714872,
+    "frameworkOverheadMillis" : 5.1628729999999905,
+    "endToEndMillis" : 1333.513299,
+    "generation" : {
+      "text" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM. [health-grove-images]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 58,
+      "outputTokens" : 19,
+      "ttftMillis" : 605.926583,
+      "totalMillis" : 1326.635554,
+      "prefillTokensPerSecond" : 96.32696752859279,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1461080064,
+      "cpuMillis" : 9180.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM.",
+      "text" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM. [health-grove-images]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-records-timing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-harbor-records",
+        "title" : "Harbor records request",
+        "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR."
+      },
+      "score" : 4.368799,
+      "rank" : 1
+    } ],
+    "promptSha256" : "03aa181a970fa260e3821885b30f8077507a84392711895046067d4adc879a49",
+    "retrievalMillis" : 1.558685,
+    "frameworkOverheadMillis" : 5.216180999999779,
+    "endToEndMillis" : 2731.773726,
+    "generation" : {
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 62,
+      "ttftMillis" : 646.991424,
+      "totalMillis" : 2724.99886,
+      "prefillTokensPerSecond" : 96.43249193708104,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1461112832,
+      "cpuMillis" : 19900.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "15 business days is the processing time for complete records requests, and the tracking prefix is HRR. The answer is 15 business days and HRR. The source is [health-harbor-records] Harbor records request. The source ID is 1. The source is a Harbor Medical process complete records",
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-raven-treatment",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 0.98855627,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3cc8c35d53300b042494af401f35048d60fddfa295facec23f9c565727a8b409",
+    "retrievalMillis" : 1.34457,
+    "frameworkOverheadMillis" : 5.017351999999846,
+    "endToEndMillis" : 2687.87961,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 159,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 57,
+      "outputTokens" : 62,
+      "ttftMillis" : 612.954975,
+      "totalMillis" : 2681.517688,
+      "prefillTokensPerSecond" : 93.56113269637571,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1461149696,
+      "cpuMillis" : 19650.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Raven Clinic uses protocol BT-204, 2) follow-up research visits occur every six weeks, and 3) the synthetic Beacon study uses protocol BT-204. Therefore, the treatment protocol Raven Clinic uses for condition Zeta is BT-204. The answer is BT-",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "atlas-consent-form",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-atlas-consent",
+        "title" : "Atlas consent workflow",
+        "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent."
+      },
+      "score" : 8.389286,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cdb5e5dfecf678c33ca1652dd70c41d1097a37be804f85cad0cb5b08071875ae",
+    "retrievalMillis" : 1.741622,
+    "frameworkOverheadMillis" : 5.364878999999746,
+    "endToEndMillis" : 2713.72657,
+    "generation" : {
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 63,
+      "ttftMillis" : 635.992876,
+      "totalMillis" : 2706.620069,
+      "prefillTokensPerSecond" : 96.5303059783616,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1461186560,
+      "cpuMillis" : 19820.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Atlas Clinic records consent in form AC-17, and 2) a certified interpreter is required when the patient requests translated consent. Therefore, the form that records Atlas Clinic consent is AC-17, and an interpreter is required when the patient requests translated consent. The answer is AC-17 and",
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "beacon-protocol-visits",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 6.8266687,
+      "rank" : 1
+    } ],
+    "promptSha256" : "eb0d73f449600d8e78f81a3dda0051ffe6c7efef6c23712483c80d5e100c0ade",
+    "retrievalMillis" : 1.7005,
+    "frameworkOverheadMillis" : 4.905913000000055,
+    "endToEndMillis" : 2741.378787,
+    "generation" : {
+      "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks. [health-beacon-visits]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 63,
+      "ttftMillis" : 662.483284,
+      "totalMillis" : 2734.772374,
+      "prefillTokensPerSecond" : 92.60382593708802,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1464512512,
+      "cpuMillis" : 19920.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "204 is the protocol code and that follow-up visits occur every six weeks. The answer is 204 and every six weeks. The source is the synthetic Beacon study. The source ID is BT-204. The source is the synthetic Beacon study. The source ID is BT-204",
+      "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks. [health-beacon-visits]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cedar-storage-retention",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-cedar-specimens",
+        "title" : "Cedar specimen storage",
+        "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure."
+      },
+      "score" : 2.7801502,
+      "rank" : 1
+    } ],
+    "promptSha256" : "73bb93ae9e4c306d41cba40e9aad1d6e49069020e6d583645808c579fcfb96a2",
+    "retrievalMillis" : 1.600608,
+    "frameworkOverheadMillis" : 5.594457000000148,
+    "endToEndMillis" : 1303.042124,
+    "generation" : {
+      "text" : "7-year retention is after study closure at minus 80 degrees Celsius. [health-cedar-specimens]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 14,
+      "ttftMillis" : 653.378621,
+      "totalMillis" : 1295.847059,
+      "prefillTokensPerSecond" : 95.50588993911718,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465692160,
+      "cpuMillis" : 8550.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "7-year retention is after study closure at minus 80 degrees Celsius.",
+      "text" : "7-year retention is after study closure at minus 80 degrees Celsius. [health-cedar-specimens]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-arrival-desk",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-delta-arrival",
+        "title" : "Delta imaging arrival",
+        "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4."
+      },
+      "score" : 4.609287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d3e55aaf173b5afa23ef6fff56b48efe5af16155efb3fade2a0c5a57f8815399",
+    "retrievalMillis" : 1.394356,
+    "frameworkOverheadMillis" : 5.294452000000092,
+    "endToEndMillis" : 2715.872697,
+    "generation" : {
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 62,
+      "ttftMillis" : 626.338627,
+      "totalMillis" : 2709.183889,
+      "prefillTokensPerSecond" : 96.42633476807951,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465741312,
+      "cpuMillis" : 19810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "20 minutes before a scheduled scan, patients should arrive at desk D4 for registration. The patient should arrive 20 minutes early. The source is Delta Imaging's own policy. The answer is 20 minutes early. The source is Delta Imaging's own policy. The source is Delta Imaging's own policy.",
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "elm-portal-routing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-elm-portal",
+        "title" : "Elm portal messages",
+        "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal."
+      },
+      "score" : 6.6502957,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fcb523920e2a63afda56a00f7553ad26bf3b5bb220a49a61e8a44621716e4af4",
+    "retrievalMillis" : 1.310678,
+    "frameworkOverheadMillis" : 5.202984000000015,
+    "endToEndMillis" : 2828.013384,
+    "generation" : {
+      "text" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 63,
+      "ttftMillis" : 733.520023,
+      "totalMillis" : 2821.499722,
+      "prefillTokensPerSecond" : 91.84176244989146,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465794560,
+      "cpuMillis" : 20320.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "text" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fir-reconciliation-owner",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-fir-reconciliation",
+        "title" : "Fir medication reconciliation",
+        "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion."
+      },
+      "score" : 6.4065657,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7cd4c35a957b8e2e73db94899936c7ccf5cee7e7dd37c496320ae4a7f604c7e3",
+    "retrievalMillis" : 0.977292,
+    "frameworkOverheadMillis" : 5.066205999999966,
+    "endToEndMillis" : 1187.413307,
+    "generation" : {
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion. [health-fir-reconciliation]",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 54,
+      "outputTokens" : 16,
+      "ttftMillis" : 562.175443,
+      "totalMillis" : 1181.369809,
+      "prefillTokensPerSecond" : 96.74303102304819,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465827328,
+      "cpuMillis" : 8180.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion.",
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion. [health-fir-reconciliation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-image-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-grove-images",
+        "title" : "Grove image exchange",
+        "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days."
+      },
+      "score" : 7.4368615,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c9611ed2220c3ee144f0e87b5514357b0f9770b201b42466d32c8fa80c6cea65",
+    "retrievalMillis" : 1.080429,
+    "frameworkOverheadMillis" : 4.960595999999896,
+    "endToEndMillis" : 1329.804771,
+    "generation" : {
+      "text" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM. [health-grove-images]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 58,
+      "outputTokens" : 19,
+      "ttftMillis" : 606.162926,
+      "totalMillis" : 1323.763746,
+      "prefillTokensPerSecond" : 96.29153682576107,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465847808,
+      "cpuMillis" : 9160.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM.",
+      "text" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM. [health-grove-images]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-records-timing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-harbor-records",
+        "title" : "Harbor records request",
+        "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR."
+      },
+      "score" : 4.368799,
+      "rank" : 1
+    } ],
+    "promptSha256" : "03aa181a970fa260e3821885b30f8077507a84392711895046067d4adc879a49",
+    "retrievalMillis" : 1.109274,
+    "frameworkOverheadMillis" : 5.073627000000215,
+    "endToEndMillis" : 2734.318862,
+    "generation" : {
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 62,
+      "ttftMillis" : 647.554551,
+      "totalMillis" : 2728.135961,
+      "prefillTokensPerSecond" : 96.34189303807904,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465880576,
+      "cpuMillis" : 19960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "15 business days is the processing time for complete records requests, and the tracking prefix is HRR. The answer is 15 business days and HRR. The source is [health-harbor-records] Harbor records request. The source ID is 1. The source is a Harbor Medical process complete records",
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-raven-treatment",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 0.98855627,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3cc8c35d53300b042494af401f35048d60fddfa295facec23f9c565727a8b409",
+    "retrievalMillis" : 0.866203,
+    "frameworkOverheadMillis" : 4.826352999999926,
+    "endToEndMillis" : 2680.889359,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 159,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 57,
+      "outputTokens" : 62,
+      "ttftMillis" : 599.674922,
+      "totalMillis" : 2675.196803,
+      "prefillTokensPerSecond" : 95.64161672729861,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465905152,
+      "cpuMillis" : 19680.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Raven Clinic uses protocol BT-204, 2) follow-up research visits occur every six weeks, and 3) the synthetic Beacon study uses protocol BT-204. Therefore, the treatment protocol Raven Clinic uses for condition Zeta is BT-204. The answer is BT-",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "atlas-consent-form",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-atlas-consent",
+        "title" : "Atlas consent workflow",
+        "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent."
+      },
+      "score" : 8.389286,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cdb5e5dfecf678c33ca1652dd70c41d1097a37be804f85cad0cb5b08071875ae",
+    "retrievalMillis" : 1.03411,
+    "frameworkOverheadMillis" : 5.176512999999886,
+    "endToEndMillis" : 2720.617718,
+    "generation" : {
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 63,
+      "ttftMillis" : 637.268105,
+      "totalMillis" : 2714.407095,
+      "prefillTokensPerSecond" : 96.32464216457376,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465954304,
+      "cpuMillis" : 19940.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Atlas Clinic records consent in form AC-17, and 2) a certified interpreter is required when the patient requests translated consent. Therefore, the form that records Atlas Clinic consent is AC-17, and an interpreter is required when the patient requests translated consent. The answer is AC-17 and",
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "beacon-protocol-visits",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 6.8266687,
+      "rank" : 1
+    } ],
+    "promptSha256" : "eb0d73f449600d8e78f81a3dda0051ffe6c7efef6c23712483c80d5e100c0ade",
+    "retrievalMillis" : 1.100809,
+    "frameworkOverheadMillis" : 4.833894999999757,
+    "endToEndMillis" : 2727.99685,
+    "generation" : {
+      "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks. [health-beacon-visits]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 63,
+      "ttftMillis" : 642.310362,
+      "totalMillis" : 2722.062146,
+      "prefillTokensPerSecond" : 95.53030985279491,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1465982976,
+      "cpuMillis" : 19880.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "204 is the protocol code and that follow-up visits occur every six weeks. The answer is 204 and every six weeks. The source is the synthetic Beacon study. The source ID is BT-204. The source is the synthetic Beacon study. The source ID is BT-204",
+      "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks. [health-beacon-visits]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cedar-storage-retention",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-cedar-specimens",
+        "title" : "Cedar specimen storage",
+        "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure."
+      },
+      "score" : 2.7801502,
+      "rank" : 1
+    } ],
+    "promptSha256" : "73bb93ae9e4c306d41cba40e9aad1d6e49069020e6d583645808c579fcfb96a2",
+    "retrievalMillis" : 1.083224,
+    "frameworkOverheadMillis" : 5.049670999999989,
+    "endToEndMillis" : 1238.746328,
+    "generation" : {
+      "text" : "7-year retention is after study closure at minus 80 degrees Celsius. [health-cedar-specimens]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 14,
+      "ttftMillis" : 643.169074,
+      "totalMillis" : 1232.613433,
+      "prefillTokensPerSecond" : 96.98831068565288,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1466011648,
+      "cpuMillis" : 8380.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "7-year retention is after study closure at minus 80 degrees Celsius.",
+      "text" : "7-year retention is after study closure at minus 80 degrees Celsius. [health-cedar-specimens]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-arrival-desk",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-delta-arrival",
+        "title" : "Delta imaging arrival",
+        "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4."
+      },
+      "score" : 4.609287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d3e55aaf173b5afa23ef6fff56b48efe5af16155efb3fade2a0c5a57f8815399",
+    "retrievalMillis" : 0.946466,
+    "frameworkOverheadMillis" : 5.2338910000003125,
+    "endToEndMillis" : 2698.962026,
+    "generation" : {
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 62,
+      "ttftMillis" : 622.850259,
+      "totalMillis" : 2692.781669,
+      "prefillTokensPerSecond" : 96.92619273483616,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1466908672,
+      "cpuMillis" : 19800.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "20 minutes before a scheduled scan, patients should arrive at desk D4 for registration. The patient should arrive 20 minutes early. The source is Delta Imaging's own policy. The answer is 20 minutes early. The source is Delta Imaging's own policy. The source is Delta Imaging's own policy.",
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "elm-portal-routing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-elm-portal",
+        "title" : "Elm portal messages",
+        "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal."
+      },
+      "score" : 6.6502957,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fcb523920e2a63afda56a00f7553ad26bf3b5bb220a49a61e8a44621716e4af4",
+    "retrievalMillis" : 0.944013,
+    "frameworkOverheadMillis" : 5.105454999999893,
+    "endToEndMillis" : 2798.793957,
+    "generation" : {
+      "text" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 63,
+      "ttftMillis" : 705.947795,
+      "totalMillis" : 2792.744489,
+      "prefillTokensPerSecond" : 95.44982085030247,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1467019264,
+      "cpuMillis" : 20350.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "text" : "72 hours is the time frame for Elm Health to route nonurgent portal messages to the care team. Emergency messages are not accepted through the portal. The answer is 72 hours. The sources are [health-elm-portal] and [health-elm-portal]. The sources are [health-elm-",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fir-reconciliation-owner",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-fir-reconciliation",
+        "title" : "Fir medication reconciliation",
+        "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion."
+      },
+      "score" : 6.4065657,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7cd4c35a957b8e2e73db94899936c7ccf5cee7e7dd37c496320ae4a7f604c7e3",
+    "retrievalMillis" : 0.943711,
+    "frameworkOverheadMillis" : 5.177736000000095,
+    "endToEndMillis" : 1201.641873,
+    "generation" : {
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion. [health-fir-reconciliation]",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 54,
+      "outputTokens" : 16,
+      "ttftMillis" : 565.159344,
+      "totalMillis" : 1195.520426,
+      "prefillTokensPerSecond" : 96.22251829415929,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1467056128,
+      "cpuMillis" : 8170.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion.",
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The nurse records completion. [health-fir-reconciliation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-image-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-grove-images",
+        "title" : "Grove image exchange",
+        "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days."
+      },
+      "score" : 7.4368615,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c9611ed2220c3ee144f0e87b5514357b0f9770b201b42466d32c8fa80c6cea65",
+    "retrievalMillis" : 0.946226,
+    "frameworkOverheadMillis" : 5.892037999999957,
+    "endToEndMillis" : 1328.545998,
+    "generation" : {
+      "text" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM. [health-grove-images]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 58,
+      "outputTokens" : 19,
+      "ttftMillis" : 605.066948,
+      "totalMillis" : 1321.707734,
+      "prefillTokensPerSecond" : 96.98306372886039,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1475952640,
+      "cpuMillis" : 9140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM.",
+      "text" : "30 days is the expiration period for temporary transfer links. The format exchanged is DICOM. [health-grove-images]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-records-timing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-harbor-records",
+        "title" : "Harbor records request",
+        "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR."
+      },
+      "score" : 4.368799,
+      "rank" : 1
+    } ],
+    "promptSha256" : "03aa181a970fa260e3821885b30f8077507a84392711895046067d4adc879a49",
+    "retrievalMillis" : 1.045556,
+    "frameworkOverheadMillis" : 8.28046200000017,
+    "endToEndMillis" : 2732.626397,
+    "generation" : {
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 62,
+      "ttftMillis" : 646.8846,
+      "totalMillis" : 2723.300379,
+      "prefillTokensPerSecond" : 96.92036948502248,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1490530304,
+      "cpuMillis" : 19890.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "15 business days is the processing time for complete records requests, and the tracking prefix is HRR. The answer is 15 business days and HRR. The source is [health-harbor-records] Harbor records request. The source ID is 1. The source is a Harbor Medical process complete records",
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-raven-treatment",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 0.98855627,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3cc8c35d53300b042494af401f35048d60fddfa295facec23f9c565727a8b409",
+    "retrievalMillis" : 0.862459,
+    "frameworkOverheadMillis" : 6.448793000000023,
+    "endToEndMillis" : 2662.491803,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 159,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 57,
+      "outputTokens" : 62,
+      "ttftMillis" : 594.401095,
+      "totalMillis" : 2655.180551,
+      "prefillTokensPerSecond" : 96.49998776820331,
+      "loadMillis" : 435.543591,
+      "peakRssBytes" : 1492631552,
+      "cpuMillis" : 19600.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1) Raven Clinic uses protocol BT-204, 2) follow-up research visits occur every six weeks, and 3) the synthetic Beacon study uses protocol BT-204. Therefore, the treatment protocol Raven Clinic uses for condition Zeta is BT-204. The answer is BT-",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

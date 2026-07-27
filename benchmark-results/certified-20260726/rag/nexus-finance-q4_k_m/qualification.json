@@ -1,0 +1,47 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v4",
+  "candidate" : {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-finance-q4_k_m-v17-no-think-stop-newline-final/models-rust-ffm.json",
+    "sha256" : "08aa2d38deb08ebf5170f3ac298527d9260fce1fca6a5d18357dc0b423f75618"
+  },
+  "comparators" : [ {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-finance-q4_k_m-v17-no-think-stop-newline-final/llama.cpp.json",
+    "sha256" : "6671071bc6e7c8d2523f802f03403807110f042a49203c96d0c56f0ae3f39ca4"
+  }, {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-finance-q4_k_m-v17-no-think-stop-newline-final/ollama.json",
+    "sha256" : "2cb55489dc41d900aeba5f29f61542988fa92fb14832d4379b204b5b31117829"
+  } ],
+  "qualification" : {
+    "modelId" : "king3djbl_nexus_finance_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "a849ca49f91889b614518e9242ceec6e24034289de0f3f8621784f3e1b77bb60",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 15,
+    "modelAnswerRate" : 0.5555555555555556,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "llama.cpp", "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "llama.cpp",
+      "decodeThroughputRatio" : 0.6656655640745915,
+      "endToEndLatencyRatio" : 0.9161196609204363,
+      "minimumDecodeThroughputRatio" : 0.45,
+      "maximumEndToEndLatencyRatio" : 2.0,
+      "qualified" : true,
+      "failures" : [ ]
+    }, {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 1.054472467427808,
+      "endToEndLatencyRatio" : 0.7675441975381284,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}

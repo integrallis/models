@@ -119,4 +119,49 @@ class RagEvaluatorTest {
     assertThat(evaluation.factCoverage()).isEqualTo(1.0);
     assertThat(evaluation.correct()).isTrue();
   }
+
+  @Test
+  void normalizesEquivalentNumericAndNumberWordFacts() {
+    RagDocument expected = new RagDocument("legal-fjord-audit", "Fjord audit rights", "irrelevant");
+    RagCase testCase =
+        new RagCase(
+            "fjord-audit",
+            "question",
+            List.of("legal-fjord-audit"),
+            List.of("one", "10 business days"),
+            true);
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(expected, 1.0f, 1)),
+            "1 compliance audit is permitted per calendar year with 10 business days of notice "
+                + "[legal-fjord-audit].");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
+
+  @Test
+  void normalizesAttributiveSingularAndPluralFacts() {
+    RagDocument expected =
+        new RagDocument("health-cedar-specimens", "Cedar specimen storage", "irrelevant");
+    RagCase testCase =
+        new RagCase(
+            "cedar-storage",
+            "question",
+            List.of("health-cedar-specimens"),
+            List.of("minus 80 degrees Celsius", "seven years"),
+            true);
+
+    RagEvaluation evaluation =
+        RagEvaluator.evaluate(
+            testCase,
+            List.of(new RetrievedDocument(expected, 1.0f, 1)),
+            "7-year retention is after study closure at minus 80 degrees Celsius "
+                + "[health-cedar-specimens].");
+
+    assertThat(evaluation.factCoverage()).isEqualTo(1.0);
+    assertThat(evaluation.correct()).isTrue();
+  }
 }

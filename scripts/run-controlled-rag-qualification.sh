@@ -14,6 +14,7 @@ WORKLOAD=$3
 PROMPT_TEMPLATE=$4
 OUTPUT_DIR=${5:-"$ROOT_DIR/build/reports/rag/qualification/$MODEL_ID"}
 THREADS=${RAG_THREADS:-$(nproc)}
+NATIVE_THREADS=${RAG_NATIVE_THREADS:-$THREADS}
 CONTEXT=${RAG_CONTEXT:-2048}
 MAX_TOKENS=${RAG_MAX_TOKENS:-64}
 STOP_SEQUENCE=${RAG_STOP_SEQUENCE:-}
@@ -139,7 +140,7 @@ export JAVA_OPTS="${JAVA_OPTS:-} --enable-native-access=ALL-UNNAMED"
 export JAVA_OPTS="$JAVA_OPTS -XX:ActiveProcessorCount=$THREADS"
 export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.library=$NATIVE_LIBRARY"
 export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.quantizedDecode=true"
-export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.threads=$THREADS"
+export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.threads=$NATIVE_THREADS"
 
 COMMON_ARGS=(
   --framework plain-java

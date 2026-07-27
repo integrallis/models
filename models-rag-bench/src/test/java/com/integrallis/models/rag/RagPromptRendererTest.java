@@ -89,6 +89,22 @@ class RagPromptRendererTest {
   }
 
   @Test
+  void chatmlAnswerProfilePrefillsOnlyTheAnswerLabel() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.parse("chatml-answer"));
+
+    assertThat(prompt)
+        .startsWith("<|im_start|>system\nYou answer questions")
+        .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n[source-1] Policy")
+        .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\nAnswer: ");
+  }
+
+  @Test
   void zephyrProfileUsesNativeSystemAndUserTurns() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 
@@ -171,6 +187,37 @@ class RagPromptRendererTest {
         .startsWith("### Instruction:\nYou answer questions")
         .contains("Do not use prior knowledge.\n\nCONTEXT\n[source-1] Policy")
         .endsWith("ANSWER\n\n### Response:\n");
+  }
+
+  @Test
+  void h2oProfileUsesPromptAndAnswerTokens() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.parse("h2o"));
+
+    assertThat(prompt)
+        .startsWith("<|prompt|>You answer questions")
+        .contains("Do not use prior knowledge.\n\nCONTEXT\n[source-1] Policy")
+        .endsWith("ANSWER</s><|answer|>");
+  }
+
+  @Test
+  void h2oDirectProfilePrefillsAConciseAnswerLeadIn() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.parse("h2o-direct"));
+
+    assertThat(prompt)
+        .startsWith("<|prompt|>You answer questions")
+        .endsWith("ANSWER</s><|answer|>The context states that ");
   }
 
   @Test

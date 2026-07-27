@@ -1,0 +1,1853 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-07-27T00:01:03.394849750Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@fc7f9754 modeljars@05cc4fa vectors@c298a0b7",
+  "modelId" : "h2oai_h2o_danube2_1_8b_chat_gguf_q4_k_m",
+  "model" : "h2oai_h2o_danube2_1_8b_chat_gguf_q4_k_m",
+  "artifactSha256" : "6a303ee6b94a961aa43e48eb11629e933c4438fae5e6db336318a5d33fe57d79",
+  "artifactSizeBytes" : 1112145056,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "h2o-direct",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v18",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0",
+      "temperature" : "0.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v10",
+    "environment" : {
+      "gguf-chunks-per-thread" : "2",
+      "gguf-threads" : "8",
+      "transformer-runtime" : "java",
+      "sve" : "false",
+      "projection-layers" : "24",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "native-kernel-abi" : "2",
+      "java-version" : "25.0.3",
+      "q4-short-pairwise-supported" : "true",
+      "vm-version" : "25.0.3+9-LTS",
+      "vm-vendor" : "Eclipse Adoptium",
+      "model-architecture" : "llama",
+      "gguf-executor" : "persistent",
+      "architecture" : "amd64",
+      "kernel-runtime" : "rust-ffm",
+      "modeljar-sha256" : "6a303ee6b94a961aa43e48eb11629e933c4438fae5e6db336318a5d33fe57d79",
+      "vector-api" : "true",
+      "modeljar-coordinate" : "org.modeljars.huggingface:h2oai.h2o-danube2-1.8b-chat-gguf.q4_k_m:2.0.0-q4_k_m.1",
+      "preferred-vector-bits" : "256",
+      "os" : "Linux",
+      "java-feature" : "25",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "modeljar-alias" : "h2oai_h2o_danube2_1_8b_chat_gguf_q4_k_m",
+      "processors" : "8",
+      "kernel-implementation" : "rust-ffm-quantized-v10",
+      "fast-vector-fma" : "true",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-threads" : "8",
+      "active-vector-bits" : "256",
+      "compiler" : "hotspot-c2",
+      "gguf-parallel" : "true",
+      "native-quantized-decode" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v10",
+        "qkv" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "12",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q4_K",
+        "output-rows" : "requested"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "unused-rows" : "kv-only",
+        "formats" : "Q4_K,Q4_K,Q4_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "eligible-layers" : "0",
+        "partitions" : "8",
+        "partition" : "batch-rows"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "GGUF tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "8"
+      }
+    }, {
+      "id" : "modeljars.profile.h2oai.h2o.danube2.1.8b.chat.gguf.q4.k.m.epyc.milan.jdk25.rust.ffm",
+      "status" : "ENABLED",
+      "reason" : "The running model and JVM satisfy the exact measured ModelJars profile",
+      "settings" : {
+        "recommended-java-feature" : "25",
+        "benchmark-id" : "h2o-danube2-1.8b-rust-ffm-general-rag-20260726",
+        "recommendations" : "models.native.kernels.threads=8\nmodels.native.quantizedDecode=true\nmodels.purejava.batchedAttentionScores=false\nmodels.purejava.batchedAttentionValues=false\nmodels.purejava.prefillBatchSize=32",
+        "missing-jvm-arguments" : "",
+        "selector-mismatches" : "",
+        "required-jvm-arguments" : "--enable-native-access=ALL-UNNAMED",
+        "recommended-runtime" : "hotspot-c2",
+        "profile-id" : "h2oai_h2o_danube2_1_8b_chat_gguf_q4_k_m_epyc_milan_jdk25_rust_ffm",
+        "marker-coordinate" : "org.modeljars.huggingface:h2oai.h2o-danube2-1.8b-chat-gguf.q4_k_m:2.0.0-q4_k_m.1"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "2",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "qualification" : "model-and-platform-specific",
+        "property" : "models.native.q5_0.grouped"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "property" : "models.native.quantizedDecode"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 370.110582,
+    "retrievalMillis" : {
+      "p50" : 1.22598,
+      "p95" : 2.1945001
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.6259030000001076,
+      "p95" : 2.447248200000149
+    },
+    "ttftMillis" : {
+      "p50" : 1162.086889,
+      "p95" : 1481.6081704
+    },
+    "tpotMillis" : {
+      "p50" : 38.32558015873016,
+      "p95" : 39.11383598747475
+    },
+    "endToEndMillis" : {
+      "p50" : 3554.276965,
+      "p95" : 3928.1087137
+    },
+    "p50PrefillTokensPerSecond" : 72.93649826418428,
+    "p50DecodeTokensPerSecond" : 26.092233851604476,
+    "peakRssBytes" : 1554866176,
+    "totalCpuMillis" : 621830.0,
+    "totalInputTokens" : 5622,
+    "totalCacheReadInputTokens" : 3360,
+    "totalCacheWriteInputTokens" : 2262,
+    "totalOutputTokens" : 1704,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0
+  },
+  "performanceTier" : "USABLE",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "68e11f8c906ebbbd8033100fc8969b7ec2ae8f77e3d1c7328f89917e7a09a642",
+    "retrievalMillis" : 1.879671,
+    "frameworkOverheadMillis" : 2.4071899999999005,
+    "endToEndMillis" : 2930.660895,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 213,
+      "cacheReadInputTokens" : 178,
+      "cacheWriteInputTokens" : 35,
+      "outputTokens" : 64,
+      "ttftMillis" : 511.862484,
+      "totalMillis" : 2926.374034,
+      "prefillTokensPerSecond" : 68.56819085422268,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1530605568,
+      "cpuMillis" : 19610.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[claims-auto-glass] Auto glass claims\nNorthstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\n\nSo, you have",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0fb8e12d5876db1e48e1e3214fd2b21492db76150d4bb33ad63d8478fe597450",
+    "retrievalMillis" : 1.73346,
+    "frameworkOverheadMillis" : 2.356333000000177,
+    "endToEndMillis" : 3710.848793,
+    "generation" : {
+      "text" : "[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "inputTokens" : 214,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 94,
+      "outputTokens" : 64,
+      "ttftMillis" : 1280.291809,
+      "totalMillis" : 3706.759,
+      "prefillTokensPerSecond" : 73.49649362576365,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1531645952,
+      "cpuMillis" : 23900.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "text" : "[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "828674d130a3599f4314f9003b8d85cf2a52abd9ce8ffb081635de64f1c2c76d",
+    "retrievalMillis" : 2.238574,
+    "frameworkOverheadMillis" : 2.4993309999999838,
+    "endToEndMillis" : 3694.448247,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 212,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 95,
+      "outputTokens" : 64,
+      "ttftMillis" : 1285.178542,
+      "totalMillis" : 3689.710342,
+      "prefillTokensPerSecond" : 73.99400575182511,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1533054976,
+      "cpuMillis" : 23940.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "15-dollar copay is required for in-network behavioral health telemedicine visits without a referral.\n\nSource: [health-telemedicine]\n\nID: 1\n\nCitation:\n[health-telemedicine]\n\nDate: 2",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "459747e3adb0478cc4a6f6052f02b496424a222abcaada02c734cfa99c32c530",
+    "retrievalMillis" : 2.055427,
+    "frameworkOverheadMillis" : 2.4644160000002557,
+    "endToEndMillis" : 3523.651839,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 64,
+      "ttftMillis" : 1129.725408,
+      "totalMillis" : 3519.131996,
+      "prefillTokensPerSecond" : 74.44546233153947,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1534058496,
+      "cpuMillis" : 23120.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[payments-settlement] Approved claim settlement\nApproved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee.\n\nSo, approved domestic ACH claims and international claim w",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7007f2d78bfdd9c9077728e5b3b54df01bf25679ce5ba034deaada25bb4c3986",
+    "retrievalMillis" : 1.625975,
+    "frameworkOverheadMillis" : 2.2079280000002655,
+    "endToEndMillis" : 3462.665673,
+    "generation" : {
+      "text" : "[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 64,
+      "ttftMillis" : 1066.853021,
+      "totalMillis" : 3458.83177,
+      "prefillTokensPerSecond" : 74.1100422869087,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1534971904,
+      "cpuMillis" : 22830.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "text" : "[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e4ad50bbb3779845c326a7d5de9433cfd3c609071ce4f2624b23f8949ed1f5b4",
+    "retrievalMillis" : 1.95306,
+    "frameworkOverheadMillis" : 1.8782390000001215,
+    "endToEndMillis" : 3528.070625,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 85,
+      "outputTokens" : 64,
+      "ttftMillis" : 1144.068439,
+      "totalMillis" : 3524.239326,
+      "prefillTokensPerSecond" : 74.35314608612579,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1536225280,
+      "cpuMillis" : 23140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[security-access] Production emergency access\nThe production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes.\n\nThe question asks for the production break-glass code name and the",
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c2191ae047f3d4cc38f6e83a874922093198e86d0cc4a9931a6508d6ef9d7a41",
+    "retrievalMillis" : 2.091661,
+    "frameworkOverheadMillis" : 1.9015540000000328,
+    "endToEndMillis" : 3938.136442,
+    "generation" : {
+      "text" : "[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "inputTokens" : 224,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 107,
+      "outputTokens" : 64,
+      "ttftMillis" : 1484.047777,
+      "totalMillis" : 3934.143227,
+      "prefillTokensPerSecond" : 72.14501253241801,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1537224704,
+      "cpuMillis" : 25070.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "text" : "[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "04f552d6bde02faf3c964ebabb7f2d98eb83b720f50b9ca2718ee6546489fd27",
+    "retrievalMillis" : 8.134515,
+    "frameworkOverheadMillis" : 1.4849519999997938,
+    "endToEndMillis" : 3555.34567,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 64,
+      "ttftMillis" : 1162.678471,
+      "totalMillis" : 3545.726203,
+      "prefillTokensPerSecond" : 72.27840922514531,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554268160,
+      "cpuMillis" : 23160.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n\"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander.\"\n\nTherefore, a priority one incident is acknowledged within 15 minutes, and the route that escalates it is",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fb7c35cd47baf8630aa5ee338abde70155162393f50c230d0a959046c5104c8d",
+    "retrievalMillis" : 0.989961,
+    "frameworkOverheadMillis" : 1.5300899999997455,
+    "endToEndMillis" : 3368.911979,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 208,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 56,
+      "ttftMillis" : 1236.132296,
+      "totalMillis" : 3366.391928,
+      "prefillTokensPerSecond" : 73.64617600344322,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554292736,
+      "cpuMillis" : 21810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "75 dollars is the deductible for windshield repair, and there is no mention of a deductible for damage to a lunar rover. Therefore, the deductible for damage to a lunar rover is INSUFFICIENT_CONTEXT.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "68e11f8c906ebbbd8033100fc8969b7ec2ae8f77e3d1c7328f89917e7a09a642",
+    "retrievalMillis" : 1.347384,
+    "frameworkOverheadMillis" : 1.666577999999845,
+    "endToEndMillis" : 2972.538709,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 213,
+      "cacheReadInputTokens" : 178,
+      "cacheWriteInputTokens" : 35,
+      "outputTokens" : 64,
+      "ttftMillis" : 520.278829,
+      "totalMillis" : 2969.524747,
+      "prefillTokensPerSecond" : 67.36227673778998,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554354176,
+      "cpuMillis" : 19820.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[claims-auto-glass] Auto glass claims\nNorthstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\n\nSo, you have",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0fb8e12d5876db1e48e1e3214fd2b21492db76150d4bb33ad63d8478fe597450",
+    "retrievalMillis" : 1.557702,
+    "frameworkOverheadMillis" : 1.737724999999955,
+    "endToEndMillis" : 3764.910127,
+    "generation" : {
+      "text" : "[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "inputTokens" : 214,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 94,
+      "outputTokens" : 64,
+      "ttftMillis" : 1323.253085,
+      "totalMillis" : 3761.6147,
+      "prefillTokensPerSecond" : 71.08011579818948,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554382848,
+      "cpuMillis" : 24260.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "text" : "[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "828674d130a3599f4314f9003b8d85cf2a52abd9ce8ffb081635de64f1c2c76d",
+    "retrievalMillis" : 1.239009,
+    "frameworkOverheadMillis" : 1.6259030000001076,
+    "endToEndMillis" : 3759.991101,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 212,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 95,
+      "outputTokens" : 64,
+      "ttftMillis" : 1312.607765,
+      "totalMillis" : 3757.126189,
+      "prefillTokensPerSecond" : 72.4113301063059,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554440192,
+      "cpuMillis" : 24210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "15-dollar copay is required for in-network behavioral health telemedicine visits without a referral.\n\nSource: [health-telemedicine]\n\nID: 1\n\nCitation:\n[health-telemedicine]\n\nDate: 2",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "459747e3adb0478cc4a6f6052f02b496424a222abcaada02c734cfa99c32c530",
+    "retrievalMillis" : 1.22598,
+    "frameworkOverheadMillis" : 1.929775999999947,
+    "endToEndMillis" : 3574.268508,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 64,
+      "ttftMillis" : 1157.464629,
+      "totalMillis" : 3571.112752,
+      "prefillTokensPerSecond" : 72.61785867656978,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554477056,
+      "cpuMillis" : 23380.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[payments-settlement] Approved claim settlement\nApproved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee.\n\nSo, approved domestic ACH claims and international claim w",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7007f2d78bfdd9c9077728e5b3b54df01bf25679ce5ba034deaada25bb4c3986",
+    "retrievalMillis" : 1.098647,
+    "frameworkOverheadMillis" : 1.5620280000002822,
+    "endToEndMillis" : 3560.134709,
+    "generation" : {
+      "text" : "[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 64,
+      "ttftMillis" : 1087.878992,
+      "totalMillis" : 3557.474034,
+      "prefillTokensPerSecond" : 72.65639165984527,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554509824,
+      "cpuMillis" : 23040.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "text" : "[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e4ad50bbb3779845c326a7d5de9433cfd3c609071ce4f2624b23f8949ed1f5b4",
+    "retrievalMillis" : 1.480876,
+    "frameworkOverheadMillis" : 1.6939979999997377,
+    "endToEndMillis" : 3565.85142,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 85,
+      "outputTokens" : 64,
+      "ttftMillis" : 1162.086889,
+      "totalMillis" : 3562.676546,
+      "prefillTokensPerSecond" : 73.17451593213282,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554546688,
+      "cpuMillis" : 23300.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[security-access] Production emergency access\nThe production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes.\n\nThe question asks for the production break-glass code name and the",
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c2191ae047f3d4cc38f6e83a874922093198e86d0cc4a9931a6508d6ef9d7a41",
+    "retrievalMillis" : 1.442828,
+    "frameworkOverheadMillis" : 1.8337999999998829,
+    "endToEndMillis" : 3941.336192,
+    "generation" : {
+      "text" : "[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "inputTokens" : 224,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 107,
+      "outputTokens" : 64,
+      "ttftMillis" : 1490.417737,
+      "totalMillis" : 3938.059564,
+      "prefillTokensPerSecond" : 71.83353576773378,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554558976,
+      "cpuMillis" : 25110.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "text" : "[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "04f552d6bde02faf3c964ebabb7f2d98eb83b720f50b9ca2718ee6546489fd27",
+    "retrievalMillis" : 1.050523,
+    "frameworkOverheadMillis" : 1.5180310000000645,
+    "endToEndMillis" : 3554.276965,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 64,
+      "ttftMillis" : 1148.959586,
+      "totalMillis" : 3551.708411,
+      "prefillTokensPerSecond" : 73.14851768765425,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554612224,
+      "cpuMillis" : 23240.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n\"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander.\"\n\nTherefore, a priority one incident is acknowledged within 15 minutes, and the route that escalates it is",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fb7c35cd47baf8630aa5ee338abde70155162393f50c230d0a959046c5104c8d",
+    "retrievalMillis" : 0.924252,
+    "frameworkOverheadMillis" : 1.5903620000003684,
+    "endToEndMillis" : 3451.000641,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 208,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 56,
+      "ttftMillis" : 1248.227905,
+      "totalMillis" : 3448.486027,
+      "prefillTokensPerSecond" : 72.93649826418428,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554616320,
+      "cpuMillis" : 22030.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "75 dollars is the deductible for windshield repair, and there is no mention of a deductible for damage to a lunar rover. Therefore, the deductible for damage to a lunar rover is INSUFFICIENT_CONTEXT.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "68e11f8c906ebbbd8033100fc8969b7ec2ae8f77e3d1c7328f89917e7a09a642",
+    "retrievalMillis" : 1.177356,
+    "frameworkOverheadMillis" : 1.65023199999996,
+    "endToEndMillis" : 2952.87394,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 213,
+      "cacheReadInputTokens" : 178,
+      "cacheWriteInputTokens" : 35,
+      "outputTokens" : 64,
+      "ttftMillis" : 519.495025,
+      "totalMillis" : 2950.046352,
+      "prefillTokensPerSecond" : 67.4539346432236,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554640896,
+      "cpuMillis" : 19680.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[claims-auto-glass] Auto glass claims\nNorthstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\n\nSo, you have",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0fb8e12d5876db1e48e1e3214fd2b21492db76150d4bb33ad63d8478fe597450",
+    "retrievalMillis" : 1.221242,
+    "frameworkOverheadMillis" : 1.5622199999997974,
+    "endToEndMillis" : 3720.022947,
+    "generation" : {
+      "text" : "[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "inputTokens" : 214,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 94,
+      "outputTokens" : 64,
+      "ttftMillis" : 1292.824513,
+      "totalMillis" : 3717.239485,
+      "prefillTokensPerSecond" : 72.7455850845647,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554685952,
+      "cpuMillis" : 24030.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "text" : "[claims-travel] Travel interruption claims\nTrip interruption claims use form T-19 and the reimbursement limit is 3,500 dollars per covered traveler.\n\nAnswer: Trip interruption claims use form T-19 and the",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "828674d130a3599f4314f9003b8d85cf2a52abd9ce8ffb081635de64f1c2c76d",
+    "retrievalMillis" : 1.13488,
+    "frameworkOverheadMillis" : 1.4558790000000954,
+    "endToEndMillis" : 3720.916004,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 212,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 95,
+      "outputTokens" : 64,
+      "ttftMillis" : 1307.176267,
+      "totalMillis" : 3718.325245,
+      "prefillTokensPerSecond" : 72.70627242844049,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554735104,
+      "cpuMillis" : 24070.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "15-dollar copay is required for in-network behavioral health telemedicine visits without a referral.\n\nSource: [health-telemedicine]\n\nID: 1\n\nCitation:\n[health-telemedicine]\n\nDate: 2",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "459747e3adb0478cc4a6f6052f02b496424a222abcaada02c734cfa99c32c530",
+    "retrievalMillis" : 1.02856,
+    "frameworkOverheadMillis" : 1.5543949999996585,
+    "endToEndMillis" : 3529.394655,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 64,
+      "ttftMillis" : 1143.265956,
+      "totalMillis" : 3526.8117,
+      "prefillTokensPerSecond" : 73.50921423298567,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554776064,
+      "cpuMillis" : 23140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[payments-settlement] Approved claim settlement\nApproved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee.\n\nSo, approved domestic ACH claims and international claim w",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7007f2d78bfdd9c9077728e5b3b54df01bf25679ce5ba034deaada25bb4c3986",
+    "retrievalMillis" : 1.052006,
+    "frameworkOverheadMillis" : 1.4523130000002311,
+    "endToEndMillis" : 3458.49658,
+    "generation" : {
+      "text" : "[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 120,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 64,
+      "ttftMillis" : 1073.47139,
+      "totalMillis" : 3455.992261,
+      "prefillTokensPerSecond" : 73.63233385396768,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554833408,
+      "cpuMillis" : 22810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "text" : "[payments-chargeback] Merchant chargeback evidence\nMerchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nThe merchant chargeback evidence deadline and upload format are:",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e4ad50bbb3779845c326a7d5de9433cfd3c609071ce4f2624b23f8949ed1f5b4",
+    "retrievalMillis" : 1.143744,
+    "frameworkOverheadMillis" : 1.5366180000000895,
+    "endToEndMillis" : 3537.115017,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 85,
+      "outputTokens" : 64,
+      "ttftMillis" : 1152.238414,
+      "totalMillis" : 3534.434655,
+      "prefillTokensPerSecond" : 73.80596905149524,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554849792,
+      "cpuMillis" : 23180.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[security-access] Production emergency access\nThe production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes.\n\nThe question asks for the production break-glass code name and the",
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c2191ae047f3d4cc38f6e83a874922093198e86d0cc4a9931a6508d6ef9d7a41",
+    "retrievalMillis" : 0.987348,
+    "frameworkOverheadMillis" : 1.455899000000045,
+    "endToEndMillis" : 3904.710681,
+    "generation" : {
+      "text" : "[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "inputTokens" : 224,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 107,
+      "outputTokens" : 64,
+      "ttftMillis" : 1475.915755,
+      "totalMillis" : 3902.267434,
+      "prefillTokensPerSecond" : 72.51837657512972,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554853888,
+      "cpuMillis" : 24990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "text" : "[api-idempotency] Claims API idempotency\nClaims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "04f552d6bde02faf3c964ebabb7f2d98eb83b720f50b9ca2718ee6546489fd27",
+    "retrievalMillis" : 0.884782,
+    "frameworkOverheadMillis" : 1.4062309999999343,
+    "endToEndMillis" : 3528.343191,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 64,
+      "ttftMillis" : 1139.828757,
+      "totalMillis" : 3526.052178,
+      "prefillTokensPerSecond" : 73.72236165446576,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554857984,
+      "cpuMillis" : 23110.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\n\n\"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander.\"\n\nTherefore, a priority one incident is acknowledged within 15 minutes, and the route that escalates it is",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "h2o-danube2-1.8b-chat",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fb7c35cd47baf8630aa5ee338abde70155162393f50c230d0a959046c5104c8d",
+    "retrievalMillis" : 0.768134,
+    "frameworkOverheadMillis" : 1.5239910000000236,
+    "endToEndMillis" : 3384.273107,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 208,
+      "cacheReadInputTokens" : 117,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 56,
+      "ttftMillis" : 1241.767618,
+      "totalMillis" : 3381.980982,
+      "prefillTokensPerSecond" : 73.31266041988339,
+      "loadMillis" : 370.110582,
+      "peakRssBytes" : 1554866176,
+      "cpuMillis" : 21850.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "75 dollars is the deductible for windshield repair, and there is no mention of a deductible for damage to a lunar rover. Therefore, the deductible for damage to a lunar rover is INSUFFICIENT_CONTEXT.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

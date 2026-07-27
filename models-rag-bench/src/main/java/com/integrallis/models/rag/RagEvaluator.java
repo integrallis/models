@@ -32,6 +32,10 @@ public final class RagEvaluator {
       Pattern.compile("\\b(\\d+(?:\\.\\d+)?)\\s+dollars\\b");
   private static final Pattern THIRD_PERSON_DOES = Pattern.compile("\\bdoes\\b");
   private static final Pattern OPTIONAL_PLURAL_MARKER = Pattern.compile("\\(s\\)");
+  private static final Pattern NUMBER_WORD =
+      Pattern.compile("\\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\\b");
+  private static final Pattern PLURAL_TIME_UNIT =
+      Pattern.compile("\\b(years|months|weeks|days|hours|minutes|seconds)\\b");
 
   private RagEvaluator() {}
 
@@ -135,6 +139,29 @@ public final class RagEvaluator {
     normalized = PLURAL_DOLLARS.matcher(normalized).replaceAll("$1 dollar");
     normalized = THIRD_PERSON_DOES.matcher(normalized).replaceAll("do");
     normalized = OPTIONAL_PLURAL_MARKER.matcher(normalized).replaceAll("s");
+    normalized =
+        NUMBER_WORD
+            .matcher(normalized)
+            .replaceAll(
+                result ->
+                    switch (result.group()) {
+                      case "zero" -> "0";
+                      case "one" -> "1";
+                      case "two" -> "2";
+                      case "three" -> "3";
+                      case "four" -> "4";
+                      case "five" -> "5";
+                      case "six" -> "6";
+                      case "seven" -> "7";
+                      case "eight" -> "8";
+                      case "nine" -> "9";
+                      case "ten" -> "10";
+                      default -> throw new IllegalStateException("Unexpected number word");
+                    });
+    normalized =
+        PLURAL_TIME_UNIT
+            .matcher(normalized)
+            .replaceAll(result -> result.group().substring(0, result.group().length() - 1));
     return normalized.replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
   }
 }

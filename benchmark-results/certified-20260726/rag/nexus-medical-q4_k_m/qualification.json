@@ -1,0 +1,47 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v4",
+  "candidate" : {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-medical-q4_k_m-v18-chatml-direct-so-answer-final/models-rust-ffm.json",
+    "sha256" : "49442a85ab0330f86eb81bf8d54b5aef9a67b4c00b8ffb00c7ae0fa974851ae5"
+  },
+  "comparators" : [ {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-medical-q4_k_m-v18-chatml-direct-so-answer-final/llama.cpp.json",
+    "sha256" : "84226f6d37753b6886141b9eb3982abb628796a8a6b554a47be6bc473214a2d2"
+  }, {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-medical-q4_k_m-v18-chatml-direct-so-answer-final/ollama.json",
+    "sha256" : "250571b5c681d377d7025da2d520489863aa69fcae6e9222f17b6d5c31d4e275"
+  } ],
+  "qualification" : {
+    "modelId" : "king3djbl_nexus_medical_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "f26138b8e049e91a3e006f215a3618e3da0fef28755f73fe83bea19f73c700ea",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 12,
+    "modelAnswerRate" : 0.4444444444444444,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "llama.cpp", "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "llama.cpp",
+      "decodeThroughputRatio" : 0.6444334151544434,
+      "endToEndLatencyRatio" : 1.1051223269187491,
+      "minimumDecodeThroughputRatio" : 0.45,
+      "maximumEndToEndLatencyRatio" : 2.0,
+      "qualified" : true,
+      "failures" : [ ]
+    }, {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 1.086580076389276,
+      "endToEndLatencyRatio" : 0.7185179492784308,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}

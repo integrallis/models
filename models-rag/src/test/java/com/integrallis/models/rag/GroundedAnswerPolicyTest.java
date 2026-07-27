@@ -54,6 +54,45 @@ class GroundedAnswerPolicyTest {
   }
 
   @Test
+  void abstainsWhenRetrievedEvidenceDoesNotContainAnyNamedQuestionEntity() {
+    GroundingDocument amber =
+        new GroundingDocument(
+            "legal-amber-notice",
+            "Amber vendor notice",
+            "The Amber vendor agreement requires 30 calendar days of termination notice.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which governing law applies to the Orchid reseller agreement?",
+            List.of(amber),
+            "The Amber agreement requires 30 days of notice.");
+
+    assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.RETRIEVAL_ABSTENTION);
+  }
+
+  @Test
+  void retainsEvidenceWhenAnyTokenFromAMultiwordNamedEntityMatches() {
+    GroundingDocument northstar =
+        new GroundingDocument(
+            "claims-northstar",
+            "Northstar claims",
+            "Northstar glass claims must be reported through the Aurora portal.",
+            8.0f,
+            1);
+    String generated = "Northstar glass claims must be reported through the Aurora portal.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Where does Northstar Mutual accept glass claims?", List.of(northstar), generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [claims-northstar]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
   void preservesAnAnswerWithOnlyTrustedCitations() {
     String generated =
         "Domestic claims take 2 days and international wires take 5 days. "
@@ -505,5 +544,169 @@ class GroundedAnswerPolicyTest {
     assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
     assertThat(answer.rawText()).isEqualTo(generated);
     assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
+  }
+
+  @Test
+  void acceptsSupportedClaimsWithNumberedListMarkers() {
+    GroundingDocument liability =
+        new GroundingDocument(
+            "legal-cobalt-cap",
+            "Cobalt liability cap",
+            "Cobalt's liability cap equals fees paid during the prior 12 months. "
+                + "Confidentiality breaches are excluded from the cap.",
+            8.0f,
+            1);
+    String generated =
+        "1) Cobalt's liability cap equals fees paid during the prior 12 months, and "
+            + "2) confidentiality breaches are excluded from the cap.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "How is Cobalt's liability cap calculated and which breach is excluded?",
+            List.of(liability),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [legal-cobalt-cap]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void acceptsEquivalentNumericAndNumberWordClaims() {
+    GroundingDocument audits =
+        new GroundingDocument(
+            "legal-fjord-audit",
+            "Fjord audit rights",
+            "Fjord permits one compliance audit per calendar year with 10 business days of notice.",
+            8.0f,
+            1);
+    String generated =
+        "1 compliance audit is permitted per calendar year, and 10 business days of notice "
+            + "is required.";
+
+    GroundedAnswer answer =
+        policy.apply(
+            "How often may Fjord be audited and how much notice is required?",
+            List.of(audits),
+            generated);
+
+    assertThat(answer.text()).isEqualTo(generated + " [legal-fjord-audit]");
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+  }
+
+  @Test
+  void preservesATerminalExplicitAbstentionAfterModelAnalysis() {
+    String generated =
+        "The retrieved agreement discusses termination notice but not the requested governing "
+            + "law. Therefore, the answer is INSUFFICIENT_CONTEXT.";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.text()).isEqualTo("INSUFFICIENT_CONTEXT");
+    assertThat(answer.rawText()).isEqualTo(generated);
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
+  }
+
+  @Test
+  void rejectsAnAbstentionTokenFollowedByAnUnsupportedClaim() {
+    String generated = "INSUFFICIENT_CONTEXT. The settlement takes 30 business days.";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+  }
+
+  @Test
+  void rejectsAnIdentifierWithItsAlphabeticPrefixRemoved() {
+    GroundingDocument protocol =
+        new GroundingDocument(
+            "health-beacon-visits",
+            "Beacon research visits",
+            "The synthetic Beacon study uses protocol BT-204. "
+                + "Follow-up research visits occur every six weeks.",
+            8.0f,
+            1);
+
+    GroundedAnswer answer =
+        policy.apply(
+            "Which protocol code does the Beacon study use, and how often are follow-up visits?",
+            List.of(protocol),
+            "204 is the protocol code and follow-up visits occur every six weeks.");
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+    assertThat(answer.text()).contains("BT-204").endsWith("[health-beacon-visits]");
+  }
+
+  @Test
+  void acceptsConciseHealthcareAnswersWithDistinctEvidenceAnchors() {
+    GroundingDocument specimens =
+        new GroundingDocument(
+            "health-cedar-specimens",
+            "Cedar specimen storage",
+            "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. "
+                + "Retention lasts seven years after study closure.",
+            8.0f,
+            1);
+    GroundingDocument reconciliation =
+        new GroundingDocument(
+            "health-fir-reconciliation",
+            "Fir medication reconciliation",
+            "Fir Practice performs medication reconciliation at every admission and discharge. "
+                + "The assigned nurse records completion.",
+            8.0f,
+            1);
+    GroundingDocument portal =
+        new GroundingDocument(
+            "health-elm-portal",
+            "Elm portal routing",
+            "Elm Health routes nonurgent portal messages to the care team within 72 hours. "
+                + "Emergency messages are not accepted through the portal.",
+            8.0f,
+            1);
+    GroundingDocument images =
+        new GroundingDocument(
+            "health-grove-images",
+            "Grove image transfer",
+            "Grove Hospital exchanges diagnostic images in DICOM format. "
+                + "Temporary transfer links expire after 30 days.",
+            8.0f,
+            1);
+
+    assertThat(
+            policy
+                .apply(
+                    "At what temperature does Cedar store specimens and how long are they retained?",
+                    List.of(specimens),
+                    "7-year retention is after study closure at minus 80 degrees Celsius.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+    assertThat(
+            policy
+                .apply(
+                    "When does Fir perform medication reconciliation and who records completion?",
+                    List.of(reconciliation),
+                    "Fir Practice performs medication reconciliation at every admission and discharge. "
+                        + "The nurse records completion.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+    assertThat(
+            policy
+                .apply(
+                    "When does Elm route nonurgent messages and which messages are rejected?",
+                    List.of(portal),
+                    "72 hours is the time frame for Elm Health to route nonurgent portal messages "
+                        + "to the care team. Emergency messages are not accepted through the portal.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
+    assertThat(
+            policy
+                .apply(
+                    "Which image format does Grove exchange and when do transfer links expire?",
+                    List.of(images),
+                    "30 days is the expiration period for temporary transfer links. "
+                        + "The format exchanged is DICOM.")
+                .decision())
+        .isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
   }
 }

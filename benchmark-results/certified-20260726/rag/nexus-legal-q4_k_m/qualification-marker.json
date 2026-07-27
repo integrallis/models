@@ -1,0 +1,47 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v4",
+  "candidate" : {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-legal-q4_k_m-v17-marker-final/models-rust-ffm-marker.json",
+    "sha256" : "68a57876f44b951fa5f6a67f8554ab76a46279f16f17d6dca3d4eca3439a1ad7"
+  },
+  "comparators" : [ {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-legal-q4_k_m-v17-chatml-direct-therefore-stop-final/llama.cpp.json",
+    "sha256" : "6bb49de7dc24950c854107d59cba5b0fcbe8a303e3215232fc27ebe8e291aad6"
+  }, {
+    "path" : "/opt/native-q8-gate/qualification-wave-12/nexus-legal-q4_k_m-v17-chatml-direct-therefore-stop-final/ollama.json",
+    "sha256" : "43e330c9725175fe7c769dcc5aa1a79d7b35a63c1caa96963180b1e194bd2f94"
+  } ],
+  "qualification" : {
+    "modelId" : "king3djbl_nexus_legal_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "309437dc5aa980fd7025fc29b3a25740564244e124a0d806967ee05ed01b6d93",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 12,
+    "modelAnswerRate" : 0.4444444444444444,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "llama.cpp", "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "llama.cpp",
+      "decodeThroughputRatio" : 0.6118373529889185,
+      "endToEndLatencyRatio" : 1.1305497915976443,
+      "minimumDecodeThroughputRatio" : 0.45,
+      "maximumEndToEndLatencyRatio" : 2.0,
+      "qualified" : true,
+      "failures" : [ ]
+    }, {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.8819918872146607,
+      "endToEndLatencyRatio" : 0.9210286071799246,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}

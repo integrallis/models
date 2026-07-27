@@ -22,12 +22,15 @@ public enum RagPromptTemplate {
   RAW("raw"),
   CHATML("chatml"),
   CHATML_DIRECT("chatml-direct"),
+  CHATML_ANSWER("chatml-answer"),
   CHATML_NO_THINK("chatml-no-think"),
   ZEPHYR("zephyr"),
   LLAMA3("llama3"),
   GEMMA("gemma"),
   PHI3("phi3"),
   DEEPSEEK("deepseek"),
+  H2O("h2o"),
+  H2O_DIRECT("h2o-direct"),
   MINICPM5_NO_THINK("minicpm5-no-think");
 
   private final String id;
@@ -50,6 +53,8 @@ public enum RagPromptTemplate {
           "<|im_start|>user\n"
               + prompt
               + "<|im_end|>\n<|im_start|>assistant\nThe context states that ";
+      case CHATML_ANSWER ->
+          "<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\nAnswer: ";
       case CHATML_NO_THINK ->
           "<|im_start|>user\n"
               + prompt
@@ -63,6 +68,8 @@ public enum RagPromptTemplate {
           "<start_of_turn>user\n" + prompt.strip() + "<end_of_turn>\n<start_of_turn>model\n";
       case PHI3 -> "<|user|>\n" + prompt.strip() + "<|end|>\n<|assistant|>\n";
       case DEEPSEEK -> "### Instruction:\n" + prompt + "\n### Response:\n";
+      case H2O -> "<|prompt|>" + prompt.strip() + "</s><|answer|>";
+      case H2O_DIRECT -> "<|prompt|>" + prompt.strip() + "</s><|answer|>The context states that ";
       case MINICPM5_NO_THINK ->
           "<s><|im_start|>user\n"
               + prompt
@@ -86,6 +93,12 @@ public enum RagPromptTemplate {
               + "<|im_end|>\n<|im_start|>user\n"
               + userPrompt
               + "<|im_end|>\n<|im_start|>assistant\nThe context states that ";
+      case CHATML_ANSWER ->
+          "<|im_start|>system\n"
+              + systemPrompt.stripTrailing()
+              + "<|im_end|>\n<|im_start|>user\n"
+              + userPrompt
+              + "<|im_end|>\n<|im_start|>assistant\nAnswer: ";
       case CHATML_NO_THINK ->
           "<|im_start|>system\n"
               + systemPrompt.stripTrailing()
@@ -122,6 +135,14 @@ public enum RagPromptTemplate {
               + "\n\n"
               + userPrompt
               + "\n### Response:\n";
+      case H2O ->
+          "<|prompt|>" + systemPrompt.strip() + "\n\n" + userPrompt.strip() + "</s><|answer|>";
+      case H2O_DIRECT ->
+          "<|prompt|>"
+              + systemPrompt.strip()
+              + "\n\n"
+              + userPrompt.strip()
+              + "</s><|answer|>The context states that ";
       case MINICPM5_NO_THINK ->
           "<s><|im_start|>system\n"
               + systemPrompt.stripTrailing()
@@ -139,7 +160,8 @@ public enum RagPromptTemplate {
       }
     }
     throw new IllegalArgumentException(
-        "prompt-template must be one of raw, chatml, chatml-direct, chatml-no-think, zephyr, "
-            + "llama3, gemma, phi3, deepseek, minicpm5-no-think");
+        "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
+            + "chatml-no-think, zephyr, llama3, gemma, phi3, deepseek, h2o, h2o-direct, "
+            + "minicpm5-no-think");
   }
 }
