@@ -677,6 +677,18 @@ tasks.register("verifyGithubWorkflows") {
             "MFCQI workflow must checkout the required ModelJars composite build"
         }
 
+        val docsWorkflow = workflowDir.resolve("docs.yml").readText()
+        require(
+            "working-directory: models" in docsWorkflow &&
+                "repository: ModelJars/modeljars" in docsWorkflow &&
+                Regex("""(?m)^\s+path: models\s*$""").containsMatchIn(docsWorkflow) &&
+                Regex("""(?m)^\s+path: model-jars\s*$""").containsMatchIn(docsWorkflow) &&
+                "cache-dependency-path: models/docs/package-lock.json" in docsWorkflow &&
+                "path: models/docs/build/public" in docsWorkflow
+        ) {
+            "Docs workflow must checkout Models and ModelJars as sibling composite builds"
+        }
+
         val nativeWorkflow = workflowDir.resolve("native-kernels.yml").readText()
         val modelJarsDownloads =
             Regex(
