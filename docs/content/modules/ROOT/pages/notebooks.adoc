@@ -1,0 +1,65 @@
+= Executable Notebooks
+:navtitle: Executable Notebooks
+
+The repository's Java notebooks run on JDK 25 through the DFLib JJava kernel.
+They execute against either the current source tree or an exact staged or
+published Models release. Checked-in notebooks include their last validated
+outputs so they render as complete examples without starting Jupyter.
+
+[cols="1,3,1",options="header"]
+|===
+|Notebook |Coverage |Modes
+
+|`01_getting_started.ipynb`
+|Synthetic GGUF generation, real Java backend loading, metadata, diagnostics,
+forward execution, and generation
+|Source, release
+
+|`02_framework_adapters.ipynb`
+|Plain Java, LangChain4j, and Spring AI adapter behavior over one generation
+contract
+|Source, release
+
+|`03_guarded_rag.ipynb`
+|Grounded answers, derived citations, retrieval abstention, and extractive
+fallback
+|Source, release
+|===
+
+Browse the {url-models-github}/tree/main/notebooks[notebook sources on
+GitHub^].
+
+== Launch
+
+[source,bash]
+----
+cd notebooks
+./docker-compose.sh up --build
+----
+
+Open `http://localhost:8888`. The local development server does not require a
+token or password. The launcher pulls the public container images anonymously
+and does not read the host Docker credential store.
+
+Use release mode without editing notebook cells:
+
+[source,bash,subs="attributes+"]
+----
+MODELS_NOTEBOOK_MODE=release \
+MODELS_VERSION={models-version} \
+./docker-compose.sh up --build
+----
+
+== Verify Outputs
+
+[source,bash]
+----
+cd notebooks
+./docker-compose.sh build
+./docker-compose.sh run --rm --no-deps jupyter \
+  bash /home/jovyan/work/models/notebooks/scripts/test-notebooks.sh
+----
+
+The verifier rejects unexecuted cells, Java exceptions, stderr, suspicious
+error text, stale source digests, and incorrect notebook-specific results.
+The notebook README contains the staged-release and output-promotion commands.

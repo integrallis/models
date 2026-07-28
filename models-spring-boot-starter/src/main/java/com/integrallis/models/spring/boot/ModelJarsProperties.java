@@ -15,7 +15,7 @@
  */
 package com.integrallis.models.spring.boot;
 
-import org.modeljars.ModelJarRequirement;
+import org.modeljars.ModelJar;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Configuration properties used to select a ModelJars descriptor. */
@@ -67,20 +67,20 @@ public class ModelJarsProperties {
     this.capability = capability;
   }
 
-  ModelJarRequirement toRequirement() {
-    ModelJarRequirement.Builder builder = ModelJarRequirement.forSource(source);
+  ModelJar toModelJar() {
+    ModelJar modelJar = ModelJar.of(source);
     if (versionRange != null && !versionRange.isBlank()) {
-      builder.versionRange(versionRange);
+      modelJar = modelJar.version(versionRange);
     }
     if (variant != null && !variant.isBlank()) {
-      builder.variant(variant);
+      modelJar = modelJar.variant(variant);
     }
     if (backend != null && !backend.isBlank()) {
-      builder.backend(backend);
+      modelJar = modelJar.backend(backend);
     }
     if (capability != null && !capability.isBlank()) {
-      builder.capability(capability);
+      modelJar = modelJar.capability(capability);
     }
-    return builder.build();
+    return modelJar;
   }
 }

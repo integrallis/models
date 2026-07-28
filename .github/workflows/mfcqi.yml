@@ -1,0 +1,79 @@
+name: MFCQI
+
+# Multi-Factor Code Quality Index (https://github.com/integrallis/mfcqi-java).
+# Scores the published production sources as one release plus each source-bearing module.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mfcqi:
+    name: MFCQI score and badges
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: models
+    steps:
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: models
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          ref: main
+          path: model-jars
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Stage published production sources
+        run: |
+          STAGE="${RUNNER_TEMP}/mfcqi-src"
+          mkdir -p "$STAGE"
+          for module in \
+            models-api \
+            models-runtime \
+            models-rag \
+            models-semantic-order \
+            backend-java \
+            backend-native \
+            models-langchain4j \
+            models-spring-ai \
+            models-embedding; do
+            cp -r "$module/src/main/java/." "$STAGE/"
+          done
+          echo "MFCQI_STAGE=$STAGE" >> "$GITHUB_ENV"
+
+      - name: Generate MFCQI badges
+        run: ./gradlew mfcqiBadge -Pmfcqi.sourceDir="$MFCQI_STAGE" --no-daemon
+
+      - name: Commit badge updates
+        if: github.event_name == 'push'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add \
+            '.github/badges/mfcqi.json' \
+            'backend-*/.github/badges/mfcqi.json' \
+            'models-*/.github/badges/mfcqi.json'
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update MFCQI badges [skip ci]"
+            git push
+          fi

@@ -12,8 +12,8 @@ on:
       - "gradlew"
       - "models-api/**"
       - "models-runtime/**"
-      - "models-backend-purejava/**"
-      - "models-backend-native/**"
+      - "backend-java/**"
+      - "backend-native/**"
       - "rust-toolchain.toml"
   pull_request:
     branches: [main]
@@ -26,17 +26,13 @@ on:
       - "gradlew"
       - "models-api/**"
       - "models-runtime/**"
-      - "models-backend-purejava/**"
-      - "models-backend-native/**"
+      - "backend-java/**"
+      - "backend-native/**"
       - "rust-toolchain.toml"
   workflow_dispatch:
     inputs:
       modeljars-ref:
         description: "ModelJars ref to test against"
-        required: false
-        default: "main"
-      vectors-ref:
-        description: "vectors ref to test against"
         required: false
         default: "main"
 
@@ -55,42 +51,42 @@ jobs:
           - name: Qwen2.5-Coder 7B
             cachePath: ~/.jvllm/models/qwen2.5-coder-7b-instruct-q4_0.gguf
             cacheKey: qwen25-coder-7b-q4_0-fixture-v1
-            gradleTask: ":models-backend-purejava:qwen25Coder7BSlowTest"
+            gradleTask: ":backend-java:qwen25Coder7BSlowTest"
             reportName: qwen25-coder-7b-slow-test-reports
           - name: DeepSeek-Coder 6.7B
             cachePath: ~/.jvllm/models/deepseek-coder-6.7b-instruct.Q4_K_M.gguf
             cacheKey: deepseek-coder-6.7b-q4_k_m-fixture-v1
-            gradleTask: ":models-backend-purejava:deepSeekCoder67BSlowTest"
+            gradleTask: ":backend-java:deepSeekCoder67BSlowTest"
             reportName: deepseek-coder-6.7b-slow-test-reports
           - name: Qwen3 8B
             cachePath: ~/.jvllm/models/Qwen3-8B-Q4_K_M.gguf
             cacheKey: qwen3-8b-q4_k_m-fixture-v1
-            gradleTask: ":models-backend-purejava:qwen38BSlowTest"
+            gradleTask: ":backend-java:qwen38BSlowTest"
             reportName: qwen3-8b-slow-test-reports
           - name: DeepSeek-R1-Distill-Qwen-7B
             cachePath: ~/.jvllm/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf
             cacheKey: deepseek-r1-distill-qwen-7b-q4_k_m-fixture-v1
-            gradleTask: ":models-backend-purejava:deepSeekR1DistillQwen7BSlowTest"
+            gradleTask: ":backend-java:deepSeekR1DistillQwen7BSlowTest"
             reportName: deepseek-r1-distill-qwen-7b-slow-test-reports
           - name: HuatuoGPT-o1-7B
             cachePath: ~/.jvllm/models/HuatuoGPT-o1-7B-Q4_K_M.gguf
             cacheKey: huatuogpt-o1-7b-q4_k_m-fixture-v1
-            gradleTask: ":models-backend-purejava:huatuoGptO17BSlowTest"
+            gradleTask: ":backend-java:huatuoGptO17BSlowTest"
             reportName: huatuogpt-o1-7b-slow-test-reports
           - name: SQLCoder-7B-2
             cachePath: ~/.jvllm/models/sqlcoder-7b-q5_k_m.gguf
             cacheKey: sqlcoder-7b-2-q5_k_m-fixture-v1
-            gradleTask: ":models-backend-purejava:sqlCoder7B2SlowTest"
+            gradleTask: ":backend-java:sqlCoder7B2SlowTest"
             reportName: sqlcoder-7b-2-slow-test-reports
           - name: SmolLM3 3B
             cachePath: ~/.jvllm/models/SmolLM3-Q4_K_M.gguf
             cacheKey: smollm3-3b-q4_k_m-fixture-v1
-            gradleTask: ":models-backend-purejava:smolLm33BSlowTest"
+            gradleTask: ":backend-java:smolLm33BSlowTest"
             reportName: smollm3-3b-slow-test-reports
           - name: Fin-R1 7B
             cachePath: ~/.jvllm/models/SUFE-AIFLM-Lab_Fin-R1-Q4_K_M.gguf
             cacheKey: fin-r1-7b-q4_k_m-fixture-v1
-            gradleTask: ":models-backend-purejava:finR17BSlowTest"
+            gradleTask: ":backend-java:finR17BSlowTest"
             reportName: fin-r1-7b-slow-test-reports
     steps:
       - name: Checkout models
@@ -104,13 +100,6 @@ jobs:
           repository: ModelJars/modeljars
           ref: ${{ github.event.inputs['modeljars-ref'] || 'main' }}
           path: model-jars
-
-      - name: Checkout vectors
-        uses: actions/checkout@v5
-        with:
-          repository: integrallis/vectors
-          ref: ${{ github.event.inputs['vectors-ref'] || 'main' }}
-          path: vectors
 
       - uses: actions/setup-java@v5
         with:
@@ -145,7 +134,7 @@ jobs:
         working-directory: models
         run: >
           ./gradlew
-          :models-backend-native:slowTest
+          :backend-native:slowTest
           --tests com.integrallis.models.backend.nativekernel.RustFfmQ5KLargeModelTest
           --no-daemon
           --stacktrace
@@ -156,6 +145,6 @@ jobs:
         with:
           name: ${{ matrix.reportName }}
           path: |
-            models/models-backend-purejava/build/reports/tests/
-            models/models-backend-native/build/reports/tests/
+            models/backend-java/build/reports/tests/
+            models/backend-native/build/reports/tests/
           retention-days: 30

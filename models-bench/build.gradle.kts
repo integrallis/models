@@ -49,15 +49,16 @@ tasks.withType<JavaExec>().configureEach {
 
 dependencies {
     implementation(project(":models-runtime"))
-    implementation(project(":models-backend-purejava"))
-    implementation(project(":models-backend-native"))
+    implementation(project(":backend-java"))
+    implementation(project(":backend-native"))
+    implementation(project(":models-modeljars"))
     runtimeOnly(
         project(
-            path = ":models-backend-native",
+            path = ":backend-native",
             configuration = "hostNativeRuntimeElements",
         )
     )
-    implementation("com.integrallis:vectors-core:0.1.0-SNAPSHOT")
+    implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     runtimeOnly("org.modeljars:modeljars-catalog:0.1.0-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")

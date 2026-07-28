@@ -44,8 +44,9 @@ tasks.withType<JavaExec>().configureEach {
 dependencies {
     implementation(project(":models-rag"))
     implementation(project(":models-runtime"))
-    implementation(project(":models-backend-purejava"))
-    implementation(project(":models-backend-native"))
+    implementation(project(":backend-java"))
+    implementation(project(":backend-native"))
+    implementation(project(":models-modeljars"))
     implementation(project(":models-langchain4j"))
     implementation(project(":models-spring-ai"))
     implementation("org.apache.lucene:lucene-core:10.4.0")

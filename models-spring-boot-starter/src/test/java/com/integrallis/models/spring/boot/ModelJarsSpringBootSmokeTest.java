@@ -19,10 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.modeljars.ModelJar;
 import org.modeljars.ModelJarDescriptor;
 import org.modeljars.ModelJarLocator;
 import org.modeljars.ModelJarRegistry;
-import org.modeljars.ModelJarRequirement;
 import org.modeljars.ModelPerformanceProfile;
 import org.modeljars.ModelPerformanceProfileRegistry;
 import org.springframework.boot.WebApplicationType;
@@ -50,7 +50,7 @@ class ModelJarsSpringBootSmokeTest {
           .extracting(ModelPerformanceProfile::id)
           .contains("qwen3_0_6b_q4_0_epyc_milan_jdk25");
       assertThat(context.getBean(ModelJarLocator.class)).isNotNull();
-      assertThat(context.getBean(ModelJarRequirement.class).source())
+      assertThat(context.getBean(ModelJar.class).source())
           .isEqualTo("hf://ggml-org/Qwen3-0.6B-GGUF");
 
       ModelJarDescriptor descriptor = context.getBean(ModelJarDescriptor.class);

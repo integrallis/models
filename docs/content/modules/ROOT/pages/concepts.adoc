@@ -1,0 +1,131 @@
+= Inference Concepts
+
+Hosted AI APIs hide model files and execution details behind an HTTP
+request. Running a model inside an application exposes some of those
+details. This page defines the terms used throughout the Models
+documentation.
+
+== Models, Weights, And Architectures
+
+A language model combines:
+
+* an *architecture*, the arrangement of computations used to process
+text
+* *weights*, the numeric values learned during training
+* a *tokenizer*, the rules that convert text into the numeric identifiers
+the model accepts
+
+Names such as Llama, Qwen, and Gemma identify architecture families.
+Model size labels such as 1B or 7B approximate the number of learned
+weight values: one billion or seven billion. More weights usually require
+more storage, memory, and computation.
+
+A *model artifact* is one exact downloadable file. Two artifacts can
+share a model name while containing different revisions, weight
+precision, or metadata. Models therefore qualifies exact artifacts, not
+names alone.
+
+== GGUF And Model Artifacts
+
+GGUF is a file format widely used to distribute models for local
+inference. A GGUF file can contain:
+
+* architecture and configuration metadata
+* tokenizer vocabulary and rules
+* named, shaped arrays of weights called tensors
+
+Model weights are often *quantized*: each value is stored with fewer bits
+than a 32-bit floating-point number. Quantization reduces file size and
+memory traffic, making local inference practical on smaller machines. It
+can also change model quality and requires specialized arithmetic for
+each format. Names such as `Q4_0`, `Q5_K`, and `Q8_0` identify different
+quantized tensor layouts.
+
+== Tokens, Prefill, And Decode
+
+A *token* is a piece of text recognized by a model's tokenizer. A token
+may be a word, part of a word, punctuation, or a byte. Models process
+token identifiers rather than Java strings.
+
+Text generation has two main phases:
+
+* *Prefill* processes all tokens in the input prompt. It prepares the
+model's internal attention state and usually performs work in batches.
+* *Decode* generates output one token at a time. After each pass, a
+sampler chooses the next token and the process repeats until a stop token
+or output limit is reached.
+
+The *key-value (KV) cache* retains attention information from tokens
+already processed. Without it, every decode step would have to recompute
+the entire conversation. The *context length* is the maximum number of
+input and output tokens the model can retain for one request.
+
+The model's final output for a step is a set of scores called *logits*.
+Sampling settings such as temperature, top-k, and top-p control how those
+scores are converted into the next token. Greedy sampling always chooses
+the highest-scoring token.
+
+== Tensors, Kernels, And SIMD
+
+A *tensor* is a multidimensional array of numbers. Most inference time is
+spent combining large weight tensors with the current token state.
+
+A *kernel* is an implementation of one frequently repeated numeric
+operation, such as a matrix-vector multiplication. Kernel speed depends
+heavily on how weights are arranged in memory and how much data the CPU
+can read per second. This is why model inference is often limited by
+memory bandwidth rather than ordinary Java control flow.
+
+*SIMD* lets one CPU instruction operate on several numeric lanes at once.
+Models uses the JDK Vector API to express SIMD work in Java. The optional
+native backend calls selected Rust kernels through the Foreign Function
+and Memory (FFM) API when Java 25 cannot yet express or compile a measured
+hot path closely enough to the production latency target.
+
+== Backends And Performance Profiles
+
+An execution *backend* determines how Models performs inference; it does
+not change the model itself. `backend-java` uses Java kernels throughout.
+`backend-native` uses the same Java model graph and replaces only selected
+numeric kernels.
+
+A *performance profile* records a configuration that was benchmarked for
+one exact model artifact, backend, JDK, and processor environment. Models
+matches profiles because a batch size or kernel that is faster for one
+combination can be slower for another. See
+xref:execution-planning.adoc#profile-matching[Profile Matching] for the
+selection rules.
+
+== Performance Measurements
+
+Models reports several measurements because no single number describes
+the user experience:
+
+* *Load time* measures how long the model takes to become ready.
+* *Time to first token (TTFT)* measures the delay between submitting a
+prompt and receiving the first generated token. Prompt processing is a
+major part of this value.
+* *Prefill throughput* measures how many prompt tokens are processed per
+second.
+* *Decode throughput* measures how many output tokens are generated per
+second after the first token.
+* *End-to-end latency* measures the complete request, including prefill
+and all generated tokens.
+* *Peak memory* measures the largest process memory footprint during the
+workload.
+
+Performance qualification also checks output correctness. A fast kernel
+that changes the expected result is not accepted.
+
+== Retrieval-Augmented Generation
+
+Retrieval-augmented generation (RAG) searches an application's documents
+before asking the language model to answer. The retrieved text is added
+to the prompt so the model can use current or private information that
+was not part of its training.
+
+An *embedding* represents text as a numeric vector. Similar vectors are
+used to retrieve relevant documents. Grounding then checks whether the
+generated answer is supported by those documents. Models provides the
+generation runtime, a Vectors storage bridge, and a guarded RAG policy
+that can accept, reject, or replace an unsupported answer.

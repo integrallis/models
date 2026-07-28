@@ -16,6 +16,7 @@
 package com.integrallis.models.bench;
 
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.modeljars.ModelJarBackends;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -86,7 +87,9 @@ record PureJavaModelSource(
   }
 
   PureJavaBackend load() {
-    return descriptor.map(PureJavaBackend::load).orElseGet(() -> PureJavaBackend.load(artifact));
+    return descriptor
+        .map(ModelJarBackends::loadPureJava)
+        .orElseGet(() -> PureJavaBackend.load(artifact));
   }
 
   private static Path requireArtifact(Path artifact) {

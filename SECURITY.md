@@ -57,16 +57,17 @@ We follow a **90-day coordinated disclosure policy**:
 
 Security-relevant boundaries:
 
-- **The published backend is Java bytecode** — It requires no JNI or native inference library.
-  GGUF weights are memory-mapped with the FFM API; the KV cache itself is on-heap.
+- **Published execution backends are explicit** — `backend-java` is Java bytecode.
+  `backend-native` optionally loads the small Models-owned Rust kernel library through
+  Java FFM; it does not load llama.cpp, Ollama, or another inference engine.
 - **No downloader is implemented in 0.1.x** — The published core modules perform no network I/O.
   Users supply a local model path.
 - **Arena-based model mapping** — The backend owns a shared `Arena` and closes it from
   `PureJavaBackend.close()`; using the backend after close is unsupported.
 - **Artifact signing is external** — JReleaser signs staged Maven artifacts with the maintainer's
   GPG key. Runtime libraries do not perform release-signing operations.
-- **Experimental modules are excluded** — ONNX, native, and framework directories are scaffolding
-  and are not Maven Central publications in 0.1.x.
+- **Publication is allowlisted** — Only modules named in `publishedModuleNames` are staged for
+  Maven Central. Adding a Gradle subproject does not publish it.
 
 ## Supply Chain Security
 
@@ -83,3 +84,5 @@ Security-relevant boundaries:
   independently verified.
 - **SAST** — A GitHub CodeQL workflow is configured for pull requests, pushes
   to `main`, and a weekly schedule.
+- **Code quality** — MFCQI scores the combined published production sources and
+  each source-bearing module on pull requests and pushes to `main`.

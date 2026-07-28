@@ -1,5 +1,7 @@
 # Inference Benchmarks
 
+[![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-bench/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
+
 `models-bench` contains the controlled comparison harness and a decode-only JFR profiler for the
 pure-Java backend.
 

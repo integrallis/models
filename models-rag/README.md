@@ -1,5 +1,7 @@
 # models-rag
 
+[![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-rag/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
+
 `models-rag` provides framework-neutral response grounding for production RAG
 applications. It is intended for local models that can answer narrow questions
 but should not be trusted to enforce source attribution or abstention alone.

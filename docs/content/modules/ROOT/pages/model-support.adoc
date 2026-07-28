@@ -1,0 +1,130 @@
+= Model Support And Qualification
+
+Models separates three different claims:
+
+[arabic]
+. *Format support* means the parser and kernels understand the required
+GGUF metadata and tensor encodings.
+. *Integration-tested* means CI downloads a pinned artifact, verifies
+its checksum, and runs parsing, tokenization, forward-pass, and
+generation tests.
+. *Qualified* means an exact artifact also clears a named workload's
+correctness and latency gates on a recorded runtime and host.
+
+A model family name alone is not a production qualification.
+
+== Supported Runtime Surface
+
+The decoder currently recognizes `llama`, `qwen2`, and `qwen3` GGUF
+metadata prefixes.
+
+Projection kernels support:
+
+* F32
+* Q4_0
+* Q5_0
+* Q8_0
+* Q4_K
+* Q5_K
+* Q6_K
+
+Embedding rows additionally support F16. The tokenizer layer supports
+GPT-2-style byte-level BPE and Llama SentencePiece metadata, including
+Unicode, byte fallback, BOS/EOS controls, and modern and legacy linear
+RoPE scaling.
+
+Other architectures, multimodal inputs, remaining quantization formats,
+and arbitrary chat templates are not implied by this list.
+
+== Qualified Identities
+
+Committed evidence covers 27 exact artifacts representing 25 distinct
+model identities. Multiple quantizations of one model count as one
+identity.
+
+[cols=",",options="header",]
+|===
+|Domain |Qualified model identities
+|General |SmolLM2 360M, SmolLM2 1.7B, SmolLM3 3B, Qwen3 1.7B, Qwen2.5
+0.5B, Qwen2.5 1.5B, Llama 3.2 1B, Llama 3.2 3B, Gemma 3 1B, H2O Danube2
+1.8B, DeepSeek-R1-Distill-Qwen 1.5B, TinyLlama 1.1B Chat
+
+|Coding |Qwen3 0.6B, Qwen2.5-Coder 0.5B, Qwen2.5-Coder 1.5B,
+DeepSeek-Coder 1.3B, MiniCPM5 1B, Yi-Coder 1.5B
+
+|Math |Qwen2.5-Math 1.5B
+
+|Multilingual |EuroLLM 1.7B
+
+|Transportation |UmarTransit 1B
+
+|Legal |Indian-Legal-Qwen2.5 3B, Nexus Legal
+
+|Finance |Nexus Finance
+
+|Healthcare |Nexus Medical
+|===
+
+The {url-models-github}/blob/main/RAG_BENCHMARKS.md[production RAG
+ledger^] records artifact SHA, quantization, backend, host, p95 time to
+first token, decode throughput, end-to-end latency, comparator ratios,
+and correctness. Individual report directories under
+{url-models-github}/tree/main/benchmark-results[`benchmark-results/`^]
+contain the machine-readable qualification records.
+
+== Strict Integration Fixtures
+
+The default and dedicated integration suites include:
+
+* Qwen3 0.6B Q4_0, 1.7B Q8_0, and 8B Q4_K_M
+* Qwen2.5-Coder 0.5B and 1.5B in Q4_0 and Q8_0, plus 3B Q4_0
+and 7B Q4_0
+* SmolLM2 360M Q8_0 and SmolLM3 3B Q4_K_M
+* TinyLlama 1.1B Chat Q4_0
+* DeepSeek-Coder 1.3B and 6.7B Q4_K_M
+* MiniCPM5 1B Q4_K_M
+* Qwen2.5-Math 1.5B Q4_K_M
+* DeepSeek-R1-Distill-Qwen 7B Q4_K_M
+* SQLCoder-7B-2 Q5_K_M
+
+The DeepSeek-Coder fixture exercises mixed
+Q4_K/Q5_0/Q8_0/Q6_K tensors and legacy linear RoPE
+scaling. MiniCPM5 exercises explicit Q/K/V head widths, 131K context
+metadata, and Llama-style byte BPE. Qwen2.5-Math exercises Q6_K
+token embeddings.
+
+Pinned greedy-token references compare selected fixtures with a recorded
+llama.cpp revision. llama.cpp is a test oracle and benchmark comparator,
+not a runtime dependency.
+
+== Backend Qualification
+
+Backend choice is attached to an exact runtime profile. A model may
+qualify with pure Java on one JDK and host and use a native kernel on
+another. The ModelJars profile adapter supplies recommendations only
+when the model SHA and complete selector match.
+
+Most qualified artifacts use the Models Rust/FFM backend to stay near
+local-runtime latency. Qwen3 0.6B Q4_0 has a qualified pure-Java
+path. Newer JDKs are re-evaluated so profiles can move back to pure Java
+when they clear the same gate.
+
+== Catalog Metadata
+
+{url-modeljars}[ModelJars.org^] supplies versioned marker artifacts
+and catalog metadata such as:
+
+* upstream model and revision
+* license
+* architecture and parameter count
+* quantization and file size
+* SHA-256
+* capabilities, domains, and tags
+* estimated memory requirements
+* supported backends
+* measured runtime recommendations
+* qualification report links
+
+Models consumes this through a registry-neutral backend configuration.
+The catalog can evolve independently without hardcoding every model in
+the runtime or website.

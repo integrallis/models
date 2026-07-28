@@ -1,0 +1,126 @@
+= Runtime Architecture
+
+Models runs a language-model pipeline inside the Java process. It does
+not delegate inference to an Ollama server, a llama.cpp executable,
+Python, or an HTTP sidecar.
+
+Terms such as GGUF, quantization, prefill, decode, KV cache, SIMD, and
+FFM are introduced in xref:concepts.adoc[Inference Concepts].
+
+== Ownership Boundary
+
+Java owns the behavior that defines the model:
+
+* GGUF parsing and memory mapping
+* tokenizer metadata and encoding
+* transformer topology and tensor routing
+* RoPE, grouped-query attention, and residual flow
+* KV-cache allocation and growth
+* sampling and generation control
+* streaming and framework contracts
+* diagnostics and runtime-profile selection
+
+Both backends run the same Java 25 transformer pipeline with FFM memory
+segments and the incubating Vector API. `backend-java` executes
+every numeric kernel in Java. `backend-native` substitutes only selected,
+measured bottleneck kernels with a Models-owned Rust implementation
+loaded through Java's final FFM API. It does not embed or call llama.cpp
+or Ollama. The Java graph remains authoritative, so the backend boundary
+is narrow and testable.
+
+image::models-0001.png[Models runtime architecture,align=center]
+
+== Why A Native Path Exists
+
+The release gate is based on observed correctness and user-facing
+latency. Current Java 25 Vector API and HotSpot code generation cannot
+express or consistently lower every quantized inference kernel close
+enough to mature native runtimes. Releasing those artifacts on the
+slower path would make them unsuitable for their qualified workloads.
+
+For affected model profiles, `backend-native` supplies the missing
+throughput with a small Rust binary. This is a temporary
+performance compatibility layer, not a second model runtime.
+
+Each native route must have:
+
+[arabic]
+. A Java reference implementation.
+. Deterministic output comparison against that implementation.
+. A benchmark on the exact model artifact and runtime selector.
+. Diagnostics identifying that the route was selected.
+. A pure-Java fallback.
+
+== Retirement Policy
+
+Models strives to become fully pure Java. A native kernel can be retired
+when a released supported JDK provides the required memory, SIMD,
+compiler, or device capability and the Java implementation clears the
+same correctness and performance gate.
+
+Retirement is evidence-driven and model-specific:
+
+[arabic]
+. Implement the Java route against the newer JDK capability.
+. Run deterministic token and tensor comparisons.
+. Re-run controlled same-host benchmarks.
+. Update the model's measured runtime profile.
+. Stop selecting the native kernel for matching JDKs.
+. Remove the native implementation when no supported profile needs it.
+
+This lets one artifact prefer pure Java on a newer JDK while another
+continues to use the FFM path.
+
+== GGUF Data Flow
+
+The pure-Java backend memory-maps GGUF weights and exposes aligned
+`MemorySegment` slices instead of materializing complete float tensors.
+
+[source,text]
+----
+token
+  -> embedding
+  -> N x (
+       RMSNorm
+       -> Q/K/V projections
+       -> RoPE
+       -> grouped-query attention
+       -> output projection
+       -> residual
+       -> RMSNorm
+       -> SwiGLU feed-forward network
+       -> residual
+     )
+  -> final RMSNorm
+  -> output logits
+  -> sampler
+----
+
+The KV cache starts with 16 positions and grows geometrically. Loading a
+model therefore does not allocate its full advertised context length.
+The `models.purejava.maxContextLength` property can impose a lower hard
+runtime limit without changing the model metadata exposed to callers.
+
+== Relationship To Vectors
+
+Low-level, reusable SIMD and `MemorySegment` numeric primitives belong
+in Vectors. Model-specific topology and transformer behavior belong in
+Models.
+
+[cols=",,",options="header",]
+|===
+|Layer |Project |Responsibility
+|Model inference |Models |tokenize, plan, execute, cache, sample, and
+generate
+
+|SIMD kernels |`vectors-core` |reusable dense and quantized numeric
+primitives
+
+|Embedding storage/search |Vectors |indexes, similarity, persistence,
+and caches
+
+|Integration |`models-embedding` |optional Models-to-Vectors bridge
+|===
+
+`models-semantic-order` uses rank lookup and sparse scalar operations,
+so it does not depend on Vectors.

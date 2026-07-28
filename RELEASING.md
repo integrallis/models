@@ -5,7 +5,7 @@ JReleaser signs and validates one Maven Central bundle, and the workflow creates
 the GitHub release.
 
 Version `0.1.x` publishes only `models-api`, `models-runtime`, and
-`models-backend-purejava`. Modules containing only planned package scaffolding
+`backend-java`. Modules containing only planned package scaffolding
 are intentionally excluded.
 
 ## Cut a release
@@ -15,7 +15,7 @@ are intentionally excluded.
 3. Run **Actions → Release** with `dry_run` enabled.
 4. After validation succeeds, rerun with `dry_run` disabled.
 
-`models-backend-purejava` depends on `vectors-core` for JDK Vector API numeric
+`backend-java` depends on `vectors-core` for JDK Vector API numeric
 kernels. Local development resolves that dependency through the sibling
 composite build; releases consume the published `vectors-core` artifact.
 Placeholder modules still declare no dependencies until they contain an

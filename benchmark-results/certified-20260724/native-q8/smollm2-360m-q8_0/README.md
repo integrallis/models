@@ -1,7 +1,7 @@
 # SmolLM2 360M Q8_0 Native Kernel Gate
 
 This directory contains the raw reports for the first controlled
-`models-backend-native` Q8_0 gate. It is implementation evidence, not a launch
+`backend-native` Q8_0 gate. It is implementation evidence, not a launch
 qualification.
 
 ## Controls

@@ -15,11 +15,11 @@
  */
 package com.integrallis.models.spring.boot;
 
+import org.modeljars.ModelJar;
 import org.modeljars.ModelJarDescriptor;
 import org.modeljars.ModelJarException;
 import org.modeljars.ModelJarLocator;
 import org.modeljars.ModelJarRegistry;
-import org.modeljars.ModelJarRequirement;
 import org.modeljars.ModelPerformanceProfileRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -53,17 +53,16 @@ public class ModelJarsAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean
   @ConditionalOnProperty(prefix = "models.modeljars", name = "source")
-  ModelJarRequirement modelJarRequirement(ModelJarsProperties properties) {
-    return properties.toRequirement();
+  ModelJar modelJar(ModelJarsProperties properties) {
+    return properties.toModelJar();
   }
 
   @Bean
   @ConditionalOnMissingBean
   @ConditionalOnProperty(prefix = "models.modeljars", name = "source")
-  ModelJarDescriptor modelJarDescriptor(
-      ModelJarRegistry registry, ModelJarRequirement requirement) {
+  ModelJarDescriptor modelJarDescriptor(ModelJarRegistry registry, ModelJar modelJar) {
     return registry
-        .resolve(requirement)
-        .orElseThrow(() -> new ModelJarException("No ModelJars descriptor matched " + requirement));
+        .resolve(modelJar)
+        .orElseThrow(() -> new ModelJarException("No ModelJars descriptor matched " + modelJar));
   }
 }

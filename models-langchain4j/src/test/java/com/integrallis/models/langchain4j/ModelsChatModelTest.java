@@ -35,9 +35,9 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.modeljars.ModelJar;
 import org.modeljars.ModelJarDescriptor;
 import org.modeljars.ModelJarRegistry;
-import org.modeljars.ModelJarRequirement;
 
 @Tag("unit")
 class ModelsChatModelTest {
@@ -137,10 +137,7 @@ class ModelsChatModelTest {
     ModelJarDescriptor descriptor =
         ModelJarRegistry.fromClasspath()
             .resolve(
-                ModelJarRequirement.forSource("hf://ggml-org/Qwen3-0.6B-GGUF")
-                    .variant("q4_0")
-                    .backend("pure-java")
-                    .build())
+                ModelJar.of("hf://ggml-org/Qwen3-0.6B-GGUF").variant("q4_0").backend("pure-java"))
             .orElseThrow();
 
     assertThat(descriptor.sourceId()).isEqualTo("hf://ggml-org/Qwen3-0.6B-GGUF");

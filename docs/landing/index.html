@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Models - In-process language-model inference for Java 25</title>
+    <meta name="description" content="Models runs qualified GGUF language models inside Java 25 applications with a shared Vector API pipeline and selective Models-owned Rust kernel acceleration through FFM.">
+    <meta property="og:title" content="Models - In-process language-model inference for Java 25">
+    <meta property="og:description" content="Load, run, stream, and integrate qualified GGUF models inside the JVM.">
+    <meta property="og:type" content="website">
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('models-theme');
+                if (!theme) {
+                    theme = window.matchMedia('(prefers-color-scheme: light)').matches
+                        ? 'light'
+                        : 'dark';
+                }
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (error) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/landing.css">
+    <link rel="icon" type="image/png" href="assets/images/favicon-32x32.png">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img class="product-mark" src="assets/images/models-logo.png" alt="">
+                <a href="#top" class="product">models</a>
+            </div>
+            <div class="nav-right">
+                <div class="nav-links">
+                    <a href="#runtime">Runtime</a>
+                    <a href="#integrations">Integrations</a>
+                    <a href="docs/">Docs</a>
+                </div>
+                <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" title="Toggle theme">
+                    <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                    <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                </button>
+                <a class="icon-btn" href="https://github.com/integrallis/models" aria-label="GitHub repository" title="GitHub">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.78 0 12.292c0 5.211 3.438 9.63 8.205 11.188.6.111.82-.254.82-.567 0-.28-.01-1.022-.015-2.005-3.338.711-4.042-1.582-4.042-1.582-.546-1.361-1.335-1.725-1.335-1.725-1.087-.731.084-.716.084-.716 1.205.082 1.838 1.215 1.838 1.215 1.07 1.803 2.809 1.282 3.495.981.108-.763.417-1.282.76-1.577-2.665-.295-5.466-1.309-5.466-5.827 0-1.287.465-2.339 1.235-3.164-.135-.298-.54-1.497.105-3.121 0 0 1.005-.316 3.3 1.209.96-.262 1.98-.392 3-.397 1.02.005 2.04.135 3 .397 2.28-1.525 3.285-1.209 3.285-1.209.645 1.624.24 2.823.12 3.121.765.825 1.23 1.877 1.23 3.164 0 4.53-2.805 5.527-5.475 5.817.42.354.81 1.077.81 2.182 0 1.578-.015 2.846-.015 3.229 0 .309.21.678.825.561C20.565 21.917 24 17.495 24 12.292 24 5.78 18.627.5 12 .5Z"/></svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero" id="top">
+            <div class="hero-content">
+                <img src="assets/images/models-logo.png" alt="Models" class="hero-logo reveal">
+                <div class="hero-eyebrow reveal"><span class="dot"></span> In-process inference - Java 25</div>
+                <h1 class="hero-title reveal">Models</h1>
+                <p class="hero-subtitle reveal">
+                    Run open-weight language models inside your Java application,
+                    without Python, a separate model server, or a network request.
+                </p>
+                <p class="runtime-disclosure reveal">
+                    Models loads GGUF files and owns tokenization, the transformer
+                    graph, KV state, sampling, and streaming. Both backends use the
+                    Java 25 runtime and Vector API.
+                    <code>backend-java</code> executes every kernel in Java;
+                    <code>backend-native</code> substitutes only selected measured
+                    bottleneck kernels with Models-owned Rust through FFM.
+                </p>
+
+                <div class="hero-cta reveal">
+                    <a href="docs/" class="btn btn-primary">Read the documentation</a>
+                    <a href="https://github.com/integrallis/models" class="btn btn-secondary">View source</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-divider" id="runtime">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-label">runtime</span>
+                    <h2 class="section-title">One Java pipeline, two measured execution paths</h2>
+                    <p class="section-description">A GGUF file packages the model structure, tokenizer metadata, and trained weights. Models maps those weights, executes the transformer, maintains its attention cache, and generates tokens in process. Backend selection changes only kernels justified by exact artifact and host evidence.</p>
+                </div>
+
+                <p class="install-label reveal"><span class="accent-tick"></span>Add Models and a backend</p>
+                <div class="install reveal">
+                    <div class="install-tabs" role="tablist" aria-label="Build tool">
+                        <button class="install-tab active" data-target="gradle-kts">Gradle (Kotlin)</button>
+                        <button class="install-tab" data-target="gradle-groovy">Gradle (Groovy)</button>
+                        <button class="install-tab" data-target="maven">Maven</button>
+                        <button class="install-tab" data-target="sbt">sbt</button>
+                    </div>
+                    <div class="install-cmd">
+                        <code id="install-text">implementation("com.integrallis:models:0.1.0")
+implementation("com.integrallis:backend-java:0.1.0")</code>
+                        <button class="install-copy" id="install-copy" aria-label="Copy dependencies" title="Copy">
+                            <svg class="clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v12"/></svg>
+                            <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="code-showcase reveal">
+                    <div class="install-tabs" role="tablist" aria-label="Code example">
+                        <button class="install-tab code-tab active" data-code="java">Java backend</button>
+                        <button class="install-tab code-tab" data-code="native">Native acceleration</button>
+                        <button class="install-tab code-tab" data-code="rag">Guarded RAG</button>
+                    </div>
+                    <div class="code-panels">
+                        <div class="code-panel active" data-code="java">
+                            <div class="code-title">// Java 25 and Vector API</div>
+                            <pre><code class="language-java hljs" data-lang="java">try (var backend = PureJavaBackend.load(modelPath)) {
+    var generator = new GenerationLoop(backend);
+    String answer = generator.generate(
+        prompt,
+        SamplingOptions.builder()
+            .temperature(0.0f)
+            .maxTokens(64)
+            .build());
+}</code></pre>
+                        </div>
+                        <div class="code-panel" data-code="native">
+                            <div class="code-title">// Same Java graph, selective Rust kernels through FFM</div>
+                            <pre><code class="language-java hljs" data-lang="java">try (var backend = RustFfmBackend.load(modelPath)) {
+    var generator = new GenerationLoop(backend);
+    String answer = generator.generate(prompt, options);
+
+    backend.diagnostics()
+        .optimizations()
+        .forEach(System.out::println);
+}</code></pre>
+                        </div>
+                        <div class="code-panel" data-code="rag">
+                            <div class="code-title">// Deterministic grounding after retrieval and generation</div>
+                            <pre><code class="language-java hljs" data-lang="java">var policy = GroundedAnswerPolicy.productionDefault();
+GroundedAnswer answer = policy.apply(
+    question,
+    retrievedDocuments,
+    generatedText);
+
+System.out.println(answer.decision());
+System.out.println(answer.text());</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="runtime-table-wrap reveal">
+                    <table class="runtime-table">
+                        <thead>
+                            <tr><th>Backend</th><th>Java 25</th><th>Vector API</th><th>Native code</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>backend-java</code></td><td>Full pipeline</td><td>Numeric kernels</td><td>None</td></tr>
+                            <tr><td><code>backend-native</code></td><td>Full pipeline</td><td>Remaining numeric kernels</td><td>Selected Rust bottlenecks via FFM</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="section section-divider" id="integrations">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-label">integrations</span>
+                    <h2 class="section-title">Application-facing Java APIs</h2>
+                    <p class="section-description">The same backend and diagnostics contracts serve plain Java, LangChain4j, Spring AI, Spring Boot, and guarded RAG.</p>
+                </div>
+                <div class="cards-grid">
+                    <article class="card reveal">
+                        <h3 class="card-title">Qualified GGUF runtime</h3>
+                        <p class="card-description">Llama, Qwen2, and Qwen3 decoder families with F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths.</p>
+                    </article>
+                    <article class="card reveal">
+                        <h3 class="card-title">Framework adapters</h3>
+                        <p class="card-description">Blocking and streaming APIs for plain Java, LangChain4j, Spring AI, and Spring Boot applications.</p>
+                    </article>
+                    <article class="card reveal">
+                        <h3 class="card-title">Guarded RAG</h3>
+                        <p class="card-description">Retrieval abstention, trusted citations, unsupported-claim detection, and deterministic extractive fallback.</p>
+                    </article>
+                    <article class="card reveal">
+                        <h3 class="card-title">Exact qualification</h3>
+                        <p class="card-description">Evidence binds model SHA, quantization, backend, host, correctness, TTFT, decode throughput, and end-to-end latency.</p>
+                    </article>
+                    <article class="card reveal">
+                        <h3 class="card-title">ModelJars metadata</h3>
+                        <p class="card-description">Versioned upstream revisions, checksums, capabilities, domains, runtime requirements, and measured backend recommendations.</p>
+                    </article>
+                    <article class="card reveal">
+                        <h3 class="card-title">Private by construction</h3>
+                        <p class="card-description">Prompts, retrieved context, model weights, and generated text remain inside the application process.</p>
+                    </article>
+                </div>
+                <div class="hero-cta reveal">
+                    <a href="docs/models/current/model-support.html" class="btn btn-primary">Browse qualified models</a>
+                    <a href="docs/models/current/notebooks.html" class="btn btn-secondary">Run the notebooks</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="docs/">Documentation</a>
+                    <a href="https://github.com/integrallis/models">GitHub</a>
+                    <a href="https://central.sonatype.com/namespace/com.integrallis">Maven Central</a>
+                    <a href="https://modeljars.org">ModelJars.org</a>
+                </div>
+                <p class="footer-by">Built by <a href="https://integrallis.com"><img class="ilogo" src="assets/images/integrallis-logo.png" alt="Integrallis"></a></p>
+                <p class="footer-copyright">Copyright 2026 Integrallis Software, LLC</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/highlight.js"></script>
+    <script src="assets/js/landing.js"></script>
+</body>
+</html>

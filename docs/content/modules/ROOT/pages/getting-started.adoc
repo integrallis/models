@@ -1,0 +1,98 @@
+= Getting Started
+:navtitle: Getting Started
+
+Models requires JDK 25 or newer. Add the facade and one execution backend:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models:{models-version}")
+    implementation("com.integrallis:backend-java:{models-version}")
+}
+----
+
+Use `backend-native` for an exact model profile that selects native kernel
+acceleration:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models:{models-version}")
+    implementation("com.integrallis:backend-native:{models-version}")
+}
+----
+
+Both backends execute the same Java 25 and Vector API transformer pipeline.
+The native artifact replaces only selected, measured bottleneck kernels
+through Java FFM.
+
+== Load and Generate
+
+[source,java]
+----
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.GenerationLoop;
+import java.nio.file.Path;
+
+Path modelPath = Path.of(System.getenv("MODELS_MODEL_PATH"));
+
+try (var backend = PureJavaBackend.load(modelPath)) {
+    var generator = new GenerationLoop(backend);
+    var options = SamplingOptions.builder()
+        .temperature(0.0f)
+        .maxTokens(64)
+        .build();
+
+    String answer = generator.generate(
+        "Classify this intent: I want to cancel my order",
+        options);
+    System.out.println(answer);
+}
+----
+
+Run the JVM with the incubating Vector API enabled:
+
+[source,bash]
+----
+java --add-modules jdk.incubator.vector ...
+----
+
+== Stream Tokens
+
+[source,java]
+----
+generator.generate(prompt, options, new TokenStream() {
+    @Override
+    public void onToken(String token) {
+        System.out.print(token);
+    }
+
+    @Override
+    public void onComplete() {
+        System.out.println();
+    }
+
+    @Override
+    public void onError(Throwable failure) {
+        failure.printStackTrace();
+    }
+});
+----
+
+== Inspect the Selected Plan
+
+Backend diagnostics identify the runtime, execution plan, enabled
+optimizations, and reasons why another path was not selected:
+
+[source,java]
+----
+System.out.println(backend.diagnostics().backend());
+backend.diagnostics().optimizations().forEach(System.out::println);
+----
+
+ModelJars descriptors bind an upstream revision, artifact checksum,
+quantization, capabilities, and measured backend recommendation to a versioned
+coordinate. See xref:model-support.adoc[Model Support] for the qualification
+boundary and xref:execution-planning.adoc[Execution Planning] for profile
+selection.

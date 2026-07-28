@@ -1,0 +1,23 @@
+services:
+  jupyter:
+    build:
+      context: .
+      dockerfile: jupyter/Dockerfile
+    image: models-jjava:latest
+    container_name: models-jjava
+    ports:
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - ../..:/home/jovyan/work:cached
+      - models-notebook-gradle-cache:/home/jovyan/.gradle
+    environment:
+      - MODELS_NOTEBOOK_MODE=${MODELS_NOTEBOOK_MODE:-source}
+      - MODELS_VERSION=${MODELS_VERSION:-0.1.0}
+      - MODELS_NOTEBOOK_REPOSITORY=${MODELS_NOTEBOOK_REPOSITORY:-}
+      - MODELS_NOTEBOOK_PREPARE=${MODELS_NOTEBOOK_PREPARE:-true}
+      - JUPYTER_ENABLE_LAB=yes
+    restart: unless-stopped
+    working_dir: /home/jovyan/work/models/notebooks
+
+volumes:
+  models-notebook-gradle-cache:

@@ -1,8 +1,10 @@
 # models-backend-apple
 
-Experimental bridge from Java to Apple's on-device Foundation Models runtime.
+[![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-backend-apple/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
 
-This module is intentionally separate from `models-backend-purejava`. The core
+Java FFM bridge to Apple's on-device Foundation Models runtime.
+
+This module is intentionally separate from `backend-java`. The core
 models runtime remains pure Java; this module uses Java FFM to load a tiny Swift
 dynamic library because Apple's `FoundationModels` API is exposed as an Apple
 platform framework, not as Java bytecode.
