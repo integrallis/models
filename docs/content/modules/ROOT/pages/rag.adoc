@@ -1,0 +1,59 @@
+= Guarded RAG
+:navtitle: Guarded RAG
+
+Small local models need an explicit policy for weak retrieval, unsupported
+claims, and source attribution. `models-rag` applies deterministic guardrails
+after retrieval and generation without coupling the application to a framework.
+
+== Decisions
+
+`GroundedAnswerPolicy` produces one of five outcomes:
+
+* `MODEL_ANSWER` for supported text with trusted citations
+* `MODEL_ANSWER_WITH_DERIVED_CITATIONS` for supported text that omitted citations
+* `MODEL_ABSTENTION` when the model explicitly reports insufficient context
+* `RETRIEVAL_ABSTENTION` when retrieval does not clear the configured gate
+* `EXTRACTIVE_FALLBACK` when generated claims cannot be grounded
+
+The result keeps both the raw model output and the final application answer.
+
+== Apply the Policy
+
+[source,java]
+----
+var evidence = List.of(
+    new GroundingDocument(
+        "policy-17",
+        "Cancellation policy",
+        "Orders can be cancelled without charge before shipment.",
+        4.2f,
+        1));
+
+var policy = GroundedAnswerPolicy.productionDefault();
+GroundedAnswer answer = policy.apply(
+    "When can an order be cancelled?",
+    evidence,
+    "Orders can be cancelled without charge before shipment. [policy-17]");
+
+System.out.println(answer.decision());
+System.out.println(answer.text());
+----
+
+The retrieval score is application-specific. Set an explicit threshold when
+the retriever's score scale differs from the production default:
+
+[source,java]
+----
+var policy = new GroundedAnswerPolicy(0.78f);
+----
+
+== Qualification
+
+The controlled RAG suite gives plain Java, LangChain4j, Spring AI, Ollama,
+llama.cpp, and hosted providers the same corpus, retrieval results, prompt,
+sampling controls, and correctness rules. Results include TTFT, decode
+throughput, end-to-end latency, grounding decisions, and answer correctness.
+
+See the {url-models-github}/blob/main/RAG_BENCHMARKS.md[production RAG
+ledger^] and the
+{url-models-github}/blob/main/models-rag-bench/README.md[benchmark runner^].

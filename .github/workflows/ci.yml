@@ -21,13 +21,6 @@ jobs:
         with:
           path: models
 
-      - name: Checkout vectors
-        uses: actions/checkout@v5
-        with:
-          repository: integrallis/vectors
-          ref: main
-          path: vectors
-
       - name: Checkout ModelJars
         uses: actions/checkout@v5
         with:
@@ -48,8 +41,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: models/docs/package-lock.json
+
       - name: Build + Test
-        run: ./gradlew spotlessCheck build
+        run: ./gradlew spotlessCheck build -x :docs:build
+
+      - name: Build documentation
+        run: ./gradlew :docs:build
 
       - name: Setup uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -80,3 +83,59 @@ jobs:
           name: test-reports
           path: 'models/*/build/reports/tests/'
           retention-days: 30
+
+  notebooks:
+    name: Execute Java notebooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: models
+    steps:
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+
+      - name: Checkout ModelJars
+        uses: actions/checkout@v5
+        with:
+          repository: ModelJars/modeljars
+          ref: main
+          path: model-jars
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Prepare source classpath
+        run: ./gradlew prepareNotebookClasspath -PnotebookMode=source
+
+      - name: Prepare writable notebook output
+        run: install -d -m 0777 build/notebooks/executed
+
+      - name: Build JJava notebook image
+        working-directory: models/notebooks
+        run: ./docker-compose.sh build
+
+      - name: Execute and validate all notebooks
+        working-directory: models/notebooks
+        env:
+          MODELS_NOTEBOOK_PREPARE: "false"
+          MODELS_NOTEBOOK_MODE: source
+        run: >-
+          ./docker-compose.sh run --rm --no-deps jupyter
+          bash /home/jovyan/work/models/notebooks/scripts/test-notebooks.sh
+
+      - name: Upload executed notebooks
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: executed-notebooks
+          path: models/build/notebooks/executed/
+          retention-days: 14

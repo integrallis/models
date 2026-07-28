@@ -1,0 +1,146 @@
+= Building And Testing
+
+== Prerequisites
+
+* JDK 25 or newer
+* the repository Gradle wrapper
+* network access for tests that download pinned model fixtures
+
+== Standard Checks
+
+[source,bash]
+----
+./gradlew build
+./gradlew test
+./gradlew unitTest
+./gradlew integrationTest
+./gradlew spotlessCheck
+./gradlew complianceCheck
+----
+
+Use `spotlessApply` to apply Google Java Format:
+
+[source,bash]
+----
+./gradlew spotlessApply
+----
+
+Publish a local development build with:
+
+[source,bash]
+----
+./gradlew publishToMavenLocal
+----
+
+Run one test class with:
+
+[source,bash]
+----
+./gradlew :backend-java:test \
+  --tests "com.integrallis.models.backend.purejava.gguf.GgufParserTest"
+----
+
+== Strict Real-Model Tests
+
+Integration tests resolve immutable model revisions through ModelJars,
+download missing files, verify file size and SHA-256, and execute the
+real weights. A missing or unloadable required fixture fails the task;
+it is not reported as a successful skipped test.
+
+The integration suite covers:
+
+* GGUF parsing
+* tokenizer behavior
+* finite forward-pass outputs
+* sampling
+* generation
+* deterministic greedy-token references
+* backend diagnostics and selected profile
+
+Run the default real-model suite with:
+
+[source,bash]
+----
+./gradlew integrationTest
+----
+
+== Download Individual Fixtures
+
+Pure Java is the default and carries no suffix. Tasks for a different
+execution path identify it explicitly, for example `Gemma31BQ4KMNative`.
+
+[source,bash]
+----
+./gradlew :models:Qwen306BQ40
+./gradlew :models:SmolLm2360MQ80
+./gradlew :models:TinyLlama11BChatV10Q40
+./gradlew :models:DeepSeekCoder13BQ4KM
+./gradlew :models:DeepSeekCoder67BQ4KM
+./gradlew :models:MiniCpm51BQ4KM
+./gradlew :models:Qwen38BQ4KM
+./gradlew :models:DeepSeekR1DistillQwen7BQ4KM
+./gradlew :models:Qwen25Math15BQ4KMNative
+./gradlew :models:SqlCoder7B2Q5KM
+----
+
+Run `./gradlew :models:tasks --group "model acquisition"` for the
+complete list. Downloaded artifacts are cached under `~/.jvllm/models`.
+
+== Large-Model Tasks
+
+Large fixtures run as dedicated strict tasks so CI workers do not cache
+several 4-5 GB artifacts at once:
+
+[source,bash]
+----
+./gradlew :backend-java:qwen25Coder7BSlowTest
+./gradlew :backend-java:deepSeekCoder67BSlowTest
+./gradlew :backend-java:qwen38BSlowTest
+./gradlew :backend-java:deepSeekR1DistillQwen7BSlowTest
+./gradlew :backend-java:sqlCoder7B2SlowTest
+./gradlew :backend-java:slowTest
+----
+
+== Determinism
+
+Selected Qwen, TinyLlama, DeepSeek, MiniCPM, math, and SQL fixtures
+compare exact greedy token sequences with pinned reference outputs.
+Kernel optimizations must pass these checks before their performance
+results can qualify a model profile.
+
+Native routes are additionally compared with the Java reference behavior
+at their FFM boundary. Performance gains alone are not sufficient.
+
+== Continuous Integration
+
+CI separates:
+
+* unit and static-analysis checks
+* strict default model integration
+* isolated large-model integration
+* deterministic reference tests
+* native kernels on every supported operating system and architecture
+* Apple bridge compilation and stub behavior
+* release dependency and publication verification
+
+The release workflow must resolve released Vectors artifacts rather than
+a sibling source checkout. Published POMs may not contain snapshot or
+composite build dependencies.
+
+== Qualification Benchmarks
+
+Controlled inference and RAG qualification require a recorded host, JVM,
+compiler arguments, model SHA, comparator revision, prompt hash, and raw
+report. The scripts are:
+
+[source,bash]
+----
+scripts/run-controlled-inference-benchmarks.sh
+scripts/run-controlled-rag-qualification.sh
+----
+
+Acceptance policy and reproduction details live in:
+
+* {url-models-github}/blob/main/INFERENCE_BENCHMARKS.md[Controlled inference benchmarks^]
+* {url-models-github}/blob/main/RAG_BENCHMARKS.md[Production RAG benchmarks^]
+* {url-models-github}/blob/main/models-rag-bench/README.md[RAG benchmark application^]

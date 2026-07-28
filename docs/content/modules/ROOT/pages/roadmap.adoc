@@ -1,0 +1,53 @@
+= Roadmap
+
+The roadmap is ordered by release risk and user impact. Completed work
+remains listed only where it explains the next step.
+
+== Production Hardening
+
+* complete Maven Central publication and external clean-room consumption
+tests
+* assemble and verify native resources for every supported platform
+* generate the public model catalog from ModelJars metadata
+* add Micrometer metrics for TTFT, decode throughput, and end-to-end
+latency
+* add JFR events for loading, prefill, decode, allocation, and kernel
+selection
+
+== Pure-Java Performance
+
+* continue prompt-prefill and decode profiling on JDK 25 and later
+releases
+* broaden exact grouped and staged quantized execution where evidence
+supports it
+* evaluate newer Vector API and HotSpot improvements per model profile
+* improve AArch64 SIMD coverage
+* add speculative decoding and reusable prompt-prefix state
+* retire Rust kernels whenever the corresponding Java route clears the
+same gate
+
+== Model Coverage
+
+* add architectures only with strict real-weight and deterministic tests
+* add remaining useful GGUF quantization formats
+* broaden domain-specific RAG workloads
+* validate chat-template behavior rather than inferring it from
+architecture
+* qualify newer JDK recommendations per exact artifact
+
+== Framework And Runtime Features
+
+* structured output with JSON-schema constraints
+* grammar-guided decoding
+* LoRA adapter loading
+* continuous batching for concurrent local requests
+* complete Quarkus and Semantic Kernel integrations
+* evaluate optional GPU kernels where Java lacks a production device API
+
+== Alternative Platforms
+
+* validate the Apple Foundation Models bridge on supported Apple
+Intelligence hardware
+* evaluate ONNX Runtime as an explicitly optional backend
+* retain a narrow backend SPI so alternative execution does not leak
+into the core API

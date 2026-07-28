@@ -1,0 +1,178 @@
+= Execution Planning
+
+When a GGUF file is loaded, `PureJavaBackend` selects the kernels,
+batching strategy, cache behavior, and optional native acceleration that
+fit both the model and the running JVM. Those choices form an immutable
+execution plan used by every request. Applications can inspect the same
+choices through `BackendDiagnostics` before serving traffic.
+
+The planner combines:
+
+* tensors and quantization formats present in every layer
+* structured Vectors runtime capabilities
+* JVM vendor, version, compiler identity, vector width, and processor
+topology
+* exact ModelJars performance profiles when a registry adapter is used
+* explicit deployment overrides
+
+`BackendDiagnostics` records enabled, disabled, and unsupported choices.
+It also retains the exact marker coordinate, model SHA, runtime
+selector, and rejected profile reasons when that metadata is available.
+
+== Profile Matching
+
+Models can execute the same mathematical operation in several correct
+ways. For example, it can process prompt tokens in different batch
+sizes, use a kernel specialized for a quantization format, or replace a
+measured numeric kernel with its Rust/FFM implementation. The fastest
+choice depends on the exact model file, CPU, JDK, and backend. A choice
+that improves one combination can slow down another.
+
+A performance profile is the result of benchmarking one model artifact
+on a known runtime. It records the configuration that improved
+throughput or latency while preserving the model's expected output.
+Profile matching lets Models reuse that result only when the current
+deployment is equivalent to the environment that produced it. When no
+profile matches, Models uses its conservative default plan.
+
+The following fields establish that equivalence:
+
+[arabic]
+. *Artifact SHA-256:* identifies the exact GGUF bytes. Two files with the
+same model name can use different revisions, quantization formats, or
+tensor layouts.
+. *Runtime selector:* identifies the JDK implementation and version, CPU
+architecture, available vector width, and other hardware characteristics
+that affect numeric kernel performance.
+. *Backend and tensor layout:* confirms that the recommendation targets
+the selected Java or Rust/FFM path and the data formats present in the
+model.
+. *Output evidence:* confirms that the optimized plan produced the
+expected deterministic output during qualification.
+. *JVM startup arguments:* confirms that options required by the
+measurement, such as compiler controls, were active before the JVM
+started.
+
+A missing compiler option is reported as requiring a process restart.
+Models does not claim to apply a JVM startup option after the process
+has started. Explicit deployment properties override profile
+recommendations. Malformed explicit values fail at load time instead of
+silently reverting to defaults.
+
+== Deployment Properties
+
+[cols=",",options="header",]
+|===
+|Property |Purpose
+|`models.purejava.groupedProjections` |Share activation preparation
+across compatible grouped projections
+
+|`models.purejava.mixedKProjections` |Enable exact mixed K-quant Q/K/V
+grouping
+
+|`models.purejava.q4Kernel` |Select `widened`, `short-pairwise`, or
+`unsigned-pairwise` Q4 arithmetic
+
+|`models.purejava.prefillBatchSize` |Set the immutable prompt-prefill
+batch size
+
+|`models.purejava.finalLayerPrefillPruning` |Restrict eligible
+final-layer FFN work to requested output rows
+
+|`models.purejava.finalLayerKvOnlyPrefill` |Produce all final-layer K/V
+rows while computing Q/output/FFN only where needed
+
+|`models.purejava.batchedAttentionScores` |Batch exact attention-score
+dot products
+
+|`models.purejava.batchedAttentionValues` |Batch cached value-row
+accumulation
+
+|`models.purejava.stagedQuantizedFfn` |Use a measured staged
+Q4_0/Q8_0 FFN schedule
+
+|`models.purejava.stagedQuantizedLayer` |Retain a wider staged quantized
+layer schedule
+
+|`models.purejava.maxContextLength` |Impose a lower hard sequence-length
+limit
+|===
+
+Automatic selection remains restricted to exact measured profiles.
+Ordinary loads use conservative defaults, including the `widened` Q4
+kernel.
+
+== Grouped Projection Paths
+
+Compatible Q/K/V projections can share one activation load. Eligible
+mixed-K projections additionally share one Q8_K activation
+quantization and one row dispatch. The mixed route remains inactive for
+all other tensor layouts.
+
+Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0,
+Q4_K, Q5_K, and Q6_K. Supporting Q5_0 prevents mixed
+DeepSeek-Coder files from reducing the complete prefill plan to one
+token at a time.
+
+== Batched Attention
+
+Attention-value batching accumulates cached value rows through the
+generic Vectors weighted-row primitive while preserving the existing
+summation order. Diagnostics report this path as
+`batched-attention-values`.
+
+Attention-score batching shares each query-vector load across two
+strided key-cache rows while preserving the active provider's
+independent dot-product result bit for bit. Diagnostics report it as
+`batched-attention-scores`.
+
+Both paths are disabled for ordinary loads. An exact profile or an
+explicit deployment property can enable them.
+
+== Staged Quantized Feed-Forward Execution
+
+Eligible staged FFN layers require:
+
+* batched prefill
+* thread-shareable Q4_0 or Q8_0 gate, up, and down weights
+* parallel GGUF execution
+* the persistent Vectors row executor
+
+The first stage runs gate/up projection, exact SwiGLU, and Q8_0
+preparation. The second stage runs the down projection. Diagnostics
+report `staged-quantized-ffn`.
+
+== Retained Quantized Layer Execution
+
+When attention output, gate, up, and down projections use Q4_0 or
+Q8_0, one seven-stage Vectors publication can span:
+
+[arabic]
+. Q/K/V normalization, RoPE, and cache writes.
+. Exact grouped-query attention.
+. Q8_0 attention preparation.
+. Output projection.
+. Residual addition, FFN normalization, and Q8_0 input preparation.
+. Gate/up projection and exact SwiGLU.
+. Down projection.
+
+Cache storage is reserved before worker publication and each batch row
+owns separate attention-score scratch. Layers with another
+attention-output format can retain the narrower FFN-only schedule.
+Diagnostics report the wider route as `staged-quantized-layer`.
+
+== Final-Layer Prompt Pruning
+
+Ordinary prompt prefill requests logits only for the last prompt token.
+For a validated final layer whose attention and FFN projections are
+uniformly Q4_0 or Q8_0, Models produces every K/V cache row but
+runs Q, attention, output projection, and FFN only for the requested
+output row.
+
+Layouts that qualify only for FFN pruning retain the narrower exact
+path. Speculative verification and observer-backed diagnostics request
+all rows and therefore keep the complete path.
+
+Set `models.purejava.finalLayerKvOnlyPrefill=false` to retain only FFN
+pruning. Set `models.purejava.finalLayerPrefillPruning=false` to disable
+both stages for rollback or controlled A/B measurement.

@@ -78,7 +78,7 @@ Always add the appropriate `@Tag` annotation to new test classes.
 - **Google Java Format** — Enforced via Spotless. Run `./gradlew spotlessApply` before committing.
 - **No Lombok** — This is a low-level library; we use explicit code.
 - **Minimal dependencies** — Library modules should keep runtime dependencies small.
-  `models-backend-purejava` may depend on `vectors-core` for reusable JDK Vector API kernels.
+  `backend-java` may depend on `vectors-core` for reusable JDK Vector API kernels.
 - **Pure Java** — No JNI, no FFM-to-C++ bindings, no native backends (in the pure-java backend).
 
 ## Module Structure
@@ -86,7 +86,7 @@ Always add the appropriate `@Tag` annotation to new test classes.
 ```
 models-api/                  — Backend SPI, ChatModel, Tokenizer, SamplingOptions, TokenStream
 models-runtime/              — Generation lifecycle, templates, sampling, observability
-models-backend-purejava/     — GGUF parser, vectors-backed kernels, KV cache
+backend-java/     — GGUF parser, vectors-backed kernels, KV cache
 models-spring-ai/            — planned adapter scaffold
 models-langchain4j/          — planned adapter scaffold
 models-embedding/            — optional vectors bridge

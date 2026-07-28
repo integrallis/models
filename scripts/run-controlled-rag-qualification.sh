@@ -24,7 +24,7 @@ DROP_CACHES=${RAG_DROP_CACHES:-0}
 LLAMA_PORT=${LLAMA_PORT:-18081}
 LLAMA_SERVER=${LLAMA_SERVER:-llama-server}
 OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://127.0.0.1:11434}
-NATIVE_LIBRARY=${MODELS_NATIVE_LIBRARY:-"$ROOT_DIR/models-backend-native/build/rust-target/release/libjmodels_kernels.so"}
+NATIVE_LIBRARY=${MODELS_NATIVE_LIBRARY:-"$ROOT_DIR/backend-native/build/rust-target/release/libjmodels_kernels.so"}
 
 if [[ $(uname -s) != Linux ]]; then
   echo "controlled qualification currently requires Linux" >&2
@@ -60,12 +60,6 @@ if ! git -C "$ROOT_DIR" diff --quiet || ! git -C "$ROOT_DIR" diff --cached --qui
   echo "models checkout must be clean" >&2
   exit 1
 fi
-if ! git -C "$ROOT_DIR/../vectors" diff --quiet \
-  || ! git -C "$ROOT_DIR/../vectors" diff --cached --quiet; then
-  echo "vectors checkout must be clean" >&2
-  exit 1
-fi
-
 mkdir -p "$OUTPUT_DIR"
 TEMP_DIR=$(mktemp -d)
 LLAMA_PID=""
@@ -121,7 +115,7 @@ assert_no_competing_inference_processes() {
 "$ROOT_DIR/gradlew" \
   --no-daemon \
   -p "$ROOT_DIR" \
-  :models-backend-native:cargoBuildRelease \
+  :backend-native:cargoBuildRelease \
   :models-rag-bench:installDist
 if [[ ! -f "$NATIVE_LIBRARY" ]]; then
   echo "Models native library not found: $NATIVE_LIBRARY" >&2
@@ -133,8 +127,8 @@ MODEL_SHA=$(sha256sum "$MODEL_PATH" | awk '{print $1}')
 SAFE_MODEL_ID=$(printf '%s' "$MODEL_ID" | tr -cs '[:alnum:]._-' '-')
 OLLAMA_MODEL="modeljars-rag-${SAFE_MODEL_ID}:${MODEL_SHA:0:12}"
 MODELS_COMMIT=$(git -C "$ROOT_DIR" rev-parse HEAD)
-VECTORS_COMMIT=$(git -C "$ROOT_DIR/../vectors" rev-parse HEAD)
-MODELS_VERSION="models@$MODELS_COMMIT vectors@$VECTORS_COMMIT"
+VECTORS_VERSION=$(sed -n -E 's/^vectorsVersion[[:space:]]*=[[:space:]]*//p' "$ROOT_DIR/gradle.properties")
+MODELS_VERSION="models@$MODELS_COMMIT com.integrallis:vectors-core@$VECTORS_VERSION"
 
 export JAVA_OPTS="${JAVA_OPTS:-} --enable-native-access=ALL-UNNAMED"
 export JAVA_OPTS="$JAVA_OPTS -XX:ActiveProcessorCount=$THREADS"

@@ -13,143 +13,124 @@
       ╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚══════╝╚══════╝     ╚═╝
 ```
 
-> **Experimental in-JVM small-language-model inference for JDK 25.**
->
-> Pure-Java core backend. Optional platform bridge modules are isolated. JDK 25+.
-> GGUF parsing, vectors-backed F32/Q4_0/Q5_0/Q8_0/Q4_K/Q5_K/Q6_K kernels, tokenization,
-> sampling, and a Llama-family forward path are implemented.
+> In-process small-language-model inference for Java 25.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![JDK 25+](https://img.shields.io/badge/JDK-25%2B-orange.svg)](https://openjdk.org/projects/jdk/25/)
-[![Pure Java](https://img.shields.io/badge/Pure%20Java-no%20JNI-brightgreen.svg)]()
+[![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-2f6fed.svg)](https://integrallis.github.io/models/)
 
----
+Models is an in-process inference library for Java applications. It loads an
+open-weight language model and generates text without Python, a separate model
+server, or a network request.
 
-> **Project status: pre-alpha.** The first publishable scope is
-> `models-api`, `models-runtime`, `models-rag`, `models-semantic-order`, and
-> `models-backend-purejava`, plus the Models-owned `models-backend-native`
-> Rust/FFM accelerator for artifacts that do not clear the production gate in
-> pure Java. Apple, ONNX, embedding, test, and benchmark modules remain
-> experimental or scaffolded and are not part of release `0.1.x`.
-> Real-model integration tests download and run the configured Qwen,
-> Qwen-Coder, SQLCoder, SmolLM2, TinyLlama, DeepSeek-Coder, and MiniCPM GGUF
-> fixtures before passing.
+Models currently reads GGUF, a local-model file format that packages model
+structure, tokenizer metadata, and trained numeric weights. Those weights are
+often quantized to reduce disk and memory requirements. Efficient inference
+must then map the weights, tokenize input, execute the transformer layers,
+maintain the attention KV cache, and sample and stream output tokens. Models
+implements that complete pipeline on Java 25 and uses the Vector API for CPU
+SIMD execution:
 
-The [controlled inference study](INFERENCE_BENCHMARKS.md) compares the same GGUF
-bytes through pure Java, llama.cpp, and Ollama and records the current
-performance gap and optimization results.
+- `backend-java` executes every inference kernel in Java.
+- `backend-native` runs the same Java 25 and Vector API pipeline, substituting
+  only selected, measured bottleneck kernels with a small Models-owned Rust
+  library through Java's Foreign Function and Memory (FFM) API.
 
-The [production RAG qualification ledger](RAG_BENCHMARKS.md) is the
-frequently updated, report-backed availability table. It distinguishes models
-that merely load from artifacts that clear the workload, quality, latency, and
-same-host Ollama gates:
+The native backend is not a wrapper around llama.cpp or Ollama. Those runtimes
+are controlled performance comparators only. The project intends to replace
+each Rust kernel with pure Java when a released JDK can provide equivalent
+correctness and performance. See [Runtime architecture](https://integrallis.github.io/models/docs/models/current/architecture.html)
+for the exact boundary and migration policy.
 
-| Qualified artifact | Best Models path | Scope | p95 TTFT | Decode | p95 end to end | Ollama decode |
-| --- | --- | --- | ---: | ---: | ---: | ---: |
-| SmolLM2 360M Q8_0 | Rust/FFM | General guarded RAG | 552.8 ms | 43.92 tok/s | 1,935.0 ms | 100.4% |
-| Qwen3 0.6B Q4_0 | Pure Java | Coding guarded RAG | 555.2 ms | 51.02 tok/s | 1,416.1 ms | 99.7% |
-| Qwen3 1.7B Q8_0 | Rust/FFM | General guarded RAG | 1,747.6 ms | 17.99 tok/s | 4,785.1 ms | 100.1% |
-| Qwen2.5-Coder 0.5B Q8_0 | Rust/FFM | Coding guarded RAG | 434.6 ms | 53.01 tok/s | 980.4 ms | 132.8% |
-| Qwen2.5-Coder 0.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 390.3 ms | 39.50 tok/s | 1,941.2 ms | 80.7% |
-| Qwen2.5-Coder 1.5B Q4_0 | Rust/FFM + profiled Java Q4 | Coding guarded RAG | 1,162.1 ms | 23.72 tok/s | 2,545.6 ms | 80.2% |
-| Qwen2.5-Coder 1.5B Q8_0 | Rust/FFM | Coding guarded RAG | 1,288.0 ms | 19.70 tok/s | 3,003.5 ms | 89.9% |
-| EuroLLM 1.7B Q4_K_M | Rust/FFM | Multilingual guarded RAG | 1,514.3 ms | 31.86 tok/s | 2,548.4 ms | 109.8% |
-| Qwen2.5 0.5B Q4_K_M | Rust/FFM | General guarded RAG | 519.7 ms | 67.53 tok/s | 933.6 ms | 146.6% |
-| Qwen2.5 1.5B Q4_K_M | Rust/FFM | General guarded RAG | 1,874.1 ms | 31.25 tok/s | 2,771.0 ms | 108.7% |
-| UmarTransit 1B Q4_K_M | Rust/FFM | Transportation guarded RAG | 1,402.7 ms | 30.93 tok/s | 2,172.4 ms | 115.2% |
-| MiniCPM5 1B Q4_K_M | Rust/FFM | Coding guarded RAG | 1,042.4 ms | 49.01 tok/s | 2,152.1 ms | 131.2% |
-| Llama 3.2 1B Q4_K_M | Rust/FFM | General guarded RAG | 1,312.6 ms | 38.73 tok/s | 1,962.3 ms | 111.4% |
-| Llama 3.2 3B Q4_K_M | Rust/FFM | General guarded RAG | 1,621.7 ms | 15.70 tok/s | 3,789.3 ms | 89.3% |
-| Gemma 3 1B Q4_K_M | Rust/FFM | General guarded RAG | 954.3 ms | 41.06 tok/s | 1,619.7 ms | 137.3% |
-| Indian-Legal-Qwen2.5 3B Q4_K_M | Rust/FFM | Legal guarded RAG | 1,251.2 ms | 15.58 tok/s | 3,487.1 ms | 84.3% |
-| DeepSeek-R1-Distill-Qwen 1.5B Q4_K_M | Rust/FFM | General guarded RAG | 1,048.9 ms | 29.04 tok/s | 2,820.3 ms | 99.0% |
-| Qwen2.5-Math 1.5B Q4_K_M | Rust/FFM | Math guarded RAG | 754.8 ms | 26.99 tok/s | 2,079.1 ms | 101.2% |
-| DeepSeek-Coder 1.3B Q4_K_M | Rust/FFM | Coding guarded RAG | 1,010.2 ms | 29.95 tok/s | 2,972.0 ms | 91.6% |
-| SmolLM3 3B Q4_K_M | Rust/FFM | General guarded RAG | 1,727.9 ms | 15.93 tok/s | 5,318.9 ms | 91.4% |
-| TinyLlama 1.1B Chat Q4_0 | Rust/FFM | General guarded RAG | 1,346.7 ms | 34.26 tok/s | 3,188.5 ms | 108.9% |
+<p align="center">
+  <img src="media/diagrams/models-0001.png" alt="Models runtime architecture" width="1100">
+</p>
 
-This is currently **21 exact qualified artifacts representing 19 distinct model
-identities**, against the required 25 launch-qualified identities. Quantization
-variants do not increase the identity count. Each row is SHA-bound to its model
-bytes, benchmark report, runtime selector, and backend plan. llama.cpp and
-Ollama appear only as controlled comparators; they are not Models runtime
-dependencies.
+## Capabilities
 
-## The pitch in 60 seconds
+Implemented functionality includes:
 
-Most Java AI applications use remote inference services or a separate native
-runtime. This project explores a narrower option: small GGUF models loaded and
-executed inside a JDK 25 process.
+- GGUF v2/v3 parsing with memory-mapped tensor access
+- Llama, Qwen2, and Qwen3 decoder architectures
+- F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
+- byte-level BPE and Llama SentencePiece tokenizers
+- grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
+- greedy, temperature, top-k, top-p, and repetition-penalty sampling
+- plain Java, LangChain4j, Spring AI, and Spring Boot integrations
+- framework-neutral guarded RAG
+- compact WordTour semantic-order models
 
-The current implementation is a research-grade local runtime:
+## Supported Models
 
-- **No native inference runtime in the pure-Java backend**: no Python, ONNX Runtime,
-  or llama.cpp for `models-backend-purejava`.
-- **Models-owned native acceleration**: `models-backend-native` keeps GGUF loading,
-  tokenization, KV state, sampling, and the transformer graph in Java while selected
-  measured kernels run in a small Rust library through the final Java 25 FFM API.
-- **GGUF-oriented**: parse GGUF v2/v3 and run the tensor types currently
-  supported by the pure-Java backend.
-- **Framework integration is emerging**: a LangChain4j `ChatModel` and Spring
-  Boot ModelJars auto-configuration are implemented; broader Spring AI support
-  remains experimental.
-- **Vectors-backed kernels**: mapped F32 and quantized GEMV use `vectors-core`,
-  with Panama Vector API SIMD when available and a scalar fallback.
-- **Compact semantic orders**: WordTour models provide in-process lexical
-  neighbors and sparse blurred bag-of-words without tensor inference or a
-  vectors dependency.
+Committed same-host evidence covers 27 exact artifacts across the 25 model
+identities below. Support is bound to an artifact SHA, workload, runtime
+selector, backend plan, correctness result, and latency measurements; consult
+the qualification ledger for those exact details.
 
+| Model identity | Domain |
+|---|---|
+| SmolLM2 360M | General |
+| SmolLM2 1.7B | General |
+| SmolLM3 3B | General |
+| Qwen3 1.7B | General |
+| Qwen2.5 0.5B | General |
+| Qwen2.5 1.5B | General |
+| Llama 3.2 1B | General |
+| Llama 3.2 3B | General |
+| Gemma 3 1B | General |
+| H2O Danube2 1.8B | General |
+| DeepSeek-R1-Distill-Qwen 1.5B | General |
+| TinyLlama 1.1B Chat | General |
+| Qwen3 0.6B | Coding |
+| Qwen2.5-Coder 0.5B | Coding |
+| Qwen2.5-Coder 1.5B | Coding |
+| DeepSeek-Coder 1.3B | Coding |
+| MiniCPM5 1B | Coding |
+| Yi-Coder 1.5B | Coding |
+| Qwen2.5-Math 1.5B | Math |
+| EuroLLM 1.7B | Multilingual |
+| UmarTransit 1B | Transportation |
+| Indian-Legal-Qwen2.5 3B | Legal |
+| Nexus Legal | Legal |
+| Nexus Finance | Finance |
+| Nexus Medical | Healthcare |
+
+- [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
+- [Production RAG results](RAG_BENCHMARKS.md)
+- [Controlled inference results](INFERENCE_BENCHMARKS.md)
+
+## Install
+
+Models requires Java 25 or newer. Add the facade and one backend:
+
+```kotlin
+dependencies {
+    implementation("com.integrallis:models:0.1.0")
+    implementation("com.integrallis:backend-java:0.1.0")
+}
 ```
-application
-    │
-    ▼
-models-runtime ──► models-api ──► models-backend-purejava
-                                      │
-                                      └── GGUF / F32 / Q4_0 / Q5_0 / Q8_0 / Q4_K / Q5_K / Q6_K
+
+Use the native accelerator for artifacts whose measured profile selects it:
+
+```kotlin
+dependencies {
+    implementation("com.integrallis:models:0.1.0")
+    implementation("com.integrallis:backend-native:0.1.0")
+}
 ```
 
-## Why it exists
+Model marker artifacts, checksums, variants, and measured runtime profiles are
+provided by [ModelJars.org](https://modeljars.org). Registry integration is
+kept in a separate adapter so the core Models artifacts remain usable without a
+catalog dependency.
 
-### The gap in the Java AI ecosystem
-
-|  | Remote API | Separate local runtime | **models 0.1.x** |
-|--|--|--|--|
-| Language | Java client → HTTP → remote | Python/C++ | **Pure Java** |
-| Process boundary | Network | IPC or local HTTP | **In-process** |
-| Runtime dependency | API key + service | Native executable/runtime | **JDK 25** |
-| Framework adapters | Commonly available | Runtime-specific | **Not implemented** |
-| Model format | Service-defined | Runtime-specific | **Limited GGUF support** |
-
-### Target use cases
-
-The research hypothesis is that routine, narrow tasks can sometimes be served
-locally by small models. Initial CPU latency evidence is available in the
-[controlled inference study](INFERENCE_BENCHMARKS.md); model quality remains a
-separate, unproven requirement for the use cases below.
-
-| Use case | Model size | Why local? |
-|---|---|---|
-| Agent heartbeats / keep-alive | 0.6–1B | no network dependency |
-| Intent classification / routing | 0.6–1.7B | deterministic, no per-call cost |
-| Tool dispatch / function calling | 1–4B | low latency in agent loops |
-| Structured extraction (JSON) | 1–4B | privacy-sensitive data stays local |
-| Embeddings for RAG | 0.5–1B | avoid embedding API costs at scale |
-| Code completion in IDEs | 1–4B | offline-capable, responsive |
-| Lexical expansion / lightweight classification | <1 MB semantic order | instant startup and bounded memory |
-
-## Quick start
-
-### Load and generate
+## Quick Start
 
 ```java
-var requirement = ModelJarRequirement.forSource("hf://ggml-org/Qwen3-0.6B-GGUF")
-    .versionRange("[3.0.0,4.0.0)")
-    .variant("q4_0")
-    .backend("pure-java")
-    .build();
-var registry = ModelJarRegistry.fromClasspath();
-new ModelJarInstaller(registry).install(requirement);
-try (var backend = PureJavaBackend.load(requirement)) {
+Path model = Path.of(System.getenv("MODELS_MODEL_PATH"));
+
+try (var backend = PureJavaBackend.load(model)) {
     var loop = new GenerationLoop(backend);
     String result = loop.generate(
         "Classify this intent: 'I want to cancel my order'",
@@ -161,462 +142,81 @@ try (var backend = PureJavaBackend.load(requirement)) {
 }
 ```
 
-### Streaming generation
+Streaming uses the same generation path:
 
 ```java
 loop.generate("Once upon a time", options, new TokenStream() {
-    @Override public void onToken(String token) { System.out.print(token); }
-    @Override public void onComplete() { System.out.println(); }
-    @Override public void onError(Throwable t) { t.printStackTrace(); }
+    @Override
+    public void onToken(String token) {
+        System.out.print(token);
+    }
+
+    @Override
+    public void onComplete() {
+        System.out.println();
+    }
+
+    @Override
+    public void onError(Throwable error) {
+        error.printStackTrace();
+    }
 });
 ```
 
-### Load a semantic-order model
-
-The canonical WordTour marker bundles its 318,552-byte payload, so it needs no
-separate model download:
+Backend diagnostics expose the exact plan selected for the loaded model:
 
 ```java
-var requirement = ModelJarRequirement.forSource("github://joisino/wordtour")
-    .versionRange("[1.0.0,2.0.0)")
-    .variant("optimal")
-    .backend("semantic-order")
-    .build();
-
-WordTour tour = WordTour.load(requirement);
-var neighbors = tour.neighbors("concept", 5);
-var document = BlurredBagOfWords.encode(
-    tour,
-    List.of("semantic", "search", "concept"));
+backend.diagnostics().optimizations().forEach(System.out::println);
 ```
 
-WordTour lookup is exact and case-sensitive. Local proximity is meaningful;
-large rank distance must not be interpreted as evidence that two terms are
-unrelated.
+Profile matching, explicit overrides, and every execution-plan switch are
+documented in [Execution planning](https://integrallis.github.io/models/docs/models/current/execution-planning.html).
 
-### Framework adapters
+## Integrations
 
-`models-langchain4j` provides `ModelsChatModel`, and `models-spring-ai` provides
-blocking and streaming `ModelsSpringAiChatModel` adapters. The Spring Boot
-starter resolves ModelJars descriptors and performance profiles and is the
-foundation for Spring AI auto-configuration. `ModelsChatModel.diagnostics()`
-returns the same backend plan used by plain Java generation; framework adapters
-do not select a separate kernel path.
-
-`models-rag` provides a framework-neutral grounding policy for small local
-models. It rejects retrieval below a configured score, accepts generated text
-only when all citations name retrieved sources, and otherwise returns the
-retrieved evidence with trusted citations. Its result records whether the
-final answer came from the model, retrieval abstention, or extractive fallback,
-and retains the raw model text for audit.
-
-`models-rag-bench` is a controlled, executable RAG application with plain Java,
-LangChain4j, and Spring AI entry points plus revision-matched Python/Ollama and
-Python/llama.cpp baselines. It enforces the same corpus, retrieval result,
-prompt hash, sampling controls, and deterministic quality checks across the
-implementations. See [models-rag-bench/README.md](models-rag-bench/README.md).
-The controlled production findings and acceptance criteria are recorded in
-[RAG_BENCHMARKS.md](RAG_BENCHMARKS.md).
-
-### Execution planning
-
-`PureJavaBackend` builds one immutable execution plan when the GGUF is loaded.
-The planner combines the tensors actually present in every layer, the structured
-Vectors runtime capabilities, JVM/compiler identity, and explicit deployment
-overrides. Grouped projections, batched prefill, and final-layer prompt pruning stages
-are consumed from this plan instead of being re-decided in the forward loop.
-
-```java
-try (PureJavaBackend backend = PureJavaBackend.load(model)) {
-    BackendDiagnostics diagnostics = backend.diagnostics();
-    diagnostics.optimizations().forEach(System.out::println);
-}
-```
-
-Diagnostics identify enabled, disabled, and unsupported choices, including the
-resolved tensor grouping, mixed Q4_K/Q5_K/Q6_K projection eligibility, Q4_0
-arithmetic kernel, prefill batch size, final-layer output-row policy, mapped
-weights, Vector FMA policy, final-layer K/V-only policy, and persistent row
-executor, including the staged Q4_0/Q8_0 layer schedule when selected.
-When the backend is loaded from a `ModelJarDescriptor`, diagnostics also retain
-the exact marker coordinate and SHA and assess every measured performance
-profile against the current JVM, processor topology, vector width, and startup
-arguments. Model-scoped recommendations are applied only when the artifact SHA,
-complete runtime selector, deterministic-output evidence, and required launch
-arguments all match. A missing compiler flag is reported as requiring a process
-restart; Models never pretends to apply JVM startup options after model loading.
-`models.purejava.groupedProjections`, `models.purejava.mixedKProjections`,
-`models.purejava.q4Kernel`, `models.purejava.prefillBatchSize`,
-`models.purejava.finalLayerPrefillPruning`,
-`models.purejava.finalLayerKvOnlyPrefill`,
-`models.purejava.batchedAttentionScores`,
-`models.purejava.batchedAttentionValues`,
-`models.purejava.stagedQuantizedFfn`, and
-`models.purejava.stagedQuantizedLayer` are parsed once per load. Malformed
-explicit values fail rather than silently reverting to defaults, and explicit
-deployment values override ModelJars recommendations. The Q4 kernel accepts
-`widened`, `short-pairwise`, or `unsigned-pairwise`; ordinary loads use
-`widened`. Optimized kernels require the corresponding Vectors runtime capability, while automatic
-selection remains scoped to an exact measured ModelJars profile. Eligible
-mixed-K Q/K/V projections share one Q8_K activation quantization and one row
-dispatch. The mixed path remains inactive for every other tensor layout.
-Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; the
-Q5_0 route allows mixed DeepSeek-Coder files to retain batching instead of
-degrading the complete prefill plan to one token at a time.
-
-Batched attention-value accumulation is disabled for ordinary loads. An exact
-ModelJar performance profile can enable it for a measured artifact and runtime,
-or a deployment can select it explicitly with
-`-Dmodels.purejava.batchedAttentionValues=true`. The route accumulates cached
-value rows through the generic Vectors weighted-row primitive, preserves the
-existing summation order, and is reported as `batched-attention-values` in
-backend diagnostics.
-
-Exact attention-score batching is also disabled for ordinary loads and selected
-only by a matching profile or
-`-Dmodels.purejava.batchedAttentionScores=true`. It shares each query-vector
-load across two strided key-cache rows through Vectors while preserving the
-active provider's independent dot-product result bit for bit. Diagnostics
-report the route as `batched-attention-scores`.
-
-Staged quantized feed-forward execution is disabled for ordinary loads and selected
-only by a matching profile or
-`-Dmodels.purejava.stagedQuantizedFfn=true`. Eligible layers require batched prefill,
-thread-shareable Q4_0 or Q8_0 gate, up, and down weights, parallel GGUF execution, and the
-persistent Vectors row executor. The first stage runs gate/up projection, exact
-SwiGLU, and Q8_0 preparation before the down-projection stage; diagnostics
-report it as `staged-quantized-ffn`. Ineligible runtimes keep the established path.
-
-Retained quantized layer execution is independently disabled for ordinary loads and
-selected only by a matching profile or
-`-Dmodels.purejava.stagedQuantizedLayer=true`. When the attention output, gate, up, and
-down projections use Q4_0 or Q8_0, one seven-stage Vectors publication spans Q/K/V
-normalization, RoPE, and cache writes; exact grouped-query attention; Q8_0
-attention preparation; output projection; residual addition, FFN normalization,
-and Q8_0 input preparation; gate/up projection plus exact SwiGLU; and down
-projection. Cache storage is reserved before worker publication and each batch
-row owns separate attention-score scratch. The FFN-only schedule remains
-available for layers whose attention output uses another format. Diagnostics
-report the wider route as `staged-quantized-layer`.
-
-Ordinary prefill requests logits only for the final prompt token. For validated
-final layers whose attention and FFN projections are uniformly Q4_0 or uniformly
-Q8_0, the default plan produces every K/V cache row but runs Q, attention, output
-projection, and FFN only for the requested output row. Layouts that qualify only
-for FFN pruning keep the narrower exact path. Other tensor layouts remain on the
-full-row path until they pass their own controlled gate. Speculative verification
-and observer-backed diagnostics request all rows and retain the complete path. Set
-`-Dmodels.purejava.finalLayerKvOnlyPrefill=false` to retain only FFN pruning, or
-`-Dmodels.purejava.finalLayerPrefillPruning=false` to disable both stages for
-rollback or controlled A/B measurement.
-
-## Supported models
-
-The tested real-model fixtures are **Qwen3 0.6B Q4_0, 1.7B Q8_0, and 8B
-Q4_K_M GGUF**, **Qwen2.5-Coder 0.5B/1.5B Q4_0/Q8_0 plus 3B Q4_0 GGUF**,
-**SmolLM2 360M Q8_0 GGUF**, **SmolLM3 3B Q4_K_M GGUF**,
-**TinyLlama 1.1B Chat v1.0 Q4_0 GGUF**,
-**DeepSeek-Coder 1.3B Instruct Q4_K_M GGUF**, **MiniCPM5 1B Q4_K_M GGUF**,
-and **Qwen2.5-Math 1.5B Instruct Q4_K_M GGUF**, resolved through ModelJars
-marker JARs. The DeepSeek fixture validates a mixed Q4_K/Q5_0/Q8_0/Q6_K tensor
-file and legacy linear RoPE scaling. MiniCPM5 validates explicit Q/K/V head
-widths, 131K context metadata, and its Llama-style byte BPE. Qwen2.5-Math
-validates Q6_K token embeddings and a deterministic arithmetic completion. The
-0.5B Qwen2.5, 0.6B/8B Qwen3, TinyLlama, DeepSeek, MiniCPM5, and Qwen2.5-Math
-fixtures have exact greedy-token reference checks against pinned `llama.cpp`
-behavior. The backend accepts Llama/Qwen2/Qwen3 metadata prefixes. Projection
-kernels support F32, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K; embedding rows also
-support F16 across the same applicable quantized formats. Other architectures,
-chat templates, long-context quality, and remaining K-quant formats are not yet
-claimed.
-The larger **Qwen2.5-Coder 7B Q4_0 GGUF**, **DeepSeek-Coder 6.7B Q4_K_M
-GGUF**, **Qwen3 8B Q4_K_M GGUF**, and **DeepSeek-R1-Distill-Qwen-7B Q4_K_M
-GGUF**, and **SQLCoder-7B-2 Q5_K_M GGUF** fixtures are covered by dedicated
-strict slow-test tasks instead of the default integration suite. The DeepSeek R1
-fixture also validates configured BOS handling for byte-level BPE tokenizers.
-
-Resolve, download, and checksum the pinned fixtures through ModelJars:
-```bash
-./gradlew :models-backend-purejava:downloadQwen306BQ40Model
-./gradlew :models-backend-purejava:downloadSmolLm2360MQ80Model
-./gradlew :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
-./gradlew :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
-./gradlew :models-backend-purejava:downloadDeepSeekCoder67BQ4KMModel
-./gradlew :models-backend-purejava:downloadMiniCpm51BQ4KMModel
-./gradlew :models-backend-purejava:downloadQwen38BQ4KMModel
-./gradlew :models-backend-purejava:downloadDeepSeekR1DistillQwen7BQ4KMModel
-./gradlew :models-backend-purejava:downloadQwen25Math15BQ4KMModel
-./gradlew :models-backend-purejava:downloadSqlCoder7B2Q5KMModel
-```
-
-## What's inside
-
-### Semantic orders (`models-semantic-order`)
-
-- UTF-8 newline-delimited cyclic WordTour loading
-- Compact binary-search rank index without a permanent term-to-rank hash map
-- Deduplicated cyclic neighbor enumeration and shortest cycle distance
-- Sparse Gaussian blurred bag-of-words with L1 normalization and distance
-- Verified loading of compact payloads bundled in ModelJars
-- No dependency on `vectors` or the Java Vector API
-
-### GGUF parser (`models-backend-purejava`)
-
-Zero-copy model loading via `MemorySegment` mmap. Parses headers, metadata, tensor info, and provides direct slices into quantized weight data without materializing full float arrays.
-
-- GGUF v2/v3 format support
-- All metadata value types (strings, arrays, typed scalars)
-- Tensor data accessed via zero-copy `MemorySegment` slices
-- Alignment-aware parsing (32-byte default alignment)
-
-### GGUF tokenizers (`models-backend-purejava`)
-
-GPT-2-style byte-level BPE and Llama SentencePiece tokenizers loaded directly
-from GGUF metadata:
-
-- `bytes_to_unicode` mapping for byte-level BPE vocabularies
-- BPE merge-based encoding with priority queue
-- SentencePiece score-priority merges, dummy-space prefix, BOS/EOS flags, and byte fallback
-- Synthetic byte-level, Unicode, ranked-merge, and fallback regression tests
-- Unicode, multibyte, and code-point aware
-
-### Quantized inference kernels (`models-backend-purejava`)
-
-- **Dequantization**: Q4_0, Q4_K, Q5_0, Q8_0, Q6_K, and F16 storage paths
-- **Quantized matmul**: operates directly on quantized `MemorySegment` data — no full dequantization needed
-- **RMSNorm**: fused normalize + scale
-- **Rotary Position Embeddings (RoPE)**: normal and NeoX layouts, configurable theta, modern and legacy linear scaling
-- **SwiGLU activation**: fused gate × silu × up projection
-- **Softmax**: numerically stable (max-subtract)
-
-### Transformer forward path (`models-backend-purejava`)
-
-Implemented Llama-family decoder path:
-
-```
-token → embed → (RMSNorm → QKV → RoPE → GQA Attention → Residual
-                 → RMSNorm → SwiGLU FFN → Residual) × N layers
-       → Final RMSNorm → Output Logits
-```
-
-- Grouped-Query Attention (GQA) with configurable head counts
-- Per-layer KV cache for autoregressive decoding
-- Single-row embedding dequantization (avoids materializing full vocab×dim)
-- Architecture-aware: supports `llama`, `qwen2`, `qwen3` metadata prefixes
-
-### Sampling (`models-runtime`)
-
-- Greedy (argmax at temperature=0)
-- Temperature scaling
-- Top-K filtering
-- Top-P (nucleus) filtering
-- Repetition penalty
-- Seeded RNG for reproducible generation
-
-### Generation loop (`models-runtime`)
-
-- Prompt prefill (processes all prompt tokens through KV cache)
-- Autoregressive decode until EOS or maxTokens
-- Push-based streaming via `TokenStream` interface
-- Blocking string-return API for simple usage
-
-## Modules
-
-| Module | Status | Description |
+| Integration | Module | Surface |
 |---|---|---|
-| [models-api](models-api/) | experimental | Backend SPI, `Tokenizer`, `SamplingOptions`, `TokenStream`, `ModelMetadata` |
-| [models-runtime](models-runtime/) | experimental | `GenerationLoop` and `Sampler` |
-| [models-semantic-order](models-semantic-order/) | experimental | Pure-Java WordTour lookup and sparse blurred bag-of-words |
-| [models-backend-purejava](models-backend-purejava/) | experimental | GGUF parser, vectors-backed kernels, BPE tokenizer, KV cache, Llama forward pass |
-| [models-backend-apple](models-backend-apple/) | experimental | Optional Apple Foundation Models bridge via Java FFM and a tiny Swift C ABI dylib |
-| [models-backend-onnx](models-backend-onnx/) | planned | ONNX Runtime backend |
-| [models-backend-native](models-backend-native/) | experimental | Models-owned Rust inference kernels via Java 25 FFM |
-| [models-spring-ai](models-spring-ai/) | scaffold | Spring AI adapter placeholder |
-| [models-langchain4j](models-langchain4j/) | experimental | LangChain4j `ChatModel` adapter |
-| [models-quarkus](models-quarkus/) | planned | Quarkus extension |
-| [models-semantic-kernel](models-semantic-kernel/) | planned | Semantic Kernel `ChatCompletionService` adapter |
-| [models-spring-boot-starter](models-spring-boot-starter/) | experimental | ModelJars registry and descriptor auto-configuration |
-| [models-embedding](models-embedding/) | experimental | Optional bridge to vectors for embedding storage/search |
-| [models-test](models-test/) | scaffold | Planned test-support integration |
-| [models-bench](models-bench/) | planned | JMH benchmarks |
+| Plain Java | `models-runtime` | `GenerationLoop` and `TokenStream` |
+| LangChain4j | `models-langchain4j` | `ModelsChatModel` |
+| Spring AI | `models-spring-ai` | blocking and streaming chat models |
+| Spring Boot | `models-spring-boot-starter` | ModelJars-backed auto-configuration |
+| Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
+| Vector storage | `models-embedding` | optional bridge to `vectors` |
 
-## Dependency graph
+These adapters are implemented and tested against the same backend contracts;
+they do not select hidden inference paths. See
+[Framework integrations](https://integrallis.github.io/models/docs/models/current/framework-integrations.html).
 
-```
-models-api                          <- foundation, no internal deps
-models-runtime                      <- api
-models-semantic-order               <- ModelJars core; no vectors dependency
-models-backend-purejava             <- api + vectors-core
-models-backend-apple                <- api + optional Apple Foundation Models dylib
-models-backend-onnx                 <- scaffold, no dependencies
-models-backend-native               <- api + pure-Java graph + Models Rust kernels
-models-spring-ai                    <- scaffold, no dependencies
-models-langchain4j                  <- api + runtime + LangChain4j
-models-quarkus                      <- scaffold, no dependencies
-models-semantic-kernel              <- scaffold, no dependencies
-models-spring-boot-starter          <- ModelJars core + Spring Boot
-models-embedding                    <- api + vectors-db + vectors-cache-semantic-db
-models-test                         <- scaffold, no dependencies
-models-bench                        <- scaffold, no dependencies
-```
+## Documentation
 
-## Relationship to vectors
+The [documentation site](https://integrallis.github.io/models/) covers
+architecture, model qualification, execution planning, integrations, guarded
+RAG, Javadocs, and release testing.
 
-**models** is a sister project to
-[vectors](https://github.com/integrallis/vectors). Low-level SIMD and
-MemorySegment-friendly numeric kernels live in `vectors`; model loading,
-tokenization, transformer semantics, KV cache, and generation stay in `models`.
+- [Executable Java notebooks](notebooks/README.md)
+- [Apple Foundation Models bridge](models-backend-apple/README.md)
+- [Native kernel backend](backend-native/README.md)
 
-| Layer | Project | What it does |
-|---|---|---|
-| **Inference** | models | Run SLMs locally (tokenize → forward → sample → generate) |
-| **SIMD kernels** | vectors-core | JDK Vector API primitives reused by the pure-Java backend |
-| **Embedding & Search** | vectors | Store, index, and search vectors |
-| **Bridge** | models-embedding | Optional embedding storage/search integration; not published in 0.1.x |
-
-`models-backend-purejava` depends on `vectors-core` for dense GEMV kernels.
-`models-semantic-order` performs rank lookup and sparse scalar operations and
-does not require vectors. The runtime and public API modules remain independent.
-
-## Requirements
-
-- **JDK 25+** (Foreign Function and Memory API)
-- **Gradle 9.4+**
-
-## Building
+## Build
 
 ```bash
-./gradlew build                  # compile all modules; release modules enforce SpotBugs + JaCoCo
-./gradlew test                   # unit tests (excludes slow/benchmark/integration)
-./gradlew unitTest               # @Tag("unit") only
-./gradlew integrationTest        # downloads, verifies, and runs real-model fixtures
-./gradlew spotlessApply          # Google Java Format 1.35.0
-./gradlew publishToMavenLocal    # install to local repo
-
-# Run a single test class
-./gradlew :models-backend-purejava:test --tests "com.integrallis.models.backend.purejava.gguf.GgufParserTest"
+./gradlew build
+./gradlew test
+./gradlew integrationTest
+./gradlew spotlessApply
 ```
 
-### Integration tests
+Real-model tests resolve immutable ModelJars revisions, download missing GGUF
+files, verify size and SHA-256, and fail if a required model cannot run. The
+complete test matrix and individual large-model tasks are in
+[Building and testing](https://integrallis.github.io/models/docs/models/current/testing.html).
 
-Integration tests resolve immutable model revisions from the ModelJars catalog,
-download missing files, verify size and SHA-256, and then execute the real weights:
+## Scope
 
-```bash
-./gradlew :models-backend-purejava:integrationTest
-```
-
-The suite exercises GGUF parsing, tokenization, finite forward-pass outputs,
-sampling, and generation. Qwen2.5-Coder 0.5B Q4_0, Qwen3 0.6B Q4_0, TinyLlama
-1.1B Q4_0, DeepSeek-Coder 1.3B Q4_K_M, MiniCPM5 1B Q4_K_M, and Qwen2.5-Math
-1.5B Q4_K_M must also match exact greedy token sequences captured from
-`llama.cpp` b9960.
-
-The Qwen3 0.6B/1.7B, Qwen2.5-Coder 0.5B/1.5B/3B, Qwen2.5-Math 1.5B, SmolLM2
-360M, TinyLlama 1.1B, DeepSeek-Coder 1.3B, and MiniCPM5 1B integration tests are
-strict: the Gradle `integrationTest` task downloads the model fixtures before
-the tests run, and the tests fail if any real model cannot be loaded. CI runs
-this path in `.github/workflows/model-integration.yml` with the downloaded GGUF
-cached under `~/.jvllm/models`. SmolLM3 3B uses the same no-skip contract in its
-dedicated `smolLm33BSlowTest` task.
-Qwen2.5-Coder 7B Q4_0, DeepSeek-Coder 6.7B Q4_K_M, Qwen3 8B Q4_K_M,
-DeepSeek-R1-Distill-Qwen-7B Q4_K_M, and SQLCoder-7B-2 Q5_K_M are strict
-large-model fixtures. Each has a dedicated test task that resolves, downloads,
-checksums, and runs only its model. The DeepSeek, Qwen3, and SQLCoder tests also
-match four-token greedy `llama.cpp` b9960 references. CI runs the five tasks as
-isolated matrix jobs in `.github/workflows/model-large-integration.yml` so no
-runner must cache multiple 4-5 GB files.
-
-The KV cache starts with 16 positions and grows geometrically, so loading a
-long-context model no longer allocates its full advertised cache. The optional
-`models.purejava.maxContextLength` property sets a hard runtime sequence limit
-without changing the model metadata reported to callers.
-
-```bash
-./gradlew :models-backend-purejava:integrationTest \
-  --tests com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.DeepSeekCoderModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.MiniCpm5ModelJarsIntegrationTest \
-  --tests com.integrallis.models.backend.purejava.Qwen25MathModelJarsIntegrationTest
-
-./gradlew :models-backend-purejava:qwen25Coder7BSlowTest
-./gradlew :models-backend-purejava:deepSeekCoder67BSlowTest
-./gradlew :models-backend-purejava:qwen38BSlowTest
-./gradlew :models-backend-purejava:deepSeekR1DistillQwen7BSlowTest
-./gradlew :models-backend-purejava:sqlCoder7B2SlowTest
-./gradlew :models-backend-purejava:slowTest # aggregate large-model suite
-```
-
-## When to use models (and when not to)
-
-| Use case | Recommendation |
-|---|---|
-| Evaluation and development against the tested Qwen3 Q4_0 fixture | Experimental fit |
-| Qualified SHA, workload, host profile, and backend | Pre-release production candidate; use the qualification ledger |
-| Unqualified artifact or different deployment profile | Benchmark and qualify before production use |
-| RAG bridge to vectors | Experimental; `models-embedding` provides the optional vectors bridge |
-| Production chat with 70B+ models, multi-turn | Use a hosted LLM API |
-| High-throughput batch inference (>100 req/s) | Use vLLM / TGI with GPU |
-| Training or fine-tuning models | Use Python ecosystem |
-| Multi-modal inference (images, audio) | Not yet supported |
-
-## Roadmap
-
-### Phase 1 — Core inference pipeline (implemented, validation limited)
-
-- GGUF binary format parser (v2/v3, zero-copy mmap)
-- GPT-2 byte-level BPE and Llama SentencePiece tokenizers
-- Dequantization kernels (Q4_0, Q8_0, F16)
-- Tensor operations (RMSNorm, matmul, quantized matmul, softmax, RoPE, SwiGLU)
-- KV cache for autoregressive decoding
-- Llama-family forward pass (supports Qwen2/Qwen3/Llama architectures)
-- Sampling strategies (greedy, temperature, top-k, top-p, repetition penalty)
-- Generation loop with streaming
-- Strict integration tests against real Qwen, Qwen-Coder, Qwen-Math, SQLCoder,
-  SmolLM2, TinyLlama, DeepSeek-Coder, MiniCPM5, and DeepSeek R1 fixtures
-
-### Phase 2 — Framework adapters & production hardening
-
-- Spring AI `ChatModel` adapter
-- LangChain4j `ChatLanguageModel` adapter
-- Chat template processing (Jinja2-style)
-- Additional ModelJars catalog entries and repository providers
-- Micrometer metrics (tok/s, latency histograms)
-- JFR events for profiling
-- Remaining quantized formats and AArch64-native SIMD kernels
-
-### Phase 3 — Performance & scale
-
-- Broader SIMD coverage and kernel benchmarking
-- Models-owned Rust FFM kernels for formats below the measured pure-Java release floor
-- Batched prefill (parallel token processing)
-- Speculative decoding
-- Continuous batching for concurrent requests
-- JMH benchmarks and tok/s tracking
-
-### Phase 4 — Alternative backends
-
-- ONNX Runtime backend (DirectML, CUDA, CoreML)
-- Models-owned GPU kernel shims where a pure-Java device API cannot meet the release floor
-- Quarkus extension with native-image support
-- Semantic Kernel adapter
-
-### Phase 5 — Advanced features
-
-- models-embedding bridge to vectors (generate + store + search)
-- Spring Boot starter with auto-configuration
-- Structured output (JSON schema-constrained generation)
-- Grammar-guided decoding
-- LoRA adapter loading
-
-## Further reading
-
-- [`research.md`](../research.md) — consolidated research from independent investigations
-- [`auggie-research.md`](../auggie-research.md) — model landscape and agentic AI positioning
-- [`codex-research.md`](../codex-research.md) — JVM precedents and technical approach
+Models is intended for local and private inference with small, qualified model
+artifacts. It is not a training framework, a high-throughput GPU serving system,
+or a claim that every GGUF architecture works. Use the qualification ledger for
+the exact model, quantization, runtime, workload, and hardware evidence.
 
 ## License
 

@@ -1,2 +1,5 @@
-// models-test — VCR record/replay, model output assertions
-// Placeholder: no implementation or dependencies yet
+// models-test - deterministic fixtures for downstream integration tests and notebooks
+
+dependencies {
+    testImplementation(project(":backend-java"))
+}

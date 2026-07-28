@@ -12,8 +12,8 @@ on:
       - "gradlew"
       - "models-api/**"
       - "models-runtime/**"
-      - "models-backend-purejava/**"
-      - "models-backend-native/**"
+      - "backend-java/**"
+      - "backend-native/**"
       - "rust-toolchain.toml"
   pull_request:
     branches: [main]
@@ -26,8 +26,8 @@ on:
       - "gradlew"
       - "models-api/**"
       - "models-runtime/**"
-      - "models-backend-purejava/**"
-      - "models-backend-native/**"
+      - "backend-java/**"
+      - "backend-native/**"
       - "rust-toolchain.toml"
   workflow_dispatch:
 
@@ -51,13 +51,6 @@ jobs:
           repository: ModelJars/modeljars
           ref: main
           path: model-jars
-
-      - name: Checkout vectors
-        uses: actions/checkout@v5
-        with:
-          repository: integrallis/vectors
-          ref: main
-          path: vectors
 
       - uses: actions/setup-java@v5
         with:
@@ -95,19 +88,19 @@ jobs:
         working-directory: models
         run: >
           ./gradlew
-          :models-backend-purejava:downloadQwen306BQ40Model
-          :models-backend-purejava:downloadQwen317BQ80Model
-          :models-backend-purejava:downloadQwen25Coder05BQ40Model
-          :models-backend-purejava:downloadQwen25Coder05BQ80Model
-          :models-backend-purejava:downloadQwen25Coder15BQ40Model
-          :models-backend-purejava:downloadQwen25Coder15BQ80Model
-          :models-backend-purejava:downloadQwen25Coder3BQ40Model
-          :models-backend-purejava:downloadSmolLm2360MQ80Model
-          :models-backend-purejava:downloadTinyLlama11BChatV10Q40Model
-          :models-backend-purejava:downloadDeepSeekCoder13BQ4KMModel
-          :models-backend-purejava:downloadMiniCpm51BQ4KMModel
-          :models-backend-purejava:downloadQwen25Math15BQ4KMModel
-          :models-backend-purejava:downloadEuroLlm17BQ4KMModel
+          :backend-java:downloadQwen306BQ40Model
+          :backend-java:downloadQwen317BQ80Model
+          :backend-java:downloadQwen25Coder05BQ40Model
+          :backend-java:downloadQwen25Coder05BQ80Model
+          :backend-java:downloadQwen25Coder15BQ40Model
+          :backend-java:downloadQwen25Coder15BQ80Model
+          :backend-java:downloadQwen25Coder3BQ40Model
+          :backend-java:downloadSmolLm2360MQ80Model
+          :backend-java:downloadTinyLlama11BChatV10Q40Model
+          :backend-java:downloadDeepSeekCoder13BQ4KMModel
+          :backend-java:downloadMiniCpm51BQ4KMModel
+          :backend-java:downloadQwen25Math15BQ4KMModel
+          :backend-java:downloadEuroLlm17BQ4KMModel
           --no-daemon
           --stacktrace
 
@@ -115,7 +108,7 @@ jobs:
         working-directory: models
         run: >
           ./gradlew
-          :models-backend-purejava:integrationTest
+          :backend-java:integrationTest
           --tests com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
           --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest
@@ -131,7 +124,7 @@ jobs:
         working-directory: models
         run: >
           ./gradlew
-          :models-backend-native:integrationTest
+          :backend-native:integrationTest
           --tests com.integrallis.models.backend.nativekernel.RustFfmBackendIntegrationTest
           --no-daemon
           --stacktrace
@@ -142,6 +135,6 @@ jobs:
         with:
           name: purejava-model-integration-test-reports
           path: |
-            models/models-backend-purejava/build/reports/tests/
-            models/models-backend-native/build/reports/tests/
+            models/backend-java/build/reports/tests/
+            models/backend-native/build/reports/tests/
           retention-days: 30

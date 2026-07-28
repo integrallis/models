@@ -66,12 +66,6 @@ if ! git -C "$ROOT_DIR" diff --quiet || ! git -C "$ROOT_DIR" diff --cached --qui
   echo "models checkout must be clean" >&2
   exit 1
 fi
-if ! git -C "$ROOT_DIR/../vectors" diff --quiet \
-  || ! git -C "$ROOT_DIR/../vectors" diff --cached --quiet; then
-  echo "vectors checkout must be clean" >&2
-  exit 1
-fi
-
 mkdir -p "$OUTPUT_DIR"
 TEMP_DIR=$(mktemp -d)
 LLAMA_PID=""
@@ -127,8 +121,8 @@ MODEL_SHA=$(sha256sum "$MODEL_PATH" | awk '{print $1}')
 SAFE_MODEL_ID=$(printf '%s' "$MODEL_ID" | tr -cs '[:alnum:]._-' '-')
 OLLAMA_MODEL="modeljars-bench-${SAFE_MODEL_ID}:${MODEL_SHA:0:12}"
 MODELS_COMMIT=$(git -C "$ROOT_DIR" rev-parse HEAD)
-VECTORS_COMMIT=$(git -C "$ROOT_DIR/../vectors" rev-parse HEAD)
-MODELS_VERSION="models@$MODELS_COMMIT vectors@$VECTORS_COMMIT"
+VECTORS_VERSION=$(sed -n -E 's/^vectorsVersion[[:space:]]*=[[:space:]]*//p' "$ROOT_DIR/gradle.properties")
+MODELS_VERSION="models@$MODELS_COMMIT com.integrallis:vectors-core@$VECTORS_VERSION"
 
 BENCHMARK_JVM_OPTIONS="-XX:ActiveProcessorCount=$THREADS"
 if [[ "$MODELS_BACKEND" == rust-ffm ]]; then

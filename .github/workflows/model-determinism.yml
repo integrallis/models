@@ -7,10 +7,6 @@ on:
         description: "ModelJars ref to test against"
         required: false
         default: "main"
-      vectors-ref:
-        description: "vectors ref to test against"
-        required: false
-        default: "main"
   schedule:
     - cron: "37 5 * * 1"
 
@@ -35,13 +31,6 @@ jobs:
           ref: ${{ github.event.inputs['modeljars-ref'] || 'main' }}
           path: model-jars
 
-      - name: Checkout vectors
-        uses: actions/checkout@v5
-        with:
-          repository: integrallis/vectors
-          ref: ${{ github.event.inputs['vectors-ref'] || 'main' }}
-          path: vectors
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -60,7 +49,7 @@ jobs:
         working-directory: models
         run: >
           ./gradlew
-          :models-backend-purejava:downloadHuatuoGptO17BQ4KMModel
+          :backend-java:downloadHuatuoGptO17BQ4KMModel
           --no-daemon
           --stacktrace
 

@@ -11,11 +11,12 @@ All notable changes to models are documented here.
 
 ### Changed
 
-- Limited the first release to the three implemented modules.
-- Removed the accidental sibling vectors dependency so the repository builds
-  and publishes independently.
-- Reframed release documentation as a pre-alpha scalar GGUF runtime with
-  framework modules explicitly identified as scaffolding.
+- Defined an explicit Maven Central publication allowlist for implemented
+  runtime, backend, RAG, embedding, and framework modules.
+- Replaced the sibling Vectors composite build with the released Vectors
+  dependency so the repository builds and publishes independently.
+- Split detailed architecture, module, integration, testing, and support
+  material out of the project README.
 
 ### Fixed
 

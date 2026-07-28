@@ -1,0 +1,280 @@
+= Framework Integrations
+
+All framework adapters delegate to the same Models backend contracts.
+They do not proxy a local HTTP server or choose a separate inference
+implementation. Backend diagnostics remain available so applications can
+inspect the selected plan.
+
+== Plain Java
+
+Add the facade and an execution backend:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models:{models-version}")
+    implementation("com.integrallis:backend-java:{models-version}")
+}
+----
+
+`RuntimeTextGenerationModel` provides the high-level contract shared by
+the framework adapters:
+
+[source,java]
+----
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import java.nio.file.Path;
+
+var options = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(64)
+    .build();
+
+try (var backend =
+        PureJavaBackend.load(Path.of(System.getenv("MODELS_MODEL_PATH")))) {
+    TextGenerationModel model = new RuntimeTextGenerationModel(backend);
+    String answer = model.generate("Summarize the retrieved context.", options);
+
+    System.out.println(answer);
+    System.out.println(model.diagnostics().optimizations());
+}
+----
+
+== LangChain4j
+
+`models-langchain4j` provides `ModelsChatModel`. It adapts LangChain4j
+chat requests to a Models backend and exposes the backend diagnostics
+used for the request.
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models-langchain4j:{models-version}")
+    implementation("com.integrallis:backend-java:{models-version}")
+}
+----
+
+[source,java]
+----
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.langchain4j.ModelsChatModel;
+import java.nio.file.Path;
+
+var options = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(128)
+    .build();
+
+try (var backend =
+        PureJavaBackend.load(Path.of(System.getenv("MODELS_MODEL_PATH")))) {
+    var model = new ModelsChatModel(backend, options);
+    String answer = model.chat("Answer using only the supplied context.");
+
+    System.out.println(answer);
+    System.out.println(model.diagnostics().backend());
+}
+----
+
+== Spring AI
+
+`models-spring-ai` provides blocking and streaming chat model adapters.
+Both paths use the same tokenizer, generation loop, sampler, and
+selected backend as plain Java.
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models-spring-ai:{models-version}")
+    implementation("com.integrallis:backend-java:{models-version}")
+}
+----
+
+[source,java]
+----
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
+import java.nio.file.Path;
+import org.springframework.ai.chat.prompt.Prompt;
+
+var options = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(128)
+    .build();
+
+try (var backend =
+        PureJavaBackend.load(Path.of(System.getenv("MODELS_MODEL_PATH")))) {
+    var model = new ModelsSpringAiChatModel(backend, options);
+
+    String answer = model.call("Answer using only the supplied context.");
+    System.out.println(answer);
+
+    model.stream(new Prompt("List the cited facts."))
+        .map(response -> response.getResult().getOutput().getText())
+        .doOnNext(System.out::print)
+        .blockLast();
+}
+----
+
+== Spring Boot
+
+`models-spring-boot-starter` provides auto-configuration for
+ModelJars registry access and descriptor selection.
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models-spring-boot-starter:{models-version}")
+    implementation("com.integrallis:models-spring-ai:{models-version}")
+    implementation("com.integrallis:backend-java:{models-version}")
+}
+----
+
+Select the ModelJar in `application.yaml`:
+
+[source,yaml]
+----
+models:
+  modeljars:
+    source: "hf://ggml-org/Qwen3-0.6B-GGUF"
+    version-range: "[3.0.0,4.0.0)"
+    variant: "q4_0"
+    backend: "pure-java"
+    capability: "text-generation"
+----
+
+The selected descriptor can be injected into ordinary Spring beans:
+
+[source,java]
+----
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
+import org.modeljars.ModelJarDescriptor;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+class LocalModelConfiguration {
+    @Bean(destroyMethod = "close")
+    PureJavaBackend backend(ModelJarDescriptor descriptor) {
+        return PureJavaBackend.load(descriptor.localPath().orElseThrow());
+    }
+
+    @Bean
+    ChatModel chatModel(PureJavaBackend backend) {
+        var options = SamplingOptions.builder()
+            .temperature(0.0f)
+            .maxTokens(128)
+            .build();
+        return new ModelsSpringAiChatModel(backend, options);
+    }
+}
+----
+
+== Guarded RAG
+
+`models-rag` is a framework-neutral grounding policy for small local
+models. Apply it to text returned by plain Java, LangChain4j, or Spring
+AI:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models-rag:{models-version}")
+}
+----
+
+[source,java]
+----
+import com.integrallis.models.rag.GroundedAnswer;
+import com.integrallis.models.rag.GroundedAnswerPolicy;
+import com.integrallis.models.rag.GroundingDocument;
+import java.util.List;
+
+var evidence = List.of(
+    new GroundingDocument(
+        "policy-17",
+        "Cancellation policy",
+        "Orders can be cancelled without charge before shipment.",
+        4.2f,
+        1));
+String generatedText =
+    "Orders can be cancelled without charge before shipment. [policy-17]";
+
+GroundedAnswer answer = GroundedAnswerPolicy.productionDefault().apply(
+    "When can an order be cancelled?",
+    evidence,
+    generatedText);
+
+System.out.println(answer.decision());
+System.out.println(answer.text());
+----
+
+The result records the chosen outcome and retains raw generated text for
+audit. See xref:rag.adoc[Guarded RAG] for retrieval gates, citation
+validation, and extractive fallback.
+
+`models-rag-bench` exercises the policy through:
+
+* plain Java
+* LangChain4j
+* Spring AI
+* revision-matched Ollama
+* revision-matched llama.cpp
+* configured hosted APIs
+
+Every client receives the same corpus, retrieval result, prompt hash,
+sampling controls, and deterministic correctness checks. See the
+{url-models-github}/blob/main/models-rag-bench/README.md[benchmark
+application^] and {url-models-github}/blob/main/RAG_BENCHMARKS.md[production
+RAG results^].
+
+== Embedding Storage
+
+`models-embedding` is the optional bridge to Vectors. It uses released
+`vectors-db` and `vectors-cache-semantic-db` modules for storage,
+search, and semantic caching without adding those dependencies to the
+core generation API.
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models-embedding:{models-version}")
+}
+----
+
+An `EmbeddingBackend` and `VectorCollection` must use the same vector
+dimension. Batch documents, commit once, and embed the query with the
+same backend:
+
+[source,java]
+----
+import com.integrallis.models.embedding.EmbeddingBackend;
+import com.integrallis.models.embedding.VectorCollectionEmbeddingSink;
+import com.integrallis.vectors.db.SearchRequest;
+import com.integrallis.vectors.db.VectorCollection;
+import java.util.List;
+
+static void indexAndSearch(
+        EmbeddingBackend embeddings,
+        VectorCollection documents) {
+    var sink = new VectorCollectionEmbeddingSink(embeddings, documents);
+    sink.putAll(
+        List.of("policy-17", "shipping-4"),
+        List.of(
+            "Orders can be cancelled before shipment.",
+            "Standard shipping takes three business days."));
+    documents.commit();
+
+    float[] query = embeddings.embed("When can I cancel an order?");
+    var results = documents.search(
+        SearchRequest.builder(query, 5).build());
+    results.hits().forEach(hit -> System.out.println(hit.id()));
+}
+----

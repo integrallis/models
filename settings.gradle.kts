@@ -1,16 +1,11 @@
-rootProject.name = "models"
-
-// Composite build: the sibling java-vectors repo is consumed in-place so the embedding bridge
-// (models-embedding) can depend on vectors-db / vectors-cache-semantic-db without requiring those
-// artifacts to be published. Gradle resolves the requested coordinates to the local source build.
-includeBuild("../vectors") {
-    dependencySubstitution {
-        substitute(module("com.integrallis:vectors-core")).using(project(":vectors-core"))
-        substitute(module("com.integrallis:vectors-db")).using(project(":vectors-db"))
-        substitute(module("com.integrallis:vectors-cache-semantic-db"))
-            .using(project(":vectors-cache-semantic-db"))
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
     }
 }
+
+rootProject.name = "models"
 
 // ModelJars is a sibling OSS marker-JAR project. Consuming it through a composite
 // build keeps local development independent of publication to modeljars.org.
@@ -25,13 +20,15 @@ includeBuild("../model-jars") {
 // --- Core ---
 include("models-api")
 include("models-runtime")
+include("models")
 include("models-rag")
 include("models-semantic-order")
+include("models-modeljars")
 
 // --- Backends ---
-include("models-backend-purejava")
+include("backend-java")
 include("models-backend-onnx")
-include("models-backend-native")
+include("backend-native")
 include("models-backend-apple")
 
 // --- Framework adapters ---
@@ -48,6 +45,7 @@ include("models-embedding")
 include("models-test")
 include("models-bench")
 include("models-rag-bench")
+include("docs")
 
 // Enable build cache
 buildCache {

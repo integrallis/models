@@ -1,5 +1,7 @@
 # Production RAG benchmark
 
+[![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-rag-bench/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
+
 `models-rag-bench` provides versioned controlled RAG workloads through three
 Java application paths:
 

@@ -1,0 +1,121 @@
+plugins {
+    id 'base'
+    id 'com.github.node-gradle.node' version '7.0.2'
+}
+
+tasks.matching { it.name.startsWith('publish') }.configureEach {
+    enabled = false
+}
+
+description = 'Models Documentation Site'
+
+ext {
+    nodeVersion = '20.17.0'
+    npmVersion = '10.9.2'
+    antoraVersion = '3.1.12'
+}
+
+node {
+    version = nodeVersion
+    npmVersion = project.ext.npmVersion
+    download = true
+    nodeProjectDir = layout.projectDirectory.asFile
+}
+
+task installAntora(type: NpmTask) {
+    args = ['ci']
+    inputs.files('package.json', 'package-lock.json')
+    outputs.dir('node_modules')
+}
+
+task copyJavadocs(type: Sync) {
+    description = 'Copy Javadoc outputs to Antora attachments'
+    group = 'documentation'
+
+    dependsOn ':aggregateJavadoc', ':generateModuleJavadocs'
+    from rootProject.layout.buildDirectory.dir('docs/javadoc')
+    into layout.projectDirectory.dir('content/modules/ROOT/attachments/javadoc')
+}
+
+task verifyJavadocAttachments {
+    description = 'Verify that only published module Javadocs are included in the site'
+    group = 'verification'
+    dependsOn copyJavadocs
+
+    def expectedModules = rootProject.ext.publishedJavadocModuleNames.toSet()
+    inputs.property('expectedModules', expectedModules.sort())
+    inputs.dir(layout.projectDirectory.dir('content/modules/ROOT/attachments/javadoc/modules'))
+
+    doLast {
+        def modulesDirectory =
+            layout.projectDirectory.dir('content/modules/ROOT/attachments/javadoc/modules').asFile
+        def actualModules = modulesDirectory.listFiles()
+            .findAll { it.directory }
+            .collect { it.name }
+            .toSet()
+        if (actualModules != expectedModules) {
+            throw new GradleException(
+                "Javadoc module set differs from published artifacts. " +
+                    "Expected ${expectedModules.sort()}, found ${actualModules.sort()}"
+            )
+        }
+    }
+}
+
+task cleanGeneratedSite(type: Delete) {
+    description = 'Remove stale Antora output before generating the site'
+    group = 'documentation'
+    delete layout.buildDirectory.dir('site')
+}
+
+task generateSite(type: NodeTask) {
+    dependsOn installAntora, verifyJavadocAttachments, cleanGeneratedSite
+    script = file('node_modules/@antora/cli/bin/antora')
+    args = [
+        '--fetch',
+        '--stacktrace',
+        '--log-format=pretty',
+        'antora-playbook.yml',
+        '--to-dir=build/site'
+    ]
+    outputs.dir(layout.buildDirectory.dir('site'))
+}
+
+task verifyGeneratedSite {
+    description = 'Verify the generated site contains the current Javadoc attachments'
+    group = 'verification'
+    dependsOn generateSite
+
+    def sourceJavadocs =
+        layout.projectDirectory.dir('content/modules/ROOT/attachments/javadoc').asFile
+    def generatedJavadocs =
+        layout.buildDirectory.dir('site/models/current/_attachments/javadoc').get().asFile
+    inputs.dir(sourceJavadocs)
+
+    doLast {
+        def sourceFiles = fileTree(sourceJavadocs).files
+            .findAll { it.name.contains('.') }
+            .collect { sourceJavadocs.toPath().relativize(it.toPath()).toString() }
+            .toSet()
+        def generatedFiles = fileTree(generatedJavadocs).files
+            .collect { generatedJavadocs.toPath().relativize(it.toPath()).toString() }
+            .toSet()
+        if (generatedFiles != sourceFiles) {
+            def stale = generatedFiles - sourceFiles
+            def missing = sourceFiles - generatedFiles
+            throw new GradleException(
+                "Generated Javadocs differ from their source attachments. " +
+                    "Stale files: ${stale.take(10)}, missing files: ${missing.take(10)}"
+            )
+        }
+    }
+}
+
+build.dependsOn verifyGeneratedSite
+assemble.dependsOn generateSite
+
+clean {
+    delete 'node_modules'
+    delete layout.buildDirectory
+    delete layout.projectDirectory.dir('content/modules/ROOT/attachments/javadoc')
+}

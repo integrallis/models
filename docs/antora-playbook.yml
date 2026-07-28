@@ -1,0 +1,49 @@
+site:
+  title: Models Documentation
+  start_page: models::index.adoc
+  keys:
+    repo_url: https://github.com/integrallis/models
+
+content:
+  sources:
+    - url: ..
+      branches: HEAD
+      start_path: docs/content
+
+runtime:
+  fetch: true
+  cache_dir: ./.cache/antora
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+  supplemental_files:
+    - path: partials/header-content.hbs
+      contents: ./supplemental-ui/partials/header-content.hbs
+    - path: partials/head-meta.hbs
+      contents: ./supplemental-ui/partials/head-meta.hbs
+    - path: css/models-theme.css
+      contents: ./supplemental-ui/css/models-theme.css
+    - path: js/models-theme.js
+      contents: ./supplemental-ui/js/models-theme.js
+    - path: img/integrallis-logo.png
+      contents: ./supplemental-ui/img/integrallis-logo.png
+    - path: img/models-logo.png
+      contents: ./supplemental-ui/img/models-logo.png
+    - path: img/favicon.ico
+      contents: ./supplemental-ui/img/favicon.ico
+    - path: img/favicon-32x32.png
+      contents: ./supplemental-ui/img/favicon-32x32.png
+
+asciidoc:
+  attributes:
+    experimental: ''
+    idprefix: ''
+    idseparator: '-'
+    page-pagination: ''
+    toc: ~
+    xrefstyle: short
+    source-language: java
+    javadoc-base-url: '_attachments/javadoc'
+    javadoc-aggregate-url: '{javadoc-base-url}/aggregate'

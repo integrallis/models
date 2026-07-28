@@ -1,0 +1,119 @@
+= Modules And Dependencies
+
+== Implemented Modules
+
+[cols=",",options="header",]
+|===
+|Module |Purpose
+|`models` |Application-facing facade for the API and generation runtime
+
+|`models-api` |Backend SPI, tokenizer, sampling, streaming, metadata,
+diagnostics, and backend configuration
+
+|`models-runtime` |Generation loop and sampling implementation
+
+|`models-rag` |Framework-neutral guarded RAG policy
+
+|`models-semantic-order` |Pure-Java WordTour lookup and blurred
+bag-of-words
+
+|`backend-java` |GGUF parser, tokenizers, model graph, KV cache,
+and Java kernels
+
+|`backend-native` |Java 25 and Vector API backend with selective Rust
+kernel acceleration through FFM
+
+|`models-backend-apple` |Apple Foundation Models bridge through Java FFM
+and a small Swift C ABI
+
+|`models-langchain4j` |LangChain4j `ChatModel` adapter
+
+|`models-spring-ai` |Blocking and streaming Spring AI chat adapters
+
+|`models-spring-boot-starter` |ModelJars-backed Spring Boot
+auto-configuration
+
+|`models-embedding` |Optional bridge to Vectors storage and semantic
+caching
+
+|`models-modeljars` |ModelJars descriptor and measured-profile adapter
+
+|`models-bench` |Local model and kernel benchmarks
+
+|`models-rag-bench` |Controlled plain Java, LangChain4j, Spring AI,
+Ollama, llama.cpp, and hosted RAG comparisons
+|===
+
+The Spring and LangChain4j adapters are implemented and tested. They use
+the same backend and diagnostics contracts as plain Java.
+
+== Planned Or Scaffolded Modules
+
+[cols=",",options="header",]
+|===
+|Module |Intended purpose
+|`models-backend-onnx` |Optional ONNX Runtime backend
+|`models-quarkus` |Quarkus integration
+|`models-semantic-kernel` |Semantic Kernel chat adapter
+|`models-test` |Reusable downstream integration-test support
+|===
+
+Scaffolded modules are not part of the initial Maven Central
+publication.
+
+== Dependency Direction
+
+[source,text]
+----
+models-api
+  <- models-runtime
+      <- models
+  <- backend-java <- vectors-core
+  <- backend-native   <- Models Rust kernels through FFM
+  <- models-langchain4j      <- LangChain4j
+  <- models-spring-ai        <- Spring AI
+  <- models-embedding        <- Vectors database modules
+
+models-semantic-order
+
+models-modeljars
+  <- ModelJars registry
+  <- Models backends
+----
+
+Registry-specific code is isolated in `models-modeljars`. Published core
+backends accept a registry-neutral backend configuration so their Maven
+POMs do not require a ModelJars catalog artifact.
+
+== Release Surface
+
+The release build publishes only implemented modules whose dependency
+graphs can be resolved from the target repository. Benchmark
+applications, internal test fixtures, and placeholders are not library
+publications.
+
+Application dependencies use:
+
+* `com.integrallis:models`
+* `com.integrallis:backend-java`
+* `com.integrallis:backend-native`
+
+Native platform resources are assembled by CI for:
+
+* Linux x86-64
+* Linux AArch64
+* macOS x86-64
+* macOS AArch64
+* Windows x86-64
+* Windows AArch64
+
+The runtime selects a bundled library by operating system and
+architecture and verifies its resource checksum before loading it.
+
+== Requirements
+
+* JDK 25 or newer
+* Gradle 9.4 or newer for source builds
+
+Java 25 is the minimum runtime. Measured model profiles may recommend a
+newer JDK when it provides a verified performance improvement.

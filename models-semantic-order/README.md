@@ -1,23 +1,25 @@
 # models-semantic-order
 
+[![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-semantic-order/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
+
 Pure-Java runtime for compact one-dimensional semantic-order models. The first
 supported format is `wordtour-v1`: one unique UTF-8 term per line, arranged as a
 cycle.
 
 ## ModelJars use
 
-Add `models-semantic-order` and the WordTour marker JAR to the application
-classpath, then resolve it by source and semantic version:
+Add `models-modeljars` and the WordTour marker JAR to the application classpath,
+then resolve it by source and semantic version:
 
 ```java
-var requirement = ModelJarRequirement.forSource("github://joisino/wordtour")
-    .versionRange("[1.0.0,2.0.0)")
+var modelJar = ModelJar.of("github://joisino/wordtour")
+    .version("[1.0.0,2.0.0)")
     .variant("optimal")
     .backend("semantic-order")
-    .capability("semantic-neighbors")
-    .build();
+    .capability("semantic-neighbors");
 
-WordTour tour = WordTour.load(requirement);
+var descriptor = ModelJarRegistry.fromClasspath().resolve(modelJar).orElseThrow();
+WordTour tour = ModelJarBackends.loadWordTour(descriptor);
 tour.neighbors("cat", 5);
 ```
 
@@ -51,4 +53,5 @@ while distant ranks are not guaranteed to be unrelated. It is appropriate for
 local neighbor enumeration, lexical expansion, and blurred bag-of-words. It is
 not a drop-in dense embedding, and it does not implement `EmbeddingBackend`.
 
-This module has no dependency on `projects/vectors` or the Java Vector API.
+The semantic-order runtime itself has no dependency on ModelJars, Vectors, or
+the Java Vector API. Registry integration is isolated in `models-modeljars`.

@@ -26,6 +26,7 @@ import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.nativekernel.RustFfmBackend;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.modeljars.ModelJarBackends;
 import com.integrallis.models.runtime.GenerationLoop;
 import com.integrallis.models.runtime.PromptCacheMetrics;
 import java.nio.file.Path;
@@ -67,7 +68,8 @@ public final class InProcessGenerationClient implements GenerationClient {
   public static InProcessGenerationClient loadPureJava(
       ModelJarDescriptor descriptor, int contextLength, RagSamplingProfile sampling) {
     Objects.requireNonNull(descriptor, "descriptor");
-    return load("pure-java", contextLength, sampling, () -> PureJavaBackend.load(descriptor));
+    return load(
+        "pure-java", contextLength, sampling, () -> ModelJarBackends.loadPureJava(descriptor));
   }
 
   public static InProcessGenerationClient loadRustFfm(
@@ -79,7 +81,8 @@ public final class InProcessGenerationClient implements GenerationClient {
   public static InProcessGenerationClient loadRustFfm(
       ModelJarDescriptor descriptor, int contextLength, RagSamplingProfile sampling) {
     Objects.requireNonNull(descriptor, "descriptor");
-    return load("rust-ffm", contextLength, sampling, () -> RustFfmBackend.load(descriptor));
+    return load(
+        "rust-ffm", contextLength, sampling, () -> ModelJarBackends.loadRustFfm(descriptor));
   }
 
   private static InProcessGenerationClient load(
