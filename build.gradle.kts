@@ -782,6 +782,15 @@ tasks.register("verifyGithubWorkflows") {
                 "Release workflow must use the Vectors release action baseline: $action"
             }
         }
+        val windowsArmCacheOptOut =
+            "cache-disabled: \${{ matrix.platform == 'windows-aarch64' }}"
+        require(windowsArmCacheOptOut in releaseWorkflow) {
+            "Release workflow must disable Gradle cache persistence on Windows ARM"
+        }
+        val nativeKernelsWorkflow = workflowDir.resolve("native-kernels.yml").readText()
+        require(windowsArmCacheOptOut in nativeKernelsWorkflow) {
+            "Native-kernels workflow must disable Gradle cache persistence on Windows ARM"
+        }
         listOf(
             "JRELEASER_MAVENCENTRAL_SONATYPE_USERNAME: " +
                 "\${{ secrets.MAVENCENTRAL_USERNAME }}",
