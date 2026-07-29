@@ -17,19 +17,20 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.backend.purejava.fixture.ModelFixtureDescriptor;
+import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
+import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.vectors.core.VectorizationProvider;
 import java.nio.file.Files;
-import org.modeljars.ModelJar;
-import org.modeljars.ModelJarDescriptor;
-import org.modeljars.ModelJarRegistry;
 
 final class ModelOracleTestSupport {
 
   private ModelOracleTestSupport() {}
 
-  static ModelJarDescriptor installedDescriptor(ModelJar requirement, String fixtureTask) {
-    ModelJarDescriptor descriptor =
-        ModelJarRegistry.fromClasspath().resolve(requirement).orElseThrow();
+  static ModelFixtureDescriptor installedDescriptor(
+      ModelFixtureRequirement requirement, String fixtureTask) {
+    ModelFixtureDescriptor descriptor =
+        ModelFixtureRegistry.fromClasspath().resolve(requirement).orElseThrow();
     assertThat(Files.exists(descriptor.localPath().orElseThrow()))
         .as("%s must be present. Run %s.", descriptor.localPath().orElseThrow(), fixtureTask)
         .isTrue();

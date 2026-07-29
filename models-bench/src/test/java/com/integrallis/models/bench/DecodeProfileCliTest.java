@@ -24,26 +24,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.modeljars.ModelJarRegistry;
 
 class DecodeProfileCliTest {
 
   @TempDir Path directory;
 
   @Test
-  void resolvesModelJarAliasWithoutDiscardingItsDescriptor() throws Exception {
+  void resolvesExplicitModelPath() throws Exception {
     Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
-    var descriptor = ModelJarTestFixtures.descriptor("fixture", model);
 
     DecodeProfileCli.Configuration configuration =
-        DecodeProfileCli.parse(
-            new String[] {"--modeljar", "fixture"}, ModelJarRegistry.of(List.of(descriptor)));
+        DecodeProfileCli.parse(new String[] {"--model", model.toString()});
 
     assertThat(configuration.model().artifact()).isEqualTo(model);
-    assertThat(configuration.model().descriptor()).contains(descriptor);
   }
 
   @Test
@@ -53,7 +48,7 @@ class DecodeProfileCliTest {
     FakeBackend backend = new FakeBackend(events);
     DecodeProfileCli.Configuration configuration =
         new DecodeProfileCli.Configuration(
-            new PureJavaModelSource(model.toString(), model, Optional.empty()),
+            new PureJavaModelSource(model.toString(), model),
             "profile prompt",
             5,
             7,

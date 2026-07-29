@@ -28,11 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import org.modeljars.ModelJarDescriptor;
-import org.modeljars.ModelJarRegistry;
 
 /** Runs comparable in-process Models, Ollama, and llama.cpp inference measurements. */
 public final class InferenceBenchmarkCli {
@@ -44,7 +40,6 @@ public final class InferenceBenchmarkCli {
       Set.of(
           "backend",
           "model",
-          "modeljar",
           "model-id",
           "artifact",
           "endpoint",
@@ -99,12 +94,6 @@ public final class InferenceBenchmarkCli {
   }
 
   static BenchmarkConfiguration parse(String[] args) throws IOException {
-    return parse(args, ModelJarRegistry.fromClasspath());
-  }
-
-  static BenchmarkConfiguration parse(String[] args, ModelJarRegistry modelJarRegistry)
-      throws IOException {
-    Objects.requireNonNull(modelJarRegistry, "modelJarRegistry");
     Map<String, String> values = parseOptions(args);
     String backend = required(values, "backend");
     if (!BACKENDS.contains(backend)) {
@@ -112,28 +101,16 @@ public final class InferenceBenchmarkCli {
     }
     String model;
     Path artifact;
-    Optional<ModelJarDescriptor> modelJarDescriptor;
     if (isInProcess(backend)) {
       if (values.containsKey("artifact")) {
         throw new IllegalArgumentException("--artifact cannot override an in-process model source");
       }
-      if ("rust-ffm".equals(backend) && values.containsKey("modeljar")) {
-        throw new IllegalArgumentException(
-            "--modeljar requires rust-ffm catalog metadata and is not enabled yet");
-      }
-      PureJavaModelSource source =
-          PureJavaModelSource.resolve(
-              values.get("model"), values.get("modeljar"), modelJarRegistry);
+      PureJavaModelSource source = PureJavaModelSource.resolve(values.get("model"));
       model = source.identity();
       artifact = source.artifact();
-      modelJarDescriptor = source.descriptor();
     } else {
-      if (values.containsKey("modeljar")) {
-        throw new IllegalArgumentException("--modeljar is supported only by pure-java");
-      }
       model = required(values, "model");
       artifact = values.containsKey("artifact") ? Path.of(values.get("artifact")) : null;
-      modelJarDescriptor = Optional.empty();
     }
     String modelId = values.getOrDefault("model-id", safeModelId(model));
     if (artifact != null && !Files.isRegularFile(artifact)) {
@@ -177,7 +154,6 @@ public final class InferenceBenchmarkCli {
         modelId,
         model,
         artifact,
-        modelJarDescriptor,
         endpoint,
         prompt,
         maxTokens,
@@ -253,8 +229,7 @@ public final class InferenceBenchmarkCli {
   private static BenchmarkTarget target(BenchmarkConfiguration configuration) {
     if ("pure-java".equals(configuration.backend())) {
       return PureJavaBenchmarkTarget.load(
-          new PureJavaModelSource(
-              configuration.model(), configuration.artifact(), configuration.modelJarDescriptor()),
+          new PureJavaModelSource(configuration.model(), configuration.artifact()),
           configuration.contextLength(),
           configuration.speculativeOptions());
     }

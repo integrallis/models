@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.modeljars.ModelJarRegistry;
 
 /** Audits exact greedy-logit repeatability for one pure-Java model and JVM configuration. */
 final class DeterminismAuditCli {
@@ -45,7 +44,6 @@ final class DeterminismAuditCli {
   private static final Set<String> OPTIONS =
       Set.of(
           "model",
-          "modeljar",
           "model-id",
           "prompt",
           "prompt-file",
@@ -84,13 +82,8 @@ final class DeterminismAuditCli {
   }
 
   static Configuration parse(String[] args) throws IOException {
-    return parse(args, ModelJarRegistry.fromClasspath());
-  }
-
-  static Configuration parse(String[] args, ModelJarRegistry modelJarRegistry) throws IOException {
     Map<String, String> values = parseOptions(args);
-    PureJavaModelSource model =
-        PureJavaModelSource.resolve(values.get("model"), values.get("modeljar"), modelJarRegistry);
+    PureJavaModelSource model = PureJavaModelSource.resolve(values.get("model"));
     String modelId = values.getOrDefault("model-id", safeModelId(model.identity()));
     String prompt =
         values.containsKey("prompt-file")

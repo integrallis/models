@@ -20,69 +20,33 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.modeljars.ModelJarDescriptor;
-import org.modeljars.ModelJarRegistry;
 
 class PureJavaModelSourceTest {
 
   @TempDir Path directory;
 
   @Test
-  void resolvesAFileOrAnExactModelJarAlias() throws Exception {
+  void resolvesAnExplicitModelFile() throws Exception {
     Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
-    ModelJarDescriptor descriptor = ModelJarTestFixtures.descriptor("fixture", model);
-    ModelJarRegistry registry = ModelJarRegistry.of(List.of(descriptor));
 
-    PureJavaModelSource pathSource = PureJavaModelSource.resolve(model.toString(), null, registry);
-    PureJavaModelSource modelJarSource = PureJavaModelSource.resolve(null, "fixture", registry);
+    PureJavaModelSource source = PureJavaModelSource.resolve(model.toString());
 
-    assertThat(pathSource.identity()).isEqualTo(model.toString());
-    assertThat(pathSource.artifact()).isEqualTo(model);
-    assertThat(pathSource.descriptor()).isEmpty();
-    assertThat(modelJarSource.identity()).isEqualTo("fixture");
-    assertThat(modelJarSource.artifact()).isEqualTo(model);
-    assertThat(modelJarSource.descriptor()).contains(descriptor);
+    assertThat(source.identity()).isEqualTo(model.toString());
+    assertThat(source.artifact()).isEqualTo(model);
   }
 
   @Test
-  void rejectsAmbiguousMissingAndUnusableSources() throws Exception {
-    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1});
-    ModelJarDescriptor descriptor = ModelJarTestFixtures.descriptor("fixture", model);
-    ModelJarRegistry registry = ModelJarRegistry.of(List.of(descriptor));
-
-    assertThatThrownBy(() -> PureJavaModelSource.resolve(model.toString(), "fixture", registry))
+  void rejectsMissingAndUnusableSources() {
+    assertThatThrownBy(() -> PureJavaModelSource.resolve(null))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("exactly one");
-    assertThatThrownBy(() -> PureJavaModelSource.resolve(null, null, registry))
+        .hasMessageContaining("require --model");
+    assertThatThrownBy(() -> PureJavaModelSource.resolve(" "))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("exactly one");
-    assertThatThrownBy(() -> PureJavaModelSource.resolve(null, "missing", registry))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("unknown ModelJar alias");
+        .hasMessageContaining("require --model");
     assertThatThrownBy(
-            () ->
-                PureJavaModelSource.resolve(
-                    null,
-                    "fixture",
-                    ModelJarRegistry.of(
-                        List.of(
-                            descriptor,
-                            ModelJarTestFixtures.descriptor(
-                                "fixture", directory.resolve("second.gguf"))))))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("ambiguous ModelJar alias");
-    assertThatThrownBy(
-            () ->
-                PureJavaModelSource.resolve(
-                    null,
-                    "absent",
-                    ModelJarRegistry.of(
-                        List.of(
-                            ModelJarTestFixtures.descriptor(
-                                "absent", directory.resolve("absent.gguf"))))))
+            () -> PureJavaModelSource.resolve(directory.resolve("absent.gguf").toString()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("artifact does not exist");
   }
@@ -91,7 +55,7 @@ class PureJavaModelSourceTest {
   void cannotRepresentANonexistentArtifact() {
     Path absent = directory.resolve("absent.gguf");
 
-    assertThatThrownBy(() -> new PureJavaModelSource("absent", absent, java.util.Optional.empty()))
+    assertThatThrownBy(() -> new PureJavaModelSource("absent", absent))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("artifact does not exist");
   }

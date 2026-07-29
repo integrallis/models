@@ -433,10 +433,11 @@ scripts/run-controlled-inference-benchmarks.sh \
 The release qualification path defaults to `BENCH_MODELS_BACKEND=rust-ffm`,
 enables quantized native decode, pins native workers to `BENCH_THREADS`, and
 writes the in-process result to `models.json`. Set
-`BENCH_MODELS_BACKEND=pure-java` for a pure-Java ceiling control. A pure-Java
-run may also set `BENCH_MODELJAR_ALIAS` to apply an exact model-scoped profile;
-the script then rejects a resolved artifact whose SHA differs from the
-comparator artifact.
+`BENCH_MODELS_BACKEND=pure-java` for a pure-Java ceiling control. The model is
+always supplied by exact filesystem path; catalog and contribution tooling can
+resolve an independently published model artifact before invoking the script.
+The script hashes that artifact so every backend is measured against identical
+model bytes.
 
 Every benchmark process receives `-XX:ActiveProcessorCount=$BENCH_THREADS`, so
 the in-process and HTTP-client reports retain the same environment fingerprint.

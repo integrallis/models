@@ -45,13 +45,6 @@ jobs:
         with:
           path: models
 
-      - name: Checkout ModelJars
-        uses: actions/checkout@v5
-        with:
-          repository: ModelJars/modeljars
-          ref: main
-          path: model-jars
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -109,14 +102,14 @@ jobs:
         run: >
           ./gradlew
           :backend-java:integrationTest
-          --tests com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest
-          --tests com.integrallis.models.backend.purejava.Qwen25CoderModelJarsIntegrationTest
-          --tests com.integrallis.models.backend.purejava.SmolLm2ModelJarsIntegrationTest
-          --tests com.integrallis.models.backend.purejava.TinyLlamaModelJarsIntegrationTest
-          --tests com.integrallis.models.backend.purejava.DeepSeekCoderModelJarsIntegrationTest
-          --tests com.integrallis.models.backend.purejava.MiniCpm5ModelJarsIntegrationTest
-          --tests com.integrallis.models.backend.purejava.Qwen25MathModelJarsIntegrationTest
-          --tests com.integrallis.models.backend.purejava.EuroLlmModelJarsIntegrationTest
+          --tests com.integrallis.models.backend.purejava.Qwen3ModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.Qwen25CoderModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.SmolLm2ModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.TinyLlamaModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.DeepSeekCoderModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.MiniCpm5ModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.Qwen25MathModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.EuroLlmModelFixtureIntegrationTest
           --no-daemon
           --stacktrace
 

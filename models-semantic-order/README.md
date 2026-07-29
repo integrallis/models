@@ -6,24 +6,18 @@ Pure-Java runtime for compact one-dimensional semantic-order models. The first
 supported format is `wordtour-v1`: one unique UTF-8 term per line, arranged as a
 cycle.
 
-## ModelJars use
+## Loading
 
-Add `models-modeljars` and the WordTour marker JAR to the application classpath,
-then resolve it by source and semantic version:
+Load a `wordtour-v1` payload from a file or any other input stream:
 
 ```java
-var modelJar = ModelJar.of("github://joisino/wordtour")
-    .version("[1.0.0,2.0.0)")
-    .variant("optimal")
-    .backend("semantic-order")
-    .capability("semantic-neighbors");
-
-var descriptor = ModelJarRegistry.fromClasspath().resolve(modelJar).orElseThrow();
-WordTour tour = ModelJarBackends.loadWordTour(descriptor);
-tour.neighbors("cat", 5);
+try (var input = Files.newInputStream(Path.of("wordtour.txt"))) {
+    WordTour tour = WordTour.load(input);
+    tour.neighbors("cat", 5);
+}
 ```
 
-The canonical marker coordinate is:
+The same canonical payload is independently packaged as:
 
 ```text
 org.modeljars.github:joisino.wordtour-glove-6b-300d.optimal:1.0.0-optimal.1
@@ -53,5 +47,5 @@ while distant ranks are not guaranteed to be unrelated. It is appropriate for
 local neighbor enumeration, lexical expansion, and blurred bag-of-words. It is
 not a drop-in dense embedding, and it does not implement `EmbeddingBackend`.
 
-The semantic-order runtime itself has no dependency on ModelJars, Vectors, or
-the Java Vector API. Registry integration is isolated in `models-modeljars`.
+The semantic-order runtime has no dependency on a model catalog, Vectors, or
+the Java Vector API. Downstream catalog adapters can supply its input stream.

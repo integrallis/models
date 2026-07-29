@@ -18,6 +18,8 @@ package com.integrallis.models.backend.purejava.llama;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.backend.purejava.cache.KvCache;
+import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
+import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
@@ -30,16 +32,14 @@ import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.modeljars.ModelJar;
-import org.modeljars.ModelJarRegistry;
 
 @Tag("integration")
 class Qwen3BatchedPrefillIntegrationTest {
 
   private static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
   private static final int[] LLAMA_CPP_GREEDY_TOKENS = {34208, 916, 279, 15678};
-  private static final ModelJar QWEN3_0_6B_Q4_0 =
-      ModelJar.of("hf://ggml-org/Qwen3-0.6B-GGUF")
+  private static final ModelFixtureRequirement QWEN3_0_6B_Q4_0 =
+      ModelFixtureRequirement.of("hf://ggml-org/Qwen3-0.6B-GGUF")
           .version("[3.0.0,4.0.0)")
           .variant("q4_0")
           .backend("pure-java")
@@ -348,7 +348,7 @@ class Qwen3BatchedPrefillIntegrationTest {
   }
 
   private static Path modelPath() {
-    return ModelJarRegistry.fromClasspath()
+    return ModelFixtureRegistry.fromClasspath()
         .resolve(QWEN3_0_6B_Q4_0)
         .orElseThrow()
         .localPath()

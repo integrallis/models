@@ -24,26 +24,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.modeljars.ModelJarRegistry;
 
 class PrefillProfileCliTest {
 
   @TempDir Path directory;
 
   @Test
-  void resolvesModelJarAliasWithoutDiscardingItsDescriptor() throws Exception {
+  void resolvesExplicitModelPath() throws Exception {
     Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
-    var descriptor = ModelJarTestFixtures.descriptor("fixture", model);
 
     PrefillProfileCli.Configuration configuration =
-        PrefillProfileCli.parse(
-            new String[] {"--modeljar", "fixture"}, ModelJarRegistry.of(List.of(descriptor)));
+        PrefillProfileCli.parse(new String[] {"--model", model.toString()});
 
     assertThat(configuration.model().artifact()).isEqualTo(model);
-    assertThat(configuration.model().descriptor()).contains(descriptor);
   }
 
   @Test
@@ -53,7 +48,7 @@ class PrefillProfileCliTest {
     FakeBackend backend = new FakeBackend(events);
     PrefillProfileCli.Configuration configuration =
         new PrefillProfileCli.Configuration(
-            new PureJavaModelSource(model.toString(), model, Optional.empty()),
+            new PureJavaModelSource(model.toString(), model),
             "profile prompt",
             8,
             2,

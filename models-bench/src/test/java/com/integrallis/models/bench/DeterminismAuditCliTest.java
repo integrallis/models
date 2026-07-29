@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.modeljars.ModelJarRegistry;
 
 class DeterminismAuditCliTest {
 
@@ -41,26 +40,10 @@ class DeterminismAuditCliTest {
         DeterminismAuditCli.parse(new String[] {"--model", model.toString()});
 
     assertThat(configuration.model().artifact()).isEqualTo(model);
-    assertThat(configuration.model().descriptor()).isEmpty();
     assertThat(configuration.generatedTokens()).isEqualTo(4);
     assertThat(configuration.iterations()).isEqualTo(3);
     assertThat(configuration.contextLength()).isEqualTo(128);
     assertThat(configuration.promptMode()).isEqualTo(DeterminismAuditCli.PromptMode.SEQUENTIAL);
-  }
-
-  @Test
-  void resolvesModelJarAliasWithoutDiscardingItsDescriptor() throws Exception {
-    Path model = Files.write(directory.resolve("modeljar.gguf"), new byte[] {1, 2, 3});
-    var descriptor = ModelJarTestFixtures.descriptor("fixture", model);
-
-    DeterminismAuditCli.Configuration configuration =
-        DeterminismAuditCli.parse(
-            new String[] {"--modeljar", "fixture"}, ModelJarRegistry.of(List.of(descriptor)));
-
-    assertThat(configuration.model().identity()).isEqualTo("fixture");
-    assertThat(configuration.model().artifact()).isEqualTo(model);
-    assertThat(configuration.model().descriptor()).contains(descriptor);
-    assertThat(configuration.modelId()).isEqualTo("fixture");
   }
 
   @Test

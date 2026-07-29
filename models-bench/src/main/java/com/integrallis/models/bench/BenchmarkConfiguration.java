@@ -18,9 +18,6 @@ package com.integrallis.models.bench;
 import com.integrallis.models.runtime.SpeculativeGenerationOptions;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.Objects;
-import java.util.Optional;
-import org.modeljars.ModelJarDescriptor;
 
 /** Fully resolved benchmark command configuration. */
 public record BenchmarkConfiguration(
@@ -28,7 +25,6 @@ public record BenchmarkConfiguration(
     String modelId,
     String model,
     Path artifact,
-    Optional<ModelJarDescriptor> modelJarDescriptor,
     URI endpoint,
     String prompt,
     int maxTokens,
@@ -52,18 +48,6 @@ public record BenchmarkConfiguration(
     if (model == null || model.isBlank()) {
       throw new IllegalArgumentException("model must not be blank");
     }
-    modelJarDescriptor = Objects.requireNonNull(modelJarDescriptor, "modelJarDescriptor");
-    modelJarDescriptor.ifPresent(
-        descriptor -> {
-          if (!"pure-java".equals(backend)) {
-            throw new IllegalArgumentException(
-                "ModelJar descriptors are supported only by the pure-java benchmark backend");
-          }
-          if (!descriptor.localPath().filter(artifact::equals).isPresent()) {
-            throw new IllegalArgumentException(
-                "ModelJar descriptor local path does not match benchmark artifact");
-          }
-        });
     if (prompt == null || prompt.isBlank()) {
       throw new IllegalArgumentException("prompt must not be blank");
     }

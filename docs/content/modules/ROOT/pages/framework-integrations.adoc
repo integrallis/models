@@ -122,39 +122,26 @@ try (var backend =
 
 == Spring Boot
 
-`models-spring-boot-starter` provides auto-configuration for
-ModelJars registry access and descriptor selection.
+Spring Boot applications use the tested Spring AI adapter with ordinary
+configuration beans.
 
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
-    implementation("com.integrallis:models-spring-boot-starter:{models-version}")
     implementation("com.integrallis:models-spring-ai:{models-version}")
     implementation("com.integrallis:backend-java:{models-version}")
 }
 ----
 
-Select the ModelJar in `application.yaml`:
-
-[source,yaml]
-----
-models:
-  modeljars:
-    source: "hf://ggml-org/Qwen3-0.6B-GGUF"
-    version-range: "[3.0.0,4.0.0)"
-    variant: "q4_0"
-    backend: "pure-java"
-    capability: "text-generation"
-----
-
-The selected descriptor can be injected into ordinary Spring beans:
+Load the configured model path and expose the Spring AI `ChatModel`:
 
 [source,java]
 ----
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
-import org.modeljars.ModelJarDescriptor;
+import java.nio.file.Path;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -162,8 +149,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 class LocalModelConfiguration {
     @Bean(destroyMethod = "close")
-    PureJavaBackend backend(ModelJarDescriptor descriptor) {
-        return PureJavaBackend.load(descriptor.localPath().orElseThrow());
+    PureJavaBackend backend(@Value("${models.path}") Path modelPath) {
+        return PureJavaBackend.load(modelPath);
     }
 
     @Bean

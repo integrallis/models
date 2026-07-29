@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.modeljars.ModelJarRegistry;
 
 /** Captures warmed-up autoregressive decode at production sequence positions. */
 final class DecodeProfileCli {
@@ -34,7 +33,6 @@ final class DecodeProfileCli {
   private static final Set<String> OPTIONS =
       Set.of(
           "model",
-          "modeljar",
           "prompt",
           "prompt-file",
           "context",
@@ -69,13 +67,8 @@ final class DecodeProfileCli {
   }
 
   static Configuration parse(String[] args) throws IOException {
-    return parse(args, ModelJarRegistry.fromClasspath());
-  }
-
-  static Configuration parse(String[] args, ModelJarRegistry modelJarRegistry) throws IOException {
     Map<String, String> values = BenchmarkCliArguments.parse(args, OPTIONS);
-    PureJavaModelSource model =
-        PureJavaModelSource.resolve(values.get("model"), values.get("modeljar"), modelJarRegistry);
+    PureJavaModelSource model = PureJavaModelSource.resolve(values.get("model"));
     String prompt =
         values.containsKey("prompt-file")
             ? Files.readString(Path.of(values.get("prompt-file")))

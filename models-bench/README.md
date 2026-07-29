@@ -423,7 +423,7 @@ Audit the raw float bits of every generated logit vector across repeated greedy 
 ```shell
 ./gradlew :models-bench:installDist
 models-bench/build/install/models-bench/bin/models-bench determinism \
-  --modeljar qwen3_0_6b_q4_0 \
+  --model ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   --prompt-file models-bench/prompts/completion.txt \
   --tokens 4 \
   --iterations 3 \
@@ -433,12 +433,10 @@ models-bench/build/install/models-bench/bin/models-bench determinism \
 
 The schema-2 report records the artifact hash, prompt tokens, winning and runner-up logits, winner
 margins, raw-bit logit hashes, JVM and host details, the complete vectors execution configuration,
-and the selected backend plan and ModelJar profile decisions. The command exits non-zero when any
-trial differs.
+and the selected backend plan. The command exits non-zero when any trial differs.
 
-Use exactly one model source. `--modeljar <alias>` resolves the descriptor from the aggregate
-catalog on the application runtime classpath and preserves its model-scoped performance profile
-when loading the backend. `--model /path/to/model.gguf` loads unregistered bytes without a profile.
+`--model /path/to/model.gguf` identifies the exact bytes under test. Catalog and deployment tools
+can resolve independently published model artifacts before invoking this benchmark.
 
 Use `scripts/run-purejava-determinism-matrix.sh` for fresh-JVM coverage of the default Panama path,
 serial execution, FMA-disabled execution, 128-bit vectors, and the scalar reference. Provider
@@ -452,7 +450,7 @@ recording excludes model loading, warmup, reset, checksum calculation, and autor
 
 ```shell
 ./gradlew :models-bench:run --args='profile-prefill \
-  --modeljar qwen3_0_6b_q4_0 \
+  --model ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   --prompt-file models-bench/prompts/completion.txt \
   --context 2048 \
   --warmups 2 \
@@ -461,7 +459,7 @@ recording excludes model loading, warmup, reset, checksum calculation, and autor
 
 The command reports prompt tokens, warmup passes, prefill throughput, a deterministic final-logit
 checksum, and GC deltas. Use a representative prompt long enough to produce useful execution
-samples. `--model /path/to/model.gguf` remains the explicit unregistered alternative.
+samples.
 
 ## Decode-only profile
 
@@ -470,7 +468,7 @@ autoregressive decode loop at the same positions as the production generation wi
 
 ```shell
 ./gradlew :models-bench:run --args='profile-decode \
-  --modeljar qwen3_0_6b_q4_0 \
+  --model ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   --prompt "Explain vectorized inference." \
   --context 2048 \
   --warmup-tokens 64 \
@@ -485,19 +483,17 @@ Use `--prompt-file` for a file-backed prompt and `--token-id` to select the repe
 
 The requested context must hold the prompt plus the larger of the warmup and measured token counts.
 The resolved artifact is validated before loading, and the command rejects token IDs outside the
-model vocabulary. As with the determinism command, `--model /path/to/model.gguf` is the explicit
-unregistered alternative.
+model vocabulary.
 
-## ModelJar-backed comparison run
+## In-process comparison run
 
-Use a catalog alias for pure-Java measurements that must apply and record an exact model-scoped
-execution plan:
+Use one exact GGUF artifact for an in-process measurement:
 
 ```shell
 ./gradlew :models-bench:installDist
 models-bench/build/install/models-bench/bin/models-bench \
   --backend pure-java \
-  --modeljar qwen3_0_6b_q4_0 \
+  --model ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
   --prompt-file models-bench/prompts/completion.txt \
   --max-tokens 64 \
   --warmups 2 \
@@ -507,8 +503,8 @@ models-bench/build/install/models-bench/bin/models-bench \
 ```
 
 Benchmark schema 5 records `backendDiagnostics`, including the pure-Java plan version, runtime
-fingerprint, optimization decisions, and any enabled ModelJar performance profile. External
-Ollama and llama.cpp reports record explicit `unavailable` diagnostics.
+fingerprint, and optimization decisions. External Ollama and llama.cpp reports record explicit
+`unavailable` diagnostics.
 
 For release qualification, the repository runner uses the Models-owned Rust/FFM backend by
 default and compares it with the same GGUF bytes through llama.cpp and Ollama:

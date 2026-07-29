@@ -20,7 +20,6 @@ DROP_CACHES=${BENCH_DROP_CACHES:-0}
 LLAMA_PORT=${LLAMA_PORT:-18080}
 LLAMA_SERVER=${LLAMA_SERVER:-llama-server}
 PROMPT_FILE=${BENCH_PROMPT_FILE:-"$ROOT_DIR/models-bench/prompts/completion.txt"}
-BENCH_MODELJAR_ALIAS=${BENCH_MODELJAR_ALIAS:-}
 MODELS_BACKEND=${BENCH_MODELS_BACKEND:-rust-ffm}
 
 for command in awk curl git java jq nproc ollama ps realpath sha256sum sync "$LLAMA_SERVER"; do
@@ -46,10 +45,6 @@ case "$MODELS_BACKEND" in
     exit 1
     ;;
 esac
-if [[ "$MODELS_BACKEND" == rust-ffm && -n "$BENCH_MODELJAR_ALIAS" ]]; then
-  echo "BENCH_MODELJAR_ALIAS is currently supported only with BENCH_MODELS_BACKEND=pure-java" >&2
-  exit 1
-fi
 if [[ "$DROP_CACHES" == 1 && ! -w /proc/sys/vm/drop_caches ]]; then
   echo "BENCH_DROP_CACHES=1 requires permission to write /proc/sys/vm/drop_caches" >&2
   exit 1
@@ -119,7 +114,7 @@ assert_no_competing_inference_processes
 
 MODEL_SHA=$(sha256sum "$MODEL_PATH" | awk '{print $1}')
 SAFE_MODEL_ID=$(printf '%s' "$MODEL_ID" | tr -cs '[:alnum:]._-' '-')
-OLLAMA_MODEL="modeljars-bench-${SAFE_MODEL_ID}:${MODEL_SHA:0:12}"
+OLLAMA_MODEL="models-bench-${SAFE_MODEL_ID}:${MODEL_SHA:0:12}"
 MODELS_COMMIT=$(git -C "$ROOT_DIR" rev-parse HEAD)
 VECTORS_VERSION=$(sed -n -E 's/^vectorsVersion[[:space:]]*=[[:space:]]*//p' "$ROOT_DIR/gradle.properties")
 MODELS_VERSION="models@$MODELS_COMMIT com.integrallis:vectors-core@$VECTORS_VERSION"
@@ -141,15 +136,10 @@ COMMON_ARGS=(
   --threads "$THREADS"
 )
 
-MODELS_MODEL_ARGS=(--model "$MODEL_PATH")
-if [[ -n "$BENCH_MODELJAR_ALIAS" ]]; then
-  MODELS_MODEL_ARGS=(--modeljar "$BENCH_MODELJAR_ALIAS")
-fi
-
 drop_file_cache
 "$BENCHMARK_CLI" \
   --backend "$MODELS_BACKEND" \
-  "${MODELS_MODEL_ARGS[@]}" \
+  --model "$MODEL_PATH" \
   --backend-version "$MODELS_VERSION" \
   --output "$OUTPUT_DIR/models.json" \
   "${COMMON_ARGS[@]}"

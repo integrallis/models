@@ -494,6 +494,56 @@ tasks.register("verifyPublishingConfigured") {
     }
 }
 
+tasks.register("verifyArchitectureBoundaries") {
+    group = "verification"
+    description = "Verify Models has no source, build, or CI dependency on ModelJars"
+    doLast {
+        val forbiddenGroup = listOf("org", "modeljars").joinToString(".")
+        val forbiddenComposite = "includeBuild(\"../" + "model-jars" + "\")"
+        val forbiddenRepository = "repository: " + "ModelJars" + "/" + "modeljars"
+        val forbiddenPackage = listOf("com", "integrallis", "models", "modeljars").joinToString(".")
+        val forbiddenRuntimeFiles =
+            fileTree(rootProject.projectDir) {
+                include("settings.gradle.kts")
+                include("**/*.gradle.kts")
+                include("**/src/**/*.java")
+                include(".github/workflows/*.yml")
+                exclude("**/build/**")
+                exclude("benchmark-results/**")
+            }.filter { file ->
+                val text = file.readText()
+                forbiddenGroup in text ||
+                    forbiddenComposite in text ||
+                    forbiddenRepository in text ||
+                    forbiddenPackage in text
+            }
+        val forbiddenModelOption = "--model" + "jar"
+        val forbiddenBenchmarkAlias = "BENCH_" + "MODELJAR"
+        val forbiddenLegacyInterfaceFiles =
+            fileTree(rootProject.projectDir) {
+                include("**/*.java")
+                include("**/*.md")
+                include("scripts/**/*.sh")
+                exclude("**/build/**")
+                exclude("benchmark-results/**")
+            }.filter { file ->
+                val text = file.readText()
+                forbiddenModelOption in text || forbiddenBenchmarkAlias in text
+            }
+        val forbiddenFiles =
+            (forbiddenRuntimeFiles.files + forbiddenLegacyInterfaceFiles.files)
+                .distinct()
+                .sortedBy { it.relativeTo(rootProject.projectDir).path }
+
+        require(forbiddenFiles.isEmpty()) {
+            "Models must not depend on ModelJars. Reverse coupling found in:\n" +
+                forbiddenFiles.joinToString("\n") {
+                    "  - ${it.relativeTo(rootProject.projectDir)}"
+                }
+        }
+    }
+}
+
 tasks.register("verifyReleaseDependencies") {
     group = "verification"
     description =
@@ -507,8 +557,10 @@ tasks.register("verifyReleaseDependencies") {
         val expectedVectorsVersion =
             providers.gradleProperty("vectorsVersion").orNull
                 ?: error("gradle.properties must declare vectorsVersion")
+        val forbiddenGroup = listOf("org", "modeljars").joinToString(".")
         val vectorsDependencies = mutableListOf<String>()
-        val publishedDependencyBuckets = setOf("api", "implementation", "runtimeOnly")
+        val publishedDependencyBuckets =
+            setOf("api", "implementation", "compileOnly", "runtimeOnly")
 
         publishedProjects.forEach { proj ->
             proj.configurations
@@ -521,6 +573,9 @@ tasks.register("verifyReleaseDependencies") {
                             "${dependency.group}:${dependency.name}:${dependency.version}"
                         require(dependency.version?.endsWith("-SNAPSHOT") != true) {
                             "${proj.name} publishes a snapshot dependency: $coordinate"
+                        }
+                        require(dependency.group != forbiddenGroup) {
+                            "${proj.name} publishes a reverse catalog dependency: $coordinate"
                         }
                         if (dependency.group == "com.integrallis" &&
                             dependency.name.startsWith("vectors")) {
@@ -616,6 +671,10 @@ tasks.register("verifyStagedPublications") {
             require("<licenses>" in pom && "<developers>" in pom && "<scm>" in pom) {
                 "Incomplete Maven Central metadata in ${proj.name} POM"
             }
+            val forbiddenGroup = listOf("org", "modeljars").joinToString(".")
+            require("<groupId>$forbiddenGroup</groupId>" !in pom) {
+                "${proj.name} staged POM contains a reverse catalog dependency"
+            }
             internalDependency.findAll(pom).forEach { match ->
                 val artifactId = match.groupValues[1]
                 if (artifactId in libraryModuleNames) {
@@ -670,33 +729,94 @@ tasks.register("verifyGithubWorkflows") {
         require("'backend-*/.github/badges/mfcqi.json'" in mfcqiWorkflow) {
             "MFCQI workflow must commit badges for the public backend modules"
         }
-        require(
-            "repository: ModelJars/modeljars" in mfcqiWorkflow &&
-                "path: model-jars" in mfcqiWorkflow
-        ) {
-            "MFCQI workflow must checkout the required ModelJars composite build"
-        }
 
         val docsWorkflow = workflowDir.resolve("docs.yml").readText()
         require(
             "working-directory: models" in docsWorkflow &&
-                "repository: ModelJars/modeljars" in docsWorkflow &&
                 Regex("""(?m)^\s+path: models\s*$""").containsMatchIn(docsWorkflow) &&
-                Regex("""(?m)^\s+path: model-jars\s*$""").containsMatchIn(docsWorkflow) &&
                 "cache-dependency-path: models/docs/package-lock.json" in docsWorkflow &&
                 "path: models/docs/build/public" in docsWorkflow
         ) {
-            "Docs workflow must checkout Models and ModelJars as sibling composite builds"
+            "Docs workflow must build the checked-out Models project"
         }
 
-        val nativeWorkflow = workflowDir.resolve("native-kernels.yml").readText()
-        val modelJarsDownloads =
-            Regex(
-                """uses:\s+actions/download-artifact@v8\s+with:\s+""" +
-                    """name:\s+modeljars-composite-sources\s+path:\s+model-jars"""
-            )
-        require(modelJarsDownloads.findAll(nativeWorkflow).count() == 4) {
-            "Every native workflow job must download ModelJars into the composite-build path"
+        val downstreamRepository = "ModelJars" + "/" + "modeljars"
+        val testSourceClasses =
+            fileTree(rootProject.projectDir) {
+                include("**/src/test/java/**/*.java")
+                exclude("**/build/**")
+            }.files.mapTo(mutableSetOf()) { source ->
+                source
+                    .relativeTo(rootProject.projectDir)
+                    .invariantSeparatorsPath
+                    .substringAfter("/src/test/java/")
+                    .removeSuffix(".java")
+                    .replace('/', '.')
+            }
+        val testSelector = Regex("""--tests\s+([A-Za-z0-9_.$]+)""")
+        workflowDir.listFiles()
+            ?.filter { it.isFile && it.extension == "yml" }
+            ?.forEach { workflow ->
+                val workflowText = workflow.readText()
+                require(downstreamRepository !in workflowText) {
+                    "${workflow.name} must not checkout the downstream catalog project"
+                }
+                testSelector.findAll(workflowText).forEach { match ->
+                    val selectedClass = match.groupValues[1].substringBefore('$')
+                    require(selectedClass in testSourceClasses) {
+                        "${workflow.name} selects missing test class $selectedClass"
+                    }
+                }
+            }
+
+        val releaseWorkflow = workflowDir.resolve("release.yml").readText()
+        listOf(
+            "actions/checkout@v5",
+            "actions/setup-java@v5",
+            "actions/setup-node@v6",
+            "gradle/actions/setup-gradle@v6",
+            "actions/upload-artifact@v7",
+            "jreleaser/release-action@v2"
+        ).forEach { action ->
+            require(action in releaseWorkflow) {
+                "Release workflow must use the Vectors release action baseline: $action"
+            }
+        }
+        listOf(
+            "JRELEASER_MAVENCENTRAL_SONATYPE_USERNAME: " +
+                "\${{ secrets.MAVENCENTRAL_USERNAME }}",
+            "JRELEASER_MAVENCENTRAL_SONATYPE_PASSWORD: " +
+                "\${{ secrets.MAVENCENTRAL_PASSWORD }}",
+            "JRELEASER_GPG_PUBLIC_KEY: \${{ secrets.GPG_PUBLIC_KEY }}",
+            "JRELEASER_GPG_SECRET_KEY: \${{ secrets.GPG_SECRET_KEY }}",
+            "JRELEASER_GPG_PASSPHRASE: \${{ secrets.GPG_PASSPHRASE }}"
+        ).forEach { mapping ->
+            require(releaseWorkflow.windowed(mapping.length).count { it == mapping } == 2) {
+                "Release workflow must map the same secret to dry-run and live deployment: $mapping"
+            }
+        }
+        require(
+            "dry_run:" in releaseWorkflow &&
+                "skip_deploy:" in releaseWorkflow &&
+                "arguments: deploy --dry-run" in releaseWorkflow &&
+                "arguments: deploy" in releaseWorkflow
+        ) {
+            "Release workflow must retain the Vectors dry-run and live-deployment sequence"
+        }
+
+        val credentialScript = rootProject.file("scripts/verify-release-credentials.sh")
+        require(credentialScript.isFile && credentialScript.canExecute()) {
+            "Release credential preflight script must exist and be executable"
+        }
+        require(
+            "credentials:" in releaseWorkflow &&
+                "name: Verify release credentials" in releaseWorkflow &&
+                "scripts/verify-release-credentials.sh" in releaseWorkflow &&
+                "needs: [version, credentials]" in releaseWorkflow &&
+                "needs: [version, credentials, native]" in releaseWorkflow &&
+                "--signing-only" !in releaseWorkflow
+        ) {
+            "Release workflow must verify credentials before starting native release jobs"
         }
     }
 }
@@ -1028,7 +1148,7 @@ tasks.register("verifyDocumentation") {
                 "new ModelsChatModel(",
                 "new ModelsSpringAiChatModel(",
                 "model.stream(new Prompt(",
-                "ModelJarDescriptor descriptor",
+                "PureJavaBackend backend(@Value(",
                 "GroundedAnswerPolicy.productionDefault()",
                 "new VectorCollectionEmbeddingSink("
             )
@@ -1106,6 +1226,7 @@ tasks.register("complianceCheck") {
         "verifyGovernanceFiles",
         "verifyLockfiles",
         "verifyPublishingConfigured",
+        "verifyArchitectureBoundaries",
         "verifyReleaseDependencies",
         "verifyStagedPublications",
         "verifyReproducibleBuild",

@@ -35,9 +35,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.modeljars.ModelJar;
-import org.modeljars.ModelJarDescriptor;
-import org.modeljars.ModelJarRegistry;
 
 @Tag("unit")
 class ModelsChatModelTest {
@@ -130,19 +127,6 @@ class ModelsChatModelTest {
         .isThrownBy(() -> new ModelsChatModel(highLevelModel("answer"), null));
     ModelsChatModel model = new ModelsChatModel(highLevelModel("answer"));
     assertThatNullPointerException().isThrownBy(() -> model.doChat(null));
-  }
-
-  @Test
-  void langChain4jAppCanSeeModelJarsMarkerCatalog() {
-    ModelJarDescriptor descriptor =
-        ModelJarRegistry.fromClasspath()
-            .resolve(
-                ModelJar.of("hf://ggml-org/Qwen3-0.6B-GGUF").variant("q4_0").backend("pure-java"))
-            .orElseThrow();
-
-    assertThat(descriptor.sourceId()).isEqualTo("hf://ggml-org/Qwen3-0.6B-GGUF");
-    assertThat(descriptor.localPath().orElseThrow().toString())
-        .endsWith(".jvllm/models/Qwen3-0.6B-Q4_0.gguf");
   }
 
   private static InferenceBackend backendGenerating(int[] generatedSequence) {

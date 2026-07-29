@@ -30,13 +30,8 @@ and a small Swift C ABI
 
 |`models-spring-ai` |Blocking and streaming Spring AI chat adapters
 
-|`models-spring-boot-starter` |ModelJars-backed Spring Boot
-auto-configuration
-
 |`models-embedding` |Optional bridge to Vectors storage and semantic
 caching
-
-|`models-modeljars` |ModelJars descriptor and measured-profile adapter
 
 |`models-bench` |Local model and kernel benchmarks
 
@@ -75,15 +70,12 @@ models-api
   <- models-embedding        <- Vectors database modules
 
 models-semantic-order
-
-models-modeljars
-  <- ModelJars registry
-  <- Models backends
 ----
 
-Registry-specific code is isolated in `models-modeljars`. Published core
-backends accept a registry-neutral backend configuration so their Maven
-POMs do not require a ModelJars catalog artifact.
+Models has no dependency on a model catalog. Independently published
+ModelJar artifacts carry model bytes and metadata without depending on
+Models. An application or downstream adapter composes a selected model
+artifact with the Models runtime.
 
 == Release Surface
 

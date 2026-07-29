@@ -34,11 +34,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import org.modeljars.ModelJarDescriptor;
-import org.modeljars.ModelJarRegistry;
 
 /** Runs controlled plain Java, LangChain4j, and Spring AI RAG workloads. */
 public final class RagBenchmarkCli {
@@ -53,7 +49,6 @@ public final class RagBenchmarkCli {
           "backend",
           "backend-version",
           "model",
-          "modeljar",
           "model-id",
           "artifact",
           "endpoint",
@@ -89,11 +84,6 @@ public final class RagBenchmarkCli {
   }
 
   static RagBenchmarkConfiguration parse(String[] args) {
-    return parse(args, ModelJarRegistry.fromClasspath());
-  }
-
-  static RagBenchmarkConfiguration parse(String[] args, ModelJarRegistry modelJarRegistry) {
-    Objects.requireNonNull(modelJarRegistry, "modelJarRegistry");
     Map<String, String> values = parseOptions(args);
     String framework = required(values, "framework");
     if (!FRAMEWORKS.contains(framework)) {
@@ -105,7 +95,6 @@ public final class RagBenchmarkCli {
     }
     String model;
     Path artifact;
-    Optional<ModelJarDescriptor> modelJarDescriptor;
     if (IN_PROCESS_BACKENDS.contains(backend)) {
       if (values.containsKey("artifact")) {
         throw new IllegalArgumentException("--artifact cannot override an in-process model source");
@@ -113,46 +102,17 @@ public final class RagBenchmarkCli {
       if (values.containsKey("endpoint")) {
         throw new IllegalArgumentException("--endpoint is not used by an in-process backend");
       }
-      boolean hasModel = hasText(values.get("model"));
-      boolean hasModelJar = hasText(values.get("modeljar"));
-      if (hasModel == hasModelJar) {
-        throw new IllegalArgumentException(
-            backend + " requires exactly one of --model or --modeljar");
-      }
-      if (hasModel) {
-        model = values.get("model");
-        artifact = Path.of(model);
-        modelJarDescriptor = Optional.empty();
-      } else {
-        ModelJarDescriptor descriptor =
-            resolveModelJar(values.get("modeljar").trim(), backend, modelJarRegistry);
-        model = descriptor.alias();
-        artifact =
-            descriptor
-                .localPath()
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "ModelJar has no local artifact: " + descriptor.alias()));
-        modelJarDescriptor = Optional.of(descriptor);
-      }
+      model = required(values, "model");
+      artifact = Path.of(model);
     } else if (HOSTED_BACKENDS.contains(backend)) {
-      if (values.containsKey("modeljar")) {
-        throw new IllegalArgumentException("--modeljar is supported only by in-process backends");
-      }
       if (values.containsKey("artifact")) {
         throw new IllegalArgumentException("--artifact is not supported by hosted providers");
       }
       model = required(values, "model");
       artifact = null;
-      modelJarDescriptor = Optional.empty();
     } else {
-      if (values.containsKey("modeljar")) {
-        throw new IllegalArgumentException("--modeljar is supported only by in-process backends");
-      }
       model = required(values, "model");
       artifact = values.containsKey("artifact") ? Path.of(values.get("artifact")) : null;
-      modelJarDescriptor = Optional.empty();
     }
     if (artifact != null && !Files.isRegularFile(artifact)) {
       throw new IllegalArgumentException("artifact does not exist: " + artifact);
@@ -208,7 +168,6 @@ public final class RagBenchmarkCli {
         modelId,
         model,
         artifact,
-        modelJarDescriptor,
         endpoint,
         workload,
         promptTemplate,
@@ -302,32 +261,12 @@ public final class RagBenchmarkCli {
 
   private static GenerationClient generationClient(RagBenchmarkConfiguration configuration) {
     if ("pure-java".equals(configuration.backend())) {
-      return configuration
-          .modelJarDescriptor()
-          .<GenerationClient>map(
-              descriptor ->
-                  InProcessGenerationClient.loadPureJava(
-                      descriptor, configuration.contextLength(), configuration.sampling()))
-          .orElseGet(
-              () ->
-                  InProcessGenerationClient.loadPureJava(
-                      configuration.artifact(),
-                      configuration.contextLength(),
-                      configuration.sampling()));
+      return InProcessGenerationClient.loadPureJava(
+          configuration.artifact(), configuration.contextLength(), configuration.sampling());
     }
     if ("rust-ffm".equals(configuration.backend())) {
-      return configuration
-          .modelJarDescriptor()
-          .<GenerationClient>map(
-              descriptor ->
-                  InProcessGenerationClient.loadRustFfm(
-                      descriptor, configuration.contextLength(), configuration.sampling()))
-          .orElseGet(
-              () ->
-                  InProcessGenerationClient.loadRustFfm(
-                      configuration.artifact(),
-                      configuration.contextLength(),
-                      configuration.sampling()));
+      return InProcessGenerationClient.loadRustFfm(
+          configuration.artifact(), configuration.contextLength(), configuration.sampling());
     }
     if (HOSTED_BACKENDS.contains(configuration.backend())) {
       return new HostedGenerationClient(
@@ -443,29 +382,6 @@ public final class RagBenchmarkCli {
       throw new IllegalArgumentException("--" + option + " is required");
     }
     return value;
-  }
-
-  private static boolean hasText(String value) {
-    return value != null && !value.isBlank();
-  }
-
-  private static ModelJarDescriptor resolveModelJar(
-      String alias, String backend, ModelJarRegistry modelJarRegistry) {
-    List<ModelJarDescriptor> matches =
-        modelJarRegistry.descriptors().stream()
-            .filter(descriptor -> alias.equals(descriptor.alias()))
-            .toList();
-    if (matches.isEmpty()) {
-      throw new IllegalArgumentException("unknown ModelJar alias: " + alias);
-    }
-    if (matches.size() > 1) {
-      throw new IllegalArgumentException("ambiguous ModelJar alias: " + alias);
-    }
-    ModelJarDescriptor descriptor = matches.getFirst();
-    if (!descriptor.supportsBackend(backend)) {
-      throw new IllegalArgumentException("ModelJar does not support " + backend + ": " + alias);
-    }
-    return descriptor;
   }
 
   private static int positiveInteger(Map<String, String> values, String option, int fallback) {

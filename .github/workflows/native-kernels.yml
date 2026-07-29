@@ -59,28 +59,9 @@ jobs:
           echo "value=${BASE_VERSION}-ci.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}.${SHORT_SHA}" \
             >> "$GITHUB_OUTPUT"
 
-  modeljars-sources:
-    name: Prepare ModelJars composite sources
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout ModelJars
-        uses: actions/checkout@v5
-        with:
-          repository: ModelJars/modeljars
-          ref: main
-          path: model-jars
-
-      - name: Upload ModelJars sources
-        uses: actions/upload-artifact@v7
-        with:
-          name: modeljars-composite-sources
-          if-no-files-found: error
-          retention-days: 1
-          path: model-jars
-
   native:
     name: Native ${{ matrix.platform }}
-    needs: [version, modeljars-sources]
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -119,12 +100,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: models
-
-      - name: Download ModelJars sources
-        uses: actions/download-artifact@v8
-        with:
-          name: modeljars-composite-sources
-          path: model-jars
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
@@ -172,7 +147,7 @@ jobs:
 
   java:
     name: Java backend JAR
-    needs: [version, modeljars-sources]
+    needs: version
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -182,12 +157,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: models
-
-      - name: Download ModelJars sources
-        uses: actions/download-artifact@v8
-        with:
-          name: modeljars-composite-sources
-          path: model-jars
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
@@ -226,12 +195,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: models
-
-      - name: Download ModelJars sources
-        uses: actions/download-artifact@v8
-        with:
-          name: modeljars-composite-sources
-          path: model-jars
 
       - name: Download verified native JARs
         uses: actions/download-artifact@v8
@@ -284,12 +247,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: models
-
-      - name: Download ModelJars sources
-        uses: actions/download-artifact@v8
-        with:
-          name: modeljars-composite-sources
-          path: model-jars
 
       - name: Download verified native JARs
         uses: actions/download-artifact@v8

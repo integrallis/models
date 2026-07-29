@@ -19,8 +19,6 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import org.modeljars.ModelJarDescriptor;
 
 /** Fully resolved CLI configuration for a reproducible RAG benchmark. */
 public record RagBenchmarkConfiguration(
@@ -30,7 +28,6 @@ public record RagBenchmarkConfiguration(
     String modelId,
     String model,
     Path artifact,
-    Optional<ModelJarDescriptor> modelJarDescriptor,
     URI endpoint,
     RagWorkload workload,
     RagPromptTemplate promptTemplate,
@@ -46,7 +43,6 @@ public record RagBenchmarkConfiguration(
     Path output) {
   public RagBenchmarkConfiguration {
     caseIds = List.copyOf(caseIds);
-    modelJarDescriptor = Objects.requireNonNull(modelJarDescriptor, "modelJarDescriptor");
     workload = Objects.requireNonNull(workload, "workload");
     sampling = Objects.requireNonNull(sampling, "sampling");
   }
