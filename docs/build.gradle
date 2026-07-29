@@ -78,6 +78,7 @@ task generateSite(type: NodeTask) {
         'antora-playbook.yml',
         '--to-dir=build/site'
     ]
+    inputs.file('ui/antora-ui-default-0e38223.zip')
     outputs.dir(layout.buildDirectory.dir('site'))
 }
 
