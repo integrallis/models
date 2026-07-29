@@ -36,9 +36,28 @@ jobs:
           fi
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
+  credentials:
+    name: Verify release credentials
+    needs: version
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout models
+        uses: actions/checkout@v5
+
+      - name: Verify release credentials
+        env:
+          MAVENCENTRAL_USERNAME: ${{ secrets.MAVENCENTRAL_USERNAME }}
+          MAVENCENTRAL_PASSWORD: ${{ secrets.MAVENCENTRAL_PASSWORD }}
+          GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
+          GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: scripts/verify-release-credentials.sh
+
   native:
     name: Native ${{ matrix.platform }}
-    needs: version
+    needs: [version, credentials]
     strategy:
       fail-fast: false
       matrix:
@@ -71,13 +90,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: models
-
-      - name: Checkout ModelJars
-        uses: actions/checkout@v5
-        with:
-          repository: ModelJars/modeljars
-          ref: main
-          path: model-jars
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
@@ -114,7 +126,7 @@ jobs:
 
   release:
     name: Release to Maven Central and GitHub
-    needs: [version, native]
+    needs: [version, credentials, native]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -125,13 +137,6 @@ jobs:
         with:
           fetch-depth: 0
           path: models
-
-      - name: Checkout ModelJars
-        uses: actions/checkout@v5
-        with:
-          repository: ModelJars/modeljars
-          ref: main
-          path: model-jars
 
       - name: Download verified native platform JARs
         uses: actions/download-artifact@v8

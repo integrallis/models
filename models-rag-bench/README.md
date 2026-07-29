@@ -87,7 +87,7 @@ for framework in plain-java langchain4j spring-ai; do
   models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
     --framework "$framework" \
     --backend pure-java \
-    --modeljar qwen3_0_6b_q4_0 \
+    --model ~/.jvllm/models/Qwen3-0.6B-Q4_0.gguf \
     --model-id qwen3-0.6b-q4_0 \
     --prompt-template chatml \
     --context 2048 \
@@ -146,13 +146,10 @@ The final prompt token is always replayed, so an identical prompt never relies
 on a stale logits buffer. Backends without checkpoint/rewind support continue
 to reset and prefill the complete prompt.
 
-`--modeljar` resolves the exact artifact and applies only performance profiles
-whose artifact, processor, JVM, vector width, and required launch arguments all
-match. Use the catalog's recommended Java runtime and startup arguments before
-launching the benchmark. `--model /path/to/model.gguf` remains available for an
-unprofiled control and intentionally cannot select artifact-specific profiles.
-The JSON report embeds the backend diagnostics so a published run proves which
-profiles were enabled.
+`--model /path/to/model.gguf` identifies the exact artifact under test. Catalog
+and contribution tooling can resolve an independently published model artifact
+before invoking the benchmark. The JSON report embeds backend diagnostics so a
+published run proves which execution plan was enabled.
 
 Use the same Java application with a locally running native backend:
 

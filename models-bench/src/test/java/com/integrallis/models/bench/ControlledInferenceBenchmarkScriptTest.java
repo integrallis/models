@@ -50,9 +50,7 @@ class ControlledInferenceBenchmarkScriptTest {
         .contains("models.native.quantizedDecode=true")
         .contains("models.native.kernels.threads=$THREADS")
         .contains("-XX:ActiveProcessorCount=$THREADS")
-        .contains("BENCH_MODELJAR_ALIAS=${BENCH_MODELJAR_ALIAS:-}")
-        .contains("MODELS_MODEL_ARGS=(--modeljar \"$BENCH_MODELJAR_ALIAS\")")
-        .contains("\"${MODELS_MODEL_ARGS[@]}\"")
+        .contains("--model \"$MODEL_PATH\"")
         .contains("--models \"$OUTPUT_DIR/models.json\"");
   }
 

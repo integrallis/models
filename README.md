@@ -179,7 +179,6 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Plain Java | `models-runtime` | `GenerationLoop` and `TokenStream` |
 | LangChain4j | `models-langchain4j` | `ModelsChatModel` |
 | Spring AI | `models-spring-ai` | blocking and streaming chat models |
-| Spring Boot | `models-spring-boot-starter` | ModelJars-backed auto-configuration |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 

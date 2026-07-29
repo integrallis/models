@@ -1,234 +1,148 @@
+import java.util.Properties
+
 // backend-java - GGUF parser, vectors-backed inference kernels, and KV cache
 
 data class ModelFixture(
     val taskName: String,
+    val id: String,
     val displayName: String,
-    val sourceId: String,
-    val versionRange: String,
-    val variant: String,
-    val capability: String,
-    val slow: Boolean = false,
-    val backend: String = "pure-java",
+    val slow: Boolean,
+    val backend: String,
 )
+
+val fixtureProperties =
+    Properties().apply {
+        file("src/test/resources/model-fixtures.properties").inputStream().use { load(it) }
+    }
+
+fun modelFixture(taskName: String, id: String): ModelFixture {
+    val encoded =
+        requireNotNull(fixtureProperties.getProperty(id)) {
+            "No pinned model fixture is declared for $id"
+        }
+    val fields = encoded.split('|')
+    require(fields.size == 15) {
+        "Pinned model fixture $id has ${fields.size} fields; expected 15"
+    }
+    return ModelFixture(
+        taskName = taskName,
+        id = id,
+        displayName = fields[0],
+        slow = fields[14].toBooleanStrict(),
+        backend = fields[4],
+    )
+}
 
 val modelFixtures =
     listOf(
-        ModelFixture(
+        modelFixture(
             "downloadQwen306BQ40Model",
-            "Qwen3 0.6B Q4_0",
-            "hf://ggml-org/Qwen3-0.6B-GGUF",
-            "[3.0.0,4.0.0)",
-            "q4_0",
-            "text-generation",
+            "qwen3_0_6b_q4_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen317BQ80Model",
-            "Qwen3 1.7B Q8_0",
-            "hf://Qwen/Qwen3-1.7B-GGUF",
-            "[3.0.0,4.0.0)",
-            "q8_0",
-            "text-generation",
+            "qwen3_1_7b_q8_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen38BQ4KMModel",
-            "Qwen3 8B Q4_K_M",
-            "hf://Qwen/Qwen3-8B-GGUF",
-            "[3.0.0,4.0.0)",
-            "q4_k_m",
-            "chat",
-            slow = true,
+            "qwen3_8b_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen25Coder05BQ40Model",
-            "Qwen2.5-Coder 0.5B Q4_0",
-            "hf://Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF",
-            "[2.5.0,3.0.0)",
-            "q4_0",
-            "code-completion",
+            "qwen2_5_coder_0_5b_instruct_q4_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen25Coder05BQ80Model",
-            "Qwen2.5-Coder 0.5B Q8_0",
-            "hf://Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF",
-            "[2.5.0,3.0.0)",
-            "q8_0",
-            "code-completion",
+            "qwen2_5_coder_0_5b_instruct_q8_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen25Coder15BQ40Model",
-            "Qwen2.5-Coder 1.5B Q4_0",
-            "hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
-            "[2.5.0,3.0.0)",
-            "q4_0",
-            "code-completion",
+            "qwen2_5_coder_1_5b_instruct_q4_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen25Coder15BQ80Model",
-            "Qwen2.5-Coder 1.5B Q8_0",
-            "hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
-            "[2.5.0,3.0.0)",
-            "q8_0",
-            "code-completion",
+            "qwen2_5_coder_1_5b_instruct_q8_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen25Coder3BQ40Model",
-            "Qwen2.5-Coder 3B Q4_0",
-            "hf://Qwen/Qwen2.5-Coder-3B-Instruct-GGUF",
-            "[2.5.0,3.0.0)",
-            "q4_0",
-            "code-completion",
+            "qwen2_5_coder_3b_instruct_q4_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen25Coder7BQ40Model",
-            "Qwen2.5-Coder 7B Q4_0",
-            "hf://Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
-            "[2.5.0,3.0.0)",
-            "q4_0",
-            "code-completion",
-            slow = true,
+            "qwen2_5_coder_7b_instruct_q4_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadQwen25Math15BQ4KMModel",
-            "Qwen2.5-Math 1.5B Instruct Q4_K_M",
-            "hf://bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF",
-            "[2.5.0,3.0.0)",
-            "q4_k_m",
-            "math",
-            backend = "rust-ffm",
+            "qwen2_5_math_1_5b_instruct_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadSmolLm2360MQ80Model",
-            "SmolLM2 360M Q8_0",
-            "hf://HuggingFaceTB/SmolLM2-360M-Instruct-GGUF",
-            "[2.0.0,3.0.0)",
-            "q8_0",
-            "chat",
+            "smollm2_360m_instruct_q8_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadTinyLlama11BChatV10Q40Model",
-            "TinyLlama 1.1B Chat v1.0 Q4_0",
-            "hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
-            "[1.0.0,2.0.0)",
-            "q4_0",
-            "chat",
+            "tinyllama_1_1b_chat_v1_0_q4_0",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadDeepSeekCoder13BQ4KMModel",
-            "DeepSeek-Coder 1.3B Instruct Q4_K_M",
-            "hf://TheBloke/deepseek-coder-1.3b-instruct-GGUF",
-            "[1.3.0,2.0.0)",
-            "q4_k_m",
-            "code-completion",
+            "deepseek_coder_1_3b_instruct_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadDeepSeekCoder67BQ4KMModel",
-            "DeepSeek-Coder 6.7B Instruct Q4_K_M",
-            "hf://TheBloke/deepseek-coder-6.7B-instruct-GGUF",
-            "[6.7.0,7.0.0)",
-            "q4_k_m",
-            "code-completion",
-            slow = true,
+            "deepseek_coder_6_7b_instruct_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadDeepSeekR1DistillQwen7BQ4KMModel",
-            "DeepSeek-R1-Distill-Qwen-7B Q4_K_M",
-            "hf://bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
-            "[1.0.0,2.0.0)",
-            "q4_k_m",
-            "reasoning",
-            slow = true,
+            "deepseek_r1_distill_qwen_7b_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadHuatuoGptO17BQ4KMModel",
-            "HuatuoGPT-o1-7B Q4_K_M",
-            "hf://bartowski/HuatuoGPT-o1-7B-GGUF",
-            "[1.0.0,2.0.0)",
-            "q4_k_m",
-            "medical-reasoning",
-            slow = true,
+            "huatuogpt_o1_7b_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadSqlCoder7B2Q5KMModel",
-            "SQLCoder-7B-2 Q5_K_M",
-            "hf://defog/sqlcoder-7b-2",
-            "[2.0.0,3.0.0)",
-            "q5_k_m",
-            "text-to-sql",
-            slow = true,
+            "sqlcoder_7b_2_q5_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadSmolLm33BQ4KMModel",
-            "SmolLM3 3B Q4_K_M",
-            "hf://ggml-org/SmolLM3-3B-GGUF",
-            "[3.0.0,4.0.0)",
-            "q4_k_m",
-            "text-generation",
-            slow = true,
+            "smollm3_3b_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadMiniCpm51BQ4KMModel",
-            "MiniCPM5 1B Q4_K_M",
-            "hf://openbmb/MiniCPM5-1B-GGUF",
-            "[5.0.0,6.0.0)",
-            "q4_k_m",
-            "text-generation",
+            "minicpm5_1b_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadGemma31BQ4KMModel",
-            "Gemma 3 1B Instruct Q4_K_M",
-            "hf://bartowski/google_gemma-3-1b-it-GGUF",
-            "[3.0.0,4.0.0)",
-            "q4_k_m",
-            "chat",
-            backend = "rust-ffm",
+            "bartowski_google_gemma_3_1b_it_gguf_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadEuroLlm17BQ4KMModel",
-            "EuroLLM 1.7B Instruct Q4_K_M",
-            "hf://mradermacher/EuroLLM-1.7B-Instruct-GGUF",
-            "[1.0.0,2.0.0)",
-            "q4_k_m",
-            "translation",
+            "eurollm_1_7b_instruct_q4_k_m",
         ),
-        ModelFixture(
+        modelFixture(
             "downloadFinR17BQ4KMModel",
-            "Fin-R1 7B Q4_K_M",
-            "hf://bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF",
-            "[1.0.0,2.0.0)",
-            "q4_k_m",
-            "financial-reasoning",
-            slow = true,
+            "fin_r1_7b_q4_k_m",
         ),
     )
 
 dependencies {
     api(project(":models-api"))
-    testImplementation("org.modeljars:modeljars-core:0.1.0-SNAPSHOT")
 
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
 
     testImplementation(project(":models-runtime"))
-    testRuntimeOnly("org.modeljars:modeljars-catalog:0.1.0-SNAPSHOT")
 }
 
 modelFixtures.forEach { fixture ->
     tasks.register<JavaExec>(fixture.taskName) {
         description =
-            "Resolve, download, and verify the ${fixture.displayName} fixture through ModelJars"
+            "Download and verify the pinned ${fixture.displayName} test fixture"
         dependsOn(tasks.named("testClasses"))
         classpath = sourceSets["test"].runtimeClasspath
-        mainClass.set("org.modeljars.ModelJarInstallerCli")
-        args(
-            fixture.sourceId,
-            "--version",
-            fixture.versionRange,
-            "--variant",
-            fixture.variant,
-            "--backend",
-            fixture.backend,
-            "--capability",
-            fixture.capability,
+        mainClass.set(
+            "com.integrallis.models.backend.purejava.fixture.ModelFixtureInstallerCli",
         )
+        args(fixture.id)
     }
 
     val runtimeSuffix =
@@ -267,7 +181,7 @@ tasks.register<Test>("qwen306BQ40IntegrationTest") {
     }
     filter {
         includeTestsMatching(
-            "com.integrallis.models.backend.purejava.Qwen3ModelJarsIntegrationTest.*Q40*",
+            "com.integrallis.models.backend.purejava.Qwen3ModelFixtureIntegrationTest.*Q40*",
         )
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.llama.Qwen3BatchedPrefillIntegrationTest",
@@ -289,7 +203,7 @@ tasks.register<Test>("qwen25Math15BIntegrationTest") {
     }
     filter {
         includeTestsMatching(
-            "com.integrallis.models.backend.purejava.Qwen25MathModelJarsIntegrationTest",
+            "com.integrallis.models.backend.purejava.Qwen25MathModelFixtureIntegrationTest",
         )
     }
     dependsOn(tasks.named("downloadQwen25Math15BQ4KMModel"))
@@ -308,7 +222,7 @@ tasks.register<Test>("euroLlm17BIntegrationTest") {
     }
     filter {
         includeTestsMatching(
-            "com.integrallis.models.backend.purejava.EuroLlmModelJarsIntegrationTest",
+            "com.integrallis.models.backend.purejava.EuroLlmModelFixtureIntegrationTest",
         )
     }
     dependsOn(tasks.named("downloadEuroLlm17BQ4KMModel"))
@@ -339,49 +253,49 @@ listOf(
         "qwen25Coder7BSlowTest",
         "Qwen2.5-Coder 7B",
         "downloadQwen25Coder7BQ40Model",
-        "com.integrallis.models.backend.purejava.Qwen25CoderLargeModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.Qwen25CoderLargeModelFixtureSlowTest",
     ),
     LargeModelTest(
         "deepSeekCoder67BSlowTest",
         "DeepSeek-Coder 6.7B",
         "downloadDeepSeekCoder67BQ4KMModel",
-        "com.integrallis.models.backend.purejava.DeepSeekCoderLargeModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.DeepSeekCoderLargeModelFixtureSlowTest",
     ),
     LargeModelTest(
         "qwen38BSlowTest",
         "Qwen3 8B",
         "downloadQwen38BQ4KMModel",
-        "com.integrallis.models.backend.purejava.Qwen3LargeModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.Qwen3LargeModelFixtureSlowTest",
     ),
     LargeModelTest(
         "deepSeekR1DistillQwen7BSlowTest",
         "DeepSeek-R1-Distill-Qwen-7B",
         "downloadDeepSeekR1DistillQwen7BQ4KMModel",
-        "com.integrallis.models.backend.purejava.DeepSeekR1DistillQwenLargeModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.DeepSeekR1DistillQwenLargeModelFixtureSlowTest",
     ),
     LargeModelTest(
         "huatuoGptO17BSlowTest",
         "HuatuoGPT-o1-7B",
         "downloadHuatuoGptO17BQ4KMModel",
-        "com.integrallis.models.backend.purejava.HuatuoGptO1LargeModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.HuatuoGptO1LargeModelFixtureSlowTest",
     ),
     LargeModelTest(
         "sqlCoder7B2SlowTest",
         "SQLCoder-7B-2",
         "downloadSqlCoder7B2Q5KMModel",
-        "com.integrallis.models.backend.purejava.SqlCoderLargeModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.SqlCoderLargeModelFixtureSlowTest",
     ),
     LargeModelTest(
         "smolLm33BSlowTest",
         "SmolLM3 3B",
         "downloadSmolLm33BQ4KMModel",
-        "com.integrallis.models.backend.purejava.SmolLm3ModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.SmolLm3ModelFixtureSlowTest",
     ),
     LargeModelTest(
         "finR17BSlowTest",
         "Fin-R1 7B",
         "downloadFinR17BQ4KMModel",
-        "com.integrallis.models.backend.purejava.FinR1LargeModelJarsSlowTest",
+        "com.integrallis.models.backend.purejava.FinR1LargeModelFixtureSlowTest",
     ),
 ).forEach { largeModelTest ->
     tasks.register<Test>(largeModelTest.taskName) {

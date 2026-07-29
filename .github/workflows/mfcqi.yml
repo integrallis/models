@@ -27,13 +27,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: models
 
-      - name: Checkout ModelJars
-        uses: actions/checkout@v5
-        with:
-          repository: ModelJars/modeljars
-          ref: main
-          path: model-jars
-
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
