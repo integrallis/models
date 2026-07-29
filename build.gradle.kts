@@ -1058,6 +1058,9 @@ tasks.register("verifyDocumentation") {
     val docsPackageFile = file("docs/package.json")
     val docsLockFile = file("docs/package-lock.json")
     val docsBuildFile = file("docs/build.gradle")
+    val docsPlaybookFile = file("docs/antora-playbook.yml")
+    val uiBundleFile = file("docs/ui/antora-ui-default-0e38223.zip")
+    val uiBundleLicenseFile = file("docs/ui/LICENSE")
     val ciWorkflowFile = file(".github/workflows/ci.yml")
     val docsWorkflowFile = file(".github/workflows/docs.yml")
     val releaseWorkflowFile = file(".github/workflows/release.yml")
@@ -1067,6 +1070,9 @@ tasks.register("verifyDocumentation") {
         docsPackageFile,
         docsLockFile,
         docsBuildFile,
+        docsPlaybookFile,
+        uiBundleFile,
+        uiBundleLicenseFile,
         ciWorkflowFile,
         docsWorkflowFile,
         releaseWorkflowFile
@@ -1075,6 +1081,31 @@ tasks.register("verifyDocumentation") {
     doLast {
         require(docsLockFile.isFile) {
             "docs/package-lock.json must be committed for reproducible documentation builds"
+        }
+        require(uiBundleFile.isFile) {
+            "The pinned Antora UI bundle must be committed at ${uiBundleFile.relativeTo(rootDir)}"
+        }
+        val uiBundleChecksum =
+            MessageDigest.getInstance("SHA-256")
+                .digest(uiBundleFile.readBytes())
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        require(
+            uiBundleChecksum ==
+                "e0ac81aad26961a9cd3cf9bce692a598eff4a1bd2822ce73c9cdc13a15a1e70d"
+        ) {
+            "The pinned Antora UI bundle checksum is invalid: $uiBundleChecksum"
+        }
+        require(
+            docsPlaybookFile.readText().contains(
+                "url: ./ui/antora-ui-default-0e38223.zip"
+            )
+        ) {
+            "The Antora playbook must use the pinned local UI bundle"
+        }
+        require(
+            "Mozilla Public License Version 2.0" in uiBundleLicenseFile.readText()
+        ) {
+            "The vendored Antora UI bundle must include its MPL-2.0 license"
         }
 
         val malformedPages =

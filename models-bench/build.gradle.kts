@@ -40,6 +40,9 @@ application {
         listOf("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
 }
 
+val aggregateNativeRelease =
+    providers.gradleProperty("modelsNativeArtifactDirectory").isPresent
+
 tasks.withType<JavaExec>().configureEach {
     jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
     System.getProperty("models.native.kernels.library")?.let {
@@ -51,12 +54,14 @@ dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
     implementation(project(":backend-native"))
-    runtimeOnly(
-        project(
-            path = ":backend-native",
-            configuration = "hostNativeRuntimeElements",
+    if (!aggregateNativeRelease) {
+        runtimeOnly(
+            project(
+                path = ":backend-native",
+                configuration = "hostNativeRuntimeElements",
+            )
         )
-    )
+    }
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
