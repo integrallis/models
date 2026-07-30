@@ -45,29 +45,115 @@ public final class GgufParser {
     GgufMetadata metadata = headerResult.metadata();
 
     var cursor = new GgufReader.Cursor(segment, headerResult.endOffset());
+    if (header.tensorCount() > cursor.remaining() / 24) {
+      throw new MalformedGgufException(
+          "tensor count "
+              + header.tensorCount()
+              + " cannot fit in the remaining "
+              + cursor.remaining()
+              + " bytes");
+    }
 
     List<GgufTensorInfo> tensorInfos = new ArrayList<>((int) header.tensorCount());
     for (long i = 0; i < header.tensorCount(); i++) {
       String name = cursor.readString();
       int nDimensions = cursor.readU32();
+      if (nDimensions < 1 || nDimensions > 4) {
+        throw new MalformedGgufException(
+            "tensor '"
+                + name
+                + "' has invalid dimension count "
+                + Integer.toUnsignedLong(nDimensions));
+      }
       long[] shape = new long[nDimensions];
       for (int d = 0; d < nDimensions; d++) {
         shape[d] = cursor.readU64();
+        if (shape[d] <= 0) {
+          throw new MalformedGgufException(
+              "tensor '" + name + "' has invalid dimension " + Long.toUnsignedString(shape[d]));
+        }
       }
       int typeId = cursor.readU32();
-      GgufTensorType type = GgufTensorType.fromId(typeId);
+      GgufTensorType type;
+      try {
+        type = GgufTensorType.fromId(typeId);
+      } catch (IllegalArgumentException invalidType) {
+        throw new MalformedGgufException(
+            "tensor '" + name + "' has invalid type " + typeId, invalidType);
+      }
       long offset = cursor.readU64();
-      tensorInfos.add(new GgufTensorInfo(name, nDimensions, shape, type, offset));
+      if (offset < 0) {
+        throw new MalformedGgufException(
+            "tensor '" + name + "' has unsupported offset " + Long.toUnsignedString(offset));
+      }
+      try {
+        tensorInfos.add(new GgufTensorInfo(name, nDimensions, shape, type, offset));
+      } catch (IllegalArgumentException | ArithmeticException invalidTensor) {
+        throw new MalformedGgufException(
+            "tensor '" + name + "' has invalid shape or block layout", invalidTensor);
+      }
     }
 
     // Compute aligned tensor data start
-    int alignment = metadata.getUint32("general.alignment").orElse(GgufConstants.DEFAULT_ALIGNMENT);
+    long alignment =
+        Integer.toUnsignedLong(
+            metadata.getUint32("general.alignment").orElse(GgufConstants.DEFAULT_ALIGNMENT));
+    if (alignment == 0 || (alignment & (alignment - 1)) != 0) {
+      throw new MalformedGgufException(
+          "general.alignment must be a positive power of two, but was " + alignment);
+    }
     long tensorDataOffset = alignUp(cursor.offset(), alignment);
+    if (tensorDataOffset > segment.byteSize()) {
+      throw new MalformedGgufException(
+          "aligned tensor data offset "
+              + tensorDataOffset
+              + " exceeds file size "
+              + segment.byteSize());
+    }
+    for (GgufTensorInfo tensor : tensorInfos) {
+      validateTensorRange(tensor, tensorDataOffset, segment.byteSize());
+    }
 
     return new GgufFile(header, metadata, tensorInfos, tensorDataOffset, segment);
   }
 
   private static long alignUp(long value, long alignment) {
-    return (value + alignment - 1) & ~(alignment - 1);
+    long remainder = value & (alignment - 1);
+    if (remainder == 0) {
+      return value;
+    }
+    try {
+      return Math.addExact(value, alignment - remainder);
+    } catch (ArithmeticException overflow) {
+      throw new MalformedGgufException("tensor data alignment overflows a 64-bit offset", overflow);
+    }
+  }
+
+  private static void validateTensorRange(
+      GgufTensorInfo tensor, long tensorDataOffset, long fileSize) {
+    long tensorBytes;
+    try {
+      tensorBytes = tensor.byteSize();
+    } catch (IllegalArgumentException | ArithmeticException invalidLayout) {
+      throw new MalformedGgufException(
+          "tensor '" + tensor.name() + "' has an invalid block layout", invalidLayout);
+    }
+    try {
+      long start = Math.addExact(tensorDataOffset, tensor.offset());
+      long end = Math.addExact(start, tensorBytes);
+      if (end > fileSize) {
+        throw new MalformedGgufException(
+            "tensor '"
+                + tensor.name()
+                + "' extends past the file (end "
+                + end
+                + ", file size "
+                + fileSize
+                + ")");
+      }
+    } catch (ArithmeticException overflow) {
+      throw new MalformedGgufException(
+          "tensor '" + tensor.name() + "' range overflows a 64-bit offset", overflow);
+    }
   }
 }

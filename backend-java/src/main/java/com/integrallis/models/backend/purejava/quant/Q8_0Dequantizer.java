@@ -32,6 +32,7 @@ public final class Q8_0Dequantizer implements Dequantizer {
 
   @Override
   public void dequantize(MemorySegment src, long srcOffset, float[] dst, int dstOffset, int count) {
+    DequantizationChecks.validate(src, srcOffset, dst, dstOffset, count, BLOCK_SIZE, BLOCK_BYTES);
     int numBlocks = count / BLOCK_SIZE;
 
     for (int block = 0; block < numBlocks; block++) {

@@ -22,11 +22,14 @@ import java.nio.ByteOrder;
 /** Dequantizes F16 (half-precision) data to F32 element-by-element. */
 public final class F16Dequantizer implements Dequantizer {
 
+  private static final int BLOCK_SIZE = 1;
+  private static final int BLOCK_BYTES = 2;
   private static final ValueLayout.OfShort LE_SHORT =
       ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   @Override
   public void dequantize(MemorySegment src, long srcOffset, float[] dst, int dstOffset, int count) {
+    DequantizationChecks.validate(src, srcOffset, dst, dstOffset, count, BLOCK_SIZE, BLOCK_BYTES);
     for (int i = 0; i < count; i++) {
       short bits = src.get(LE_SHORT, srcOffset + (long) i * 2);
       dst[dstOffset + i] = Float16.toFloat(bits);
