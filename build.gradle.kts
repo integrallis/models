@@ -373,7 +373,7 @@ configure(benchmarkProjects) {
 }
 
 // ---------------------------------------------------------------------------
-// Publishing: only implemented 0.1.x modules stage for Maven Central.
+// Publishing: only implemented modules in the explicit allowlist stage for Maven Central.
 // ---------------------------------------------------------------------------
 
 configure(publishedProjects) {
@@ -1112,6 +1112,172 @@ tasks.register("verifyNotebooks") {
     }
 }
 
+tasks.register("verifyReleaseMetadata") {
+    group = "verification"
+    description = "Verify that release metadata and user-facing Models versions agree"
+
+    val changelogFile = file("CHANGELOG.md")
+    val releasingFile = file("RELEASING.md")
+    val securityFile = file("SECURITY.md")
+    val antoraComponentFile = file("docs/content/antora.yml")
+    val docsPackageFile = file("docs/package.json")
+    val docsLockFile = file("docs/package-lock.json")
+    val landingPageFile = file("docs/landing/index.html")
+    val nativeCargoFile = file("backend-native/src/main/rust/model-kernels/Cargo.toml")
+    val nativeCargoLockFile = file("backend-native/src/main/rust/model-kernels/Cargo.lock")
+    val notebookEnvironmentFile = file("notebooks/.env.example")
+    val notebookComposeFile = file("notebooks/docker-compose.yml")
+    val notebookClasspathScript = file("notebooks/jupyter/prepare-classpath.sh")
+    val notebookReadmeFile = file("notebooks/README.md")
+    val versionedDocumentation =
+        files(
+            "README.md",
+            "models-backend-apple/README.md",
+            "models-rag/README.md",
+            "docs/landing/index.html"
+        )
+
+    inputs.property("releaseVersion", provider { project.version.toString() })
+    inputs.files(
+        changelogFile,
+        releasingFile,
+        securityFile,
+        antoraComponentFile,
+        docsPackageFile,
+        docsLockFile,
+        landingPageFile,
+        nativeCargoFile,
+        nativeCargoLockFile,
+        notebookEnvironmentFile,
+        notebookComposeFile,
+        notebookClasspathScript,
+        notebookReadmeFile,
+        versionedDocumentation
+    )
+
+    doLast {
+        val releaseVersion = project.version.toString()
+        require(
+            Regex("""(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)""")
+                .matches(releaseVersion)
+        ) {
+            "Prepared release version must be a SemVer release without a qualifier: $releaseVersion"
+        }
+
+        val changelog = changelogFile.readText()
+        require(Regex("""(?m)^## \[$releaseVersion] - \d{4}-\d{2}-\d{2}$""").containsMatchIn(changelog)) {
+            "CHANGELOG.md must contain a dated $releaseVersion release section"
+        }
+
+        val releasing = releasingFile.readText()
+        publishedModuleNames.forEach { module ->
+            require("`$module`" in releasing) {
+                "RELEASING.md publication inventory is missing $module"
+            }
+        }
+        require("sibling composite build" !in releasing && "0.1.x" !in releasing) {
+            "RELEASING.md must describe the current independent publication pipeline"
+        }
+
+        val antoraComponent = antoraComponentFile.readText()
+        require("display_version: '$releaseVersion'" in antoraComponent) {
+            "Antora display_version must match $releaseVersion"
+        }
+        require("models-version: '$releaseVersion'" in antoraComponent) {
+            "Antora models-version must match $releaseVersion"
+        }
+
+        val docsPackage = JsonSlurper().parse(docsPackageFile) as Map<*, *>
+        require(docsPackage["version"] == releaseVersion) {
+            "docs/package.json version must match $releaseVersion"
+        }
+        val docsLock = JsonSlurper().parse(docsLockFile) as Map<*, *>
+        require(docsLock["version"] == releaseVersion) {
+            "docs/package-lock.json version must match $releaseVersion"
+        }
+        val lockedPackages = docsLock["packages"] as? Map<*, *> ?: emptyMap<Any, Any>()
+        val lockedRoot = lockedPackages[""] as? Map<*, *> ?: emptyMap<Any, Any>()
+        require(lockedRoot["version"] == releaseVersion) {
+            "docs/package-lock.json root package version must match $releaseVersion"
+        }
+
+        require(">v$releaseVersion</a>" in landingPageFile.readText()) {
+            "Landing-page version pill must match $releaseVersion"
+        }
+
+        fun packageVersion(tomlFile: File): String =
+            Regex("""(?ms)^\[package]\s+.*?^version\s*=\s*"([^"]+)"\s*$""")
+                .find(tomlFile.readText())
+                ?.groupValues
+                ?.get(1)
+                ?: error("Unable to read package version from $tomlFile")
+
+        require(packageVersion(nativeCargoFile) == releaseVersion) {
+            "Native kernel crate version must match $releaseVersion"
+        }
+        val cargoLock = nativeCargoLockFile.readText()
+        require(
+            Regex(
+                    """(?ms)^\[\[package]]\s+name = "jmodels-kernels"\s+version = "$releaseVersion"$"""
+                )
+                .containsMatchIn(cargoLock)
+        ) {
+            "Native kernel lockfile version must match $releaseVersion"
+        }
+
+        val coordinatePattern =
+            Regex(
+                """com\.integrallis:(models(?:-[A-Za-z0-9.-]+)?|backend-[A-Za-z0-9.-]+):""" +
+                    """(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)"""
+            )
+        val staleCoordinates =
+            versionedDocumentation.files
+                .sorted()
+                .flatMap { document ->
+                    coordinatePattern.findAll(document.readText()).mapNotNull { match ->
+                        val documentedVersion = match.groupValues[2]
+                        if (documentedVersion == releaseVersion) {
+                            null
+                        } else {
+                            "${document.relativeTo(rootDir)}: ${match.value}"
+                        }
+                    }
+                }
+        require(staleCoordinates.isEmpty()) {
+            "Published Models coordinates must use $releaseVersion:\n" +
+                staleCoordinates.joinToString("\n")
+        }
+
+        require(
+            "MODELS_VERSION=$releaseVersion" in notebookEnvironmentFile.readText() &&
+                "MODELS_VERSION=\${MODELS_VERSION:-$releaseVersion}" in
+                notebookComposeFile.readText() &&
+                "version=\${MODELS_VERSION:-$releaseVersion}" in
+                notebookClasspathScript.readText()
+        ) {
+            "Notebook release defaults must match $releaseVersion"
+        }
+        val notebookReadme = notebookReadmeFile.readText()
+        require(
+            "-PnotebookVersion=$releaseVersion" in notebookReadme &&
+                "MODELS_VERSION=$releaseVersion" in notebookReadme
+        ) {
+            "Notebook release examples must match $releaseVersion"
+        }
+
+        val security = securityFile.readText()
+        require("No downloader is implemented in" !in security) {
+            "SECURITY.md must describe the downloader boundary without a stale release series"
+        }
+        require(
+            !Regex("""no \d+\.\d+\.\d+ release has been\s+signed yet""")
+                .containsMatchIn(security)
+        ) {
+            "SECURITY.md must not claim that an already published release is unsigned"
+        }
+    }
+}
+
 tasks.register("verifyDocumentation") {
     group = "verification"
     description = "Verify the Antora site, landing page, and documentation toolchain"
@@ -1422,6 +1588,7 @@ tasks.register("complianceCheck") {
         "verifyReproducibleBuild",
         "verifyGithubWorkflows",
         "verifyNotebooks",
+        "verifyReleaseMetadata",
         "verifyDocumentation"
     )
 }

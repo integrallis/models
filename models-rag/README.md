@@ -7,7 +7,7 @@ applications. It is intended for local models that can answer narrow questions
 but should not be trusted to enforce source attribution or abstention alone.
 
 ```kotlin
-implementation("com.integrallis:models-rag:0.1.0")
+implementation("com.integrallis:models-rag:0.2.0")
 ```
 
 ```java
