@@ -22,10 +22,6 @@ import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -73,61 +69,13 @@ public final class ModelsChatModel implements ChatModel {
   @Override
   public ChatResponse doChat(ChatRequest request) {
     Objects.requireNonNull(request, "request");
-    String output = model.generate(prompt(request), options(request));
+    String output =
+        model.generate(
+            LangChain4jChatRequestMapper.prompt(request, template),
+            LangChain4jChatRequestMapper.options(request, defaults));
     return ChatResponse.builder()
         .aiMessage(AiMessage.from(output))
         .modelName(model.modelName())
         .build();
-  }
-
-  private String prompt(ChatRequest request) {
-    java.util.ArrayList<com.integrallis.models.runtime.chat.ChatMessage> messages =
-        new java.util.ArrayList<>(request.messages().size());
-    for (ChatMessage message : request.messages()) {
-      messages.add(render(message));
-    }
-    return template.render(messages);
-  }
-
-  private com.integrallis.models.runtime.chat.ChatMessage render(ChatMessage message) {
-    if (message instanceof UserMessage userMessage && userMessage.hasSingleText()) {
-      return com.integrallis.models.runtime.chat.ChatMessage.user(userMessage.singleText());
-    }
-    if (message instanceof SystemMessage systemMessage) {
-      return com.integrallis.models.runtime.chat.ChatMessage.system(systemMessage.text());
-    }
-    if (message instanceof AiMessage aiMessage) {
-      return com.integrallis.models.runtime.chat.ChatMessage.assistant(aiMessage.text());
-    }
-    if (message instanceof ToolExecutionResultMessage toolMessage && toolMessage.hasSingleText()) {
-      return com.integrallis.models.runtime.chat.ChatMessage.tool(toolMessage.text());
-    }
-    throw new IllegalArgumentException("Unsupported LangChain4j chat message: " + message.type());
-  }
-
-  private SamplingOptions options(ChatRequest request) {
-    SamplingOptions.Builder builder =
-        SamplingOptions.builder()
-            .temperature(defaults.temperature())
-            .topP(defaults.topP())
-            .topK(defaults.topK())
-            .maxTokens(defaults.maxTokens())
-            .repetitionPenalty(defaults.repetitionPenalty());
-    if (defaults.seed() != null) {
-      builder.seed(defaults.seed());
-    }
-    if (request.temperature() != null) {
-      builder.temperature(request.temperature().floatValue());
-    }
-    if (request.topP() != null) {
-      builder.topP(request.topP().floatValue());
-    }
-    if (request.topK() != null) {
-      builder.topK(request.topK());
-    }
-    if (request.maxOutputTokens() != null) {
-      builder.maxTokens(request.maxOutputTokens());
-    }
-    return builder.build();
   }
 }
