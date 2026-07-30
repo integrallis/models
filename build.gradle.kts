@@ -1219,6 +1219,16 @@ tasks.register("verifyDocumentation") {
             "Documentation navigation must link to the inference concepts page"
         }
 
+        val gettingStarted =
+            file("docs/content/modules/ROOT/pages/getting-started.adoc").readText()
+        require(
+            "ChatTemplate.CHATML.render(" in gettingStarted &&
+                "ChatMessage.system(" in gettingStarted &&
+                "ChatMessage.user(" in gettingStarted
+        ) {
+            "Getting started must show how to format a role-aware model prompt"
+        }
+
         val architectureSource = file("media/diagrams/models-0001.svg")
         require(architectureSource.isFile) {
             "Architecture diagram must retain an editable source"

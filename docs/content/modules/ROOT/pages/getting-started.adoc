@@ -28,12 +28,20 @@ through Java FFM.
 
 == Load and Generate
 
+Instruction-tuned models require the control tokens and role boundaries defined
+by their chat template. Use the template recorded for the exact qualified model
+artifact; selecting a template from the architecture name alone is not
+reliable. This example formats a ChatML conversation before generation.
+
 [source,java]
 ----
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.nio.file.Path;
+import java.util.List;
 
 Path modelPath = Path.of(System.getenv("MODELS_MODEL_PATH"));
 
@@ -44,9 +52,11 @@ try (var backend = PureJavaBackend.load(modelPath)) {
         .maxTokens(64)
         .build();
 
-    String answer = generator.generate(
-        "Classify this intent: I want to cancel my order",
-        options);
+    String prompt = ChatTemplate.CHATML.render(List.of(
+        ChatMessage.system("Classify the user's intent in one phrase."),
+        ChatMessage.user("I want to cancel my order")));
+
+    String answer = generator.generate(prompt, options);
     System.out.println(answer);
 }
 ----
