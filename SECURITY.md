@@ -2,9 +2,10 @@
 
 ## Supported Versions
 
-| Version            | Status                         |
-|--------------------|--------------------------------|
-| 0.1.x (unreleased) | Pre-release security fixes only |
+| Version | Status |
+|---------|--------|
+| 0.2.x | Current |
+| 0.1.x | Security fixes |
 
 ## Reporting a Vulnerability
 
@@ -60,8 +61,8 @@ Security-relevant boundaries:
 - **Published execution backends are explicit** — `backend-java` is Java bytecode.
   `backend-native` optionally loads the small Models-owned Rust kernel library through
   Java FFM; it does not load llama.cpp, Ollama, or another inference engine.
-- **No downloader is implemented in 0.1.x** — The published core modules perform no network I/O.
-  Users supply a local model path.
+- **No downloader in the core runtime** — The published core modules perform no network I/O.
+  Users supply a local model path or use the separate ModelJars facade.
 - **Arena-based model mapping** — The backend owns a shared `Arena` and closes it from
   `PureJavaBackend.close()`; using the backend after close is unsupported.
 - **Artifact signing is external** — JReleaser signs staged Maven artifacts with the maintainer's
@@ -76,9 +77,8 @@ Security-relevant boundaries:
 - **Dependency locking** — Gradle lockfiles pin all transitive dependency versions
 - **Vulnerability scanning** — OWASP Dependency-Check is available as an explicit release audit;
   findings with CVSS >= 7.0 fail that task
-- **Artifact signing** — The release workflow is configured to sign Maven
-  Central artifacts with GPG through JReleaser; no 0.1.0 release has been
-  signed yet.
+- **Artifact signing** — The release workflow signs Maven Central artifacts
+  with GPG through JReleaser.
 - **Deterministic JAR settings** — JAR tasks disable file timestamps and use
   reproducible file order. A byte-for-byte clean-room rebuild has not yet been
   independently verified.
