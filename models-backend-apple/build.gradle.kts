@@ -1,6 +1,8 @@
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.HexFormat
+import java.util.jar.JarFile
+import org.gradle.jvm.tasks.Jar
 import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
@@ -67,15 +69,68 @@ val prepareBundledAppleBridge =
 if (prepareBundledAppleBridge != null) {
     sourceSets {
         main {
-            resources.srcDir(generatedAppleResources)
+            resources.srcDir(prepareBundledAppleBridge)
         }
     }
     tasks.named("processResources") {
         dependsOn(prepareBundledAppleBridge)
     }
-    tasks.named("check") {
-        dependsOn(prepareBundledAppleBridge)
+}
+
+val appleRuntimeJar = tasks.named<Jar>("jar")
+val appleSourcesJar =
+    tasks.named<Jar>("sourcesJar") {
+        // Generated native resources belong only in the runtime artifact.
+        exclude("META-INF/models/apple-foundation/**")
     }
+
+val verifyAppleBackendArchives =
+    tasks.register("verifyAppleBackendArchives") {
+        group = "verification"
+        description = "Verify Apple bridge runtime and source archive ownership"
+        dependsOn(appleRuntimeJar, appleSourcesJar)
+        inputs.files(
+            appleRuntimeJar.flatMap { it.archiveFile },
+            appleSourcesJar.flatMap { it.archiveFile }
+        )
+        inputs.property("bundledBridgeExpected", appleBridgeArtifact != null)
+
+        doLast {
+            val resourceDirectory =
+                "META-INF/models/apple-foundation/$appleBridgePlatform/"
+            val bridgeResource = resourceDirectory + appleBridgeFileName
+            val metadataResource = resourceDirectory + "native.properties"
+
+            JarFile(appleRuntimeJar.get().archiveFile.get().asFile).use { jar ->
+                val bridge = jar.getJarEntry(bridgeResource)
+                val metadata = jar.getJarEntry(metadataResource)
+                if (appleBridgeArtifact != null) {
+                    require(bridge != null && metadata != null) {
+                        "backend-apple runtime JAR must contain the bundled bridge and metadata"
+                    }
+                } else {
+                    require(bridge == null && metadata == null) {
+                        "Source-only backend-apple runtime JAR must not contain bridge resources"
+                    }
+                }
+            }
+
+            JarFile(appleSourcesJar.get().archiveFile.get().asFile).use { jar ->
+                val nativeResources =
+                    jar.entries().asSequence()
+                        .map { it.name }
+                        .filter { it.startsWith(resourceDirectory) }
+                        .toList()
+                require(nativeResources.isEmpty()) {
+                    "backend-apple sources JAR must not duplicate native resources: " +
+                        nativeResources
+                }
+            }
+        }
+    }
+
+tasks.named("check") {
+    dependsOn(verifyAppleBackendArchives)
 }
 
 tasks.withType<Test>().configureEach {

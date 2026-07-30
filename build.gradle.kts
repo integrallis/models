@@ -671,9 +671,9 @@ tasks.register("verifyStagedPublications") {
                 }
             }
             if (proj.name == "backend-apple") {
+                val resourceDirectory =
+                    "META-INF/models/apple-foundation/macos-aarch64/"
                 JarFile(versionDir.resolve("$artifactBase.jar")).use { jar ->
-                    val resourceDirectory =
-                        "META-INF/models/apple-foundation/macos-aarch64/"
                     val bridgeEntry =
                         jar.getJarEntry(
                             resourceDirectory +
@@ -692,6 +692,17 @@ tasks.register("verifyStagedPublications") {
                         require(bridgeEntry == null && metadataEntry == null) {
                             "Source-only backend-apple staging must not contain an unverified bridge"
                         }
+                    }
+                }
+                JarFile(versionDir.resolve("$artifactBase-sources.jar")).use { jar ->
+                    val nativeResources =
+                        jar.entries().asSequence()
+                            .map { it.name }
+                            .filter { it.startsWith(resourceDirectory) }
+                            .toList()
+                    require(nativeResources.isEmpty()) {
+                        "Staged backend-apple sources JAR duplicates native resources: " +
+                            nativeResources
                     }
                 }
             }
