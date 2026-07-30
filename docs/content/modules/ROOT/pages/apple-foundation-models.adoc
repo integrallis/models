@@ -1,0 +1,179 @@
+= Apple Foundation Models
+
+`backend-apple` lets a Java 25 application use Apple's on-device
+`SystemLanguageModel`. The model is part of Apple Intelligence and is managed
+and updated by the operating system. It is not a GGUF file and does not need a
+ModelJar download.
+
+The Java API crosses a four-function C ABI with the Foreign Function and Memory
+(FFM) API. A small Models-owned Swift binary calls Apple's Foundation Models
+framework. No prompt or response is sent to Ollama, llama.cpp, or a hosted
+model provider.
+
+== Requirements
+
+* A supported Apple Silicon Mac
+* Apple Intelligence available, enabled, and ready for the current user
+* Java 25
+* Native access enabled for the application
+
+Always inspect `availability()` at runtime. Apple can report that a device is
+ineligible, Apple Intelligence is disabled, or the model is not ready.
+
+== Dependency
+
+[source,kotlin,subs=attributes+]
+----
+dependencies {
+    implementation("com.integrallis:backend-apple:{models-version}")
+}
+----
+
+Run the application with native access enabled:
+
+[source,shell]
+----
+java --enable-native-access=ALL-UNNAMED -jar application.jar
+----
+
+== Generate Text
+
+[source,java]
+----
+import com.integrallis.models.backend.apple.AppleFoundationModels;
+import com.integrallis.models.backend.apple.AppleFoundationModelsRequest;
+
+try (var client = AppleFoundationModels.create()) {
+    var availability = client.availability();
+    if (!availability.available()) {
+        throw new IllegalStateException(availability.reason());
+    }
+
+    var response = client.generate(
+        AppleFoundationModelsRequest.builder(
+                "Summarize why local inference protects private data.")
+            .instructions("Answer in one concise sentence.")
+            .maxOutputTokens(64)
+            .build());
+
+    System.out.println(response.text());
+}
+----
+
+`AppleFoundationModels.create()` first checks macOS and Apple Silicon support,
+then loads the packaged Swift bridge. The bridge checks
+`SystemLanguageModel.default.availability` before creating a
+`LanguageModelSession`.
+
+== Use Framework Adapters
+
+`AppleFoundationModelsClient` implements Models' shared
+`TextGenerationModel` contract. The existing LangChain4j and Spring AI
+adapters therefore accept the Apple client directly.
+
+For LangChain4j, add `models-langchain4j` and pass the checked client to
+`ModelsChatModel`:
+
+[source,kotlin,subs=attributes+]
+----
+dependencies {
+    implementation("com.integrallis:backend-apple:{models-version}")
+    implementation("com.integrallis:models-langchain4j:{models-version}")
+}
+----
+
+[source,java]
+----
+import com.integrallis.models.backend.apple.AppleFoundationModels;
+import com.integrallis.models.langchain4j.ModelsChatModel;
+
+try (var client = AppleFoundationModels.create()) {
+    if (!client.availability().available()) {
+        throw new IllegalStateException(client.availability().reason());
+    }
+
+    var chatModel = new ModelsChatModel(client);
+    String answer = chatModel.chat("Name one benefit of local inference.");
+}
+----
+
+Spring AI uses the same contract:
+
+[source,kotlin,subs=attributes+]
+----
+dependencies {
+    implementation("com.integrallis:backend-apple:{models-version}")
+    implementation("com.integrallis:models-spring-ai:{models-version}")
+}
+----
+
+[source,java]
+----
+import com.integrallis.models.backend.apple.AppleFoundationModels;
+import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
+
+try (var client = AppleFoundationModels.create()) {
+    if (!client.availability().available()) {
+        throw new IllegalStateException(client.availability().reason());
+    }
+
+    var chatModel = new ModelsSpringAiChatModel(client);
+    String answer = chatModel.call("Summarize the retrieved context.");
+}
+----
+
+The current Apple bridge receives a complete response from
+`SystemLanguageModel`. A framework streaming call therefore emits that response
+as one event. `maxTokens` maps to Apple's maximum-response-token option; Apple
+owns the remaining sampling behavior.
+
+== Model Identity And Updates
+
+Apple periodically updates `SystemLanguageModel` with operating-system
+releases. That makes it different from a ModelJar, which pins one downloadable
+artifact by revision, byte size, and SHA-256. Test application prompts on every
+Apple model and OS version that the application supports.
+
+The ModelJars catalog links to this backend as another local Models execution
+option, but it does not assign Maven model coordinates to Apple's private,
+OS-managed weights.
+
+== Override The Bridge
+
+For a source build or bridge-development run, point Models at a specific
+dynamic library:
+
+[source,shell]
+----
+export MODELS_APPLE_FOUNDATION_LIBRARY=/path/to/libjavamodels_apple_foundation.dylib
+----
+
+The equivalent system property is:
+
+[source,shell]
+----
+-Dmodels.apple.foundation.library=/path/to/libjavamodels_apple_foundation.dylib
+----
+
+An explicit path takes precedence over the bridge packaged in
+`backend-apple`.
+
+== Test Application Wiring
+
+Stub mode exercises availability handling and Java application wiring without
+claiming to simulate Apple's model output:
+
+[source,shell]
+----
+java \
+  --enable-native-access=ALL-UNNAMED \
+  -Dmodels.apple.foundation.mode=stub \
+  -jar application.jar
+----
+
+The real integration test still requires an eligible Apple Silicon Mac with a
+logged-in user session and Apple Intelligence enabled.
+
+See Apple's
+https://developer.apple.com/documentation/foundationmodels/systemlanguagemodel[SystemLanguageModel documentation^]
+for platform availability and model-update behavior.

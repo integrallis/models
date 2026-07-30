@@ -18,7 +18,8 @@ include("models-semantic-order")
 include("backend-java")
 include("models-backend-onnx")
 include("backend-native")
-include("models-backend-apple")
+include("backend-apple")
+project(":backend-apple").projectDir = file("models-backend-apple")
 
 // --- Framework adapters ---
 include("models-spring-ai")

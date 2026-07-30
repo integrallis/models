@@ -66,6 +66,19 @@ body {
     transition: background-color var(--transition), color var(--transition);
 }
 
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(to right, var(--grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 100% 70% at 50% 0%, #000 30%, transparent 80%);
+}
+
 a { color: inherit; text-decoration: none; }
 img { max-width: 100%; height: auto; }
 .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
@@ -83,7 +96,6 @@ img { max-width: 100%; height: auto; }
 .nav-container { max-width: 1120px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
 .nav-brand { display: flex; align-items: center; gap: 10px; }
 .nav-brand a { text-decoration: none; }
-.nav-brand .product-mark { width: 30px; height: 30px; object-fit: contain; }
 .nav-brand .brand-mark { display: inline-flex; align-items: center; }
 .nav-brand .ilogo { height: 24px; width: auto; }
 /* Integrallis logo is color-on-light; in dark mode flip lightness while keeping the orange hue. */
@@ -93,6 +105,8 @@ img { max-width: 100%; height: auto; }
 .nav-brand .sep { color: var(--subtle); font-weight: 300; }
 .nav-brand .product { font-family: var(--font-mono); font-size: 15px; font-weight: 500; color: var(--fg); transition: color var(--transition); }
 .nav-brand .product:hover { color: var(--accent-orange); }
+.nav-brand .version-pill { font-family: var(--font-mono); font-size: 11px; font-weight: 500; line-height: 1; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 100px; padding: 3px 8px; letter-spacing: 0; transition: var(--transition); }
+.nav-brand .version-pill:hover { color: var(--fg); border-color: var(--border-strong); }
 .nav-right { display: flex; align-items: center; gap: 8px; }
 .nav-links { display: flex; align-items: center; gap: 26px; margin-right: 10px; }
 .nav-links a { font-size: 14px; font-weight: 500; color: var(--muted); transition: var(--transition); }
@@ -112,9 +126,9 @@ img { max-width: 100%; height: auto; }
 [data-theme="light"] #theme-toggle .moon { display: inline; }
 
 /* Hero */
-.hero { min-height: calc(100svh - 48px); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; padding: 96px 24px 48px; text-align: center; }
+.hero { min-height: auto; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; position: relative; padding: 68px 24px 40px; text-align: center; }
 .hero-content { max-width: 860px; position: relative; z-index: 1; width: 100%; }
-.hero-logo { width: 150px; height: 150px; object-fit: contain; margin: 0 auto 14px; display: block; }
+.hero-logo { width: 96px; height: 96px; object-fit: contain; margin: 0 auto 10px; display: block; }
 
 .hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 100px; padding: 5px 13px; margin-bottom: 20px; }
 .hero-eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg); opacity: 0.7; }
@@ -123,7 +137,7 @@ img { max-width: 100%; height: auto; }
 .hero-subtitle { font-size: 1.08rem; color: var(--muted); max-width: 720px; margin: 0 auto 18px; line-height: 1.65; }
 .runtime-disclosure { max-width: 760px; margin: 0 auto 24px; padding-left: 16px; border-left: 3px solid var(--accent-orange); color: var(--muted); text-align: left; font-size: 0.94rem; line-height: 1.65; }
 .runtime-disclosure code { color: var(--fg); font-family: var(--font-mono); font-size: 0.86em; }
-.hero-cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+.hero-cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
 
 /* Force selected lines onto a single line on wide viewports; wrap again when narrow. */
 .oneline { white-space: nowrap; }
@@ -195,13 +209,89 @@ img { max-width: 100%; height: auto; }
 .scroll-line { width: 1px; height: 48px; background: var(--subtle); }
 
 /* Sections */
-.section { padding: 100px 0; position: relative; }
+.section { padding: 72px 0; position: relative; }
 .section-divider { border-top: 1px solid var(--border); }
 .section-header { text-align: center; max-width: 680px; margin: 0 auto 56px; }
 .section-label { display: inline-block; font-family: var(--font-mono); font-size: 12px; font-weight: 500; text-transform: lowercase; letter-spacing: 0.02em; color: var(--subtle); margin-bottom: 14px; }
 .section-label::before { content: '// '; color: var(--accent-orange); font-weight: 700; }
 .section-title { font-family: var(--font-display); font-size: 2.4rem; font-weight: 600; line-height: 1.2; letter-spacing: 0; margin-bottom: 16px; }
 .section-description { font-size: 1.05rem; color: var(--muted); line-height: 1.7; }
+
+.apple-section {
+    background: color-mix(in srgb, var(--bg-2) 78%, transparent);
+}
+
+.apple-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+    align-items: center;
+    gap: 64px;
+}
+
+.apple-copy .section-title,
+.apple-copy .section-description {
+    text-align: left;
+}
+
+.apple-copy .section-title {
+    margin: 10px 0 14px;
+}
+
+.apple-copy .section-description {
+    margin: 0 0 20px;
+}
+
+.apple-requirements {
+    display: grid;
+    gap: 8px;
+    margin: 0 0 26px;
+    padding: 0;
+    color: var(--muted);
+    list-style: none;
+}
+
+.apple-requirements li {
+    position: relative;
+    padding-left: 18px;
+}
+
+.apple-requirements li::before {
+    content: '';
+    position: absolute;
+    top: 0.65em;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--accent-orange);
+}
+
+.apple-example {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--code-bg);
+    text-align: left;
+}
+
+.apple-example .code-title + pre {
+    margin: 0;
+    padding: 8px 18px 16px;
+    overflow-x: auto;
+}
+
+.apple-example pre + .code-title {
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+}
+
+.apple-example code {
+    font-family: var(--font-mono);
+    font-size: 0.86rem;
+    line-height: 1.45;
+    white-space: pre;
+}
 
 /* The "how it works" / Drake analogy block */
 .equations { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 880px; margin: 0 auto 28px; }
@@ -275,20 +365,24 @@ img { max-width: 100%; height: auto; }
 /* Responsive */
 @media (max-width: 768px) {
     .nav-links { display: none; }
-    .hero { min-height: calc(100svh - 32px); padding: 92px 20px 48px; }
+    .hero { min-height: auto; padding: 74px 20px 44px; }
     .hero-content { width: 100%; max-width: 100%; min-width: 0; }
-    .hero-logo { width: 118px; height: 118px; }
+    .hero-logo { width: 96px; height: 96px; }
     .hero-title { font-size: 2.8rem; }
     .hero-subtitle { font-size: 1rem; }
     .section-title { font-size: 1.9rem; }
     .runtime-disclosure { font-size: 0.9rem; }
     .section { padding: 72px 0; }
+    .apple-layout { grid-template-columns: 1fr; gap: 30px; }
 }
 
 @media (max-width: 560px) {
+    .hero-logo { display: none; }
     .install { width: 100%; }
     .install-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .install-tab { min-width: 0; white-space: normal; border-bottom: 1px solid var(--border); }
+    .code-showcase .install-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .code-showcase .install-tab { border-bottom: 0; }
     .install-cmd { min-width: 0; }
     .runtime-disclosure { overflow-wrap: anywhere; }
 }

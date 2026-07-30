@@ -18,6 +18,8 @@ package com.integrallis.models.backend.apple;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TextGenerationModel;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +61,20 @@ class AppleFoundationModelsClientTest {
                 .build());
 
     assertThat(response.text()).isEqualTo("Be terse :: Write a haiku :: 32");
+  }
+
+  @Test
+  void implementsTheSharedTextGenerationModelContract() {
+    try (AppleFoundationModelsClient client = AppleFoundationModelsClient.of(new EchoBridge())) {
+      TextGenerationModel model = client;
+
+      String response =
+          model.generate("Write a haiku", SamplingOptions.builder().maxTokens(17).build());
+
+      assertThat(response).isEqualTo(" :: Write a haiku :: 17");
+      assertThat(model.modelName()).isEqualTo("apple-system-language-model");
+      assertThat(model.diagnostics().backend()).isEqualTo("apple-foundation-models");
+    }
   }
 
   @Test

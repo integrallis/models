@@ -33,7 +33,7 @@ interface NativeLibraryLocator {
         configured = System.getenv(LIBRARY_PATH_ENV);
       }
       if (configured == null || configured.isBlank()) {
-        return Optional.empty();
+        return BundledAppleFoundationLibrary.resolve();
       }
       return Optional.of(Path.of(configured));
     };

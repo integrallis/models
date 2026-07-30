@@ -52,6 +52,7 @@ val publishedModuleNames =
         "models-semantic-order",
         "backend-java",
         "backend-native",
+        "backend-apple",
         "models-langchain4j",
         "models-spring-ai",
         "models-embedding"
@@ -603,7 +604,10 @@ tasks.register("verifyStagedPublications") {
     dependsOn(publishedProjects.map { "${it.path}:publishMavenPublicationToStagingRepository" })
     val aggregateNativeRelease =
         providers.gradleProperty("modelsNativeArtifactDirectory").isPresent
+    val aggregateAppleRelease =
+        providers.gradleProperty("modelsAppleBridgeArtifactDirectory").isPresent
     inputs.property("aggregateNativeRelease", aggregateNativeRelease)
+    inputs.property("aggregateAppleRelease", aggregateAppleRelease)
     doLast {
         val releaseVersion = project.version.toString()
         val stagingRoot = layout.buildDirectory.dir("staging-deploy/com/integrallis").get().asFile
@@ -666,6 +670,31 @@ tasks.register("verifyStagedPublications") {
                     }
                 }
             }
+            if (proj.name == "backend-apple") {
+                JarFile(versionDir.resolve("$artifactBase.jar")).use { jar ->
+                    val resourceDirectory =
+                        "META-INF/models/apple-foundation/macos-aarch64/"
+                    val bridgeEntry =
+                        jar.getJarEntry(
+                            resourceDirectory +
+                                "libjavamodels_apple_foundation.dylib"
+                        )
+                    val metadataEntry =
+                        jar.getJarEntry(resourceDirectory + "native.properties")
+                    if (aggregateAppleRelease) {
+                        require(bridgeEntry != null) {
+                            "Staged backend-apple JAR is missing the macOS AArch64 bridge"
+                        }
+                        require(metadataEntry != null) {
+                            "Staged backend-apple JAR is missing bridge integrity metadata"
+                        }
+                    } else {
+                        require(bridgeEntry == null && metadataEntry == null) {
+                            "Source-only backend-apple staging must not contain an unverified bridge"
+                        }
+                    }
+                }
+            }
 
             val pom = pomFile.readText()
             require("<licenses>" in pom && "<developers>" in pom && "<scm>" in pom) {
@@ -718,7 +747,8 @@ tasks.register("verifyGithubWorkflows") {
             "codeql.yml",
             "mfcqi.yml",
             "release.yml",
-            "native-kernels.yml"
+            "native-kernels.yml",
+            "apple-bridge.yml"
         ).forEach { name ->
             val f = workflowDir.resolve(name)
             require(f.exists()) { "Missing workflow: ${f.absolutePath}" }
@@ -791,6 +821,26 @@ tasks.register("verifyGithubWorkflows") {
         require(windowsArmCacheOptOut in nativeKernelsWorkflow) {
             "Native-kernels workflow must disable Gradle cache persistence on Windows ARM"
         }
+        val appleBridgeWorkflow = workflowDir.resolve("apple-bridge.yml").readText()
+        require(
+            "runs-on: macos-26" in appleBridgeWorkflow &&
+                "build-bridge.sh" in appleBridgeWorkflow &&
+                ":backend-apple:integrationTest" in appleBridgeWorkflow &&
+                "modelsAppleBridgeArtifactDirectory" in appleBridgeWorkflow
+        ) {
+            "Apple bridge workflow must compile, package, and test the macOS bridge"
+        }
+        val appleBridgeBuild =
+            file(
+                "models-backend-apple/src/native/apple-foundation-models/" +
+                    "build-bridge.sh"
+            ).readText()
+        require(
+            "codesign --force --sign -" in appleBridgeBuild &&
+                "codesign --verify --strict" in appleBridgeBuild
+        ) {
+            "Apple bridge build must apply and verify an ad-hoc macOS code signature"
+        }
         listOf(
             "JRELEASER_MAVENCENTRAL_SONATYPE_USERNAME: " +
                 "\${{ secrets.MAVENCENTRAL_USERNAME }}",
@@ -822,7 +872,10 @@ tasks.register("verifyGithubWorkflows") {
                 "name: Verify release credentials" in releaseWorkflow &&
                 "scripts/verify-release-credentials.sh" in releaseWorkflow &&
                 "needs: [version, credentials]" in releaseWorkflow &&
-                "needs: [version, credentials, native]" in releaseWorkflow &&
+                "needs: [version, credentials, native, apple]" in releaseWorkflow &&
+                "release-apple-foundation" in releaseWorkflow &&
+                "-PmodelsAppleBridgeArtifactDirectory=apple-release-artifacts" in
+                releaseWorkflow &&
                 "--signing-only" !in releaseWorkflow
         ) {
             "Release workflow must verify credentials before starting native release jobs"
@@ -1202,6 +1255,7 @@ tasks.register("verifyDocumentation") {
         }
 
         val landingPage = file("docs/landing/index.html").readText()
+        val landingStyles = file("docs/landing/assets/css/landing.css").readText()
         require("backend-java" in landingPage && "backend-native" in landingPage) {
             "Landing page must describe both Models execution paths"
         }
@@ -1210,6 +1264,73 @@ tasks.register("verifyDocumentation") {
         }
         require("Java 25" in landingPage && "Vector API" in landingPage) {
             "Landing page must state the shared Java 25 and Vector API runtime"
+        }
+        require(
+            "class=\"brand-mark\"" in landingPage &&
+                "assets/images/integrallis-logo.png" in landingPage &&
+                "class=\"version-pill\"" in landingPage
+        ) {
+            "Landing page navigation must show Integrallis branding and the release version"
+        }
+        require(
+            "body::before" in landingStyles &&
+                "linear-gradient(to right, var(--grid)" in landingStyles
+        ) {
+            "Landing page must retain the shared technical grid background"
+        }
+        require(".hero { min-height: auto; display:" in landingStyles) {
+            "Landing hero must size to its content so the next section remains visible"
+        }
+        require(
+            ".hero-logo { display: none; }" in landingStyles &&
+                ".code-showcase .install-tabs { grid-template-columns: repeat(3" in landingStyles
+        ) {
+            "Landing hero must keep its three runtime choices compact on mobile"
+        }
+        require(
+            landingPage.indexOf("class=\"code-showcase") in
+                0 until landingPage.indexOf("</section>")
+        ) {
+            "Landing page hero must contain a quick usage example"
+        }
+        require(
+            landingPage.windowed("class=\"footer-by\"".length)
+                .count { it == "class=\"footer-by\"" } == 1
+        ) {
+            "Landing page must contain exactly one Integrallis footer credit"
+        }
+        require(
+            "backend-apple" in landingPage &&
+                "AppleFoundationModels.create()" in landingPage &&
+                "apple-foundation-models.html" in landingPage
+        ) {
+            "Landing page must explain how Java applications use Apple Foundation Models"
+        }
+
+        val appleGuide =
+            file("docs/content/modules/ROOT/pages/apple-foundation-models.adoc")
+        require(appleGuide.isFile) {
+            "Documentation must include an Apple Foundation Models usage guide"
+        }
+        val appleDocumentation = appleGuide.readText()
+        listOf(
+            "com.integrallis:backend-apple:",
+            "AppleFoundationModels.create()",
+            "availability()",
+            "--enable-native-access=ALL-UNNAMED",
+            "SystemLanguageModel",
+            "new ModelsChatModel(client)",
+            "new ModelsSpringAiChatModel(client)"
+        ).forEach { requiredText ->
+            require(requiredText in appleDocumentation) {
+                "Apple Foundation Models guide is missing $requiredText"
+            }
+        }
+        require(
+            "xref:apple-foundation-models.adoc" in
+                file("docs/content/modules/ROOT/nav.adoc").readText()
+        ) {
+            "Documentation navigation must link to the Apple Foundation Models guide"
         }
 
         val docsPackage = JsonSlurper().parse(docsPackageFile) as Map<*, *>
@@ -1254,6 +1375,13 @@ tasks.register("verifyDocumentation") {
                 releaseWorkflowFile.readText()
         ) {
             "Release workflow must aggregate every native platform before Maven staging"
+        }
+        require(
+            "release-apple-foundation" in releaseWorkflowFile.readText() &&
+                "-PmodelsAppleBridgeArtifactDirectory=apple-release-artifacts" in
+                releaseWorkflowFile.readText()
+        ) {
+            "Release workflow must compile and bundle the Apple Foundation Models bridge"
         }
     }
 }

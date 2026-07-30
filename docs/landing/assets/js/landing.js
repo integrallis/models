@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     { passive: true }
   );
 
-  // ---- Code-showcase tabs (Java / Spring AI / LangChain4j) -------------
+  // ---- Quick usage tabs -------------------------------------------------
   const codeTabs = document.querySelectorAll('.code-tab');
   const codePanels = document.querySelectorAll('.code-panel');
   codeTabs.forEach((tab) => {

@@ -61,4 +61,23 @@ class AppleFoundationModelsStubTest {
       }
     }
   }
+
+  @Test
+  void stubCoversStructuredPlainAndBoundedApplicationResponses() {
+    try (AppleFoundationModelsClient client = AppleFoundationModels.createStub()) {
+      assertThat(client.generate("Return JSON: a \"quote\" and \\ slash").text())
+          .isEqualTo("{\"stub\":true,\"text\":\"a \\\"quote\\\" and \\\\ slash\"}");
+      assertThat(client.generate("Explain local inference").text())
+          .isEqualTo("Stub response: Explain local inference");
+      assertThat(
+              client
+                  .generate(
+                      AppleFoundationModelsRequest.builder("Explain local inference")
+                          .instructions("Use a list")
+                          .maxOutputTokens(3)
+                          .build())
+                  .text())
+          .isEqualTo("Stub response: Explain");
+    }
+  }
 }

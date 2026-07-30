@@ -23,7 +23,7 @@ and Java kernels
 |`backend-native` |Java 25 and Vector API backend with selective Rust
 kernel acceleration through FFM
 
-|`models-backend-apple` |Apple Foundation Models bridge through Java FFM
+|`backend-apple` |Apple Foundation Models bridge through Java FFM
 and a small Swift C ABI
 
 |`models-langchain4j` |LangChain4j `ChatModel` adapter
@@ -65,6 +65,7 @@ models-api
       <- models
   <- backend-java <- vectors-core
   <- backend-native   <- Models Rust kernels through FFM
+  <- backend-apple    <- Apple's Foundation Models framework through FFM
   <- models-langchain4j      <- LangChain4j
   <- models-spring-ai        <- Spring AI
   <- models-embedding        <- Vectors database modules
@@ -89,6 +90,7 @@ Application dependencies use:
 * `com.integrallis:models`
 * `com.integrallis:backend-java`
 * `com.integrallis:backend-native`
+* `com.integrallis:backend-apple`
 
 Native platform resources are assembled by CI for:
 

@@ -22,4 +22,7 @@ xcrun --sdk macosx swiftc \
   -o "$OUT_DIR/$LIBRARY_NAME" \
   "$SCRIPT_DIR/AppleFoundationBridge.swift"
 
+codesign --force --sign - --timestamp=none "$OUT_DIR/$LIBRARY_NAME"
+codesign --verify --strict --verbose=2 "$OUT_DIR/$LIBRARY_NAME"
+
 echo "$OUT_DIR/$LIBRARY_NAME"

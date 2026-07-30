@@ -1,8 +1,12 @@
-# models-backend-apple
+# backend-apple
 
 [![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-backend-apple/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
 
 Java FFM bridge to Apple's on-device Foundation Models runtime.
+
+```kotlin
+implementation("com.integrallis:backend-apple:0.1.0")
+```
 
 This module is intentionally separate from `backend-java`. The core
 models runtime remains pure Java; this module uses Java FFM to load a tiny Swift
@@ -19,10 +23,15 @@ The native boundary is four C ABI symbols:
 - `jmodels_afm_free`
 
 The Java side loads the dylib with FFM, checks platform support before loading,
-and exposes a small prompt/response client:
+and exposes a prompt/response client that also implements Models'
+`TextGenerationModel` contract:
 
 ```java
 try (var client = AppleFoundationModels.create()) {
+    if (!client.availability().available()) {
+        throw new IllegalStateException(client.availability().reason());
+    }
+
     var response = client.generate(
         AppleFoundationModelsRequest.builder("Summarize this in one sentence.")
             .instructions("Be concise.")
@@ -38,7 +47,11 @@ Run Java with native access enabled:
 java --enable-native-access=ALL-UNNAMED ...
 ```
 
-Point the Java client at the bridge with either:
+Published `backend-apple` JARs include the macOS AArch64 bridge. Models verifies
+its SHA-256, extracts it to a content-addressed local cache, and loads it
+automatically. No separate bridge installation is required.
+
+An explicit bridge path is available for source builds and bridge development:
 
 ```bash
 export MODELS_APPLE_FOUNDATION_LIBRARY=/path/to/libjavamodels_apple_foundation.dylib
@@ -68,6 +81,21 @@ The Swift side follows the same foundation used in Apfel:
 - create `LanguageModelSession` with optional instructions
 - pass `GenerationOptions(maximumResponseTokens:)`
 - call `session.respond(to:options:)`
+
+## Framework Adapters
+
+The client can be passed directly to the existing framework adapters:
+
+```java
+try (var client = AppleFoundationModels.create()) {
+    var langChain4j = new ModelsChatModel(client);
+    var springAi = new ModelsSpringAiChatModel(client);
+}
+```
+
+See the
+[Apple Foundation Models guide](https://integrallis.github.io/models/docs/models/current/apple-foundation-models.html)
+for complete dependencies and examples.
 
 ## Stub Mode
 
@@ -107,14 +135,14 @@ Apple's `FoundationModels` framework.
 Intel Macs and ordinary CI can run the unit tests:
 
 ```bash
-./gradlew :models-backend-apple:test
+./gradlew :backend-apple:test
 ```
 
 The FFM/native ABI smoke test builds the C stub and is part of the module's
 integration task:
 
 ```bash
-./gradlew :models-backend-apple:integrationTest
+./gradlew :backend-apple:integrationTest
 ```
 
 The real Apple Intelligence smoke test is tagged `integration` and skips unless
@@ -123,7 +151,7 @@ configured, and `SystemLanguageModel` reports available:
 
 ```bash
 export MODELS_APPLE_FOUNDATION_LIBRARY=/path/to/libjavamodels_apple_foundation.dylib
-./gradlew :models-backend-apple:integrationTest
+./gradlew :backend-apple:integrationTest
 ```
 
 Testing Apple Intelligence requires a real Apple Silicon Mac with a logged-in

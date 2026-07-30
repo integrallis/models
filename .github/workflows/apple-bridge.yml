@@ -64,6 +64,7 @@ jobs:
           bridge="$(models-backend-apple/src/native/apple-foundation-models/build-bridge.sh "$bridge_dir")"
           test -f "$bridge"
           echo "MODELS_APPLE_FOUNDATION_LIBRARY=$bridge" >> "$GITHUB_ENV"
+          echo "MODELS_APPLE_FOUNDATION_BRIDGE_DIR=$bridge_dir" >> "$GITHUB_ENV"
 
       - name: Compile native stub bridge
         run: |
@@ -74,11 +75,21 @@ jobs:
       - name: Run Apple backend checks
         run: >
           ./gradlew
-          :models-backend-apple:spotlessCheck
-          :models-backend-apple:test
-          :models-backend-apple:integrationTest
+          :backend-apple:spotlessCheck
+          :backend-apple:test
+          :backend-apple:integrationTest
+          -PmodelsAppleBridgeArtifactDirectory="$MODELS_APPLE_FOUNDATION_BRIDGE_DIR"
           --no-daemon
           --stacktrace
+
+      - name: Upload compiled Apple bridge
+        uses: actions/upload-artifact@v7
+        with:
+          name: apple-foundation-models-bridge
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          path: ${{ runner.temp }}/apple-foundation-bridge/libjavamodels_apple_foundation.dylib
 
       - name: Upload Apple backend test reports
         if: failure()

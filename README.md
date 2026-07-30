@@ -37,6 +37,13 @@ SIMD execution:
   only selected, measured bottleneck kernels with a small Models-owned Rust
   library through Java's Foreign Function and Memory (FFM) API.
 
+On supported Apple Silicon Macs, `backend-apple` also exposes Apple's
+OS-managed, on-device `SystemLanguageModel` to Java through FFM and a small
+Models-owned Swift binary. It uses Apple Intelligence rather than GGUF weights,
+and its client plugs into the same Models, LangChain4j, and Spring AI
+text-generation contract. See the
+[Apple Foundation Models guide](https://integrallis.github.io/models/docs/models/current/apple-foundation-models.html).
+
 The native backend is not a wrapper around llama.cpp or Ollama. Those runtimes
 are controlled performance comparators only. The project intends to replace
 each Rust kernel with pure Java when a released JDK can provide equivalent
@@ -58,6 +65,7 @@ Implemented functionality includes:
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
+- Apple Foundation Models on supported Apple Silicon Macs
 - framework-neutral guarded RAG
 - compact WordTour semantic-order models
 
@@ -117,6 +125,14 @@ Use the native accelerator for artifacts whose measured profile selects it:
 dependencies {
     implementation("com.integrallis:models:0.1.0")
     implementation("com.integrallis:backend-native:0.1.0")
+}
+```
+
+Use Apple's on-device system model on a supported Apple Silicon Mac:
+
+```kotlin
+dependencies {
+    implementation("com.integrallis:backend-apple:0.1.0")
 }
 ```
 
@@ -181,6 +197,7 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Spring AI | `models-spring-ai` | blocking and streaming chat models |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
+| Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |
 
 These adapters are implemented and tested against the same backend contracts;
 they do not select hidden inference paths. See

@@ -15,10 +15,27 @@
  */
 package com.integrallis.models.backend.apple;
 
+import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.api.TokenStream;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** Prompt/response client backed by Apple Foundation Models when available. */
-public final class AppleFoundationModelsClient implements AutoCloseable {
+public final class AppleFoundationModelsClient implements TextGenerationModel {
+
+  private static final String MODEL_NAME = "apple-system-language-model";
+  private static final BackendDiagnostics DIAGNOSTICS =
+      new BackendDiagnostics(
+          "apple-foundation-models",
+          "system-language-model-v1",
+          Map.of(
+              "execution", "on-device",
+              "model", "SystemLanguageModel.default",
+              "weights", "managed-by-macOS"),
+          List.of());
 
   private final AppleFoundationModelsBridge bridge;
 
@@ -59,6 +76,47 @@ public final class AppleFoundationModelsClient implements AutoCloseable {
       throw new IllegalStateException(availability.reason());
     }
     return bridge.generate(request);
+  }
+
+  /**
+   * Returns the stable Models identifier for Apple's OS-managed default language model.
+   *
+   * <p>Apple does not expose a downloadable weight revision through Foundation Models.
+   */
+  @Override
+  public String modelName() {
+    return MODEL_NAME;
+  }
+
+  /** Returns the execution identity exposed to Models framework adapters. */
+  @Override
+  public BackendDiagnostics diagnostics() {
+    return DIAGNOSTICS;
+  }
+
+  /**
+   * Generates through the shared Models contract.
+   *
+   * <p>Apple Foundation Models currently returns a completed response through this bridge, so the
+   * response is delivered as one stream event. {@link SamplingOptions#maxTokens()} maps to Apple's
+   * maximum response-token option; Apple owns the remaining sampling behavior.
+   */
+  @Override
+  public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+    Objects.requireNonNull(prompt, "prompt");
+    Objects.requireNonNull(options, "options");
+    Objects.requireNonNull(stream, "stream");
+    try {
+      AppleFoundationModelsResponse response =
+          generate(
+              AppleFoundationModelsRequest.builder(prompt)
+                  .maxOutputTokens(options.maxTokens())
+                  .build());
+      stream.onToken(response.text());
+      stream.onComplete();
+    } catch (RuntimeException failure) {
+      stream.onError(failure);
+    }
   }
 
   @Override
