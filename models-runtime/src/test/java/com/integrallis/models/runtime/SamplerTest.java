@@ -17,6 +17,7 @@ package com.integrallis.models.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.SamplingOptions;
 import java.util.HashSet;
 import java.util.List;
@@ -84,6 +85,20 @@ class SamplerTest {
       // Should only sample from top 2 tokens (indices 0 and 1)
       assertThat(sampled).isSubsetOf(Set.of(0, 1));
     }
+
+    @Test
+    void clampsTopKLargerThanTheVocabulary() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(100.0f).topK(100).topP(1.0f).seed(42L).build();
+      Sampler sampler = new Sampler(options);
+
+      Set<Integer> sampled = new HashSet<>();
+      for (int index = 0; index < 100; index++) {
+        sampled.add(sampler.sample(new float[] {1.0f, 1.0f}, List.of()));
+      }
+
+      assertThat(sampled).containsExactlyInAnyOrder(0, 1);
+    }
   }
 
   @Nested
@@ -105,6 +120,20 @@ class SamplerTest {
       assertThat(sampled).contains(0);
       assertThat(sampled.size()).isLessThanOrEqualTo(2);
     }
+
+    @Test
+    void includesTheTokenThatReachesTheTopPBoundary() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(1.0f).topK(2).topP(0.5f).seed(42L).build();
+      Sampler sampler = new Sampler(options);
+
+      Set<Integer> sampled = new HashSet<>();
+      for (int index = 0; index < 100; index++) {
+        sampled.add(sampler.sample(new float[] {0.0f, 0.0f}, List.of()));
+      }
+
+      assertThat(sampled).containsExactly(0);
+    }
   }
 
   @Nested
@@ -120,6 +149,36 @@ class SamplerTest {
       // Penalize token 0 — after penalty it should be lower than others
       int result = sampler.sample(logits, List.of(0));
       assertThat(result).isNotEqualTo(0);
+    }
+
+    @Test
+    void multipliesNegativeRepeatedLogitsByThePenalty() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(0.0f).repetitionPenalty(2.0f).build();
+      Sampler sampler = new Sampler(options);
+
+      assertThat(sampler.sample(new float[] {-1.0f, -0.75f}, List.of(1))).isZero();
+    }
+
+    @Test
+    void logitBatchMatchesArraySamplingWithPenaltyAndTemperature() {
+      SamplingOptions options =
+          SamplingOptions.builder()
+              .temperature(0.7f)
+              .topK(4)
+              .topP(1.0f)
+              .repetitionPenalty(1.5f)
+              .seed(8675309L)
+              .build();
+      float[] row = {1.25f, -0.5f, 0.75f, 2.0f};
+      LogitBatch batch =
+          new LogitBatch(
+              2, row.length, new float[] {9.0f, 0.0f, 0.0f, 0.0f, 1.25f, -0.5f, 0.75f, 2.0f});
+
+      int fromArray = new Sampler(options).sample(row, List.of(0, 1));
+      int fromBatch = new Sampler(options).sample(batch, 1, List.of(0, 1));
+
+      assertThat(fromBatch).isEqualTo(fromArray);
     }
   }
 
