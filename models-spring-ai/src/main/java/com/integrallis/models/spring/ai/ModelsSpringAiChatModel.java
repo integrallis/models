@@ -32,6 +32,7 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 /** Spring AI {@link ChatModel} backed by the Models runtime generation loop. */
 public final class ModelsSpringAiChatModel implements ChatModel {
@@ -77,27 +78,28 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   @Override
   public Flux<ChatResponse> stream(Prompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
-    return Flux.create(
-        sink ->
-            model.generate(
-                render(prompt),
-                options(prompt),
-                new TokenStream() {
-                  @Override
-                  public void onToken(String token) {
-                    sink.next(response(token));
-                  }
+    return Flux.<ChatResponse>create(
+            sink ->
+                model.generate(
+                    render(prompt),
+                    options(prompt),
+                    new TokenStream() {
+                      @Override
+                      public void onToken(String token) {
+                        sink.next(response(token));
+                      }
 
-                  @Override
-                  public void onComplete() {
-                    sink.complete();
-                  }
+                      @Override
+                      public void onComplete() {
+                        sink.complete();
+                      }
 
-                  @Override
-                  public void onError(Throwable failure) {
-                    sink.error(failure);
-                  }
-                }));
+                      @Override
+                      public void onError(Throwable failure) {
+                        sink.error(failure);
+                      }
+                    }))
+        .subscribeOn(Schedulers.boundedElastic());
   }
 
   @Override

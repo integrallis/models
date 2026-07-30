@@ -34,6 +34,7 @@ class TextGenerationModelTest {
 
   @Test
   void defaultCollectorPropagatesStreamFailure() {
+    IllegalArgumentException failure = new IllegalArgumentException("bad generation");
     TextGenerationModel model =
         new TextGenerationModel() {
           @Override
@@ -48,13 +49,38 @@ class TextGenerationModelTest {
 
           @Override
           public void generate(String prompt, SamplingOptions options, TokenStream stream) {
-            stream.onError(new IllegalArgumentException("bad generation"));
+            stream.onError(failure);
           }
         };
 
     assertThatThrownBy(() -> model.generate("prompt", SamplingOptions.builder().build()))
-        .isInstanceOf(IllegalStateException.class)
-        .hasCauseInstanceOf(IllegalArgumentException.class);
+        .isSameAs(failure);
+  }
+
+  @Test
+  void defaultCollectorWrapsCheckedStreamFailureSpecifically() {
+    Exception failure = new Exception("checked generation failure");
+    TextGenerationModel model =
+        new TextGenerationModel() {
+          @Override
+          public String modelName() {
+            return "test-model";
+          }
+
+          @Override
+          public BackendDiagnostics diagnostics() {
+            return BackendDiagnostics.unavailable("test");
+          }
+
+          @Override
+          public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+            stream.onError(failure);
+          }
+        };
+
+    assertThatThrownBy(() -> model.generate("prompt", SamplingOptions.builder().build()))
+        .isInstanceOf(ModelGenerationException.class)
+        .hasCause(failure);
   }
 
   private static TextGenerationModel modelGenerating(String... tokens) {

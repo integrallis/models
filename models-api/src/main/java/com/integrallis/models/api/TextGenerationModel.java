@@ -18,7 +18,13 @@ package com.integrallis.models.api;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** High-level text generation contract shared by in-process and local-engine backends. */
+/**
+ * High-level text generation contract shared by in-process and local-engine backends.
+ *
+ * <p>Implementations may own mutable inference state and are not required to be thread-safe.
+ * Callers must serialize generation unless an implementation explicitly documents concurrent use.
+ * Prompts, options, and token streams must be non-null.
+ */
 public interface TextGenerationModel extends AutoCloseable {
 
   /** Human-readable model identifier reported to framework adapters. */
@@ -50,8 +56,15 @@ public interface TextGenerationModel extends AutoCloseable {
             failure.compareAndSet(null, throwable);
           }
         });
-    if (failure.get() != null) {
-      throw new IllegalStateException("text generation failed", failure.get());
+    Throwable generationFailure = failure.get();
+    if (generationFailure instanceof RuntimeException runtimeFailure) {
+      throw runtimeFailure;
+    }
+    if (generationFailure instanceof Error error) {
+      throw error;
+    }
+    if (generationFailure != null) {
+      throw new ModelGenerationException("text generation failed", generationFailure);
     }
     return output.toString();
   }

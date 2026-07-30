@@ -29,6 +29,7 @@ import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -153,6 +154,36 @@ class ModelsSpringAiChatModelTest {
     ChatModel model = new ModelsSpringAiChatModel(new RecordingModel("", failure));
 
     assertThatThrownBy(() -> model.stream(new Prompt("question")).blockLast()).isSameAs(failure);
+  }
+
+  @Test
+  void springAiStreamingRunsBlockingInferenceOffTheSubscriberThread() {
+    Thread subscriberThread = Thread.currentThread();
+    AtomicReference<Thread> generationThread = new AtomicReference<>();
+    TextGenerationModel delegate =
+        new TextGenerationModel() {
+          @Override
+          public String modelName() {
+            return "ThreadRecordingModel";
+          }
+
+          @Override
+          public BackendDiagnostics diagnostics() {
+            return BackendDiagnostics.unavailable("thread-recording");
+          }
+
+          @Override
+          public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+            generationThread.set(Thread.currentThread());
+            stream.onToken("answer");
+            stream.onComplete();
+          }
+        };
+
+    new ModelsSpringAiChatModel(delegate).stream(new Prompt("question")).blockLast();
+
+    assertThat(generationThread.get()).isNotSameAs(subscriberThread);
+    assertThat(generationThread.get().getName()).contains("boundedElastic");
   }
 
   @Test
