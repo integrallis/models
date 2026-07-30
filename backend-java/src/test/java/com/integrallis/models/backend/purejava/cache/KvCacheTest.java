@@ -121,6 +121,29 @@ class KvCacheTest {
       float[] valueSlice = cache.valueSlice(0, 1, 3);
       assertThat(valueSlice).containsExactly(30, 40, 50, 60);
     }
+
+    @Test
+    void keySliceRejectsAnUnpopulatedPosition() {
+      var cache = new KvCache(1, 10, 2, 2);
+      cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});
+      cache.store(0, 2, new float[] {5, 6}, new float[] {50, 60});
+
+      assertThatThrownBy(() -> cache.keySlice(0, 0, 3))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("position 1")
+          .hasMessageContaining("not populated");
+    }
+
+    @Test
+    void valueSliceRejectsAPositionWithoutAllocatedStorage() {
+      var cache = new KvCache(1, 40, 2, 2);
+      cache.store(0, 0, new float[] {1, 2}, new float[] {10, 20});
+
+      assertThatThrownBy(() -> cache.valueSlice(0, 16, 17))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("position 16")
+          .hasMessageContaining("not populated");
+    }
   }
 
   @Nested

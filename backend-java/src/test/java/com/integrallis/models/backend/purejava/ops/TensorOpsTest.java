@@ -1407,6 +1407,47 @@ class TensorOpsTest {
       float sum = x[1] + x[2] + x[3];
       assertThat(sum).isCloseTo(1.0f, within(1e-5f));
     }
+
+    @Test
+    void preservesNegativeInfinityAsAZeroProbabilityMask() {
+      float[] x = {1.0f, Float.NEGATIVE_INFINITY, 2.0f};
+
+      TensorOps.softmax(x, 0, x.length);
+
+      assertThat(x[1]).isZero();
+      assertThat(x[0] + x[2]).isCloseTo(1.0f, within(1e-5f));
+    }
+
+    @Test
+    void rejectsEmptyAndNegativeSizes() {
+      float[] x = {1.0f};
+
+      assertThatThrownBy(() -> TensorOps.softmax(x, 0, 0))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("size must be positive");
+      assertThatThrownBy(() -> TensorOps.softmax(x, 0, -1))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("size must be positive");
+    }
+
+    @Test
+    void rejectsAnAllMaskedRow() {
+      float[] x = {Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
+
+      assertThatThrownBy(() -> TensorOps.softmax(x, 0, x.length))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("finite");
+    }
+
+    @Test
+    void rejectsNaNAndPositiveInfinity() {
+      assertThatThrownBy(() -> TensorOps.softmax(new float[] {1.0f, Float.NaN}, 0, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("NaN");
+      assertThatThrownBy(() -> TensorOps.softmax(new float[] {1.0f, Float.POSITIVE_INFINITY}, 0, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("positive infinity");
+    }
   }
 
   @Nested
