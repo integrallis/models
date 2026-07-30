@@ -1250,12 +1250,17 @@ tasks.register("verifyDocumentation") {
 
         val frameworkGuide =
             file("docs/content/modules/ROOT/pages/framework-integrations.adoc").readText()
+        val modelJarsGroup = listOf("org", "modeljars").joinToString(".")
+        val modelJarsFacade = "Model" + "Jars"
         val requiredFrameworkExamples =
             listOf(
+                "$modelJarsGroup:modeljars:{modeljars-version}",
+                "$modelJarsGroup.catalog.Qwen3_0_6b_Q4_0.MODEL",
+                "$modelJarsFacade.open(MODEL)",
                 "new ModelsChatModel(",
                 "new ModelsSpringAiChatModel(",
                 "model.stream(new Prompt(",
-                "PureJavaBackend backend(@Value(",
+                "TextGenerationModel localModel()",
                 "GroundedAnswerPolicy.productionDefault()",
                 "new VectorCollectionEmbeddingSink("
             )
@@ -1263,6 +1268,9 @@ tasks.register("verifyDocumentation") {
             require(example in frameworkGuide) {
                 "Framework integration guide is missing an executable example containing $example"
             }
+        }
+        require("models.path" !in frameworkGuide && "MODELS_MODEL_PATH" !in frameworkGuide) {
+            "Framework integration examples must resolve models through their marker JARs"
         }
         require(frameworkGuide.windowed("[source,java]".length).count { it == "[source,java]" } >= 6) {
             "Framework integration guide must contain Java examples for every supported adapter"

@@ -7,36 +7,43 @@ inspect the selected plan.
 
 == Plain Java
 
-Add the facade and an execution backend:
+Add ModelJars and the marker for the selected qualified artifact:
 
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
-    implementation("com.integrallis:models:{models-version}")
-    implementation("com.integrallis:backend-java:{models-version}")
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
 }
 ----
 
-`RuntimeTextGenerationModel` provides the high-level contract shared by
-the framework adapters:
+`ModelJars.open` returns the high-level contract shared by the framework
+adapters:
 
 [source,java]
 ----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
-import com.integrallis.models.backend.purejava.PureJavaBackend;
-import com.integrallis.models.runtime.RuntimeTextGenerationModel;
-import java.nio.file.Path;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.List;
+import org.modeljars.ModelJars;
 
 var options = SamplingOptions.builder()
     .temperature(0.0f)
     .maxTokens(64)
     .build();
 
-try (var backend =
-        PureJavaBackend.load(Path.of(System.getenv("MODELS_MODEL_PATH")))) {
-    TextGenerationModel model = new RuntimeTextGenerationModel(backend);
-    String answer = model.generate("Summarize the retrieved context.", options);
+try (TextGenerationModel model = ModelJars.open(MODEL)) {
+    String prompt = ChatTemplate.CHATML_NO_THINK.render(
+        List.of(ChatMessage.user("Summarize the retrieved context.")));
+    String answer = model.generate(prompt, options);
 
     System.out.println(answer);
     System.out.println(model.diagnostics().optimizations());
@@ -52,27 +59,37 @@ used for the request.
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
     implementation("com.integrallis:models-langchain4j:{models-version}")
-    implementation("com.integrallis:backend-java:{models-version}")
 }
 ----
 
 [source,java]
 ----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
 import com.integrallis.models.api.SamplingOptions;
-import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.langchain4j.ModelsChatModel;
-import java.nio.file.Path;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.List;
+import org.modeljars.ModelJars;
 
 var options = SamplingOptions.builder()
     .temperature(0.0f)
     .maxTokens(128)
     .build();
 
-try (var backend =
-        PureJavaBackend.load(Path.of(System.getenv("MODELS_MODEL_PATH")))) {
-    var model = new ModelsChatModel(backend, options);
-    String answer = model.chat("Answer using only the supplied context.");
+try (var runtime = ModelJars.open(MODEL)) {
+    var model = new ModelsChatModel(runtime, options);
+    String prompt = ChatTemplate.CHATML_NO_THINK.render(
+        List.of(ChatMessage.user("Answer using only the supplied context.")));
+    String answer = model.chat(prompt);
 
     System.out.println(answer);
     System.out.println(model.diagnostics().backend());
@@ -88,32 +105,44 @@ selected backend as plain Java.
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
     implementation("com.integrallis:models-spring-ai:{models-version}")
-    implementation("com.integrallis:backend-java:{models-version}")
 }
 ----
 
 [source,java]
 ----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
 import com.integrallis.models.api.SamplingOptions;
-import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
-import java.nio.file.Path;
+import java.util.List;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.modeljars.ModelJars;
 
 var options = SamplingOptions.builder()
     .temperature(0.0f)
     .maxTokens(128)
     .build();
 
-try (var backend =
-        PureJavaBackend.load(Path.of(System.getenv("MODELS_MODEL_PATH")))) {
-    var model = new ModelsSpringAiChatModel(backend, options);
+try (var runtime = ModelJars.open(MODEL)) {
+    var model = new ModelsSpringAiChatModel(runtime, options);
+    String prompt = ChatTemplate.CHATML_NO_THINK.render(
+        List.of(ChatMessage.user("Answer using only the supplied context.")));
 
-    String answer = model.call("Answer using only the supplied context.");
+    String answer = model.call(prompt);
     System.out.println(answer);
 
-    model.stream(new Prompt("List the cited facts."))
+    String streamingPrompt = ChatTemplate.CHATML_NO_THINK.render(
+        List.of(ChatMessage.user("List the cited facts.")));
+    model.stream(new Prompt(streamingPrompt))
         .map(response -> response.getResult().getOutput().getText())
         .doOnNext(System.out::print)
         .blockLast();
@@ -128,38 +157,44 @@ configuration beans.
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
     implementation("com.integrallis:models-spring-ai:{models-version}")
-    implementation("com.integrallis:backend-java:{models-version}")
 }
 ----
 
-Load the configured model path and expose the Spring AI `ChatModel`:
+Open the selected marker and expose the Spring AI `ChatModel`:
 
 [source,java]
 ----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
 import com.integrallis.models.api.SamplingOptions;
-import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
-import java.nio.file.Path;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.modeljars.ModelJars;
 
 @Configuration
 class LocalModelConfiguration {
     @Bean(destroyMethod = "close")
-    PureJavaBackend backend(@Value("${models.path}") Path modelPath) {
-        return PureJavaBackend.load(modelPath);
+    TextGenerationModel localModel() {
+        return ModelJars.open(MODEL);
     }
 
     @Bean
-    ChatModel chatModel(PureJavaBackend backend) {
+    ChatModel chatModel(TextGenerationModel localModel) {
         var options = SamplingOptions.builder()
             .temperature(0.0f)
             .maxTokens(128)
             .build();
-        return new ModelsSpringAiChatModel(backend, options);
+        return new ModelsSpringAiChatModel(localModel, options);
     }
 }
 ----

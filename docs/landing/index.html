@@ -77,22 +77,25 @@
 
                 <div class="code-showcase reveal">
                     <div class="install-tabs" role="tablist" aria-label="Quick usage examples">
-                        <button class="install-tab code-tab active" data-code="java">Java</button>
-                        <button class="install-tab code-tab" data-code="native">Native</button>
+                        <button class="install-tab code-tab active" data-code="java">ModelJar</button>
+                        <button class="install-tab code-tab" data-code="native">Coordinate</button>
                         <button class="install-tab code-tab" data-code="apple">Apple</button>
                     </div>
                     <div class="code-panels">
                         <div class="code-panel active" data-code="java">
-                            <div class="code-title">// Java 25 and Vector API</div>
-                            <pre><code class="language-java hljs" data-lang="java">try (var backend = PureJavaBackend.load(modelPath)) {
-    var model = new RuntimeTextGenerationModel(backend);
+                            <div class="code-title">// Generated reference to a qualified artifact</div>
+                            <pre><code class="language-java hljs" data-lang="java">import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
+try (var model = ModelJars.open(MODEL)) {
     String answer = model.generate(prompt, options);
 }</code></pre>
                         </div>
                         <div class="code-panel" data-code="native">
-                            <div class="code-title">// Same Java pipeline, selected Rust kernels</div>
-                            <pre><code class="language-java hljs" data-lang="java">try (var backend = RustFfmBackend.load(modelPath)) {
-    var model = new RuntimeTextGenerationModel(backend);
+                            <div class="code-title">// Exact Maven-style marker coordinate</div>
+                            <pre><code class="language-java hljs" data-lang="java">try (var model = ModelJars.open(
+        "org.modeljars.huggingface:" +
+        "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+        "3.0.0-q4_0.1")) {
     String answer = model.generate(prompt, options);
 }</code></pre>
                         </div>
@@ -122,7 +125,7 @@
                     <p class="section-description">A GGUF file packages the model structure, tokenizer metadata, and trained weights. Models maps those weights, executes the transformer, maintains its attention cache, and generates tokens in process. Backend selection changes only kernels justified by exact artifact and host evidence.</p>
                 </div>
 
-                <p class="install-label reveal"><span class="accent-tick"></span>Add Models and a backend</p>
+                <p class="install-label reveal"><span class="accent-tick"></span>Add ModelJars and a qualified model marker</p>
                 <div class="install reveal">
                     <div class="install-tabs" role="tablist" aria-label="Build tool">
                         <button class="install-tab active" data-target="gradle-kts">Gradle (Kotlin)</button>
@@ -131,8 +134,8 @@
                         <button class="install-tab" data-target="sbt">sbt</button>
                     </div>
                     <div class="install-cmd">
-                        <code id="install-text">implementation("com.integrallis:models:0.1.0")
-implementation("com.integrallis:backend-java:0.1.0")</code>
+                        <code id="install-text">implementation("org.modeljars:modeljars:0.1.0")
+implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")</code>
                         <button class="install-copy" id="install-copy" aria-label="Copy dependencies" title="Copy">
                             <svg class="clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v12"/></svg>
                             <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>

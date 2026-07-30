@@ -78,37 +78,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const COORDS = {
     'gradle-kts': {
       copy:
-        'implementation("com.integrallis:models:0.1.0")\n' +
-        'implementation("com.integrallis:backend-java:0.1.0")',
+        'implementation("org.modeljars:modeljars:0.1.0")\n' +
+        'implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")',
       show:
-        'implementation("com.integrallis:models:0.1.0")\n' +
-        'implementation("com.integrallis:backend-java:0.1.0")',
+        'implementation("org.modeljars:modeljars:0.1.0")\n' +
+        'implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")',
     },
     'gradle-groovy': {
       copy:
-        "implementation 'com.integrallis:models:0.1.0'\n" +
-        "implementation 'com.integrallis:backend-java:0.1.0'",
+        "implementation 'org.modeljars:modeljars:0.1.0'\n" +
+        "implementation 'org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1'",
       show:
-        "implementation 'com.integrallis:models:0.1.0'\n" +
-        "implementation 'com.integrallis:backend-java:0.1.0'",
+        "implementation 'org.modeljars:modeljars:0.1.0'\n" +
+        "implementation 'org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1'",
     },
     maven: {
       copy:
-        '<dependency>\n  <groupId>com.integrallis</groupId>\n' +
-        '  <artifactId>models</artifactId>\n  <version>0.1.0</version>\n</dependency>\n' +
-        '<dependency>\n  <groupId>com.integrallis</groupId>\n' +
-        '  <artifactId>backend-java</artifactId>\n  <version>0.1.0</version>\n</dependency>',
+        '<dependency>\n  <groupId>org.modeljars</groupId>\n' +
+        '  <artifactId>modeljars</artifactId>\n  <version>0.1.0</version>\n</dependency>\n' +
+        '<dependency>\n  <groupId>org.modeljars.huggingface</groupId>\n' +
+        '  <artifactId>ggml-org.qwen3-0.6b-gguf.q4_0</artifactId>\n' +
+        '  <version>3.0.0-q4_0.1</version>\n</dependency>',
       show:
-        '<dependency>com.integrallis:models:0.1.0</dependency>\n' +
-        '<dependency>com.integrallis:backend-java:0.1.0</dependency>',
+        '<dependency>org.modeljars:modeljars:0.1.0</dependency>\n' +
+        '<dependency>org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1</dependency>',
     },
     sbt: {
       copy:
-        'libraryDependencies += "com.integrallis" % "models" % "0.1.0"\n' +
-        'libraryDependencies += "com.integrallis" % "backend-java" % "0.1.0"',
+        'libraryDependencies += "org.modeljars" % "modeljars" % "0.1.0"\n' +
+        'libraryDependencies += "org.modeljars.huggingface" % "ggml-org.qwen3-0.6b-gguf.q4_0" % "3.0.0-q4_0.1"',
       show:
-        'libraryDependencies += "com.integrallis" % "models" % "0.1.0"\n' +
-        'libraryDependencies += "com.integrallis" % "backend-java" % "0.1.0"',
+        'libraryDependencies += "org.modeljars" % "modeljars" % "0.1.0"\n' +
+        'libraryDependencies += "org.modeljars.huggingface" % "ggml-org.qwen3-0.6b-gguf.q4_0" % "3.0.0-q4_0.1"',
     },
   };
   // Build-system tabs are the .install-tab buttons that carry a data-target.

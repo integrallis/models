@@ -110,21 +110,28 @@ the qualification ledger for those exact details.
 
 ## Install
 
-Models requires Java 25 or newer. Add the facade and one backend:
+Models requires Java 25 or newer. For a versioned, qualified artifact, add ModelJars and the marker
+JAR for the selected model:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:models:0.1.0")
-    implementation("com.integrallis:backend-java:0.1.0")
+    implementation("org.modeljars:modeljars:0.1.0")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1",
+    )
 }
 ```
 
-Use the native accelerator for artifacts whose measured profile selects it:
+The ModelJars facade brings Models and both execution backends, then selects the backend qualified
+for that exact artifact. Applications that manage their own GGUF files can depend on Models
+directly:
 
 ```kotlin
 dependencies {
     implementation("com.integrallis:models:0.1.0")
-    implementation("com.integrallis:backend-native:0.1.0")
+    implementation("com.integrallis:backend-java:0.1.0") // or backend-native
 }
 ```
 
@@ -137,52 +144,64 @@ dependencies {
 ```
 
 Model marker artifacts, checksums, variants, and measured runtime profiles are
-provided by [ModelJars.org](https://modeljars.org). Registry integration is
-kept in a separate adapter so the core Models artifacts remain usable without a
+provided by [ModelJars.org](https://modeljars.org). ModelJars is a separate
+project and depends on Models; the Models artifacts remain usable without a
 catalog dependency.
 
 ## Quick Start
 
 ```java
-Path model = Path.of(System.getenv("MODELS_MODEL_PATH"));
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
-try (var backend = PureJavaBackend.load(model)) {
-    var loop = new GenerationLoop(backend);
-    String result = loop.generate(
-        "Classify this intent: 'I want to cancel my order'",
-        SamplingOptions.builder()
-            .temperature(0.0f)
-            .maxTokens(20)
-            .build());
+var prompt = ChatTemplate.CHATML_NO_THINK.render(List.of(
+    ChatMessage.system("Classify the user's intent in one phrase."),
+    ChatMessage.user("I want to cancel my order")));
+var options = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(20)
+    .build();
+
+try (var model = ModelJars.open(MODEL)) {
+    String result = model.generate(prompt, options);
     System.out.println(result);
 }
 ```
 
-Streaming uses the same generation path:
+`ModelJars.open` resolves the pinned artifact, downloads and verifies it when needed, chooses its
+qualified Models backend, and applies a matching performance profile. Applications that manage
+their own GGUF files can use the lower-level `PureJavaBackend.load(Path)` and
+`RustFfmBackend.load(Path)` APIs described in the
+[getting-started guide](https://integrallis.github.io/models/docs/models/current/getting-started.html).
+
+Streaming uses the same loaded model:
 
 ```java
-loop.generate("Once upon a time", options, new TokenStream() {
-    @Override
-    public void onToken(String token) {
-        System.out.print(token);
-    }
+try (var model = ModelJars.open(MODEL)) {
+    model.generate(prompt, options, new TokenStream() {
+        @Override
+        public void onToken(String token) {
+            System.out.print(token);
+        }
 
-    @Override
-    public void onComplete() {
-        System.out.println();
-    }
+        @Override
+        public void onComplete() {
+            System.out.println();
+        }
 
-    @Override
-    public void onError(Throwable error) {
-        error.printStackTrace();
-    }
-});
+        @Override
+        public void onError(Throwable error) {
+            error.printStackTrace();
+        }
+    });
+}
 ```
 
 Backend diagnostics expose the exact plan selected for the loaded model:
 
 ```java
-backend.diagnostics().optimizations().forEach(System.out::println);
+try (var model = ModelJars.open(MODEL)) {
+    model.diagnostics().optimizations().forEach(System.out::println);
+}
 ```
 
 Profile matching, explicit overrides, and every execution-plan switch are

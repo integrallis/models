@@ -41,7 +41,9 @@ When the matching platform artifact is present on the runtime classpath,
 25 FFM:
 
 ```java
-try (var backend = RustFfmBackend.load(modelPath)) {
+Path gguf = Path.of("/opt/models/private-model.gguf");
+
+try (var backend = RustFfmBackend.load(gguf)) {
   // Use the same Models backend API as the pure-Java implementation.
 }
 ```
