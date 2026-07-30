@@ -20,6 +20,9 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -34,6 +37,7 @@ import reactor.core.publisher.Flux;
 public final class ModelsSpringAiChatModel implements ChatModel {
   private final SamplingOptions defaults;
   private final TextGenerationModel model;
+  private final ChatTemplate template;
 
   public ModelsSpringAiChatModel(InferenceBackend backend) {
     this(new RuntimeTextGenerationModel(backend));
@@ -48,14 +52,25 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   public ModelsSpringAiChatModel(TextGenerationModel model, SamplingOptions defaults) {
+    this(model, ChatTemplate.RAW, defaults);
+  }
+
+  public ModelsSpringAiChatModel(
+      InferenceBackend backend, ChatTemplate template, SamplingOptions defaults) {
+    this(new RuntimeTextGenerationModel(backend), template, defaults);
+  }
+
+  public ModelsSpringAiChatModel(
+      TextGenerationModel model, ChatTemplate template, SamplingOptions defaults) {
     this.model = Objects.requireNonNull(model, "model");
+    this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
   }
 
   @Override
   public ChatResponse call(Prompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
-    String output = model.generate(prompt.getContents(), options(prompt));
+    String output = model.generate(render(prompt), options(prompt));
     return response(output);
   }
 
@@ -65,7 +80,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     return Flux.create(
         sink ->
             model.generate(
-                prompt.getContents(),
+                render(prompt),
                 options(prompt),
                 new TokenStream() {
                   @Override
@@ -123,6 +138,20 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       }
     }
     return builder.build();
+  }
+
+  private String render(Prompt prompt) {
+    List<ChatMessage> messages = new ArrayList<>(prompt.getInstructions().size());
+    for (org.springframework.ai.chat.messages.Message message : prompt.getInstructions()) {
+      messages.add(
+          switch (message.getMessageType()) {
+            case SYSTEM -> ChatMessage.system(message.getText());
+            case USER -> ChatMessage.user(message.getText());
+            case ASSISTANT -> ChatMessage.assistant(message.getText());
+            case TOOL -> ChatMessage.tool(message.getText());
+          });
+    }
+    return template.render(messages);
   }
 
   private static ChatResponse response(String text) {

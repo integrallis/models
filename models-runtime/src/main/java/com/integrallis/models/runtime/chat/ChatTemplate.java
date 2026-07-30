@@ -40,6 +40,13 @@ public enum ChatTemplate {
   H2O_DIRECT("h2o-direct"),
   MINICPM5_NO_THINK("minicpm5-no-think");
 
+  private static final String DEEPSEEK_BOS = "<｜begin▁of▁sentence｜>";
+  private static final String DEEPSEEK_DEFAULT_SYSTEM =
+      "You are an AI programming assistant, utilizing the Deepseek Coder model, developed by "
+          + "Deepseek Company, and you only answer questions related to computer science. For "
+          + "politically sensitive questions, security and privacy issues, and other "
+          + "non-computer science questions, you will refuse to answer";
+
   private final String id;
 
   ChatTemplate(String id) {
@@ -178,41 +185,38 @@ public enum ChatTemplate {
   }
 
   private static String renderDeepSeek(List<ChatMessage> messages) {
-    StringBuilder prompt = new StringBuilder();
-    StringBuilder pendingInstruction = new StringBuilder();
+    StringBuilder prompt = new StringBuilder(DEEPSEEK_BOS);
+    boolean hasSystemMessage =
+        messages.stream().anyMatch(message -> message.role() == ChatRole.SYSTEM);
+    if (!hasSystemMessage) {
+      prompt.append(DEEPSEEK_DEFAULT_SYSTEM).append('\n');
+    }
+
     for (ChatMessage message : messages) {
-      if (message.role() == ChatRole.ASSISTANT) {
-        appendInstruction(prompt, pendingInstruction);
-        prompt.append("### Response:\n").append(message.text().strip()).append('\n');
-      } else {
-        if (!pendingInstruction.isEmpty()) {
-          pendingInstruction.append("\n\n");
-        }
-        pendingInstruction.append(message.text().strip());
+      switch (message.role()) {
+        case SYSTEM -> prompt.append(message.text());
+        case USER -> prompt.append("### Instruction:\n").append(message.text()).append('\n');
+        case ASSISTANT ->
+            prompt.append("### Response:\n").append(message.text()).append("\n<|EOT|>\n");
+        case TOOL ->
+            throw new IllegalArgumentException(
+                "DeepSeek Coder chat template does not support role " + message.role());
       }
     }
-    appendInstruction(prompt, pendingInstruction);
     return prompt.append("### Response:\n").toString();
-  }
-
-  private static void appendInstruction(StringBuilder prompt, StringBuilder instruction) {
-    if (!instruction.isEmpty()) {
-      prompt.append("### Instruction:\n").append(instruction).append('\n');
-      instruction.setLength(0);
-    }
   }
 
   private static String renderH2o(List<ChatMessage> messages, String assistantPrefix) {
     StringBuilder prompt = new StringBuilder();
     for (ChatMessage message : messages) {
-      if (!prompt.isEmpty()) {
-        prompt.append("\n\n");
+      switch (message.role()) {
+        case USER -> prompt.append("<|prompt|>").append(message.text()).append("</s>");
+        case ASSISTANT -> prompt.append("<|answer|>").append(message.text()).append("</s>");
+        case SYSTEM, TOOL ->
+            throw new IllegalArgumentException(
+                "H2O chat template does not support role " + message.role());
       }
-      if (message.role() == ChatRole.ASSISTANT) {
-        prompt.append("Previous answer: ");
-      }
-      prompt.append(message.text().strip());
     }
-    return "<|prompt|>" + prompt + "</s><|answer|>" + assistantPrefix;
+    return prompt.append("<|answer|>").append(assistantPrefix).toString();
   }
 }

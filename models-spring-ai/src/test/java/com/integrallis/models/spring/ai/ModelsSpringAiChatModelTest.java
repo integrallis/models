@@ -26,10 +26,14 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -87,13 +91,31 @@ class ModelsSpringAiChatModelTest {
             .repetitionPenalty(1.2f)
             .seed(42L)
             .build();
-    ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);
+    ModelsSpringAiChatModel model =
+        new ModelsSpringAiChatModel(delegate, ChatTemplate.CHATML, defaults);
     ChatOptions requested =
         ChatOptions.builder().temperature(0.2).topP(0.3).topK(7).maxTokens(19).build();
 
-    ChatResponse response = model.call(new Prompt("question", requested));
+    ChatResponse response =
+        model.call(
+            new Prompt(
+                List.of(
+                    new SystemMessage("system"),
+                    new UserMessage("question"),
+                    new AssistantMessage("prior answer")),
+                requested));
 
-    assertThat(delegate.prompt).isEqualTo("question");
+    assertThat(delegate.prompt)
+        .isEqualTo(
+            """
+            <|im_start|>system
+            system<|im_end|>
+            <|im_start|>user
+            question<|im_end|>
+            <|im_start|>assistant
+            prior answer<|im_end|>
+            <|im_start|>assistant
+            """);
     assertThat(delegate.options.temperature()).isEqualTo(0.2f);
     assertThat(delegate.options.topP()).isEqualTo(0.3f);
     assertThat(delegate.options.topK()).isEqualTo(7);
@@ -139,6 +161,13 @@ class ModelsSpringAiChatModelTest {
         .isThrownBy(() -> new ModelsSpringAiChatModel((TextGenerationModel) null));
     assertThatNullPointerException()
         .isThrownBy(() -> new ModelsSpringAiChatModel(highLevelModel("answer"), null));
+    assertThatNullPointerException()
+        .isThrownBy(
+            () ->
+                new ModelsSpringAiChatModel(
+                    highLevelModel("answer"),
+                    (ChatTemplate) null,
+                    SamplingOptions.builder().build()));
     ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(highLevelModel("answer"));
     assertThatNullPointerException().isThrownBy(() -> model.call((Prompt) null));
     assertThatNullPointerException().isThrownBy(() -> model.stream((Prompt) null));

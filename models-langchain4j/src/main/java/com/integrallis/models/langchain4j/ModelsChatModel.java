@@ -20,9 +20,11 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -32,6 +34,7 @@ import java.util.Objects;
 /** LangChain4J {@link ChatModel} backed by the models runtime generation loop. */
 public final class ModelsChatModel implements ChatModel {
   private final TextGenerationModel model;
+  private final ChatTemplate template;
   private final SamplingOptions defaults;
 
   public ModelsChatModel(InferenceBackend backend) {
@@ -47,7 +50,18 @@ public final class ModelsChatModel implements ChatModel {
   }
 
   public ModelsChatModel(TextGenerationModel model, SamplingOptions defaults) {
+    this(model, ChatTemplate.RAW, defaults);
+  }
+
+  public ModelsChatModel(
+      InferenceBackend backend, ChatTemplate template, SamplingOptions defaults) {
+    this(new RuntimeTextGenerationModel(backend), template, defaults);
+  }
+
+  public ModelsChatModel(
+      TextGenerationModel model, ChatTemplate template, SamplingOptions defaults) {
     this.model = Objects.requireNonNull(model, "model");
+    this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
   }
 
@@ -67,27 +81,28 @@ public final class ModelsChatModel implements ChatModel {
   }
 
   private String prompt(ChatRequest request) {
-    StringBuilder prompt = new StringBuilder();
+    java.util.ArrayList<com.integrallis.models.runtime.chat.ChatMessage> messages =
+        new java.util.ArrayList<>(request.messages().size());
     for (ChatMessage message : request.messages()) {
-      if (!prompt.isEmpty()) {
-        prompt.append('\n');
-      }
-      prompt.append(render(message));
+      messages.add(render(message));
     }
-    return prompt.toString();
+    return template.render(messages);
   }
 
-  private String render(ChatMessage message) {
+  private com.integrallis.models.runtime.chat.ChatMessage render(ChatMessage message) {
     if (message instanceof UserMessage userMessage && userMessage.hasSingleText()) {
-      return userMessage.singleText();
+      return com.integrallis.models.runtime.chat.ChatMessage.user(userMessage.singleText());
     }
     if (message instanceof SystemMessage systemMessage) {
-      return systemMessage.text();
+      return com.integrallis.models.runtime.chat.ChatMessage.system(systemMessage.text());
     }
     if (message instanceof AiMessage aiMessage) {
-      return aiMessage.text();
+      return com.integrallis.models.runtime.chat.ChatMessage.assistant(aiMessage.text());
     }
-    return message.toString();
+    if (message instanceof ToolExecutionResultMessage toolMessage && toolMessage.hasSingleText()) {
+      return com.integrallis.models.runtime.chat.ChatMessage.tool(toolMessage.text());
+    }
+    throw new IllegalArgumentException("Unsupported LangChain4j chat message: " + message.type());
   }
 
   private SamplingOptions options(ChatRequest request) {

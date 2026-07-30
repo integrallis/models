@@ -25,14 +25,14 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.CustomMessage;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +65,7 @@ class ModelsChatModelTest {
     ModelsChatModel model =
         new ModelsChatModel(
             delegate,
+            ChatTemplate.CHATML,
             SamplingOptions.builder()
                 .temperature(0.9f)
                 .topP(0.8f)
@@ -73,7 +74,6 @@ class ModelsChatModelTest {
                 .repetitionPenalty(1.2f)
                 .seed(42L)
                 .build());
-    CustomMessage custom = CustomMessage.from(Map.of("source", "tool"));
     ChatRequest request =
         ChatRequest.builder()
             .messages(
@@ -81,7 +81,7 @@ class ModelsChatModelTest {
                     SystemMessage.from("system"),
                     UserMessage.from("question"),
                     AiMessage.from("prior answer"),
-                    custom))
+                    ToolExecutionResultMessage.from("call-1", "lookup", "tool result")))
             .temperature(0.2)
             .topP(0.3)
             .topK(7)
@@ -90,7 +90,19 @@ class ModelsChatModelTest {
 
     var response = model.doChat(request);
 
-    assertThat(delegate.prompt).isEqualTo("system\nquestion\nprior answer\n" + custom);
+    assertThat(delegate.prompt)
+        .isEqualTo(
+            """
+            <|im_start|>system
+            system<|im_end|>
+            <|im_start|>user
+            question<|im_end|>
+            <|im_start|>assistant
+            prior answer<|im_end|>
+            <|im_start|>tool
+            tool result<|im_end|>
+            <|im_start|>assistant
+            """);
     assertThat(delegate.options.temperature()).isEqualTo(0.2f);
     assertThat(delegate.options.topP()).isEqualTo(0.3f);
     assertThat(delegate.options.topK()).isEqualTo(7);
@@ -125,6 +137,13 @@ class ModelsChatModelTest {
         .isThrownBy(() -> new ModelsChatModel((TextGenerationModel) null));
     assertThatNullPointerException()
         .isThrownBy(() -> new ModelsChatModel(highLevelModel("answer"), null));
+    assertThatNullPointerException()
+        .isThrownBy(
+            () ->
+                new ModelsChatModel(
+                    highLevelModel("answer"),
+                    (ChatTemplate) null,
+                    SamplingOptions.builder().build()));
     ModelsChatModel model = new ModelsChatModel(highLevelModel("answer"));
     assertThatNullPointerException().isThrownBy(() -> model.doChat(null));
   }

@@ -27,6 +27,12 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class ChatTemplateTest {
 
+  private static final String DEEPSEEK_DEFAULT_SYSTEM =
+      "You are an AI programming assistant, utilizing the Deepseek Coder model, developed by "
+          + "Deepseek Company, and you only answer questions related to computer science. For "
+          + "politically sensitive questions, security and privacy issues, and other "
+          + "non-computer science questions, you will refuse to answer";
+
   @Test
   void rendersRoleAwareChatMlConversation() {
     String prompt =
@@ -114,7 +120,11 @@ class ChatTemplateTest {
                 ChatTemplate.GEMMA,
                 "<start_of_turn>user\nPrompt<end_of_turn>\n<start_of_turn>model\n"),
             Map.entry(ChatTemplate.PHI3, "<|user|>\nPrompt<|end|>\n<|assistant|>\n"),
-            Map.entry(ChatTemplate.DEEPSEEK, "### Instruction:\nPrompt\n### Response:\n"),
+            Map.entry(
+                ChatTemplate.DEEPSEEK,
+                "<｜begin▁of▁sentence｜>"
+                    + DEEPSEEK_DEFAULT_SYSTEM
+                    + "\n### Instruction:\nPrompt\n### Response:\n"),
             Map.entry(ChatTemplate.H2O, "<|prompt|>Prompt</s><|answer|>"),
             Map.entry(
                 ChatTemplate.H2O_DIRECT, "<|prompt|>Prompt</s><|answer|>The context states that "),
@@ -131,7 +141,7 @@ class ChatTemplateTest {
   }
 
   @Test
-  void rendersRoleAwareGemmaDeepSeekAndH2oConversations() {
+  void rendersRoleAwareGemmaConversation() {
     List<ChatMessage> conversation =
         List.of(
             ChatMessage.system("System"),
@@ -152,23 +162,53 @@ class ChatTemplateTest {
             Tool result<end_of_turn>
             <start_of_turn>model
             """);
+  }
+
+  @Test
+  void rendersDeepSeekCoderConversationLikeApplyChatTemplate() {
+    List<ChatMessage> conversation =
+        List.of(
+            ChatMessage.system("System"),
+            ChatMessage.user("Question"),
+            ChatMessage.assistant("Answer"),
+            ChatMessage.user("Next"));
+
     assertThat(ChatTemplate.DEEPSEEK.render(conversation))
         .isEqualTo(
             """
-            ### Instruction:
-            System
-
+            <｜begin▁of▁sentence｜>System### Instruction:
             Question
             ### Response:
             Answer
+            <|EOT|>
             ### Instruction:
-            Tool result
+            Next
             ### Response:
             """);
+  }
+
+  @Test
+  void rendersH2oConversationLikeApplyChatTemplate() {
+    List<ChatMessage> conversation =
+        List.of(
+            ChatMessage.user("Question"),
+            ChatMessage.assistant("Answer"),
+            ChatMessage.user("Next"));
+
     assertThat(ChatTemplate.H2O.render(conversation))
-        .isEqualTo(
-            "<|prompt|>System\n\nQuestion\n\nPrevious answer: Answer\n\n"
-                + "Tool result</s><|answer|>");
+        .isEqualTo("<|prompt|>Question</s><|answer|>Answer</s>" + "<|prompt|>Next</s><|answer|>");
+  }
+
+  @Test
+  void rejectsRolesUnsupportedByUpstreamTemplates() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ChatTemplate.H2O.render(List.of(ChatMessage.system("System"))))
+        .withMessageContaining("H2O")
+        .withMessageContaining("SYSTEM");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ChatTemplate.DEEPSEEK.render(List.of(ChatMessage.tool("Tool result"))))
+        .withMessageContaining("DeepSeek")
+        .withMessageContaining("TOOL");
   }
 
   @Test
