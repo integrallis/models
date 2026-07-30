@@ -16,6 +16,7 @@
 package com.integrallis.models.rag;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -35,8 +36,10 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v18";
+      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v19";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
+  public static final int DEFAULT_MAXIMUM_EXTRACTIVE_DOCUMENTS = 3;
+  public static final int DEFAULT_MAXIMUM_EXTRACTIVE_CHARACTERS = 4_000;
   private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^(?:INSUFFICIENT_CONTEXT[.!]?\\s*)+$");
@@ -112,12 +115,32 @@ public final class GroundedAnswerPolicy {
           "with");
 
   private final float minimumRetrievalScore;
+  private final int maximumExtractiveDocuments;
+  private final int maximumExtractiveCharacters;
 
   public GroundedAnswerPolicy(float minimumRetrievalScore) {
+    this(
+        minimumRetrievalScore,
+        DEFAULT_MAXIMUM_EXTRACTIVE_DOCUMENTS,
+        DEFAULT_MAXIMUM_EXTRACTIVE_CHARACTERS);
+  }
+
+  public GroundedAnswerPolicy(
+      float minimumRetrievalScore,
+      int maximumExtractiveDocuments,
+      int maximumExtractiveCharacters) {
     if (!Float.isFinite(minimumRetrievalScore) || minimumRetrievalScore < 0) {
       throw new IllegalArgumentException("minimumRetrievalScore must be finite and non-negative");
     }
+    if (maximumExtractiveDocuments < 1) {
+      throw new IllegalArgumentException("maximumExtractiveDocuments must be positive");
+    }
+    if (maximumExtractiveCharacters < 1) {
+      throw new IllegalArgumentException("maximumExtractiveCharacters must be positive");
+    }
     this.minimumRetrievalScore = minimumRetrievalScore;
+    this.maximumExtractiveDocuments = maximumExtractiveDocuments;
+    this.maximumExtractiveCharacters = maximumExtractiveCharacters;
   }
 
   public static GroundedAnswerPolicy productionDefault() {
@@ -157,13 +180,24 @@ public final class GroundedAnswerPolicy {
       return new GroundedAnswer(
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
+    List<GroundingDocument> supportingDocuments =
+        supportingDocuments(question, validationCandidate, retrieved, retrieved);
+    if (supportingDocuments.isEmpty()) {
+      return new GroundedAnswer(
+          generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
+    }
     if (!hasCitations(candidate)) {
       return new GroundedAnswer(
           generatedText,
-          attachCitations(candidate, retrieved),
+          attachCitations(candidate, supportingDocuments),
           GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
     }
     if (!hasOnlyTrustedCitations(candidate, retrieved)) {
+      return new GroundedAnswer(
+          generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
+    }
+    List<GroundingDocument> citedDocuments = citedDocuments(candidate, retrieved);
+    if (supportingDocuments(question, validationCandidate, retrieved, citedDocuments).isEmpty()) {
       return new GroundedAnswer(
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
@@ -468,6 +502,68 @@ public final class GroundedAnswerPolicy {
     return foundTrusted;
   }
 
+  private static List<GroundingDocument> citedDocuments(
+      String candidate, List<GroundingDocument> retrieved) {
+    Set<String> citedIds = new HashSet<>();
+    Matcher matcher = BRACKETED_TEXT.matcher(candidate);
+    while (matcher.find()) {
+      citedIds.add(matcher.group(1).strip());
+    }
+    return retrieved.stream().filter(document -> citedIds.contains(document.id())).toList();
+  }
+
+  private static List<GroundingDocument> supportingDocuments(
+      String question,
+      String candidate,
+      List<GroundingDocument> evidenceUniverse,
+      List<GroundingDocument> allowedDocuments) {
+    Set<String> questionWords = words(question);
+    Set<String> evidenceWords = documentWords(evidenceUniverse);
+    LinkedHashMap<String, GroundingDocument> supporting = new LinkedHashMap<>();
+
+    String uncited = BRACKETED_TEXT.matcher(candidate).replaceAll(" ");
+    for (Set<String> claim : clauses(uncited)) {
+      Set<String> evidenceBoundWords = new HashSet<>();
+      for (String word : claim) {
+        if (containsEquivalentWord(evidenceWords, word)) {
+          evidenceBoundWords.add(word);
+        } else if (!containsEquivalentWord(questionWords, word)) {
+          return List.of();
+        }
+      }
+      if (evidenceBoundWords.isEmpty()) {
+        continue;
+      }
+
+      GroundingDocument document =
+          allowedDocuments.stream()
+              .filter(
+                  candidateDocument -> {
+                    Set<String> candidateDocumentWords =
+                        words(candidateDocument.title() + "\n" + candidateDocument.text());
+                    return evidenceBoundWords.stream()
+                        .allMatch(word -> containsEquivalentWord(candidateDocumentWords, word));
+                  })
+              .findFirst()
+              .orElse(null);
+      if (document == null) {
+        return List.of();
+      }
+      supporting.putIfAbsent(document.id(), document);
+    }
+    return List.copyOf(supporting.values());
+  }
+
+  private static Set<String> documentWords(List<GroundingDocument> documents) {
+    Set<String> result = new HashSet<>();
+    documents.forEach(
+        document -> {
+          result.addAll(words(document.title()));
+          result.addAll(words(document.text()));
+        });
+    return result;
+  }
+
   private static boolean preservesAtomicIdentifiers(
       String candidate, List<GroundingDocument> retrieved) {
     Set<String> candidateIdentifiers = atomicIdentifiers(candidate);
@@ -512,19 +608,39 @@ public final class GroundedAnswerPolicy {
     return answer.toString();
   }
 
-  private static String extractiveAnswer(List<GroundingDocument> retrieved) {
+  private String extractiveAnswer(List<GroundingDocument> retrieved) {
     StringBuilder answer = new StringBuilder();
-    for (GroundingDocument hit : retrieved) {
-      if (!answer.isEmpty()) {
-        answer.append(' ');
+    int documentCount = Math.min(maximumExtractiveDocuments, retrieved.size());
+    for (int index = 0; index < documentCount; index++) {
+      GroundingDocument hit = retrieved.get(index);
+      String separator = answer.isEmpty() ? "" : " ";
+      String citation = " [" + hit.id() + "]";
+      int textBudget =
+          maximumExtractiveCharacters - answer.length() - separator.length() - citation.length();
+      if (textBudget <= 0) {
+        break;
       }
+
       String text = hit.text().strip();
-      answer.append(text);
       if (!text.endsWith(".") && !text.endsWith("!") && !text.endsWith("?")) {
-        answer.append('.');
+        text += ".";
       }
-      answer.append(" [").append(hit.id()).append(']');
+      if (text.length() > textBudget) {
+        text = truncate(text, textBudget);
+      }
+      answer.append(separator).append(text).append(citation);
     }
-    return answer.toString();
+    return answer.isEmpty() ? ABSTENTION : answer.toString();
+  }
+
+  private static String truncate(String text, int maximumCharacters) {
+    if (text.length() <= maximumCharacters) {
+      return text;
+    }
+    if (maximumCharacters <= 3) {
+      return text.substring(0, maximumCharacters);
+    }
+    String prefix = text.substring(0, maximumCharacters - 3).stripTrailing();
+    return prefix + "...";
   }
 }
