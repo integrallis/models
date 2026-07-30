@@ -41,21 +41,23 @@ class NativeLibraryLocatorTest {
   }
 
   @Test
-  void systemLocatorFallsBackToTheBundledBridge() {
-    String previousLibrary = System.getProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY);
-    String previousCache =
-        System.getProperty(BundledAppleFoundationLibrary.CACHE_DIRECTORY_PROPERTY);
-    try {
-      System.clearProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY);
-      System.setProperty(
-          BundledAppleFoundationLibrary.CACHE_DIRECTORY_PROPERTY,
-          temporaryDirectory.resolve("cache").toString());
+  void configuredLocatorUsesTheEnvironmentBeforeTheBundledBridge() {
+    Path environment = temporaryDirectory.resolve("environment.dylib");
+    Path bundled = temporaryDirectory.resolve("bundled.dylib");
 
-      assertThat(NativeLibraryLocator.system().locate()).isEmpty();
-    } finally {
-      restoreProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY, previousLibrary);
-      restoreProperty(BundledAppleFoundationLibrary.CACHE_DIRECTORY_PROPERTY, previousCache);
-    }
+    assertThat(
+            NativeLibraryLocator.resolveConfigured(
+                null, environment.toString(), NativeLibraryLocator.fixed(bundled)))
+        .contains(environment);
+  }
+
+  @Test
+  void configuredLocatorFallsBackToTheBundledBridge() {
+    Path bundled = temporaryDirectory.resolve("bundled.dylib");
+
+    assertThat(
+            NativeLibraryLocator.resolveConfigured(" ", null, NativeLibraryLocator.fixed(bundled)))
+        .contains(bundled);
   }
 
   private static void restoreProperty(String name, String previous) {

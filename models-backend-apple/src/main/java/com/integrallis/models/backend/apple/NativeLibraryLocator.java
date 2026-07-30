@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.apple;
 
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.Optional;
 
 @FunctionalInterface
@@ -27,16 +28,23 @@ interface NativeLibraryLocator {
   Optional<Path> locate();
 
   static NativeLibraryLocator system() {
-    return () -> {
-      String configured = System.getProperty(LIBRARY_PATH_PROPERTY);
-      if (configured == null || configured.isBlank()) {
-        configured = System.getenv(LIBRARY_PATH_ENV);
-      }
-      if (configured == null || configured.isBlank()) {
-        return BundledAppleFoundationLibrary.resolve();
-      }
-      return Optional.of(Path.of(configured));
-    };
+    return () ->
+        resolveConfigured(
+            System.getProperty(LIBRARY_PATH_PROPERTY),
+            System.getenv(LIBRARY_PATH_ENV),
+            BundledAppleFoundationLibrary::resolve);
+  }
+
+  static Optional<Path> resolveConfigured(
+      String propertyValue, String environmentValue, NativeLibraryLocator fallback) {
+    String configured = propertyValue;
+    if (configured == null || configured.isBlank()) {
+      configured = environmentValue;
+    }
+    if (configured == null || configured.isBlank()) {
+      return Objects.requireNonNull(fallback, "fallback").locate();
+    }
+    return Optional.of(Path.of(configured));
   }
 
   static NativeLibraryLocator fixed(Path path) {

@@ -830,6 +830,10 @@ tasks.register("verifyGithubWorkflows") {
         ) {
             "Apple bridge workflow must compile, package, and test the macOS bridge"
         }
+        val codeqlWorkflow = workflowDir.resolve("codeql.yml").readText()
+        require("run: ./gradlew assemble testClasses" in codeqlWorkflow) {
+            "CodeQL must compile production and test sources without invoking coverage gates"
+        }
         val appleBridgeBuild =
             file(
                 "models-backend-apple/src/native/apple-foundation-models/" +

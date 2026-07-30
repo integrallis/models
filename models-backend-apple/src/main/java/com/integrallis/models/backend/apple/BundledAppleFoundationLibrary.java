@@ -57,12 +57,16 @@ final class BundledAppleFoundationLibrary {
   private BundledAppleFoundationLibrary() {}
 
   static Optional<Path> resolve() {
+    return resolve(AppleFoundationModels.class.getClassLoader());
+  }
+
+  static Optional<Path> resolve(ClassLoader classLoader) {
     String configuredCache = System.getProperty(CACHE_DIRECTORY_PROPERTY);
     Path cacheRoot =
         configuredCache == null || configuredCache.isBlank()
             ? Path.of(System.getProperty("user.home"), ".models", "apple-foundation")
             : Path.of(configuredCache);
-    return resolve(AppleFoundationModels.class.getClassLoader(), cacheRoot);
+    return resolve(classLoader, cacheRoot);
   }
 
   static Optional<Path> resolve(ClassLoader classLoader, Path cacheRoot) {

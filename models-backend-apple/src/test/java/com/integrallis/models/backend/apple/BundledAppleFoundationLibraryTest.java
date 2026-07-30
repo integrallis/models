@@ -128,22 +128,25 @@ class BundledAppleFoundationLibraryTest {
   }
 
   @Test
-  void returnsEmptyWhenNoBundledBridgeIsPresent() {
-    assertThat(
-            BundledAppleFoundationLibrary.resolve(
-                getClass().getClassLoader(), temporaryDirectory.resolve("cache")))
-        .isEmpty();
+  void returnsEmptyWhenNoBundledBridgeIsPresent() throws Exception {
+    try (var loader = new URLClassLoader(new java.net.URL[0], null)) {
+      assertThat(BundledAppleFoundationLibrary.resolve(loader, temporaryDirectory.resolve("cache")))
+          .isEmpty();
+    }
   }
 
   @Test
-  void systemResolutionHonorsTheConfiguredCacheDirectory() {
+  void configuredResolutionUsesTheConfiguredCacheDirectory() throws Exception {
+    Path resources = temporaryDirectory.resolve("configured-cache-resources");
+    writeBundle(resources, sha256(LIBRARY));
+    Path configuredCache = temporaryDirectory.resolve("configured-cache");
     String previous = System.getProperty(BundledAppleFoundationLibrary.CACHE_DIRECTORY_PROPERTY);
-    try {
+    try (var loader = new URLClassLoader(new java.net.URL[] {resources.toUri().toURL()}, null)) {
       System.setProperty(
-          BundledAppleFoundationLibrary.CACHE_DIRECTORY_PROPERTY,
-          temporaryDirectory.resolve("configured-cache").toString());
+          BundledAppleFoundationLibrary.CACHE_DIRECTORY_PROPERTY, configuredCache.toString());
 
-      assertThat(BundledAppleFoundationLibrary.resolve()).isEmpty();
+      assertThat(BundledAppleFoundationLibrary.resolve(loader).orElseThrow())
+          .startsWith(configuredCache.toAbsolutePath().normalize());
     } finally {
       restoreProperty(BundledAppleFoundationLibrary.CACHE_DIRECTORY_PROPERTY, previous);
     }
