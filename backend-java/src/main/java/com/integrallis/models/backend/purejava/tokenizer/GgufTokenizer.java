@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Tokenizer loaded from GGUF metadata. Supports GPT-2 byte-level BPE, Llama SentencePiece-style
@@ -36,27 +34,6 @@ import java.util.regex.Pattern;
  */
 public final class GgufTokenizer implements Tokenizer {
 
-  private static final Pattern LLAMA3_PRETOKEN_PATTERN =
-      Pattern.compile(
-          "(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])"
-              + "|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+"
-              + "|\\p{N}{1,3}"
-              + "| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*"
-              + "|\\s*[\\r\\n]+"
-              + "|\\s+(?!\\S)"
-              + "|\\s+");
-  private static final Set<String> LLAMA3_PRETOKENIZERS =
-      Set.of(
-          "llama3",
-          "llama-v3",
-          "llama-bpe",
-          "falcon3",
-          "falcon-h1",
-          "pixtral",
-          "midm-2.0",
-          "lfm2",
-          "jina-v5-nano",
-          "smaug-bpe");
   private static final Set<String> END_OF_GENERATION_TOKEN_TEXTS =
       Set.of(
           "<|eot_id|>",
@@ -102,7 +79,7 @@ public final class GgufTokenizer implements Tokenizer {
   private final boolean addBosToken;
   private final boolean addEosToken;
   private final boolean addSpacePrefix;
-  private final boolean useLlama3PreTokenizer;
+  private final BpePreTokenizer bpePreTokenizer;
   private final int unknownTokenId;
   private final char[] byteToChar;
   private final int[] charToByte;
@@ -121,7 +98,7 @@ public final class GgufTokenizer implements Tokenizer {
       boolean addBosToken,
       boolean addEosToken,
       boolean addSpacePrefix,
-      boolean useLlama3PreTokenizer,
+      BpePreTokenizer bpePreTokenizer,
       int unknownTokenId) {
     this.vocab = vocab;
     this.scores = scores;
@@ -136,7 +113,7 @@ public final class GgufTokenizer implements Tokenizer {
     this.addBosToken = addBosToken;
     this.addEosToken = addEosToken;
     this.addSpacePrefix = addSpacePrefix;
-    this.useLlama3PreTokenizer = useLlama3PreTokenizer;
+    this.bpePreTokenizer = bpePreTokenizer;
     this.unknownTokenId = unknownTokenId;
     this.byteToChar = buildBytesToUnicode();
     this.charToByte = buildUnicodeToBytes(byteToChar);
@@ -229,7 +206,7 @@ public final class GgufTokenizer implements Tokenizer {
     boolean addSpacePrefix =
         metadata.getBool("tokenizer.ggml.add_space_prefix").orElse(useSentencePiece);
     String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
-    boolean useLlama3PreTokenizer = LLAMA3_PRETOKENIZERS.contains(preTokenizer);
+    BpePreTokenizer bpePreTokenizer = BpePreTokenizer.forName(preTokenizer);
     int unknownTokenId = metadata.getUint32("tokenizer.ggml.unknown_token_id").orElse(0);
 
     return new GgufTokenizer(
@@ -246,7 +223,7 @@ public final class GgufTokenizer implements Tokenizer {
         addBosToken,
         addEosToken,
         addSpacePrefix,
-        useLlama3PreTokenizer,
+        bpePreTokenizer,
         unknownTokenId);
   }
 
@@ -348,6 +325,14 @@ public final class GgufTokenizer implements Tokenizer {
       encoded = encodeWithSpecialTokens(text);
     }
     return addConfiguredBoundaryTokens(encoded);
+  }
+
+  @Override
+  public int[] encodeOrdinary(String text) {
+    if (text == null) {
+      return new int[0];
+    }
+    return addConfiguredBoundaryTokens(encodeOrdinaryText(text));
   }
 
   private int[] encodeWithSpecialTokens(String text) {
@@ -522,26 +507,11 @@ public final class GgufTokenizer implements Tokenizer {
    * bytes_to_unicode to produce a Unicode string that the BPE vocabulary operates on.
    */
   private int[] encodeByteLevelBpe(String text) {
-    if (!useLlama3PreTokenizer) {
-      return encodeByteLevelBpePiece(text);
-    }
-
     List<Integer> tokens = new ArrayList<>();
-    Matcher matcher = LLAMA3_PRETOKEN_PATTERN.matcher(text);
-    int matchedThrough = 0;
-    while (matcher.find()) {
-      if (matcher.start() != matchedThrough) {
-        throw new IllegalArgumentException(
-            "Tokenizer pre-pattern did not match input at index " + matchedThrough);
-      }
-      for (int token : encodeByteLevelBpePiece(matcher.group())) {
+    for (String piece : bpePreTokenizer.split(text)) {
+      for (int token : encodeByteLevelBpePiece(piece)) {
         tokens.add(token);
       }
-      matchedThrough = matcher.end();
-    }
-    if (matchedThrough != text.length()) {
-      throw new IllegalArgumentException(
-          "Tokenizer pre-pattern did not match input at index " + matchedThrough);
     }
     return tokens.stream().mapToInt(Integer::intValue).toArray();
   }
@@ -556,6 +526,13 @@ public final class GgufTokenizer implements Tokenizer {
     }
     String unicodeText = mapped.toString();
 
+    if (bpePreTokenizer.ignoresMerges()) {
+      Integer token = tokenToId.get(unicodeText);
+      if (token != null) {
+        return new int[] {token};
+      }
+    }
+
     // Initial tokenization: each character is a separate token
     List<Integer> tokens = new ArrayList<>();
     for (int i = 0; i < unicodeText.length(); i++) {
@@ -567,7 +544,7 @@ public final class GgufTokenizer implements Tokenizer {
         // Fallback: try <0xNN> byte token for the original byte
         String byteToken = String.format("<0x%02X>", textBytes[i] & 0xFF);
         Integer byteId = tokenToId.get(byteToken);
-        tokens.add(byteId != null ? byteId : 0);
+        tokens.add(byteId != null ? byteId : unknownTokenId);
       }
     }
 
@@ -611,7 +588,7 @@ public final class GgufTokenizer implements Tokenizer {
         // Fall back to byte-level token <0xNN>
         String byteToken = String.format("<0x%02X>", textBytes[i] & 0xFF);
         Integer id = tokenToId.get(byteToken);
-        tokens.add(id != null ? id : 0);
+        tokens.add(id != null ? id : unknownTokenId);
         i += 1;
       }
     }

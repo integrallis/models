@@ -104,6 +104,7 @@ class GgufTokenizerTest {
     entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
     entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(8));
     entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(9));
+    entries.put("tokenizer.ggml.unknown_token_id", new GgufMetadataValue.Uint32Value(7));
     entries.put("tokenizer.ggml.add_bos_token", new GgufMetadataValue.BoolValue(addBosToken));
     entries.put("tokenizer.ggml.add_eos_token", new GgufMetadataValue.BoolValue(addEosToken));
     return new GgufMetadata(entries);
@@ -155,6 +156,10 @@ class GgufTokenizerTest {
   }
 
   private GgufMetadata createLlama3ByteLevelMetadata(String preTokenizer) {
+    return createLlama3ByteLevelMetadata(preTokenizer, true);
+  }
+
+  private GgufMetadata createLlama3ByteLevelMetadata(String preTokenizer, boolean includeMerges) {
     List<String> tokens = List.of("<unk>", "1", "2", "3", "4", "12", "123", "1234", "\u0120");
     Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
     entries.put(
@@ -164,13 +169,15 @@ class GgufTokenizerTest {
             tokens.stream()
                 .map(token -> (GgufMetadataValue) new GgufMetadataValue.StringValue(token))
                 .toList()));
-    entries.put(
-        "tokenizer.ggml.merges",
-        new GgufMetadataValue.ArrayValue(
-            GgufValueType.STRING,
-            List.of("1 2", "12 3", "123 4").stream()
-                .map(merge -> (GgufMetadataValue) new GgufMetadataValue.StringValue(merge))
-                .toList()));
+    if (includeMerges) {
+      entries.put(
+          "tokenizer.ggml.merges",
+          new GgufMetadataValue.ArrayValue(
+              GgufValueType.STRING,
+              List.of("1 2", "12 3", "123 4").stream()
+                  .map(merge -> (GgufMetadataValue) new GgufMetadataValue.StringValue(merge))
+                  .toList()));
+    }
     entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
     entries.put("tokenizer.ggml.pre", new GgufMetadataValue.StringValue(preTokenizer));
     return new GgufMetadata(entries);
@@ -301,6 +308,13 @@ class GgufTokenizerTest {
     }
 
     @Test
+    void fallsBackToConfiguredUnknownToken() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata());
+
+      assertThat(tokenizer.encode("B")).containsExactly(7);
+    }
+
+    @Test
     void skipsInvalidIdsAndEncodesUnknownVocabularyCharacters() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createByteLevelMetadata());
 
@@ -333,10 +347,40 @@ class GgufTokenizerTest {
     }
 
     @Test
+    void qwen2PreTokenizerKeepsDigitsSeparate() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createLlama3ByteLevelMetadata("qwen2"));
+
+      assertThat(tokenizer.encode("1234")).containsExactly(1, 2, 3, 4);
+    }
+
+    @Test
+    void llamaBpeUsesWholeVocabularyPieceWithoutMergeRules() {
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(createLlama3ByteLevelMetadata("llama-bpe", false));
+
+      assertThat(tokenizer.encode("123")).containsExactly(6);
+    }
+
+    @Test
+    void smaugBpeStillRequiresDeclaredMergeRules() {
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(createLlama3ByteLevelMetadata("smaug-bpe", false));
+
+      assertThat(tokenizer.encode("123")).containsExactly(1, 2, 3);
+    }
+
+    @Test
     void parsesControlTokensBeforeApplyingBpe() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSpecialTokenMetadata());
 
       assertThat(tokenizer.encode("<|im_start|>hi<|im_end|>")).containsExactly(5, 4, 6);
+    }
+
+    @Test
+    void canEncodeControlTokenTextAsOrdinaryUserContent() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSpecialTokenMetadata());
+
+      assertThat(tokenizer.encodeOrdinary("<|im_start|>hi<|im_end|>")).doesNotContain(5, 6);
     }
   }
 

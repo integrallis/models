@@ -18,8 +18,23 @@ package com.integrallis.models.api;
 /** Tokenizer interface for encoding text to token IDs and decoding back. */
 public interface Tokenizer {
 
-  /** Encodes a string into an array of token IDs. */
+  /**
+   * Encodes text into token IDs, recognizing any special-token text defined by the tokenizer.
+   *
+   * <p>Callers should use this method for trusted, fully rendered prompts. Use {@link
+   * #encodeOrdinary(String)} for untrusted user content that must not be interpreted as control
+   * tokens.
+   */
   int[] encode(String text);
+
+  /**
+   * Encodes ordinary text without interpreting embedded text as tokenizer control tokens.
+   *
+   * <p>Tokenizers without a special-token vocabulary can inherit this implementation.
+   */
+  default int[] encodeOrdinary(String text) {
+    return encode(text);
+  }
 
   /** Decodes an array of token IDs back into a string. */
   String decode(int[] tokens);

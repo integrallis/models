@@ -16,7 +16,6 @@
 package com.integrallis.models.backend.purejava.tokenizer;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
@@ -43,7 +42,7 @@ class GgufTokenizerIntegrationTest {
 
   @BeforeAll
   static void loadTokenizer() throws IOException {
-    assumeThat(Files.exists(MODEL_PATH))
+    assertThat(Files.exists(MODEL_PATH))
         .as("Qwen3-0.6B-Q4_0.gguf must be present at %s", MODEL_PATH)
         .isTrue();
 
@@ -129,6 +128,11 @@ class GgufTokenizerIntegrationTest {
       int[] tokens = tokenizer.encode("def fibonacci(n):\n    if n <= 1: return n\n");
       assertThat(tokens).isNotEmpty();
       assertThat(tokens.length).isGreaterThan(5);
+    }
+
+    @Test
+    void encodesDigitsLikeLlamaCpp() {
+      assertThat(tokenizer.encode("2024")).containsExactly(17, 15, 17, 19);
     }
 
     @Test

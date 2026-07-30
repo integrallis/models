@@ -59,6 +59,9 @@ class SmolLm2ModelFixtureIntegrationTest {
 
       int[] tokens = backend.tokenizer().encode("Hello from Java");
       assertThat(tokens).isNotEmpty();
+      assertThat(backend.tokenizer().encode("2024 code::foo"))
+          .as("token IDs must match llama.cpp b10012 for the pinned SmolLM2 GGUF")
+          .containsExactly(34, 32, 34, 36, 2909, 9533, 15236);
 
       float[] logits = backend.forward(tokens[0], 0);
       assertThat(logits).hasSize(backend.metadata().vocabSize());
