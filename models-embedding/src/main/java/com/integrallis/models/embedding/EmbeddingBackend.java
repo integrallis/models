@@ -20,9 +20,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Minimal SPI for an embedding model that produces fixed-dimension float vectors. The interface is
- * deliberately scoped so a future fp16/bf16 implementation can plug in alongside the float[] path
- * without breaking callers (see {@link #embed(String)} for the ownership contract).
+ * Embedding model SPI that produces fixed-dimension float vectors.
  *
  * <p>Distinct from {@code com.integrallis.models.api.InferenceBackend}: that SPI runs a generative
  * forward pass (token in → logits out). This SPI is for embedding models — input text in, fixed
@@ -34,10 +32,7 @@ import java.util.Objects;
  * {@link #embedAll(List)} are <b>caller-owned</b>: the implementation must not retain or mutate the
  * array after returning. Callers (notably {@code VectorCollectionEmbeddingSink}) hand the array
  * directly to {@code vectors-db}, which is documented to defensively clone at the staging boundary
- * — so the caller may reuse its own buffers freely once the call returns. This is the "no upcast
- * round-trip" path the audit calls out under ROADMAP II.12 F4: the embedder produces a native
- * {@code float[]} and the storage layer consumes it without an intermediate copy beyond the
- * documented staging clone.
+ * — so the caller may reuse its own buffers freely once the call returns.
  */
 public interface EmbeddingBackend extends AutoCloseable {
 
@@ -84,7 +79,9 @@ public interface EmbeddingBackend extends AutoCloseable {
   default List<float[]> embedAllAsList(List<String> texts) {
     float[][] rows = embedAll(texts);
     List<float[]> view = new ArrayList<>(rows.length);
-    for (float[] row : rows) view.add(row);
+    for (float[] row : rows) {
+      view.add(row);
+    }
     return view;
   }
 }

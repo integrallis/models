@@ -366,8 +366,9 @@ dependencies {
 ----
 
 An `EmbeddingBackend` and `VectorCollection` must use the same vector
-dimension. Batch documents, commit once, and embed the query with the
-same backend:
+dimension. `VectorCollectionEmbeddingSink` owns and closes the embedding
+backend; the application retains ownership of the collection. Batch documents,
+commit once, and embed the query with the same backend:
 
 [source,java]
 ----
@@ -380,17 +381,22 @@ import java.util.List;
 static void indexAndSearch(
         EmbeddingBackend embeddings,
         VectorCollection documents) {
-    var sink = new VectorCollectionEmbeddingSink(embeddings, documents);
-    sink.putAll(
-        List.of("policy-17", "shipping-4"),
-        List.of(
-            "Orders can be cancelled before shipment.",
-            "Standard shipping takes three business days."));
-    documents.commit();
+    try (var sink = new VectorCollectionEmbeddingSink(embeddings, documents)) {
+        sink.putAll(
+            List.of("policy-17", "shipping-4"),
+            List.of(
+                "Orders can be cancelled before shipment.",
+                "Standard shipping takes three business days."));
+        documents.commit();
 
-    float[] query = embeddings.embed("When can I cancel an order?");
-    var results = documents.search(
-        SearchRequest.builder(query, 5).build());
-    results.hits().forEach(hit -> System.out.println(hit.id()));
+        float[] query = sink.backend().embed("When can I cancel an order?");
+        var results = documents.search(
+            SearchRequest.builder(query, 5).build());
+        results.hits().forEach(hit -> System.out.println(hit.id()));
+    }
 }
 ----
+
+The sink validates every vector returned by the backend before mutating the
+collection. A wrong batch size, null row, or mismatched dimension is reported as
+an embedding-backend contract violation rather than a later index error.

@@ -20,28 +20,24 @@ import com.integrallis.vectors.db.VectorCollection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Bridges an {@link EmbeddingBackend} into a {@link VectorCollection}: the caller hands over an
- * {@code id} and {@code text}, the sink invokes the backend, and the resulting {@code float[]} is
- * placed directly on the collection via {@link Document#of(String, float[], String)}. No
- * intermediate copy between the embedder's output and the collection's staging buffer (the staging
- * buffer's defensive clone is the only allocation; the embedder's array is consumed once and
- * reusable as soon as {@code put} returns).
+ * Embeds text and writes the resulting vectors to a {@link VectorCollection}.
  *
- * <p>Closes the documented audit gap II.12 F4 — the "zero-copy {@code models ↔ vectors} pipeline".
- * Before this sink existed, every framework adapter (Spring AI, LangChain4j, …) had to define its
- * own bridge code, each with its own copy semantics. The sink consolidates that surface.
+ * <p>A successfully constructed sink owns its {@link EmbeddingBackend}; {@link #close()} releases
+ * that backend exactly once. The caller retains ownership of the collection. Every returned vector
+ * is checked against the declared dimension before the collection is mutated.
  *
- * <p>Dimension validation runs at construction time: the backend's reported {@link
- * EmbeddingBackend#dimension()} must equal the collection's configured dimension, otherwise the
- * sink throws {@link IllegalArgumentException} before any embed() call is made (the alternative —
- * defer until first put() — surfaces a cryptic vectors-db error at insert time).
+ * <p>The embedding array is passed directly to {@link Document#of(String, float[], String)}.
+ * Vectors performs its documented defensive copy at the staging boundary.
  */
-public final class VectorCollectionEmbeddingSink {
+public final class VectorCollectionEmbeddingSink implements AutoCloseable {
 
   private final EmbeddingBackend backend;
   private final VectorCollection collection;
+  private final int dimension;
+  private final AtomicBoolean closed = new AtomicBoolean();
 
   /**
    * Constructs the sink. Validates that the backend's dimension matches the collection's.
@@ -61,6 +57,7 @@ public final class VectorCollectionEmbeddingSink {
               + collDim
               + ")");
     }
+    this.dimension = backendDim;
   }
 
   /**
@@ -69,9 +66,10 @@ public final class VectorCollectionEmbeddingSink {
    * fit.
    */
   public void put(String id, String text) {
+    ensureOpen();
     Objects.requireNonNull(id, "id must not be null");
     Objects.requireNonNull(text, "text must not be null");
-    float[] vector = backend.embed(text);
+    float[] vector = validateVector(backend.embed(text), 0);
     collection.add(Document.of(id, vector, text));
   }
 
@@ -84,6 +82,7 @@ public final class VectorCollectionEmbeddingSink {
    * @throws IllegalArgumentException if list sizes differ
    */
   public void putAll(List<String> ids, List<String> texts) {
+    ensureOpen();
     Objects.requireNonNull(ids, "ids must not be null");
     Objects.requireNonNull(texts, "texts must not be null");
     if (ids.size() != texts.size()) {
@@ -91,7 +90,14 @@ public final class VectorCollectionEmbeddingSink {
           "ids.size() (" + ids.size() + ") != texts.size() (" + texts.size() + ")");
     }
     if (texts.isEmpty()) return;
+    for (int i = 0; i < texts.size(); i++) {
+      Objects.requireNonNull(ids.get(i), "ids must not contain null");
+      Objects.requireNonNull(texts.get(i), "texts must not contain null");
+    }
     float[][] vectors = backend.embedAll(texts);
+    if (vectors == null) {
+      throw new IllegalStateException("backend returned a null vector batch");
+    }
     if (vectors.length != texts.size()) {
       throw new IllegalStateException(
           "backend returned "
@@ -100,11 +106,12 @@ public final class VectorCollectionEmbeddingSink {
               + texts.size()
               + " texts — embedAll contract violation");
     }
+    for (int i = 0; i < vectors.length; i++) {
+      validateVector(vectors[i], i);
+    }
     List<Document> docs = new ArrayList<>(texts.size());
     for (int i = 0; i < texts.size(); i++) {
-      String id = Objects.requireNonNull(ids.get(i), "ids must not contain null");
-      String text = Objects.requireNonNull(texts.get(i), "texts must not contain null");
-      docs.add(Document.of(id, vectors[i], text));
+      docs.add(Document.of(ids.get(i), vectors[i], texts.get(i)));
     }
     collection.addAll(docs);
   }
@@ -119,6 +126,18 @@ public final class VectorCollectionEmbeddingSink {
     collection.commit();
   }
 
+  /**
+   * Closes the owned embedding backend. The caller-owned collection remains open.
+   *
+   * <p>Repeated calls have no effect.
+   */
+  @Override
+  public void close() {
+    if (closed.compareAndSet(false, true)) {
+      backend.close();
+    }
+  }
+
   /** Returns the backing {@link EmbeddingBackend}. */
   public EmbeddingBackend backend() {
     return backend;
@@ -127,5 +146,27 @@ public final class VectorCollectionEmbeddingSink {
   /** Returns the backing {@link VectorCollection}. */
   public VectorCollection collection() {
     return collection;
+  }
+
+  private float[] validateVector(float[] vector, int index) {
+    if (vector == null) {
+      throw new IllegalStateException("backend returned a null vector for text at index " + index);
+    }
+    if (vector.length != dimension) {
+      throw new IllegalStateException(
+          "backend returned dimension "
+              + vector.length
+              + " for text at index "
+              + index
+              + "; expected "
+              + dimension);
+    }
+    return vector;
+  }
+
+  private void ensureOpen() {
+    if (closed.get()) {
+      throw new IllegalStateException("embedding sink is closed");
+    }
   }
 }

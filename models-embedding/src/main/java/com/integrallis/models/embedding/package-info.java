@@ -20,7 +20,7 @@
  * <p>{@link com.integrallis.models.embedding.EmbeddingBackend} is the minimal SPI an embedding
  * model implements. {@link com.integrallis.models.embedding.VectorCollectionEmbeddingSink} consumes
  * that SPI and routes the produced {@code float[]} directly into a {@link
- * com.integrallis.vectors.db.VectorCollection}. Closes ROADMAP II.12 F4 — every framework adapter
- * used to roll its own bridge; this consolidates the surface.
+ * com.integrallis.vectors.db.VectorCollection}, validates backend output, and owns the backend
+ * lifecycle.
  */
 package com.integrallis.models.embedding;
