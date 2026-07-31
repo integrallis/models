@@ -1,79 +1,169 @@
-= Guarded RAG
-:navtitle: Guarded RAG
+= RAG Validation
+:navtitle: RAG Validation
 
-Small local models need an explicit policy for weak retrieval, unsafe retrieved
-text, unsupported claims, and source attribution. `models-rag` validates the
-retrieved context before generation and validates the answer afterward without
-coupling the application to a framework.
+Guarded RAG is an application policy around retrieval-augmented generation.
+Retrieval selects text that may help answer a question, but a successful vector
+search does not make that text safe and does not guarantee that the model will
+use it correctly. `models-rag` therefore applies two deterministic checks:
 
-== Before Generation
+. validate retrieved context before it enters the model prompt
+. validate the generated answer against the retrieved documents before it
+  reaches the caller
+
+The policy is framework-neutral. The same checks can wrap plain Java,
+LangChain4j, Spring AI, or another caller of a Models runtime.
+
+== Retrieval Validation
 
 Retrieved documents are untrusted input. Call `assess` before placing them in a
 prompt:
 
 [source,java]
 ----
+var policy = GroundedAnswerPolicy.productionDefault();
 GroundingContextDecision context = policy.assess(question, evidence);
 if (!context.generationAllowed()) {
     return GroundedAnswerPolicy.ABSTENTION;
 }
-
-String rawModelText = model.generate(prompt);
-GroundedAnswer answer = policy.apply(question, evidence, rawModelText);
 ----
 
-The preflight rejects empty or low-confidence retrieval, evidence unrelated to
-named entities in the question, more than 32 documents, more than 131,072
-characters, common instruction-override phrases, and model control-token
-delimiters. Use `GroundingLimits` to choose lower context and fallback limits
-for a model with a smaller context window.
+`assess` returns an explicit reason:
 
-== Decisions
+[cols="1,3",options="header"]
+|===
+|Decision |Meaning
 
-`GroundedAnswerPolicy` produces one of five outcomes:
+|`ACCEPTED`
+|The context passed every configured retrieval gate.
 
-* `MODEL_ANSWER` for supported text with trusted citations
-* `MODEL_ANSWER_WITH_DERIVED_CITATIONS` for supported text that omitted citations
-* `MODEL_ABSTENTION` when the model explicitly reports insufficient context
-* `RETRIEVAL_ABSTENTION` when retrieval does not clear the configured gate
-* `EXTRACTIVE_FALLBACK` when generated claims cannot be grounded
+|`EMPTY`
+|No documents were retrieved.
 
-The result keeps both the raw model output and the final application answer.
+|`LOW_CONFIDENCE`
+|No document met the minimum retrieval score.
 
-== Apply the Policy
+|`QUESTION_MISMATCH`
+|Named entities in the question had no overlap with the evidence.
+
+|`TOO_MANY_DOCUMENTS`
+|The result exceeded the configured document count.
+
+|`TOO_LARGE`
+|Titles and document text exceeded the configured character budget.
+
+|`PROMPT_INJECTION`
+|A title or document contained a recognized instruction-override phrase or
+model control-token delimiter.
+|===
+
+The production limits allow at most 32 documents and 131,072 retrieved
+characters. `GroundingLimits` can impose smaller limits for a model with a
+smaller context window. The minimum retrieval score is retriever-specific and
+must be set to match that retriever's score scale.
+
+== Answer Validation
+
+After generation, pass the same question and evidence to `apply`:
 
 [source,java]
 ----
-var evidence = List.of(
-    new GroundingDocument(
-        "policy-17",
-        "Cancellation policy",
-        "Orders can be cancelled without charge before shipment.",
-        4.2f,
-        1));
-
-var policy = GroundedAnswerPolicy.productionDefault();
-if (!policy.assess("When can an order be cancelled?", evidence).generationAllowed()) {
-    return GroundedAnswerPolicy.ABSTENTION;
-}
-GroundedAnswer answer = policy.apply(
-    "When can an order be cancelled?",
-    evidence,
-    "Orders can be cancelled without charge before shipment. [policy-17]");
+String rawModelText = model.generate(prompt, options);
+GroundedAnswer answer = policy.apply(question, evidence, rawModelText);
 
 System.out.println(answer.decision());
 System.out.println(answer.text());
 ----
 
-The retrieval score is application-specific. Set an explicit threshold when
-the retriever's score scale differs from the production default:
+`apply` repeats retrieval validation so unsafe context cannot yield an accepted
+answer even if the application forgot the preflight. It then evaluates the
+answer in this order:
+
+. Preserve an explicit model abstention as `MODEL_ABSTENTION`.
+. Reject an answer that alters an atomic identifier such as `POLICY-17` by
+  reusing only pieces of it.
+. Require every substantive answer term to appear in the question or retrieved
+  evidence, allowing only the policy's small set of normalized inflections.
+. Require evidence anchors for every clause of a multi-part question.
+. Require each substantive statement's evidence-bound terms to be supported by
+  one retrieved document. Terms pooled from unrelated documents cannot be
+  recombined into a supported claim.
+. Accept only citations whose IDs were retrieved, then verify that the cited
+  documents themselves support the answer. If a supported answer omitted
+  citations, attach only the supporting document IDs.
+. Replace unsupported output with a size-bounded extractive answer copied from
+  trusted retrieved documents.
+
+The result retains both the raw model text and the final application text for
+audit. The validator is a conservative lexical policy, not a natural-language
+inference model: it does not prove semantic or factual correctness. It reduces
+specific failure modes such as unsupported terms, cross-document
+recombinations, invented citations, and lost identifiers. Applications with a
+higher assurance requirement should add domain validation or human review.
+
+== Complete Flow
+
+[source,java]
+----
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.rag.GroundedAnswerPolicy;
+import com.integrallis.models.rag.GroundingDocument;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.List;
+import java.util.stream.Collectors;
+
+final class RagAnswerService {
+    static String answer(
+            TextGenerationModel model,
+            String question,
+            List<GroundingDocument> evidence,
+            SamplingOptions options) {
+        var policy = GroundedAnswerPolicy.productionDefault();
+        if (!policy.assess(question, evidence).generationAllowed()) {
+            return GroundedAnswerPolicy.ABSTENTION;
+        }
+
+        String context = evidence.stream()
+            .map(document ->
+                "[" + document.id() + "] " + document.title() + "\n" + document.text())
+            .collect(Collectors.joining("\n\n"));
+        var prompt = ChatTemplate.CHATML_NO_THINK.render(List.of(
+            ChatMessage.system(
+                "Answer only from the context and cite source IDs in brackets."),
+            ChatMessage.user("Context:\n" + context + "\n\nQuestion:\n" + question)));
+
+        String rawModelText = model.generate(prompt, options);
+        return policy.apply(question, evidence, rawModelText).text();
+    }
+}
+----
+
+== Final Decisions
+
+`GroundedAnswerPolicy` produces one of five answer outcomes:
+
+* `MODEL_ANSWER` for supported text with trusted citations
+* `MODEL_ANSWER_WITH_DERIVED_CITATIONS` for supported text whose citations were
+  deterministically attached by the policy
+* `MODEL_ABSTENTION` when the model explicitly reports insufficient context
+* `RETRIEVAL_ABSTENTION` when retrieval does not clear the configured gates
+* `EXTRACTIVE_FALLBACK` when generated claims or citations cannot be validated
+
+Fallback output uses at most the configured number of retrieved documents and
+characters. If no bounded extractive answer can be produced, the result is
+`INSUFFICIENT_CONTEXT`.
+
+== Configure the Policy
+
+Set a threshold that matches the retriever:
 
 [source,java]
 ----
 var policy = new GroundedAnswerPolicy(0.78f);
 ----
 
-Custom limits are explicit:
+Set context and fallback bounds explicitly:
 
 [source,java]
 ----
@@ -84,6 +174,14 @@ var limits = new GroundingLimits(
     2_000);  // maximum fallback characters
 var policy = new GroundedAnswerPolicy(0.78f, limits);
 ----
+
+== Framework Placement
+
+Run retrieval through the framework integration, call `assess`, add only
+accepted evidence to the prompt, generate through the local model, and call
+`apply` before returning the answer. See xref:langchain4j.adoc[LangChain4j],
+xref:spring-ai.adoc[Spring AI], xref:spring-boot.adoc[Spring Boot], and
+xref:vectors.adoc[Vectors] for adapter wiring.
 
 == Qualification
 

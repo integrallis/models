@@ -1,0 +1,145 @@
+= Spring Boot
+:navtitle: Spring Boot
+
+`models-spring-boot-starter` turns an application-provided Models runtime into
+a Spring AI `ChatModel`. Model resolution remains explicit: the application
+adds one ModelJar marker and exposes the resulting `TextGenerationModel` as a
+bean. The starter applies the configured chat template and sampling defaults.
+
+The Models and Vectors starters are tested together on Spring AI 1.1.4, 1.1.8,
+and 2.0.0. They contribute separate chat and vector-store beans and do not
+replace one another.
+
+== Dependencies
+
+Use the Spring AI BOM or an existing Spring AI provider starter to select the
+framework version. The explicit `spring-ai-model` dependency below is the
+smallest standalone setup:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("org.springframework.ai:spring-ai-model:2.0.0")
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
+    implementation("com.integrallis:models-spring-boot-starter:{models-version}")
+}
+----
+
+== Provide the Model
+
+[source,java]
+----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
+import com.integrallis.models.api.TextGenerationModel;
+import org.modeljars.ModelJars;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+class LocalModelConfiguration {
+    @Bean(destroyMethod = "close")
+    TextGenerationModel localModel() {
+        return ModelJars.open(MODEL);
+    }
+}
+----
+
+When a `TextGenerationModel` bean is present, the starter registers
+`ModelsSpringAiChatModel` under the stable bean name `modelsChatModel`. An
+`InferenceBackend` bean can be supplied instead; a high-level
+`TextGenerationModel` takes precedence when both exist. If neither exists, the
+starter does not create a phantom chat-model bean.
+
+Other Spring AI model-provider beans can coexist. Inject the local model by
+name when an application has more than one `ChatModel`:
+
+[source,java]
+----
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+@Component
+final class LocalAssistant {
+    private final ChatModel model;
+
+    LocalAssistant(@Qualifier("modelsChatModel") ChatModel model) {
+        this.model = model;
+    }
+}
+----
+
+== Configure Chat and Sampling
+
+[source,yaml]
+----
+integrallis:
+  models:
+    chat-template: chatml-no-think
+    sampling:
+      temperature: 0.0
+      top-p: 0.9
+      top-k: 40
+      max-tokens: 128
+      seed: 42
+      repetition-penalty: 1.0
+      stop-sequences:
+        - "</answer>"
+----
+
+These values become immutable adapter defaults. Non-null Spring AI
+`ChatOptions` on an individual `Prompt` override temperature, top-p, top-k,
+maximum tokens, and stop sequences for that request without mutating the bean.
+The configured seed and repetition penalty remain in effect.
+
+== Blocking and Streaming
+
+The injected bean implements both Spring AI paths:
+
+[source,java]
+----
+String answer = model.call("Summarize the retrieved policy.");
+
+model.stream(new Prompt("List the retrieved facts."))
+    .map(response -> response.getResult().getOutput().getText())
+    .doOnNext(System.out::print)
+    .blockLast();
+----
+
+Streaming has the same ordering and error semantics described in
+xref:spring-ai.adoc#_streaming_chat[Spring AI streaming]. Blocking model
+inference runs off the Reactor subscriber thread.
+
+== Add Vectors for RAG
+
+Add the Vectors starter to expose a standard Spring AI `VectorStore` beside the
+local Models `ChatModel`:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:vectors-spring-boot-starter:{vectors-version}")
+}
+----
+
+[source,yaml]
+----
+java-vectors:
+  index-type: HNSW
+  quantizer: SQ8
+----
+
+When the application provides a Spring AI `EmbeddingModel`, the Vectors starter
+infers its dimension and contributes `JavaVectorsVectorStore`. Spring AI's
+`ChatClient` and retrieval advisors can then use `modelsChatModel` and that
+standard `VectorStore` without adapter-specific glue.
+
+Retrieval advisors assemble context but do not prove that the generated answer
+is supported. Apply xref:rag.adoc[RAG Validation] when the application requires
+retrieval screening, citation validation, and bounded fallback.

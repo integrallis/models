@@ -29,6 +29,52 @@ a small Models-owned Rust library through Java's Foreign Function and Memory
 New to local model execution? Start with
 xref:concepts.adoc[Inference Concepts].
 
+== Run a Model
+
+Add the ModelJars runtime and one qualified model marker:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
+}
+----
+
+The marker supplies the exact model descriptor; the application does not
+construct a model-file path:
+
+[source,java]
+----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.List;
+import org.modeljars.ModelJars;
+
+var prompt = ChatTemplate.CHATML_NO_THINK.render(
+    List.of(ChatMessage.user("Why is local inference useful?")));
+var options = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(64)
+    .build();
+
+try (var model = ModelJars.open(MODEL)) {
+    System.out.println(model.generate(prompt, options));
+}
+----
+
+Continue with xref:using-models.adoc[Using Models] for streaming, diagnostics,
+and unmanaged GGUF files. Framework users can go directly to
+xref:langchain4j.adoc[LangChain4j], xref:spring-ai.adoc[Spring AI], or
+xref:spring-boot.adoc[Spring Boot].
+
 image::models-0001.png[Models runtime architecture,align=center]
 
 == Published Modules
@@ -74,7 +120,7 @@ image::models-0001.png[Models runtime architecture,align=center]
 |Optional Models-to-Vectors storage and semantic-cache bridge
 |===
 
-Start with xref:getting-started.adoc[Getting Started], then select an exact
+Start with xref:using-models.adoc[Using Models], then select an exact
 artifact from xref:model-support.adoc[Model Support].
 
 == Evidence

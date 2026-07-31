@@ -1,5 +1,5 @@
-= Getting Started
-:navtitle: Getting Started
+= Using Models
+:navtitle: Using Models
 
 Models requires JDK 25 or newer. The shortest path to a qualified model is the
 ModelJars facade plus one independently versioned marker JAR:
@@ -76,8 +76,16 @@ java --add-modules jdk.incubator.vector \
 
 == Stream Tokens
 
+The plain Java streaming API delivers decoded token fragments serially and in
+generation order. Exactly one terminal callback follows: `onComplete` after a
+successful generation or `onError` with the original failure. Callbacks may run
+on an implementation-selected thread, so callback methods should return
+promptly and must not re-enter the same non-thread-safe model.
+
 [source,java]
 ----
+import com.integrallis.models.api.TokenStream;
+
 try (var model = ModelJars.open(MODEL)) {
     model.generate(prompt, options, new TokenStream() {
         @Override
