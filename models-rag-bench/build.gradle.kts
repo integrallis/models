@@ -4,6 +4,8 @@ plugins {
     id("com.github.spotbugs")
 }
 
+val langchain4jVersion = providers.gradleProperty("langchain4jVersion").getOrElse("1.17.2")
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
@@ -48,6 +50,7 @@ dependencies {
     implementation(project(":backend-native"))
     implementation(project(":models-langchain4j"))
     implementation(project(":models-spring-ai"))
+    implementation("dev.langchain4j:langchain4j:$langchain4jVersion")
     implementation("org.apache.lucene:lucene-core:10.4.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     implementation("org.springframework.ai:spring-ai-rag:2.0.0")

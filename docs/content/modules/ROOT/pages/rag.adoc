@@ -1,9 +1,32 @@
 = Guarded RAG
 :navtitle: Guarded RAG
 
-Small local models need an explicit policy for weak retrieval, unsupported
-claims, and source attribution. `models-rag` applies deterministic guardrails
-after retrieval and generation without coupling the application to a framework.
+Small local models need an explicit policy for weak retrieval, unsafe retrieved
+text, unsupported claims, and source attribution. `models-rag` validates the
+retrieved context before generation and validates the answer afterward without
+coupling the application to a framework.
+
+== Before Generation
+
+Retrieved documents are untrusted input. Call `assess` before placing them in a
+prompt:
+
+[source,java]
+----
+GroundingContextDecision context = policy.assess(question, evidence);
+if (!context.generationAllowed()) {
+    return GroundedAnswerPolicy.ABSTENTION;
+}
+
+String rawModelText = model.generate(prompt);
+GroundedAnswer answer = policy.apply(question, evidence, rawModelText);
+----
+
+The preflight rejects empty or low-confidence retrieval, evidence unrelated to
+named entities in the question, more than 32 documents, more than 131,072
+characters, common instruction-override phrases, and model control-token
+delimiters. Use `GroundingLimits` to choose lower context and fallback limits
+for a model with a smaller context window.
 
 == Decisions
 
@@ -30,6 +53,9 @@ var evidence = List.of(
         1));
 
 var policy = GroundedAnswerPolicy.productionDefault();
+if (!policy.assess("When can an order be cancelled?", evidence).generationAllowed()) {
+    return GroundedAnswerPolicy.ABSTENTION;
+}
 GroundedAnswer answer = policy.apply(
     "When can an order be cancelled?",
     evidence,
@@ -45,6 +71,18 @@ the retriever's score scale differs from the production default:
 [source,java]
 ----
 var policy = new GroundedAnswerPolicy(0.78f);
+----
+
+Custom limits are explicit:
+
+[source,java]
+----
+var limits = new GroundingLimits(
+    12,      // maximum retrieved documents
+    48_000,  // maximum retrieved characters
+    2,       // maximum fallback documents
+    2_000);  // maximum fallback characters
+var policy = new GroundedAnswerPolicy(0.78f, limits);
 ----
 
 == Qualification
