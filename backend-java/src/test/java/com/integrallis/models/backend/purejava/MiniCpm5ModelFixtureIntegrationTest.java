@@ -27,9 +27,12 @@ import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
+import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -74,9 +77,8 @@ class MiniCpm5ModelFixtureIntegrationTest {
           .containsExactly(7018, 15571, 4865, 42, 89, 18491, 13920, 38, 220, 2311);
       assertThat(
               tokenizer.encode(
-                  "<s><|im_start|>system\nYou<|im_end|>\n"
-                      + "<|im_start|>user\nHi<|im_end|>\n"
-                      + "<|im_start|>assistant\n<think>\n\n</think>\n\n"))
+                  ChatTemplate.MINICPM5_NO_THINK.render(
+                      List.of(ChatMessage.system("You"), ChatMessage.user("Hi")))))
           .as("MiniCPM5 chat templates own BOS because tokenizer metadata disables automatic BOS")
           .containsExactly(
               0, 130072, 17261, 220, 2311, 130073, 220, 130072, 8448, 220, 19301, 130073, 220,

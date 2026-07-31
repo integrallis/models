@@ -490,6 +490,14 @@ class GgufTokenizerTest {
       assertThat(tokenizer.decode(7)).isEqualTo(" a");
       assertThat(tokenizer.decode(new int[] {1, 7})).isEqualTo("a");
     }
+
+    @Test
+    void segmentedPromptPreservesTokenizerContextAcrossOrdinaryBoundaries() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSentencePieceMetadata());
+      ModelPrompt prompt = ModelPrompt.builder().control("a").text("bc").build();
+
+      assertThat(tokenizer.encode(prompt)).containsExactly(tokenizer.encode("abc"));
+    }
   }
 
   @Nested

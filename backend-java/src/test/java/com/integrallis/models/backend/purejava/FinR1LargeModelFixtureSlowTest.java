@@ -17,12 +17,16 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureDescriptor;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.lang.foreign.Arena;
+import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -39,13 +43,11 @@ class FinR1LargeModelFixtureSlowTest {
           + "<answer>\n"
           + "...\n"
           + "</answer>";
-  private static final String FINANCIAL_PROMPT =
-      "<|im_start|>system\n"
-          + SYSTEM_PROMPT
-          + "<|im_end|>\n"
-          + "<|im_start|>user\n"
-          + "If a $100 investment gains 10%, what is its value?<|im_end|>\n"
-          + "<|im_start|>assistant\n";
+  private static final ModelPrompt FINANCIAL_PROMPT =
+      ChatTemplate.CHATML.render(
+          List.of(
+              ChatMessage.system(SYSTEM_PROMPT),
+              ChatMessage.user("If a $100 investment gains 10%, what is its value?")));
 
   private static final ModelFixtureRequirement FIN_R1_7B_Q4_K_M =
       ModelFixtureRequirement.of("hf://bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF")

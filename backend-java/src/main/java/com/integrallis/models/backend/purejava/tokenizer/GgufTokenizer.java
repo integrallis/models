@@ -320,24 +320,26 @@ public final class GgufTokenizer implements Tokenizer {
   public int[] encode(ModelPrompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
     List<Integer> encoded = new ArrayList<>();
+    StringBuilder ordinaryText = new StringBuilder();
     for (ModelPrompt.Segment segment : prompt.segments()) {
-      int[] segmentTokens =
-          segment.kind() == ModelPrompt.SegmentKind.CONTROL
-              ? encodeWithSpecialTokens(segment.text())
-              : encodeOrdinaryText(segment.text());
-      append(encoded, segmentTokens);
+      if (segment.kind() == ModelPrompt.SegmentKind.CONTROL) {
+        appendTrustedControl(encoded, ordinaryText, segment.text());
+      } else {
+        ordinaryText.append(segment.text());
+      }
     }
+    flushOrdinaryText(encoded, ordinaryText);
     return addConfiguredBoundaryTokens(encoded.stream().mapToInt(Integer::intValue).toArray());
   }
 
-  private int[] encodeWithSpecialTokens(String text) {
-    List<Integer> encoded = new ArrayList<>();
+  private void appendTrustedControl(
+      List<Integer> encoded, StringBuilder ordinaryText, String controlText) {
     int position = 0;
-    while (position < text.length()) {
+    while (position < controlText.length()) {
       SpecialToken nextSpecial = null;
       int nextSpecialIndex = -1;
       for (SpecialToken candidate : specialTokens) {
-        int candidateIndex = text.indexOf(candidate.text(), position);
+        int candidateIndex = controlText.indexOf(candidate.text(), position);
         if (candidateIndex >= 0 && (nextSpecialIndex < 0 || candidateIndex < nextSpecialIndex)) {
           nextSpecial = candidate;
           nextSpecialIndex = candidateIndex;
@@ -345,16 +347,24 @@ public final class GgufTokenizer implements Tokenizer {
       }
 
       if (nextSpecial == null) {
-        append(encoded, encodeOrdinaryText(text.substring(position)));
+        ordinaryText.append(controlText, position, controlText.length());
         break;
       }
       if (nextSpecialIndex > position) {
-        append(encoded, encodeOrdinaryText(text.substring(position, nextSpecialIndex)));
+        ordinaryText.append(controlText, position, nextSpecialIndex);
       }
+      flushOrdinaryText(encoded, ordinaryText);
       encoded.add(nextSpecial.id());
       position = nextSpecialIndex + nextSpecial.text().length();
     }
-    return encoded.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  private void flushOrdinaryText(List<Integer> encoded, StringBuilder ordinaryText) {
+    if (ordinaryText.isEmpty()) {
+      return;
+    }
+    append(encoded, encodeOrdinaryText(ordinaryText.toString()));
+    ordinaryText.setLength(0);
   }
 
   private int[] encodeOrdinaryText(String text) {

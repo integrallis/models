@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureDescriptor;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
@@ -30,14 +31,15 @@ import org.junit.jupiter.api.Test;
 class EuroLlmModelFixtureIntegrationTest {
 
   private static final int INTEGRATION_CONTEXT_LENGTH = 128;
-  private static final String TRANSLATION_PROMPT =
-      "<|im_start|>system\n"
-          + "<|im_end|>\n"
-          + "<|im_start|>user\n"
-          + "Translate the following English source text to Portuguese:\n"
-          + "English: The sky is blue.\n"
-          + "Portuguese:<|im_end|>\n"
-          + "<|im_start|>assistant\n";
+  private static final ModelPrompt TRANSLATION_PROMPT =
+      ModelPrompt.builder()
+          .control("<|im_start|>system\n<|im_end|>\n<|im_start|>user\n")
+          .text(
+              "Translate the following English source text to Portuguese:\n"
+                  + "English: The sky is blue.\n"
+                  + "Portuguese:")
+          .control("<|im_end|>\n<|im_start|>assistant\n")
+          .build();
 
   private static final ModelFixtureRequirement EUROLLM_1_7B_Q4_K_M =
       ModelFixtureRequirement.of("hf://mradermacher/EuroLLM-1.7B-Instruct-GGUF")
