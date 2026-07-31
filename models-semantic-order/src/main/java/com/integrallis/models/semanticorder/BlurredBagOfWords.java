@@ -51,7 +51,8 @@ public final class BlurredBagOfWords {
 
   /**
    * Encodes terms using weights {@code exp(-(distance^2) / sigma)} and L1 normalization. Unknown
-   * terms are ignored.
+   * terms are ignored. The radius is capped at half the cyclic order so each rank receives one
+   * weight at its shortest cyclic distance.
    */
   public static BlurredBagOfWords encode(
       SemanticOrder order, List<String> terms, int radius, double sigma) {
@@ -65,6 +66,7 @@ public final class BlurredBagOfWords {
     }
 
     Map<Integer, Double> accumulated = new HashMap<>();
+    int effectiveRadius = Math.min(radius, order.size() / 2);
     for (String term : terms) {
       Objects.requireNonNull(term, "terms must not contain null");
       OptionalInt rank = order.rank(term);
@@ -72,12 +74,14 @@ public final class BlurredBagOfWords {
         continue;
       }
       add(accumulated, rank.getAsInt(), 1.0);
-      for (int distance = 1; distance <= radius; distance++) {
+      for (int distance = 1; distance <= effectiveRadius; distance++) {
         double weight = Math.exp(-((double) distance * distance) / sigma);
         int predecessor = Math.floorMod((long) rank.getAsInt() - distance, order.size());
         int successor = Math.floorMod((long) rank.getAsInt() + distance, order.size());
         add(accumulated, predecessor, weight);
-        add(accumulated, successor, weight);
+        if (successor != predecessor) {
+          add(accumulated, successor, weight);
+        }
       }
     }
 

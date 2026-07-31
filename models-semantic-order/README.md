@@ -37,8 +37,10 @@ var right = BlurredBagOfWords.encode(tour, List.of("dog", "animal"));
 double distance = left.l1Distance(right);
 ```
 
-The default radius is 10 and the default Gaussian denominator is 10. Unknown
-terms are ignored. Callers own tokenization and text normalization.
+The default radius is 10 and the default Gaussian denominator is 10. A radius
+larger than half the vocabulary is capped so each rank is weighted once at its
+shortest cyclic distance. Unknown terms are ignored. Callers own tokenization
+and text normalization.
 
 ## Semantics
 
