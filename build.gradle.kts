@@ -55,6 +55,7 @@ val publishedModuleNames =
         "backend-apple",
         "models-langchain4j",
         "models-spring-ai",
+        "models-spring-boot-starter",
         "models-embedding"
     )
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
@@ -711,6 +712,31 @@ tasks.register("verifyStagedPublications") {
             require("<licenses>" in pom && "<developers>" in pom && "<scm>" in pom) {
                 "Incomplete Maven Central metadata in ${proj.name} POM"
             }
+            if (proj.name in
+                setOf(
+                    "models-langchain4j",
+                    "models-spring-ai",
+                    "models-spring-boot-starter"
+                )
+            ) {
+                listOf("dev.langchain4j", "org.springframework.ai", "org.springframework.boot")
+                    .forEach { frameworkGroup ->
+                        require("<groupId>$frameworkGroup</groupId>" !in pom) {
+                            "${proj.name} must let the application own $frameworkGroup versions"
+                        }
+                    }
+            }
+            if (proj.name in setOf("models-langchain4j", "models-spring-ai")) {
+                val runtimeApiDependency =
+                    Regex(
+                        """<dependency>\s*<groupId>com\.integrallis</groupId>""" +
+                            """\s*<artifactId>models-runtime</artifactId>""" +
+                            """\s*<version>[^<]+</version>\s*<scope>compile</scope>"""
+                    )
+                require(runtimeApiDependency.containsMatchIn(pom)) {
+                    "${proj.name} must expose models-runtime because ChatTemplate is public API"
+                }
+            }
             val forbiddenGroup = listOf("org", "modeljars").joinToString(".")
             require("<groupId>$forbiddenGroup</groupId>" !in pom) {
                 "${proj.name} staged POM contains a reverse catalog dependency"
@@ -759,7 +785,8 @@ tasks.register("verifyGithubWorkflows") {
             "mfcqi.yml",
             "release.yml",
             "native-kernels.yml",
-            "apple-bridge.yml"
+            "apple-bridge.yml",
+            "framework-compat.yml"
         ).forEach { name ->
             val f = workflowDir.resolve(name)
             require(f.exists()) { "Missing workflow: ${f.absolutePath}" }

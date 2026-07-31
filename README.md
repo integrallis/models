@@ -212,14 +212,17 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Integration | Module | Surface |
 |---|---|---|
 | Plain Java | `models-runtime` | `GenerationLoop` and `TokenStream` |
-| LangChain4j | `models-langchain4j` | `ModelsChatModel` |
+| LangChain4j | `models-langchain4j` | blocking and streaming chat models |
 | Spring AI | `models-spring-ai` | blocking and streaming chat models |
+| Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel` auto-configuration |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 | Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |
 
 These adapters are implemented and tested against the same backend contracts;
-they do not select hidden inference paths. See
+they do not select hidden inference paths. Their framework dependencies are
+caller-owned, and CI composes them with the corresponding Vectors adapters and
+starter across the supported Spring AI and LangChain4j versions. See
 [Framework integrations](https://integrallis.github.io/models/docs/models/current/framework-integrations.html).
 
 ## Documentation

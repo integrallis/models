@@ -102,7 +102,6 @@ public final class ModelsSpringAiChatModel implements ChatModel {
         .subscribeOn(Schedulers.boundedElastic());
   }
 
-  @Override
   public ChatOptions getOptions() {
     return ChatOptions.builder()
         .temperature((double) defaults.temperature())

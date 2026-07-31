@@ -74,7 +74,7 @@ final class LangChain4jChatRequestMapper {
     if (message instanceof AiMessage aiMessage) {
       return com.integrallis.models.runtime.chat.ChatMessage.assistant(aiMessage.text());
     }
-    if (message instanceof ToolExecutionResultMessage toolMessage && toolMessage.hasSingleText()) {
+    if (message instanceof ToolExecutionResultMessage toolMessage) {
       return com.integrallis.models.runtime.chat.ChatMessage.tool(toolMessage.text());
     }
     throw new IllegalArgumentException("Unsupported LangChain4j chat message: " + message.type());
