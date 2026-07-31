@@ -52,6 +52,9 @@ public interface Tokenizer {
   /**
    * Decodes token IDs in sequence order.
    *
+   * <p>Sequence decoding may remove tokenizer artifacts that apply only at the beginning of a
+   * complete input, such as SentencePiece's configured dummy space prefix.
+   *
    * @param tokens token IDs in {@code [0, vocabSize())}
    * @return decoded text
    */
@@ -59,6 +62,10 @@ public interface Tokenizer {
 
   /**
    * Decodes one token ID.
+   *
+   * <p>The result is the token's stream fragment. It preserves meaningful token-boundary text,
+   * including a leading space, so concatenating fragments in generation order produces streamed
+   * output without losing word boundaries.
    *
    * @param token token ID in {@code [0, vocabSize())}
    * @return decoded token text, which may be empty

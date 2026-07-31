@@ -482,6 +482,14 @@ class GgufTokenizerTest {
       assertThat(encoded).containsExactly(1, 3, 11);
       assertThat(tokenizer.decode(encoded)).isEqualTo("!");
     }
+
+    @Test
+    void preservesWordBoundaryForSingleTokenStreamingButRemovesDummySequencePrefix() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSentencePieceMetadata());
+
+      assertThat(tokenizer.decode(7)).isEqualTo(" a");
+      assertThat(tokenizer.decode(new int[] {1, 7})).isEqualTo("a");
+    }
   }
 
   @Nested
