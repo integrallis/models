@@ -171,7 +171,7 @@ try (var model = ModelJars.open(MODEL)) {
 qualified Models backend, and applies a matching performance profile. Applications that manage
 their own GGUF files can use the lower-level `PureJavaBackend.load(Path)` and
 `RustFfmBackend.load(Path)` APIs described in the
-[getting-started guide](https://integrallis.github.io/models/docs/models/current/getting-started.html).
+[Using Models guide](https://integrallis.github.io/models/docs/models/current/using-models.html).
 
 Streaming uses the same loaded model:
 
@@ -222,8 +222,10 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 These adapters are implemented and tested against the same backend contracts;
 they do not select hidden inference paths. Their framework dependencies are
 caller-owned, and CI composes them with the corresponding Vectors adapters and
-starter across the supported Spring AI and LangChain4j versions. See
-[Framework integrations](https://integrallis.github.io/models/docs/models/current/framework-integrations.html).
+starter across the supported versions. See the guides for
+[LangChain4j](https://integrallis.github.io/models/docs/models/current/langchain4j.html),
+[Spring AI](https://integrallis.github.io/models/docs/models/current/spring-ai.html), and
+[Spring Boot](https://integrallis.github.io/models/docs/models/current/spring-boot.html).
 
 ## Documentation
 

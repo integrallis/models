@@ -1,0 +1,192 @@
+= LangChain4j
+:navtitle: LangChain4j
+
+`models-langchain4j` adapts the Models `TextGenerationModel` contract to
+LangChain4j's blocking `ChatModel` and `StreamingChatModel` APIs. It uses the
+same in-process tokenizer, chat template, generation loop, and selected backend
+as plain Java; it does not start or call an HTTP model server.
+
+Compatibility CI exercises LangChain4j 1.0.0, 1.13.1, and 1.17.2. The
+application owns the LangChain4j version because the Models adapter does not
+add it transitively.
+
+== Dependencies
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("dev.langchain4j:langchain4j:1.17.2")
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
+    implementation("com.integrallis:models-langchain4j:{models-version}")
+}
+----
+
+== Blocking Chat
+
+The adapter maps LangChain4j system, user, assistant, and tool messages to the
+selected Models chat template. Framework message text remains ordinary text;
+only template-owned delimiters are treated as model control tokens.
+
+[source,java]
+----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.langchain4j.ModelsChatModel;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.List;
+import org.modeljars.ModelJars;
+
+var defaults = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(128)
+    .stopSequences(List.of("</answer>"))
+    .build();
+
+try (var runtime = ModelJars.open(MODEL)) {
+    var model = new ModelsChatModel(
+        runtime,
+        ChatTemplate.CHATML_NO_THINK,
+        defaults);
+
+    String answer = model.chat("Answer using only the supplied context.");
+    System.out.println(answer);
+    System.out.println(model.diagnostics().backend());
+}
+----
+
+Use the template recorded by the exact ModelJar. Models does not infer a chat
+template from an architecture family because two instruction-tuned artifacts
+with the same architecture can require different role delimiters.
+
+== Request Options
+
+Non-null LangChain4j request values override adapter defaults for temperature,
+top-p, top-k, maximum output tokens, and stop sequences. An absent request value
+retains the configured Models default. A non-empty request `stopSequences` list
+replaces the default list for that generation; repetition penalty and seed
+remain Models defaults because LangChain4j's common request contract does not
+expose them consistently across supported versions.
+
+[source,java]
+----
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import java.util.List;
+
+var request = ChatRequest.builder()
+    .messages(List.of(UserMessage.from("Return one cited sentence.")))
+    .temperature(0.2)
+    .maxOutputTokens(96)
+    .stopSequences(List.of("</answer>"))
+    .build();
+
+ChatResponse response = model.chat(request);
+System.out.println(response.aiMessage().text());
+----
+
+== Streaming Chat
+
+`ModelsStreamingChatModel` emits each decoded token fragment through
+`onPartialResponse` in generation order. It then invokes exactly one terminal
+callback: `onCompleteResponse` with the accumulated answer or `onError` with
+the original generation failure. It does not invoke completion after an error.
+Generation starts on the thread that calls `doChat`, so handlers should return
+quickly if that thread serves other work.
+
+[source,java]
+----
+import com.integrallis.models.langchain4j.ModelsStreamingChatModel;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import java.util.List;
+
+var streaming = new ModelsStreamingChatModel(
+    runtime,
+    ChatTemplate.CHATML_NO_THINK,
+    defaults);
+var request = ChatRequest.builder()
+    .messages(List.of(UserMessage.from("List the retrieved facts.")))
+    .stopSequences(List.of("</answer>"))
+    .build();
+
+streaming.doChat(request, new StreamingChatResponseHandler() {
+    @Override
+    public void onPartialResponse(String token) {
+        System.out.print(token);
+    }
+
+    @Override
+    public void onCompleteResponse(ChatResponse response) {
+        System.out.println();
+        System.out.println("Complete: " + response.aiMessage().text());
+    }
+
+    @Override
+    public void onError(Throwable failure) {
+        failure.printStackTrace();
+    }
+});
+----
+
+The application owns and closes the `TextGenerationModel`; the blocking and
+streaming adapters do not close it.
+
+== RAG With Vectors
+
+`vectors-langchain4j` implements LangChain4j's standard
+`EmbeddingStore<TextSegment>`. It composes directly with `ModelsChatModel` in
+`AiServices`, so retrieval and generation stay in the same JVM.
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:vectors-langchain4j:{vectors-version}")
+}
+----
+
+[source,java]
+----
+interface Assistant {
+    String answer(String question);
+}
+
+var collection = VectorCollection.builder()
+    .dimension(embeddingModel.dimension())
+    .metric(SimilarityFunction.COSINE)
+    .indexType(IndexType.HNSW)
+    .build();
+
+try (var runtime = ModelJars.open(MODEL);
+     var store = JavaVectorsEmbeddingStore.builder(collection)
+         .commitAfterAdd(true)
+         .build()) {
+    var retriever = EmbeddingStoreContentRetriever.builder()
+        .embeddingModel(embeddingModel)
+        .embeddingStore(store)
+        .maxResults(4)
+        .build();
+
+    var assistant = AiServices.builder(Assistant.class)
+        .chatModel(new ModelsChatModel(
+            runtime,
+            ChatTemplate.CHATML_NO_THINK,
+            defaults))
+        .contentRetriever(retriever)
+        .build();
+
+    String answer = assistant.answer("What does the retrieved policy allow?");
+}
+----
+
+Retrieval integration does not validate generated claims by itself. Apply the
+xref:rag.adoc[RAG Validation] policy when the application requires retrieval
+gates, citation checks, and bounded fallback.

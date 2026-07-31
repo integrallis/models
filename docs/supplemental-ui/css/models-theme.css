@@ -319,6 +319,56 @@ body {
 }
 
 /* ── article / document body ───────────────────────────────────────────────── */
+@media screen and (max-width: 1023.5px) {
+  html,
+  body,
+  .body,
+  main {
+    max-width: 100vw;
+    min-width: 0;
+  }
+  body {
+    overflow-x: hidden;
+  }
+  .body,
+  main {
+    width: 100vw;
+  }
+  main > .content {
+    min-width: 0;
+    max-width: 100vw;
+    width: 100vw;
+    overflow-x: hidden;
+  }
+  .doc {
+    min-width: 0;
+    max-width: 100vw;
+    width: 100vw;
+  }
+  .doc .listingblock,
+  .doc .literalblock {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .doc .listingblock > .content {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .doc .listingblock pre,
+  .doc .literalblock pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .doc .tablecontainer {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .doc :not(pre) > code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
 .doc {
   color: var(--fg);
   font-size: 15px;

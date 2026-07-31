@@ -1339,6 +1339,7 @@ tasks.register("verifyDocumentation") {
     val docsPlaybookFile = file("docs/antora-playbook.yml")
     val uiBundleFile = file("docs/ui/antora-ui-default-0e38223.zip")
     val uiBundleLicenseFile = file("docs/ui/LICENSE")
+    val docsThemeFile = file("docs/supplemental-ui/css/models-theme.css")
     val ciWorkflowFile = file(".github/workflows/ci.yml")
     val docsWorkflowFile = file(".github/workflows/docs.yml")
     val releaseWorkflowFile = file(".github/workflows/release.yml")
@@ -1351,6 +1352,7 @@ tasks.register("verifyDocumentation") {
         docsPlaybookFile,
         uiBundleFile,
         uiBundleLicenseFile,
+        docsThemeFile,
         ciWorkflowFile,
         docsWorkflowFile,
         releaseWorkflowFile
@@ -1431,18 +1433,36 @@ tasks.register("verifyDocumentation") {
                 "Inference concepts page is missing $section"
             }
         }
-        require("xref:concepts.adoc" in file("docs/content/modules/ROOT/nav.adoc").readText()) {
+        val documentationNavigation =
+            file("docs/content/modules/ROOT/nav.adoc").readText()
+        require("xref:concepts.adoc" in documentationNavigation) {
             "Documentation navigation must link to the inference concepts page"
         }
 
-        val gettingStarted =
-            file("docs/content/modules/ROOT/pages/getting-started.adoc").readText()
+        val usingModelsFile =
+            file("docs/content/modules/ROOT/pages/using-models.adoc")
+        require(usingModelsFile.isFile) {
+            "Documentation must provide a dedicated Using Models page"
+        }
+        val usingModels = usingModelsFile.readText()
         require(
-            "ChatTemplate.CHATML.render(" in gettingStarted &&
-                "ChatMessage.system(" in gettingStarted &&
-                "ChatMessage.user(" in gettingStarted
+            "ChatTemplate.CHATML.render(" in usingModels &&
+                "ChatMessage.system(" in usingModels &&
+                "ChatMessage.user(" in usingModels &&
+                "new TokenStream()" in usingModels
         ) {
-            "Getting started must show how to format a role-aware model prompt"
+            "Using Models must show role-aware prompting and token streaming"
+        }
+        require("xref:using-models.adoc[Using Models]" in documentationNavigation) {
+            "Documentation navigation must expose the Using Models page"
+        }
+
+        require(
+            "xref:using-models.adoc[Using Models]" in docsIndex &&
+                "ModelJars.open(MODEL)" in docsIndex &&
+                "ChatTemplate.CHATML_NO_THINK.render(" in docsIndex
+        ) {
+            "The Models opening page must link to Using Models and show a complete quick example"
         }
 
         val architectureSource = file("media/diagrams/models-0001.svg")
@@ -1460,36 +1480,113 @@ tasks.register("verifyDocumentation") {
             "README and documentation architecture diagrams must be identical"
         }
 
-        val frameworkGuide =
-            file("docs/content/modules/ROOT/pages/framework-integrations.adoc").readText()
         val modelJarsGroup = listOf("org", "modeljars").joinToString(".")
         val modelJarsFacade = "Model" + "Jars"
-        val requiredFrameworkExamples =
-            listOf(
-                "$modelJarsGroup:modeljars:{modeljars-version}",
-                "$modelJarsGroup.catalog.Qwen3_0_6b_Q4_0.MODEL",
-                "$modelJarsFacade.open(MODEL)",
-                "new ModelsChatModel(",
-                "new ModelsSpringAiChatModel(",
-                "model.stream(new Prompt(",
-                "TextGenerationModel localModel()",
-                "GroundedAnswerPolicy.productionDefault()",
-                "new VectorCollectionEmbeddingSink("
+        val frameworkPages =
+            mapOf(
+                "langchain4j.adoc" to "LangChain4j",
+                "spring-ai.adoc" to "Spring AI",
+                "spring-boot.adoc" to "Spring Boot"
             )
-        requiredFrameworkExamples.forEach { example ->
-            require(example in frameworkGuide) {
-                "Framework integration guide is missing an executable example containing $example"
+        val frameworkDocumentation =
+            frameworkPages.mapValues { (page, title) ->
+                val documentation = file("docs/content/modules/ROOT/pages/$page")
+                require(documentation.isFile) {
+                    "Documentation must provide a dedicated $title page"
+                }
+                require("xref:$page[$title]" in documentationNavigation) {
+                    "Documentation navigation must link to the $title page"
+                }
+                documentation.readText()
             }
+        require(!file("docs/content/modules/ROOT/pages/framework-integrations.adoc").exists()) {
+            "Framework documentation must be split into individual framework pages"
         }
-        require("models.path" !in frameworkGuide && "MODELS_MODEL_PATH" !in frameworkGuide) {
+        require(
+            frameworkDocumentation.values.none {
+                "models.path" in it || "MODELS_MODEL_PATH" in it
+            }
+        ) {
             "Framework integration examples must resolve models through their marker JARs"
         }
-        require(frameworkGuide.windowed("[source,java]".length).count { it == "[source,java]" } >= 6) {
-            "Framework integration guide must contain Java examples for every supported adapter"
+        require(
+            "roadmap.adoc" !in documentationNavigation &&
+                !file("docs/content/modules/ROOT/pages/roadmap.adoc").exists()
+        ) {
+            "The documentation must not publish a Roadmap section"
+        }
+
+        val langChain4jGuide = frameworkDocumentation.getValue("langchain4j.adoc")
+        listOf(
+            "$modelJarsGroup:modeljars:{modeljars-version}",
+            "$modelJarsGroup.catalog.Qwen3_0_6b_Q4_0.MODEL",
+            "$modelJarsFacade.open(MODEL)",
+            "new ModelsChatModel(",
+            "new ModelsStreamingChatModel(",
+            "StreamingChatResponseHandler",
+            "onPartialResponse",
+            "onCompleteResponse",
+            "onError",
+            "stopSequences"
+        ).forEach { example ->
+            require(example in langChain4jGuide) {
+                "LangChain4j guide is missing $example"
+            }
+        }
+
+        val springAiGuide = frameworkDocumentation.getValue("spring-ai.adoc")
+        listOf(
+            "$modelJarsGroup:modeljars:{modeljars-version}",
+            "$modelJarsGroup.catalog.Qwen3_0_6b_Q4_0.MODEL",
+            "$modelJarsFacade.open(MODEL)",
+            "new ModelsSpringAiChatModel(",
+            "model.stream(new Prompt(",
+            "ChatOptions.builder()",
+            "stopSequences",
+            "subscriber thread"
+        ).forEach { example ->
+            require(example in springAiGuide) {
+                "Spring AI guide is missing $example"
+            }
+        }
+
+        val springBootGuide = frameworkDocumentation.getValue("spring-boot.adoc")
+        listOf(
+            "com.integrallis:models-spring-boot-starter:{models-version}",
+            "com.integrallis:vectors-spring-boot-starter:{vectors-version}",
+            "TextGenerationModel localModel()",
+            "modelsChatModel",
+            "stop-sequences"
+        ).forEach { example ->
+            require(example in springBootGuide) {
+                "Spring Boot guide is missing $example"
+            }
+        }
+
+        val vectorsGuide = file("docs/content/modules/ROOT/pages/vectors.adoc")
+        require(vectorsGuide.isFile && "xref:vectors.adoc[Vectors]" in documentationNavigation) {
+            "Documentation must provide a dedicated Vectors integration page"
+        }
+        require("new VectorCollectionEmbeddingSink(" in vectorsGuide.readText()) {
+            "Vectors integration guide must show the Models embedding-storage bridge"
+        }
+
+        val ragGuide = file("docs/content/modules/ROOT/pages/rag.adoc").readText()
+        listOf(
+            "== Retrieval Validation",
+            "== Answer Validation",
+            "one retrieved document",
+            "does not prove semantic or factual correctness",
+            "GroundedAnswerPolicy.productionDefault()"
+        ).forEach { requiredText ->
+            require(requiredText in ragGuide) {
+                "RAG validation guide is missing $requiredText"
+            }
         }
 
         val landingPage = file("docs/landing/index.html").readText()
         val landingStyles = file("docs/landing/assets/css/landing.css").readText()
+        val docsTheme = docsThemeFile.readText()
         require("backend-java" in landingPage && "backend-native" in landingPage) {
             "Landing page must describe both Models execution paths"
         }
@@ -1532,6 +1629,15 @@ tasks.register("verifyDocumentation") {
                 .count { it == "class=\"footer-by\"" } == 1
         ) {
             "Landing page must contain exactly one Integrallis footer credit"
+        }
+        require(
+            ".body,\n  main {\n    width: 100vw;" in docsTheme &&
+                "main > .content {\n    min-width: 0;\n    max-width: 100vw;" in docsTheme &&
+                ".doc .listingblock > .content {\n    min-width: 0;\n    max-width: 100%;" in
+                docsTheme &&
+                ".doc .tablecontainer {\n    max-width: 100%;\n    overflow-x: auto;" in docsTheme
+        ) {
+            "Documentation content, code blocks, and tables must remain within mobile viewports"
         }
         require(
             "backend-apple" in landingPage &&

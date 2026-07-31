@@ -1,0 +1,121 @@
+= Spring AI
+:navtitle: Spring AI
+
+`models-spring-ai` implements Spring AI's blocking and streaming `ChatModel`
+contract over a Models `TextGenerationModel`. Both paths use the same
+in-process tokenizer, chat template, generation loop, sampler, and selected
+backend as plain Java.
+
+Compatibility CI exercises Spring AI 1.1.4, 1.1.8, and 2.0.0. The application
+normally selects the Spring AI version through its Spring AI BOM; the Models
+adapter does not impose a provider or hosted model client.
+
+== Dependencies
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("org.springframework.ai:spring-ai-model:2.0.0")
+    implementation("org.modeljars:modeljars:{modeljars-version}")
+    implementation(
+        "org.modeljars.huggingface:" +
+            "ggml-org.qwen3-0.6b-gguf.q4_0:" +
+            "3.0.0-q4_0.1"
+    )
+    implementation("com.integrallis:models-spring-ai:{models-version}")
+}
+----
+
+== Blocking Chat
+
+The adapter maps Spring AI system, user, assistant, and tool messages to the
+selected Models chat template. Message text remains ordinary text and cannot
+inject template control tokens.
+
+[source,java]
+----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
+import java.util.List;
+import org.modeljars.ModelJars;
+
+var defaults = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(128)
+    .stopSequences(List.of("</answer>"))
+    .build();
+
+try (var runtime = ModelJars.open(MODEL)) {
+    var model = new ModelsSpringAiChatModel(
+        runtime,
+        ChatTemplate.CHATML_NO_THINK,
+        defaults);
+
+    String answer = model.call("Answer using only the supplied context.");
+    System.out.println(answer);
+}
+----
+
+Use the chat template recorded by the exact qualified ModelJar rather than
+selecting one from the architecture name.
+
+== Request Options
+
+Non-null `ChatOptions` values override adapter defaults for temperature, top-p,
+top-k, maximum tokens, and stop sequences. Values absent from the request retain
+the Models defaults. A request `stopSequences` list replaces the default list
+for that generation; repetition penalty and seed remain Models defaults because
+Spring AI's common `ChatOptions` contract does not expose them.
+
+[source,java]
+----
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import java.util.List;
+
+var requestOptions = ChatOptions.builder()
+    .temperature(0.2)
+    .maxTokens(96)
+    .stopSequences(List.of("</answer>"))
+    .build();
+var prompt = new Prompt(
+    List.of(new UserMessage("Return one cited sentence.")),
+    requestOptions);
+
+ChatResponse response = model.call(prompt);
+System.out.println(response.getResult().getOutput().getText());
+----
+
+`getOptions()` exposes the adapter defaults through Spring AI's `ChatOptions`
+view. Per-request overrides do not mutate those defaults.
+
+== Streaming Chat
+
+`stream(Prompt)` returns a `Flux<ChatResponse>` whose elements contain decoded
+token fragments in generation order. Models runs blocking inference on
+Reactor's bounded-elastic scheduler so subscription does not block the
+subscriber thread. A generation failure is propagated through the Flux error
+signal without being wrapped or followed by completion.
+
+[source,java]
+----
+model.stream(new Prompt("List the retrieved facts."))
+    .map(response -> response.getResult().getOutput().getText())
+    .doOnNext(System.out::print)
+    .doOnError(Throwable::printStackTrace)
+    .blockLast();
+----
+
+The adapter does not close the underlying `TextGenerationModel`; the
+application or Spring bean lifecycle owns it. Apple's system model implements
+the same contract, but currently emits its complete response as one streaming
+element because Apple's API returns a complete response to the bridge.
+
+For auto-configuration, named-bean behavior, and combined Models/Vectors setup,
+continue with xref:spring-boot.adoc[Spring Boot]. For validation after
+retrieval, see xref:rag.adoc[RAG Validation].
