@@ -24,7 +24,9 @@ import java.util.function.Consumer;
  *
  * <p>Implementations may own mutable inference state and are not required to be thread-safe.
  * Callers must serialize generation unless an implementation explicitly documents concurrent use.
- * Prompts, options, and token streams must be non-null.
+ * Prompts, options, token streams, model names, and diagnostics must be non-null. A streaming
+ * generation invokes its terminal callback before returning, which allows the default blocking
+ * methods to collect the result without a second synchronization contract.
  */
 public interface TextGenerationModel extends AutoCloseable {
 
@@ -52,7 +54,13 @@ public interface TextGenerationModel extends AutoCloseable {
     return collect(stream -> generate(prompt, options, stream));
   }
 
-  /** Generates text incrementally through the supplied stream callback. */
+  /**
+   * Generates text incrementally through the supplied stream callback.
+   *
+   * <p>The implementation follows the ordering and terminal-signal contract defined by {@link
+   * TokenStream}. It must report an inference failure to {@code stream.onError} rather than also
+   * throwing that same failure.
+   */
   void generate(String prompt, SamplingOptions options, TokenStream stream);
 
   /**
@@ -62,6 +70,8 @@ public interface TextGenerationModel extends AutoCloseable {
    */
   default void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
     Objects.requireNonNull(prompt, "prompt");
+    Objects.requireNonNull(options, "options");
+    Objects.requireNonNull(stream, "stream");
     generate(prompt.text(), options, stream);
   }
 

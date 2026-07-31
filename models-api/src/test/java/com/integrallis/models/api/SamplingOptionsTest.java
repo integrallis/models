@@ -86,6 +86,27 @@ class SamplingOptionsTest {
     }
 
     @Test
+    void nonFiniteFloatingPointOptionsAreRejected() {
+      assertThatThrownBy(() -> SamplingOptions.builder().temperature(Float.NaN).build())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("temperature");
+      assertThatThrownBy(
+              () -> SamplingOptions.builder().temperature(Float.POSITIVE_INFINITY).build())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("temperature");
+      assertThatThrownBy(() -> SamplingOptions.builder().topP(Float.NaN).build())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("topP");
+      assertThatThrownBy(() -> SamplingOptions.builder().repetitionPenalty(Float.NaN).build())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("repetitionPenalty");
+      assertThatThrownBy(
+              () -> SamplingOptions.builder().repetitionPenalty(Float.POSITIVE_INFINITY).build())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("repetitionPenalty");
+    }
+
+    @Test
     void zeroTopKRejected() {
       assertThatThrownBy(() -> SamplingOptions.builder().topK(0).build())
           .isInstanceOf(IllegalArgumentException.class)

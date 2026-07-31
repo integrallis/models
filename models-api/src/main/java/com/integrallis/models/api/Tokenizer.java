@@ -17,7 +17,13 @@ package com.integrallis.models.api;
 
 import java.util.Objects;
 
-/** Tokenizer interface for encoding text to token IDs and decoding back. */
+/**
+ * Converts model text and trusted template controls to token IDs and back.
+ *
+ * <p>Tokenizer instances returned by a backend are read-only and safe for concurrent encode/decode
+ * calls. Inputs and returned strings/arrays are non-null. Returned arrays are caller-owned, and
+ * implementations do not mutate array inputs.
+ */
 public interface Tokenizer {
 
   /**
@@ -43,10 +49,20 @@ public interface Tokenizer {
     return encode(ModelPrompt.control(Objects.requireNonNull(text, "text")));
   }
 
-  /** Decodes an array of token IDs back into a string. */
+  /**
+   * Decodes token IDs in sequence order.
+   *
+   * @param tokens token IDs in {@code [0, vocabSize())}
+   * @return decoded text
+   */
   String decode(int[] tokens);
 
-  /** Decodes a single token ID to its string representation. */
+  /**
+   * Decodes one token ID.
+   *
+   * @param token token ID in {@code [0, vocabSize())}
+   * @return decoded token text, which may be empty
+   */
   String decode(int token);
 
   /** Returns the vocabulary size. */

@@ -15,15 +15,22 @@
  */
 package com.integrallis.models.api;
 
-/** Push-based interface for streaming generated tokens. */
+/**
+ * Push callback for one generation.
+ *
+ * <p>The producer invokes callbacks serially and in token order. It invokes exactly one terminal
+ * callback, either {@link #onComplete()} or {@link #onError(Throwable)}, and invokes nothing
+ * afterward. The callback thread is implementation-specific; consumers should return promptly and
+ * must not reenter the same non-thread-safe model.
+ */
 public interface TokenStream {
 
-  /** Called when a new token is generated. */
+  /** Called with a non-null decoded token fragment, which may be empty. */
   void onToken(String token);
 
   /** Called when generation is complete. */
   void onComplete();
 
-  /** Called when an error occurs during generation. */
-  void onError(Throwable t);
+  /** Called with the non-null failure that ended generation. */
+  void onError(Throwable failure);
 }
