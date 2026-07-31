@@ -52,25 +52,22 @@ class NativeLibraryLocatorTest {
   }
 
   @Test
-  void systemLocatorRejectsAnExplicitPathWithoutIntegrityMetadata() throws Exception {
-    String previousPath = System.getProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY);
-    String previousDigest = System.getProperty("models.apple.foundation.library.sha256");
-    String previousOptIn = System.getProperty("models.apple.foundation.library.allow-unverified");
+  void configuredLocatorRejectsAnExplicitPathWithoutIntegrityMetadata() throws Exception {
     Path configured = temporaryDirectory.resolve("unchecked.dylib");
     Files.writeString(configured, "unchecked native library", StandardCharsets.UTF_8);
-    try {
-      System.setProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY, configured.toString());
-      System.clearProperty("models.apple.foundation.library.sha256");
-      System.clearProperty("models.apple.foundation.library.allow-unverified");
 
-      assertThatThrownBy(() -> NativeLibraryLocator.system().locate())
-          .isInstanceOf(SecurityException.class)
-          .hasMessageContaining("SHA-256");
-    } finally {
-      restoreProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY, previousPath);
-      restoreProperty("models.apple.foundation.library.sha256", previousDigest);
-      restoreProperty("models.apple.foundation.library.allow-unverified", previousOptIn);
-    }
+    assertThatThrownBy(
+            () ->
+                NativeLibraryLocator.resolveConfigured(
+                    configured.toString(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    NativeLibraryLocator.empty()))
+        .isInstanceOf(SecurityException.class)
+        .hasMessageContaining("SHA-256");
   }
 
   @Test
@@ -93,24 +90,21 @@ class NativeLibraryLocatorTest {
   }
 
   @Test
-  void systemLocatorRequiresAnExplicitOptInForUnverifiedDevelopmentLibraries() throws Exception {
-    String previousPath = System.getProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY);
-    String previousDigest = System.getProperty("models.apple.foundation.library.sha256");
-    String previousOptIn = System.getProperty("models.apple.foundation.library.allow-unverified");
+  void configuredLocatorRequiresAnExplicitOptInForUnverifiedDevelopmentLibraries()
+      throws Exception {
     Path configured = temporaryDirectory.resolve("development.dylib");
     Files.writeString(configured, "development native library", StandardCharsets.UTF_8);
-    try {
-      System.setProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY, configured.toString());
-      System.clearProperty("models.apple.foundation.library.sha256");
-      System.setProperty("models.apple.foundation.library.allow-unverified", "true");
 
-      assertThat(NativeLibraryLocator.system().locate())
-          .contains(configured.toAbsolutePath().normalize());
-    } finally {
-      restoreProperty(NativeLibraryLocator.LIBRARY_PATH_PROPERTY, previousPath);
-      restoreProperty("models.apple.foundation.library.sha256", previousDigest);
-      restoreProperty("models.apple.foundation.library.allow-unverified", previousOptIn);
-    }
+    assertThat(
+            NativeLibraryLocator.resolveConfigured(
+                configured.toString(),
+                null,
+                null,
+                null,
+                "true",
+                null,
+                NativeLibraryLocator.empty()))
+        .contains(configured.toAbsolutePath().normalize());
   }
 
   @Test
