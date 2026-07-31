@@ -70,6 +70,10 @@ val notebookVersion =
     providers.gradleProperty("notebookVersion")
         .orElse(providers.environmentVariable("MODELS_VERSION"))
         .orElse(provider { project.version.toString() })
+val notebookLangchain4jVersion =
+    providers.gradleProperty("langchain4jVersion").getOrElse("1.17.2")
+val notebookSpringAiVersion =
+    providers.gradleProperty("springAiVersion").getOrElse("2.0.0")
 
 fun Configuration.asNotebookRuntimeClasspath() {
     isCanBeConsumed = false
@@ -110,7 +114,11 @@ dependencies {
         notebookReleaseClasspath("com.integrallis:$artifact:${notebookVersion.get()}")
     }
 
-    listOf("org.slf4j:slf4j-nop:2.0.17").forEach { dependency ->
+    listOf(
+        "dev.langchain4j:langchain4j-core:$notebookLangchain4jVersion",
+        "org.springframework.ai:spring-ai-model:$notebookSpringAiVersion",
+        "org.slf4j:slf4j-nop:2.0.17"
+    ).forEach { dependency ->
         notebookSourceClasspath(dependency)
         notebookReleaseClasspath(dependency)
     }
