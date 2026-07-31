@@ -6,6 +6,7 @@ repository=${MODELS_REPOSITORY:-/home/jovyan/work/models}
 notebook_dir="$repository/notebooks"
 output_dir=${MODELS_NOTEBOOK_OUTPUT_DIR:-"$repository/build/notebooks/executed"}
 mode=${MODELS_NOTEBOOK_MODE:-source}
+classpath_dir=${MODELS_NOTEBOOK_CLASSPATH:-"$repository/build/notebooks/classpath"}
 
 case "$mode" in
     source|release)
@@ -22,6 +23,8 @@ case "$mode" in
 esac
 
 mkdir -p "$output_dir"
+
+python "$notebook_dir/scripts/verify_notebook_classpath.py" "$classpath_dir"
 
 for notebook in "${notebooks[@]}"; do
     name=$(basename "$notebook")

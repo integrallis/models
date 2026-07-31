@@ -133,6 +133,100 @@ class GgufParserTest {
       // Tensor data offset should be aligned to 32 bytes
       assertThat(file.tensorDataOffset() % GgufConstants.DEFAULT_ALIGNMENT).isZero();
     }
+
+    @Test
+    void rejectsZeroAlignmentAsMalformedGguf() {
+      byte[] data = new SyntheticGgufBuilder().addUint32("general.alignment", 0).build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data)))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Malformed GGUF")
+          .hasMessageContaining("alignment");
+    }
+
+    @Test
+    void rejectsNonPowerOfTwoAlignmentAsMalformedGguf() {
+      byte[] data = new SyntheticGgufBuilder().addUint32("general.alignment", 3).build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data)))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Malformed GGUF")
+          .hasMessageContaining("alignment");
+    }
+  }
+
+  @Nested
+  class MalformedInput {
+
+    @Test
+    void rejectsTruncatedHeaderWithAStableParserException() {
+      assertThatThrownBy(
+              () -> GgufParser.parseSegment(MemorySegment.ofArray(new byte[] {'G', 'G', 'U'})))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Malformed GGUF")
+          .hasMessageContaining("offset");
+    }
+
+    @Test
+    void rejectsTensorCountBeyondJavaCollectionLimits() {
+      ByteBuffer data = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN);
+      data.putInt(GgufConstants.MAGIC);
+      data.putInt(3);
+      data.putLong((long) Integer.MAX_VALUE + 1);
+      data.putLong(0);
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data.array())))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Malformed GGUF")
+          .hasMessageContaining("tensor count");
+    }
+
+    @Test
+    void rejectsMetadataArrayBeyondJavaCollectionLimits() {
+      ByteBuffer data = ByteBuffer.allocate(49).order(ByteOrder.LITTLE_ENDIAN);
+      data.putInt(GgufConstants.MAGIC);
+      data.putInt(3);
+      data.putLong(0);
+      data.putLong(1);
+      data.putLong(1);
+      data.put((byte) 'x');
+      data.putInt(GgufValueType.ARRAY.id());
+      data.putInt(GgufValueType.UINT8.id());
+      data.putLong((long) Integer.MAX_VALUE + 1);
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data.array())))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Malformed GGUF")
+          .hasMessageContaining("array length");
+    }
+
+    @Test
+    void rejectsTensorDataThatExtendsPastTheFile() {
+      byte[] data =
+          new SyntheticGgufBuilder()
+              .addTensor("short", GgufTensorType.F32, new long[] {2}, new byte[4])
+              .build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data)))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Malformed GGUF")
+          .hasMessageContaining("short")
+          .hasMessageContaining("file");
+    }
+
+    @Test
+    void rejectsPartialQuantizationBlocks() {
+      byte[] data =
+          new SyntheticGgufBuilder()
+              .addTensor("partial", GgufTensorType.Q4_0, new long[] {31}, new byte[18])
+              .build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data)))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Malformed GGUF")
+          .hasMessageContaining("partial")
+          .hasMessageContaining("block");
+    }
   }
 
   @Nested

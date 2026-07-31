@@ -17,6 +17,7 @@ package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
@@ -49,6 +50,16 @@ public final class RuntimeTextGenerationModel implements TextGenerationModel {
 
   @Override
   public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+    generationLoop.generate(prompt, options, stream);
+  }
+
+  @Override
+  public String generate(ModelPrompt prompt, SamplingOptions options) {
+    return generationLoop.generate(prompt, options);
+  }
+
+  @Override
+  public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
     generationLoop.generate(prompt, options, stream);
   }
 }

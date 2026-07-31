@@ -55,6 +55,7 @@ val publishedModuleNames =
         "backend-apple",
         "models-langchain4j",
         "models-spring-ai",
+        "models-spring-boot-starter",
         "models-embedding"
     )
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
@@ -69,6 +70,10 @@ val notebookVersion =
     providers.gradleProperty("notebookVersion")
         .orElse(providers.environmentVariable("MODELS_VERSION"))
         .orElse(provider { project.version.toString() })
+val notebookLangchain4jVersion =
+    providers.gradleProperty("langchain4jVersion").getOrElse("1.17.2")
+val notebookSpringAiVersion =
+    providers.gradleProperty("springAiVersion").getOrElse("2.0.0")
 
 fun Configuration.asNotebookRuntimeClasspath() {
     isCanBeConsumed = false
@@ -109,7 +114,11 @@ dependencies {
         notebookReleaseClasspath("com.integrallis:$artifact:${notebookVersion.get()}")
     }
 
-    listOf("org.slf4j:slf4j-nop:2.0.17").forEach { dependency ->
+    listOf(
+        "dev.langchain4j:langchain4j-core:$notebookLangchain4jVersion",
+        "org.springframework.ai:spring-ai-model:$notebookSpringAiVersion",
+        "org.slf4j:slf4j-nop:2.0.17"
+    ).forEach { dependency ->
         notebookSourceClasspath(dependency)
         notebookReleaseClasspath(dependency)
     }
@@ -711,6 +720,31 @@ tasks.register("verifyStagedPublications") {
             require("<licenses>" in pom && "<developers>" in pom && "<scm>" in pom) {
                 "Incomplete Maven Central metadata in ${proj.name} POM"
             }
+            if (proj.name in
+                setOf(
+                    "models-langchain4j",
+                    "models-spring-ai",
+                    "models-spring-boot-starter"
+                )
+            ) {
+                listOf("dev.langchain4j", "org.springframework.ai", "org.springframework.boot")
+                    .forEach { frameworkGroup ->
+                        require("<groupId>$frameworkGroup</groupId>" !in pom) {
+                            "${proj.name} must let the application own $frameworkGroup versions"
+                        }
+                    }
+            }
+            if (proj.name in setOf("models-langchain4j", "models-spring-ai")) {
+                val runtimeApiDependency =
+                    Regex(
+                        """<dependency>\s*<groupId>com\.integrallis</groupId>""" +
+                            """\s*<artifactId>models-runtime</artifactId>""" +
+                            """\s*<version>[^<]+</version>\s*<scope>compile</scope>"""
+                    )
+                require(runtimeApiDependency.containsMatchIn(pom)) {
+                    "${proj.name} must expose models-runtime because ChatTemplate is public API"
+                }
+            }
             val forbiddenGroup = listOf("org", "modeljars").joinToString(".")
             require("<groupId>$forbiddenGroup</groupId>" !in pom) {
                 "${proj.name} staged POM contains a reverse catalog dependency"
@@ -759,7 +793,8 @@ tasks.register("verifyGithubWorkflows") {
             "mfcqi.yml",
             "release.yml",
             "native-kernels.yml",
-            "apple-bridge.yml"
+            "apple-bridge.yml",
+            "framework-compat.yml"
         ).forEach { name ->
             val f = workflowDir.resolve(name)
             require(f.exists()) { "Missing workflow: ${f.absolutePath}" }

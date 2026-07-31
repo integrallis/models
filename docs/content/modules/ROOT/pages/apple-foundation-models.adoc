@@ -5,10 +5,11 @@
 and updated by the operating system. It is not a GGUF file and does not need a
 ModelJar download.
 
-The Java API crosses a four-function C ABI with the Foreign Function and Memory
+The Java API crosses a three-function C ABI with the Foreign Function and Memory
 (FFM) API. A small Models-owned Swift binary calls Apple's Foundation Models
 framework. No prompt or response is sent to Ollama, llama.cpp, or a hosted
-model provider.
+model provider. Every native call returns an owned result with an exact UTF-8
+byte length and per-call error detail.
 
 == Requirements
 
@@ -77,6 +78,7 @@ For LangChain4j, add `models-langchain4j` and pass the checked client to
 [source,kotlin,subs=attributes+]
 ----
 dependencies {
+    implementation("dev.langchain4j:langchain4j:1.17.2")
     implementation("com.integrallis:backend-apple:{models-version}")
     implementation("com.integrallis:models-langchain4j:{models-version}")
 }
@@ -102,6 +104,7 @@ Spring AI uses the same contract:
 [source,kotlin,subs=attributes+]
 ----
 dependencies {
+    implementation("org.springframework.ai:spring-ai-model:2.0.0")
     implementation("com.integrallis:backend-apple:{models-version}")
     implementation("com.integrallis:models-spring-ai:{models-version}")
 }
@@ -145,18 +148,30 @@ dynamic library:
 
 [source,shell]
 ----
-export MODELS_APPLE_FOUNDATION_LIBRARY=/path/to/libjavamodels_apple_foundation.dylib
+bridge=/path/to/libjavamodels_apple_foundation.dylib
+export MODELS_APPLE_FOUNDATION_LIBRARY="$bridge"
+export MODELS_APPLE_FOUNDATION_LIBRARY_SHA256="$(
+  shasum -a 256 "$bridge" | cut -d ' ' -f 1
+)"
 ----
 
-The equivalent system property is:
+The equivalent system properties are:
 
 [source,shell]
 ----
--Dmodels.apple.foundation.library=/path/to/libjavamodels_apple_foundation.dylib
+-Dmodels.apple.foundation.library=/path/to/libjavamodels_apple_foundation.dylib \
+-Dmodels.apple.foundation.library.sha256=<64-hex-digit-sha256>
 ----
 
 An explicit path takes precedence over the bridge packaged in
-`backend-apple`.
+`backend-apple`. Models rejects the path if its SHA-256 is absent or does not
+match. A bridge rebuilt during local development can opt out explicitly with
+`-Dmodels.apple.foundation.library.allow-unverified=true` or
+`MODELS_APPLE_FOUNDATION_LIBRARY_ALLOW_UNVERIFIED=true`.
+
+The packaged bridge is also verified before loading. Models extracts it under a
+content-addressed, owner-controlled cache and rejects a configured cache root
+that is group or world writable.
 
 == Test Application Wiring
 

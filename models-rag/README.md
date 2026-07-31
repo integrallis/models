@@ -2,9 +2,10 @@
 
 [![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-rag/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
 
-`models-rag` provides framework-neutral response grounding for production RAG
-applications. It is intended for local models that can answer narrow questions
-but should not be trusted to enforce source attribution or abstention alone.
+`models-rag` provides framework-neutral retrieval preflight and response
+grounding for RAG applications. It bounds and screens retrieved evidence before
+generation, then enforces source attribution, abstention, and extractive fallback
+on the generated answer.
 
 ```kotlin
 implementation("com.integrallis:models-rag:0.2.0")
@@ -14,20 +15,26 @@ implementation("com.integrallis:models-rag:0.2.0")
 var policy = new GroundedAnswerPolicy(2.0f);
 var evidence = retrieved.stream()
     .map(hit -> new GroundingDocument(
-        hit.id(), hit.text(), hit.score(), hit.rank()))
+        hit.id(), hit.title(), hit.text(), hit.score(), hit.rank()))
     .toList();
 
+if (!policy.assess(question, evidence).generationAllowed()) {
+    return GroundedAnswerPolicy.ABSTENTION;
+}
+
+String rawModelText = model.generate(prompt);
 GroundedAnswer answer = policy.apply(question, evidence, rawModelText);
 System.out.println(answer.text());
 System.out.println(answer.decision());
 ```
 
-The policy has four explicit outcomes:
+The policy has five answer outcomes:
 
 - `MODEL_ANSWER`: the response contains only citations from retrieved sources.
 - `MODEL_ANSWER_WITH_DERIVED_CITATIONS`: the response text is supported by the
   retrieved evidence but omitted citations, so the library retained the model
   text and attached the retrieved source IDs.
+- `MODEL_ABSTENTION`: the model explicitly reports insufficient context.
 - `RETRIEVAL_ABSTENTION`: no retrieved source clears the configured score.
 - `EXTRACTIVE_FALLBACK`: retrieval is strong, but the model refuses or emits
   unsupported text or citations; exact source text is returned.

@@ -5,6 +5,10 @@ They do not proxy a local HTTP server or choose a separate inference
 implementation. Backend diagnostics remain available so applications can
 inspect the selected plan.
 
+Compatibility CI exercises Spring AI 1.1.4, 1.1.8, and 2.0.0 and
+LangChain4j 1.0.0, 1.13.1, and 1.17.2. The common Spring AI floor for
+the Models and Vectors starters is 1.1.4.
+
 == Plain Java
 
 Add ModelJars and the marker for the selected qualified artifact:
@@ -41,7 +45,7 @@ var options = SamplingOptions.builder()
     .build();
 
 try (TextGenerationModel model = ModelJars.open(MODEL)) {
-    String prompt = ChatTemplate.CHATML_NO_THINK.render(
+    var prompt = ChatTemplate.CHATML_NO_THINK.render(
         List.of(ChatMessage.user("Summarize the retrieved context.")));
     String answer = model.generate(prompt, options);
 
@@ -50,15 +54,23 @@ try (TextGenerationModel model = ModelJars.open(MODEL)) {
 }
 ----
 
+The segmented prompt keeps chat-template controls distinct from message text,
+so control-token text inside retrieved or user-provided content cannot create a
+new chat turn. The LangChain4j and Spring AI adapters apply the same segmented
+rendering automatically.
+
 == LangChain4j
 
 `models-langchain4j` provides `ModelsChatModel`. It adapts LangChain4j
 chat requests to a Models backend and exposes the backend diagnostics
-used for the request.
+used for the request. `ModelsStreamingChatModel` implements the matching
+streaming contract. The application selects the LangChain4j version;
+the Models adapter does not add one transitively.
 
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
+    implementation("dev.langchain4j:langchain4j:1.17.2")
     implementation("org.modeljars:modeljars:{modeljars-version}")
     implementation(
         "org.modeljars.huggingface:" +
@@ -75,9 +87,7 @@ import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.langchain4j.ModelsChatModel;
-import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
-import java.util.List;
 import org.modeljars.ModelJars;
 
 var options = SamplingOptions.builder()
@@ -86,13 +96,79 @@ var options = SamplingOptions.builder()
     .build();
 
 try (var runtime = ModelJars.open(MODEL)) {
-    var model = new ModelsChatModel(runtime, options);
-    String prompt = ChatTemplate.CHATML_NO_THINK.render(
-        List.of(ChatMessage.user("Answer using only the supplied context.")));
-    String answer = model.chat(prompt);
+    var model = new ModelsChatModel(
+        runtime,
+        ChatTemplate.CHATML_NO_THINK,
+        options);
+    String answer = model.chat("Answer using only the supplied context.");
 
     System.out.println(answer);
     System.out.println(model.diagnostics().backend());
+}
+----
+
+=== RAG with Vectors
+
+`vectors-langchain4j` implements LangChain4j's standard
+`EmbeddingStore<TextSegment>`. It composes directly with the Models chat
+adapter in `AiServices`; no Models-to-Vectors bridge or HTTP process is
+required.
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:vectors-langchain4j:{vectors-version}")
+}
+----
+
+[source,java]
+----
+import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
+
+import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.langchain4j.ModelsChatModel;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.vectors.core.SimilarityFunction;
+import com.integrallis.vectors.db.IndexType;
+import com.integrallis.vectors.db.VectorCollection;
+import com.integrallis.vectors.langchain4j.JavaVectorsEmbeddingStore;
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
+import dev.langchain4j.service.AiServices;
+import org.modeljars.ModelJars;
+
+interface Assistant {
+    String answer(String question);
+}
+
+var options = SamplingOptions.builder()
+    .temperature(0.0f)
+    .maxTokens(128)
+    .build();
+var collection = VectorCollection.builder()
+    .dimension(embeddingModel.dimension())
+    .metric(SimilarityFunction.COSINE)
+    .indexType(IndexType.HNSW)
+    .build();
+
+try (var runtime = ModelJars.open(MODEL);
+     var store = JavaVectorsEmbeddingStore.builder(collection)
+         .commitAfterAdd(true)
+         .build()) {
+    var retriever = EmbeddingStoreContentRetriever.builder()
+        .embeddingModel(embeddingModel)
+        .embeddingStore(store)
+        .maxResults(4)
+        .build();
+
+    var assistant = AiServices.builder(Assistant.class)
+        .chatModel(new ModelsChatModel(
+            runtime,
+            ChatTemplate.CHATML_NO_THINK,
+            options))
+        .contentRetriever(retriever)
+        .build();
+
+    String answer = assistant.answer("What does the retrieved policy allow?");
 }
 ----
 
@@ -100,11 +176,13 @@ try (var runtime = ModelJars.open(MODEL)) {
 
 `models-spring-ai` provides blocking and streaming chat model adapters.
 Both paths use the same tokenizer, generation loop, sampler, and
-selected backend as plain Java.
+selected backend as plain Java. The application selects the Spring AI
+version, normally through its Spring AI BOM.
 
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
+    implementation("org.springframework.ai:spring-ai-model:2.0.0")
     implementation("org.modeljars:modeljars:{modeljars-version}")
     implementation(
         "org.modeljars.huggingface:" +
@@ -120,10 +198,8 @@ dependencies {
 import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
 import com.integrallis.models.api.SamplingOptions;
-import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
-import java.util.List;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.modeljars.ModelJars;
 
@@ -133,16 +209,15 @@ var options = SamplingOptions.builder()
     .build();
 
 try (var runtime = ModelJars.open(MODEL)) {
-    var model = new ModelsSpringAiChatModel(runtime, options);
-    String prompt = ChatTemplate.CHATML_NO_THINK.render(
-        List.of(ChatMessage.user("Answer using only the supplied context.")));
+    var model = new ModelsSpringAiChatModel(
+        runtime,
+        ChatTemplate.CHATML_NO_THINK,
+        options);
 
-    String answer = model.call(prompt);
+    String answer = model.call("Answer using only the supplied context.");
     System.out.println(answer);
 
-    String streamingPrompt = ChatTemplate.CHATML_NO_THINK.render(
-        List.of(ChatMessage.user("List the cited facts.")));
-    model.stream(new Prompt(streamingPrompt))
+    model.stream(new Prompt("List the cited facts."))
         .map(response -> response.getResult().getOutput().getText())
         .doOnNext(System.out::print)
         .blockLast();
@@ -151,32 +226,37 @@ try (var runtime = ModelJars.open(MODEL)) {
 
 == Spring Boot
 
-Spring Boot applications use the tested Spring AI adapter with ordinary
-configuration beans.
+`models-spring-boot-starter` creates the local
+`ModelsSpringAiChatModel` from an application-provided
+`TextGenerationModel` or `InferenceBackend`. The Vectors starter
+independently creates the Spring AI `VectorStore` from the application's
+`EmbeddingModel`; both starters can run in the same application context.
+An application that already uses a Spring AI model-provider starter does
+not need the explicit `spring-ai-model` dependency shown below.
 
 [source,kotlin,subs="attributes+"]
 ----
 dependencies {
+    implementation("org.springframework.ai:spring-ai-model:2.0.0")
     implementation("org.modeljars:modeljars:{modeljars-version}")
     implementation(
         "org.modeljars.huggingface:" +
             "ggml-org.qwen3-0.6b-gguf.q4_0:" +
             "3.0.0-q4_0.1"
     )
-    implementation("com.integrallis:models-spring-ai:{models-version}")
+    implementation("com.integrallis:models-spring-boot-starter:{models-version}")
+    implementation("com.integrallis:vectors-spring-boot-starter:{vectors-version}")
 }
 ----
 
-Open the selected marker and expose the Spring AI `ChatModel`:
+Open the selected marker as a Models runtime bean. The starter exposes it
+as the Spring AI bean named `modelsChatModel`:
 
 [source,java]
 ----
 import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
-import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
-import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.modeljars.ModelJars;
@@ -187,17 +267,31 @@ class LocalModelConfiguration {
     TextGenerationModel localModel() {
         return ModelJars.open(MODEL);
     }
-
-    @Bean
-    ChatModel chatModel(TextGenerationModel localModel) {
-        var options = SamplingOptions.builder()
-            .temperature(0.0f)
-            .maxTokens(128)
-            .build();
-        return new ModelsSpringAiChatModel(localModel, options);
-    }
 }
 ----
+
+Configure the model-facing chat envelope and sampling defaults separately
+from the Vectors index:
+
+[source,yaml]
+----
+integrallis:
+  models:
+    chat-template: chatml-no-think
+    sampling:
+      temperature: 0.0
+      max-tokens: 128
+
+java-vectors:
+  index-type: HNSW
+  quantizer: SQ8
+----
+
+When a Spring AI `EmbeddingModel` bean is available,
+`vectors-spring-boot-starter` infers its dimension and contributes
+`JavaVectorsVectorStore`. Spring AI's `ChatClient` and RAG advisors can
+therefore inject the named local chat model and the standard
+`VectorStore` without adapter-specific glue.
 
 == Guarded RAG
 
@@ -272,8 +366,9 @@ dependencies {
 ----
 
 An `EmbeddingBackend` and `VectorCollection` must use the same vector
-dimension. Batch documents, commit once, and embed the query with the
-same backend:
+dimension. `VectorCollectionEmbeddingSink` owns and closes the embedding
+backend; the application retains ownership of the collection. Batch documents,
+commit once, and embed the query with the same backend:
 
 [source,java]
 ----
@@ -286,17 +381,22 @@ import java.util.List;
 static void indexAndSearch(
         EmbeddingBackend embeddings,
         VectorCollection documents) {
-    var sink = new VectorCollectionEmbeddingSink(embeddings, documents);
-    sink.putAll(
-        List.of("policy-17", "shipping-4"),
-        List.of(
-            "Orders can be cancelled before shipment.",
-            "Standard shipping takes three business days."));
-    documents.commit();
+    try (var sink = new VectorCollectionEmbeddingSink(embeddings, documents)) {
+        sink.putAll(
+            List.of("policy-17", "shipping-4"),
+            List.of(
+                "Orders can be cancelled before shipment.",
+                "Standard shipping takes three business days."));
+        documents.commit();
 
-    float[] query = embeddings.embed("When can I cancel an order?");
-    var results = documents.search(
-        SearchRequest.builder(query, 5).build());
-    results.hits().forEach(hit -> System.out.println(hit.id()));
+        float[] query = sink.backend().embed("When can I cancel an order?");
+        var results = documents.search(
+            SearchRequest.builder(query, 5).build());
+        results.hits().forEach(hit -> System.out.println(hit.id()));
+    }
 }
 ----
+
+The sink validates every vector returned by the backend before mutating the
+collection. A wrong batch size, null row, or mismatched dimension is reported as
+an embedding-backend contract violation rather than a later index error.

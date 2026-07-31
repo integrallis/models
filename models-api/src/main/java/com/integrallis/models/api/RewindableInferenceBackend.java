@@ -15,12 +15,21 @@
  */
 package com.integrallis.models.api;
 
-/** Optional state capability for retaining and restoring an exact sequence prefix. */
+/**
+ * Optional state capability for retaining and restoring an exact sequence prefix.
+ *
+ * <p>Checkpoint and rewind calls follow the single-threaded lifecycle of {@link InferenceBackend}.
+ */
 public interface RewindableInferenceBackend extends InferenceBackend {
 
-  /** Returns the next sequence position, suitable for a later {@link #rewind(int)} call. */
+  /** Returns the non-negative next sequence position, suitable for a later {@link #rewind(int)}. */
   int checkpoint();
 
-  /** Discards cached sequence state at and after {@code checkpoint}. */
+  /**
+   * Discards cached sequence state at and after {@code checkpoint}.
+   *
+   * @param checkpoint a position previously returned by {@link #checkpoint()}, no greater than the
+   *     current checkpoint
+   */
   void rewind(int checkpoint);
 }

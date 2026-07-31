@@ -19,7 +19,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable configuration for token sampling strategies. */
+/**
+ * Immutable configuration for token sampling strategies.
+ *
+ * <p>Floating-point controls are finite. A zero temperature selects deterministic greedy sampling;
+ * {@code seed} is nullable and absent when the caller accepts a runtime-selected seed.
+ */
 public record SamplingOptions(
     float temperature,
     float topP,
@@ -31,11 +36,12 @@ public record SamplingOptions(
 
   public SamplingOptions {
     stopSequences = List.copyOf(Objects.requireNonNull(stopSequences, "stopSequences"));
-    if (temperature < 0) {
-      throw new IllegalArgumentException("temperature must be >= 0, got: " + temperature);
+    if (!Float.isFinite(temperature) || temperature < 0) {
+      throw new IllegalArgumentException(
+          "temperature must be finite and >= 0, got: " + temperature);
     }
-    if (topP <= 0 || topP > 1.0f) {
-      throw new IllegalArgumentException("topP must be in (0, 1], got: " + topP);
+    if (!Float.isFinite(topP) || topP <= 0 || topP > 1.0f) {
+      throw new IllegalArgumentException("topP must be finite and in (0, 1], got: " + topP);
     }
     if (topK <= 0) {
       throw new IllegalArgumentException("topK must be > 0, got: " + topK);
@@ -43,9 +49,9 @@ public record SamplingOptions(
     if (maxTokens <= 0) {
       throw new IllegalArgumentException("maxTokens must be > 0, got: " + maxTokens);
     }
-    if (repetitionPenalty < 1.0f) {
+    if (!Float.isFinite(repetitionPenalty) || repetitionPenalty < 1.0f) {
       throw new IllegalArgumentException(
-          "repetitionPenalty must be >= 1.0, got: " + repetitionPenalty);
+          "repetitionPenalty must be finite and >= 1.0, got: " + repetitionPenalty);
     }
     for (String stopSequence : stopSequences) {
       if (stopSequence == null || stopSequence.isEmpty()) {

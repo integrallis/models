@@ -39,6 +39,12 @@ class RustFfmBackendIntegrationTest {
           System.getProperty("user.home"), ".jvllm", "models", "smollm2-360m-instruct-q8_0.gguf");
   private static final Path MINICPM5_MODEL_PATH =
       Path.of(System.getProperty("user.home"), ".jvllm", "models", "MiniCPM5-1B-Q4_K_M.gguf");
+  private static final Path DEEPSEEK_CODER_MODEL_PATH =
+      Path.of(
+          System.getProperty("user.home"),
+          ".jvllm",
+          "models",
+          "deepseek-coder-1.3b-instruct.Q4_K_M.gguf");
   private static final int[] EXPECTED_PROMPT_TOKENS = {785, 3974, 13876, 38835};
   private static final int[] EXPECTED_GENERATED_TOKENS = {34208, 916, 279, 15678};
 
@@ -151,6 +157,38 @@ class RustFfmBackendIntegrationTest {
           kernel, normalized, layer.wq(), layer.wqType(), config.queryDim(), config.embeddingDim());
       assertProjectionMatches(
           kernel, normalized, layer.wv(), layer.wvType(), config.valueDim(), config.embeddingDim());
+    }
+  }
+
+  @Test
+  void q5_0KernelMatchesVectorProjectionOracleOnPinnedDeepSeekCoderWeights() throws Exception {
+    assertThat(DEEPSEEK_CODER_MODEL_PATH)
+        .as("download the pinned DeepSeek Coder fixture before running native integration tests")
+        .isRegularFile();
+    Path library = Path.of(System.getProperty(RustFfmBackend.LIBRARY_PATH_PROPERTY));
+    assertThat(library).isRegularFile();
+
+    try (Arena arena = Arena.ofShared();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library, true)) {
+      var file = GgufParser.parse(DEEPSEEK_CODER_MODEL_PATH, arena);
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaWeights.LayerWeights layer = weights.layer(13);
+      float[] input = new float[config.hiddenDim()];
+      for (int index = 0; index < input.length; index++) {
+        input[index] = (float) Math.sin((index + 1) * 0.03125);
+      }
+
+      assertThat(layer.ffnDownType())
+          .as("the pinned layer 13 FFN-down projection must remain Q5_0")
+          .isEqualTo(GgufTensorType.Q5_0);
+      assertProjectionMatches(
+          kernel,
+          input,
+          layer.ffnDown(),
+          layer.ffnDownType(),
+          config.embeddingDim(),
+          config.hiddenDim());
     }
   }
 

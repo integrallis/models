@@ -18,6 +18,7 @@ xcrun --sdk macosx swiftc \
   -O \
   -emit-library \
   -parse-as-library \
+  -import-objc-header "$SCRIPT_DIR/jmodels_apple_foundation.h" \
   -module-name JavaModelsAppleFoundationBridge \
   -o "$OUT_DIR/$LIBRARY_NAME" \
   "$SCRIPT_DIR/AppleFoundationBridge.swift"

@@ -1,0 +1,89 @@
+name: Framework Compatibility
+
+# Framework APIs are compileOnly so applications can use their own BOMs. These tests also compose
+# each Models adapter with the corresponding published Vectors 0.1.4 integration.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'models-api/**'
+      - 'models-runtime/**'
+      - 'models-spring-ai/**'
+      - 'models-spring-boot-starter/**'
+      - 'models-langchain4j/**'
+      - 'gradle.properties'
+      - '.github/workflows/framework-compat.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'models-api/**'
+      - 'models-runtime/**'
+      - 'models-spring-ai/**'
+      - 'models-spring-boot-starter/**'
+      - 'models-langchain4j/**'
+      - 'gradle.properties'
+      - '.github/workflows/framework-compat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spring-ai:
+    name: Spring AI ${{ matrix.spring_ai }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - spring_ai: "1.1.4"
+            spring_boot: "3.4.5"
+            spring_framework: "6.2.6"
+            micrometer: "1.14.4"
+          - spring_ai: "1.1.8"
+            spring_boot: "3.4.5"
+            spring_framework: "6.2.6"
+            micrometer: "1.14.4"
+          - spring_ai: "2.0.0"
+            spring_boot: "4.1.0"
+            spring_framework: "7.0.8"
+            micrometer: "1.16.6"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Test Spring adapters and starters
+        run: >
+          ./gradlew
+          :models-spring-ai:test
+          :models-spring-boot-starter:test
+          -PspringAiVersion=${{ matrix.spring_ai }}
+          -PspringBootVersion=${{ matrix.spring_boot }}
+          -PspringFrameworkVersion=${{ matrix.spring_framework }}
+          -PmicrometerObservationVersion=${{ matrix.micrometer }}
+          --write-locks --console=plain
+
+  langchain4j:
+    name: LangChain4j ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["1.0.0", "1.13.1", "1.17.2"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Test LangChain4j adapters
+        run: >
+          ./gradlew
+          :models-langchain4j:test
+          -Plangchain4jVersion=${{ matrix.version }}
+          --write-locks --console=plain

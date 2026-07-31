@@ -71,6 +71,17 @@ class Float16Test {
     void nanBits() {
       assertThat(Float16.toFloat((short) 0x7E00)).isNaN();
     }
+
+    @Test
+    void decodesPositiveSubnormalBoundariesExactly() {
+      assertThat(Float16.toFloat((short) 0x0001)).isEqualTo(Math.scalb(1.0f, -24));
+      assertThat(Float16.toFloat((short) 0x03FF)).isEqualTo(Math.scalb(1023.0f, -24));
+    }
+
+    @Test
+    void decodesNegativeSubnormalBoundaryExactly() {
+      assertThat(Float16.toFloat((short) 0x8001)).isEqualTo(-Math.scalb(1.0f, -24));
+    }
   }
 
   @Nested

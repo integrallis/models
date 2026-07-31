@@ -23,6 +23,7 @@ import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
+import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Tag;
@@ -50,6 +51,9 @@ class DeepSeekCoderModelFixtureIntegrationTest {
       assertThat(file.metadata().getString("general.architecture")).contains("llama");
       assertThat(file.metadata().getString("tokenizer.ggml.model")).contains("gpt2");
       assertThat(file.metadata().getFloat32("llama.rope.scale_linear")).contains(4.0f);
+      assertThat(GgufTokenizer.fromMetadata(file.metadata()).encode("2024 code::foo"))
+          .as("token IDs must match llama.cpp b10012 for the pinned DeepSeek Coder GGUF")
+          .containsExactly(17, 15, 17, 19, 2974, 1161, 12453);
       assertThat(file.tensorInfos())
           .extracting(tensor -> tensor.type())
           .contains(GgufTensorType.Q4_K, GgufTensorType.Q5_0, GgufTensorType.Q6_K);

@@ -15,12 +15,16 @@ platform framework, not as Java bytecode.
 
 ## Shape
 
-The native boundary is four C ABI symbols:
+The native boundary is three C ABI symbols:
 
 - `jmodels_afm_available`
 - `jmodels_afm_generate`
-- `jmodels_afm_last_error`
-- `jmodels_afm_free`
+- `jmodels_afm_result_free`
+
+Availability, generated text, and errors use the same owned result structure.
+It carries an exact UTF-8 byte length, so the Java FFM layer never scans an
+unbounded native C string. Each call owns its result and error detail; there is
+no shared native error buffer.
 
 The Java side loads the dylib with FFM, checks platform support before loading,
 and exposes a prompt/response client that also implements Models'
@@ -54,14 +58,24 @@ automatically. No separate bridge installation is required.
 An explicit bridge path is available for source builds and bridge development:
 
 ```bash
-export MODELS_APPLE_FOUNDATION_LIBRARY=/path/to/libjavamodels_apple_foundation.dylib
+bridge=/path/to/libjavamodels_apple_foundation.dylib
+export MODELS_APPLE_FOUNDATION_LIBRARY="$bridge"
+export MODELS_APPLE_FOUNDATION_LIBRARY_SHA256="$(
+  shasum -a 256 "$bridge" | cut -d ' ' -f 1
+)"
 ```
 
 or:
 
 ```bash
--Dmodels.apple.foundation.library=/path/to/libjavamodels_apple_foundation.dylib
+-Dmodels.apple.foundation.library=/path/to/libjavamodels_apple_foundation.dylib \
+-Dmodels.apple.foundation.library.sha256=<64-hex-digit-sha256>
 ```
+
+Models rejects an explicit library whose digest is absent or does not match.
+For a locally rebuilt bridge only, verification can be bypassed explicitly
+with `-Dmodels.apple.foundation.library.allow-unverified=true` or
+`MODELS_APPLE_FOUNDATION_LIBRARY_ALLOW_UNVERIFIED=true`.
 
 ## Native Bridge
 
@@ -72,8 +86,8 @@ Build on an Apple Silicon Mac with the macOS SDK that includes
 models-backend-apple/src/native/apple-foundation-models/build-bridge.sh
 ```
 
-The script prints the dylib path. Use that path as
-`MODELS_APPLE_FOUNDATION_LIBRARY` or `models.apple.foundation.library`.
+The script prints the dylib path. Configure both that path and its SHA-256 as
+shown above.
 
 The Swift side follows the same foundation used in Apfel:
 
@@ -126,9 +140,10 @@ There is also a native C ABI stub for the FFM boundary:
 models-backend-apple/src/native/apple-foundation-models/build-stub-bridge.sh
 ```
 
-That library exports the same symbols as the Swift bridge, so the Java FFM
-loader, pointer ownership, and native error path can be tested without importing
-Apple's `FoundationModels` framework.
+That library exports the same ABI as the Swift bridge, so the Java FFM loader,
+exact-length payload handling, concurrent error isolation, result ownership,
+and native error path can be tested without importing Apple's
+`FoundationModels` framework.
 
 ## Testing
 
@@ -150,7 +165,11 @@ the current machine is macOS on Apple Silicon, the native bridge path is
 configured, and `SystemLanguageModel` reports available:
 
 ```bash
-export MODELS_APPLE_FOUNDATION_LIBRARY=/path/to/libjavamodels_apple_foundation.dylib
+bridge=/path/to/libjavamodels_apple_foundation.dylib
+export MODELS_APPLE_FOUNDATION_LIBRARY="$bridge"
+export MODELS_APPLE_FOUNDATION_LIBRARY_SHA256="$(
+  shasum -a 256 "$bridge" | cut -d ' ' -f 1
+)"
 ./gradlew :backend-apple:integrationTest
 ```
 

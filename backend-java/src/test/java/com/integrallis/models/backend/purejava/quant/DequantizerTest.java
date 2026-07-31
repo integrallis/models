@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.quant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import java.lang.foreign.Arena;
@@ -90,6 +91,16 @@ class DequantizerTest {
       // Block 1: all nibbles 0, so all values = (0-8)*2.0 = -16.0
       assertThat(dst[32]).isEqualTo(-16.0f);
     }
+
+    @Test
+    void rejectsPartialBlocksInsteadOfSilentlyDroppingValues() {
+      MemorySegment segment = Arena.ofConfined().allocate(18);
+      float[] dst = new float[31];
+
+      assertThatThrownBy(() -> new Q4_0Dequantizer().dequantize(segment, 0, dst, 0, 31))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("multiple of 32");
+    }
   }
 
   @Nested
@@ -128,6 +139,16 @@ class DequantizerTest {
       for (float v : dst) {
         assertThat(v).isEqualTo(0.0f);
       }
+    }
+
+    @Test
+    void rejectsPartialBlocksInsteadOfSilentlyDroppingValues() {
+      MemorySegment segment = Arena.ofConfined().allocate(34);
+      float[] dst = new float[31];
+
+      assertThatThrownBy(() -> new Q8_0Dequantizer().dequantize(segment, 0, dst, 0, 31))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("multiple of 32");
     }
   }
 

@@ -19,6 +19,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 /** Stateless reader for GGUF little-endian primitives from a {@link MemorySegment}. */
 public final class GgufReader {
@@ -42,7 +43,11 @@ public final class GgufReader {
     private long offset;
 
     public Cursor(MemorySegment segment, long offset) {
-      this.segment = segment;
+      this.segment = Objects.requireNonNull(segment, "segment");
+      if (offset < 0 || offset > segment.byteSize()) {
+        throw new MalformedGgufException(
+            "initial offset " + offset + " is outside a " + segment.byteSize() + "-byte segment");
+      }
       this.offset = offset;
     }
 
@@ -51,8 +56,14 @@ public final class GgufReader {
       return offset;
     }
 
+    /** Returns the number of unread bytes. */
+    public long remaining() {
+      return segment.byteSize() - offset;
+    }
+
     /** Reads a little-endian unsigned 32-bit integer (returned as int, interpret as unsigned). */
     public int readU32() {
+      requireRemaining(4, "u32");
       int value = segment.get(LE_INT, offset);
       offset += 4;
       return value;
@@ -60,6 +71,7 @@ public final class GgufReader {
 
     /** Reads a little-endian signed 32-bit integer. */
     public int readI32() {
+      requireRemaining(4, "i32");
       int value = segment.get(LE_INT, offset);
       offset += 4;
       return value;
@@ -67,6 +79,7 @@ public final class GgufReader {
 
     /** Reads a little-endian unsigned 64-bit integer (returned as long). */
     public long readU64() {
+      requireRemaining(8, "u64");
       long value = segment.get(LE_LONG, offset);
       offset += 8;
       return value;
@@ -74,6 +87,7 @@ public final class GgufReader {
 
     /** Reads a little-endian signed 64-bit integer. */
     public long readI64() {
+      requireRemaining(8, "i64");
       long value = segment.get(LE_LONG, offset);
       offset += 8;
       return value;
@@ -81,6 +95,7 @@ public final class GgufReader {
 
     /** Reads a little-endian 32-bit float. */
     public float readF32() {
+      requireRemaining(4, "f32");
       float value = segment.get(LE_FLOAT, offset);
       offset += 4;
       return value;
@@ -88,6 +103,7 @@ public final class GgufReader {
 
     /** Reads a little-endian 64-bit double. */
     public double readF64() {
+      requireRemaining(8, "f64");
       double value = segment.get(LE_DOUBLE, offset);
       offset += 8;
       return value;
@@ -95,6 +111,7 @@ public final class GgufReader {
 
     /** Reads a little-endian unsigned 16-bit integer (returned as int). */
     public int readU16() {
+      requireRemaining(2, "u16");
       int value = Short.toUnsignedInt(segment.get(LE_SHORT, offset));
       offset += 2;
       return value;
@@ -102,6 +119,7 @@ public final class GgufReader {
 
     /** Reads a little-endian signed 16-bit integer. */
     public short readI16() {
+      requireRemaining(2, "i16");
       short value = segment.get(LE_SHORT, offset);
       offset += 2;
       return value;
@@ -109,6 +127,7 @@ public final class GgufReader {
 
     /** Reads a single unsigned byte (returned as int 0-255). */
     public int readU8() {
+      requireRemaining(1, "u8");
       int value = Byte.toUnsignedInt(segment.get(ValueLayout.JAVA_BYTE, offset));
       offset += 1;
       return value;
@@ -116,6 +135,7 @@ public final class GgufReader {
 
     /** Reads a single signed byte. */
     public byte readI8() {
+      requireRemaining(1, "i8");
       byte value = segment.get(ValueLayout.JAVA_BYTE, offset);
       offset += 1;
       return value;
@@ -127,17 +147,36 @@ public final class GgufReader {
       if (length == 0) {
         return "";
       }
-      byte[] bytes = new byte[(int) length];
-      MemorySegment.copy(segment, ValueLayout.JAVA_BYTE, offset, bytes, 0, (int) length);
+      if (length < 0 || length > Integer.MAX_VALUE) {
+        throw new MalformedGgufException(
+            "string length " + Long.toUnsignedString(length) + " cannot be represented in Java");
+      }
+      requireRemaining(length, "string payload");
+      int arrayLength = (int) length;
+      byte[] bytes = new byte[arrayLength];
+      MemorySegment.copy(segment, ValueLayout.JAVA_BYTE, offset, bytes, 0, arrayLength);
       offset += length;
       return new String(bytes, StandardCharsets.UTF_8);
     }
 
     /** Reads a boolean (single byte, non-zero = true). */
     public boolean readBool() {
-      byte value = segment.get(ValueLayout.JAVA_BYTE, offset);
-      offset += 1;
-      return value != 0;
+      return readI8() != 0;
+    }
+
+    private void requireRemaining(long byteCount, String valueType) {
+      if (byteCount < 0 || byteCount > remaining()) {
+        throw new MalformedGgufException(
+            "cannot read "
+                + byteCount
+                + " bytes for "
+                + valueType
+                + " at offset "
+                + offset
+                + " from a "
+                + segment.byteSize()
+                + "-byte segment");
+      }
     }
   }
 }

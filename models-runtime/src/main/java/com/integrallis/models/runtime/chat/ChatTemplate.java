@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.runtime.chat;
 
+import com.integrallis.models.api.ModelPrompt;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -40,6 +41,13 @@ public enum ChatTemplate {
   H2O_DIRECT("h2o-direct"),
   MINICPM5_NO_THINK("minicpm5-no-think");
 
+  private static final String DEEPSEEK_BOS = "<｜begin▁of▁sentence｜>";
+  private static final String DEEPSEEK_DEFAULT_SYSTEM =
+      "You are an AI programming assistant, utilizing the Deepseek Coder model, developed by "
+          + "Deepseek Company, and you only answer questions related to computer science. For "
+          + "politically sensitive questions, security and privacy issues, and other "
+          + "non-computer science questions, you will refuse to answer";
+
   private final String id;
 
   ChatTemplate(String id) {
@@ -51,8 +59,8 @@ public enum ChatTemplate {
     return id;
   }
 
-  /** Renders a complete conversation and opens the assistant turn to be generated. */
-  public String render(List<ChatMessage> messages) {
+  /** Renders a conversation while keeping template controls separate from ordinary message text. */
+  public ModelPrompt render(List<ChatMessage> messages) {
     List<ChatMessage> conversation = validated(messages);
     return switch (this) {
       case RAW -> renderRaw(conversation);
@@ -92,127 +100,124 @@ public enum ChatTemplate {
     return List.copyOf(messages);
   }
 
-  private static String renderRaw(List<ChatMessage> messages) {
-    return String.join("\n", messages.stream().map(ChatMessage::text).toList());
+  private static ModelPrompt renderRaw(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    for (int index = 0; index < messages.size(); index++) {
+      if (index > 0) {
+        prompt.control("\n");
+      }
+      prompt.text(messages.get(index).text());
+    }
+    return prompt.build();
   }
 
-  private static String renderChatMl(
+  private static ModelPrompt renderChatMl(
       List<ChatMessage> messages, String prefix, String assistantPrefix) {
-    StringBuilder prompt = new StringBuilder(prefix);
+    ModelPrompt.Builder prompt = ModelPrompt.builder().control(prefix);
     for (ChatMessage message : messages) {
       prompt
-          .append("<|im_start|>")
-          .append(message.role().templateName())
-          .append('\n')
-          .append(message.text())
-          .append("<|im_end|>\n");
+          .control("<|im_start|>" + message.role().templateName() + "\n")
+          .text(message.text())
+          .control("<|im_end|>\n");
     }
-    return prompt.append("<|im_start|>assistant\n").append(assistantPrefix).toString();
+    return prompt.control("<|im_start|>assistant\n" + assistantPrefix).build();
   }
 
-  private static String renderZephyr(List<ChatMessage> messages) {
-    StringBuilder prompt = new StringBuilder();
+  private static ModelPrompt renderZephyr(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
     for (ChatMessage message : messages) {
       prompt
-          .append("<|")
-          .append(message.role().templateName())
-          .append("|>\n")
-          .append(message.text())
-          .append("</s>\n");
+          .control("<|" + message.role().templateName() + "|>\n")
+          .text(message.text())
+          .control("</s>\n");
     }
-    return prompt.append("<|assistant|>").toString();
+    return prompt.control("<|assistant|>").build();
   }
 
-  private static String renderLlama3(List<ChatMessage> messages) {
-    StringBuilder prompt = new StringBuilder();
+  private static ModelPrompt renderLlama3(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
     for (ChatMessage message : messages) {
       prompt
-          .append("<|start_header_id|>")
-          .append(message.role().templateName())
-          .append("<|end_header_id|>\n\n")
-          .append(message.text().strip())
-          .append("<|eot_id|>");
+          .control("<|start_header_id|>" + message.role().templateName() + "<|end_header_id|>\n\n")
+          .text(message.text().strip())
+          .control("<|eot_id|>");
     }
-    return prompt.append("<|start_header_id|>assistant<|end_header_id|>\n\n").toString();
+    return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
   }
 
-  private static String renderGemma(List<ChatMessage> messages) {
-    StringBuilder prompt = new StringBuilder();
-    StringBuilder pendingUser = new StringBuilder();
+  private static ModelPrompt renderGemma(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    boolean pendingUser = false;
     for (ChatMessage message : messages) {
       if (message.role() == ChatRole.ASSISTANT) {
-        appendGemmaUser(prompt, pendingUser);
+        if (pendingUser) {
+          prompt.control("<end_of_turn>\n");
+          pendingUser = false;
+        }
         prompt
-            .append("<start_of_turn>model\n")
-            .append(message.text().strip())
-            .append("<end_of_turn>\n");
+            .control("<start_of_turn>model\n")
+            .text(message.text().strip())
+            .control("<end_of_turn>\n");
       } else {
-        if (!pendingUser.isEmpty()) {
-          pendingUser.append("\n\n");
+        if (pendingUser) {
+          prompt.control("\n\n");
+        } else {
+          prompt.control("<start_of_turn>user\n");
         }
-        pendingUser.append(message.text().strip());
+        prompt.text(message.text().strip());
+        pendingUser = true;
       }
     }
-    appendGemmaUser(prompt, pendingUser);
-    return prompt.append("<start_of_turn>model\n").toString();
-  }
-
-  private static void appendGemmaUser(StringBuilder prompt, StringBuilder pendingUser) {
-    if (!pendingUser.isEmpty()) {
-      prompt.append("<start_of_turn>user\n").append(pendingUser).append("<end_of_turn>\n");
-      pendingUser.setLength(0);
+    if (pendingUser) {
+      prompt.control("<end_of_turn>\n");
     }
+    return prompt.control("<start_of_turn>model\n").build();
   }
 
-  private static String renderPhi3(List<ChatMessage> messages) {
-    StringBuilder prompt = new StringBuilder();
+  private static ModelPrompt renderPhi3(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
     for (ChatMessage message : messages) {
       prompt
-          .append("<|")
-          .append(message.role().templateName())
-          .append("|>\n")
-          .append(message.text().strip())
-          .append("<|end|>\n");
+          .control("<|" + message.role().templateName() + "|>\n")
+          .text(message.text().strip())
+          .control("<|end|>\n");
     }
-    return prompt.append("<|assistant|>\n").toString();
+    return prompt.control("<|assistant|>\n").build();
   }
 
-  private static String renderDeepSeek(List<ChatMessage> messages) {
-    StringBuilder prompt = new StringBuilder();
-    StringBuilder pendingInstruction = new StringBuilder();
+  private static ModelPrompt renderDeepSeek(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder().control(DEEPSEEK_BOS);
+    boolean hasSystemMessage =
+        messages.stream().anyMatch(message -> message.role() == ChatRole.SYSTEM);
+    if (!hasSystemMessage) {
+      prompt.text(DEEPSEEK_DEFAULT_SYSTEM).control("\n");
+    }
+
     for (ChatMessage message : messages) {
-      if (message.role() == ChatRole.ASSISTANT) {
-        appendInstruction(prompt, pendingInstruction);
-        prompt.append("### Response:\n").append(message.text().strip()).append('\n');
-      } else {
-        if (!pendingInstruction.isEmpty()) {
-          pendingInstruction.append("\n\n");
-        }
-        pendingInstruction.append(message.text().strip());
+      switch (message.role()) {
+        case SYSTEM -> prompt.text(message.text());
+        case USER -> prompt.control("### Instruction:\n").text(message.text()).control("\n");
+        case ASSISTANT ->
+            prompt.control("### Response:\n").text(message.text()).control("\n<|EOT|>\n");
+        case TOOL ->
+            throw new IllegalArgumentException(
+                "DeepSeek Coder chat template does not support role " + message.role());
       }
     }
-    appendInstruction(prompt, pendingInstruction);
-    return prompt.append("### Response:\n").toString();
+    return prompt.control("### Response:\n").build();
   }
 
-  private static void appendInstruction(StringBuilder prompt, StringBuilder instruction) {
-    if (!instruction.isEmpty()) {
-      prompt.append("### Instruction:\n").append(instruction).append('\n');
-      instruction.setLength(0);
-    }
-  }
-
-  private static String renderH2o(List<ChatMessage> messages, String assistantPrefix) {
-    StringBuilder prompt = new StringBuilder();
+  private static ModelPrompt renderH2o(List<ChatMessage> messages, String assistantPrefix) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
     for (ChatMessage message : messages) {
-      if (!prompt.isEmpty()) {
-        prompt.append("\n\n");
+      switch (message.role()) {
+        case USER -> prompt.control("<|prompt|>").text(message.text()).control("</s>");
+        case ASSISTANT -> prompt.control("<|answer|>").text(message.text()).control("</s>");
+        case SYSTEM, TOOL ->
+            throw new IllegalArgumentException(
+                "H2O chat template does not support role " + message.role());
       }
-      if (message.role() == ChatRole.ASSISTANT) {
-        prompt.append("Previous answer: ");
-      }
-      prompt.append(message.text().strip());
     }
-    return "<|prompt|>" + prompt + "</s><|answer|>" + assistantPrefix;
+    return prompt.control("<|answer|>" + assistantPrefix).build();
   }
 }

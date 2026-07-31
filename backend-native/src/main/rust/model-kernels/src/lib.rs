@@ -333,13 +333,16 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
             }
             observed_generation =
                 next_generation.unwrap_or_else(|| shared.generation.0.load(Ordering::Acquire));
-            state.job.expect("worker generation must provide a job")
+            state.job
         };
-        let succeeded = catch_unwind(AssertUnwindSafe(|| {
-            // SAFETY: every worker receives a distinct output range and read-only shared inputs.
-            unsafe { execute_job_partition(job, worker_index, total_threads) }
-        }))
-        .is_ok();
+        let succeeded = match job {
+            Some(job) => catch_unwind(AssertUnwindSafe(|| {
+                // SAFETY: every worker receives a distinct output range and read-only shared inputs.
+                unsafe { execute_job_partition(job, worker_index, total_threads) }
+            }))
+            .is_ok(),
+            None => false,
+        };
         if !succeeded {
             lock(&shared.state).failed = true;
         }
@@ -3861,6 +3864,40 @@ mod tests {
         assert!(!poll_completion(&remaining, 1));
         remaining.store(0, Ordering::Release);
         assert!(poll_completion(&remaining, 1));
+    }
+
+    #[test]
+    fn worker_accounts_for_a_published_generation_without_a_job() {
+        let shared = Arc::new(WorkerShared {
+            generation: CachePadded(AtomicU64::new(1)),
+            remaining: CachePadded(AtomicUsize::new(1)),
+            state: Mutex::new(WorkerState {
+                shutdown: false,
+                job: None,
+                failed: false,
+            }),
+            work_available: Condvar::new(),
+            work_complete: Condvar::new(),
+        });
+        let worker_shared = Arc::clone(&shared);
+        let worker = thread::spawn(move || worker_loop(worker_shared, 1, 2));
+
+        for _ in 0..100 {
+            if shared.remaining.0.load(Ordering::Acquire) == 0 {
+                break;
+            }
+            thread::sleep(std::time::Duration::from_millis(1));
+        }
+        {
+            let mut state = lock(&shared.state);
+            state.shutdown = true;
+            shared.generation.0.fetch_add(1, Ordering::Release);
+            shared.work_available.notify_all();
+        }
+
+        assert_eq!(shared.remaining.0.load(Ordering::Acquire), 0);
+        assert!(lock(&shared.state).failed);
+        assert!(worker.join().is_ok());
     }
 
     #[test]

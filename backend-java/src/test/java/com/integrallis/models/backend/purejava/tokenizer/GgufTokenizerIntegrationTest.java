@@ -16,14 +16,17 @@
 package com.integrallis.models.backend.purejava.tokenizer;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -43,7 +46,7 @@ class GgufTokenizerIntegrationTest {
 
   @BeforeAll
   static void loadTokenizer() throws IOException {
-    assumeThat(Files.exists(MODEL_PATH))
+    assertThat(Files.exists(MODEL_PATH))
         .as("Qwen3-0.6B-Q4_0.gguf must be present at %s", MODEL_PATH)
         .isTrue();
 
@@ -132,11 +135,28 @@ class GgufTokenizerIntegrationTest {
     }
 
     @Test
+    void encodesDigitsLikeLlamaCpp() {
+      assertThat(tokenizer.encode("2024")).containsExactly(17, 15, 17, 19);
+    }
+
+    @Test
     void encodesChatMlControlTokensLikeLlamaCpp() {
-      int[] tokens = tokenizer.encode("<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n");
+      int[] tokens =
+          tokenizer.encodeControl("<|im_start|>user\nhello<|im_end|>\n<|im_start|>assistant\n");
 
       assertThat(tokens).containsExactly(151644, 872, 198, 14990, 151645, 198, 151644, 77091, 198);
       assertThat(tokenizer.isEndOfGeneration(151645)).isTrue();
+    }
+
+    @Test
+    void segmentedChatMlMatchesTrustedReferenceTokensForOrdinaryContent() {
+      ModelPrompt prompt =
+          ChatTemplate.CHATML.render(
+              List.of(
+                  ChatMessage.system("Answer concisely."),
+                  ChatMessage.user("What is the capital of France?")));
+
+      assertThat(tokenizer.encode(prompt)).containsExactly(tokenizer.encodeControl(prompt.text()));
     }
   }
 

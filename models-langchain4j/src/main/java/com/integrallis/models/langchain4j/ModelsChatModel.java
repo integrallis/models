@@ -20,10 +20,8 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -32,6 +30,7 @@ import java.util.Objects;
 /** LangChain4J {@link ChatModel} backed by the models runtime generation loop. */
 public final class ModelsChatModel implements ChatModel {
   private final TextGenerationModel model;
+  private final ChatTemplate template;
   private final SamplingOptions defaults;
 
   public ModelsChatModel(InferenceBackend backend) {
@@ -47,7 +46,18 @@ public final class ModelsChatModel implements ChatModel {
   }
 
   public ModelsChatModel(TextGenerationModel model, SamplingOptions defaults) {
+    this(model, ChatTemplate.RAW, defaults);
+  }
+
+  public ModelsChatModel(
+      InferenceBackend backend, ChatTemplate template, SamplingOptions defaults) {
+    this(new RuntimeTextGenerationModel(backend), template, defaults);
+  }
+
+  public ModelsChatModel(
+      TextGenerationModel model, ChatTemplate template, SamplingOptions defaults) {
     this.model = Objects.requireNonNull(model, "model");
+    this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
   }
 
@@ -59,60 +69,13 @@ public final class ModelsChatModel implements ChatModel {
   @Override
   public ChatResponse doChat(ChatRequest request) {
     Objects.requireNonNull(request, "request");
-    String output = model.generate(prompt(request), options(request));
+    String output =
+        model.generate(
+            LangChain4jChatRequestMapper.prompt(request, template),
+            LangChain4jChatRequestMapper.options(request, defaults));
     return ChatResponse.builder()
         .aiMessage(AiMessage.from(output))
         .modelName(model.modelName())
         .build();
-  }
-
-  private String prompt(ChatRequest request) {
-    StringBuilder prompt = new StringBuilder();
-    for (ChatMessage message : request.messages()) {
-      if (!prompt.isEmpty()) {
-        prompt.append('\n');
-      }
-      prompt.append(render(message));
-    }
-    return prompt.toString();
-  }
-
-  private String render(ChatMessage message) {
-    if (message instanceof UserMessage userMessage && userMessage.hasSingleText()) {
-      return userMessage.singleText();
-    }
-    if (message instanceof SystemMessage systemMessage) {
-      return systemMessage.text();
-    }
-    if (message instanceof AiMessage aiMessage) {
-      return aiMessage.text();
-    }
-    return message.toString();
-  }
-
-  private SamplingOptions options(ChatRequest request) {
-    SamplingOptions.Builder builder =
-        SamplingOptions.builder()
-            .temperature(defaults.temperature())
-            .topP(defaults.topP())
-            .topK(defaults.topK())
-            .maxTokens(defaults.maxTokens())
-            .repetitionPenalty(defaults.repetitionPenalty());
-    if (defaults.seed() != null) {
-      builder.seed(defaults.seed());
-    }
-    if (request.temperature() != null) {
-      builder.temperature(request.temperature().floatValue());
-    }
-    if (request.topP() != null) {
-      builder.topP(request.topP().floatValue());
-    }
-    if (request.topK() != null) {
-      builder.topK(request.topK());
-    }
-    if (request.maxOutputTokens() != null) {
-      builder.maxTokens(request.maxOutputTokens());
-    }
-    return builder.build();
   }
 }

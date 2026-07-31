@@ -23,6 +23,7 @@ project(":backend-apple").projectDir = file("models-backend-apple")
 
 // --- Framework adapters ---
 include("models-spring-ai")
+include("models-spring-boot-starter")
 include("models-langchain4j")
 include("models-quarkus")
 include("models-semantic-kernel")

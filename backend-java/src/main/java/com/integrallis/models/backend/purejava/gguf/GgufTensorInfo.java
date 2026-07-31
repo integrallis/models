@@ -30,6 +30,17 @@ public record GgufTensorInfo(
       throw new IllegalArgumentException(
           "nDimensions (" + nDimensions + ") != shape.length (" + shape.length + ")");
     }
+    if (nDimensions < 1 || nDimensions > 4) {
+      throw new IllegalArgumentException("nDimensions must be between 1 and 4: " + nDimensions);
+    }
+    for (long dimension : shape) {
+      if (dimension <= 0) {
+        throw new IllegalArgumentException("Tensor dimensions must be positive: " + dimension);
+      }
+    }
+    if (offset < 0) {
+      throw new IllegalArgumentException("Tensor offset must be non-negative: " + offset);
+    }
   }
 
   @Override
@@ -41,7 +52,7 @@ public record GgufTensorInfo(
   public long elementCount() {
     long count = 1;
     for (long dim : shape) {
-      count *= dim;
+      count = Math.multiplyExact(count, dim);
     }
     return count;
   }
@@ -49,7 +60,16 @@ public record GgufTensorInfo(
   /** Computes the byte size of this tensor's data. */
   public long byteSize() {
     long elements = elementCount();
-    long blocks = (elements + type.blockSize() - 1) / type.blockSize();
-    return blocks * type.typeSize();
+    if (elements % type.blockSize() != 0) {
+      throw new IllegalArgumentException(
+          "Tensor element count "
+              + elements
+              + " is not a multiple of "
+              + type
+              + " block size "
+              + type.blockSize());
+    }
+    long blocks = elements / type.blockSize();
+    return Math.multiplyExact(blocks, type.typeSize());
   }
 }

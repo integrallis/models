@@ -1096,11 +1096,27 @@ public final class TensorOps {
 
   /** In-place numerically stable softmax over x[offset..offset+size). */
   public static void softmax(float[] x, int offset, int size) {
+    Objects.requireNonNull(x, "x");
+    if (size <= 0) {
+      throw new IllegalArgumentException("size must be positive: " + size);
+    }
+    Objects.checkFromIndexSize(offset, size, x.length);
     float max = Float.NEGATIVE_INFINITY;
     for (int i = 0; i < size; i++) {
-      if (x[offset + i] > max) {
-        max = x[offset + i];
+      float value = x[offset + i];
+      if (Float.isNaN(value)) {
+        throw new IllegalArgumentException("softmax input contains NaN at index " + (offset + i));
       }
+      if (value == Float.POSITIVE_INFINITY) {
+        throw new IllegalArgumentException(
+            "softmax input contains positive infinity at index " + (offset + i));
+      }
+      if (value > max) {
+        max = value;
+      }
+    }
+    if (!Float.isFinite(max)) {
+      throw new IllegalArgumentException("softmax requires at least one finite input");
     }
     float sum = 0.0f;
     for (int i = 0; i < size; i++) {

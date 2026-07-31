@@ -214,6 +214,98 @@ class VectorCollectionEmbeddingSinkTest {
     }
   }
 
+  @Test
+  void putRejectsABackendVectorWithTheWrongDimension() {
+    VectorCollection c = collection(DIM);
+    EmbeddingBackend buggy =
+        new EmbeddingBackend() {
+          @Override
+          public int dimension() {
+            return DIM;
+          }
+
+          @Override
+          public float[] embed(String text) {
+            return new float[DIM - 1];
+          }
+        };
+    try (c;
+        VectorCollectionEmbeddingSink sink = new VectorCollectionEmbeddingSink(buggy, c)) {
+      assertThatThrownBy(() -> sink.put("bad", "wrong dimension"))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("backend returned dimension 3 for text at index 0; expected 4");
+      c.commit();
+      assertThat(c.size()).isZero();
+    }
+  }
+
+  @Test
+  void putAllValidatesEveryVectorBeforeMutatingTheCollection() {
+    VectorCollection c = collection(DIM);
+    EmbeddingBackend buggy =
+        new EmbeddingBackend() {
+          @Override
+          public int dimension() {
+            return DIM;
+          }
+
+          @Override
+          public float[] embed(String text) {
+            throw new AssertionError("batch path expected");
+          }
+
+          @Override
+          public float[][] embedAll(List<String> texts) {
+            return new float[][] {new float[DIM], new float[DIM + 1]};
+          }
+        };
+    try (c;
+        VectorCollectionEmbeddingSink sink = new VectorCollectionEmbeddingSink(buggy, c)) {
+      assertThatThrownBy(() -> sink.putAll(List.of("good", "bad"), List.of("first", "second")))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("backend returned dimension 5 for text at index 1; expected 4");
+      c.commit();
+      assertThat(c.size()).isZero();
+    }
+  }
+
+  @Test
+  void closeReleasesTheOwnedBackendExactlyOnceAndLeavesTheCollectionOpen() {
+    VectorCollection c = collection(DIM);
+    AtomicInteger closes = new AtomicInteger();
+    EmbeddingBackend backend =
+        new EmbeddingBackend() {
+          @Override
+          public int dimension() {
+            return DIM;
+          }
+
+          @Override
+          public float[] embed(String text) {
+            return new float[DIM];
+          }
+
+          @Override
+          public void close() {
+            closes.incrementAndGet();
+          }
+        };
+    VectorCollectionEmbeddingSink sink = new VectorCollectionEmbeddingSink(backend, c);
+
+    sink.close();
+    sink.close();
+
+    assertThat(closes).hasValue(1);
+    assertThatThrownBy(() -> sink.put("closed", "closed"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("embedding sink is closed");
+    try (c) {
+      c.add(com.integrallis.vectors.core.Document.of("direct", new float[DIM], "still open"));
+      c.commit();
+      assertThat(c.contains("direct")).isTrue();
+    }
+  }
+
   private static EmbeddingBackend constantBackend(int dim, float value) {
     return new EmbeddingBackend() {
       @Override

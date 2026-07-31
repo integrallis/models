@@ -15,16 +15,61 @@
  */
 package com.integrallis.models.api;
 
-/** Tokenizer interface for encoding text to token IDs and decoding back. */
+import java.util.Objects;
+
+/**
+ * Converts model text and trusted template controls to token IDs and back.
+ *
+ * <p>Tokenizer instances returned by a backend are read-only and safe for concurrent encode/decode
+ * calls. Inputs and returned strings/arrays are non-null. Returned arrays are caller-owned, and
+ * implementations do not mutate array inputs.
+ */
 public interface Tokenizer {
 
-  /** Encodes a string into an array of token IDs. */
+  /**
+   * Encodes ordinary text into token IDs.
+   *
+   * <p>Text that spells a registered special token is treated as ordinary input. Use {@link
+   * #encode(ModelPrompt)} when applying a model template with trusted control-token segments.
+   */
   int[] encode(String text);
 
-  /** Decodes an array of token IDs back into a string. */
+  /**
+   * Encodes a segmented model prompt, recognizing special tokens only in control segments.
+   *
+   * <p>Tokenizers without a special-token vocabulary may inherit the flattening implementation. A
+   * tokenizer with special tokens must override this method.
+   */
+  default int[] encode(ModelPrompt prompt) {
+    return encode(Objects.requireNonNull(prompt, "prompt").text());
+  }
+
+  /** Encodes trusted template text in which registered tokenizer control tokens are recognized. */
+  default int[] encodeControl(String text) {
+    return encode(ModelPrompt.control(Objects.requireNonNull(text, "text")));
+  }
+
+  /**
+   * Decodes token IDs in sequence order.
+   *
+   * <p>Sequence decoding may remove tokenizer artifacts that apply only at the beginning of a
+   * complete input, such as SentencePiece's configured dummy space prefix.
+   *
+   * @param tokens token IDs in {@code [0, vocabSize())}
+   * @return decoded text
+   */
   String decode(int[] tokens);
 
-  /** Decodes a single token ID to its string representation. */
+  /**
+   * Decodes one token ID.
+   *
+   * <p>The result is the token's stream fragment. It preserves meaningful token-boundary text,
+   * including a leading space, so concatenating fragments in generation order produces streamed
+   * output without losing word boundaries.
+   *
+   * @param token token ID in {@code [0, vocabSize())}
+   * @return decoded token text, which may be empty
+   */
   String decode(int token);
 
   /** Returns the vocabulary size. */

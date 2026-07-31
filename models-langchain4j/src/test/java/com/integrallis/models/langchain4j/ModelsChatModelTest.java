@@ -21,18 +21,19 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.CustomMessage;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +66,7 @@ class ModelsChatModelTest {
     ModelsChatModel model =
         new ModelsChatModel(
             delegate,
+            ChatTemplate.CHATML,
             SamplingOptions.builder()
                 .temperature(0.9f)
                 .topP(0.8f)
@@ -72,8 +74,8 @@ class ModelsChatModelTest {
                 .maxTokens(200)
                 .repetitionPenalty(1.2f)
                 .seed(42L)
+                .stopSequences(List.of("DEFAULT_STOP"))
                 .build());
-    CustomMessage custom = CustomMessage.from(Map.of("source", "tool"));
     ChatRequest request =
         ChatRequest.builder()
             .messages(
@@ -81,22 +83,42 @@ class ModelsChatModelTest {
                     SystemMessage.from("system"),
                     UserMessage.from("question"),
                     AiMessage.from("prior answer"),
-                    custom))
+                    ToolExecutionResultMessage.from("call-1", "lookup", "tool result")))
             .temperature(0.2)
             .topP(0.3)
             .topK(7)
             .maxOutputTokens(19)
+            .stopSequences(List.of("REQUEST_STOP"))
             .build();
 
     var response = model.doChat(request);
 
-    assertThat(delegate.prompt).isEqualTo("system\nquestion\nprior answer\n" + custom);
+    assertThat(delegate.prompt)
+        .isEqualTo(
+            """
+            <|im_start|>system
+            system<|im_end|>
+            <|im_start|>user
+            question<|im_end|>
+            <|im_start|>assistant
+            prior answer<|im_end|>
+            <|im_start|>tool
+            tool result<|im_end|>
+            <|im_start|>assistant
+            """);
+    assertThat(delegate.modelPrompt.segments())
+        .anySatisfy(
+            segment -> {
+              assertThat(segment.kind()).isEqualTo(ModelPrompt.SegmentKind.TEXT);
+              assertThat(segment.text()).isEqualTo("question");
+            });
     assertThat(delegate.options.temperature()).isEqualTo(0.2f);
     assertThat(delegate.options.topP()).isEqualTo(0.3f);
     assertThat(delegate.options.topK()).isEqualTo(7);
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
+    assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(response.aiMessage().text()).isEqualTo("mapped answer");
     assertThat(response.modelName()).isEqualTo("RecordingModel");
   }
@@ -111,6 +133,7 @@ class ModelsChatModelTest {
             .topK(12)
             .maxTokens(31)
             .repetitionPenalty(1.1f)
+            .stopSequences(List.of("END"))
             .build();
     ModelsChatModel model = new ModelsChatModel(delegate, defaults);
 
@@ -125,6 +148,13 @@ class ModelsChatModelTest {
         .isThrownBy(() -> new ModelsChatModel((TextGenerationModel) null));
     assertThatNullPointerException()
         .isThrownBy(() -> new ModelsChatModel(highLevelModel("answer"), null));
+    assertThatNullPointerException()
+        .isThrownBy(
+            () ->
+                new ModelsChatModel(
+                    highLevelModel("answer"),
+                    (ChatTemplate) null,
+                    SamplingOptions.builder().build()));
     ModelsChatModel model = new ModelsChatModel(highLevelModel("answer"));
     assertThatNullPointerException().isThrownBy(() -> model.doChat(null));
   }
@@ -187,6 +217,7 @@ class ModelsChatModelTest {
   private static final class RecordingModel implements TextGenerationModel {
     private final String answer;
     private String prompt;
+    private ModelPrompt modelPrompt;
     private SamplingOptions options;
 
     private RecordingModel(String answer) {
@@ -201,6 +232,12 @@ class ModelsChatModelTest {
     @Override
     public BackendDiagnostics diagnostics() {
       return BackendDiagnostics.unavailable("recording");
+    }
+
+    @Override
+    public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+      this.modelPrompt = prompt;
+      generate(prompt.text(), options, stream);
     }
 
     @Override

@@ -51,6 +51,22 @@ class BlurredBagOfWordsTest {
   }
 
   @Test
+  void capsBlurAtUniqueShortestCyclicDistances() {
+    WordTour evenTour = WordTour.fromTerms(List.of("alpha", "beta", "gamma", "delta"));
+
+    BlurredBagOfWords bow = BlurredBagOfWords.encode(evenTour, List.of("alpha"), 20, 1.0);
+    double adjacent = Math.exp(-1.0);
+    double antipode = Math.exp(-4.0);
+    double total = 1.0 + 2.0 * adjacent + antipode;
+
+    assertThat(bow.nonZeroCount()).isEqualTo(evenTour.size());
+    assertThat(bow.weightAtRank(0)).isCloseTo(1.0 / total, within(1.0e-12));
+    assertThat(bow.weightAtRank(1)).isCloseTo(adjacent / total, within(1.0e-12));
+    assertThat(bow.weightAtRank(2)).isCloseTo(antipode / total, within(1.0e-12));
+    assertThat(bow.weightAtRank(3)).isCloseTo(adjacent / total, within(1.0e-12));
+  }
+
+  @Test
   void ignoresOutOfVocabularyTermsWithoutInventingDimensions() {
     BlurredBagOfWords bow =
         BlurredBagOfWords.encode(TOUR, List.of("missing", "alpha", "unknown"), 0, 10.0);

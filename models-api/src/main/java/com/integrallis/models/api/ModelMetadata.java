@@ -17,7 +17,12 @@ package com.integrallis.models.api;
 
 import java.util.Objects;
 
-/** Metadata describing a loaded model's architecture. */
+/**
+ * Metadata describing a loaded model's architecture.
+ *
+ * <p>Names are nonblank, dimensions are positive, and {@code numHeads} is divisible by {@code
+ * numKvHeads} for grouped-query attention.
+ */
 public record ModelMetadata(
     String modelFamily,
     String modelName,
@@ -29,7 +34,31 @@ public record ModelMetadata(
     int numKvHeads) {
 
   public ModelMetadata {
-    Objects.requireNonNull(modelFamily, "modelFamily");
-    Objects.requireNonNull(modelName, "modelName");
+    modelFamily = requireText(modelFamily, "modelFamily");
+    modelName = requireText(modelName, "modelName");
+    requirePositive(contextLength, "contextLength");
+    requirePositive(vocabSize, "vocabSize");
+    requirePositive(embeddingDim, "embeddingDim");
+    requirePositive(numLayers, "numLayers");
+    requirePositive(numHeads, "numHeads");
+    requirePositive(numKvHeads, "numKvHeads");
+    if (numHeads % numKvHeads != 0) {
+      throw new IllegalArgumentException(
+          "numHeads must be divisible by numKvHeads: " + numHeads + " and " + numKvHeads);
+    }
+  }
+
+  private static String requireText(String value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value.isBlank()) {
+      throw new IllegalArgumentException(name + " must not be blank");
+    }
+    return value.trim();
+  }
+
+  private static void requirePositive(int value, String name) {
+    if (value <= 0) {
+      throw new IllegalArgumentException(name + " must be positive: " + value);
+    }
   }
 }

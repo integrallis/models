@@ -63,7 +63,9 @@ jobs:
           bridge_dir="$RUNNER_TEMP/apple-foundation-bridge"
           bridge="$(models-backend-apple/src/native/apple-foundation-models/build-bridge.sh "$bridge_dir")"
           test -f "$bridge"
+          bridge_sha256="$(shasum -a 256 "$bridge" | cut -d ' ' -f 1)"
           echo "MODELS_APPLE_FOUNDATION_LIBRARY=$bridge" >> "$GITHUB_ENV"
+          echo "MODELS_APPLE_FOUNDATION_LIBRARY_SHA256=$bridge_sha256" >> "$GITHUB_ENV"
           echo "MODELS_APPLE_FOUNDATION_BRIDGE_DIR=$bridge_dir" >> "$GITHUB_ENV"
 
       - name: Compile native stub bridge

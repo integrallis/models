@@ -14,5 +14,12 @@
  * limitations under the License.
  */
 
-/** Backend SPI, ChatModel, Tokenizer, SamplingOptions, TokenStream. */
+/**
+ * Contracts for model inference, tokenization, sampling, and streaming.
+ *
+ * <p>Public parameters, collection elements, and return values are non-null unless a declaration
+ * explicitly documents an optional value. Immutable value objects are safe to share between
+ * threads. Inference backends and text-generation models own mutable sequence state and require
+ * serialized use; tokenizer instances support concurrent read-only calls.
+ */
 package com.integrallis.models.api;

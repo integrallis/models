@@ -16,6 +16,7 @@
 package com.integrallis.models.rag;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -26,18 +27,20 @@ import java.util.regex.Pattern;
 /**
  * Applies deterministic retrieval and source-attribution guardrails to generated RAG answers.
  *
- * <p>A weak retrieval abstains. A high-confidence answer is accepted only when every bracketed
- * citation names a retrieved source and every substantive answer token is supported by the question
- * or retrieved evidence. Explicit model abstentions are preserved. When a supported answer omits
- * citations, retrieved provenance is attached deterministically. Otherwise the exact retrieved
- * evidence is returned with trusted source IDs.
+ * <p>{@link #assess(String, List)} rejects irrelevant, oversized, or suspicious retrieved context
+ * before generation. A high-confidence answer is accepted only when every citation names a
+ * retrieved source and every substantive answer token is supported by the question or retrieved
+ * evidence. Explicit model abstentions are preserved. When a supported answer omits citations,
+ * retrieved provenance is attached deterministically. Otherwise the exact retrieved evidence is
+ * returned with trusted source IDs.
  */
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "trusted-title-provenance-statement-anchors-safe-discourse-explicit-abstention-v18";
+      "bounded-context-injection-screened-citation-safe-statement-grounding-v20";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
-  private static final Pattern BRACKETED_TEXT = Pattern.compile("\\[([^\\]\\r\\n]+)]");
+  private static final Pattern CITATION =
+      Pattern.compile("\\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})]");
   private static final Pattern ABSTENTION_PATTERN =
       Pattern.compile("(?i)^(?:INSUFFICIENT_CONTEXT[.!]?\\s*)+$");
   private static final Pattern TERMINAL_ABSTENTION_PATTERN =
@@ -60,6 +63,22 @@ public final class GroundedAnswerPolicy {
       Pattern.compile(
           "(?i)\\b(?=[\\p{L}\\p{N}-]*\\p{L})(?=[\\p{L}\\p{N}-]*\\p{N})"
               + "[\\p{L}\\p{N}]+(?:-[\\p{L}\\p{N}]+)+\\b");
+  private static final List<Pattern> PROMPT_INJECTION_PATTERNS =
+      List.of(
+          Pattern.compile(
+              "(?i)\\b(?:ignore|disregard|forget)\\s+(?:all\\s+)?"
+                  + "(?:previous|prior|above|earlier)\\s+"
+                  + "(?:instructions?|rules?|prompts?|directions?)\\b"),
+          Pattern.compile(
+              "(?i)\\b(?:do not|don't)\\s+(?:follow|obey)\\s+(?:the\\s+)?"
+                  + "(?:previous|prior|system|developer)\\s+"
+                  + "(?:instructions?|rules?|prompt)\\b"),
+          Pattern.compile(
+              "(?i)\\b(?:reveal|print|show|disclose|repeat)\\s+(?:the\\s+)?"
+                  + "(?:system|developer)\\s+(?:message|prompt|instructions?)\\b"),
+          Pattern.compile(
+              "(?i)(?:<\\|(?:im_start|im_end|system|assistant|endoftext)\\|>"
+                  + "|\\[/?INST]|<<\\s*/?SYS\\s*>>)"));
   private static final Set<String> FUNCTION_WORDS =
       Set.of(
           "a",
@@ -112,12 +131,18 @@ public final class GroundedAnswerPolicy {
           "with");
 
   private final float minimumRetrievalScore;
+  private final GroundingLimits limits;
 
   public GroundedAnswerPolicy(float minimumRetrievalScore) {
+    this(minimumRetrievalScore, GroundingLimits.productionDefault());
+  }
+
+  public GroundedAnswerPolicy(float minimumRetrievalScore, GroundingLimits limits) {
     if (!Float.isFinite(minimumRetrievalScore) || minimumRetrievalScore < 0) {
       throw new IllegalArgumentException("minimumRetrievalScore must be finite and non-negative");
     }
     this.minimumRetrievalScore = minimumRetrievalScore;
+    this.limits = Objects.requireNonNull(limits, "limits");
   }
 
   public static GroundedAnswerPolicy productionDefault() {
@@ -128,19 +153,50 @@ public final class GroundedAnswerPolicy {
     return minimumRetrievalScore;
   }
 
+  public GroundingLimits limits() {
+    return limits;
+  }
+
+  /**
+   * Validates retrieval relevance, size, and common prompt-injection payloads before generation.
+   *
+   * <p>This deterministic screen is intentionally conservative. Applications should call it before
+   * placing retrieved text in a model prompt; {@link #apply(String, List, String)} repeats the same
+   * check so an unsafe context cannot produce an accepted final answer.
+   */
+  public GroundingContextDecision assess(String question, List<GroundingDocument> retrieved) {
+    requireInputs(question, retrieved);
+    if (retrieved.isEmpty()) {
+      return GroundingContextDecision.EMPTY;
+    }
+    if (retrieved.size() > limits.maximumRetrievedDocuments()) {
+      return GroundingContextDecision.TOO_MANY_DOCUMENTS;
+    }
+    long retrievedCharacters = 0;
+    for (GroundingDocument document : retrieved) {
+      retrievedCharacters += (long) document.title().length() + document.text().length();
+      if (retrievedCharacters > limits.maximumRetrievedCharacters()) {
+        return GroundingContextDecision.TOO_LARGE;
+      }
+      if (containsPromptInjection(document.title()) || containsPromptInjection(document.text())) {
+        return GroundingContextDecision.PROMPT_INJECTION;
+      }
+    }
+    if (retrieved.stream().map(GroundingDocument::score).max(Float::compare).orElse(0.0f)
+        < minimumRetrievalScore) {
+      return GroundingContextDecision.LOW_CONFIDENCE;
+    }
+    if (lacksNamedEntityOverlap(question, retrieved)) {
+      return GroundingContextDecision.QUESTION_MISMATCH;
+    }
+    return GroundingContextDecision.ACCEPTED;
+  }
+
   public GroundedAnswer apply(
       String question, List<GroundingDocument> retrieved, String generatedText) {
-    Objects.requireNonNull(question, "question");
-    Objects.requireNonNull(retrieved, "retrieved");
     Objects.requireNonNull(generatedText, "generatedText");
-    if (question.isBlank()) {
-      throw new IllegalArgumentException("question must not be blank");
-    }
 
-    if (retrieved.isEmpty()
-        || retrieved.stream().map(GroundingDocument::score).max(Float::compare).orElse(0.0f)
-            < minimumRetrievalScore
-        || lacksNamedEntityOverlap(question, retrieved)) {
+    if (!assess(question, retrieved).generationAllowed()) {
       return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.RETRIEVAL_ABSTENTION);
     }
 
@@ -157,13 +213,24 @@ public final class GroundedAnswerPolicy {
       return new GroundedAnswer(
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
+    List<GroundingDocument> supportingDocuments =
+        supportingDocuments(question, validationCandidate, retrieved, retrieved);
+    if (supportingDocuments.isEmpty()) {
+      return new GroundedAnswer(
+          generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
+    }
     if (!hasCitations(candidate)) {
       return new GroundedAnswer(
           generatedText,
-          attachCitations(candidate, retrieved),
+          attachCitations(candidate, supportingDocuments),
           GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
     }
     if (!hasOnlyTrustedCitations(candidate, retrieved)) {
+      return new GroundedAnswer(
+          generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
+    }
+    List<GroundingDocument> citedDocuments = citedDocuments(candidate, retrieved);
+    if (supportingDocuments(question, validationCandidate, retrieved, citedDocuments).isEmpty()) {
       return new GroundedAnswer(
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
@@ -182,7 +249,7 @@ public final class GroundedAnswerPolicy {
   }
 
   private static boolean isExplicitAbstention(String candidate) {
-    String undecorated = BRACKETED_TEXT.matcher(candidate).replaceAll(" ").strip();
+    String undecorated = CITATION.matcher(candidate).replaceAll(" ").strip();
     return ABSTENTION_PATTERN.matcher(undecorated).matches()
         || TERMINAL_ABSTENTION_PATTERN.matcher(undecorated).find();
   }
@@ -196,7 +263,7 @@ public final class GroundedAnswerPolicy {
           supported.addAll(words(hit.text()));
         });
 
-    String uncited = BRACKETED_TEXT.matcher(candidate).replaceAll(" ");
+    String uncited = CITATION.matcher(candidate).replaceAll(" ");
     return words(uncited).stream().allMatch(word -> isSupportedClaimWord(word, supported));
   }
 
@@ -257,7 +324,7 @@ public final class GroundedAnswerPolicy {
 
     List<Set<String>> questionClauses = clauses(question);
     List<Set<String>> candidateClauses =
-        statementClauses(BRACKETED_TEXT.matcher(candidate).replaceAll(" "));
+        statementClauses(CITATION.matcher(candidate).replaceAll(" "));
     if (questionClauses.size() == 1) {
       Set<String> anchors = new HashSet<>(words(candidate));
       anchors.retainAll(evidenceWords);
@@ -457,7 +524,7 @@ public final class GroundedAnswerPolicy {
     retrieved.forEach(hit -> trustedIds.add(hit.id()));
 
     boolean foundTrusted = false;
-    Matcher matcher = BRACKETED_TEXT.matcher(candidate);
+    Matcher matcher = CITATION.matcher(candidate);
     while (matcher.find()) {
       String citation = matcher.group(1).strip();
       if (!trustedIds.contains(citation)) {
@@ -466,6 +533,68 @@ public final class GroundedAnswerPolicy {
       foundTrusted = true;
     }
     return foundTrusted;
+  }
+
+  private static List<GroundingDocument> citedDocuments(
+      String candidate, List<GroundingDocument> retrieved) {
+    Set<String> citedIds = new HashSet<>();
+    Matcher matcher = CITATION.matcher(candidate);
+    while (matcher.find()) {
+      citedIds.add(matcher.group(1).strip());
+    }
+    return retrieved.stream().filter(document -> citedIds.contains(document.id())).toList();
+  }
+
+  private static List<GroundingDocument> supportingDocuments(
+      String question,
+      String candidate,
+      List<GroundingDocument> evidenceUniverse,
+      List<GroundingDocument> allowedDocuments) {
+    Set<String> questionWords = words(question);
+    Set<String> evidenceWords = documentWords(evidenceUniverse);
+    LinkedHashMap<String, GroundingDocument> supporting = new LinkedHashMap<>();
+
+    String uncited = CITATION.matcher(candidate).replaceAll(" ");
+    for (Set<String> claim : clauses(uncited)) {
+      Set<String> evidenceBoundWords = new HashSet<>();
+      for (String word : claim) {
+        if (containsEquivalentWord(evidenceWords, word)) {
+          evidenceBoundWords.add(word);
+        } else if (!containsEquivalentWord(questionWords, word)) {
+          return List.of();
+        }
+      }
+      if (evidenceBoundWords.isEmpty()) {
+        continue;
+      }
+
+      GroundingDocument document =
+          allowedDocuments.stream()
+              .filter(
+                  candidateDocument -> {
+                    Set<String> candidateDocumentWords =
+                        words(candidateDocument.title() + "\n" + candidateDocument.text());
+                    return evidenceBoundWords.stream()
+                        .allMatch(word -> containsEquivalentWord(candidateDocumentWords, word));
+                  })
+              .findFirst()
+              .orElse(null);
+      if (document == null) {
+        return List.of();
+      }
+      supporting.putIfAbsent(document.id(), document);
+    }
+    return List.copyOf(supporting.values());
+  }
+
+  private static Set<String> documentWords(List<GroundingDocument> documents) {
+    Set<String> result = new HashSet<>();
+    documents.forEach(
+        document -> {
+          result.addAll(words(document.title()));
+          result.addAll(words(document.text()));
+        });
+    return result;
   }
 
   private static boolean preservesAtomicIdentifiers(
@@ -498,7 +627,7 @@ public final class GroundedAnswerPolicy {
   }
 
   private static boolean hasCitations(String candidate) {
-    return BRACKETED_TEXT.matcher(candidate).find();
+    return CITATION.matcher(candidate).find();
   }
 
   private static String attachCitations(String candidate, List<GroundingDocument> retrieved) {
@@ -512,19 +641,55 @@ public final class GroundedAnswerPolicy {
     return answer.toString();
   }
 
-  private static String extractiveAnswer(List<GroundingDocument> retrieved) {
+  private String extractiveAnswer(List<GroundingDocument> retrieved) {
     StringBuilder answer = new StringBuilder();
-    for (GroundingDocument hit : retrieved) {
-      if (!answer.isEmpty()) {
-        answer.append(' ');
+    int documentCount = Math.min(limits.maximumExtractiveDocuments(), retrieved.size());
+    for (int index = 0; index < documentCount; index++) {
+      GroundingDocument hit = retrieved.get(index);
+      String separator = answer.isEmpty() ? "" : " ";
+      String citation = " [" + hit.id() + "]";
+      int textBudget =
+          limits.maximumExtractiveCharacters()
+              - answer.length()
+              - separator.length()
+              - citation.length();
+      if (textBudget <= 0) {
+        break;
       }
+
       String text = hit.text().strip();
-      answer.append(text);
       if (!text.endsWith(".") && !text.endsWith("!") && !text.endsWith("?")) {
-        answer.append('.');
+        text += ".";
       }
-      answer.append(" [").append(hit.id()).append(']');
+      if (text.length() > textBudget) {
+        text = truncate(text, textBudget);
+      }
+      answer.append(separator).append(text).append(citation);
     }
-    return answer.toString();
+    return answer.isEmpty() ? ABSTENTION : answer.toString();
+  }
+
+  private static String truncate(String text, int maximumCharacters) {
+    if (text.length() <= maximumCharacters) {
+      return text;
+    }
+    if (maximumCharacters <= 3) {
+      return text.substring(0, maximumCharacters);
+    }
+    String prefix = text.substring(0, maximumCharacters - 3).stripTrailing();
+    return prefix + "...";
+  }
+
+  private static boolean containsPromptInjection(String text) {
+    return PROMPT_INJECTION_PATTERNS.stream().anyMatch(pattern -> pattern.matcher(text).find());
+  }
+
+  private static void requireInputs(String question, List<GroundingDocument> retrieved) {
+    Objects.requireNonNull(question, "question");
+    Objects.requireNonNull(retrieved, "retrieved");
+    if (question.isBlank()) {
+      throw new IllegalArgumentException("question must not be blank");
+    }
+    retrieved.forEach(document -> Objects.requireNonNull(document, "retrieved document"));
   }
 }

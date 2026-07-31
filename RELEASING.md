@@ -6,9 +6,10 @@ the GitHub release.
 
 The publication allowlist contains `models-api`, `models-runtime`, `models`,
 `models-rag`, `models-semantic-order`, `backend-java`, `backend-native`,
-`backend-apple`, `models-langchain4j`, `models-spring-ai`, and
-`models-embedding`. Benchmark applications, documentation tooling, and modules
-containing only package scaffolding are not published.
+`backend-apple`, `models-langchain4j`, `models-spring-ai`,
+`models-spring-boot-starter`, and `models-embedding`. Benchmark applications,
+documentation tooling, and modules containing only package scaffolding are not
+published.
 
 ## Cut a release
 

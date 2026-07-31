@@ -38,13 +38,13 @@ public final class WordTour implements SemanticOrder {
   private static final char BYTE_ORDER_MARK = '\ufeff';
 
   private final String[] termsByRank;
-  private final int[] ranksByTerm;
+  private final int[] ranksInLexicalTermOrder;
   private final List<String> terms;
   private final String fingerprint;
 
-  private WordTour(String[] termsByRank, int[] ranksByTerm) {
+  private WordTour(String[] termsByRank, int[] ranksInLexicalTermOrder) {
     this.termsByRank = termsByRank;
-    this.ranksByTerm = ranksByTerm;
+    this.ranksInLexicalTermOrder = ranksInLexicalTermOrder;
     this.terms = List.copyOf(Arrays.asList(termsByRank));
     this.fingerprint = fingerprint(termsByRank);
   }
@@ -110,15 +110,15 @@ public final class WordTour implements SemanticOrder {
     }
     Arrays.sort(sortedRanks, Comparator.comparing(rank -> termsByRank[rank]));
 
-    int[] ranksByTerm = new int[sortedRanks.length];
+    int[] ranksInLexicalTermOrder = new int[sortedRanks.length];
     for (int index = 0; index < sortedRanks.length; index++) {
       int rank = sortedRanks[index];
       if (index > 0 && termsByRank[sortedRanks[index - 1]].equals(termsByRank[rank])) {
         throw new IllegalArgumentException("Duplicate Word Tour term: " + termsByRank[rank]);
       }
-      ranksByTerm[index] = rank;
+      ranksInLexicalTermOrder[index] = rank;
     }
-    return new WordTour(termsByRank, ranksByTerm);
+    return new WordTour(termsByRank, ranksInLexicalTermOrder);
   }
 
   @Override
@@ -130,10 +130,10 @@ public final class WordTour implements SemanticOrder {
   public OptionalInt rank(String term) {
     Objects.requireNonNull(term, "term");
     int low = 0;
-    int high = ranksByTerm.length - 1;
+    int high = ranksInLexicalTermOrder.length - 1;
     while (low <= high) {
       int middle = (low + high) >>> 1;
-      int rank = ranksByTerm[middle];
+      int rank = ranksInLexicalTermOrder[middle];
       int comparison = termsByRank[rank].compareTo(term);
       if (comparison < 0) {
         low = middle + 1;

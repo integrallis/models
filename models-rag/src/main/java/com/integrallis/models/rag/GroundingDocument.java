@@ -16,11 +16,19 @@
 package com.integrallis.models.rag;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 
-/** Trusted prompt-visible document and retrieval evidence used to ground a generated answer. */
+/** Retrieved evidence screened before generation and used to ground a generated answer. */
 public record GroundingDocument(String id, String title, String text, float score, int rank) {
+  private static final Pattern CITATION_SAFE_ID =
+      Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}");
+
   public GroundingDocument {
     id = requireText(id, "id");
+    if (!CITATION_SAFE_ID.matcher(id).matches()) {
+      throw new IllegalArgumentException(
+          "id must contain 1-128 ASCII letters, digits, '.', '_', ':', or '-'");
+    }
     title = requireText(title, "title");
     text = requireText(text, "text");
     if (!Float.isFinite(score)) {

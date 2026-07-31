@@ -41,6 +41,42 @@ class ModelMetadataTest {
     }
 
     @Test
+    void blankNamesAndNonPositiveDimensionsAreRejected() {
+      assertThatThrownBy(() -> new ModelMetadata(" ", "test", 2048, 32000, 4096, 32, 32, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("modelFamily");
+      assertThatThrownBy(() -> new ModelMetadata("llama", "", 2048, 32000, 4096, 32, 32, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("modelName");
+      assertThatThrownBy(() -> new ModelMetadata("llama", "test", 0, 32000, 4096, 32, 32, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("contextLength");
+      assertThatThrownBy(() -> new ModelMetadata("llama", "test", 2048, 0, 4096, 32, 32, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("vocabSize");
+      assertThatThrownBy(() -> new ModelMetadata("llama", "test", 2048, 32000, 0, 32, 32, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("embeddingDim");
+      assertThatThrownBy(() -> new ModelMetadata("llama", "test", 2048, 32000, 4096, 0, 32, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("numLayers");
+      assertThatThrownBy(() -> new ModelMetadata("llama", "test", 2048, 32000, 4096, 32, 0, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("numHeads");
+      assertThatThrownBy(() -> new ModelMetadata("llama", "test", 2048, 32000, 4096, 32, 32, 0))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("numKvHeads");
+    }
+
+    @Test
+    void incompatibleGroupedQueryHeadCountsAreRejected() {
+      assertThatThrownBy(() -> new ModelMetadata("llama", "test", 2048, 32000, 4096, 32, 12, 8))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("numHeads")
+          .hasMessageContaining("numKvHeads");
+    }
+
+    @Test
     void validMetadataCreated() {
       var meta = new ModelMetadata("llama", "Llama-3.2-1B", 2048, 32000, 2048, 16, 32, 8);
 

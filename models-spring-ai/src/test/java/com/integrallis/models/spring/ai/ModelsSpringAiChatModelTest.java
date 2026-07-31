@@ -22,14 +22,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -86,25 +92,58 @@ class ModelsSpringAiChatModelTest {
             .maxTokens(200)
             .repetitionPenalty(1.2f)
             .seed(42L)
+            .stopSequences(List.of("DEFAULT_STOP"))
             .build();
-    ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);
+    ModelsSpringAiChatModel model =
+        new ModelsSpringAiChatModel(delegate, ChatTemplate.CHATML, defaults);
     ChatOptions requested =
-        ChatOptions.builder().temperature(0.2).topP(0.3).topK(7).maxTokens(19).build();
+        ChatOptions.builder()
+            .temperature(0.2)
+            .topP(0.3)
+            .topK(7)
+            .maxTokens(19)
+            .stopSequences(List.of("REQUEST_STOP"))
+            .build();
 
-    ChatResponse response = model.call(new Prompt("question", requested));
+    ChatResponse response =
+        model.call(
+            new Prompt(
+                List.of(
+                    new SystemMessage("system"),
+                    new UserMessage("question"),
+                    new AssistantMessage("prior answer")),
+                requested));
 
-    assertThat(delegate.prompt).isEqualTo("question");
+    assertThat(delegate.prompt)
+        .isEqualTo(
+            """
+            <|im_start|>system
+            system<|im_end|>
+            <|im_start|>user
+            question<|im_end|>
+            <|im_start|>assistant
+            prior answer<|im_end|>
+            <|im_start|>assistant
+            """);
+    assertThat(delegate.modelPrompt.segments())
+        .anySatisfy(
+            segment -> {
+              assertThat(segment.kind()).isEqualTo(ModelPrompt.SegmentKind.TEXT);
+              assertThat(segment.text()).isEqualTo("question");
+            });
     assertThat(delegate.options.temperature()).isEqualTo(0.2f);
     assertThat(delegate.options.topP()).isEqualTo(0.3f);
     assertThat(delegate.options.topK()).isEqualTo(7);
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
+    assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(response.getResult().getOutput().getText()).isEqualTo("mapped answer");
     assertThat(model.getOptions().getTemperature()).isEqualTo((double) defaults.temperature());
     assertThat(model.getOptions().getTopP()).isEqualTo((double) defaults.topP());
     assertThat(model.getOptions().getTopK()).isEqualTo(40);
     assertThat(model.getOptions().getMaxTokens()).isEqualTo(200);
+    assertThat(model.getOptions().getStopSequences()).containsExactly("DEFAULT_STOP");
   }
 
   @Test
@@ -117,6 +156,7 @@ class ModelsSpringAiChatModelTest {
             .topK(11)
             .maxTokens(32)
             .repetitionPenalty(1.1f)
+            .stopSequences(List.of("END"))
             .build();
     ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);
 
@@ -134,11 +174,48 @@ class ModelsSpringAiChatModelTest {
   }
 
   @Test
+  void springAiStreamingRunsBlockingInferenceOffTheSubscriberThread() {
+    Thread subscriberThread = Thread.currentThread();
+    AtomicReference<Thread> generationThread = new AtomicReference<>();
+    TextGenerationModel delegate =
+        new TextGenerationModel() {
+          @Override
+          public String modelName() {
+            return "ThreadRecordingModel";
+          }
+
+          @Override
+          public BackendDiagnostics diagnostics() {
+            return BackendDiagnostics.unavailable("thread-recording");
+          }
+
+          @Override
+          public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+            generationThread.set(Thread.currentThread());
+            stream.onToken("answer");
+            stream.onComplete();
+          }
+        };
+
+    new ModelsSpringAiChatModel(delegate).stream(new Prompt("question")).blockLast();
+
+    assertThat(generationThread.get()).isNotSameAs(subscriberThread);
+    assertThat(generationThread.get().getName()).contains("boundedElastic");
+  }
+
+  @Test
   void springAiChatModelRejectsNullDependenciesAndPrompts() {
     assertThatNullPointerException()
         .isThrownBy(() -> new ModelsSpringAiChatModel((TextGenerationModel) null));
     assertThatNullPointerException()
         .isThrownBy(() -> new ModelsSpringAiChatModel(highLevelModel("answer"), null));
+    assertThatNullPointerException()
+        .isThrownBy(
+            () ->
+                new ModelsSpringAiChatModel(
+                    highLevelModel("answer"),
+                    (ChatTemplate) null,
+                    SamplingOptions.builder().build()));
     ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(highLevelModel("answer"));
     assertThatNullPointerException().isThrownBy(() -> model.call((Prompt) null));
     assertThatNullPointerException().isThrownBy(() -> model.stream((Prompt) null));
@@ -203,6 +280,7 @@ class ModelsSpringAiChatModelTest {
     private final String answer;
     private final RuntimeException failure;
     private String prompt;
+    private ModelPrompt modelPrompt;
     private SamplingOptions options;
 
     private RecordingModel(String answer, RuntimeException failure) {
@@ -218,6 +296,12 @@ class ModelsSpringAiChatModelTest {
     @Override
     public BackendDiagnostics diagnostics() {
       return BackendDiagnostics.unavailable("recording");
+    }
+
+    @Override
+    public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+      this.modelPrompt = prompt;
+      generate(prompt.text(), options, stream);
     }
 
     @Override

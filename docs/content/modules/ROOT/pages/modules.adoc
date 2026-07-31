@@ -26,9 +26,12 @@ kernel acceleration through FFM
 |`backend-apple` |Apple Foundation Models bridge through Java FFM
 and a small Swift C ABI
 
-|`models-langchain4j` |LangChain4j `ChatModel` adapter
+|`models-langchain4j` |LangChain4j blocking and streaming chat adapters
 
 |`models-spring-ai` |Blocking and streaming Spring AI chat adapters
+
+|`models-spring-boot-starter` |Spring Boot auto-configuration for the
+Models-backed Spring AI chat model
 
 |`models-embedding` |Optional bridge to Vectors storage and semantic
 caching
@@ -39,8 +42,9 @@ caching
 Ollama, llama.cpp, and hosted RAG comparisons
 |===
 
-The Spring and LangChain4j adapters are implemented and tested. They use
-the same backend and diagnostics contracts as plain Java.
+The Spring and LangChain4j adapters use the same backend and diagnostics
+contracts as plain Java. Compatibility CI composes each adapter with the
+matching Vectors integration in a real retrieval-and-generation flow.
 
 == Planned Or Scaffolded Modules
 
@@ -68,6 +72,7 @@ models-api
   <- backend-apple    <- Apple's Foundation Models framework through FFM
   <- models-langchain4j      <- LangChain4j
   <- models-spring-ai        <- Spring AI
+      <- models-spring-boot-starter
   <- models-embedding        <- Vectors database modules
 
 models-semantic-order
@@ -91,6 +96,9 @@ Application dependencies use:
 * `com.integrallis:backend-java`
 * `com.integrallis:backend-native`
 * `com.integrallis:backend-apple`
+* `com.integrallis:models-langchain4j`
+* `com.integrallis:models-spring-ai`
+* `com.integrallis:models-spring-boot-starter`
 
 Native platform resources are assembled by CI for:
 

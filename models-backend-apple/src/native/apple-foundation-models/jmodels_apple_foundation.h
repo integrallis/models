@@ -17,20 +17,30 @@
 #ifndef JMODELS_APPLE_FOUNDATION_H
 #define JMODELS_APPLE_FOUNDATION_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int jmodels_afm_available(void);
+typedef struct jmodels_afm_result {
+  int32_t status;
+  int32_t value;
+  size_t length;
+  uint8_t *data;
+} jmodels_afm_result;
 
-char *jmodels_afm_generate(
-    const char *prompt,
-    const char *instructions,
-    int max_output_tokens);
+jmodels_afm_result *jmodels_afm_available(void);
 
-char *jmodels_afm_last_error(void);
+jmodels_afm_result *jmodels_afm_generate(
+    const uint8_t *prompt,
+    size_t prompt_length,
+    const uint8_t *instructions,
+    size_t instructions_length,
+    int32_t max_output_tokens);
 
-void jmodels_afm_free(char *pointer);
+void jmodels_afm_result_free(jmodels_afm_result *result);
 
 #ifdef __cplusplus
 }

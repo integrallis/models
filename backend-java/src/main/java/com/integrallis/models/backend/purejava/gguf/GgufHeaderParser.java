@@ -38,7 +38,7 @@ public final class GgufHeaderParser {
 
     int magic = cursor.readU32();
     if (magic != GgufConstants.MAGIC) {
-      throw new IllegalArgumentException(
+      throw new MalformedGgufException(
           String.format(
               "Invalid GGUF magic: 0x%08X (expected 0x%08X)", magic, GgufConstants.MAGIC));
     }
@@ -46,6 +46,12 @@ public final class GgufHeaderParser {
     int version = cursor.readU32();
     long tensorCount = cursor.readU64();
     long metadataKvCount = cursor.readU64();
+    requireCollectionCount("tensor count", tensorCount);
+    requireCollectionCount("metadata KV count", metadataKvCount);
+    if (!GgufConstants.isVersionSupported(version)) {
+      throw new MalformedGgufException("Unsupported GGUF version: " + version);
+    }
+    requireSerializedEntriesFit("metadata KV count", metadataKvCount, cursor.remaining(), 13);
 
     GgufHeader header = new GgufHeader(version, tensorCount, metadataKvCount);
 
@@ -61,7 +67,12 @@ public final class GgufHeaderParser {
 
   private static GgufMetadataValue readValue(GgufReader.Cursor cursor) {
     int typeId = cursor.readU32();
-    GgufValueType type = GgufValueType.fromId(typeId);
+    GgufValueType type;
+    try {
+      type = GgufValueType.fromId(typeId);
+    } catch (IllegalArgumentException invalidType) {
+      throw new MalformedGgufException("invalid metadata value type " + typeId, invalidType);
+    }
     return readTypedValue(cursor, type);
   }
 
@@ -85,12 +96,49 @@ public final class GgufHeaderParser {
 
   private static GgufMetadataValue.ArrayValue readArray(GgufReader.Cursor cursor) {
     int elementTypeId = cursor.readU32();
-    GgufValueType elementType = GgufValueType.fromId(elementTypeId);
+    GgufValueType elementType;
+    try {
+      elementType = GgufValueType.fromId(elementTypeId);
+    } catch (IllegalArgumentException invalidType) {
+      throw new MalformedGgufException(
+          "invalid metadata array element type " + elementTypeId, invalidType);
+    }
+    if (elementType == GgufValueType.ARRAY) {
+      throw new MalformedGgufException("nested metadata arrays are not valid");
+    }
     long length = cursor.readU64();
+    requireCollectionCount("metadata array length", length);
+    requireSerializedEntriesFit(
+        "metadata array length", length, cursor.remaining(), minimumSerializedSize(elementType));
     List<GgufMetadataValue> elements = new ArrayList<>((int) length);
     for (long i = 0; i < length; i++) {
       elements.add(readTypedValue(cursor, elementType));
     }
     return new GgufMetadataValue.ArrayValue(elementType, elements);
+  }
+
+  private static void requireCollectionCount(String description, long count) {
+    if (count < 0 || count > Integer.MAX_VALUE) {
+      throw new MalformedGgufException(
+          description + " " + Long.toUnsignedString(count) + " exceeds Java collection limits");
+    }
+  }
+
+  private static void requireSerializedEntriesFit(
+      String description, long count, long remainingBytes, int minimumEntryBytes) {
+    if (count > remainingBytes / minimumEntryBytes) {
+      throw new MalformedGgufException(
+          description + " " + count + " cannot fit in the remaining " + remainingBytes + " bytes");
+    }
+  }
+
+  private static int minimumSerializedSize(GgufValueType type) {
+    return switch (type) {
+      case UINT8, INT8, BOOL -> 1;
+      case UINT16, INT16 -> 2;
+      case UINT32, INT32, FLOAT32 -> 4;
+      case UINT64, INT64, FLOAT64, STRING -> 8;
+      case ARRAY -> throw new IllegalArgumentException("nested arrays have no serialized size");
+    };
   }
 }

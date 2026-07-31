@@ -185,15 +185,21 @@ public final class KvCache {
     float[] result = new float[len * dimension];
     for (int p = 0; p < len; p++) {
       int position = fromPos + p;
-      if (position < allocatedSequenceCapacity) {
-        int slot = slotIndex(layer, position);
-        if (!populated[slot]) {
-          continue;
-        }
-        System.arraycopy(store, slot * dimension, result, p * dimension, dimension);
+      if (position >= allocatedSequenceCapacity) {
+        throw unpopulatedPosition(layer, position);
       }
+      int slot = slotIndex(layer, position);
+      if (!populated[slot]) {
+        throw unpopulatedPosition(layer, position);
+      }
+      System.arraycopy(store, slot * dimension, result, p * dimension, dimension);
     }
     return result;
+  }
+
+  private static IllegalStateException unpopulatedPosition(int layer, int position) {
+    return new IllegalStateException(
+        "cache position " + position + " for layer " + layer + " is not populated");
   }
 
   private void checkBounds(int layer, int position) {

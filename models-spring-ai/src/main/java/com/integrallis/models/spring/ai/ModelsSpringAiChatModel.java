@@ -16,10 +16,14 @@
 package com.integrallis.models.spring.ai;
 
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -29,11 +33,13 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 /** Spring AI {@link ChatModel} backed by the Models runtime generation loop. */
 public final class ModelsSpringAiChatModel implements ChatModel {
   private final SamplingOptions defaults;
   private final TextGenerationModel model;
+  private final ChatTemplate template;
 
   public ModelsSpringAiChatModel(InferenceBackend backend) {
     this(new RuntimeTextGenerationModel(backend));
@@ -48,50 +54,62 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   public ModelsSpringAiChatModel(TextGenerationModel model, SamplingOptions defaults) {
+    this(model, ChatTemplate.RAW, defaults);
+  }
+
+  public ModelsSpringAiChatModel(
+      InferenceBackend backend, ChatTemplate template, SamplingOptions defaults) {
+    this(new RuntimeTextGenerationModel(backend), template, defaults);
+  }
+
+  public ModelsSpringAiChatModel(
+      TextGenerationModel model, ChatTemplate template, SamplingOptions defaults) {
     this.model = Objects.requireNonNull(model, "model");
+    this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
   }
 
   @Override
   public ChatResponse call(Prompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
-    String output = model.generate(prompt.getContents(), options(prompt));
+    String output = model.generate(render(prompt), options(prompt));
     return response(output);
   }
 
   @Override
   public Flux<ChatResponse> stream(Prompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
-    return Flux.create(
-        sink ->
-            model.generate(
-                prompt.getContents(),
-                options(prompt),
-                new TokenStream() {
-                  @Override
-                  public void onToken(String token) {
-                    sink.next(response(token));
-                  }
+    return Flux.<ChatResponse>create(
+            sink ->
+                model.generate(
+                    render(prompt),
+                    options(prompt),
+                    new TokenStream() {
+                      @Override
+                      public void onToken(String token) {
+                        sink.next(response(token));
+                      }
 
-                  @Override
-                  public void onComplete() {
-                    sink.complete();
-                  }
+                      @Override
+                      public void onComplete() {
+                        sink.complete();
+                      }
 
-                  @Override
-                  public void onError(Throwable failure) {
-                    sink.error(failure);
-                  }
-                }));
+                      @Override
+                      public void onError(Throwable failure) {
+                        sink.error(failure);
+                      }
+                    }))
+        .subscribeOn(Schedulers.boundedElastic());
   }
 
-  @Override
   public ChatOptions getOptions() {
     return ChatOptions.builder()
         .temperature((double) defaults.temperature())
         .topP((double) defaults.topP())
         .topK(defaults.topK())
         .maxTokens(defaults.maxTokens())
+        .stopSequences(defaults.stopSequences())
         .build();
   }
 
@@ -102,7 +120,8 @@ public final class ModelsSpringAiChatModel implements ChatModel {
             .topP(defaults.topP())
             .topK(defaults.topK())
             .maxTokens(defaults.maxTokens())
-            .repetitionPenalty(defaults.repetitionPenalty());
+            .repetitionPenalty(defaults.repetitionPenalty())
+            .stopSequences(defaults.stopSequences());
     if (defaults.seed() != null) {
       builder.seed(defaults.seed());
     }
@@ -121,8 +140,25 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       if (requested.getMaxTokens() != null) {
         builder.maxTokens(requested.getMaxTokens());
       }
+      if (requested.getStopSequences() != null) {
+        builder.stopSequences(requested.getStopSequences());
+      }
     }
     return builder.build();
+  }
+
+  private ModelPrompt render(Prompt prompt) {
+    List<ChatMessage> messages = new ArrayList<>(prompt.getInstructions().size());
+    for (org.springframework.ai.chat.messages.Message message : prompt.getInstructions()) {
+      messages.add(
+          switch (message.getMessageType()) {
+            case SYSTEM -> ChatMessage.system(message.getText());
+            case USER -> ChatMessage.user(message.getText());
+            case ASSISTANT -> ChatMessage.assistant(message.getText());
+            case TOOL -> ChatMessage.tool(message.getText());
+          });
+    }
+    return template.render(messages);
   }
 
   private static ChatResponse response(String text) {

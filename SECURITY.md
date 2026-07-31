@@ -61,6 +61,13 @@ Security-relevant boundaries:
 - **Published execution backends are explicit** — `backend-java` is Java bytecode.
   `backend-native` optionally loads the small Models-owned Rust kernel library through
   Java FFM; it does not load llama.cpp, Ollama, or another inference engine.
+- **Apple bridge integrity is enforced before loading** — The bridge bundled in
+  `backend-apple` is SHA-256 verified, extracted to a content-addressed owner-controlled cache,
+  and reverified on every resolution. An explicit bridge path requires its expected SHA-256.
+  The unverified override is an explicit local-development opt-in.
+- **Apple native results are length-delimited and call-owned** — The FFM bridge reads only the
+  byte length returned for that call, and frees the result after decoding. Native error detail is
+  not stored in shared process state.
 - **No downloader in the core runtime** — The published core modules perform no network I/O.
   Users supply a local model path or use the separate ModelJars facade.
 - **Arena-based model mapping** — The backend owns a shared `Arena` and closes it from

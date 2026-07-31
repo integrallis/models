@@ -14,28 +14,57 @@
  * limitations under the License.
  */
 
+#include "jmodels_apple_foundation.h"
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static char *last_error = NULL;
-
-static char *duplicate_string(const char *value) {
-  if (value == NULL) {
+static jmodels_afm_result *make_result(
+    int32_t status,
+    int32_t value,
+    const uint8_t *data,
+    size_t length) {
+  jmodels_afm_result *result = calloc(1, sizeof(jmodels_afm_result));
+  if (result == NULL) {
     return NULL;
   }
-  size_t length = strlen(value) + 1;
-  char *copy = malloc(length);
-  if (copy != NULL) {
-    memcpy(copy, value, length);
+  result->status = status;
+  result->value = value;
+  if (length == 0) {
+    return result;
   }
-  return copy;
+  result->data = malloc(length);
+  if (result->data == NULL) {
+    result->status = 1;
+    return result;
+  }
+  memcpy(result->data, data, length);
+  result->length = length;
+  return result;
 }
 
-static void set_last_error(const char *message) {
-  free(last_error);
-  last_error = duplicate_string(message);
+static jmodels_afm_result *make_text_result(
+    int32_t status,
+    int32_t value,
+    const char *text) {
+  return make_result(status, value, (const uint8_t *) text, strlen(text));
+}
+
+static char *copy_as_c_string(const uint8_t *bytes, size_t length) {
+  if (length > 0 && bytes == NULL) {
+    return NULL;
+  }
+  char *text = malloc(length + 1);
+  if (text == NULL) {
+    return NULL;
+  }
+  if (length > 0) {
+    memcpy(text, bytes, length);
+  }
+  text[length] = '\0';
+  return text;
 }
 
 static int contains_case_insensitive(const char *haystack, const char *needle) {
@@ -69,47 +98,65 @@ static const char *subject(const char *prompt) {
   return colon;
 }
 
-int jmodels_afm_available(void) {
-  set_last_error("Apple Foundation Models native stub mode is available");
-  return 1;
+jmodels_afm_result *jmodels_afm_available(void) {
+  return make_text_result(
+      0, 1, "Apple Foundation Models native stub mode is available");
 }
 
-char *jmodels_afm_generate(
-    const char *prompt,
-    const char *instructions,
-    int max_output_tokens) {
+jmodels_afm_result *jmodels_afm_generate(
+    const uint8_t *prompt_bytes,
+    size_t prompt_length,
+    const uint8_t *instructions,
+    size_t instructions_length,
+    int32_t max_output_tokens) {
   (void) instructions;
+  (void) instructions_length;
   (void) max_output_tokens;
+  char *prompt = copy_as_c_string(prompt_bytes, prompt_length);
   if (prompt == NULL) {
-    set_last_error("prompt pointer was null");
-    return NULL;
-  }
-  if (contains_case_insensitive(prompt, "single word hello")) {
-    set_last_error("ok");
-    return duplicate_string("hello");
+    return make_text_result(1, 0, "prompt payload was invalid or out of memory");
   }
 
-  const char *prefix =
-      contains_case_insensitive(prompt, "summarize") ? "Stub summary: " : "Stub response: ";
-  const char *body = contains_case_insensitive(prompt, "summarize") ? subject(prompt) : prompt;
-  size_t length = strlen(prefix) + strlen(body) + 1;
-  char *response = malloc(length);
-  if (response == NULL) {
-    set_last_error("out of memory");
-    return NULL;
+  jmodels_afm_result *result;
+  if (contains_case_insensitive(prompt, "force native error")) {
+    const char *prefix = "forced native failure: ";
+    size_t length = strlen(prefix) + strlen(prompt) + 1;
+    char *message = malloc(length);
+    if (message == NULL) {
+      result = make_text_result(1, 0, "out of memory");
+    } else {
+      snprintf(message, length, "%s%s", prefix, prompt);
+      result = make_text_result(1, 0, message);
+      free(message);
+    }
+  } else if (contains_case_insensitive(prompt, "embedded-null")) {
+    static const uint8_t embedded_null[] = {
+      'p', 'r', 'e', 'f', 'i', 'x', '\0', 's', 'u', 'f', 'f', 'i', 'x'
+    };
+    result = make_result(0, 0, embedded_null, sizeof(embedded_null));
+  } else if (contains_case_insensitive(prompt, "single word hello")) {
+    result = make_text_result(0, 0, "hello");
+  } else {
+    const char *prefix =
+        contains_case_insensitive(prompt, "summarize") ? "Stub summary: " : "Stub response: ";
+    const char *body = contains_case_insensitive(prompt, "summarize") ? subject(prompt) : prompt;
+    size_t length = strlen(prefix) + strlen(body) + 1;
+    char *response = malloc(length);
+    if (response == NULL) {
+      result = make_text_result(1, 0, "out of memory");
+    } else {
+      snprintf(response, length, "%s%s", prefix, body);
+      result = make_text_result(0, 0, response);
+      free(response);
+    }
   }
-  snprintf(response, length, "%s%s", prefix, body);
-  set_last_error("ok");
-  return response;
+  free(prompt);
+  return result;
 }
 
-char *jmodels_afm_last_error(void) {
-  if (last_error == NULL) {
-    return duplicate_string("Apple Foundation Models native stub mode has not been initialized");
+void jmodels_afm_result_free(jmodels_afm_result *result) {
+  if (result != NULL) {
+    free(result->data);
+    free(result);
   }
-  return duplicate_string(last_error);
-}
-
-void jmodels_afm_free(char *pointer) {
-  free(pointer);
 }
