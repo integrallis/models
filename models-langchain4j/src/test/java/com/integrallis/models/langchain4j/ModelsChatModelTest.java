@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
@@ -103,6 +104,12 @@ class ModelsChatModelTest {
             tool result<|im_end|>
             <|im_start|>assistant
             """);
+    assertThat(delegate.modelPrompt.segments())
+        .anySatisfy(
+            segment -> {
+              assertThat(segment.kind()).isEqualTo(ModelPrompt.SegmentKind.TEXT);
+              assertThat(segment.text()).isEqualTo("question");
+            });
     assertThat(delegate.options.temperature()).isEqualTo(0.2f);
     assertThat(delegate.options.topP()).isEqualTo(0.3f);
     assertThat(delegate.options.topK()).isEqualTo(7);
@@ -206,6 +213,7 @@ class ModelsChatModelTest {
   private static final class RecordingModel implements TextGenerationModel {
     private final String answer;
     private String prompt;
+    private ModelPrompt modelPrompt;
     private SamplingOptions options;
 
     private RecordingModel(String answer) {
@@ -220,6 +228,12 @@ class ModelsChatModelTest {
     @Override
     public BackendDiagnostics diagnostics() {
       return BackendDiagnostics.unavailable("recording");
+    }
+
+    @Override
+    public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+      this.modelPrompt = prompt;
+      generate(prompt.text(), options, stream);
     }
 
     @Override

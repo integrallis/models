@@ -15,25 +15,32 @@
  */
 package com.integrallis.models.api;
 
+import java.util.Objects;
+
 /** Tokenizer interface for encoding text to token IDs and decoding back. */
 public interface Tokenizer {
 
   /**
-   * Encodes text into token IDs, recognizing any special-token text defined by the tokenizer.
+   * Encodes ordinary text into token IDs.
    *
-   * <p>Callers should use this method for trusted, fully rendered prompts. Use {@link
-   * #encodeOrdinary(String)} for untrusted user content that must not be interpreted as control
-   * tokens.
+   * <p>Text that spells a registered special token is treated as ordinary input. Use {@link
+   * #encode(ModelPrompt)} when applying a model template with trusted control-token segments.
    */
   int[] encode(String text);
 
   /**
-   * Encodes ordinary text without interpreting embedded text as tokenizer control tokens.
+   * Encodes a segmented model prompt, recognizing special tokens only in control segments.
    *
-   * <p>Tokenizers without a special-token vocabulary can inherit this implementation.
+   * <p>Tokenizers without a special-token vocabulary may inherit the flattening implementation. A
+   * tokenizer with special tokens must override this method.
    */
-  default int[] encodeOrdinary(String text) {
-    return encode(text);
+  default int[] encode(ModelPrompt prompt) {
+    return encode(Objects.requireNonNull(prompt, "prompt").text());
+  }
+
+  /** Encodes trusted template text in which registered tokenizer control tokens are recognized. */
+  default int[] encodeControl(String text) {
+    return encode(ModelPrompt.control(Objects.requireNonNull(text, "text")));
   }
 
   /** Decodes an array of token IDs back into a string. */

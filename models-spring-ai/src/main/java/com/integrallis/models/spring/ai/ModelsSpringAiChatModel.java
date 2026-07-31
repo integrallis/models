@@ -16,6 +16,7 @@
 package com.integrallis.models.spring.ai;
 
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
@@ -141,7 +142,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     return builder.build();
   }
 
-  private String render(Prompt prompt) {
+  private ModelPrompt render(Prompt prompt) {
     List<ChatMessage> messages = new ArrayList<>(prompt.getInstructions().size());
     for (org.springframework.ai.chat.messages.Message message : prompt.getInstructions()) {
       messages.add(

@@ -45,7 +45,7 @@ var options = SamplingOptions.builder()
     .build();
 
 try (TextGenerationModel model = ModelJars.open(MODEL)) {
-    String prompt = ChatTemplate.CHATML_NO_THINK.render(
+    var prompt = ChatTemplate.CHATML_NO_THINK.render(
         List.of(ChatMessage.user("Summarize the retrieved context.")));
     String answer = model.generate(prompt, options);
 
@@ -53,6 +53,11 @@ try (TextGenerationModel model = ModelJars.open(MODEL)) {
     System.out.println(model.diagnostics().optimizations());
 }
 ----
+
+The segmented prompt keeps chat-template controls distinct from message text,
+so control-token text inside retrieved or user-provided content cannot create a
+new chat turn. The LangChain4j and Spring AI adapters apply the same segmented
+rendering automatically.
 
 == LangChain4j
 

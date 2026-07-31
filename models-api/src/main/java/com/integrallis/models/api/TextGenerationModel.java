@@ -17,6 +17,7 @@ package com.integrallis.models.api;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * High-level text generation contract shared by in-process and local-engine backends.
@@ -37,11 +38,41 @@ public interface TextGenerationModel extends AutoCloseable {
   default String generate(String prompt, SamplingOptions options) {
     Objects.requireNonNull(prompt, "prompt");
     Objects.requireNonNull(options, "options");
+    return collect(stream -> generate(prompt, options, stream));
+  }
+
+  /**
+   * Generates text from a prompt that separates template controls from ordinary message text.
+   *
+   * <p>Implementations without segmented-tokenization support receive the complete prompt text.
+   */
+  default String generate(ModelPrompt prompt, SamplingOptions options) {
+    Objects.requireNonNull(prompt, "prompt");
+    Objects.requireNonNull(options, "options");
+    return collect(stream -> generate(prompt, options, stream));
+  }
+
+  /** Generates text incrementally through the supplied stream callback. */
+  void generate(String prompt, SamplingOptions options, TokenStream stream);
+
+  /**
+   * Generates text incrementally from a segmented prompt.
+   *
+   * <p>The default supports engines that accept text rather than tokenizer segments.
+   */
+  default void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+    Objects.requireNonNull(prompt, "prompt");
+    generate(prompt.text(), options, stream);
+  }
+
+  /** Releases backend-owned resources. */
+  @Override
+  default void close() {}
+
+  private static String collect(Consumer<TokenStream> generation) {
     StringBuilder output = new StringBuilder();
     AtomicReference<Throwable> failure = new AtomicReference<>();
-    generate(
-        prompt,
-        options,
+    generation.accept(
         new TokenStream() {
           @Override
           public void onToken(String token) {
@@ -68,11 +99,4 @@ public interface TextGenerationModel extends AutoCloseable {
     }
     return output.toString();
   }
-
-  /** Generates text incrementally through the supplied stream callback. */
-  void generate(String prompt, SamplingOptions options, TokenStream stream);
-
-  /** Releases backend-owned resources. */
-  @Override
-  default void close() {}
 }

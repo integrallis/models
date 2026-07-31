@@ -17,6 +17,7 @@ package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.LogitBatch;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -64,10 +65,12 @@ public final class GenerationLoop {
 
   /** Generates text from a prompt, returning the complete generated string. */
   public String generate(String prompt, SamplingOptions options) {
-    Objects.requireNonNull(prompt, "prompt");
-    if (prompt.isEmpty()) {
-      throw new IllegalArgumentException("prompt must not be empty");
-    }
+    return generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options);
+  }
+
+  /** Generates text from a segmented prompt, returning the complete generated string. */
+  public String generate(ModelPrompt prompt, SamplingOptions options) {
+    requirePrompt(prompt);
     Objects.requireNonNull(options, "options");
 
     StringBuilder result = new StringBuilder();
@@ -93,10 +96,12 @@ public final class GenerationLoop {
 
   /** Generates text with streaming output via a TokenStream callback. */
   public void generate(String prompt, SamplingOptions options, TokenStream stream) {
-    Objects.requireNonNull(prompt, "prompt");
-    if (prompt.isEmpty()) {
-      throw new IllegalArgumentException("prompt must not be empty");
-    }
+    generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options, stream);
+  }
+
+  /** Generates text from a segmented prompt with streaming output via a callback. */
+  public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+    requirePrompt(prompt);
     Objects.requireNonNull(options, "options");
     Objects.requireNonNull(stream, "stream");
 
@@ -151,6 +156,13 @@ public final class GenerationLoop {
         lastSpeculativeMetrics = speculativeMetrics.snapshot();
         lastPromptCacheMetrics = promptPrefill.metrics();
       }
+    }
+  }
+
+  private static void requirePrompt(ModelPrompt prompt) {
+    Objects.requireNonNull(prompt, "prompt");
+    if (prompt.isEmpty()) {
+      throw new IllegalArgumentException("prompt must not be empty");
     }
   }
 

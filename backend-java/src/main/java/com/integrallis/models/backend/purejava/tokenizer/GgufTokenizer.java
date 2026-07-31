@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.tokenizer;
 
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import java.io.ByteArrayOutputStream;
@@ -312,27 +313,21 @@ public final class GgufTokenizer implements Tokenizer {
 
   @Override
   public int[] encode(String text) {
-    if (text == null) {
-      return new int[0];
-    }
-
-    int[] encoded;
-    if (text.isEmpty()) {
-      encoded = new int[0];
-    } else if (specialTokens.isEmpty()) {
-      encoded = encodeOrdinaryText(text);
-    } else {
-      encoded = encodeWithSpecialTokens(text);
-    }
-    return addConfiguredBoundaryTokens(encoded);
+    return encode(ModelPrompt.text(Objects.requireNonNull(text, "text")));
   }
 
   @Override
-  public int[] encodeOrdinary(String text) {
-    if (text == null) {
-      return new int[0];
+  public int[] encode(ModelPrompt prompt) {
+    Objects.requireNonNull(prompt, "prompt");
+    List<Integer> encoded = new ArrayList<>();
+    for (ModelPrompt.Segment segment : prompt.segments()) {
+      int[] segmentTokens =
+          segment.kind() == ModelPrompt.SegmentKind.CONTROL
+              ? encodeWithSpecialTokens(segment.text())
+              : encodeOrdinaryText(segment.text());
+      append(encoded, segmentTokens);
     }
-    return addConfiguredBoundaryTokens(encodeOrdinaryText(text));
+    return addConfiguredBoundaryTokens(encoded.stream().mapToInt(Integer::intValue).toArray());
   }
 
   private int[] encodeWithSpecialTokens(String text) {
@@ -606,37 +601,64 @@ public final class GgufTokenizer implements Tokenizer {
       return tokens;
     }
 
-    List<Integer> result = new ArrayList<>(tokens);
-
-    while (true) {
-      int bestRank = Integer.MAX_VALUE;
-      int bestIdx = -1;
-
-      for (int i = 0; i < result.size() - 1; i++) {
-        String pair = vocab[result.get(i)] + " " + vocab[result.get(i + 1)];
-        Integer rank = mergeRanks.get(pair);
-        if (rank != null && rank < bestRank) {
-          bestRank = rank;
-          bestIdx = i;
-        }
-      }
-
-      if (bestIdx < 0) {
-        break;
-      }
-
-      // Merge the pair
-      String merged = vocab[result.get(bestIdx)] + vocab[result.get(bestIdx + 1)];
-      Integer mergedId = tokenToId.get(merged);
-      if (mergedId == null) {
-        break;
-      }
-
-      result.set(bestIdx, mergedId);
-      result.remove(bestIdx + 1);
+    List<BpeSymbol> symbols = new ArrayList<>(tokens.size());
+    for (int index = 0; index < tokens.size(); index++) {
+      symbols.add(
+          new BpeSymbol(tokens.get(index), index - 1, index + 1 < tokens.size() ? index + 1 : -1));
+    }
+    PriorityQueue<BpeMerge> workQueue =
+        new PriorityQueue<>(
+            Comparator.comparingInt(BpeMerge::rank).thenComparingInt(BpeMerge::left));
+    for (int right = 1; right < symbols.size(); right++) {
+      addBpeMerge(workQueue, symbols, right - 1, right);
     }
 
+    while (!workQueue.isEmpty()) {
+      BpeMerge merge = workQueue.remove();
+      BpeSymbol left = symbols.get(merge.left());
+      BpeSymbol right = symbols.get(merge.right());
+      if (!left.active
+          || !right.active
+          || left.next != merge.right()
+          || left.version != merge.leftVersion()
+          || right.version != merge.rightVersion()) {
+        continue;
+      }
+
+      left.token = merge.mergedToken();
+      left.version++;
+      left.next = right.next;
+      right.active = false;
+      if (right.next >= 0) {
+        symbols.get(right.next).previous = merge.left();
+      }
+
+      addBpeMerge(workQueue, symbols, left.previous, merge.left());
+      addBpeMerge(workQueue, symbols, merge.left(), left.next);
+    }
+
+    List<Integer> result = new ArrayList<>();
+    for (int index = 0; index >= 0; index = symbols.get(index).next) {
+      result.add(symbols.get(index).token);
+    }
     return result;
+  }
+
+  private void addBpeMerge(
+      PriorityQueue<BpeMerge> workQueue, List<BpeSymbol> symbols, int leftIndex, int rightIndex) {
+    if (leftIndex < 0 || rightIndex < 0) {
+      return;
+    }
+    BpeSymbol left = symbols.get(leftIndex);
+    BpeSymbol right = symbols.get(rightIndex);
+    String leftText = vocab[left.token];
+    String rightText = vocab[right.token];
+    Integer rank = mergeRanks.get(leftText + " " + rightText);
+    Integer mergedToken = tokenToId.get(leftText + rightText);
+    if (rank != null && mergedToken != null) {
+      workQueue.add(
+          new BpeMerge(leftIndex, rightIndex, rank, mergedToken, left.version, right.version));
+    }
   }
 
   @Override
@@ -785,6 +807,23 @@ public final class GgufTokenizer implements Tokenizer {
 
   private record SentencePieceBigram(
       int left, int right, float score, int leftVersion, int rightVersion) {}
+
+  private static final class BpeSymbol {
+    private int token;
+    private int previous;
+    private int next;
+    private int version;
+    private boolean active = true;
+
+    private BpeSymbol(int token, int previous, int next) {
+      this.token = token;
+      this.previous = previous;
+      this.next = next;
+    }
+  }
+
+  private record BpeMerge(
+      int left, int right, int rank, int mergedToken, int leftVersion, int rightVersion) {}
 
   private record SpecialToken(String text, int id) {}
 

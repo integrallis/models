@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.langchain4j;
 
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import dev.langchain4j.data.message.AiMessage;
@@ -29,7 +30,7 @@ final class LangChain4jChatRequestMapper {
 
   private LangChain4jChatRequestMapper() {}
 
-  static String prompt(ChatRequest request, ChatTemplate template) {
+  static ModelPrompt prompt(ChatRequest request, ChatTemplate template) {
     ArrayList<com.integrallis.models.runtime.chat.ChatMessage> messages =
         new ArrayList<>(request.messages().size());
     for (ChatMessage message : request.messages()) {

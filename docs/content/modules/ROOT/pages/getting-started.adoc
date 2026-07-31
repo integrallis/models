@@ -44,7 +44,7 @@ try (var model = ModelJars.open(MODEL)) {
         .maxTokens(64)
         .build();
 
-    String prompt = ChatTemplate.CHATML.render(List.of(
+    var prompt = ChatTemplate.CHATML.render(List.of(
         ChatMessage.system("Classify the user's intent in one phrase."),
         ChatMessage.user("I want to cancel my order")));
 
@@ -53,6 +53,13 @@ try (var model = ModelJars.open(MODEL)) {
     System.out.println(model.diagnostics().optimizations());
 }
 ----
+
+`render` preserves template-owned control tokens as trusted segments and
+keeps every message as ordinary text. User content that spells a token such as
+`<|im_end|>` therefore remains content instead of terminating its chat turn.
+Plain `String` prompts are also encoded as ordinary text. Use
+`ModelPrompt.control(...)` only for a complete, trusted template supplied by
+the application.
 
 `ModelJars.open` resolves the marker already present on the classpath, downloads
 the pinned weights when they are absent, verifies size and SHA-256, selects the
