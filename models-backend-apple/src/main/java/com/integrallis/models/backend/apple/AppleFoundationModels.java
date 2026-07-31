@@ -42,7 +42,9 @@ public final class AppleFoundationModels {
    * Creates an Apple Foundation Models client.
    *
    * <p>The native bridge path can be supplied with the {@code models.apple.foundation.library}
-   * system property or {@code MODELS_APPLE_FOUNDATION_LIBRARY} environment variable.
+   * system property or {@code MODELS_APPLE_FOUNDATION_LIBRARY} environment variable. An explicit
+   * path also requires its SHA-256 through {@code models.apple.foundation.library.sha256} or {@code
+   * MODELS_APPLE_FOUNDATION_LIBRARY_SHA256}.
    *
    * <p>For local development on machines without Apple Intelligence, set {@code
    * models.apple.foundation.mode=stub} or {@code MODELS_APPLE_FOUNDATION_MODE=stub}.

@@ -19,17 +19,74 @@ import Dispatch
 import Foundation
 import FoundationModels
 
-private let lastErrorLock = NSLock()
-private var lastErrorPointer: UnsafeMutablePointer<CChar>? =
-    strdup("Apple Foundation Models bridge has not been initialized")
-
-private func setLastError(_ message: String) {
-    lastErrorLock.lock()
-    defer { lastErrorLock.unlock() }
-    if let lastErrorPointer {
-        free(lastErrorPointer)
+private func makeResult(
+    status: Int32,
+    value: Int32 = 0,
+    text: String
+) -> UnsafeMutablePointer<jmodels_afm_result>? {
+    guard
+        let result =
+            malloc(MemoryLayout<jmodels_afm_result>.stride)?
+                .assumingMemoryBound(to: jmodels_afm_result.self)
+    else {
+        return nil
     }
-    lastErrorPointer = strdup(message)
+    result.initialize(to: jmodels_afm_result())
+    result.pointee.status = status
+    result.pointee.value = value
+
+    let bytes = Array(text.utf8)
+    if !bytes.isEmpty {
+        guard let data = malloc(bytes.count)?.assumingMemoryBound(to: UInt8.self) else {
+            result.deinitialize(count: 1)
+            free(result)
+            return nil
+        }
+        _ = bytes.withUnsafeBytes { source in
+            memcpy(data, source.baseAddress!, bytes.count)
+        }
+        result.pointee.data = data
+        result.pointee.length = bytes.count
+    }
+    return result
+}
+
+private func decode(
+    _ pointer: UnsafePointer<UInt8>?,
+    length: UInt,
+    name: String
+) throws -> String {
+    guard let count = Int(exactly: length) else {
+        throw BridgeInputError.invalidLength(name)
+    }
+    if count == 0 {
+        return ""
+    }
+    guard let pointer else {
+        throw BridgeInputError.nullPayload(name)
+    }
+    let bytes = UnsafeBufferPointer(start: pointer, count: count)
+    guard let text = String(bytes: bytes, encoding: .utf8) else {
+        throw BridgeInputError.invalidUtf8(name)
+    }
+    return text
+}
+
+private enum BridgeInputError: Error, CustomStringConvertible {
+    case invalidLength(String)
+    case nullPayload(String)
+    case invalidUtf8(String)
+
+    var description: String {
+        switch self {
+        case .invalidLength(let name):
+            return "\(name) length cannot be represented"
+        case .nullPayload(let name):
+            return "\(name) payload was null"
+        case .invalidUtf8(let name):
+            return "\(name) payload was not valid UTF-8"
+        }
+    }
 }
 
 private func availabilityMessage(_ model: SystemLanguageModel) -> (Bool, String) {
@@ -60,54 +117,48 @@ private func runBlocking<T>(_ operation: @escaping () async throws -> T) throws 
     Task {
         do {
             let value = try await operation()
-            lock.lock()
-            result = .success(value)
-            lock.unlock()
+            lock.withLock {
+                result = .success(value)
+            }
         } catch {
-            lock.lock()
-            result = .failure(error)
-            lock.unlock()
+            lock.withLock {
+                result = .failure(error)
+            }
         }
         semaphore.signal()
     }
 
     semaphore.wait()
-    lock.lock()
-    defer { lock.unlock() }
-    return try result!.get()
+    return try lock.withLock {
+        try result!.get()
+    }
 }
 
 @_cdecl("jmodels_afm_available")
-public func jmodels_afm_available() -> Int32 {
-    let model = SystemLanguageModel.default
-    let availability = availabilityMessage(model)
-    setLastError(availability.1)
-    return availability.0 ? 1 : 0
+public func jmodelsAppleFoundationAvailable() -> UnsafeMutablePointer<jmodels_afm_result>? {
+    let availability = availabilityMessage(SystemLanguageModel.default)
+    return makeResult(status: 0, value: availability.0 ? 1 : 0, text: availability.1)
 }
 
 @_cdecl("jmodels_afm_generate")
-public func jmodels_afm_generate(
-    _ promptPointer: UnsafePointer<CChar>?,
-    _ instructionsPointer: UnsafePointer<CChar>?,
+public func jmodelsAppleFoundationGenerate(
+    _ promptPointer: UnsafePointer<UInt8>?,
+    _ promptLength: UInt,
+    _ instructionsPointer: UnsafePointer<UInt8>?,
+    _ instructionsLength: UInt,
     _ maxOutputTokens: Int32
-) -> UnsafeMutablePointer<CChar>? {
-    guard let promptPointer else {
-        setLastError("prompt pointer was null")
-        return nil
-    }
-
-    let model = SystemLanguageModel.default
-    let availability = availabilityMessage(model)
-    guard availability.0 else {
-        setLastError(availability.1)
-        return nil
-    }
-
-    let prompt = String(cString: promptPointer)
-    let instructions = instructionsPointer.map { String(cString: $0) } ?? ""
-    let boundedMaxOutputTokens = max(1, Int(maxOutputTokens))
-
+) -> UnsafeMutablePointer<jmodels_afm_result>? {
     do {
+        let prompt = try decode(promptPointer, length: promptLength, name: "prompt")
+        let instructions =
+            try decode(instructionsPointer, length: instructionsLength, name: "instructions")
+        let model = SystemLanguageModel.default
+        let availability = availabilityMessage(model)
+        guard availability.0 else {
+            return makeResult(status: 1, text: availability.1)
+        }
+
+        let boundedMaxOutputTokens = max(1, Int(maxOutputTokens))
         let text = try runBlocking {
             let session =
                 instructions.isEmpty
@@ -117,27 +168,20 @@ public func jmodels_afm_generate(
             let response = try await session.respond(to: prompt, options: options)
             return response.content
         }
-        setLastError("ok")
-        return strdup(text)
+        return makeResult(status: 0, text: text)
     } catch {
-        setLastError(String(describing: error))
-        return nil
+        return makeResult(status: 1, text: String(describing: error))
     }
 }
 
-@_cdecl("jmodels_afm_last_error")
-public func jmodels_afm_last_error() -> UnsafeMutablePointer<CChar>? {
-    lastErrorLock.lock()
-    defer { lastErrorLock.unlock() }
-    guard let lastErrorPointer else {
-        return nil
+@_cdecl("jmodels_afm_result_free")
+public func jmodelsAppleFoundationResultFree(
+    _ result: UnsafeMutablePointer<jmodels_afm_result>?
+) {
+    guard let result else {
+        return
     }
-    return strdup(lastErrorPointer)
-}
-
-@_cdecl("jmodels_afm_free")
-public func jmodels_afm_free(_ pointer: UnsafeMutablePointer<CChar>?) {
-    if let pointer {
-        free(pointer)
-    }
+    free(result.pointee.data)
+    result.deinitialize(count: 1)
+    free(result)
 }

@@ -14,7 +14,7 @@ dependencies {
 
 val appleBridgeFileName = "libjavamodels_apple_foundation.dylib"
 val appleBridgePlatform = "macos-aarch64"
-val appleBridgeAbi = 1
+val appleBridgeAbi = 2
 val appleBridgeArtifactDirectory =
     providers.gradleProperty("modelsAppleBridgeArtifactDirectory").map(rootProject::file).orNull
 val appleBridgeArtifact =
@@ -135,8 +135,14 @@ tasks.named("check") {
 
 tasks.withType<Test>().configureEach {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
-    System.getProperty("models.apple.foundation.library")?.let {
-        systemProperty("models.apple.foundation.library", it)
+    listOf(
+        "models.apple.foundation.library",
+        "models.apple.foundation.library.sha256",
+        "models.apple.foundation.library.allow-unverified"
+    ).forEach { name ->
+        System.getProperty(name)?.let {
+            systemProperty(name, it)
+        }
     }
 }
 

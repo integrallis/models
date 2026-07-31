@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
@@ -44,7 +45,7 @@ final class BundledAppleFoundationLibrary {
   static final String LIBRARY_FILE_NAME = "libjavamodels_apple_foundation.dylib";
   static final String CACHE_DIRECTORY_PROPERTY = "models.apple.foundation.cache";
 
-  private static final int ABI_VERSION = 1;
+  private static final int ABI_VERSION = 2;
   private static final String PLATFORM = "macos-aarch64";
   private static final String RESOURCE_DIRECTORY =
       "META-INF/models/apple-foundation/" + PLATFORM + "/";
@@ -107,9 +108,7 @@ final class BundledAppleFoundationLibrary {
     }
 
     Path target =
-        cacheRoot
-            .toAbsolutePath()
-            .normalize()
+        prepareCacheRoot(cacheRoot)
             .resolve("abi-" + ABI_VERSION)
             .resolve(PLATFORM)
             .resolve(expectedDigest)
@@ -197,6 +196,38 @@ final class BundledAppleFoundationLibrary {
       verifyDigest(target, expectedDigest);
     } catch (IOException failure) {
       throw new IllegalStateException("Unable to extract Apple bridge to " + target, failure);
+    }
+  }
+
+  private static Path prepareCacheRoot(Path configuredRoot) {
+    Path cacheRoot = configuredRoot.toAbsolutePath().normalize();
+    boolean existed = Files.exists(cacheRoot, LinkOption.NOFOLLOW_LINKS);
+    try {
+      Files.createDirectories(cacheRoot);
+      if (Files.isSymbolicLink(cacheRoot)
+          || !Files.isDirectory(cacheRoot, LinkOption.NOFOLLOW_LINKS)) {
+        throw new SecurityException(
+            "Apple Foundation Models cache root must be a real directory: " + cacheRoot);
+      }
+      if (!existed) {
+        setOwnerPermissions(cacheRoot);
+      }
+      try {
+        Set<PosixFilePermission> permissions =
+            Files.getPosixFilePermissions(cacheRoot, LinkOption.NOFOLLOW_LINKS);
+        if (permissions.contains(PosixFilePermission.GROUP_WRITE)
+            || permissions.contains(PosixFilePermission.OTHERS_WRITE)) {
+          throw new SecurityException(
+              "Apple Foundation Models cache root must not be group or world writable: "
+                  + cacheRoot);
+        }
+      } catch (UnsupportedOperationException ignored) {
+        // Non-POSIX filesystems do not expose group and world write permissions.
+      }
+      return cacheRoot;
+    } catch (IOException failure) {
+      throw new IllegalStateException(
+          "Unable to prepare Apple Foundation Models cache root " + cacheRoot, failure);
     }
   }
 

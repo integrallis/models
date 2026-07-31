@@ -71,10 +71,6 @@ public final class AppleFoundationModelsClient implements TextGenerationModel {
   /** Generates a response for the supplied request. */
   public AppleFoundationModelsResponse generate(AppleFoundationModelsRequest request) {
     Objects.requireNonNull(request, "request");
-    AppleFoundationModelsAvailability availability = availability();
-    if (!availability.available()) {
-      throw new IllegalStateException(availability.reason());
-    }
     return bridge.generate(request);
   }
 

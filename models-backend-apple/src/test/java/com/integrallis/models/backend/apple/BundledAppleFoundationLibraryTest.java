@@ -22,7 +22,9 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.security.MessageDigest;
+import java.util.EnumSet;
 import java.util.HexFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -74,8 +76,8 @@ class BundledAppleFoundationLibraryTest {
 
     Path incompatibleAbi = temporaryDirectory.resolve("incompatible-abi");
     Path abiDirectory = writeBundle(incompatibleAbi, sha256(LIBRARY));
-    replaceMetadata(abiDirectory, "abi=1", "abi=2");
-    assertBundleFailure(incompatibleAbi, "abi must be 1");
+    replaceMetadata(abiDirectory, "abi=2", "abi=1");
+    assertBundleFailure(incompatibleAbi, "abi must be 2");
 
     Path missingDigest = temporaryDirectory.resolve("missing-digest");
     Path digestDirectory = writeBundle(missingDigest, sha256(LIBRARY));
@@ -128,6 +130,32 @@ class BundledAppleFoundationLibraryTest {
   }
 
   @Test
+  void rejectsAGroupOrWorldWritableCacheRoot() throws Exception {
+    Path resources = temporaryDirectory.resolve("unsafe-cache-resources");
+    writeBundle(resources, sha256(LIBRARY));
+    Path cache = temporaryDirectory.resolve("unsafe-cache");
+    Files.createDirectories(cache);
+    try {
+      Files.setPosixFilePermissions(
+          cache,
+          EnumSet.of(
+              PosixFilePermission.OWNER_READ,
+              PosixFilePermission.OWNER_WRITE,
+              PosixFilePermission.OWNER_EXECUTE,
+              PosixFilePermission.GROUP_WRITE,
+              PosixFilePermission.OTHERS_WRITE));
+    } catch (UnsupportedOperationException failure) {
+      return;
+    }
+
+    try (var loader = new URLClassLoader(new java.net.URL[] {resources.toUri().toURL()}, null)) {
+      assertThatThrownBy(() -> BundledAppleFoundationLibrary.resolve(loader, cache))
+          .isInstanceOf(SecurityException.class)
+          .hasMessageContaining("group or world writable");
+    }
+  }
+
+  @Test
   void returnsEmptyWhenNoBundledBridgeIsPresent() throws Exception {
     try (var loader = new URLClassLoader(new java.net.URL[0], null)) {
       assertThat(BundledAppleFoundationLibrary.resolve(loader, temporaryDirectory.resolve("cache")))
@@ -170,7 +198,7 @@ class BundledAppleFoundationLibraryTest {
     Files.writeString(
         directory.resolve(BundledAppleFoundationLibrary.METADATA_FILE_NAME),
         """
-        abi=1
+        abi=2
         platform=macos-aarch64
         library=libjavamodels_apple_foundation.dylib
         sha256=%s

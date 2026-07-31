@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -61,6 +62,34 @@ class AppleFoundationModelsClientTest {
                 .build());
 
     assertThat(response.text()).isEqualTo("Be terse :: Write a haiku :: 32");
+  }
+
+  @Test
+  void generateDoesNotPerformARedundantAvailabilityRoundTrip() {
+    AtomicInteger availabilityCalls = new AtomicInteger();
+    AtomicInteger generationCalls = new AtomicInteger();
+    AppleFoundationModelsBridge bridge =
+        new AppleFoundationModelsBridge() {
+          @Override
+          public AppleFoundationModelsAvailability availability() {
+            availabilityCalls.incrementAndGet();
+            return AppleFoundationModelsAvailability.availableNow();
+          }
+
+          @Override
+          public AppleFoundationModelsResponse generate(AppleFoundationModelsRequest request) {
+            generationCalls.incrementAndGet();
+            return new AppleFoundationModelsResponse("answer");
+          }
+
+          @Override
+          public void close() {}
+        };
+    AppleFoundationModelsClient client = AppleFoundationModelsClient.of(bridge);
+
+    assertThat(client.generate("question").text()).isEqualTo("answer");
+    assertThat(availabilityCalls).hasValue(0);
+    assertThat(generationCalls).hasValue(1);
   }
 
   @Test
