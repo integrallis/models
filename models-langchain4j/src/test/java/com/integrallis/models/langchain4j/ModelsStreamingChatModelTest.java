@@ -48,6 +48,7 @@ class ModelsStreamingChatModelTest {
             .maxTokens(100)
             .repetitionPenalty(1.2f)
             .seed(42L)
+            .stopSequences(List.of("DEFAULT_STOP"))
             .build();
     ModelsStreamingChatModel model =
         new ModelsStreamingChatModel(delegate, ChatTemplate.CHATML, defaults);
@@ -58,6 +59,7 @@ class ModelsStreamingChatModelTest {
             .topP(0.3)
             .topK(7)
             .maxOutputTokens(19)
+            .stopSequences(List.of("REQUEST_STOP"))
             .build();
     List<String> partials = new ArrayList<>();
     AtomicReference<ChatResponse> completed = new AtomicReference<>();
@@ -84,6 +86,7 @@ class ModelsStreamingChatModelTest {
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
+    assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(model.diagnostics().backend()).isEqualTo("stream-recording");
   }
 

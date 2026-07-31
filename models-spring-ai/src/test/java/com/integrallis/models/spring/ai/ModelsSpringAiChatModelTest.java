@@ -92,11 +92,18 @@ class ModelsSpringAiChatModelTest {
             .maxTokens(200)
             .repetitionPenalty(1.2f)
             .seed(42L)
+            .stopSequences(List.of("DEFAULT_STOP"))
             .build();
     ModelsSpringAiChatModel model =
         new ModelsSpringAiChatModel(delegate, ChatTemplate.CHATML, defaults);
     ChatOptions requested =
-        ChatOptions.builder().temperature(0.2).topP(0.3).topK(7).maxTokens(19).build();
+        ChatOptions.builder()
+            .temperature(0.2)
+            .topP(0.3)
+            .topK(7)
+            .maxTokens(19)
+            .stopSequences(List.of("REQUEST_STOP"))
+            .build();
 
     ChatResponse response =
         model.call(
@@ -130,11 +137,13 @@ class ModelsSpringAiChatModelTest {
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
+    assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(response.getResult().getOutput().getText()).isEqualTo("mapped answer");
     assertThat(model.getOptions().getTemperature()).isEqualTo((double) defaults.temperature());
     assertThat(model.getOptions().getTopP()).isEqualTo((double) defaults.topP());
     assertThat(model.getOptions().getTopK()).isEqualTo(40);
     assertThat(model.getOptions().getMaxTokens()).isEqualTo(200);
+    assertThat(model.getOptions().getStopSequences()).containsExactly("DEFAULT_STOP");
   }
 
   @Test
@@ -147,6 +156,7 @@ class ModelsSpringAiChatModelTest {
             .topK(11)
             .maxTokens(32)
             .repetitionPenalty(1.1f)
+            .stopSequences(List.of("END"))
             .build();
     ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);
 

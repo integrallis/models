@@ -46,7 +46,8 @@ final class LangChain4jChatRequestMapper {
             .topP(defaults.topP())
             .topK(defaults.topK())
             .maxTokens(defaults.maxTokens())
-            .repetitionPenalty(defaults.repetitionPenalty());
+            .repetitionPenalty(defaults.repetitionPenalty())
+            .stopSequences(defaults.stopSequences());
     if (defaults.seed() != null) {
       builder.seed(defaults.seed());
     }
@@ -61,6 +62,9 @@ final class LangChain4jChatRequestMapper {
     }
     if (request.maxOutputTokens() != null) {
       builder.maxTokens(request.maxOutputTokens());
+    }
+    if (request.stopSequences() != null && !request.stopSequences().isEmpty()) {
+      builder.stopSequences(request.stopSequences());
     }
     return builder.build();
   }

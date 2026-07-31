@@ -109,6 +109,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
         .topP((double) defaults.topP())
         .topK(defaults.topK())
         .maxTokens(defaults.maxTokens())
+        .stopSequences(defaults.stopSequences())
         .build();
   }
 
@@ -119,7 +120,8 @@ public final class ModelsSpringAiChatModel implements ChatModel {
             .topP(defaults.topP())
             .topK(defaults.topK())
             .maxTokens(defaults.maxTokens())
-            .repetitionPenalty(defaults.repetitionPenalty());
+            .repetitionPenalty(defaults.repetitionPenalty())
+            .stopSequences(defaults.stopSequences());
     if (defaults.seed() != null) {
       builder.seed(defaults.seed());
     }
@@ -137,6 +139,9 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       }
       if (requested.getMaxTokens() != null) {
         builder.maxTokens(requested.getMaxTokens());
+      }
+      if (requested.getStopSequences() != null) {
+        builder.stopSequences(requested.getStopSequences());
       }
     }
     return builder.build();

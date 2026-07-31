@@ -17,39 +17,24 @@ package com.integrallis.models.spring.boot;
 
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.runtime.chat.ChatTemplate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /** Configuration for the auto-configured Models Spring AI chat model. */
 @ConfigurationProperties("integrallis.models")
-public class ModelsProperties {
+public record ModelsProperties(
+    @DefaultValue("raw") String chatTemplate,
+    @DefaultValue @NestedConfigurationProperty Sampling sampling) {
 
-  /** Stable Models chat-template identifier, such as {@code chatml} or {@code llama3}. */
-  private String chatTemplate = ChatTemplate.RAW.id();
-
-  /** Default sampling values used when a Spring AI prompt does not override them. */
-  @NestedConfigurationProperty private Sampling sampling = new Sampling();
-
-  public String getChatTemplate() {
-    return chatTemplate;
+  public ModelsProperties {
+    Objects.requireNonNull(chatTemplate, "chatTemplate");
+    Objects.requireNonNull(sampling, "sampling");
   }
 
-  public void setChatTemplate(String chatTemplate) {
-    this.chatTemplate = Objects.requireNonNull(chatTemplate, "chatTemplate");
-  }
-
-  public Sampling getSampling() {
-    return sampling;
-  }
-
-  public void setSampling(Sampling sampling) {
-    this.sampling = Objects.requireNonNull(sampling, "sampling");
-  }
-
-  ChatTemplate chatTemplate() {
+  ChatTemplate parsedChatTemplate() {
     return ChatTemplate.parse(chatTemplate);
   }
 
@@ -58,69 +43,17 @@ public class ModelsProperties {
   }
 
   /** Sampling properties for local generation. */
-  public static class Sampling {
-    private float temperature = 1.0f;
-    private float topP = 0.9f;
-    private int topK = 40;
-    private int maxTokens = 256;
-    private Long seed;
-    private float repetitionPenalty = 1.0f;
-    private List<String> stopSequences = new ArrayList<>();
+  public record Sampling(
+      @DefaultValue("1.0") float temperature,
+      @DefaultValue("0.9") float topP,
+      @DefaultValue("40") int topK,
+      @DefaultValue("256") int maxTokens,
+      Long seed,
+      @DefaultValue("1.0") float repetitionPenalty,
+      List<String> stopSequences) {
 
-    public float getTemperature() {
-      return temperature;
-    }
-
-    public void setTemperature(float temperature) {
-      this.temperature = temperature;
-    }
-
-    public float getTopP() {
-      return topP;
-    }
-
-    public void setTopP(float topP) {
-      this.topP = topP;
-    }
-
-    public int getTopK() {
-      return topK;
-    }
-
-    public void setTopK(int topK) {
-      this.topK = topK;
-    }
-
-    public int getMaxTokens() {
-      return maxTokens;
-    }
-
-    public void setMaxTokens(int maxTokens) {
-      this.maxTokens = maxTokens;
-    }
-
-    public Long getSeed() {
-      return seed;
-    }
-
-    public void setSeed(Long seed) {
-      this.seed = seed;
-    }
-
-    public float getRepetitionPenalty() {
-      return repetitionPenalty;
-    }
-
-    public void setRepetitionPenalty(float repetitionPenalty) {
-      this.repetitionPenalty = repetitionPenalty;
-    }
-
-    public List<String> getStopSequences() {
-      return List.copyOf(stopSequences);
-    }
-
-    public void setStopSequences(List<String> stopSequences) {
-      this.stopSequences = new ArrayList<>(Objects.requireNonNull(stopSequences, "stopSequences"));
+    public Sampling {
+      stopSequences = stopSequences == null ? List.of() : List.copyOf(stopSequences);
     }
 
     SamplingOptions toOptions() {

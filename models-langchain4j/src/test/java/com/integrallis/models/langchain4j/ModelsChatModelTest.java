@@ -74,6 +74,7 @@ class ModelsChatModelTest {
                 .maxTokens(200)
                 .repetitionPenalty(1.2f)
                 .seed(42L)
+                .stopSequences(List.of("DEFAULT_STOP"))
                 .build());
     ChatRequest request =
         ChatRequest.builder()
@@ -87,6 +88,7 @@ class ModelsChatModelTest {
             .topP(0.3)
             .topK(7)
             .maxOutputTokens(19)
+            .stopSequences(List.of("REQUEST_STOP"))
             .build();
 
     var response = model.doChat(request);
@@ -116,6 +118,7 @@ class ModelsChatModelTest {
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
+    assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(response.aiMessage().text()).isEqualTo("mapped answer");
     assertThat(response.modelName()).isEqualTo("RecordingModel");
   }
@@ -130,6 +133,7 @@ class ModelsChatModelTest {
             .topK(12)
             .maxTokens(31)
             .repetitionPenalty(1.1f)
+            .stopSequences(List.of("END"))
             .build();
     ModelsChatModel model = new ModelsChatModel(delegate, defaults);
 

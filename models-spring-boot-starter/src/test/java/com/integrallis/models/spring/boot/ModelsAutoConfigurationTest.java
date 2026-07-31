@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
@@ -26,6 +27,7 @@ import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
 import com.integrallis.vectors.db.VectorCollection;
 import com.integrallis.vectors.spring.ai.JavaVectorsVectorStore;
 import com.integrallis.vectors.spring.boot.JavaVectorsAutoConfiguration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,6 +94,74 @@ class ModelsAutoConfigurationTest {
   }
 
   @Test
+  void bindsImmutableDefaultsWithoutRequiringAModelRuntime() {
+    runner.run(
+        context -> {
+          ModelsProperties properties = context.getBean(ModelsProperties.class);
+
+          assertThat(properties.chatTemplate()).isEqualTo("raw");
+          assertThat(properties.sampling().temperature()).isEqualTo(1.0f);
+          assertThat(properties.sampling().topP()).isEqualTo(0.9f);
+          assertThat(properties.sampling().topK()).isEqualTo(40);
+          assertThat(properties.sampling().maxTokens()).isEqualTo(256);
+          assertThat(properties.sampling().seed()).isNull();
+          assertThat(properties.sampling().repetitionPenalty()).isEqualTo(1.0f);
+          assertThat(properties.sampling().stopSequences()).isEmpty();
+        });
+  }
+
+  @Test
+  void bindsEverySamplingProperty() {
+    runner
+        .withPropertyValues(
+            "integrallis.models.chat-template=chatml",
+            "integrallis.models.sampling.temperature=0.2",
+            "integrallis.models.sampling.top-p=0.7",
+            "integrallis.models.sampling.top-k=12",
+            "integrallis.models.sampling.max-tokens=17",
+            "integrallis.models.sampling.seed=42",
+            "integrallis.models.sampling.repetition-penalty=1.2",
+            "integrallis.models.sampling.stop-sequences[0]=END",
+            "integrallis.models.sampling.stop-sequences[1]=STOP")
+        .run(
+            context -> {
+              ModelsProperties properties = context.getBean(ModelsProperties.class);
+
+              assertThat(properties.chatTemplate()).isEqualTo("chatml");
+              assertThat(properties.sampling().temperature()).isEqualTo(0.2f);
+              assertThat(properties.sampling().topP()).isEqualTo(0.7f);
+              assertThat(properties.sampling().topK()).isEqualTo(12);
+              assertThat(properties.sampling().maxTokens()).isEqualTo(17);
+              assertThat(properties.sampling().seed()).isEqualTo(42L);
+              assertThat(properties.sampling().repetitionPenalty()).isEqualTo(1.2f);
+              assertThat(properties.sampling().stopSequences()).containsExactly("END", "STOP");
+            });
+  }
+
+  @Test
+  void immutableSamplingOwnsItsStopSequences() {
+    List<String> stops = new ArrayList<>(List.of("END"));
+    ModelsProperties.Sampling sampling =
+        new ModelsProperties.Sampling(0.2f, 0.7f, 12, 17, 42L, 1.2f, stops);
+
+    stops.add("MUTATED");
+
+    assertThat(sampling.stopSequences()).containsExactly("END").isUnmodifiable();
+  }
+
+  @Test
+  void createsSpringAiChatModelFromAnInferenceBackend() {
+    runner
+        .withUserConfiguration(LocalBackendConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context).hasSingleBean(InferenceBackend.class);
+              assertThat(context).hasSingleBean(ModelsSpringAiChatModel.class);
+            });
+  }
+
+  @Test
   void userProvidedModelsAdapterReplacesTheDefault() {
     runner
         .withUserConfiguration(UserProvidedAdapterConfiguration.class)
@@ -136,7 +206,8 @@ class ModelsAutoConfigurationTest {
             "java-vectors.dimension=2",
             "integrallis.models.chat-template=chatml",
             "integrallis.models.sampling.temperature=0.0",
-            "integrallis.models.sampling.max-tokens=17")
+            "integrallis.models.sampling.max-tokens=17",
+            "integrallis.models.sampling.stop-sequences[0]=END")
         .run(
             context -> {
               assertThat(context).hasNotFailed();
@@ -174,6 +245,7 @@ class ModelsAutoConfigurationTest {
                       """);
               assertThat(options.get().temperature()).isZero();
               assertThat(options.get().maxTokens()).isEqualTo(17);
+              assertThat(options.get().stopSequences()).containsExactly("END");
             });
   }
 
@@ -207,6 +279,14 @@ class ModelsAutoConfigurationTest {
           stream.onComplete();
         }
       };
+    }
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class LocalBackendConfiguration {
+    @Bean
+    InferenceBackend inferenceBackend() {
+      return mock(InferenceBackend.class);
     }
   }
 

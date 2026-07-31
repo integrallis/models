@@ -92,7 +92,7 @@ public class ModelsAutoConfiguration {
                 beanFactory.getBeanProvider(TextGenerationModel.class).getIfAvailable();
             if (model != null) {
               return new ModelsSpringAiChatModel(
-                  model, properties.chatTemplate(), properties.samplingOptions());
+                  model, properties.parsedChatTemplate(), properties.samplingOptions());
             }
             InferenceBackend backend =
                 beanFactory.getBeanProvider(InferenceBackend.class).getIfAvailable();
@@ -102,7 +102,7 @@ public class ModelsAutoConfiguration {
                       + MODELS_CHAT_MODEL_BEAN_NAME);
             }
             return new ModelsSpringAiChatModel(
-                backend, properties.chatTemplate(), properties.samplingOptions());
+                backend, properties.parsedChatTemplate(), properties.samplingOptions());
           });
       registry.registerBeanDefinition(MODELS_CHAT_MODEL_BEAN_NAME, definition);
     }
