@@ -37,6 +37,19 @@
       "meanNmtCommittedBytes": 2285975552.0,
       "gcCollections": 0
     },
+    "q6OneQueryBatched": {
+      "runs": 3,
+      "meanAggregateTokensPerSecond": 24.660334710097775,
+      "minAggregateTokensPerSecond": 24.206066130529017,
+      "maxAggregateTokensPerSecond": 24.928797450931913,
+      "meanPerRequestTokenMillis": 162.23187673958333,
+      "meanCpuMillis": 77760.0,
+      "maxPeakRssBytes": 2049413120,
+      "meanCurrentRssBytes": 1793925120.0,
+      "meanAnonymousRssBytes": 1166863018.6666667,
+      "meanHeapUsedBytes": 1099201520.0,
+      "gcCollections": 0
+    },
     "batched": {
       "runs": 3,
       "meanAggregateTokensPerSecond": 17.10297411508973,
@@ -49,6 +62,13 @@
       "meanHeapUsedBytes": 294563890.6666667,
       "meanNmtCommittedBytes": 2288380586.6666665,
       "gcCollections": 0
+    },
+    "q6TwoQueryChange": {
+      "aggregateThroughputPercent": 12.540311363016121,
+      "perRequestTokenMillisPercent": -11.157258472424225,
+      "cpuMillisPercent": -12.03275034293554,
+      "currentRssPercent": 11.324519944288426,
+      "peakRssPercent": 3.890515544274442
     },
     "batchingChange": {
       "aggregateThroughputPercent": 42.293589122565,
@@ -117,6 +137,7 @@
   "conclusions": {
     "batchingMemorySource": "anonymous resident pages; file-backed model residency and measured heap use were unchanged on Temurin",
     "graalRecommendation": "retained for this model and host profile",
+    "q6BatchedKernelRecommendation": "two-query-block retained for the exact Graal MiniCPM session profile",
     "compilerDirectiveRecommendation": "rejected because repeated fresh-process runs regressed throughput and triggered collections"
   }
 }
