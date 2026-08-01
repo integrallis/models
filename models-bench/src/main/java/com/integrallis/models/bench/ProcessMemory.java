@@ -31,31 +31,48 @@ final class ProcessMemory {
   }
 
   static long highWaterBytes(long pid) {
+    return snapshot(pid).highWaterBytes();
+  }
+
+  static Snapshot snapshot(long pid) {
     if (pid <= 0) {
-      return 0;
+      return Snapshot.ZERO;
     }
     Path status = Path.of("/proc", Long.toString(pid), "status");
     if (Files.isRegularFile(status)) {
       try {
-        return parseLinuxStatus(Files.readString(status, StandardCharsets.UTF_8));
+        return parseLinuxStatusSnapshot(Files.readString(status, StandardCharsets.UTF_8));
       } catch (IOException ignored) {
-        return 0;
+        return Snapshot.ZERO;
       }
     }
     if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
-      return currentMacResidentBytes(pid);
+      long residentBytes = currentMacResidentBytes(pid);
+      return new Snapshot(residentBytes, residentBytes);
     }
-    return 0;
+    return Snapshot.ZERO;
   }
 
   static long parseLinuxStatus(String status) {
+    return parseLinuxStatusSnapshot(status).highWaterBytes();
+  }
+
+  static Snapshot parseLinuxStatusSnapshot(String status) {
+    long highWaterBytes = 0;
+    long residentBytes = 0;
     for (String line : status.lines().toList()) {
       if (line.startsWith("VmHWM:")) {
-        String digits = line.substring("VmHWM:".length()).replaceAll("[^0-9]", "");
-        return digits.isEmpty() ? 0 : Long.parseLong(digits) * 1024;
+        highWaterBytes = kibibytes(line, "VmHWM:");
+      } else if (line.startsWith("VmRSS:")) {
+        residentBytes = kibibytes(line, "VmRSS:");
       }
     }
-    return 0;
+    return new Snapshot(highWaterBytes, residentBytes);
+  }
+
+  private static long kibibytes(String line, String prefix) {
+    String digits = line.substring(prefix.length()).replaceAll("[^0-9]", "");
+    return digits.isEmpty() ? 0 : Long.parseLong(digits) * 1024;
   }
 
   private static long currentMacResidentBytes(long pid) {
@@ -70,5 +87,9 @@ final class ProcessMemory {
       Thread.currentThread().interrupt();
       return 0;
     }
+  }
+
+  record Snapshot(long highWaterBytes, long residentBytes) {
+    private static final Snapshot ZERO = new Snapshot(0, 0);
   }
 }

@@ -15,8 +15,10 @@
  */
 package com.integrallis.models.bench;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class ProcessMetricsTest {
@@ -33,5 +35,19 @@ class ProcessMetricsTest {
                       throw new RuntimeException("operation not permitted");
                     }))
         .doesNotThrowAnyException();
+  }
+
+  @Test
+  void retainsCurrentAndHighWaterResidentMemorySeparately() {
+    long currentPid = ProcessHandle.current().pid();
+
+    ProcessMetrics.Snapshot snapshot =
+        ProcessMetrics.capture(
+            currentPid,
+            ignored -> Stream.empty(),
+            ignored -> new ProcessMemory.Snapshot(1_200, 900));
+
+    assertThat(snapshot.highWaterBytes()).isEqualTo(1_200);
+    assertThat(snapshot.residentBytes()).isEqualTo(900);
   }
 }

@@ -27,4 +27,14 @@ class ProcessMemoryTest {
 
     assertThat(ProcessMemory.parseLinuxStatus(status)).isEqualTo(123456L * 1024);
   }
+
+  @Test
+  void distinguishesCurrentResidentMemoryFromTheProcessHighWaterMark() {
+    String status = "Name:\tjava\nVmHWM:\t123456 kB\nVmRSS:\t120000 kB\n";
+
+    ProcessMemory.Snapshot snapshot = ProcessMemory.parseLinuxStatusSnapshot(status);
+
+    assertThat(snapshot.highWaterBytes()).isEqualTo(123456L * 1024);
+    assertThat(snapshot.residentBytes()).isEqualTo(120000L * 1024);
+  }
 }
