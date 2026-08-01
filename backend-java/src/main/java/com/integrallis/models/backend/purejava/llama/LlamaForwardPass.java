@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.llama;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
@@ -69,8 +70,8 @@ public final class LlamaForwardPass {
   private final LlamaConfig config;
   private final LlamaWeights weights;
   private final KvCache cache;
-  private final RopeTable globalRopeTable;
-  private final RopeTable slidingWindowRopeTable;
+  private final RotaryTable globalRopeTable;
+  private final RotaryTable slidingWindowRopeTable;
   private final LayerObserver layerObserver;
   private final boolean groupedProjections;
   private final boolean mixedKProjections;
@@ -221,10 +222,10 @@ public final class LlamaForwardPass {
           "execution plan selected Llama-only layer shortcuts for " + config.architecture());
     }
     this.globalRopeTable =
-        new RopeTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
+        new RotaryTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
     this.slidingWindowRopeTable =
         config.slidingWindow() > 0
-            ? new RopeTable(config.keyLength(), config.slidingWindowRopeTheta(), 1.0f)
+            ? new RotaryTable(config.keyLength(), config.slidingWindowRopeTheta(), 1.0f)
             : globalRopeTable;
 
     int dim = config.embeddingDim();
@@ -1619,7 +1620,7 @@ public final class LlamaForwardPass {
     }
   }
 
-  private RopeTable ropeTable(int layer) {
+  private RotaryTable ropeTable(int layer) {
     return config.usesSlidingWindow(layer) ? slidingWindowRopeTable : globalRopeTable;
   }
 
