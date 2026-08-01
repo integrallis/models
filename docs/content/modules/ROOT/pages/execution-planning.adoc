@@ -126,6 +126,11 @@ Q4_K, Q5_K, and Q6_K. Supporting Q5_0 prevents mixed
 DeepSeek-Coder files from reducing the complete prefill plan to one
 token at a time.
 
+The same batch-major projection kernels can advance independent decode
+sessions while each request retains its own position and KV cache. See
+xref:session-batching.adoc[Concurrent Session Batching] for the serving API,
+lifecycle rules, and measured throughput/memory tradeoff.
+
 == Profiled Q6_K Register Tiling
 
 Q6_K weights store six-bit values in separate low- and high-bit planes.
