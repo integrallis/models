@@ -96,18 +96,31 @@ selected when the model is loaded.
 == What Is Measured
 
 On the controlled eight-vCPU AMD EPYC-Milan qualification host, four MiniCPM5
-1B sessions improved aggregate decode throughput from 12.025 to 16.984 tok/s
-(+41.24%). Per-request TPOT fell from 332.648 to 235.519 ms (-29.20%), and
-process CPU fell 31.78%. All runs generated the same token sequence.
+1B sessions on Temurin 25 improved aggregate decode throughput from 12.019 to
+17.103 tok/s (+42.29%). Per-request TPOT fell from 332.794 to 233.879 ms
+(-29.72%), and process CPU fell 32.04%. All runs generated the same token
+sequence and completed without measured garbage collection.
 
-Maximum observed process RSS increased from 1.055 to 1.655 GB. The sessions
-exist in both modes, so the difference is associated with the batched execution
-path, but RSS includes Java heap, native memory, and mapped GGUF page residency.
-Treat available memory and `maxBatchSize()` as deployment capacity constraints
-and qualify the intended model, context, concurrency, JDK, and host together.
+The follow-up memory attribution found a 574 MB mean current-RSS increase in
+batched mode. The increase was anonymous resident memory: file-backed RSS,
+which includes the mapped GGUF weights, differed by 12 KB; measured active heap
+was 8 MB lower; and Native Memory Tracking committed totals were effectively
+unchanged. JFR localized the transient allocation to Vector API conversion work
+before the large four-query Q4_K method reached optimized compilation. It was
+not a steady-state per-token allocation.
 
-The versioned process reports and aggregate are under
-`benchmark-results/certified-20260801/decode/minicpm5-1b-session-batch-long/`.
+GraalVM Community Java 25 is faster for this exact model and host profile. Three
+fresh batched processes averaged 27.753 tok/s with 144.131 ms per-request TPOT,
+62.27% more throughput than batched Temurin, 38.37% lower TPOT, identical token
+hashes, and no measured collections. Mean current RSS was 23.24% higher than
+Temurin, so treat available memory and `maxBatchSize()` as deployment capacity
+constraints and qualify the intended model, context, concurrency, JDK, and host
+together. The qualified Graal launch includes
+`-Djdk.graal.MaximumInliningSize=10000`.
+
+The versioned attribution, JVM comparison, rejected compiler-directive screens,
+and aggregate are under
+`benchmark-results/certified-20260801/decode/minicpm5-1b-session-memory-nmt/`.
 
 == Serving Work Still Above This API
 
