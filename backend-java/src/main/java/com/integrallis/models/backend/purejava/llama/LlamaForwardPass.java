@@ -78,6 +78,7 @@ public final class LlamaForwardPass {
   private final GgufQ6BatchedKernel q6BatchedKernel;
   private final boolean batchedPrefill;
   private final boolean groupedBatchedPrefill;
+  private final boolean batchedSessionOutputProjection;
   private final boolean finalLayerPrefillPruning;
   private final boolean finalLayerKvOnlyPrefill;
   private final boolean batchedAttentionScores;
@@ -256,6 +257,8 @@ public final class LlamaForwardPass {
         batchedPrefill
             && groupedProjections
             && usesGroupedBatchedProjection(config, weights, mixedKProjections);
+    this.batchedSessionOutputProjection =
+        batchedPrefill && TensorOps.supportsBatchedMatmul(weights.outputType());
     this.prefillBatchCapacity = batchedPrefill ? capacity : 0;
     this.batchX = batchBuffer(prefillBatchCapacity, dim);
     this.batchXNorm = batchBuffer(prefillBatchCapacity, dim);
@@ -285,8 +288,12 @@ public final class LlamaForwardPass {
             Math.max(config.queryDim(), Math.max(config.keyDim(), config.valueDim())));
     int q4LaneRows =
         groupedBatchedPrefill ? maxGroupedQ4ProjectionRows(config, weights) : maxProjectionOutput;
+    if (weights.outputType() == GgufTensorType.Q4_0) {
+      q4LaneRows = Math.max(q4LaneRows, vocabSize);
+    }
     this.batchQ4LaneScratch =
-        usesProjectionType(config, weights, GgufTensorType.Q4_0)
+        (weights.outputType() == GgufTensorType.Q4_0
+                || usesProjectionType(config, weights, GgufTensorType.Q4_0))
             ? new float[Math.multiplyExact(Math.multiplyExact(prefillBatchCapacity, q4LaneRows), 8)]
             : new float[0];
     this.stagedQuantizedPlan =
@@ -815,13 +822,39 @@ public final class LlamaForwardPass {
     }
 
     ensureSessionBatchLogits(Math.multiplyExact(batchSize, vocabSize));
-    for (int batch = 0; batch < batchSize; batch++) {
-      int stateOffset = batch * dim;
-      TensorOps.rmsNorm(
-          xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
-      matmulDispatch(logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
-      softcapLogits(logits);
-      System.arraycopy(logits, 0, sessionBatchLogits, batch * vocabSize, vocabSize);
+    if (usesBatchedSessionOutputProjection(batchSize)) {
+      for (int batch = 0; batch < batchSize; batch++) {
+        int stateOffset = batch * dim;
+        TensorOps.rmsNorm(
+            batchXNorm,
+            stateOffset,
+            batchX,
+            stateOffset,
+            weights.outputNormWeight(),
+            dim,
+            config.rmsNormEps());
+      }
+      batchedMatmulDispatch(
+          sessionBatchLogits,
+          batchXNorm,
+          batchSize,
+          weights.outputSegment(),
+          weights.outputType(),
+          vocabSize,
+          dim);
+      for (int batch = 0; batch < batchSize; batch++) {
+        softcapLogits(sessionBatchLogits, batch * vocabSize, vocabSize);
+      }
+    } else {
+      for (int batch = 0; batch < batchSize; batch++) {
+        int stateOffset = batch * dim;
+        TensorOps.rmsNorm(
+            xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
+        matmulDispatch(
+            logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+        softcapLogits(logits);
+        System.arraycopy(logits, 0, sessionBatchLogits, batch * vocabSize, vocabSize);
+      }
     }
     for (Session session : sessions) {
       session.nextPosition++;
@@ -1186,6 +1219,16 @@ public final class LlamaForwardPass {
 
   boolean usesParallelQ8FfnPreparation() {
     return parallelQ8FfnPreparation && stagedQuantizedPlan != null;
+  }
+
+  boolean usesBatchedSessionOutputProjection() {
+    return batchedSessionOutputProjection;
+  }
+
+  private boolean usesBatchedSessionOutputProjection(int batchSize) {
+    return batchedSessionOutputProjection
+        || batchedMatrixKernel.isEligible(
+            weights.outputType(), batchSize, config.vocabSize(), config.embeddingDim());
   }
 
   int stagedQuantizedLayerStageCount() {
@@ -1614,11 +1657,16 @@ public final class LlamaForwardPass {
   }
 
   private void softcapLogits(float[] values) {
+    softcapLogits(values, 0, values.length);
+  }
+
+  private void softcapLogits(float[] values, int offset, int length) {
     float softcap = config.finalLogitSoftcap();
     if (softcap == 0.0f) {
       return;
     }
-    for (int index = 0; index < values.length; index++) {
+    int limit = Math.addExact(offset, length);
+    for (int index = offset; index < limit; index++) {
       values[index] = softcap * (float) Math.tanh(values[index] / softcap);
     }
   }

@@ -170,6 +170,32 @@ class LlamaForwardPassTest {
         valueCount -> randomQ6K(rng, valueCount));
   }
 
+  private GgufFile buildMixedQ4KQ6KQuantizedOutputNanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng,
+        GgufTensorType.Q4_K,
+        256,
+        256,
+        valueCount -> randomQ4K(rng, valueCount),
+        GgufTensorType.Q6_K,
+        valueCount -> randomQ6K(rng, valueCount),
+        false,
+        true);
+  }
+
+  private GgufFile buildQ4QuantizedOutputNanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng,
+        GgufTensorType.Q4_0,
+        256,
+        256,
+        valueCount -> randomQ4(rng, valueCount),
+        GgufTensorType.Q4_0,
+        valueCount -> randomQ4(rng, valueCount),
+        false,
+        true);
+  }
+
   private GgufFile buildMixedQ5KQ6KNanoModel(Random rng) {
     return buildQuantizedNanoModel(
         rng,
@@ -205,7 +231,8 @@ class LlamaForwardPassTest {
         quantizedData,
         quantizedType,
         quantizedData,
-        quantizedEmbedding);
+        quantizedEmbedding,
+        false);
   }
 
   private GgufFile buildQuantizedNanoModel(
@@ -229,6 +256,28 @@ class LlamaForwardPassTest {
       GgufTensorType secondaryType,
       IntFunction<byte[]> secondaryData,
       boolean quantizedEmbedding) {
+    return buildQuantizedNanoModel(
+        rng,
+        quantizedType,
+        dim,
+        hiddenDim,
+        quantizedData,
+        secondaryType,
+        secondaryData,
+        quantizedEmbedding,
+        false);
+  }
+
+  private GgufFile buildQuantizedNanoModel(
+      Random rng,
+      GgufTensorType quantizedType,
+      int dim,
+      int hiddenDim,
+      IntFunction<byte[]> quantizedData,
+      GgufTensorType secondaryType,
+      IntFunction<byte[]> secondaryData,
+      boolean quantizedEmbedding,
+      boolean quantizedOutput) {
     int headDim = dim / HEADS;
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -250,9 +299,11 @@ class LlamaForwardPassTest {
             .addTensor("output_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
             .addTensor(
                 "output.weight",
-                GgufTensorType.F32,
+                quantizedOutput ? secondaryType : GgufTensorType.F32,
                 new long[] {dim, VOCAB_SIZE},
-                randomF32(rng, VOCAB_SIZE * dim));
+                quantizedOutput
+                    ? secondaryData.apply(VOCAB_SIZE * dim)
+                    : randomF32(rng, VOCAB_SIZE * dim));
 
     for (int layer = 0; layer < LAYERS; layer++) {
       String prefix = "blk." + layer + ".";
@@ -1494,6 +1545,56 @@ class LlamaForwardPassTest {
             .containsExactly(expectedCaches[index].keyBuffer());
         assertThat(sessions[index].cache().valueBuffer())
             .containsExactly(expectedCaches[index].valueBuffer());
+      }
+    }
+
+    @Test
+    void independentSessionBatchReusesQuantizedOutputWeightsExactly() {
+      assertIndependentSessionBatchOutputExact(
+          buildMixedQ4KQ6KQuantizedOutputNanoModel(new Random(44)), GgufTensorType.Q6_K);
+    }
+
+    @Test
+    void independentSessionBatchSizesScratchForQ4QuantizedOutput() {
+      assertIndependentSessionBatchOutputExact(
+          buildQ4QuantizedOutputNanoModel(new Random(45)), GgufTensorType.Q4_0);
+    }
+
+    private void assertIndependentSessionBatchOutputExact(
+        GgufFile file, GgufTensorType expectedOutputType) {
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[][] prompts = {{3, 5}, {7, 11, 13}, {17, 19, 23, 29}, {31}};
+      int[] tokens = {2, 4, 6, 8};
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              executionPlan(config, weights, 32, false));
+      LlamaForwardPass.Session[] sessions = new LlamaForwardPass.Session[prompts.length];
+      float[][] expected = new float[prompts.length][];
+      for (int index = 0; index < prompts.length; index++) {
+        LlamaForwardPass sequential =
+            new LlamaForwardPass(
+                config,
+                weights,
+                new KvCache(
+                    config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+                executionPlan(config, weights, 32, false));
+        sequential.prefill(prompts[index], 0);
+        expected[index] = sequential.forward(tokens[index], prompts[index].length);
+        sessions[index] = batched.openSession();
+        batched.prefill(sessions[index], prompts[index], 0);
+      }
+
+      LogitBatch actual = batched.forwardBatchTransient(sessions, tokens);
+
+      assertThat(weights.outputType()).isEqualTo(expectedOutputType);
+      assertThat(batched.usesBatchedSessionOutputProjection()).isTrue();
+      for (int index = 0; index < sessions.length; index++) {
+        assertThat(actual.copyRow(index)).containsExactly(expected[index]);
       }
     }
 
