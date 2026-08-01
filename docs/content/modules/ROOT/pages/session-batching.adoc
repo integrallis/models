@@ -118,6 +118,12 @@ constraints and qualify the intended model, context, concurrency, JDK, and host
 together. The qualified Graal launch includes
 `-Djdk.graal.MaximumInliningSize=10000`.
 
+This profile also selects the two-query Q6_K batch kernel. Against three
+GraalVM one-query controls, it raises aggregate throughput from 24.660 to
+27.753 tok/s (+12.54%), lowers TPOT 11.16%, and lowers process CPU 12.03%.
+Maximum observed RSS rises 3.89%. All six runs are token-exact and report zero
+collections.
+
 The versioned attribution, JVM comparison, rejected compiler-directive screens,
 and aggregate are under
 `benchmark-results/certified-20260801/decode/minicpm5-1b-session-memory-nmt/`.

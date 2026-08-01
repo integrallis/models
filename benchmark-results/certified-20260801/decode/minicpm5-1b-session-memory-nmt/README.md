@@ -4,8 +4,8 @@ This gate attributes the resident-memory increase from four-session decode
 batching and qualifies the JVM used by the MiniCPM5 EPYC-Milan performance
 profile. Every process used the same 688,065,920-byte GGUF artifact, four
 sessions, a 256-token context, 16 warmup steps, 64 measured steps per session,
-a fixed 2 GiB G1 heap, eight processors, 256-bit vectors, and the two-query
-Q6_K batch kernel.
+a fixed 2 GiB G1 heap, eight processors, and 256-bit vectors. Retained rows use
+the two-query Q6_K batch kernel unless the row names the one-query control.
 
 ## Retained Results
 
@@ -14,6 +14,7 @@ Q6_K batch kernel.
 | Temurin 25, sequential | 12.019 tok/s | 332.794 ms | 167,340 ms | 1.046 GB | 0.440 GB | 0.607 GB | 0 |
 | Temurin 25, batched | 17.103 tok/s | 233.879 ms | 113,717 ms | 1.621 GB | 1.014 GB | 0.607 GB | 0 |
 | GraalVM 25, sequential | 19.561 tok/s | 204.504 ms | 100,643 ms | 1.092 GB | 0.465 GB | 0.627 GB | 0 |
+| GraalVM 25, batched, Q6 one-query | 24.660 tok/s | 162.232 ms | 77,760 ms | 1.794 GB | 1.167 GB | 0.627 GB | 0 |
 | GraalVM 25, batched | 27.753 tok/s | 144.131 ms | 68,403 ms | 1.997 GB | 1.370 GB | 0.627 GB | 0 |
 
 Batching raises aggregate throughput by 42.29% on Temurin and 41.87% on
@@ -34,6 +35,12 @@ both throughput and memory capacity. GraalVM was launched with:
 ```text
 -Djdk.graal.MaximumInliningSize=10000
 ```
+
+The Q6_K policy is independently retained on GraalVM. Three one-query controls
+averaged 24.660 tok/s; two-query blocks improve aggregate throughput 12.54%,
+reduce TPOT 11.16%, and reduce process CPU 12.03%. Maximum observed RSS rises
+3.89%. Every corresponding run is token-exact and reports zero collections.
+The raw one-query controls are under `q6-one-query-graal/`.
 
 ## Rejected Compiler Directives
 

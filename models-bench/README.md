@@ -473,6 +473,11 @@ identical output and zero measured collections. Graal used 23.24% more mean curr
 process reports, rejected C2 directive screens, and the aggregate are under
 `benchmark-results/certified-20260801/decode/minicpm5-1b-session-memory-nmt/`.
 
+The same gate isolates Q6_K query tiling on GraalVM. Three one-query processes averaged
+24.660 tok/s; the retained two-query kernel averages 27.753 tok/s (+12.54%), lowers TPOT 11.16%,
+and lowers CPU 12.03%, with identical output and zero collections. Maximum observed RSS rises
+3.89%. One-query controls are in the gate's `q6-one-query-graal/` directory.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:
