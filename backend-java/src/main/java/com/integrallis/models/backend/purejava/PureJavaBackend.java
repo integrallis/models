@@ -17,6 +17,8 @@ package com.integrallis.models.backend.purejava;
 
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -46,7 +48,7 @@ import java.util.Objects;
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
  * any native dependencies.
  */
-public final class PureJavaBackend implements SpeculativeInferenceBackend {
+public final class PureJavaBackend implements SpeculativeInferenceBackend, BatchInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
@@ -58,6 +60,35 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   private final PureJavaExecutionPlan executionPlan;
   private final BackendDiagnostics diagnostics;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
+  private LlamaForwardPass.Session[] sessionBatch = new LlamaForwardPass.Session[0];
+  private boolean closed;
+
+  private static final class PureJavaInferenceSession implements InferenceSession {
+    private final PureJavaBackend owner;
+    private final LlamaForwardPass.Session delegate;
+    private boolean closed;
+
+    private PureJavaInferenceSession(PureJavaBackend owner, LlamaForwardPass.Session delegate) {
+      this.owner = owner;
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int checkpoint() {
+      owner.requireOpen(this);
+      return delegate.checkpoint();
+    }
+
+    @Override
+    public boolean isClosed() {
+      return closed || owner.closed;
+    }
+
+    @Override
+    public void close() {
+      owner.closeSession(this);
+    }
+  }
 
   private PureJavaBackend(
       Arena arena,
@@ -214,6 +245,12 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   }
 
   @Override
+  public int maxBatchSize() {
+    checkOpen();
+    return forwardPass.maxSessionBatchSize();
+  }
+
+  @Override
   public float[] forward(int token, int position) {
     return forwardPass.forward(token, position);
   }
@@ -226,6 +263,47 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
   @Override
   public float[] prefill(int[] tokens, int startPosition) {
     return forwardPass.prefill(tokens, startPosition);
+  }
+
+  @Override
+  public InferenceSession openSession() {
+    checkOpen();
+    return new PureJavaInferenceSession(this, forwardPass.openSession());
+  }
+
+  @Override
+  public float[] forward(InferenceSession session, int token, int position) {
+    return forwardPass.forward(requireOpen(session).delegate, token, position);
+  }
+
+  @Override
+  public float[] forwardTransient(InferenceSession session, int token, int position) {
+    return forwardPass.forwardTransient(requireOpen(session).delegate, token, position);
+  }
+
+  @Override
+  public float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
+    return forwardPass.prefill(requireOpen(session).delegate, tokens, startPosition);
+  }
+
+  @Override
+  public LogitBatch forwardBatch(InferenceSession[] sessions, int[] tokens) {
+    return forwardPass.forwardBatch(unwrapSessions(sessions), tokens);
+  }
+
+  @Override
+  public LogitBatch forwardBatchTransient(InferenceSession[] sessions, int[] tokens) {
+    return forwardPass.forwardBatchTransient(unwrapSessions(sessions), tokens);
+  }
+
+  @Override
+  public void rewind(InferenceSession session, int checkpoint) {
+    forwardPass.rewind(requireOpen(session).delegate, checkpoint);
+  }
+
+  @Override
+  public void reset(InferenceSession session) {
+    forwardPass.reset(requireOpen(session).delegate);
   }
 
   @Override
@@ -270,8 +348,54 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend {
         closeFailure.addSuppressed(failure);
       }
     }
+    closed = true;
     if (closeFailure != null) {
       throw closeFailure;
+    }
+  }
+
+  private LlamaForwardPass.Session[] unwrapSessions(InferenceSession[] sessions) {
+    Objects.requireNonNull(sessions, "sessions");
+    if (sessionBatch.length != sessions.length) {
+      sessionBatch = new LlamaForwardPass.Session[sessions.length];
+    }
+    for (int index = 0; index < sessions.length; index++) {
+      sessionBatch[index] = requireOpen(sessions[index]).delegate;
+    }
+    return sessionBatch;
+  }
+
+  private PureJavaInferenceSession requireOpen(InferenceSession session) {
+    checkOpen();
+    Objects.requireNonNull(session, "session");
+    if (!(session instanceof PureJavaInferenceSession pureJavaSession)
+        || pureJavaSession.owner != this) {
+      throw new IllegalArgumentException("session belongs to a different backend");
+    }
+    return requireOpen(pureJavaSession);
+  }
+
+  private PureJavaInferenceSession requireOpen(PureJavaInferenceSession session) {
+    checkOpen();
+    if (session.closed) {
+      throw new IllegalStateException("session is closed");
+    }
+    return session;
+  }
+
+  private void closeSession(PureJavaInferenceSession session) {
+    if (session.closed) {
+      return;
+    }
+    session.closed = true;
+    if (!closed) {
+      forwardPass.reset(session.delegate);
+    }
+  }
+
+  private void checkOpen() {
+    if (closed) {
+      throw new IllegalStateException("backend is closed");
     }
   }
 

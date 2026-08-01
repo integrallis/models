@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "minicpm5-session-output-projection-20260801",
+  "subject": "batched quantized vocabulary projection",
+  "model": {
+    "name": "MiniCPM5-1B-Q4_K_M",
+    "artifactSha256": "81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa",
+    "artifactSizeBytes": 688065920
+  },
+  "revisions": {
+    "baseline": "293a9fa71a4eff4663fea879b27d666b38b975d2",
+    "candidate": "b79acefaee23f07dd19ca9ec4be59590d26f267f"
+  },
+  "controls": {
+    "processOrder": ["baseline-a", "candidate-a", "candidate-b", "baseline-b"],
+    "contextLength": 256,
+    "concurrency": 4,
+    "warmupSteps": 16,
+    "measuredSteps": 64,
+    "generatedTokensPerProcess": 256,
+    "heap": "2g-fixed",
+    "collector": "G1",
+    "activeProcessorCount": 8,
+    "q6BatchedKernel": "two-query-block",
+    "cpuModel": "AMD EPYC-Milan Processor",
+    "java": "Eclipse Temurin 25.0.3+9-LTS",
+    "activeVectorBits": 256
+  },
+  "baseline": {
+    "meanAggregateTokensPerSecond": 14.025151376135067,
+    "meanPerRequestTokenMillis": 285.207545765625,
+    "meanCpuMillis": 139150.0,
+    "maxPeakRssBytes": 2101682176,
+    "gcCollections": 29
+  },
+  "candidate": {
+    "meanAggregateTokensPerSecond": 16.834076273464383,
+    "meanPerRequestTokenMillis": 237.6148847265625,
+    "meanCpuMillis": 114830.0,
+    "maxPeakRssBytes": 1670877184,
+    "gcCollections": 0
+  },
+  "change": {
+    "aggregateThroughputPercent": 20.02776884183175,
+    "perRequestTokenMillisPercent": -16.687027305432068,
+    "cpuMillisPercent": -17.47754222062522
+  },
+  "correctness": {
+    "allRunsMatch": true,
+    "outputTokenSha256": "722fe1aa593780b2ff7da300037decad54be5d9d0ff6e026e7515329fd56ce01"
+  }
+}

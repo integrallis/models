@@ -146,5 +146,7 @@ This API intentionally accepts a filesystem path because Models cannot verify
 an unmanaged artifact against ModelJars metadata. Use `backend-native` and
 `RustFfmBackend.load(gguf)` for explicit native-kernel loading.
 
-See xref:model-support.adoc[Model Support] for the qualification boundary and
-xref:execution-planning.adoc[Execution Planning] for profile selection.
+See xref:model-support.adoc[Model Support] for the qualification boundary,
+xref:execution-planning.adoc[Execution Planning] for profile selection, and
+xref:session-batching.adoc[Concurrent Session Batching] when one loaded model
+must serve several independent requests.

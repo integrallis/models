@@ -1,0 +1,118 @@
+= Concurrent Session Batching
+
+Autoregressive generation normally advances one request by one token, then
+reads the same model weights again for the next request. Decode is often
+limited by moving those weights through memory rather than by arithmetic.
+Advancing several requests together lets Models load quantized weight blocks
+once and apply them to several independent hidden states.
+
+`BatchInferenceBackend` exposes that capability without combining request
+state. Every `InferenceSession` owns its sequence position and KV cache. A
+batch call shares model weights and projection work, but attention for one
+session cannot read or modify another session's tokens.
+
+The API is intended for runtimes and servers that manage several active
+generations. A normal application with one request at a time should continue
+to use `TextGenerationModel` or a framework adapter.
+
+== Advance Active Requests
+
+`PureJavaBackend` implements `BatchInferenceBackend`. Open one session per
+request, prefill each prompt, and pass the active sessions and their current
+tokens in matching array positions:
+
+[source,java]
+----
+import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.InferenceSession;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import java.nio.file.Path;
+
+Path gguf = Path.of("/opt/models/MiniCPM5-1B-Q4_K_M.gguf");
+
+try (PureJavaBackend loaded = PureJavaBackend.load(gguf)) {
+    BatchInferenceBackend backend = loaded;
+    if (backend.maxBatchSize() < 2) {
+        throw new IllegalStateException("This execution plan cannot batch sessions");
+    }
+
+    try (InferenceSession first = backend.openSession();
+         InferenceSession second = backend.openSession()) {
+        int[] firstPrompt = backend.tokenizer().encode("Summarize the first document.");
+        int[] secondPrompt = backend.tokenizer().encode("Summarize the second document.");
+
+        int firstToken = argmax(backend.prefill(first, firstPrompt, 0));
+        int secondToken = argmax(backend.prefill(second, secondPrompt, 0));
+
+        var sessions = new InferenceSession[] {first, second};
+        var tokens = new int[] {firstToken, secondToken};
+
+        for (int step = 0; step < 32; step++) {
+            var logits = backend.forwardBatchTransient(sessions, tokens);
+            tokens[0] = logits.argmax(0);
+            tokens[1] = logits.argmax(1);
+        }
+    }
+}
+----
+
+The example uses greedy selection for brevity. A serving runtime can pass each
+row to `Sampler` with that request's sampling options and token history.
+
+`forwardBatchTransient` may reuse its logit storage on the next backend call.
+Consume each row before invoking the backend again, or call `snapshot()` when
+the complete result must outlive the step. `forwardBatch` returns stable logits
+at the cost of a copy.
+
+The helper used above is:
+
+[source,java]
+----
+static int argmax(float[] logits) {
+    int best = 0;
+    for (int index = 1; index < logits.length; index++) {
+        if (logits[index] > logits[best]) {
+            best = index;
+        }
+    }
+    return best;
+}
+----
+
+== Session Lifecycle
+
+* Keep all sessions in one batch owned by the same loaded backend.
+* Preserve the same array index between a session and its input token for each
+step. The active batch size may change between calls.
+* Serialize calls into one backend. The backend shares reusable activation and
+logit buffers; sessions isolate sequence state, not concurrent method calls.
+* Close a completed session to release request state. Closing the backend also
+invalidates its sessions.
+* Use `checkpoint()` and `rewind(session, checkpoint)` to discard a rejected
+suffix. Use `reset(session)` to reuse an open session from position zero.
+* Never exceed `maxBatchSize()`. The value is fixed by the execution plan
+selected when the model is loaded.
+
+== What Is Measured
+
+On the controlled eight-vCPU AMD EPYC-Milan qualification host, four MiniCPM5
+1B sessions improved aggregate decode throughput from 12.025 to 16.984 tok/s
+(+41.24%). Per-request TPOT fell from 332.648 to 235.519 ms (-29.20%), and
+process CPU fell 31.78%. All runs generated the same token sequence.
+
+Maximum observed process RSS increased from 1.055 to 1.655 GB. The sessions
+exist in both modes, so the difference is associated with the batched execution
+path, but RSS includes Java heap, native memory, and mapped GGUF page residency.
+Treat available memory and `maxBatchSize()` as deployment capacity constraints
+and qualify the intended model, context, concurrency, JDK, and host together.
+
+The versioned process reports and aggregate are under
+`benchmark-results/certified-20260801/decode/minicpm5-1b-session-batch-long/`.
+
+== Serving Work Still Above This API
+
+This capability performs one transformer step for the supplied active set. It
+does not provide an HTTP server, request queue, fairness policy, dynamic
+admission loop, or chunked prefill scheduler. A serving layer decides which
+requests join each step, removes completed requests, and interleaves bounded
+prompt chunks with decode without blocking existing requests.

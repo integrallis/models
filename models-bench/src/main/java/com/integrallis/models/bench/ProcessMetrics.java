@@ -18,6 +18,7 @@ package com.integrallis.models.bench;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 /** Best-effort CPU and resident-memory metrics for a backend process tree. */
 final class ProcessMetrics {
@@ -25,6 +26,10 @@ final class ProcessMetrics {
   private ProcessMetrics() {}
 
   static Snapshot capture(long rootPid) {
+    return capture(rootPid, ProcessHandle::descendants);
+  }
+
+  static Snapshot capture(long rootPid, DescendantSource descendantSource) {
     if (rootPid <= 0) {
       return Snapshot.ZERO;
     }
@@ -34,7 +39,11 @@ final class ProcessMetrics {
     }
     List<ProcessHandle> processes = new ArrayList<>();
     processes.add(root);
-    root.descendants().forEach(processes::add);
+    try (Stream<ProcessHandle> descendants = descendantSource.descendants(root)) {
+      descendants.forEach(processes::add);
+    } catch (RuntimeException ignored) {
+      // Some operating systems deny process-tree enumeration; retain root-process metrics.
+    }
     long highWaterBytes = 0;
     Duration cpu = Duration.ZERO;
     for (ProcessHandle process : processes) {
@@ -42,6 +51,11 @@ final class ProcessMetrics {
       cpu = cpu.plus(process.info().totalCpuDuration().orElse(Duration.ZERO));
     }
     return new Snapshot(highWaterBytes, cpu);
+  }
+
+  @FunctionalInterface
+  interface DescendantSource {
+    Stream<ProcessHandle> descendants(ProcessHandle root);
   }
 
   record Snapshot(long highWaterBytes, Duration cpu) {

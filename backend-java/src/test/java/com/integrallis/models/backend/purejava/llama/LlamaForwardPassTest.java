@@ -170,6 +170,32 @@ class LlamaForwardPassTest {
         valueCount -> randomQ6K(rng, valueCount));
   }
 
+  private GgufFile buildMixedQ4KQ6KQuantizedOutputNanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng,
+        GgufTensorType.Q4_K,
+        256,
+        256,
+        valueCount -> randomQ4K(rng, valueCount),
+        GgufTensorType.Q6_K,
+        valueCount -> randomQ6K(rng, valueCount),
+        false,
+        true);
+  }
+
+  private GgufFile buildQ4QuantizedOutputNanoModel(Random rng) {
+    return buildQuantizedNanoModel(
+        rng,
+        GgufTensorType.Q4_0,
+        256,
+        256,
+        valueCount -> randomQ4(rng, valueCount),
+        GgufTensorType.Q4_0,
+        valueCount -> randomQ4(rng, valueCount),
+        false,
+        true);
+  }
+
   private GgufFile buildMixedQ5KQ6KNanoModel(Random rng) {
     return buildQuantizedNanoModel(
         rng,
@@ -205,7 +231,8 @@ class LlamaForwardPassTest {
         quantizedData,
         quantizedType,
         quantizedData,
-        quantizedEmbedding);
+        quantizedEmbedding,
+        false);
   }
 
   private GgufFile buildQuantizedNanoModel(
@@ -229,6 +256,28 @@ class LlamaForwardPassTest {
       GgufTensorType secondaryType,
       IntFunction<byte[]> secondaryData,
       boolean quantizedEmbedding) {
+    return buildQuantizedNanoModel(
+        rng,
+        quantizedType,
+        dim,
+        hiddenDim,
+        quantizedData,
+        secondaryType,
+        secondaryData,
+        quantizedEmbedding,
+        false);
+  }
+
+  private GgufFile buildQuantizedNanoModel(
+      Random rng,
+      GgufTensorType quantizedType,
+      int dim,
+      int hiddenDim,
+      IntFunction<byte[]> quantizedData,
+      GgufTensorType secondaryType,
+      IntFunction<byte[]> secondaryData,
+      boolean quantizedEmbedding,
+      boolean quantizedOutput) {
     int headDim = dim / HEADS;
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -250,9 +299,11 @@ class LlamaForwardPassTest {
             .addTensor("output_norm.weight", GgufTensorType.F32, new long[] {dim}, onesF32(dim))
             .addTensor(
                 "output.weight",
-                GgufTensorType.F32,
+                quantizedOutput ? secondaryType : GgufTensorType.F32,
                 new long[] {dim, VOCAB_SIZE},
-                randomF32(rng, VOCAB_SIZE * dim));
+                quantizedOutput
+                    ? secondaryData.apply(VOCAB_SIZE * dim)
+                    : randomF32(rng, VOCAB_SIZE * dim));
 
     for (int layer = 0; layer < LAYERS; layer++) {
       String prefix = "blk." + layer + ".";
@@ -1391,6 +1442,235 @@ class LlamaForwardPassTest {
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
+    }
+
+    @Test
+    void independentSessionBatchPreservesLogitsKvStateAndAutoregressiveContinuation() {
+      GgufFile file = buildQ4KNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] firstPrompt = {5, 7, 11};
+      int[] secondPrompt = {13, 17, 19, 23};
+
+      KvCache firstExpectedCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass firstExpected = new LlamaForwardPass(config, weights, firstExpectedCache);
+      firstExpected.prefill(firstPrompt, 0);
+      KvCache secondExpectedCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass secondExpected = new LlamaForwardPass(config, weights, secondExpectedCache);
+      secondExpected.prefill(secondPrompt, 0);
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session first = batched.openSession();
+      LlamaForwardPass.Session second = batched.openSession();
+      batched.prefill(first, firstPrompt, 0);
+      batched.prefill(second, secondPrompt, 0);
+
+      float[] firstExpectedLogits = firstExpected.forward(29, firstPrompt.length);
+      float[] secondExpectedLogits = secondExpected.forward(31, secondPrompt.length);
+      LogitBatch actual =
+          batched.forwardBatchTransient(
+              new LlamaForwardPass.Session[] {first, second}, new int[] {29, 31});
+
+      assertThat(actual.tokenCount()).isEqualTo(2);
+      assertThat(actual.copyRow(0)).containsExactly(firstExpectedLogits);
+      assertThat(actual.copyRow(1)).containsExactly(secondExpectedLogits);
+      assertThat(first.cache().keyBuffer()).containsExactly(firstExpectedCache.keyBuffer());
+      assertThat(first.cache().valueBuffer()).containsExactly(firstExpectedCache.valueBuffer());
+      assertThat(second.cache().keyBuffer()).containsExactly(secondExpectedCache.keyBuffer());
+      assertThat(second.cache().valueBuffer()).containsExactly(secondExpectedCache.valueBuffer());
+      assertThat(first.checkpoint()).isEqualTo(firstPrompt.length + 1);
+      assertThat(second.checkpoint()).isEqualTo(secondPrompt.length + 1);
+
+      int firstNext = argmax(firstExpectedLogits);
+      int secondNext = argmax(secondExpectedLogits);
+      float[] firstExpectedNext = firstExpected.forward(firstNext, firstPrompt.length + 1);
+      float[] secondExpectedNext = secondExpected.forward(secondNext, secondPrompt.length + 1);
+      LogitBatch next =
+          batched.forwardBatchTransient(
+              new LlamaForwardPass.Session[] {first, second}, new int[] {firstNext, secondNext});
+
+      assertThat(next.copyRow(0)).containsExactly(firstExpectedNext);
+      assertThat(next.copyRow(1)).containsExactly(secondExpectedNext);
+      assertThat(first.cache().keyBuffer()).containsExactly(firstExpectedCache.keyBuffer());
+      assertThat(first.cache().valueBuffer()).containsExactly(firstExpectedCache.valueBuffer());
+      assertThat(second.cache().keyBuffer()).containsExactly(secondExpectedCache.keyBuffer());
+      assertThat(second.cache().valueBuffer()).containsExactly(secondExpectedCache.valueBuffer());
+    }
+
+    @Test
+    void fourSessionBatchExercisesRegisterTiledKQuantPathExactly() {
+      GgufFile file = buildQ4KNanoModel(new Random(43));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[][] prompts = {{3, 5}, {7, 11, 13}, {17, 19, 23, 29}, {31}};
+      int[] tokens = {2, 4, 6, 8};
+      KvCache[] expectedCaches = new KvCache[prompts.length];
+      LlamaForwardPass[] expectedPasses = new LlamaForwardPass[prompts.length];
+
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session[] sessions = new LlamaForwardPass.Session[prompts.length];
+      float[][] expectedLogits = new float[prompts.length][];
+      for (int index = 0; index < prompts.length; index++) {
+        expectedCaches[index] =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        expectedPasses[index] = new LlamaForwardPass(config, weights, expectedCaches[index]);
+        expectedPasses[index].prefill(prompts[index], 0);
+        expectedLogits[index] = expectedPasses[index].forward(tokens[index], prompts[index].length);
+
+        sessions[index] = batched.openSession();
+        batched.prefill(sessions[index], prompts[index], 0);
+      }
+
+      LogitBatch actual = batched.forwardBatchTransient(sessions, tokens);
+
+      assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
+      for (int index = 0; index < sessions.length; index++) {
+        assertThat(actual.copyRow(index)).containsExactly(expectedLogits[index]);
+        assertThat(sessions[index].cache().keyBuffer())
+            .containsExactly(expectedCaches[index].keyBuffer());
+        assertThat(sessions[index].cache().valueBuffer())
+            .containsExactly(expectedCaches[index].valueBuffer());
+      }
+    }
+
+    @Test
+    void independentSessionBatchReusesQuantizedOutputWeightsExactly() {
+      assertIndependentSessionBatchOutputExact(
+          buildMixedQ4KQ6KQuantizedOutputNanoModel(new Random(44)), GgufTensorType.Q6_K);
+    }
+
+    @Test
+    void independentSessionBatchSizesScratchForQ4QuantizedOutput() {
+      assertIndependentSessionBatchOutputExact(
+          buildQ4QuantizedOutputNanoModel(new Random(45)), GgufTensorType.Q4_0);
+    }
+
+    private void assertIndependentSessionBatchOutputExact(
+        GgufFile file, GgufTensorType expectedOutputType) {
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[][] prompts = {{3, 5}, {7, 11, 13}, {17, 19, 23, 29}, {31}};
+      int[] tokens = {2, 4, 6, 8};
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              executionPlan(config, weights, 32, false));
+      LlamaForwardPass.Session[] sessions = new LlamaForwardPass.Session[prompts.length];
+      float[][] expected = new float[prompts.length][];
+      for (int index = 0; index < prompts.length; index++) {
+        LlamaForwardPass sequential =
+            new LlamaForwardPass(
+                config,
+                weights,
+                new KvCache(
+                    config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+                executionPlan(config, weights, 32, false));
+        sequential.prefill(prompts[index], 0);
+        expected[index] = sequential.forward(tokens[index], prompts[index].length);
+        sessions[index] = batched.openSession();
+        batched.prefill(sessions[index], prompts[index], 0);
+      }
+
+      LogitBatch actual = batched.forwardBatchTransient(sessions, tokens);
+
+      assertThat(weights.outputType()).isEqualTo(expectedOutputType);
+      assertThat(batched.usesBatchedSessionOutputProjection()).isTrue();
+      for (int index = 0; index < sessions.length; index++) {
+        assertThat(actual.copyRow(index)).containsExactly(expected[index]);
+      }
+    }
+
+    @Test
+    void sessionBatchRejectsInvalidOwnershipShapeAndAliasing() {
+      GgufFile file = buildQ4KNanoModel(new Random(44));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass first =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass second =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session owned = first.openSession();
+      LlamaForwardPass.Session foreign = second.openSession();
+
+      assertThatThrownBy(
+              () -> first.forwardBatchTransient(new LlamaForwardPass.Session[0], new int[0]))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("sessions must not be empty");
+      assertThatThrownBy(
+              () ->
+                  first.forwardBatchTransient(
+                      new LlamaForwardPass.Session[] {owned}, new int[] {1, 2}))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("tokens.length must equal sessions.length");
+      assertThatThrownBy(
+              () ->
+                  first.forwardBatchTransient(
+                      new LlamaForwardPass.Session[] {owned, owned}, new int[] {1, 2}))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("sessions must be distinct");
+      assertThatThrownBy(
+              () ->
+                  first.forwardBatchTransient(
+                      new LlamaForwardPass.Session[] {owned, foreign}, new int[] {1, 2}))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("session belongs to a different forward pass");
+    }
+
+    @Test
+    void rewindAndResetAffectOnlyTheirSession() {
+      GgufFile file = buildNanoModel(new Random(45));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass batched =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session first = batched.openSession();
+      LlamaForwardPass.Session second = batched.openSession();
+      batched.prefill(first, new int[] {3, 5, 7}, 0);
+      batched.prefill(second, new int[] {11, 13, 17}, 0);
+      float[] secondKeys = second.cache().keyBuffer().clone();
+      float[] secondValues = second.cache().valueBuffer().clone();
+
+      batched.rewind(first, 2);
+      assertThat(first.checkpoint()).isEqualTo(2);
+      assertThat(second.checkpoint()).isEqualTo(3);
+      assertThat(second.cache().keyBuffer()).containsExactly(secondKeys);
+      assertThat(second.cache().valueBuffer()).containsExactly(secondValues);
+
+      batched.reset(first);
+      assertThat(first.checkpoint()).isZero();
+      assertThat(second.checkpoint()).isEqualTo(3);
+      assertThat(second.cache().keyBuffer()).containsExactly(secondKeys);
+      assertThat(second.cache().valueBuffer()).containsExactly(secondValues);
     }
 
     @Test
