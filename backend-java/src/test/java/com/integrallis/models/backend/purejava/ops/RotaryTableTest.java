@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.backend.purejava.llama;
+package com.integrallis.models.backend.purejava.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.data.Offset.offset;
 
-import com.integrallis.models.backend.purejava.ops.TensorOps;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("unit")
-class RopeTableTest {
+class RotaryTableTest {
 
   @Test
   void reusesFactorsForEveryHeadAtTheSamePosition() {
-    RopeTable table = new RopeTable(4, 10_000.0f, 0.25f);
+    RotaryTable table = new RotaryTable(4, 10_000.0f, 0.25f);
     float[] first = {1.0f, 2.0f, 3.0f, 4.0f};
     float[] second = {5.0f, 6.0f, 7.0f, 8.0f};
 
@@ -40,7 +41,7 @@ class RopeTableTest {
 
   @Test
   void cachedFactorsMatchDirectStandardAndNeoxRope() {
-    RopeTable table = new RopeTable(4, 10_000.0f, 0.25f);
+    RotaryTable table = new RotaryTable(4, 10_000.0f, 0.25f);
     float[] standard = {99.0f, 1.0f, 2.0f, 3.0f, 4.0f, 98.0f};
     float[] expectedStandard = standard.clone();
     float[] neox = {97.0f, 5.0f, 6.0f, 7.0f, 8.0f, 96.0f};
@@ -58,7 +59,7 @@ class RopeTableTest {
 
   @Test
   void batchFactorsArePreparedOnceAndAddressedByToken() {
-    RopeTable table = new RopeTable(4, 10_000.0f, 0.25f);
+    RotaryTable table = new RotaryTable(4, 10_000.0f, 0.25f);
     float[] first = {1.0f, 2.0f, 3.0f, 4.0f};
     float[] second = {5.0f, 6.0f, 7.0f, 8.0f};
     float[] expectedFirst = first.clone();
@@ -73,5 +74,30 @@ class RopeTableTest {
     assertThat(first).containsExactly(expectedFirst);
     assertThat(second).containsExactly(expectedSecond);
     assertThat(table.preparationCount()).isEqualTo(2);
+  }
+
+  @Test
+  void ggufFrequencyFactorsPreserveGemma4ProportionalRopeLayout() {
+    RotaryTable table =
+        new RotaryTable(8, 1_000_000.0f, 1.0f, new float[] {1.0f, 1.0e30f, 1.0e30f, 1.0e30f});
+    float[] head = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    table.prepare(2);
+    table.apply(head, 0, true);
+
+    assertThat(head[0]).isCloseTo(-4.9626341f, offset(1.0e-6f));
+    assertThat(head[4]).isCloseTo(-1.1714368f, offset(1.0e-6f));
+    assertThat(head).containsExactly(head[0], 2, 3, 4, head[4], 6, 7, 8);
+  }
+
+  @Test
+  void frequencyFactorsMustMatchTheRotaryPairCountAndRemainPositive() {
+    assertThatThrownBy(() -> new RotaryTable(8, 10_000.0f, 1.0f, new float[] {1, 1}))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("frequencyFactors");
+    assertThatThrownBy(
+            () -> new RotaryTable(4, 10_000.0f, 1.0f, new float[] {1, Float.POSITIVE_INFINITY}))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("frequencyFactors[1]");
   }
 }

@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import com.integrallis.vectors.core.GgufQ4Kernel;
@@ -84,10 +85,10 @@ class Qwen3BatchedPrefillIntegrationTest {
       float[] batchScales = new float[batchSize * blocks];
       int[] batchCorrections = new int[batchSize * ((cols + 3) / 4)];
       float[] batchLanes = new float[batchSize * rows * 8];
-      RopeTable sequentialRope =
-          new RopeTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
-      RopeTable batchedRope =
-          new RopeTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
+      RotaryTable sequentialRope =
+          new RotaryTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
+      RotaryTable batchedRope =
+          new RotaryTable(headDim, config.ropeTheta(), config.ropeFrequencyScale());
 
       for (int iteration = 0; iteration < 16; iteration++) {
         for (int batch = 0; batch < batchSize; batch++) {
