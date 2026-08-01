@@ -656,13 +656,21 @@ public final class LlamaForwardPass {
   private LogitBatch forwardIndependentSessionBatch(Session[] sessions, int[] tokens) {
     int batchSize = sessions.length;
     int dim = config.embeddingDim();
-    int queryDim = config.queryDim();
-    int keyDim = config.keyDim();
-    int valueDim = config.valueDim();
-    int attentionOutputDim = config.attentionOutputDim();
-    int hiddenDim = config.hiddenDim();
     int vocabSize = config.vocabSize();
 
+    prepareIndependentSessionInputs(sessions, tokens, batchSize, dim);
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      executeIndependentSessionLayer(sessions, batchSize, layer);
+    }
+    projectIndependentSessionLogits(batchSize, dim, vocabSize);
+    for (Session session : sessions) {
+      session.nextPosition++;
+    }
+    return new LogitBatch(batchSize, vocabSize, sessionBatchLogits);
+  }
+
+  private void prepareIndependentSessionInputs(
+      Session[] sessions, int[] tokens, int batchSize, int dim) {
     for (int batch = 0; batch < batchSize; batch++) {
       batchPositions[batch] = sessions[batch].nextPosition;
     }
@@ -673,167 +681,179 @@ public final class LlamaForwardPass {
       scaleActive(x, 0, dim, config.embeddingScale());
       System.arraycopy(x, 0, batchX, batch * dim, dim);
     }
+  }
 
-    for (int layer = 0; layer < config.numLayers(); layer++) {
-      LlamaWeights.LayerWeights lw = weights.layer(layer);
-      for (int batch = 0; batch < batchSize; batch++) {
-        int stateOffset = batch * dim;
-        TensorOps.rmsNorm(
-            batchXNorm,
-            stateOffset,
-            batchX,
-            stateOffset,
-            lw.attentionNorm(),
-            dim,
-            config.rmsNormEps());
-      }
+  private void executeIndependentSessionLayer(Session[] sessions, int batchSize, int layer) {
+    int dim = config.embeddingDim();
+    int attentionOutputDim = config.attentionOutputDim();
+    LlamaWeights.LayerWeights lw = weights.layer(layer);
 
-      if (groupedBatchedPrefill) {
-        tripleBatchedMatmulDispatch(
-            batchQ,
-            lw.wq(),
-            lw.wqType(),
-            queryDim,
-            batchK,
-            lw.wk(),
-            lw.wkType(),
-            keyDim,
-            batchV,
-            lw.wv(),
-            lw.wvType(),
-            valueDim,
-            batchXNorm,
-            batchSize,
-            dim);
-      } else {
-        batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
-        batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
-        batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
-      }
+    normalizeIndependentSessionBatch(batchXNorm, batchX, batchSize, dim, lw.attentionNorm());
+    projectIndependentSessionQkv(lw, batchSize, dim);
+    attendIndependentSessions(sessions, batchSize, layer, lw);
 
-      for (int batch = 0; batch < batchSize; batch++) {
-        int queryOffset = batch * queryDim;
-        int keyOffset = batch * keyDim;
-        int valueOffset = batch * valueDim;
-        addOptionalBias(batchQ, queryOffset, lw.qBias());
-        addOptionalBias(batchK, keyOffset, lw.kBias());
-        addOptionalBias(batchV, valueOffset, lw.vBias());
-        for (int head = 0; head < config.numHeads(); head++) {
-          int offset = queryOffset + head * config.keyLength();
-          normalizeHead(batchQ, offset, lw.qNorm(), config.keyLength());
-          if (config.usesRope(layer)) {
-            applyRopeBatch(batchQ, offset, batch, layer);
-          }
-        }
-        for (int head = 0; head < config.numKvHeads(); head++) {
-          int offset = keyOffset + head * config.keyLength();
-          normalizeHead(batchK, offset, lw.kNorm(), config.keyLength());
-          if (config.usesRope(layer)) {
-            applyRopeBatch(batchK, offset, batch, layer);
-          }
-        }
+    batchedMatmulDispatch(
+        batchAttnProjected, batchAttnOut, batchSize, lw.wo(), lw.woType(), dim, attentionOutputDim);
+    normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
+    addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
 
-        Session session = sessions[batch];
-        session.cache.store(layer, session.nextPosition, batchK, keyOffset, batchV, valueOffset);
-        float[] scores = batchAttentionScores.length == 0 ? attentionScores : batchAttentionScores;
-        int scoresOffset = batchAttentionScores.length == 0 ? 0 : batch * session.cache.maxSeqLen();
-        groupedQueryAttention(
-            batchQ,
-            queryOffset,
-            batchAttnOut,
-            batch * attentionOutputDim,
-            layer,
-            session.nextPosition,
-            session.cache,
-            session.cache.keyBuffer(),
-            session.cache.valueBuffer(),
-            scores,
-            scoresOffset);
-      }
+    executeIndependentSessionFfn(lw, batchSize, dim);
+    observeIndependentSessionLayer(sessions, batchSize, layer, dim);
+  }
 
-      batchedMatmulDispatch(
-          batchAttnProjected,
-          batchAttnOut,
-          batchSize,
-          lw.wo(),
-          lw.woType(),
-          dim,
-          attentionOutputDim);
-      normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
-      addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
-
-      for (int batch = 0; batch < batchSize; batch++) {
-        int stateOffset = batch * dim;
-        TensorOps.rmsNorm(
-            batchXNorm, stateOffset, batchX, stateOffset, lw.ffnNorm(), dim, config.rmsNormEps());
-      }
-      if (stagedQuantizedFfn
-          && stagedQuantizedPlan != null
-          && stagedQuantizedPlan.supportsFfn(lw)) {
-        stagedQuantizedPlan.executeFfn(lw, batchSize);
-      } else {
-        if (groupedBatchedPrefill) {
-          dualBatchedMatmulDispatch(
-              batchFfnGate,
-              lw.ffnGate(),
-              lw.ffnGateType(),
-              hiddenDim,
-              batchFfnUp,
-              lw.ffnUp(),
-              lw.ffnUpType(),
-              hiddenDim,
-              batchXNorm,
-              batchSize,
-              dim);
-        } else {
-          batchedMatmulDispatch(
-              batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
-          batchedMatmulDispatch(
-              batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
-        }
-        for (int batch = 0; batch < batchSize; batch++) {
-          int hiddenOffset = batch * hiddenDim;
-          activateFfn(
-              batchFfnOut,
-              hiddenOffset,
-              batchFfnGate,
-              hiddenOffset,
-              batchFfnUp,
-              hiddenOffset,
-              hiddenDim);
-        }
-        batchedMatmulDispatch(
-            batchFfnProjected,
-            batchFfnOut,
-            batchSize,
-            lw.ffnDown(),
-            lw.ffnDownType(),
-            dim,
-            hiddenDim);
-      }
-      normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
-      addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
-      if (layerObserver != null) {
-        for (int batch = 0; batch < batchSize; batch++) {
-          layerObserver.onLayerComplete(
-              layer, sessions[batch].nextPosition, batchX, batch * dim, dim);
-        }
-      }
+  private void normalizeIndependentSessionBatch(
+      float[] target, float[] source, int batchSize, int dim, float[] norm) {
+    for (int batch = 0; batch < batchSize; batch++) {
+      int stateOffset = batch * dim;
+      TensorOps.rmsNorm(target, stateOffset, source, stateOffset, norm, dim, config.rmsNormEps());
     }
+  }
 
+  private void projectIndependentSessionQkv(LlamaWeights.LayerWeights lw, int batchSize, int dim) {
+    int queryDim = config.queryDim();
+    int keyDim = config.keyDim();
+    int valueDim = config.valueDim();
+    if (groupedBatchedPrefill) {
+      tripleBatchedMatmulDispatch(
+          batchQ,
+          lw.wq(),
+          lw.wqType(),
+          queryDim,
+          batchK,
+          lw.wk(),
+          lw.wkType(),
+          keyDim,
+          batchV,
+          lw.wv(),
+          lw.wvType(),
+          valueDim,
+          batchXNorm,
+          batchSize,
+          dim);
+      return;
+    }
+    batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
+    batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
+    batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
+  }
+
+  private void attendIndependentSessions(
+      Session[] sessions, int batchSize, int layer, LlamaWeights.LayerWeights lw) {
+    int queryDim = config.queryDim();
+    int keyDim = config.keyDim();
+    int valueDim = config.valueDim();
+    int attentionOutputDim = config.attentionOutputDim();
+    boolean usesRope = config.usesRope(layer);
+    for (int batch = 0; batch < batchSize; batch++) {
+      int queryOffset = batch * queryDim;
+      int keyOffset = batch * keyDim;
+      int valueOffset = batch * valueDim;
+      addOptionalBias(batchQ, queryOffset, lw.qBias());
+      addOptionalBias(batchK, keyOffset, lw.kBias());
+      addOptionalBias(batchV, valueOffset, lw.vBias());
+      for (int head = 0; head < config.numHeads(); head++) {
+        int offset = queryOffset + head * config.keyLength();
+        normalizeHead(batchQ, offset, lw.qNorm(), config.keyLength());
+        if (usesRope) {
+          applyRopeBatch(batchQ, offset, batch, layer);
+        }
+      }
+      for (int head = 0; head < config.numKvHeads(); head++) {
+        int offset = keyOffset + head * config.keyLength();
+        normalizeHead(batchK, offset, lw.kNorm(), config.keyLength());
+        if (usesRope) {
+          applyRopeBatch(batchK, offset, batch, layer);
+        }
+      }
+
+      Session session = sessions[batch];
+      session.cache.store(layer, session.nextPosition, batchK, keyOffset, batchV, valueOffset);
+      float[] scores = batchAttentionScores.length == 0 ? attentionScores : batchAttentionScores;
+      int scoresOffset = batchAttentionScores.length == 0 ? 0 : batch * session.cache.maxSeqLen();
+      groupedQueryAttention(
+          batchQ,
+          queryOffset,
+          batchAttnOut,
+          batch * attentionOutputDim,
+          layer,
+          session.nextPosition,
+          session.cache,
+          session.cache.keyBuffer(),
+          session.cache.valueBuffer(),
+          scores,
+          scoresOffset);
+    }
+  }
+
+  private void executeIndependentSessionFfn(LlamaWeights.LayerWeights lw, int batchSize, int dim) {
+    int hiddenDim = config.hiddenDim();
+    normalizeIndependentSessionBatch(batchXNorm, batchX, batchSize, dim, lw.ffnNorm());
+    if (stagedQuantizedFfn && stagedQuantizedPlan != null && stagedQuantizedPlan.supportsFfn(lw)) {
+      stagedQuantizedPlan.executeFfn(lw, batchSize);
+    } else {
+      projectIndependentSessionGateUp(lw, batchSize, dim, hiddenDim);
+      batchedMatmulDispatch(
+          batchFfnProjected,
+          batchFfnOut,
+          batchSize,
+          lw.ffnDown(),
+          lw.ffnDownType(),
+          dim,
+          hiddenDim);
+    }
+    normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
+    addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
+  }
+
+  private void projectIndependentSessionGateUp(
+      LlamaWeights.LayerWeights lw, int batchSize, int dim, int hiddenDim) {
+    if (groupedBatchedPrefill) {
+      dualBatchedMatmulDispatch(
+          batchFfnGate,
+          lw.ffnGate(),
+          lw.ffnGateType(),
+          hiddenDim,
+          batchFfnUp,
+          lw.ffnUp(),
+          lw.ffnUpType(),
+          hiddenDim,
+          batchXNorm,
+          batchSize,
+          dim);
+    } else {
+      batchedMatmulDispatch(
+          batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
+      batchedMatmulDispatch(
+          batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
+    }
+    for (int batch = 0; batch < batchSize; batch++) {
+      int hiddenOffset = batch * hiddenDim;
+      activateFfn(
+          batchFfnOut,
+          hiddenOffset,
+          batchFfnGate,
+          hiddenOffset,
+          batchFfnUp,
+          hiddenOffset,
+          hiddenDim);
+    }
+  }
+
+  private void observeIndependentSessionLayer(
+      Session[] sessions, int batchSize, int layer, int dim) {
+    if (layerObserver == null) {
+      return;
+    }
+    for (int batch = 0; batch < batchSize; batch++) {
+      layerObserver.onLayerComplete(layer, sessions[batch].nextPosition, batchX, batch * dim, dim);
+    }
+  }
+
+  private void projectIndependentSessionLogits(int batchSize, int dim, int vocabSize) {
     ensureSessionBatchLogits(Math.multiplyExact(batchSize, vocabSize));
     if (usesBatchedSessionOutputProjection(batchSize)) {
-      for (int batch = 0; batch < batchSize; batch++) {
-        int stateOffset = batch * dim;
-        TensorOps.rmsNorm(
-            batchXNorm,
-            stateOffset,
-            batchX,
-            stateOffset,
-            weights.outputNormWeight(),
-            dim,
-            config.rmsNormEps());
-      }
+      normalizeIndependentSessionBatch(
+          batchXNorm, batchX, batchSize, dim, weights.outputNormWeight());
       batchedMatmulDispatch(
           sessionBatchLogits,
           batchXNorm,
@@ -845,21 +865,16 @@ public final class LlamaForwardPass {
       for (int batch = 0; batch < batchSize; batch++) {
         softcapLogits(sessionBatchLogits, batch * vocabSize, vocabSize);
       }
-    } else {
-      for (int batch = 0; batch < batchSize; batch++) {
-        int stateOffset = batch * dim;
-        TensorOps.rmsNorm(
-            xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
-        matmulDispatch(
-            logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
-        softcapLogits(logits);
-        System.arraycopy(logits, 0, sessionBatchLogits, batch * vocabSize, vocabSize);
-      }
+      return;
     }
-    for (Session session : sessions) {
-      session.nextPosition++;
+    for (int batch = 0; batch < batchSize; batch++) {
+      int stateOffset = batch * dim;
+      TensorOps.rmsNorm(
+          xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
+      matmulDispatch(logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+      softcapLogits(logits);
+      System.arraycopy(logits, 0, sessionBatchLogits, batch * vocabSize, vocabSize);
     }
-    return new LogitBatch(batchSize, vocabSize, sessionBatchLogits);
   }
 
   private void validateSessionBatch(Session[] sessions, int[] tokens) {
