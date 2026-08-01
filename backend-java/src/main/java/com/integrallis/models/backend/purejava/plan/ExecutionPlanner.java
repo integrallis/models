@@ -64,8 +64,8 @@ public final class ExecutionPlanner {
     boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
     boolean finalLayerKvOnlyPrefill =
         finalLayerKvOnlyPrefill(topology, configuration, finalLayerPrefillPruning, decisions);
-    boolean batchedAttentionScores = batchedAttentionScores(configuration, decisions);
-    boolean batchedAttentionValues = batchedAttentionValues(configuration, decisions);
+    boolean batchedAttentionScores = batchedAttentionScores(topology, configuration, decisions);
+    boolean batchedAttentionValues = batchedAttentionValues(topology, configuration, decisions);
     boolean stagedQuantizedFfn =
         stagedQuantizedFfn(runtime, topology, configuration, prefillBatchSize, decisions);
     boolean stagedQuantizedLayer =
@@ -486,7 +486,18 @@ public final class ExecutionPlanner {
   }
 
   private static boolean batchedAttentionScores(
-      PureJavaPlanConfiguration configuration, List<OptimizationDecision> decisions) {
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      List<OptimizationDecision> decisions) {
+    if (!topology.supportsBatchedAttentionKernels()) {
+      decisions.add(
+          new OptimizationDecision(
+              "batched-attention-scores",
+              OptimizationStatus.UNSUPPORTED,
+              "the loaded decoder does not consume the Llama batched scoring kernel",
+              Map.of("rows-per-group", "1")));
+      return false;
+    }
     boolean enabled = configuration.batchedAttentionScores();
     decisions.add(
         new OptimizationDecision(
@@ -500,7 +511,18 @@ public final class ExecutionPlanner {
   }
 
   private static boolean batchedAttentionValues(
-      PureJavaPlanConfiguration configuration, List<OptimizationDecision> decisions) {
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      List<OptimizationDecision> decisions) {
+    if (!topology.supportsBatchedAttentionKernels()) {
+      decisions.add(
+          new OptimizationDecision(
+              "batched-attention-values",
+              OptimizationStatus.UNSUPPORTED,
+              "the loaded decoder does not consume the Llama batched value kernel",
+              Map.of("rows-per-group", "1")));
+      return false;
+    }
     boolean enabled = configuration.batchedAttentionValues();
     decisions.add(
         new OptimizationDecision(

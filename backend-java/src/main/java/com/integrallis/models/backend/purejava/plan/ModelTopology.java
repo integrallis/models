@@ -156,12 +156,14 @@ public record ModelTopology(
   }
 
   boolean supportsBatchedPrefill() {
-    return layers.stream().allMatch(LayerTopology::supportsBatchedPrefill);
+    return supportsLlamaProjectionRouting()
+        && layers.stream().allMatch(LayerTopology::supportsBatchedPrefill);
   }
 
   boolean hasGroupedProjection() {
-    return layers.stream()
-        .anyMatch(layer -> layer.groupsGateUp() || !"independent".equals(layer.qkvMode()));
+    return supportsLlamaProjectionRouting()
+        && layers.stream()
+            .anyMatch(layer -> layer.groupsGateUp() || !"independent".equals(layer.qkvMode()));
   }
 
   boolean hasGroupedProjection(GgufBatchedMatrixKernel kernel) {
@@ -171,14 +173,18 @@ public record ModelTopology(
   /** Returns whether an injected kernel can group at least one loaded projection set. */
   public boolean hasInjectedGroupedProjection(GgufBatchedMatrixKernel kernel) {
     Objects.requireNonNull(kernel, "kernel");
-    return layers.stream()
-        .anyMatch(
-            layer ->
-                kernel.supportsDual(layer.gate(), layer.up())
-                    || kernel.supportsTriple(layer.query(), layer.key(), layer.value()));
+    return supportsLlamaProjectionRouting()
+        && layers.stream()
+            .anyMatch(
+                layer ->
+                    kernel.supportsDual(layer.gate(), layer.up())
+                        || kernel.supportsTriple(layer.query(), layer.key(), layer.value()));
   }
 
   int mixedKProjectionLayers() {
+    if (!supportsLlamaProjectionRouting()) {
+      return 0;
+    }
     return Math.toIntExact(layers.stream().filter(LayerTopology::groupsMixedKQkv).count());
   }
 
@@ -294,7 +300,15 @@ public record ModelTopology(
   }
 
   private boolean supportsStandardLlamaLayerSemantics() {
-    return !"gemma3".equals(architecture);
+    return !"gemma3".equals(architecture) && supportsLlamaProjectionRouting();
+  }
+
+  boolean supportsBatchedAttentionKernels() {
+    return supportsLlamaProjectionRouting();
+  }
+
+  private boolean supportsLlamaProjectionRouting() {
+    return !"gemma4".equals(architecture);
   }
 
   String finalLayerFfnFormats() {
