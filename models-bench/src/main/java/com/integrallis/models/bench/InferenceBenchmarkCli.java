@@ -79,6 +79,10 @@ public final class InferenceBenchmarkCli {
       DecodeProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "profile-sessions".equals(args[0])) {
+      SessionBatchProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "compare".equals(args[0])) {
       BenchmarkComparisonCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
