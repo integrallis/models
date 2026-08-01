@@ -30,11 +30,20 @@ class ProcessMemoryTest {
 
   @Test
   void distinguishesCurrentResidentMemoryFromTheProcessHighWaterMark() {
-    String status = "Name:\tjava\nVmHWM:\t123456 kB\nVmRSS:\t120000 kB\n";
+    String status =
+        "Name:\tjava\n"
+            + "VmHWM:\t123456 kB\n"
+            + "VmRSS:\t120000 kB\n"
+            + "RssAnon:\t70000 kB\n"
+            + "RssFile:\t49000 kB\n"
+            + "RssShmem:\t1000 kB\n";
 
     ProcessMemory.Snapshot snapshot = ProcessMemory.parseLinuxStatusSnapshot(status);
 
     assertThat(snapshot.highWaterBytes()).isEqualTo(123456L * 1024);
     assertThat(snapshot.residentBytes()).isEqualTo(120000L * 1024);
+    assertThat(snapshot.anonymousResidentBytes()).isEqualTo(70000L * 1024);
+    assertThat(snapshot.fileResidentBytes()).isEqualTo(49000L * 1024);
+    assertThat(snapshot.sharedMemoryResidentBytes()).isEqualTo(1000L * 1024);
   }
 }

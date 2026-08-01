@@ -51,14 +51,26 @@ final class ProcessMetrics {
     }
     long highWaterBytes = 0;
     long residentBytes = 0;
+    long anonymousResidentBytes = 0;
+    long fileResidentBytes = 0;
+    long sharedMemoryResidentBytes = 0;
     Duration cpu = Duration.ZERO;
     for (ProcessHandle process : processes) {
       ProcessMemory.Snapshot memory = memorySource.capture(process.pid());
       highWaterBytes += memory.highWaterBytes();
       residentBytes += memory.residentBytes();
+      anonymousResidentBytes += memory.anonymousResidentBytes();
+      fileResidentBytes += memory.fileResidentBytes();
+      sharedMemoryResidentBytes += memory.sharedMemoryResidentBytes();
       cpu = cpu.plus(process.info().totalCpuDuration().orElse(Duration.ZERO));
     }
-    return new Snapshot(highWaterBytes, residentBytes, cpu);
+    return new Snapshot(
+        highWaterBytes,
+        residentBytes,
+        anonymousResidentBytes,
+        fileResidentBytes,
+        sharedMemoryResidentBytes,
+        cpu);
   }
 
   @FunctionalInterface
@@ -71,8 +83,14 @@ final class ProcessMetrics {
     ProcessMemory.Snapshot capture(long pid);
   }
 
-  record Snapshot(long highWaterBytes, long residentBytes, Duration cpu) {
-    private static final Snapshot ZERO = new Snapshot(0, 0, Duration.ZERO);
+  record Snapshot(
+      long highWaterBytes,
+      long residentBytes,
+      long anonymousResidentBytes,
+      long fileResidentBytes,
+      long sharedMemoryResidentBytes,
+      Duration cpu) {
+    private static final Snapshot ZERO = new Snapshot(0, 0, 0, 0, 0, Duration.ZERO);
 
     double cpuMillisSince(Snapshot earlier) {
       long nanos = cpu.minus(earlier.cpu).toNanos();

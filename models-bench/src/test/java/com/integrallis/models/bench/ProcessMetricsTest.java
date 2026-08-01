@@ -45,9 +45,12 @@ class ProcessMetricsTest {
         ProcessMetrics.capture(
             currentPid,
             ignored -> Stream.empty(),
-            ignored -> new ProcessMemory.Snapshot(1_200, 900));
+            ignored -> new ProcessMemory.Snapshot(1_200, 900, 600, 250, 50));
 
     assertThat(snapshot.highWaterBytes()).isEqualTo(1_200);
     assertThat(snapshot.residentBytes()).isEqualTo(900);
+    assertThat(snapshot.anonymousResidentBytes()).isEqualTo(600);
+    assertThat(snapshot.fileResidentBytes()).isEqualTo(250);
+    assertThat(snapshot.sharedMemoryResidentBytes()).isEqualTo(50);
   }
 }

@@ -38,7 +38,7 @@ import java.util.function.Supplier;
 /** Measures weight-reusing decode across independent in-process inference sessions. */
 final class SessionBatchProfileCli {
 
-  private static final int SCHEMA_VERSION = 2;
+  private static final int SCHEMA_VERSION = 3;
   private static final Set<String> OPTIONS =
       Set.of(
           "model",
@@ -191,6 +191,9 @@ final class SessionBatchProfileCli {
         boundary.process().cpuMillisSince(processBefore),
         boundary.process().highWaterBytes(),
         boundary.process().residentBytes(),
+        boundary.process().anonymousResidentBytes(),
+        boundary.process().fileResidentBytes(),
+        boundary.process().sharedMemoryResidentBytes(),
         jvmMemoryBefore,
         boundary.jvmMemory(),
         BenchmarkEnvironment.capture(),
@@ -354,6 +357,9 @@ final class SessionBatchProfileCli {
       double cpuMillis,
       long peakRssBytes,
       long currentRssBytes,
+      long anonymousRssBytes,
+      long fileRssBytes,
+      long sharedMemoryRssBytes,
       JvmMemorySnapshot jvmMemoryBefore,
       JvmMemorySnapshot jvmMemoryActive,
       BenchmarkEnvironment environment,

@@ -100,10 +100,13 @@ class SessionBatchProfileCliTest {
               return snapshots.removeFirst();
             });
 
-    assertThat(result.schemaVersion()).isEqualTo(2);
+    assertThat(result.schemaVersion()).isEqualTo(3);
     assertThat(result.jvmMemoryBefore()).isEqualTo(before);
     assertThat(result.jvmMemoryActive()).isEqualTo(active);
     assertThat(result.currentRssBytes()).isGreaterThanOrEqualTo(0);
+    assertThat(result.anonymousRssBytes()).isGreaterThanOrEqualTo(0);
+    assertThat(result.fileRssBytes()).isGreaterThanOrEqualTo(0);
+    assertThat(result.sharedMemoryRssBytes()).isGreaterThanOrEqualTo(0);
     assertThat(snapshots).isEmpty();
     assertThat(backend.closedSessions()).isEqualTo(4);
   }

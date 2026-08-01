@@ -48,7 +48,7 @@ final class ProcessMemory {
     }
     if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
       long residentBytes = currentMacResidentBytes(pid);
-      return new Snapshot(residentBytes, residentBytes);
+      return new Snapshot(residentBytes, residentBytes, 0, 0, 0);
     }
     return Snapshot.ZERO;
   }
@@ -60,14 +60,28 @@ final class ProcessMemory {
   static Snapshot parseLinuxStatusSnapshot(String status) {
     long highWaterBytes = 0;
     long residentBytes = 0;
+    long anonymousResidentBytes = 0;
+    long fileResidentBytes = 0;
+    long sharedMemoryResidentBytes = 0;
     for (String line : status.lines().toList()) {
       if (line.startsWith("VmHWM:")) {
         highWaterBytes = kibibytes(line, "VmHWM:");
       } else if (line.startsWith("VmRSS:")) {
         residentBytes = kibibytes(line, "VmRSS:");
+      } else if (line.startsWith("RssAnon:")) {
+        anonymousResidentBytes = kibibytes(line, "RssAnon:");
+      } else if (line.startsWith("RssFile:")) {
+        fileResidentBytes = kibibytes(line, "RssFile:");
+      } else if (line.startsWith("RssShmem:")) {
+        sharedMemoryResidentBytes = kibibytes(line, "RssShmem:");
       }
     }
-    return new Snapshot(highWaterBytes, residentBytes);
+    return new Snapshot(
+        highWaterBytes,
+        residentBytes,
+        anonymousResidentBytes,
+        fileResidentBytes,
+        sharedMemoryResidentBytes);
   }
 
   private static long kibibytes(String line, String prefix) {
@@ -89,7 +103,12 @@ final class ProcessMemory {
     }
   }
 
-  record Snapshot(long highWaterBytes, long residentBytes) {
-    private static final Snapshot ZERO = new Snapshot(0, 0);
+  record Snapshot(
+      long highWaterBytes,
+      long residentBytes,
+      long anonymousResidentBytes,
+      long fileResidentBytes,
+      long sharedMemoryResidentBytes) {
+    private static final Snapshot ZERO = new Snapshot(0, 0, 0, 0, 0);
   }
 }
