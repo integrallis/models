@@ -18,13 +18,8 @@ package com.integrallis.models.backend.purejava.llama;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
-import com.integrallis.models.backend.purejava.quant.F16Dequantizer;
-import com.integrallis.models.backend.purejava.quant.Q4_0Dequantizer;
-import com.integrallis.models.backend.purejava.quant.Q8_0Dequantizer;
-import com.integrallis.vectors.core.VectorUtil;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.nio.ByteOrder;
 
 /** Holds references to weight tensors from a parsed GGUF file for a Llama-family model. */
 public final class LlamaWeights {
@@ -188,60 +183,7 @@ public final class LlamaWeights {
    */
   private static void dequantizeRow(
       MemorySegment segment, GgufTensorType type, int row, int cols, float[] out) {
-    switch (type) {
-      case F32 -> {
-        long offset = (long) row * cols * 4;
-        for (int i = 0; i < cols; i++) {
-          out[i] =
-              segment.get(
-                  ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
-                  offset + (long) i * 4);
-        }
-      }
-      case F16 -> {
-        long offset = (long) row * cols * 2;
-        new F16Dequantizer().dequantize(segment, offset, out, 0, cols);
-      }
-      case Q4_0 -> {
-        // Q4_0: 32 values per block, 18 bytes per block
-        int blocksPerRow = cols / 32;
-        long bytesPerRow = (long) blocksPerRow * 18;
-        long offset = (long) row * bytesPerRow;
-        new Q4_0Dequantizer().dequantize(segment, offset, out, 0, cols);
-      }
-      case Q5_0 -> {
-        int blocksPerRow = cols / type.blockSize();
-        long bytesPerRow = (long) blocksPerRow * type.typeSize();
-        long offset = (long) row * bytesPerRow;
-        VectorUtil.ggufQ5_0Dequantize(segment, offset, out, 0, cols);
-      }
-      case Q4_K -> {
-        int blocksPerRow = cols / type.blockSize();
-        long bytesPerRow = (long) blocksPerRow * type.typeSize();
-        long offset = (long) row * bytesPerRow;
-        VectorUtil.ggufQ4_KDequantize(segment, offset, out, 0, cols);
-      }
-      case Q5_K -> {
-        int blocksPerRow = cols / type.blockSize();
-        long bytesPerRow = (long) blocksPerRow * type.typeSize();
-        long offset = (long) row * bytesPerRow;
-        VectorUtil.ggufQ5_KDequantize(segment, offset, out, 0, cols);
-      }
-      case Q6_K -> {
-        int blocksPerRow = cols / type.blockSize();
-        long bytesPerRow = (long) blocksPerRow * type.typeSize();
-        long offset = (long) row * bytesPerRow;
-        VectorUtil.ggufQ6_KDequantize(segment, offset, out, 0, cols);
-      }
-      case Q8_0 -> {
-        // Q8_0: 32 values per block, 34 bytes per block
-        int blocksPerRow = cols / 32;
-        long bytesPerRow = (long) blocksPerRow * 34;
-        long offset = (long) row * bytesPerRow;
-        new Q8_0Dequantizer().dequantize(segment, offset, out, 0, cols);
-      }
-      default -> throw new IllegalArgumentException("Unsupported embedding tensor type: " + type);
-    }
+    GgufTensorValues.dequantizeRow(segment, type, row, cols, out);
   }
 
   /**
@@ -249,29 +191,7 @@ public final class LlamaWeights {
    * formats.
    */
   private static float[] loadF32Tensor(GgufFile file, String name) {
-    GgufTensorData tensor = file.getTensor(name);
-    int count = (int) tensor.info().elementCount();
-    float[] result = new float[count];
-    MemorySegment seg = tensor.dataSegment();
-
-    switch (tensor.type()) {
-      case F32 -> {
-        for (int i = 0; i < count; i++) {
-          result[i] =
-              seg.get(
-                  ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
-                  (long) i * 4);
-        }
-      }
-      case F16 -> new F16Dequantizer().dequantize(seg, 0, result, 0, count);
-      case Q4_0 -> new Q4_0Dequantizer().dequantize(seg, 0, result, 0, count);
-      case Q8_0 -> new Q8_0Dequantizer().dequantize(seg, 0, result, 0, count);
-      default ->
-          throw new IllegalArgumentException(
-              "Unsupported tensor type for dequantization: " + tensor.type() + " in " + name);
-    }
-
-    return result;
+    return GgufTensorValues.toFloatArray(file.getTensor(name));
   }
 
   private static float[] loadOptionalF32Tensor(GgufFile file, String name, int expectedLength) {
