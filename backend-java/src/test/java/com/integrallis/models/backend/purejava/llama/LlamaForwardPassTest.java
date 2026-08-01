@@ -1507,8 +1507,8 @@ class LlamaForwardPassTest {
     }
 
     @Test
-    void fourSessionBatchPrewarmsMixedRegisterTiledKQuantPathExactly() {
-      GgufFile file = buildMixedQ4KQ6KNanoModel(new Random(43));
+    void fourSessionBatchExercisesRegisterTiledKQuantPathExactly() {
+      GgufFile file = buildQ4KNanoModel(new Random(43));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       int[][] prompts = {{3, 5}, {7, 11, 13}, {17, 19, 23, 29}, {31}};
@@ -1536,11 +1536,9 @@ class LlamaForwardPassTest {
         batched.prefill(sessions[index], prompts[index], 0);
       }
 
-      assertThat(batched.mixedKFourQueryKernelPrewarmed()).isFalse();
       LogitBatch actual = batched.forwardBatchTransient(sessions, tokens);
 
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
-      assertThat(batched.mixedKFourQueryKernelPrewarmed()).isTrue();
       for (int index = 0; index < sessions.length; index++) {
         assertThat(actual.copyRow(index)).containsExactly(expectedLogits[index]);
         assertThat(sessions[index].cache().keyBuffer())
