@@ -73,6 +73,9 @@ grouping
 |`models.purejava.q4Kernel` |Select `widened`, `short-pairwise`, or
 `unsigned-pairwise` Q4 arithmetic
 
+|`models.purejava.q6BatchedKernel` |Select `one-query-block` or
+`two-query-block` Q6_K prompt-prefill register tiling
+
 |`models.purejava.prefillBatchSize` |Set the immutable prompt-prefill
 batch size
 
@@ -94,6 +97,15 @@ Q4_0/Q8_0 FFN schedule
 |`models.purejava.stagedQuantizedLayer` |Retain a wider staged quantized
 layer schedule
 
+|`models.purejava.blockMajorQ8Activations` |Store staged Q8_0
+activations in block-major order
+
+|`models.purejava.q8BlockMajorKernel` |Select `scattered`,
+`row-accumulated`, or `float-lane-accumulated` Q8_0 arithmetic
+
+|`models.purejava.parallelQ8FfnPreparation` |Prepare eligible Q8_0 FFN
+activations in parallel
+
 |`models.purejava.maxContextLength` |Impose a lower hard sequence-length
 limit
 |===
@@ -113,6 +125,23 @@ Batch-major prefill kernels cover Q4_0, Q5_0, Q8_0,
 Q4_K, Q5_K, and Q6_K. Supporting Q5_0 prevents mixed
 DeepSeek-Coder files from reducing the complete prefill plan to one
 token at a time.
+
+== Profiled Q6_K Register Tiling
+
+Q6_K weights store six-bit values in separate low- and high-bit planes.
+During prompt processing, Models can reconstruct one weight vector and
+apply it to either one or two prompt queries before loading the next
+vector. The one-query form limits live SIMD state and is the conservative
+default. The two-query form reuses reconstructed weights and improves
+throughput on the qualified x86 path.
+
+The planner accepts `two-query-block` only when the loaded model uses
+Q6_K, the prompt batch contains at least four rows, the runtime is x86,
+and the active Vector API species is at least 256 bits. Other runtimes
+retain `one-query-block`. An exact ModelJar performance profile can
+recommend the faster form; an explicit deployment property can override
+that recommendation. Diagnostics report the decision as
+`q6-batched-kernel`.
 
 == Batched Attention
 

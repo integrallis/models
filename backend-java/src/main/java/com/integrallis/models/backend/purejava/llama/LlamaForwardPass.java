@@ -26,6 +26,7 @@ import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
@@ -53,6 +54,7 @@ public final class LlamaForwardPass {
   private final boolean groupedProjections;
   private final boolean mixedKProjections;
   private final GgufQ4Kernel q4Kernel;
+  private final GgufQ6BatchedKernel q6BatchedKernel;
   private final boolean batchedPrefill;
   private final boolean groupedBatchedPrefill;
   private final boolean finalLayerPrefillPruning;
@@ -175,6 +177,7 @@ public final class LlamaForwardPass {
     this.groupedProjections = executionPlan.groupedProjections();
     this.mixedKProjections = executionPlan.mixedKProjections();
     this.q4Kernel = executionPlan.q4Kernel();
+    this.q6BatchedKernel = executionPlan.q6BatchedKernel();
     this.finalLayerPrefillPruning = executionPlan.finalLayerPrefillPruning();
     this.finalLayerKvOnlyPrefill = executionPlan.finalLayerKvOnlyPrefill();
     this.batchedAttentionScores = executionPlan.batchedAttentionScores();
@@ -793,6 +796,10 @@ public final class LlamaForwardPass {
 
   boolean usesFinalLayerKvOnlyPrefill() {
     return finalLayerKvOnlyPrefill;
+  }
+
+  GgufQ6BatchedKernel q6BatchedKernel() {
+    return q6BatchedKernel;
   }
 
   boolean usesBatchedAttentionValues() {
@@ -1485,6 +1492,7 @@ public final class LlamaForwardPass {
         batchQuantizedActivationSums,
         batchQ4LaneScratch,
         q4Kernel,
+        q6BatchedKernel,
         mixedKProjections);
   }
 
@@ -1513,7 +1521,8 @@ public final class LlamaForwardPass {
         batchQuantizedActivationZeroPointCorrections,
         batchQuantizedActivationSums,
         batchQ4LaneScratch,
-        q4Kernel);
+        q4Kernel,
+        q6BatchedKernel);
   }
 
   private static boolean usesProjectionType(

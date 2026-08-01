@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.plan;
 
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -29,6 +30,7 @@ public record PureJavaPlanConfiguration(
     boolean groupedProjections,
     boolean mixedKProjections,
     GgufQ4Kernel q4Kernel,
+    GgufQ6BatchedKernel q6BatchedKernel,
     int prefillBatchSize,
     boolean finalLayerPrefillPruning,
     boolean finalLayerKvOnlyPrefill,
@@ -43,6 +45,7 @@ public record PureJavaPlanConfiguration(
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
   public static final String Q4_KERNEL_PROPERTY = "models.purejava.q4Kernel";
+  public static final String Q6_BATCHED_KERNEL_PROPERTY = "models.purejava.q6BatchedKernel";
   public static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
   public static final String FINAL_LAYER_PREFILL_PRUNING_PROPERTY =
       "models.purejava.finalLayerPrefillPruning";
@@ -67,6 +70,7 @@ public record PureJavaPlanConfiguration(
           GROUPED_PROJECTIONS_PROPERTY,
           MIXED_K_PROJECTIONS_PROPERTY,
           Q4_KERNEL_PROPERTY,
+          Q6_BATCHED_KERNEL_PROPERTY,
           PREFILL_BATCH_SIZE_PROPERTY,
           FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
           FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
@@ -80,6 +84,7 @@ public record PureJavaPlanConfiguration(
 
   public PureJavaPlanConfiguration {
     q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
+    q6BatchedKernel = Objects.requireNonNull(q6BatchedKernel, "q6BatchedKernel");
     q8BlockMajorKernel = Objects.requireNonNull(q8BlockMajorKernel, "q8BlockMajorKernel");
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException(
@@ -93,6 +98,7 @@ public record PureJavaPlanConfiguration(
         true,
         true,
         GgufQ4Kernel.WIDENED,
+        GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
         DEFAULT_PREFILL_BATCH_SIZE,
         true,
         true,
@@ -134,6 +140,7 @@ public record PureJavaPlanConfiguration(
         groupedProjections(configured(GROUPED_PROJECTIONS_PROPERTY, deployment, recommendations)),
         mixedKProjections(configured(MIXED_K_PROJECTIONS_PROPERTY, deployment, recommendations)),
         q4Kernel(configured(Q4_KERNEL_PROPERTY, deployment, recommendations)),
+        q6BatchedKernel(configured(Q6_BATCHED_KERNEL_PROPERTY, deployment, recommendations)),
         prefillBatchSize(configured(PREFILL_BATCH_SIZE_PROPERTY, deployment, recommendations)),
         finalLayerPrefillPruning(
             configured(FINAL_LAYER_PREFILL_PRUNING_PROPERTY, deployment, recommendations)),
@@ -190,6 +197,21 @@ public record PureJavaPlanConfiguration(
           throw new IllegalArgumentException(
               Q4_KERNEL_PROPERTY
                   + " must be widened, short-pairwise, or unsigned-pairwise: "
+                  + configured);
+    };
+  }
+
+  static GgufQ6BatchedKernel q6BatchedKernel(String configured) {
+    if (configured == null) {
+      return GgufQ6BatchedKernel.ONE_QUERY_BLOCK;
+    }
+    return switch (configured.trim().toLowerCase(Locale.ROOT)) {
+      case "one-query-block" -> GgufQ6BatchedKernel.ONE_QUERY_BLOCK;
+      case "two-query-block" -> GgufQ6BatchedKernel.TWO_QUERY_BLOCK;
+      default ->
+          throw new IllegalArgumentException(
+              Q6_BATCHED_KERNEL_PROPERTY
+                  + " must be one-query-block or two-query-block: "
                   + configured);
     };
   }

@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -483,7 +484,7 @@ class TensorOpsTest {
 
     @Test
     void q6_KBatchedMatmulMatchesIndependentQueries() {
-      int batchSize = 3;
+      int batchSize = 5;
       int cols = 256;
       float[] queries = new float[batchSize * cols];
       float[] expected = new float[batchSize];
@@ -519,7 +520,8 @@ class TensorOpsTest {
             q4Corrections(batchSize * cols),
             new short[0],
             new float[0],
-            GgufQ4Kernel.WIDENED);
+            GgufQ4Kernel.WIDENED,
+            GgufQ6BatchedKernel.TWO_QUERY_BLOCK);
       }
 
       assertThat(TensorOps.supportsBatchedMatmul(GgufTensorType.Q6_K)).isTrue();
@@ -876,7 +878,7 @@ class TensorOpsTest {
 
     @Test
     void mixedQ4_KQ6_KTripleBatchedMatmulMatchesSeparateBatchedProjectionsExactly() {
-      int batchSize = 3;
+      int batchSize = 5;
       int cols = 256;
       float[] input = repeatingQueries(batchSize, cols);
       float[] expectedFirst = new float[batchSize];
@@ -959,6 +961,7 @@ class TensorOpsTest {
             sums,
             new float[0],
             GgufQ4Kernel.WIDENED,
+            GgufQ6BatchedKernel.TWO_QUERY_BLOCK,
             true);
       }
 

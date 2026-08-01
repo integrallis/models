@@ -22,6 +22,7 @@ import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.lang.foreign.MemorySegment;
 import java.util.List;
@@ -40,9 +41,10 @@ class ExecutionPlannerTest {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
-    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v18");
+    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v19");
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
+    assertThat(plan.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isTrue();
@@ -221,6 +223,7 @@ class ExecutionPlannerTest {
             true,
             true,
             GgufQ4Kernel.SHORT_PAIRWISE,
+            GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
             32,
             true,
             true,
@@ -249,6 +252,7 @@ class ExecutionPlannerTest {
             true,
             true,
             GgufQ4Kernel.UNSIGNED_PAIRWISE,
+            GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
             32,
             true,
             true,
@@ -283,6 +287,7 @@ class ExecutionPlannerTest {
             true,
             true,
             GgufQ4Kernel.UNSIGNED_PAIRWISE,
+            GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
             32,
             true,
             true,
@@ -330,6 +335,7 @@ class ExecutionPlannerTest {
                     valid.injectedGroupedProjections(),
                     valid.mixedKProjections(),
                     GgufQ4Kernel.UNSIGNED_PAIRWISE,
+                    GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                     valid.prefillBatchSize(),
                     valid.finalLayerPrefillPruning(),
                     valid.finalLayerKvOnlyPrefill(),
@@ -363,6 +369,7 @@ class ExecutionPlannerTest {
             true,
             true,
             GgufQ4Kernel.SHORT_PAIRWISE,
+            GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
             32,
             true,
             true,
@@ -447,6 +454,7 @@ class ExecutionPlannerTest {
                 true,
                 false,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -472,6 +480,7 @@ class ExecutionPlannerTest {
             false,
             true,
             GgufQ4Kernel.WIDENED,
+            GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
             1,
             false,
             false,
@@ -515,6 +524,7 @@ class ExecutionPlannerTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 false,
@@ -546,6 +556,7 @@ class ExecutionPlannerTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 false,
                 true,
@@ -809,6 +820,68 @@ class ExecutionPlannerTest {
   }
 
   @Test
+  void selectsTwoQueryQ6KernelOnlyForTheMeasuredVectorEnvelope() {
+    PureJavaPlanConfiguration recommended =
+        PureJavaPlanConfiguration.from(
+            Map.of(),
+            Map.of(PureJavaPlanConfiguration.Q6_BATCHED_KERNEL_PROPERTY, "two-query-block"));
+
+    PureJavaExecutionPlan selected =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"), uniformTopology(GgufTensorType.Q6_K), recommended);
+
+    assertThat(selected.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.TWO_QUERY_BLOCK);
+    assertThat(selected.diagnostics().optimization("q6-batched-kernel"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(decision.settings())
+                  .containsEntry("requested-kernel", "two-query-block")
+                  .containsEntry("kernel", "two-query-block")
+                  .containsEntry("active-vector-bits", "256");
+            });
+
+    PureJavaExecutionPlan narrow =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2", true, 8, 128), uniformTopology(GgufTensorType.Q6_K), recommended);
+    assertThat(narrow.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
+    assertThat(narrow.diagnostics().optimization("q6-batched-kernel"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+
+    PureJavaExecutionPlan arm =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2", true, 8, 256, "aarch64"),
+            uniformTopology(GgufTensorType.Q6_K),
+            recommended);
+    assertThat(arm.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
+    assertThat(arm.diagnostics().optimization("q6-batched-kernel"))
+        .hasValueSatisfying(
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED);
+              assertThat(decision.reason()).contains("x86");
+            });
+
+    PureJavaExecutionPlan absent =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"), uniformTopology(GgufTensorType.Q4_K), recommended);
+    assertThat(absent.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
+  }
+
+  @Test
+  void parsesTypedQ6BatchedKernelSelection() {
+    assertThat(PureJavaPlanConfiguration.q6BatchedKernel(null))
+        .isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
+    assertThat(PureJavaPlanConfiguration.q6BatchedKernel("one-query-block"))
+        .isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
+    assertThat(PureJavaPlanConfiguration.q6BatchedKernel("two-query-block"))
+        .isEqualTo(GgufQ6BatchedKernel.TWO_QUERY_BLOCK);
+    assertThatThrownBy(() -> PureJavaPlanConfiguration.q6BatchedKernel("fastest"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("models.purejava.q6BatchedKernel");
+  }
+
+  @Test
   void selectsFloatLaneQ8KernelOnlyForAnExact256BitGraalRuntime() {
     PureJavaPlanConfiguration recommended =
         PureJavaPlanConfiguration.from(
@@ -1001,6 +1074,7 @@ class ExecutionPlannerTest {
                     true,
                     true,
                     GgufQ4Kernel.WIDENED,
+                    GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                     0,
                     true,
                     true,
@@ -1097,6 +1171,7 @@ class ExecutionPlannerTest {
             Map.entry(PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY, "false"),
             Map.entry(PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY, "false"),
             Map.entry(PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY, "short-pairwise"),
+            Map.entry(PureJavaPlanConfiguration.Q6_BATCHED_KERNEL_PROPERTY, "two-query-block"),
             Map.entry(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, "16"),
             Map.entry(PureJavaPlanConfiguration.FINAL_LAYER_PREFILL_PRUNING_PROPERTY, "false"),
             Map.entry(PureJavaPlanConfiguration.FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, "false"),
@@ -1114,6 +1189,7 @@ class ExecutionPlannerTest {
     assertThat(recommended.groupedProjections()).isFalse();
     assertThat(recommended.mixedKProjections()).isFalse();
     assertThat(recommended.q4Kernel()).isEqualTo(GgufQ4Kernel.SHORT_PAIRWISE);
+    assertThat(recommended.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.TWO_QUERY_BLOCK);
     assertThat(recommended.prefillBatchSize()).isEqualTo(16);
     assertThat(recommended.finalLayerPrefillPruning()).isFalse();
     assertThat(recommended.finalLayerKvOnlyPrefill()).isFalse();
@@ -1127,29 +1203,22 @@ class ExecutionPlannerTest {
 
     PureJavaPlanConfiguration overridden =
         PureJavaPlanConfiguration.from(
-            Map.of(
-                PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
-                "true",
-                PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY,
-                "widened",
-                PureJavaPlanConfiguration.BATCHED_ATTENTION_VALUES_PROPERTY,
-                "false",
-                PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY,
-                "false",
-                PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
-                "false",
-                PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
-                "false",
-                PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
-                "false",
-                PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_KERNEL_PROPERTY,
-                "scattered",
-                PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY,
-                "false"),
+            Map.ofEntries(
+                Map.entry(PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY, "true"),
+                Map.entry(PureJavaPlanConfiguration.Q4_KERNEL_PROPERTY, "widened"),
+                Map.entry(PureJavaPlanConfiguration.Q6_BATCHED_KERNEL_PROPERTY, "one-query-block"),
+                Map.entry(PureJavaPlanConfiguration.BATCHED_ATTENTION_VALUES_PROPERTY, "false"),
+                Map.entry(PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY, "false"),
+                Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY, "false"),
+                Map.entry(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "false"),
+                Map.entry(PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, "false"),
+                Map.entry(PureJavaPlanConfiguration.Q8_BLOCK_MAJOR_KERNEL_PROPERTY, "scattered"),
+                Map.entry(PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY, "false")),
             recommendations);
 
     assertThat(overridden.mixedKProjections()).isTrue();
     assertThat(overridden.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
+    assertThat(overridden.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
     assertThat(overridden.batchedAttentionValues()).isFalse();
     assertThat(overridden.batchedAttentionScores()).isFalse();
     assertThat(overridden.stagedQuantizedFfn()).isFalse();
@@ -1197,6 +1266,7 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     GgufQ4Kernel.WIDENED,
+                    GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                     32,
                     true,
                     true,
@@ -1228,6 +1298,7 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     GgufQ4Kernel.WIDENED,
+                    GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                     32,
                     false,
                     true,
@@ -1258,6 +1329,11 @@ class ExecutionPlannerTest {
 
   private static RuntimeFingerprint runtime(
       String compiler, boolean ggufParallel, int ggufThreads, int vectorBits) {
+    return runtime(compiler, ggufParallel, ggufThreads, vectorBits, "amd64");
+  }
+
+  private static RuntimeFingerprint runtime(
+      String compiler, boolean ggufParallel, int ggufThreads, int vectorBits, String architecture) {
     return new RuntimeFingerprint(
         "25.0.3",
         "OpenJDK 64-Bit Server VM",
@@ -1265,7 +1341,7 @@ class ExecutionPlannerTest {
         "25.0.3+9",
         compiler,
         "Linux",
-        "amd64",
+        architecture,
         "AMD EPYC-Milan Processor",
         "test-vector",
         true,

@@ -5,6 +5,33 @@
 `models-bench` contains the controlled comparison harness and a decode-only JFR profiler for the
 pure-Java backend.
 
+## Retained profiled Q6_K prefill gate
+
+MiniCPM5 1B Q4_K_M was used to qualify the Vectors 0.1.5 Q6_K policy through the complete Models
+execution path. The controlled eight-vCPU AMD EPYC-Milan host ran Temurin 25.0.3 with 256-bit
+vectors, a fixed 1 GiB heap, prefill batch 32, two warmups, and 16 one-token measurements in each
+fresh process. The process order was one-query, two-query, two-query, one-query.
+
+| Metric | One-query block | Two-query block | Change |
+| --- | ---: | ---: | ---: |
+| p50 TTFT | 6,146.90 ms | 5,899.45 ms | -4.03% |
+| p95 TTFT | 6,233.67 ms | 5,967.55 ms | -4.27% |
+| p50 prefill | 24.423 tok/s | 25.419 tok/s | +4.08% |
+| p50 process CPU | 45,640 ms | 43,520 ms | -4.65% |
+| completed young collections | 112 | 8 | -92.86% |
+| young-GC pause time | 265.969 ms | 57.807 ms | -78.27% |
+
+The bootstrap 95% interval is 3.56-4.46% for p50 TTFT reduction and 3.80-4.38% for p50 prefill
+gain. All 32 two-query measurements were faster than all 32 one-query measurements. Corresponding
+input-token sequences and output SHA-256 values match, and all reports pin the same model and prompt
+SHA-256. Peak RSS was 1.0% lower in the candidate observations, but process-level RSS does not
+support a memory-capacity claim. The raw reports, GC logs, exact hashes, and reproduction command
+are under `benchmark-results/certified-20260801/prefill/minicpm5-1b-q6k/`.
+
+`ONE_QUERY_BLOCK` remains the conservative default. An exact performance profile can select
+`TWO_QUERY_BLOCK` only on x86, with at least 256-bit vectors and a prompt batch of at least four.
+Other runtime envelopes fall back to the one-query kernel.
+
 ## Retained grouped K-quant prefill gate
 
 The mixed Q4_K/Q4_K/Q6_K grouped batched path was retained on the controlled eight-vCPU AMD

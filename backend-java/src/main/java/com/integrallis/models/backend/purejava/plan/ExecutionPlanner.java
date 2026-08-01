@@ -21,17 +21,19 @@ import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
 
-  public static final String PLAN_VERSION = "pure-java-v18";
+  public static final String PLAN_VERSION = "pure-java-v19";
 
   private ExecutionPlanner() {}
 
@@ -57,6 +59,8 @@ public final class ExecutionPlanner {
     boolean mixedK = mixedKProjections(topology, configuration, grouped, decisions);
     GgufQ4Kernel q4Kernel = q4Kernel(runtime, topology, configuration, decisions);
     int prefillBatchSize = batchedPrefill(topology, configuration, decisions);
+    GgufQ6BatchedKernel q6BatchedKernel =
+        q6BatchedKernel(runtime, topology, configuration, prefillBatchSize, decisions);
     boolean finalLayerPrefillPruning = finalLayerPrefillPruning(topology, configuration, decisions);
     boolean finalLayerKvOnlyPrefill =
         finalLayerKvOnlyPrefill(topology, configuration, finalLayerPrefillPruning, decisions);
@@ -111,6 +115,7 @@ public final class ExecutionPlanner {
         injectedGrouped,
         mixedK,
         q4Kernel,
+        q6BatchedKernel,
         prefillBatchSize,
         finalLayerPrefillPruning,
         finalLayerKvOnlyPrefill,
@@ -122,6 +127,75 @@ public final class ExecutionPlanner {
         q8BlockMajorKernel,
         parallelQ8FfnPreparation,
         diagnostics);
+  }
+
+  private static GgufQ6BatchedKernel q6BatchedKernel(
+      RuntimeFingerprint runtime,
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      int prefillBatchSize,
+      List<OptimizationDecision> decisions) {
+    GgufQ6BatchedKernel requested = configuration.q6BatchedKernel();
+    boolean specialized = requested == GgufQ6BatchedKernel.TWO_QUERY_BLOCK;
+    boolean q6Eligible = topology.uses(GgufTensorType.Q6_K);
+    boolean x86 = isX86(runtime.architecture());
+    boolean vectorWidthEligible = runtime.vectorBits() >= 256;
+    boolean batchEligible = prefillBatchSize >= 4;
+    boolean enabled = specialized && q6Eligible && x86 && vectorWidthEligible && batchEligible;
+    OptimizationStatus status;
+    String reason;
+    if (enabled) {
+      status = OptimizationStatus.ENABLED;
+      reason = "Q6_K weight vectors are reused across two prompt queries";
+    } else if (!q6Eligible) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "loaded projection topology has no Q6_K consumer";
+    } else if (!specialized) {
+      status = OptimizationStatus.DISABLED;
+      reason = "models.purejava.q6BatchedKernel selects one-query blocks";
+    } else if (!x86) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "two-query Q6_K blocks are retained only for measured x86 runtimes";
+    } else if (!vectorWidthEligible) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "two-query Q6_K blocks require at least a 256-bit vector species";
+    } else if (!batchEligible) {
+      status = OptimizationStatus.UNSUPPORTED;
+      reason = "two-query Q6_K blocks require a prefill batch of at least four";
+    } else {
+      throw new IllegalStateException("unhandled Q6_K batched kernel decision");
+    }
+    GgufQ6BatchedKernel kernel =
+        enabled ? GgufQ6BatchedKernel.TWO_QUERY_BLOCK : GgufQ6BatchedKernel.ONE_QUERY_BLOCK;
+    decisions.add(
+        new OptimizationDecision(
+            "q6-batched-kernel",
+            status,
+            reason,
+            Map.of(
+                "active-vector-bits",
+                Integer.toString(runtime.vectorBits()),
+                "architecture",
+                runtime.architecture(),
+                "batch-size",
+                Integer.toString(prefillBatchSize),
+                "kernel",
+                q6KernelName(kernel),
+                "requested-kernel",
+                q6KernelName(requested))));
+    return kernel;
+  }
+
+  private static boolean isX86(String architecture) {
+    String normalized = architecture.toLowerCase(Locale.ROOT);
+    return normalized.equals("amd64") || normalized.equals("x86_64") || normalized.equals("x64");
+  }
+
+  private static String q6KernelName(GgufQ6BatchedKernel kernel) {
+    return switch (kernel) {
+      case ONE_QUERY_BLOCK -> "one-query-block";
+      case TWO_QUERY_BLOCK -> "two-query-block";
+    };
   }
 
   private static GgufQ8BlockMajorKernel q8BlockMajorKernel(

@@ -32,6 +32,7 @@ import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -475,6 +476,7 @@ class LlamaForwardPassTest {
                   false,
                   false,
                   GgufQ4Kernel.WIDENED,
+                  GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                   32,
                   true,
                   true,
@@ -700,6 +702,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -749,6 +752,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -782,6 +786,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -1045,6 +1050,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -1078,6 +1084,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -1111,6 +1118,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -1140,6 +1148,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -1167,6 +1176,7 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
                 32,
                 true,
                 true,
@@ -1319,12 +1329,31 @@ class LlamaForwardPassTest {
               config,
               weights,
               new KvCache(
-                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              ExecutionPlanner.plan(
+                  x86Runtime256(),
+                  ModelTopology.from("llama", config, weights),
+                  new PureJavaPlanConfiguration(
+                      true,
+                      true,
+                      GgufQ4Kernel.WIDENED,
+                      GgufQ6BatchedKernel.TWO_QUERY_BLOCK,
+                      32,
+                      true,
+                      true,
+                      false,
+                      false,
+                      false,
+                      false,
+                      false,
+                      GgufQ8BlockMajorKernel.SCATTERED,
+                      false)));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
       assertThat(batched.usesFinalLayerPrefillPruning()).isFalse();
+      assertThat(batched.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.TWO_QUERY_BLOCK);
       assertThat(actual).containsExactly(expected);
       assertThat(batched.forward(3, tokens.length))
           .containsExactly(sequential.forward(3, tokens.length));
@@ -1615,6 +1644,7 @@ class LlamaForwardPassTest {
             true,
             true,
             GgufQ4Kernel.WIDENED,
+            GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
             prefillBatchSize,
             finalLayerPrefillPruning,
             finalLayerKvOnlyPrefill,
@@ -1672,6 +1702,33 @@ class LlamaForwardPassTest {
         runtime.fastVectorFma(),
         runtime.fastScalarFma(),
         runtime.sve(),
+        true,
+        true,
+        runtime.ggufParallel(),
+        runtime.ggufExecutor(),
+        runtime.ggufThreads(),
+        runtime.ggufChunksPerThread(),
+        runtime.processors());
+  }
+
+  private static RuntimeFingerprint x86Runtime256() {
+    RuntimeFingerprint runtime = RuntimeFingerprint.capture();
+    return new RuntimeFingerprint(
+        runtime.javaVersion(),
+        runtime.vmName(),
+        runtime.vmVendor(),
+        runtime.vmVersion(),
+        runtime.compiler(),
+        runtime.osName(),
+        "amd64",
+        "test-x86-256",
+        runtime.vectorProvider(),
+        true,
+        Math.max(256, runtime.preferredVectorBits()),
+        256,
+        runtime.fastVectorFma(),
+        runtime.fastScalarFma(),
+        false,
         true,
         true,
         runtime.ggufParallel(),
