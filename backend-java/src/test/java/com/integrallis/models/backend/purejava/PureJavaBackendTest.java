@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.BackendConfiguration;
+import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -43,7 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
 @Tag("unit")
 class PureJavaBackendTest {
 
-  private static final int DIM = 16;
+  private static final int DIM = 32;
   private static final int HEADS = 2;
   private static final int KV_HEADS = 1;
   private static final int HIDDEN_DIM = 32;
@@ -52,6 +54,11 @@ class PureJavaBackendTest {
   private static final int CONTEXT = 64;
 
   static Path buildNanoModelFile(Path dir, Random rng) throws IOException {
+    return buildNanoModelFile(dir, rng, GgufTensorType.F32);
+  }
+
+  static Path buildNanoModelFile(Path dir, Random rng, GgufTensorType projectionType)
+      throws IOException {
     List<String> tokens = new ArrayList<>();
     for (int i = 0; i < VOCAB_SIZE; i++) {
       tokens.add("t" + i);
@@ -97,41 +104,41 @@ class PureJavaBackendTest {
           prefix + "attn_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
       builder.addTensor(
           prefix + "attn_q.weight",
-          GgufTensorType.F32,
+          projectionType,
           new long[] {DIM, DIM},
-          randomF32(rng, DIM * DIM));
+          projectionData(rng, projectionType, DIM * DIM));
       builder.addTensor(
           prefix + "attn_k.weight",
-          GgufTensorType.F32,
+          projectionType,
           new long[] {DIM, kvDim},
-          randomF32(rng, kvDim * DIM));
+          projectionData(rng, projectionType, kvDim * DIM));
       builder.addTensor(
           prefix + "attn_v.weight",
-          GgufTensorType.F32,
+          projectionType,
           new long[] {DIM, kvDim},
-          randomF32(rng, kvDim * DIM));
+          projectionData(rng, projectionType, kvDim * DIM));
       builder.addTensor(
           prefix + "attn_output.weight",
-          GgufTensorType.F32,
+          projectionType,
           new long[] {DIM, DIM},
-          randomF32(rng, DIM * DIM));
+          projectionData(rng, projectionType, DIM * DIM));
       builder.addTensor(
           prefix + "ffn_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
       builder.addTensor(
           prefix + "ffn_gate.weight",
-          GgufTensorType.F32,
+          projectionType,
           new long[] {DIM, HIDDEN_DIM},
-          randomF32(rng, HIDDEN_DIM * DIM));
+          projectionData(rng, projectionType, HIDDEN_DIM * DIM));
       builder.addTensor(
           prefix + "ffn_up.weight",
-          GgufTensorType.F32,
+          projectionType,
           new long[] {DIM, HIDDEN_DIM},
-          randomF32(rng, HIDDEN_DIM * DIM));
+          projectionData(rng, projectionType, HIDDEN_DIM * DIM));
       builder.addTensor(
           prefix + "ffn_down.weight",
-          GgufTensorType.F32,
+          projectionType,
           new long[] {HIDDEN_DIM, DIM},
-          randomF32(rng, DIM * HIDDEN_DIM));
+          projectionData(rng, projectionType, DIM * HIDDEN_DIM));
     }
 
     byte[] data = builder.build();
@@ -208,6 +215,31 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void exposesIndependentSessionBatchingThroughTheBackendSpi(@TempDir Path dir)
+        throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(42), GgufTensorType.Q4_0);
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertThat(backend).isInstanceOf(BatchInferenceBackend.class);
+        BatchInferenceBackend batching = backend;
+        assertThat(batching.maxBatchSize()).isGreaterThanOrEqualTo(2);
+        try (InferenceSession first = batching.openSession();
+            InferenceSession second = batching.openSession()) {
+          batching.prefill(first, new int[] {5, 7}, 0);
+          batching.prefill(second, new int[] {11, 13, 17}, 0);
+
+          var logits =
+              batching.forwardBatch(new InferenceSession[] {first, second}, new int[] {19, 23});
+
+          assertThat(logits.tokenCount()).isEqualTo(2);
+          assertThat(logits.vocabularySize()).isEqualTo(VOCAB_SIZE);
+          assertThat(first.checkpoint()).isEqualTo(3);
+          assertThat(second.checkpoint()).isEqualTo(4);
+        }
+      }
+    }
+
+    @Test
     void capsRuntimeContextLengthWithoutChangingModelMetadata(@TempDir Path dir)
         throws IOException {
       Path modelPath = buildNanoModelFile(dir, new Random(43));
@@ -251,6 +283,27 @@ class PureJavaBackendTest {
     ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
     for (int i = 0; i < count; i++) {
       buf.putFloat(i * 4, (rng.nextFloat() - 0.5f) * 0.1f);
+    }
+    return data;
+  }
+
+  private static byte[] projectionData(Random rng, GgufTensorType type, int count) {
+    return switch (type) {
+      case F32 -> randomF32(rng, count);
+      case Q4_0 -> randomQ40(rng, count);
+      default -> throw new IllegalArgumentException("unsupported test projection type: " + type);
+    };
+  }
+
+  private static byte[] randomQ40(Random rng, int count) {
+    if (count % 32 != 0) {
+      throw new IllegalArgumentException("Q4_0 value count must be a multiple of 32");
+    }
+    byte[] data = new byte[(count / 32) * 18];
+    rng.nextBytes(data);
+    ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+    for (int block = 0; block < count / 32; block++) {
+      buffer.putShort(block * 18, Float.floatToFloat16(0.01f));
     }
     return data;
   }

@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.llama;
 
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import java.util.Arrays;
 
 /** Per-position rotary factors shared by every attention head and transformer layer. */
 final class RopeTable {
@@ -27,6 +28,7 @@ final class RopeTable {
   private final float[] sine;
   private float[] batchCosine = new float[0];
   private float[] batchSine = new float[0];
+  private int[] preparedPositions = new int[0];
   private int preparedPosition = -1;
   private int preparedBatchStart = -1;
   private int preparedBatchSize;
@@ -98,7 +100,47 @@ final class RopeTable {
     }
     preparedBatchStart = startPosition;
     preparedBatchSize = batchSize;
+    preparedPositions = new int[0];
     preparationCount += batchSize;
+  }
+
+  void preparePositions(int[] positions, int count) {
+    if (positions == null) {
+      throw new NullPointerException("positions");
+    }
+    if (count < 1 || count > positions.length) {
+      throw new IllegalArgumentException("count must be between 1 and positions.length: " + count);
+    }
+    for (int index = 0; index < count; index++) {
+      if (positions[index] < 0) {
+        throw new IllegalArgumentException("position must be >= 0: " + positions[index]);
+      }
+    }
+    if (preparedPositions.length == count
+        && Arrays.equals(preparedPositions, 0, count, positions, 0, count)) {
+      return;
+    }
+
+    int pairCount = headDim / 2;
+    int requiredFactors = Math.multiplyExact(count, pairCount);
+    if (batchCosine.length < requiredFactors) {
+      batchCosine = new float[requiredFactors];
+      batchSine = new float[requiredFactors];
+    }
+    for (int batch = 0; batch < count; batch++) {
+      float scaledPosition = positions[batch] * frequencyScale;
+      int factorOffset = batch * pairCount;
+      for (int pair = 0; pair < pairCount; pair++) {
+        float frequency = (float) (1.0 / Math.pow(theta, (double) (pair * 2) / headDim));
+        float angle = scaledPosition * frequency;
+        batchCosine[factorOffset + pair] = (float) Math.cos(angle);
+        batchSine[factorOffset + pair] = (float) Math.sin(angle);
+      }
+    }
+    preparedPositions = Arrays.copyOf(positions, count);
+    preparedBatchStart = -1;
+    preparedBatchSize = count;
+    preparationCount += count;
   }
 
   void applyBatch(float[] vector, int offset, int batchIndex, boolean neox) {
