@@ -454,6 +454,36 @@ class GgufTokenizerTest {
   }
 
   @Nested
+  class Gemma4Bpe {
+
+    @Test
+    void appliesWhitespaceEscapingAndRankedRawUtf8Merges() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createGemma4Metadata());
+
+      assertThat(tokenizer.encode("ab")).containsExactly(2, 8);
+      assertThat(tokenizer.encode(" ab")).containsExactly(2, 9);
+      assertThat(tokenizer.encode("a  b")).containsExactly(2, 4, 6, 6, 5);
+      assertThat(tokenizer.decode(tokenizer.encode(" ab"))).isEqualTo(" ab");
+    }
+
+    @Test
+    void preservesWholeNewlineRunsWhenTheVocabularyContainsThem() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createGemma4Metadata());
+
+      assertThat(tokenizer.encode("a\n\nb")).containsExactly(2, 4, 12, 5);
+      assertThat(tokenizer.decode(tokenizer.encode("a\n\nb"))).isEqualTo("a\n\nb");
+    }
+
+    @Test
+    void roundTripsRawUtf8AndByteFallback() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createGemma4Metadata());
+
+      assertThat(tokenizer.encode("é!")).containsExactly(2, 13, 11);
+      assertThat(tokenizer.decode(tokenizer.encode("é!"))).isEqualTo("é!");
+    }
+  }
+
+  @Nested
   class SentencePiece {
 
     @Test
@@ -557,6 +587,38 @@ class GgufTokenizerTest {
 
   private static long count(int[] tokens, int expected) {
     return java.util.Arrays.stream(tokens).filter(token -> token == expected).count();
+  }
+
+  private static GgufMetadata createGemma4Metadata() {
+    List<String> tokens =
+        List.of(
+            "<unk>", "<eos>", "<bos>", "<pad>", "a", "b", "▁", "▁a", "ab", "▁ab", "\n", "<0x21>",
+            "\n\n", "é");
+    List<String> merges = List.of("a b", "▁ a", "▁ ab");
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(GgufMetadataValue.StringValue::new)
+                .map(GgufMetadataValue.class::cast)
+                .toList()));
+    entries.put(
+        "tokenizer.ggml.merges",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            merges.stream()
+                .map(GgufMetadataValue.StringValue::new)
+                .map(GgufMetadataValue.class::cast)
+                .toList()));
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gemma4"));
+    entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(2));
+    entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(1));
+    entries.put("tokenizer.ggml.unknown_token_id", new GgufMetadataValue.Uint32Value(0));
+    entries.put("tokenizer.ggml.add_bos_token", new GgufMetadataValue.BoolValue(true));
+    entries.put("tokenizer.ggml.add_space_prefix", new GgufMetadataValue.BoolValue(false));
+    return new GgufMetadata(entries);
   }
 
   private static int[] referenceBpe(String text, List<String> vocab, List<String> merges) {
