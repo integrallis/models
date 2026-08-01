@@ -130,6 +130,7 @@ public final class LlamaForwardPass {
   private final float[] batchQ4LaneScratch;
   private float[] verificationLogits = new float[0];
   private float[] sessionBatchLogits = new float[0];
+  private boolean mixedKFourQueryKernelPrewarmed;
   private int nextPosition;
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
@@ -714,6 +715,7 @@ public final class LlamaForwardPass {
     int keyDim = config.keyDim();
     int valueDim = config.valueDim();
     if (groupedBatchedPrefill) {
+      prewarmMixedKFourQueryKernels(lw, batchSize, dim);
       tripleBatchedMatmulDispatch(
           batchQ,
           lw.wq(),
@@ -735,6 +737,37 @@ public final class LlamaForwardPass {
     batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
     batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
     batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
+  }
+
+  private void prewarmMixedKFourQueryKernels(
+      LlamaWeights.LayerWeights layer, int batchSize, int cols) {
+    if (mixedKFourQueryKernelPrewarmed
+        || !mixedKProjections
+        || batchSize < 4
+        || layer.wqType() != GgufTensorType.Q4_K
+        || layer.wkType() != GgufTensorType.Q4_K
+        || layer.wvType() != GgufTensorType.Q6_K) {
+      return;
+    }
+
+    VectorUtil.ggufQ4_KQ4_KQ6_KQ8_KTripleBatchedMatmul(
+        batchXNorm,
+        layer.wq(),
+        1,
+        batchQ,
+        layer.wk(),
+        1,
+        batchK,
+        layer.wv(),
+        1,
+        batchV,
+        batchSize,
+        cols,
+        batchQuantizedActivation,
+        batchQuantizedActivationScales,
+        batchQuantizedActivationSums,
+        q6BatchedKernel);
+    mixedKFourQueryKernelPrewarmed = true;
   }
 
   private void attendIndependentSessions(
@@ -1214,6 +1247,10 @@ public final class LlamaForwardPass {
 
   boolean usesBatchedAttentionValues() {
     return batchedAttentionValues;
+  }
+
+  boolean mixedKFourQueryKernelPrewarmed() {
+    return mixedKFourQueryKernelPrewarmed;
   }
 
   boolean usesBatchedAttentionScores() {
