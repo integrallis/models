@@ -140,6 +140,44 @@ class ExecutionPlannerTest {
   }
 
   @Test
+  void keepsGemma4OnOnlyTheExecutionPathsItsDecoderConsumes() {
+    ModelTopology.LayerTopology layer =
+        new ModelTopology.LayerTopology(
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q4_K,
+            GgufTensorType.Q8_0);
+    ModelTopology topology = new ModelTopology("gemma4", 8192, 2048, 2048, List.of(layer), true);
+    PureJavaPlanConfiguration requested =
+        PureJavaPlanConfiguration.from(
+            Map.of(),
+            Map.of(
+                PureJavaPlanConfiguration.BATCHED_ATTENTION_SCORES_PROPERTY,
+                "true",
+                PureJavaPlanConfiguration.BATCHED_ATTENTION_VALUES_PROPERTY,
+                "true"));
+
+    PureJavaExecutionPlan plan = ExecutionPlanner.plan(runtime("hotspot-c2"), topology, requested);
+
+    assertThat(plan.groupedProjections()).isFalse();
+    assertThat(plan.mixedKProjections()).isFalse();
+    assertThat(plan.prefillBatchSize()).isEqualTo(1);
+    assertThat(plan.finalLayerPrefillPruning()).isFalse();
+    assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
+    assertThat(plan.batchedAttentionScores()).isFalse();
+    assertThat(plan.batchedAttentionValues()).isFalse();
+    assertThat(plan.diagnostics().optimization("batched-attention-scores"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+    assertThat(plan.diagnostics().optimization("batched-attention-values"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
+  }
+
+  @Test
   void plansQ5_0BatchedPrefillFromTopology() {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(

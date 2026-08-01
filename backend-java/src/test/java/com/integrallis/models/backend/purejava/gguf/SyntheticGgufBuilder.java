@@ -84,6 +84,16 @@ public final class SyntheticGgufBuilder {
     return this;
   }
 
+  public SyntheticGgufBuilder addInt32Array(String key, List<Integer> values) {
+    metadataEntries.add(new MetadataEntry(key, GgufValueType.ARRAY, new Int32ArrayData(values)));
+    return this;
+  }
+
+  public SyntheticGgufBuilder addBoolArray(String key, List<Boolean> values) {
+    metadataEntries.add(new MetadataEntry(key, GgufValueType.ARRAY, new BoolArrayData(values)));
+    return this;
+  }
+
   public SyntheticGgufBuilder addTensor(
       String name, GgufTensorType type, long[] shape, byte[] data) {
     tensorEntries.add(new TensorEntry(name, type, shape, data));
@@ -161,6 +171,18 @@ public final class SyntheticGgufBuilder {
           for (Float f : fad.values) {
             writeF32(out, f);
           }
+        } else if (entry.value instanceof Int32ArrayData iad) {
+          writeU32(out, GgufValueType.INT32.id());
+          writeU64(out, iad.values.size());
+          for (Integer value : iad.values) {
+            writeI32(out, value);
+          }
+        } else if (entry.value instanceof BoolArrayData bad) {
+          writeU32(out, GgufValueType.BOOL.id());
+          writeU64(out, bad.values.size());
+          for (Boolean value : bad.values) {
+            out.write(value ? 1 : 0);
+          }
         }
       }
       default -> throw new UnsupportedOperationException("Type not supported: " + entry.type);
@@ -206,4 +228,8 @@ public final class SyntheticGgufBuilder {
   private record StringArrayData(List<String> values) {}
 
   private record Float32ArrayData(List<Float> values) {}
+
+  private record Int32ArrayData(List<Integer> values) {}
+
+  private record BoolArrayData(List<Boolean> values) {}
 }

@@ -158,12 +158,12 @@ public final class Gemma4TensorLayout {
       requireShape(
           gateUp,
           new long[] {config.embeddingDim(), 2L * config.expertHiddenDim(), config.numExperts()});
-      requireType(gateUp, Set.of(GgufTensorType.Q4_K));
+      requireType(gateUp, Set.of(GgufTensorType.F32, GgufTensorType.Q4_K));
 
       GgufTensorInfo down = requiredTensor(tensorsByName, prefix + "ffn_down_exps.weight");
       requireShape(
           down, new long[] {config.expertHiddenDim(), config.embeddingDim(), config.numExperts()});
-      requireType(down, Set.of(GgufTensorType.Q5_0, GgufTensorType.Q8_0));
+      requireType(down, Set.of(GgufTensorType.F32, GgufTensorType.Q5_0, GgufTensorType.Q8_0));
 
       GgufTensorInfo downScale = requiredTensor(tensorsByName, prefix + "ffn_down_exps.scale");
       requireShape(downScale, new long[] {config.numExperts()});

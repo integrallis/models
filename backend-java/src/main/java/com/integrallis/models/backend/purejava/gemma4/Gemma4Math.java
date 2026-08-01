@@ -24,6 +24,36 @@ final class Gemma4Math {
 
   private Gemma4Math() {}
 
+  /** Applies RMS normalization without a learned weight. */
+  static void normalizeWithoutWeight(float[] output, float[] input, float epsilon) {
+    Objects.requireNonNull(output, "output");
+    Objects.requireNonNull(input, "input");
+    if (input.length == 0 || output.length != input.length) {
+      throw new IllegalArgumentException("input and output lengths must match and be non-empty");
+    }
+    normalizeWithoutWeight(output, 0, input, 0, input.length, epsilon);
+  }
+
+  /** Applies unweighted RMS normalization over matching source and destination slices. */
+  static void normalizeWithoutWeight(
+      float[] output, int outputOffset, float[] input, int inputOffset, int length, float epsilon) {
+    Objects.requireNonNull(output, "output");
+    Objects.requireNonNull(input, "input");
+    if (length <= 0) {
+      throw new IllegalArgumentException("length must be > 0: " + length);
+    }
+    Objects.checkFromIndexSize(outputOffset, length, output.length);
+    Objects.checkFromIndexSize(inputOffset, length, input.length);
+    if (!(epsilon > 0.0f) || !Float.isFinite(epsilon)) {
+      throw new IllegalArgumentException("epsilon must be finite and > 0: " + epsilon);
+    }
+    float sumSquares = VectorUtil.dotProduct(input, inputOffset, input, inputOffset, length);
+    float inverse = (float) (1.0 / Math.sqrt(sumSquares / length + epsilon));
+    for (int index = 0; index < length; index++) {
+      output[outputOffset + index] = input[inputOffset + index] * inverse;
+    }
+  }
+
   /** Applies the router's unweighted RMS normalization and learned dimension scale. */
   static void normalizeRouterInput(
       float[] output, float[] hidden, float[] routerScale, float epsilon) {

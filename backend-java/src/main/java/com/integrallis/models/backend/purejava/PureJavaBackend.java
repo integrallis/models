@@ -24,8 +24,11 @@ import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.cache.KvCache;
+import com.integrallis.models.backend.purejava.gemma4.Gemma4Config;
+import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
@@ -40,7 +43,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -51,24 +56,28 @@ import java.util.Objects;
 public final class PureJavaBackend implements SpeculativeInferenceBackend, BatchInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
+  public static final String GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY = "models.gemma4.expertCacheSlots";
+  private static final int DEFAULT_GEMMA4_EXPERT_CACHE_SLOTS = 16;
 
   private final Arena arena;
-  private final LlamaConfig config;
   private final GgufTokenizer tokenizer;
-  private final LlamaForwardPass forwardPass;
+  private final PureJavaDecoder decoder;
   private final ModelMetadata modelMetadata;
   private final PureJavaExecutionPlan executionPlan;
   private final BackendDiagnostics diagnostics;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
-  private LlamaForwardPass.Session[] sessionBatch = new LlamaForwardPass.Session[0];
+  private PureJavaDecoder.Session[] sessionBatch = new PureJavaDecoder.Session[0];
   private boolean closed;
+
+  private record LoadedDecoder(
+      PureJavaDecoder decoder, ModelMetadata metadata, PureJavaExecutionPlan executionPlan) {}
 
   private static final class PureJavaInferenceSession implements InferenceSession {
     private final PureJavaBackend owner;
-    private final LlamaForwardPass.Session delegate;
+    private final PureJavaDecoder.Session delegate;
     private boolean closed;
 
-    private PureJavaInferenceSession(PureJavaBackend owner, LlamaForwardPass.Session delegate) {
+    private PureJavaInferenceSession(PureJavaBackend owner, PureJavaDecoder.Session delegate) {
       this.owner = owner;
       this.delegate = delegate;
     }
@@ -92,17 +101,15 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
 
   private PureJavaBackend(
       Arena arena,
-      LlamaConfig config,
       GgufTokenizer tokenizer,
-      LlamaForwardPass forwardPass,
+      PureJavaDecoder decoder,
       ModelMetadata modelMetadata,
       PureJavaExecutionPlan executionPlan,
       BackendDiagnostics diagnostics,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
     this.arena = arena;
-    this.config = config;
     this.tokenizer = tokenizer;
-    this.forwardPass = forwardPass;
+    this.decoder = decoder;
     this.modelMetadata = modelMetadata;
     this.executionPlan = executionPlan;
     this.diagnostics = diagnostics;
@@ -165,58 +172,117 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     Objects.requireNonNull(arena, "arena");
     Objects.requireNonNull(backendConfiguration, "backendConfiguration");
     Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
+    LoadedDecoder loaded = null;
     try {
       Objects.requireNonNull(modelPath, "modelPath");
       GgufFile file = GgufParser.parse(modelPath, arena);
-      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
-      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
       String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
       RuntimeFingerprint runtime = RuntimeFingerprint.capture();
-      PureJavaExecutionPlan executionPlan =
-          ExecutionPlanner.plan(
-              runtime,
-              ModelTopology.from(modelFamily, config, weights),
-              PureJavaPlanConfiguration.fromSystemProperties(
-                  recommendations(backendConfiguration, batchedMatrixKernel)),
-              batchedMatrixKernel);
-      KvCache cache =
-          new KvCache(
-              config.numLayers(), runtimeContextLength(config), config.keyDim(), config.valueDim());
-      LlamaForwardPass forwardPass =
-          new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel);
+      Map<String, String> recommendations =
+          recommendations(backendConfiguration, batchedMatrixKernel);
+      PureJavaPlanConfiguration planConfiguration =
+          PureJavaPlanConfiguration.fromSystemProperties(recommendations);
+      loaded =
+          "gemma4".equals(modelFamily)
+              ? loadGemma4(
+                  modelPath,
+                  file,
+                  modelFamily,
+                  runtime,
+                  planConfiguration,
+                  backendConfiguration,
+                  batchedMatrixKernel)
+              : loadLlama(
+                  modelPath, file, modelFamily, runtime, planConfiguration, batchedMatrixKernel);
 
-      String modelName =
-          file.metadata().getString("general.name").orElse(modelPath.getFileName().toString());
-      ModelMetadata metadata =
-          new ModelMetadata(
-              modelFamily,
-              modelName,
-              config.contextLength(),
-              config.vocabSize(),
-              config.embeddingDim(),
-              config.numLayers(),
-              config.numHeads(),
-              config.numKvHeads());
-
-      BackendDiagnostics diagnostics = backendConfiguration.enrich(executionPlan.diagnostics());
+      BackendDiagnostics diagnostics =
+          backendConfiguration.enrich(loaded.executionPlan().diagnostics());
 
       return new PureJavaBackend(
           arena,
-          config,
           tokenizer,
-          forwardPass,
-          metadata,
-          executionPlan,
+          loaded.decoder(),
+          loaded.metadata(),
+          loaded.executionPlan(),
           diagnostics,
           batchedMatrixKernel);
     } catch (IOException e) {
-      closeAfterFailure(arena, batchedMatrixKernel, e);
+      closeAfterFailure(null, arena, batchedMatrixKernel, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
     } catch (RuntimeException | Error e) {
-      closeAfterFailure(arena, batchedMatrixKernel, e);
+      closeAfterFailure(loaded == null ? null : loaded.decoder(), arena, batchedMatrixKernel, e);
       throw e;
     }
+  }
+
+  private static LoadedDecoder loadLlama(
+      Path modelPath,
+      GgufFile file,
+      String modelFamily,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+    LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.from(modelFamily, config, weights),
+            planConfiguration,
+            batchedMatrixKernel);
+    KvCache cache =
+        new KvCache(
+            config.numLayers(),
+            runtimeContextLength(config.contextLength()),
+            config.keyDim(),
+            config.valueDim());
+    PureJavaDecoder decoder =
+        new LlamaDecoder(
+            new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            modelFamily,
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, executionPlan);
+  }
+
+  private static LoadedDecoder loadGemma4(
+      Path modelPath,
+      GgufFile file,
+      String modelFamily,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      BackendConfiguration backendConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel)
+      throws IOException {
+    Gemma4Config config = Gemma4Config.fromMetadata(file.metadata());
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime, gemma4Topology(file, config), planConfiguration, batchedMatrixKernel);
+    ModelMetadata metadata =
+        new ModelMetadata(
+            modelFamily,
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads(0));
+    Gemma4Decoder decoder =
+        Gemma4Decoder.load(
+            modelPath,
+            file,
+            runtimeContextLength(config.contextLength()),
+            gemma4ExpertCacheSlots(backendConfiguration));
+    return new LoadedDecoder(new Gemma4DecoderAdapter(decoder), metadata, executionPlan);
   }
 
   @Override
@@ -247,117 +313,131 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   @Override
   public int maxBatchSize() {
     checkOpen();
-    return forwardPass.maxSessionBatchSize();
+    return decoder.maxBatchSize();
   }
 
   @Override
   public float[] forward(int token, int position) {
-    return forwardPass.forward(token, position);
+    checkOpen();
+    return decoder.forward(token, position);
   }
 
   @Override
   public float[] forwardTransient(int token, int position) {
-    return forwardPass.forwardTransient(token, position);
+    checkOpen();
+    return decoder.forwardTransient(token, position);
   }
 
   @Override
   public float[] prefill(int[] tokens, int startPosition) {
-    return forwardPass.prefill(tokens, startPosition);
+    checkOpen();
+    return decoder.prefill(tokens, startPosition);
   }
 
   @Override
   public InferenceSession openSession() {
     checkOpen();
-    return new PureJavaInferenceSession(this, forwardPass.openSession());
+    return new PureJavaInferenceSession(this, decoder.openSession());
   }
 
   @Override
   public float[] forward(InferenceSession session, int token, int position) {
-    return forwardPass.forward(requireOpen(session).delegate, token, position);
+    return decoder.forward(requireOpen(session).delegate, token, position);
   }
 
   @Override
   public float[] forwardTransient(InferenceSession session, int token, int position) {
-    return forwardPass.forwardTransient(requireOpen(session).delegate, token, position);
+    return decoder.forwardTransient(requireOpen(session).delegate, token, position);
   }
 
   @Override
   public float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
-    return forwardPass.prefill(requireOpen(session).delegate, tokens, startPosition);
+    return decoder.prefill(requireOpen(session).delegate, tokens, startPosition);
   }
 
   @Override
   public LogitBatch forwardBatch(InferenceSession[] sessions, int[] tokens) {
-    return forwardPass.forwardBatch(unwrapSessions(sessions), tokens);
+    return decoder.forwardBatch(unwrapSessions(sessions), tokens);
   }
 
   @Override
   public LogitBatch forwardBatchTransient(InferenceSession[] sessions, int[] tokens) {
-    return forwardPass.forwardBatchTransient(unwrapSessions(sessions), tokens);
+    return decoder.forwardBatchTransient(unwrapSessions(sessions), tokens);
   }
 
   @Override
   public void rewind(InferenceSession session, int checkpoint) {
-    forwardPass.rewind(requireOpen(session).delegate, checkpoint);
+    decoder.rewind(requireOpen(session).delegate, checkpoint);
   }
 
   @Override
   public void reset(InferenceSession session) {
-    forwardPass.reset(requireOpen(session).delegate);
+    decoder.reset(requireOpen(session).delegate);
   }
 
   @Override
   public int checkpoint() {
-    return forwardPass.checkpoint();
+    checkOpen();
+    return decoder.checkpoint();
   }
 
   @Override
   public LogitBatch verify(int[] tokens, int startPosition) {
-    return forwardPass.verify(tokens, startPosition);
+    checkOpen();
+    return decoder.verify(tokens, startPosition);
   }
 
   @Override
   public LogitBatch verifyTransient(int[] tokens, int startPosition) {
-    return forwardPass.verifyTransient(tokens, startPosition);
+    checkOpen();
+    return decoder.verifyTransient(tokens, startPosition);
   }
 
   @Override
   public void rewind(int checkpoint) {
-    forwardPass.rewind(checkpoint);
+    checkOpen();
+    decoder.rewind(checkpoint);
   }
 
   @Override
   public void reset() {
-    forwardPass.reset();
+    checkOpen();
+    decoder.reset();
   }
 
   @Override
   public void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
     RuntimeException closeFailure = null;
     try {
-      batchedMatrixKernel.close();
+      decoder.close();
+    } catch (IOException failure) {
+      closeFailure = new UncheckedIOException("Failed to close decoder resources", failure);
     } catch (RuntimeException failure) {
       closeFailure = failure;
     }
     try {
+      batchedMatrixKernel.close();
+    } catch (RuntimeException failure) {
+      closeFailure = combineCloseFailures(closeFailure, failure);
+    }
+    try {
       arena.close();
     } catch (RuntimeException failure) {
-      if (closeFailure == null) {
-        closeFailure = failure;
-      } else {
-        closeFailure.addSuppressed(failure);
-      }
+      closeFailure = combineCloseFailures(closeFailure, failure);
     }
-    closed = true;
     if (closeFailure != null) {
       throw closeFailure;
     }
   }
 
-  private LlamaForwardPass.Session[] unwrapSessions(InferenceSession[] sessions) {
+  private PureJavaDecoder.Session[] unwrapSessions(InferenceSession[] sessions) {
     Objects.requireNonNull(sessions, "sessions");
     if (sessionBatch.length != sessions.length) {
-      sessionBatch = new LlamaForwardPass.Session[sessions.length];
+      sessionBatch = new PureJavaDecoder.Session[sessions.length];
     }
     for (int index = 0; index < sessions.length; index++) {
       sessionBatch[index] = requireOpen(sessions[index]).delegate;
@@ -389,7 +469,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     }
     session.closed = true;
     if (!closed) {
-      forwardPass.reset(session.delegate);
+      decoder.reset(session.delegate);
     }
   }
 
@@ -399,10 +479,10 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     }
   }
 
-  private static int runtimeContextLength(LlamaConfig config) {
+  private static int runtimeContextLength(int modelContextLength) {
     String value = System.getProperty(MAX_CONTEXT_LENGTH_PROPERTY);
     if (value == null || value.isBlank()) {
-      return config.contextLength();
+      return modelContextLength;
     }
     int maxContextLength;
     try {
@@ -415,7 +495,59 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
       throw new IllegalArgumentException(
           MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value);
     }
-    return Math.min(config.contextLength(), maxContextLength);
+    return Math.min(modelContextLength, maxContextLength);
+  }
+
+  private static ModelTopology gemma4Topology(GgufFile file, Gemma4Config config) {
+    List<ModelTopology.LayerTopology> layers = new ArrayList<>(config.numLayers());
+    int queryRows = 0;
+    int keyRows = 0;
+    int valueRows = 0;
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      String prefix = "blk." + layer + ".";
+      GgufTensorType key = tensorType(file, prefix + "attn_k.weight");
+      layers.add(
+          new ModelTopology.LayerTopology(
+              tensorType(file, prefix + "attn_q.weight"),
+              key,
+              config.usesSlidingWindow(layer) ? tensorType(file, prefix + "attn_v.weight") : key,
+              tensorType(file, prefix + "attn_output.weight"),
+              tensorType(file, prefix + "ffn_gate.weight"),
+              tensorType(file, prefix + "ffn_up.weight"),
+              tensorType(file, prefix + "ffn_down.weight")));
+      queryRows = Math.max(queryRows, config.queryDim(layer));
+      keyRows = Math.max(keyRows, config.keyDim(layer));
+      valueRows = Math.max(valueRows, config.valueDim(layer));
+    }
+    return new ModelTopology("gemma4", queryRows, keyRows, valueRows, layers, true);
+  }
+
+  private static GgufTensorType tensorType(GgufFile file, String name) {
+    return file.getTensor(name).type();
+  }
+
+  private static int gemma4ExpertCacheSlots(BackendConfiguration backendConfiguration) {
+    String configured = System.getProperty(GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY);
+    if (configured == null) {
+      configured = backendConfiguration.recommendations().get(GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY);
+    }
+    if (configured == null || configured.isBlank()) {
+      return DEFAULT_GEMMA4_EXPERT_CACHE_SLOTS;
+    }
+    try {
+      int slots = Integer.parseInt(configured);
+      if (slots > 0) {
+        return slots;
+      }
+    } catch (NumberFormatException ignored) {
+      // Report one stable configuration error below.
+    }
+    throw new IllegalArgumentException(
+        GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY + " must be a positive integer: " + configured);
+  }
+
+  private static String modelName(Path modelPath, GgufFile file) {
+    return file.metadata().getString("general.name").orElse(modelPath.getFileName().toString());
   }
 
   private static Map<String, String> recommendations(
@@ -426,7 +558,17 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   }
 
   private static void closeAfterFailure(
-      Arena arena, GgufBatchedMatrixKernel batchedMatrixKernel, Throwable failure) {
+      PureJavaDecoder decoder,
+      Arena arena,
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      Throwable failure) {
+    if (decoder != null) {
+      try {
+        decoder.close();
+      } catch (IOException | RuntimeException closeFailure) {
+        failure.addSuppressed(closeFailure);
+      }
+    }
     try {
       batchedMatrixKernel.close();
     } catch (RuntimeException closeFailure) {
@@ -437,5 +579,14 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     } catch (RuntimeException closeFailure) {
       failure.addSuppressed(closeFailure);
     }
+  }
+
+  private static RuntimeException combineCloseFailures(
+      RuntimeException current, RuntimeException next) {
+    if (current == null) {
+      return next;
+    }
+    current.addSuppressed(next);
+    return current;
   }
 }

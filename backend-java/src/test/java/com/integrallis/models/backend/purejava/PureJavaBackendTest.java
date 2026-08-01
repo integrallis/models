@@ -170,6 +170,29 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void loadsGemma4ThroughTheCompleteBackendContract(@TempDir Path dir) throws IOException {
+      Path modelPath = buildNanoGemma4ModelFile(dir, new Random(84));
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertThat(backend.metadata().modelFamily()).isEqualTo("gemma4");
+        assertThat(backend.metadata().modelName()).isEqualTo("NanoGemma4");
+        assertThat(backend.tokenizer().vocabSize()).isEqualTo(VOCAB_SIZE);
+        assertThat(backend.executionPlan().topology().architecture()).isEqualTo("gemma4");
+        assertThat(backend.executionPlan().prefillBatchSize()).isEqualTo(1);
+
+        float[] first = backend.forward(5, 0);
+        assertFiniteLogits(first);
+        backend.reset();
+        assertFiniteLogits(backend.prefill(new int[] {5, 7}, 0));
+
+        try (InferenceSession session = backend.openSession()) {
+          assertFiniteLogits(backend.prefill(session, new int[] {11, 13}, 0));
+          assertThat(session.checkpoint()).isEqualTo(2);
+        }
+      }
+    }
+
+    @Test
     void appliesAnExternalBackendProfileWithoutDependingOnItsRegistry(@TempDir Path dir)
         throws IOException {
       Path modelPath = buildNanoModelFile(dir, new Random(42));
@@ -285,6 +308,146 @@ class PureJavaBackendTest {
       buf.putFloat(i * 4, (rng.nextFloat() - 0.5f) * 0.1f);
     }
     return data;
+  }
+
+  private static void assertFiniteLogits(float[] logits) {
+    assertThat(logits).hasSize(VOCAB_SIZE);
+    for (float logit : logits) {
+      assertThat(Float.isFinite(logit)).isTrue();
+    }
+  }
+
+  private static Path buildNanoGemma4ModelFile(Path dir, Random rng) throws IOException {
+    int headLength = DIM / HEADS;
+    int keyValueDim = KV_HEADS * headLength;
+    int expertCount = 2;
+    int expertHiddenDim = 4;
+    List<String> tokens = new ArrayList<>();
+    List<Float> scores = new ArrayList<>();
+    for (int token = 0; token < VOCAB_SIZE; token++) {
+      tokens.add("t" + token);
+      scores.add(0.0f);
+    }
+
+    SyntheticGgufBuilder builder =
+        new SyntheticGgufBuilder()
+            .addString("general.name", "NanoGemma4")
+            .addString("general.architecture", "gemma4")
+            .addUint32("gemma4.embedding_length", DIM)
+            .addUint32("gemma4.block_count", LAYERS)
+            .addUint32("gemma4.attention.head_count", HEADS)
+            .addInt32Array("gemma4.attention.head_count_kv", List.of(KV_HEADS, KV_HEADS))
+            .addUint32("gemma4.vocab_size", VOCAB_SIZE)
+            .addUint32("gemma4.context_length", CONTEXT)
+            .addUint32("gemma4.feed_forward_length", HIDDEN_DIM)
+            .addUint32("gemma4.expert_feed_forward_length", expertHiddenDim)
+            .addUint32("gemma4.expert_count", expertCount)
+            .addUint32("gemma4.expert_used_count", 1)
+            .addUint32("gemma4.attention.key_length", headLength)
+            .addUint32("gemma4.attention.key_length_swa", headLength)
+            .addUint32("gemma4.attention.value_length", headLength)
+            .addUint32("gemma4.attention.value_length_swa", headLength)
+            .addFloat32("gemma4.rope.freq_base", 1_000_000.0f)
+            .addFloat32("gemma4.rope.freq_base_swa", 10_000.0f)
+            .addUint32("gemma4.rope.dimension_count", headLength)
+            .addUint32("gemma4.rope.dimension_count_swa", headLength)
+            .addFloat32("gemma4.attention.layer_norm_rms_epsilon", 1.0e-6f)
+            .addUint32("gemma4.attention.sliding_window", 4)
+            .addBoolArray("gemma4.attention.sliding_window_pattern", List.of(true, false))
+            .addFloat32("gemma4.final_logit_softcapping", 30.0f)
+            .addString("tokenizer.ggml.model", "gemma4")
+            .addStringArray("tokenizer.ggml.tokens", tokens)
+            .addFloat32Array("tokenizer.ggml.scores", scores)
+            .addUint32("tokenizer.ggml.bos_token_id", 0)
+            .addUint32("tokenizer.ggml.eos_token_id", 1);
+
+    addF32(builder, "token_embd.weight", new long[] {DIM, VOCAB_SIZE}, rng);
+    builder.addTensor("output_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+    builder.addTensor(
+        "rope_freqs.weight",
+        GgufTensorType.F32,
+        new long[] {headLength / 2},
+        onesF32(headLength / 2));
+    for (int layer = 0; layer < LAYERS; layer++) {
+      addGemma4Layer(
+          builder, rng, layer, layer == 0, headLength, keyValueDim, expertHiddenDim, expertCount);
+    }
+
+    Path modelPath = dir.resolve("nano-gemma4.gguf");
+    Files.write(modelPath, builder.build());
+    return modelPath;
+  }
+
+  private static void addGemma4Layer(
+      SyntheticGgufBuilder builder,
+      Random rng,
+      int layer,
+      boolean sliding,
+      int headLength,
+      int keyValueDim,
+      int expertHiddenDim,
+      int expertCount) {
+    String prefix = "blk." + layer + ".";
+    builder.addTensor(
+        prefix + "attn_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+    addF32(builder, prefix + "attn_q.weight", new long[] {DIM, HEADS * headLength}, rng);
+    addF32(builder, prefix + "attn_k.weight", new long[] {DIM, keyValueDim}, rng);
+    if (sliding) {
+      addF32(builder, prefix + "attn_v.weight", new long[] {DIM, keyValueDim}, rng);
+    }
+    addF32(builder, prefix + "attn_output.weight", new long[] {HEADS * headLength, DIM}, rng);
+    builder.addTensor(
+        prefix + "attn_q_norm.weight",
+        GgufTensorType.F32,
+        new long[] {headLength},
+        onesF32(headLength));
+    builder.addTensor(
+        prefix + "attn_k_norm.weight",
+        GgufTensorType.F32,
+        new long[] {headLength},
+        onesF32(headLength));
+    addGemma4Norm(builder, prefix + "post_attention_norm.weight");
+
+    addGemma4Norm(builder, prefix + "ffn_norm.weight");
+    addF32(builder, prefix + "ffn_gate.weight", new long[] {DIM, HIDDEN_DIM}, rng);
+    addF32(builder, prefix + "ffn_up.weight", new long[] {DIM, HIDDEN_DIM}, rng);
+    addF32(builder, prefix + "ffn_down.weight", new long[] {HIDDEN_DIM, DIM}, rng);
+    addGemma4Norm(builder, prefix + "pre_ffw_norm_2.weight");
+    addGemma4Norm(builder, prefix + "post_ffw_norm_1.weight");
+    addGemma4Norm(builder, prefix + "post_ffw_norm_2.weight");
+    addGemma4Norm(builder, prefix + "post_ffw_norm.weight");
+
+    addGemma4Norm(builder, prefix + "ffn_gate_inp.scale");
+    addF32(builder, prefix + "ffn_gate_inp.weight", new long[] {DIM, expertCount}, rng);
+    builder.addTensor(
+        prefix + "ffn_down_exps.scale",
+        GgufTensorType.F32,
+        new long[] {expertCount},
+        onesF32(expertCount));
+    builder.addTensor(
+        prefix + "layer_output_scale.weight", GgufTensorType.F32, new long[] {1}, onesF32(1));
+    addF32(
+        builder,
+        prefix + "ffn_gate_up_exps.weight",
+        new long[] {DIM, 2L * expertHiddenDim, expertCount},
+        rng);
+    addF32(
+        builder,
+        prefix + "ffn_down_exps.weight",
+        new long[] {expertHiddenDim, DIM, expertCount},
+        rng);
+  }
+
+  private static void addGemma4Norm(SyntheticGgufBuilder builder, String name) {
+    builder.addTensor(name, GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+  }
+
+  private static void addF32(SyntheticGgufBuilder builder, String name, long[] shape, Random rng) {
+    long elements = 1;
+    for (long dimension : shape) {
+      elements = Math.multiplyExact(elements, dimension);
+    }
+    builder.addTensor(name, GgufTensorType.F32, shape, randomF32(rng, Math.toIntExact(elements)));
   }
 
   private static byte[] projectionData(Random rng, GgufTensorType type, int count) {

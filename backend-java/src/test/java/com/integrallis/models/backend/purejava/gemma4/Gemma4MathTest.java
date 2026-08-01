@@ -26,6 +26,18 @@ import org.junit.jupiter.api.Test;
 class Gemma4MathTest {
 
   @Test
+  void normalizesAnUnweightedHeadInPlaceWithoutTouchingAdjacentValues() {
+    float[] values = {99.0f, 3.0f, 4.0f, 98.0f};
+
+    Gemma4Math.normalizeWithoutWeight(values, 1, values, 1, 2, 1.0e-6f);
+
+    assertThat(values[0]).isEqualTo(99.0f);
+    assertThat(values[1]).isCloseTo(0.8485281f, offset(1.0e-6f));
+    assertThat(values[2]).isCloseTo(1.1313708f, offset(1.0e-6f));
+    assertThat(values[3]).isEqualTo(98.0f);
+  }
+
+  @Test
   void routerInputUsesUnweightedRmsNormAndTheLearnedDimensionScale() {
     float[] output = new float[2];
 
