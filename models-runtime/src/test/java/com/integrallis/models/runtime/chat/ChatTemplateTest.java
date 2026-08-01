@@ -94,6 +94,7 @@ class ChatTemplateTest {
                     "zephyr",
                     "llama3",
                     "gemma",
+                    "gemma4",
                     "phi3",
                     "deepseek",
                     "h2o",
@@ -110,6 +111,7 @@ class ChatTemplateTest {
             ChatTemplate.ZEPHYR,
             ChatTemplate.LLAMA3,
             ChatTemplate.GEMMA,
+            ChatTemplate.GEMMA4,
             ChatTemplate.PHI3,
             ChatTemplate.DEEPSEEK,
             ChatTemplate.H2O,
@@ -143,6 +145,9 @@ class ChatTemplateTest {
             Map.entry(
                 ChatTemplate.GEMMA,
                 "<start_of_turn>user\nPrompt<end_of_turn>\n<start_of_turn>model\n"),
+            Map.entry(
+                ChatTemplate.GEMMA4,
+                "<|turn>user\nPrompt<turn|>\n" + "<|turn>model\n<|channel>thought\n<channel|>"),
             Map.entry(ChatTemplate.PHI3, "<|user|>\nPrompt<|end|>\n<|assistant|>\n"),
             Map.entry(
                 ChatTemplate.DEEPSEEK,
@@ -187,6 +192,41 @@ class ChatTemplateTest {
             Tool result<end_of_turn>
             <start_of_turn>model
             """);
+  }
+
+  @Test
+  void rendersRoleAwareGemma4Conversation() {
+    List<ChatMessage> conversation =
+        List.of(
+            ChatMessage.system("System"),
+            ChatMessage.user("Question"),
+            ChatMessage.assistant("Answer"),
+            ChatMessage.user("Next"));
+
+    assertThat(ChatTemplate.GEMMA4.render(conversation).text())
+        .isEqualTo(
+            """
+            <|turn>system
+            System<turn|>
+            <|turn>user
+            Question<turn|>
+            <|turn>model
+            Answer<turn|>
+            <|turn>user
+            Next<turn|>
+            <|turn>model
+            <|channel>thought
+            <channel|>""");
+  }
+
+  @Test
+  void rejectsGemma4SystemMessagesAfterTheFirstTurn() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ChatTemplate.GEMMA4.render(
+                    List.of(ChatMessage.user("Question"), ChatMessage.system("Too late"))))
+        .withMessageContaining("system message must be first");
   }
 
   @Test

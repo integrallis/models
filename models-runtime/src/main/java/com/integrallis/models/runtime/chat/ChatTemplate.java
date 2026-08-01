@@ -35,6 +35,7 @@ public enum ChatTemplate {
   ZEPHYR("zephyr"),
   LLAMA3("llama3"),
   GEMMA("gemma"),
+  GEMMA4("gemma4"),
   PHI3("phi3"),
   DEEPSEEK("deepseek"),
   H2O("h2o"),
@@ -71,6 +72,7 @@ public enum ChatTemplate {
       case ZEPHYR -> renderZephyr(conversation);
       case LLAMA3 -> renderLlama3(conversation);
       case GEMMA -> renderGemma(conversation);
+      case GEMMA4 -> renderGemma4(conversation);
       case PHI3 -> renderPhi3(conversation);
       case DEEPSEEK -> renderDeepSeek(conversation);
       case H2O -> renderH2o(conversation, "");
@@ -172,6 +174,29 @@ public enum ChatTemplate {
       prompt.control("<end_of_turn>\n");
     }
     return prompt.control("<start_of_turn>model\n").build();
+  }
+
+  private static ModelPrompt renderGemma4(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    for (int index = 0; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      String role =
+          switch (message.role()) {
+            case SYSTEM -> {
+              if (index != 0) {
+                throw new IllegalArgumentException("Gemma 4 system message must be first");
+              }
+              yield "system";
+            }
+            case USER -> "user";
+            case ASSISTANT -> "model";
+            case TOOL ->
+                throw new IllegalArgumentException(
+                    "Gemma 4 text chat template does not support role " + message.role());
+          };
+      prompt.control("<|turn>" + role + "\n").text(message.text().strip()).control("<turn|>\n");
+    }
+    return prompt.control("<|turn>model\n<|channel>thought\n<channel|>").build();
   }
 
   private static ModelPrompt renderPhi3(List<ChatMessage> messages) {

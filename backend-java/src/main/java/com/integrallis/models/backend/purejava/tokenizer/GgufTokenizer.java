@@ -77,6 +77,7 @@ public final class GgufTokenizer implements Tokenizer {
   private final List<SpecialToken> specialTokens;
   private final boolean useByteLevel;
   private final boolean useSentencePiece;
+  private final boolean useGemma4Bpe;
   private final boolean addBosToken;
   private final boolean addEosToken;
   private final boolean addSpacePrefix;
@@ -96,6 +97,7 @@ public final class GgufTokenizer implements Tokenizer {
       List<SpecialToken> specialTokens,
       boolean useByteLevel,
       boolean useSentencePiece,
+      boolean useGemma4Bpe,
       boolean addBosToken,
       boolean addEosToken,
       boolean addSpacePrefix,
@@ -111,6 +113,7 @@ public final class GgufTokenizer implements Tokenizer {
     this.specialTokens = specialTokens;
     this.useByteLevel = useByteLevel;
     this.useSentencePiece = useSentencePiece;
+    this.useGemma4Bpe = useGemma4Bpe;
     this.addBosToken = addBosToken;
     this.addEosToken = addEosToken;
     this.addSpacePrefix = addSpacePrefix;
@@ -201,7 +204,9 @@ public final class GgufTokenizer implements Tokenizer {
     // the bytes_to_unicode mapping is in use
     String tokenizerModel = metadata.getString("tokenizer.ggml.model").orElse("");
     boolean useSentencePiece = "llama".equals(tokenizerModel);
-    boolean useByteLevel = !useSentencePiece && detectByteLevel(tokenizerModel, vocab, tokenToId);
+    boolean useGemma4Bpe = "gemma4".equals(tokenizerModel);
+    boolean useByteLevel =
+        !useSentencePiece && !useGemma4Bpe && detectByteLevel(tokenizerModel, vocab, tokenToId);
     boolean addBosToken = metadata.getBool("tokenizer.ggml.add_bos_token").orElse(useSentencePiece);
     boolean addEosToken = metadata.getBool("tokenizer.ggml.add_eos_token").orElse(false);
     boolean addSpacePrefix =
@@ -221,6 +226,7 @@ public final class GgufTokenizer implements Tokenizer {
         specialTokens,
         useByteLevel,
         useSentencePiece,
+        useGemma4Bpe,
         addBosToken,
         addEosToken,
         addSpacePrefix,
@@ -374,6 +380,9 @@ public final class GgufTokenizer implements Tokenizer {
     if (useSentencePiece) {
       return encodeSentencePiece(text);
     }
+    if (useGemma4Bpe) {
+      return encodeGemma4Bpe(text);
+    }
     return useByteLevel ? encodeByteLevelBpe(text) : encodePlainBpe(text);
   }
 
@@ -504,6 +513,105 @@ public final class GgufTokenizer implements Tokenizer {
     for (byte value : symbol.getBytes(StandardCharsets.UTF_8)) {
       Integer token = tokenToId.get(String.format("<0x%02X>", value & 0xFF));
       tokens.add(token != null ? token : unknownTokenId);
+    }
+  }
+
+  private int[] encodeGemma4Bpe(String text) {
+    String normalized = text.replace(' ', '\u2581');
+    List<Integer> tokens = new ArrayList<>();
+    int pieceStart = 0;
+    while (pieceStart < normalized.length()) {
+      boolean newlineRun = normalized.charAt(pieceStart) == '\n';
+      int pieceEnd = pieceStart + 1;
+      while (pieceEnd < normalized.length()
+          && (normalized.charAt(pieceEnd) == '\n') == newlineRun) {
+        pieceEnd++;
+      }
+      encodeGemma4Piece(normalized.substring(pieceStart, pieceEnd), newlineRun, tokens);
+      pieceStart = pieceEnd;
+    }
+    return tokens.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  private void encodeGemma4Piece(String piece, boolean newlineRun, List<Integer> output) {
+    if (newlineRun) {
+      Integer wholeRun = tokenToId.get(piece);
+      if (wholeRun != null) {
+        output.add(wholeRun);
+        return;
+      }
+    }
+
+    List<RawBpeSymbol> symbols = new ArrayList<>();
+    piece
+        .codePoints()
+        .forEach(
+            codePoint -> {
+              int index = symbols.size();
+              symbols.add(
+                  new RawBpeSymbol(new String(Character.toChars(codePoint)), index - 1, -1));
+              if (index > 0) {
+                symbols.get(index - 1).next = index;
+              }
+            });
+    if (symbols.isEmpty()) {
+      return;
+    }
+
+    PriorityQueue<RawBpeMerge> workQueue =
+        new PriorityQueue<>(
+            Comparator.comparingInt(RawBpeMerge::rank).thenComparingInt(RawBpeMerge::left));
+    for (int right = 1; right < symbols.size(); right++) {
+      addRawBpeMerge(workQueue, symbols, right - 1, right);
+    }
+
+    while (!workQueue.isEmpty()) {
+      RawBpeMerge merge = workQueue.remove();
+      RawBpeSymbol left = symbols.get(merge.left());
+      RawBpeSymbol right = symbols.get(merge.right());
+      if (!left.active
+          || !right.active
+          || left.next != merge.right()
+          || left.version != merge.leftVersion()
+          || right.version != merge.rightVersion()) {
+        continue;
+      }
+
+      left.text += right.text;
+      left.version++;
+      left.next = right.next;
+      right.active = false;
+      if (right.next >= 0) {
+        symbols.get(right.next).previous = merge.left();
+      }
+      addRawBpeMerge(workQueue, symbols, left.previous, merge.left());
+      addRawBpeMerge(workQueue, symbols, merge.left(), left.next);
+    }
+
+    for (int index = 0; index >= 0; index = symbols.get(index).next) {
+      String symbol = symbols.get(index).text;
+      Integer token = tokenToId.get(symbol);
+      if (token != null) {
+        output.add(token);
+      } else {
+        appendByteFallback(output, symbol);
+      }
+    }
+  }
+
+  private void addRawBpeMerge(
+      PriorityQueue<RawBpeMerge> workQueue,
+      List<RawBpeSymbol> symbols,
+      int leftIndex,
+      int rightIndex) {
+    if (leftIndex < 0 || rightIndex < 0) {
+      return;
+    }
+    RawBpeSymbol left = symbols.get(leftIndex);
+    RawBpeSymbol right = symbols.get(rightIndex);
+    Integer rank = mergeRanks.get(left.text + " " + right.text);
+    if (rank != null) {
+      workQueue.add(new RawBpeMerge(leftIndex, rightIndex, rank, left.version, right.version));
     }
   }
 
@@ -676,6 +784,9 @@ public final class GgufTokenizer implements Tokenizer {
     if (useSentencePiece) {
       return decodeSentencePiece(tokens);
     }
+    if (useGemma4Bpe) {
+      return decodeGemma4Bpe(tokens);
+    }
     if (!useByteLevel) {
       StringBuilder sb = new StringBuilder();
       for (int token : tokens) {
@@ -749,6 +860,23 @@ public final class GgufTokenizer implements Tokenizer {
     return decoded;
   }
 
+  private String decodeGemma4Bpe(int[] tokens) {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    for (int token : tokens) {
+      if (token < 0 || token >= vocab.length || token == bosTokenId || isEndOfGeneration(token)) {
+        continue;
+      }
+      String piece = vocab[token];
+      Integer byteValue = explicitByteValue(piece);
+      if (byteValue != null) {
+        bytes.write(byteValue);
+      } else {
+        bytes.writeBytes(piece.replace('\u2581', ' ').getBytes(StandardCharsets.UTF_8));
+      }
+    }
+    return bytes.toString(StandardCharsets.UTF_8);
+  }
+
   @Override
   public String decode(int token) {
     if (token < 0 || token >= vocab.length || token == bosTokenId || isEndOfGeneration(token)) {
@@ -783,7 +911,7 @@ public final class GgufTokenizer implements Tokenizer {
       return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    if (useSentencePiece) {
+    if (useSentencePiece || useGemma4Bpe) {
       return piece.replace('\u2581', ' ');
     }
 
@@ -817,6 +945,22 @@ public final class GgufTokenizer implements Tokenizer {
 
   private record SentencePieceBigram(
       int left, int right, float score, int leftVersion, int rightVersion) {}
+
+  private static final class RawBpeSymbol {
+    private String text;
+    private int previous;
+    private int next;
+    private int version;
+    private boolean active = true;
+
+    private RawBpeSymbol(String text, int previous, int next) {
+      this.text = text;
+      this.previous = previous;
+      this.next = next;
+    }
+  }
+
+  private record RawBpeMerge(int left, int right, int rank, int leftVersion, int rightVersion) {}
 
   private static final class BpeSymbol {
     private int token;

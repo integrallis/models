@@ -118,4 +118,15 @@ public record GgufMetadata(Map<String, GgufMetadataValue> entries) {
                     .map(e -> ((GgufMetadataValue.Int32Value) e).value())
                     .toList());
   }
+
+  /** Returns a boolean array value for the given key. */
+  public Optional<List<Boolean>> getBoolArray(String key) {
+    return get(key)
+        .filter(v -> v instanceof GgufMetadataValue.ArrayValue)
+        .map(v -> (GgufMetadataValue.ArrayValue) v)
+        .filter(a -> a.elementType() == GgufValueType.BOOL)
+        .map(
+            a ->
+                a.elements().stream().map(e -> ((GgufMetadataValue.BoolValue) e).value()).toList());
+  }
 }

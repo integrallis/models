@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.llama;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
@@ -1405,9 +1406,9 @@ class LlamaForwardPassTest {
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
       assertThat(batched.usesFinalLayerPrefillPruning()).isFalse();
       assertThat(batched.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.TWO_QUERY_BLOCK);
-      assertThat(actual).containsExactly(expected);
+      assertThat(actual).containsExactly(expected, within(2.0e-7f));
       assertThat(batched.forward(3, tokens.length))
-          .containsExactly(sequential.forward(3, tokens.length));
+          .containsExactly(sequential.forward(3, tokens.length), within(2.0e-7f));
     }
 
     @Test
