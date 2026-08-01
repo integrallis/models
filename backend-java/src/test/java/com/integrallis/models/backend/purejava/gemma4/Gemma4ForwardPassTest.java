@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.gemma4;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
 
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufHeader;
@@ -65,6 +66,55 @@ class Gemma4ForwardPassTest {
       assertClose(actual.prefill(new int[] {0, 1}, 0), expected.prefill(0, 1));
       assertThat(actual.checkpoint()).isEqualTo(2);
       assertThat(experts.stats().misses()).isGreaterThan(0);
+    }
+  }
+
+  @Test
+  void isolatesSessionsAndSupportsSpeculativeVerification() throws Exception {
+    ToyModel model = ToyModel.create();
+    Gemma4Weights weights = Gemma4Weights.fromGgufFile(model.file(), model.config());
+    Gemma4TensorLayout layout = weights.expertLayout();
+
+    try (Gemma4ExpertCache experts =
+        new Gemma4ExpertCache(
+            new Gemma4ExpertLoader(reader(model.file().fileSegment())),
+            model.config().numLayers(),
+            model.config().numExperts(),
+            1,
+            (layer, expert) -> layout.layer(layer).expert(expert),
+            Gemma4ExpertCache.CachePolicy.LFU)) {
+      Gemma4ForwardPass actual =
+          new Gemma4ForwardPass(
+              model.config(), weights, Gemma4KvCache.create(model.config(), 8, 2), experts);
+      Gemma4ForwardPass.Session first = actual.openSession();
+      Gemma4ForwardPass.Session second = actual.openSession();
+      ScalarReference expectedFirst = new ScalarReference(model);
+      ScalarReference expectedSecond = new ScalarReference(model);
+
+      assertClose(actual.prefill(first, new int[] {0}, 0), expectedFirst.forward(0));
+      assertClose(actual.prefill(second, new int[] {1}, 0), expectedSecond.forward(1));
+
+      LogitBatch batch =
+          actual.forwardBatch(new Gemma4ForwardPass.Session[] {first, second}, new int[] {1, 0});
+      assertClose(batch.copyRow(0), expectedFirst.forward(1));
+      assertClose(batch.copyRow(1), expectedSecond.forward(0));
+      assertThat(first.checkpoint()).isEqualTo(2);
+      assertThat(second.checkpoint()).isEqualTo(2);
+
+      actual.rewind(first, 1);
+      ScalarReference rewoundFirst = new ScalarReference(model);
+      rewoundFirst.forward(0);
+      assertClose(actual.forward(first, 0, 1), rewoundFirst.forward(0));
+
+      actual.reset(second);
+      ScalarReference resetSecond = new ScalarReference(model);
+      assertClose(actual.prefill(second, new int[] {0, 1}, 0), resetSecond.prefill(0, 1));
+
+      ScalarReference expectedDefault = new ScalarReference(model);
+      LogitBatch verification = actual.verify(new int[] {0, 1}, 0);
+      assertClose(verification.copyRow(0), expectedDefault.forward(0));
+      assertClose(verification.copyRow(1), expectedDefault.forward(1));
+      assertThat(actual.checkpoint()).isEqualTo(2);
     }
   }
 
