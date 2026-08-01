@@ -18,7 +18,9 @@ package com.integrallis.models.backend.purejava.plan;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
+import java.util.Locale;
 import java.util.Objects;
 
 /** Immutable execution choices selected for one loaded pure-Java model. */
@@ -29,6 +31,7 @@ public record PureJavaExecutionPlan(
     boolean injectedGroupedProjections,
     boolean mixedKProjections,
     GgufQ4Kernel q4Kernel,
+    GgufQ6BatchedKernel q6BatchedKernel,
     int prefillBatchSize,
     boolean finalLayerPrefillPruning,
     boolean finalLayerKvOnlyPrefill,
@@ -45,6 +48,7 @@ public record PureJavaExecutionPlan(
     runtime = Objects.requireNonNull(runtime, "runtime");
     topology = Objects.requireNonNull(topology, "topology");
     q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
+    q6BatchedKernel = Objects.requireNonNull(q6BatchedKernel, "q6BatchedKernel");
     q8BlockMajorKernel = Objects.requireNonNull(q8BlockMajorKernel, "q8BlockMajorKernel");
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException("prefillBatchSize must be >= 1");
@@ -72,6 +76,14 @@ public record PureJavaExecutionPlan(
     if (q4Kernel == GgufQ4Kernel.UNSIGNED_PAIRWISE && !runtime.q4UnsignedPairwiseSupported()) {
       throw new IllegalArgumentException(
           "unsigned-pairwise Q4 kernel contradicts the execution plan runtime");
+    }
+    if (q6BatchedKernel == GgufQ6BatchedKernel.TWO_QUERY_BLOCK
+        && (!topology.uses(GgufTensorType.Q6_K)
+            || prefillBatchSize < 4
+            || runtime.vectorBits() < 256
+            || !isX86(runtime.architecture()))) {
+      throw new IllegalArgumentException(
+          "two-query Q6_K kernel contradicts the execution plan topology or runtime");
     }
     if (prefillBatchSize > 1 && !topology.supportsBatchedPrefill()) {
       throw new IllegalArgumentException("batched prefill contradicts the execution plan topology");
@@ -126,5 +138,10 @@ public record PureJavaExecutionPlan(
           "final-layer K/V-only prefill contradicts the execution plan topology");
     }
     diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
+  }
+
+  private static boolean isX86(String architecture) {
+    String normalized = architecture.toLowerCase(Locale.ROOT);
+    return normalized.equals("amd64") || normalized.equals("x86_64") || normalized.equals("x64");
   }
 }
