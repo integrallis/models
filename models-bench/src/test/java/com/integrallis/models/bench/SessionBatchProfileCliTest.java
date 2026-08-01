@@ -25,8 +25,11 @@ import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.Tokenizer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -77,6 +80,37 @@ class SessionBatchProfileCliTest {
         .hasMessage("concurrency 3 exceeds backend batch capacity 2");
   }
 
+  @Test
+  void capturesJvmMemoryBeforeMeasuredSessionsClose() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1});
+    SessionBatchProfileCli.Configuration configuration =
+        configuration(model, SessionBatchProfileCli.Mode.BATCHED, 2, 1, 1);
+    FakeBatchBackend backend = new FakeBatchBackend(4);
+    JvmMemorySnapshot before = memorySnapshot(100);
+    JvmMemorySnapshot active = memorySnapshot(200);
+    Deque<JvmMemorySnapshot> snapshots = new ArrayDeque<>(List.of(before, active));
+
+    SessionBatchProfileCli.Result result =
+        SessionBatchProfileCli.profile(
+            backend,
+            configuration,
+            ticker(100, 1_100),
+            () -> {
+              assertThat(backend.closedSessions()).isEqualTo(2);
+              return snapshots.removeFirst();
+            });
+
+    assertThat(result.schemaVersion()).isEqualTo(3);
+    assertThat(result.jvmMemoryBefore()).isEqualTo(before);
+    assertThat(result.jvmMemoryActive()).isEqualTo(active);
+    assertThat(result.currentRssBytes()).isGreaterThanOrEqualTo(0);
+    assertThat(result.anonymousRssBytes()).isGreaterThanOrEqualTo(0);
+    assertThat(result.fileRssBytes()).isGreaterThanOrEqualTo(0);
+    assertThat(result.sharedMemoryRssBytes()).isGreaterThanOrEqualTo(0);
+    assertThat(snapshots).isEmpty();
+    assertThat(backend.closedSessions()).isEqualTo(4);
+  }
+
   private SessionBatchProfileCli.Configuration configuration(
       Path model,
       SessionBatchProfileCli.Mode mode,
@@ -103,6 +137,11 @@ class SessionBatchProfileCliTest {
         return values[index++];
       }
     };
+  }
+
+  private static JvmMemorySnapshot memorySnapshot(long base) {
+    return new JvmMemorySnapshot(
+        base, base + 1, base + 2, base + 3, Map.of(), NativeMemoryTracking.Summary.unavailable());
   }
 
   private static final class FakeBatchBackend implements BatchInferenceBackend {

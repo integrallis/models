@@ -26,10 +26,15 @@ final class ProcessMetrics {
   private ProcessMetrics() {}
 
   static Snapshot capture(long rootPid) {
-    return capture(rootPid, ProcessHandle::descendants);
+    return capture(rootPid, ProcessHandle::descendants, ProcessMemory::snapshot);
   }
 
   static Snapshot capture(long rootPid, DescendantSource descendantSource) {
+    return capture(rootPid, descendantSource, ProcessMemory::snapshot);
+  }
+
+  static Snapshot capture(
+      long rootPid, DescendantSource descendantSource, ProcessMemorySource memorySource) {
     if (rootPid <= 0) {
       return Snapshot.ZERO;
     }
@@ -45,12 +50,27 @@ final class ProcessMetrics {
       // Some operating systems deny process-tree enumeration; retain root-process metrics.
     }
     long highWaterBytes = 0;
+    long residentBytes = 0;
+    long anonymousResidentBytes = 0;
+    long fileResidentBytes = 0;
+    long sharedMemoryResidentBytes = 0;
     Duration cpu = Duration.ZERO;
     for (ProcessHandle process : processes) {
-      highWaterBytes += ProcessMemory.highWaterBytes(process.pid());
+      ProcessMemory.Snapshot memory = memorySource.capture(process.pid());
+      highWaterBytes += memory.highWaterBytes();
+      residentBytes += memory.residentBytes();
+      anonymousResidentBytes += memory.anonymousResidentBytes();
+      fileResidentBytes += memory.fileResidentBytes();
+      sharedMemoryResidentBytes += memory.sharedMemoryResidentBytes();
       cpu = cpu.plus(process.info().totalCpuDuration().orElse(Duration.ZERO));
     }
-    return new Snapshot(highWaterBytes, cpu);
+    return new Snapshot(
+        highWaterBytes,
+        residentBytes,
+        anonymousResidentBytes,
+        fileResidentBytes,
+        sharedMemoryResidentBytes,
+        cpu);
   }
 
   @FunctionalInterface
@@ -58,8 +78,19 @@ final class ProcessMetrics {
     Stream<ProcessHandle> descendants(ProcessHandle root);
   }
 
-  record Snapshot(long highWaterBytes, Duration cpu) {
-    private static final Snapshot ZERO = new Snapshot(0, Duration.ZERO);
+  @FunctionalInterface
+  interface ProcessMemorySource {
+    ProcessMemory.Snapshot capture(long pid);
+  }
+
+  record Snapshot(
+      long highWaterBytes,
+      long residentBytes,
+      long anonymousResidentBytes,
+      long fileResidentBytes,
+      long sharedMemoryResidentBytes,
+      Duration cpu) {
+    private static final Snapshot ZERO = new Snapshot(0, 0, 0, 0, 0, Duration.ZERO);
 
     double cpuMillisSince(Snapshot earlier) {
       long nanos = cpu.minus(earlier.cpu).toNanos();

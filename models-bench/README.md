@@ -443,6 +443,36 @@ proved exact internal repeatability while explicitly confirming expected traject
 the row/scattered arithmetic order. Reports remain under `/opt/q8-float-lane-model-gate/reports/`
 with local copies under `/private/tmp/q8-float-lane-reports/`.
 
+## Independent-session decode profile
+
+Measure several isolated KV-cache sessions advanced sequentially or through one weight-reusing
+transformer pass:
+
+```shell
+./gradlew :models-bench:installDist
+models-bench/build/install/models-bench/bin/models-bench profile-sessions \
+  --model ~/.jvllm/models/MiniCPM5-1B-Q4_K_M.gguf \
+  --context 256 \
+  --concurrency 4 \
+  --warmup-steps 16 \
+  --measure-steps 64 \
+  --mode batched \
+  --output build/reports/inference/minicpm5-sessions.json
+```
+
+Schema 3 records throughput, per-request TPOT, process CPU, GC, current and peak RSS, Linux
+anonymous/file/shared RSS, heap and non-heap use, buffer pools, Native Memory Tracking categories,
+the execution plan, and deterministic token output. Run the command in separate JVMs with
+`--mode sequential` and `--mode batched`; do not compare both modes inside one warmed process.
+
+The controlled MiniCPM5 gate found 42.29% higher aggregate throughput and 29.72% lower TPOT from
+batching on Temurin 25. The 574 MB RSS increase was anonymous memory, not mapped model pages or
+measured active heap. GraalVM Community Java 25 with
+`-Djdk.graal.MaximumInliningSize=10000` averaged 27.753 tok/s, 62.27% above batched Temurin, with
+identical output and zero measured collections. Graal used 23.24% more mean current RSS. Raw
+process reports, rejected C2 directive screens, and the aggregate are under
+`benchmark-results/certified-20260801/decode/minicpm5-1b-session-memory-nmt/`.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:

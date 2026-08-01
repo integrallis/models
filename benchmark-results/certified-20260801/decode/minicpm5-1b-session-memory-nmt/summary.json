@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "minicpm5-session-memory-and-jvm-20260801",
+  "subject": "four-session pure-Java decode memory attribution and JVM selection",
+  "model": {
+    "name": "MiniCPM5-1B-Q4_K_M",
+    "artifactSha256": "81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa",
+    "artifactSizeBytes": 688065920
+  },
+  "revision": "dd6d50c",
+  "controls": {
+    "contextLength": 256,
+    "concurrency": 4,
+    "warmupSteps": 16,
+    "measuredSteps": 64,
+    "generatedTokensPerProcess": 256,
+    "heap": "2g-fixed",
+    "collector": "G1",
+    "activeProcessorCount": 8,
+    "q6BatchedKernel": "two-query-block",
+    "cpuModel": "AMD EPYC-Milan Processor",
+    "activeVectorBits": 256,
+    "cooldownSecondsBetweenGraalProcesses": 30
+  },
+  "temurin": {
+    "java": "Eclipse Temurin 25.0.3+9-LTS",
+    "sequential": {
+      "runs": 3,
+      "meanAggregateTokensPerSecond": 12.019497308735415,
+      "meanPerRequestTokenMillis": 332.7936254791667,
+      "meanCpuMillis": 167340.0,
+      "maxPeakRssBytes": 1060843520,
+      "meanCurrentRssBytes": 1046497962.6666666,
+      "meanAnonymousRssBytes": 439900842.6666667,
+      "meanFileRssBytes": 606597120.0,
+      "meanHeapUsedBytes": 302594754.6666667,
+      "meanNmtCommittedBytes": 2285975552.0,
+      "gcCollections": 0
+    },
+    "batched": {
+      "runs": 3,
+      "meanAggregateTokensPerSecond": 17.10297411508973,
+      "meanPerRequestTokenMillis": 233.87866700520837,
+      "meanCpuMillis": 113716.66666666667,
+      "maxPeakRssBytes": 1639415808,
+      "meanCurrentRssBytes": 1620531882.6666667,
+      "meanAnonymousRssBytes": 1013922474.6666666,
+      "meanFileRssBytes": 606609408.0,
+      "meanHeapUsedBytes": 294563890.6666667,
+      "meanNmtCommittedBytes": 2288380586.6666665,
+      "gcCollections": 0
+    },
+    "batchingChange": {
+      "aggregateThroughputPercent": 42.293589122565,
+      "perRequestTokenMillisPercent": -29.722612123816205,
+      "cpuMillisPercent": -32.044540058165005,
+      "currentRssBytes": 574033920,
+      "anonymousRssBytes": 574021632,
+      "fileRssBytes": 12288,
+      "heapUsedBytes": -8030864
+    }
+  },
+  "graal": {
+    "java": "GraalVM Community 25.0.3+9-jvmci-25.1-b19",
+    "requiredJvmArguments": [
+      "-Djdk.graal.MaximumInliningSize=10000"
+    ],
+    "sequential": {
+      "runs": 3,
+      "meanAggregateTokensPerSecond": 19.561481655368592,
+      "meanPerRequestTokenMillis": 204.50353850520833,
+      "meanCpuMillis": 100643.33333333333,
+      "maxPeakRssBytes": 1180078080,
+      "meanCurrentRssBytes": 1091745109.3333333,
+      "meanAnonymousRssBytes": 464625664.0,
+      "meanFileRssBytes": 627119445.3333334,
+      "meanHeapUsedBytes": 242443936.0,
+      "meanNmtCommittedBytes": 2290064384.0,
+      "gcCollections": 0
+    },
+    "batched": {
+      "runs": 3,
+      "meanAggregateTokensPerSecond": 27.752817465905974,
+      "minAggregateTokensPerSecond": 27.6169643680672,
+      "maxAggregateTokensPerSecond": 27.827233320571274,
+      "meanPerRequestTokenMillis": 144.13124692708334,
+      "meanCpuMillis": 68403.33333333333,
+      "maxPeakRssBytes": 2129145856,
+      "meanCurrentRssBytes": 1997078528.0,
+      "meanAnonymousRssBytes": 1369986389.3333333,
+      "meanFileRssBytes": 627092138.6666666,
+      "meanHeapUsedBytes": 670905917.3333334,
+      "meanNmtCommittedBytes": 2292348245.3333335,
+      "gcCollections": 0
+    },
+    "batchingChange": {
+      "aggregateThroughputPercent": 41.87482295488232,
+      "perRequestTokenMillisPercent": -29.52139215751879,
+      "cpuMillisPercent": -32.033915145894746,
+      "currentRssBytes": 905333418.6666667,
+      "anonymousRssBytes": 905360725.3333333,
+      "fileRssBytes": -27306.6666667,
+      "heapUsedBytes": 428461981.3333334
+    },
+    "changeFromTemurinBatched": {
+      "aggregateThroughputPercent": 62.26895555796945,
+      "perRequestTokenMillisPercent": -38.3734956365757,
+      "cpuMillisPercent": -39.847574380770936,
+      "currentRssPercent": 23.235991180482472,
+      "currentRssBytes": 376546645.3333333
+    }
+  },
+  "correctness": {
+    "allRunsMatch": true,
+    "outputTokenSha256": "722fe1aa593780b2ff7da300037decad54be5d9d0ff6e026e7515329fd56ce01"
+  },
+  "conclusions": {
+    "batchingMemorySource": "anonymous resident pages; file-backed model residency and measured heap use were unchanged on Temurin",
+    "graalRecommendation": "retained for this model and host profile",
+    "compilerDirectiveRecommendation": "rejected because repeated fresh-process runs regressed throughput and triggered collections"
+  }
+}

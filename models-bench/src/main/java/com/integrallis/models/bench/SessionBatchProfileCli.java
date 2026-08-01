@@ -33,11 +33,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /** Measures weight-reusing decode across independent in-process inference sessions. */
 final class SessionBatchProfileCli {
 
-  private static final int SCHEMA_VERSION = 1;
+  private static final int SCHEMA_VERSION = 3;
   private static final Set<String> OPTIONS =
       Set.of(
           "model",
@@ -118,9 +119,19 @@ final class SessionBatchProfileCli {
   static Result profile(
       BatchInferenceBackend backend, Configuration configuration, LongSupplier nanoTime)
       throws IOException {
+    return profile(backend, configuration, nanoTime, JvmMemorySnapshot::capture);
+  }
+
+  static Result profile(
+      BatchInferenceBackend backend,
+      Configuration configuration,
+      LongSupplier nanoTime,
+      Supplier<JvmMemorySnapshot> memorySnapshot)
+      throws IOException {
     Objects.requireNonNull(backend, "backend");
     Objects.requireNonNull(configuration, "configuration");
     Objects.requireNonNull(nanoTime, "nanoTime");
+    Objects.requireNonNull(memorySnapshot, "memorySnapshot");
     int maxBatchSize = backend.maxBatchSize();
     if (configuration.concurrency() > maxBatchSize) {
       throw new IllegalArgumentException(
@@ -130,15 +141,27 @@ final class SessionBatchProfileCli {
               + maxBatchSize);
     }
 
-    runPhase(backend, configuration, configuration.warmupSteps(), false);
+    runPhase(
+        backend,
+        configuration,
+        configuration.warmupSteps(),
+        false,
+        MeasurementBoundary::unmeasured);
 
-    ProcessMetrics.Snapshot processBefore = ProcessMetrics.capture(ProcessHandle.current().pid());
+    long processId = ProcessHandle.current().pid();
+    JvmMemorySnapshot jvmMemoryBefore = memorySnapshot.get();
+    ProcessMetrics.Snapshot processBefore = ProcessMetrics.capture(processId);
     ProfileSupport.GcMetrics gcBefore = ProfileSupport.gcMetrics();
     long start = nanoTime.getAsLong();
-    int[][] outputTokens = runPhase(backend, configuration, configuration.measuredSteps(), true);
-    long elapsedNanos = nanoTime.getAsLong() - start;
-    ProfileSupport.GcMetrics gcAfter = ProfileSupport.gcMetrics();
-    ProcessMetrics.Snapshot processAfter = ProcessMetrics.capture(ProcessHandle.current().pid());
+    PhaseResult measured =
+        runPhase(
+            backend,
+            configuration,
+            configuration.measuredSteps(),
+            true,
+            () -> MeasurementBoundary.capture(nanoTime, processId, memorySnapshot));
+    MeasurementBoundary boundary = measured.boundary();
+    long elapsedNanos = boundary.completedNanos() - start;
     if (elapsedNanos <= 0) {
       throw new IllegalStateException("measured elapsed time must be positive: " + elapsedNanos);
     }
@@ -162,17 +185,27 @@ final class SessionBatchProfileCli {
         elapsedNanos,
         generatedTokens * 1_000_000_000.0 / elapsedNanos,
         elapsedNanos / (configuration.measuredSteps() * 1_000_000.0),
-        outputHash(outputTokens),
-        Math.max(0, gcAfter.collections() - gcBefore.collections()),
-        Math.max(0, gcAfter.pauseMillis() - gcBefore.pauseMillis()),
-        processAfter.cpuMillisSince(processBefore),
-        processAfter.highWaterBytes(),
+        outputHash(measured.outputTokens()),
+        Math.max(0, boundary.gc().collections() - gcBefore.collections()),
+        Math.max(0, boundary.gc().pauseMillis() - gcBefore.pauseMillis()),
+        boundary.process().cpuMillisSince(processBefore),
+        boundary.process().highWaterBytes(),
+        boundary.process().residentBytes(),
+        boundary.process().anonymousResidentBytes(),
+        boundary.process().fileResidentBytes(),
+        boundary.process().sharedMemoryResidentBytes(),
+        jvmMemoryBefore,
+        boundary.jvmMemory(),
         BenchmarkEnvironment.capture(),
         backend.diagnostics());
   }
 
-  private static int[][] runPhase(
-      BatchInferenceBackend backend, Configuration configuration, int steps, boolean retainTokens) {
+  private static PhaseResult runPhase(
+      BatchInferenceBackend backend,
+      Configuration configuration,
+      int steps,
+      boolean retainTokens,
+      Supplier<MeasurementBoundary> boundary) {
     InferenceSession[] sessions = new InferenceSession[configuration.concurrency()];
     int opened = 0;
     try {
@@ -202,7 +235,7 @@ final class SessionBatchProfileCli {
           }
         }
       }
-      return outputTokens;
+      return new PhaseResult(outputTokens, boundary.get());
     } finally {
       for (int index = opened - 1; index >= 0; index--) {
         sessions[index].close();
@@ -323,6 +356,34 @@ final class SessionBatchProfileCli {
       long gcPauseMillis,
       double cpuMillis,
       long peakRssBytes,
+      long currentRssBytes,
+      long anonymousRssBytes,
+      long fileRssBytes,
+      long sharedMemoryRssBytes,
+      JvmMemorySnapshot jvmMemoryBefore,
+      JvmMemorySnapshot jvmMemoryActive,
       BenchmarkEnvironment environment,
       BackendDiagnostics diagnostics) {}
+
+  private record PhaseResult(int[][] outputTokens, MeasurementBoundary boundary) {}
+
+  private record MeasurementBoundary(
+      long completedNanos,
+      ProcessMetrics.Snapshot process,
+      ProfileSupport.GcMetrics gc,
+      JvmMemorySnapshot jvmMemory) {
+
+    private static MeasurementBoundary capture(
+        LongSupplier nanoTime, long processId, Supplier<JvmMemorySnapshot> memorySnapshot) {
+      long completedNanos = nanoTime.getAsLong();
+      ProcessMetrics.Snapshot process = ProcessMetrics.capture(processId);
+      ProfileSupport.GcMetrics gc = ProfileSupport.gcMetrics();
+      return new MeasurementBoundary(completedNanos, process, gc, memorySnapshot.get());
+    }
+
+    private static MeasurementBoundary unmeasured() {
+      return new MeasurementBoundary(
+          0, ProcessMetrics.capture(-1), new ProfileSupport.GcMetrics(0, 0), null);
+    }
+  }
 }
