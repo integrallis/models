@@ -33,13 +33,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.IntConsumer;
+import java.util.stream.IntStream;
 
 /** Allocation-stable autoregressive execution of the text-only Gemma 4 decoder graph. */
 final class Gemma4ForwardPass {
 
   private static final int MAX_SESSION_BATCH_SIZE = 32;
-  private static final int MAX_PREFILL_BATCH_SIZE = 32;
+  private static final int MAX_PREFILL_BATCH_SIZE = 128;
   private static final int MAX_INDEPENDENT_ROUTE_GROUP_SIZE = 16;
+  private static final int MIN_PARALLEL_BATCH_SIZE = 4;
 
   /** Mutable sequence state sharing this graph's immutable weights and expert cache. */
   static final class Session {
@@ -57,7 +60,7 @@ final class Gemma4ForwardPass {
     }
   }
 
-  private record F32Scratch(int rows, int columns, float[] input, float[] output) {}
+  private record F32Scratch(int rows, int columns, float[][] inputs, float[][] outputs) {}
 
   private final Gemma4Config config;
   private final Gemma4Weights weights;
@@ -107,6 +110,7 @@ final class Gemma4ForwardPass {
   private final float[] batchKey;
   private final float[] batchValue;
   private final float[] batchAttentionOutput;
+  private final float[] batchAttentionScores;
   private final float[] batchProjected;
   private final float[] batchSharedGate;
   private final float[] batchSharedUp;
@@ -163,6 +167,17 @@ final class Gemma4ForwardPass {
 
     this.rotaryTables = new RotaryTable[config.numLayers()];
     for (int layer = 0; layer < config.numLayers(); layer++) {
+      for (int prior = 0; prior < layer; prior++) {
+        if (config.usesSlidingWindow(prior) == config.usesSlidingWindow(layer)
+            && config.ropeDimension(prior) == config.ropeDimension(layer)
+            && Float.compare(config.ropeTheta(prior), config.ropeTheta(layer)) == 0) {
+          rotaryTables[layer] = rotaryTables[prior];
+          break;
+        }
+      }
+      if (rotaryTables[layer] != null) {
+        continue;
+      }
       float[] frequencyFactors =
           config.usesSlidingWindow(layer) ? null : weights.ropeFrequencyFactors();
       rotaryTables[layer] =
@@ -227,6 +242,7 @@ final class Gemma4ForwardPass {
     this.batchKey = batchBuffer(prefillBatchCapacity, maxKeyDim);
     this.batchValue = batchBuffer(prefillBatchCapacity, maxValueDim);
     this.batchAttentionOutput = batchBuffer(prefillBatchCapacity, maxAttentionOutputDim);
+    this.batchAttentionScores = batchBuffer(prefillBatchCapacity, defaultCache.maxSeqLen());
     this.batchProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchSharedGate = batchBuffer(prefillBatchCapacity, config.sharedHiddenDim());
     this.batchSharedUp = batchBuffer(prefillBatchCapacity, config.sharedHiddenDim());
@@ -258,7 +274,10 @@ final class Gemma4ForwardPass {
             MAX_INDEPENDENT_ROUTE_GROUP_SIZE, prefillBatchCapacity * config.expertHiddenDim());
     this.groupedExpertOutputs =
         matrixBuffer(MAX_INDEPENDENT_ROUTE_GROUP_SIZE, prefillBatchCapacity * dim);
-    this.batchF32Scratch = batchedPrefill ? createF32Scratch(config, weights) : new F32Scratch[0];
+    this.batchF32Scratch =
+        batchedPrefill
+            ? createF32Scratch(config, weights, prefillBatchCapacity)
+            : new F32Scratch[0];
   }
 
   /** Executes one token and returns stable logits. */
@@ -554,57 +573,95 @@ final class Gemma4ForwardPass {
     }
 
     RotaryTable rotary = rotaryTables[layer];
+    boolean parallelAttention =
+        batchSize >= MIN_PARALLEL_BATCH_SIZE
+            && startPosition + batchSize <= sequenceCache.physicalSequenceCapacity(layer);
+    rotary.prepareBatch(startPosition, batchSize);
+    parallelFor(
+        batchSize,
+        batch -> {
+          int queryOffset = batch * queryDim;
+          int keyOffset = batch * keyDim;
+          int valueOffset = batch * valueDim;
+          for (int head = 0; head < config.numHeads(); head++) {
+            int offset = queryOffset + head * headDim;
+            TensorOps.rmsNorm(
+                batchQuery,
+                offset,
+                batchQuery,
+                offset,
+                layerWeights.queryNorm(),
+                headDim,
+                config.rmsNormEps());
+          }
+          for (int head = 0; head < config.numKvHeads(layer); head++) {
+            int keyHeadOffset = keyOffset + head * headDim;
+            int valueHeadOffset = valueOffset + head * headDim;
+            TensorOps.rmsNorm(
+                batchKey,
+                keyHeadOffset,
+                batchKey,
+                keyHeadOffset,
+                layerWeights.keyNorm(),
+                headDim,
+                config.rmsNormEps());
+            Gemma4Math.normalizeWithoutWeight(
+                batchValue,
+                valueHeadOffset,
+                batchValue,
+                valueHeadOffset,
+                headDim,
+                config.rmsNormEps());
+          }
+
+          for (int head = 0; head < config.numHeads(); head++) {
+            rotary.applyBatch(batchQuery, queryOffset + head * headDim, batch, true);
+          }
+          for (int head = 0; head < config.numKvHeads(layer); head++) {
+            rotary.applyBatch(batchKey, keyOffset + head * headDim, batch, true);
+          }
+        });
     for (int batch = 0; batch < batchSize; batch++) {
       int queryOffset = batch * queryDim;
       int keyOffset = batch * keyDim;
       int valueOffset = batch * valueDim;
-      for (int head = 0; head < config.numHeads(); head++) {
-        int offset = queryOffset + head * headDim;
-        TensorOps.rmsNorm(
-            batchQuery,
-            offset,
-            batchQuery,
-            offset,
-            layerWeights.queryNorm(),
-            headDim,
-            config.rmsNormEps());
-      }
-      for (int head = 0; head < config.numKvHeads(layer); head++) {
-        int keyHeadOffset = keyOffset + head * headDim;
-        int valueHeadOffset = valueOffset + head * headDim;
-        TensorOps.rmsNorm(
-            batchKey,
-            keyHeadOffset,
-            batchKey,
-            keyHeadOffset,
-            layerWeights.keyNorm(),
-            headDim,
-            config.rmsNormEps());
-        Gemma4Math.normalizeWithoutWeight(
-            batchValue, valueHeadOffset, batchValue, valueHeadOffset, headDim, config.rmsNormEps());
-      }
-
       int position = startPosition + batch;
-      rotary.prepare(position);
-      for (int head = 0; head < config.numHeads(); head++) {
-        rotary.apply(batchQuery, queryOffset + head * headDim, true);
-      }
-      for (int head = 0; head < config.numKvHeads(layer); head++) {
-        rotary.apply(batchKey, keyOffset + head * headDim, true);
-      }
-
       sequenceCache.store(layer, position, batchKey, keyOffset, batchValue, valueOffset);
-      computeAttention(
-          sequenceCache,
-          layer,
-          position,
-          batchQuery,
-          queryOffset,
-          queryDim,
-          keyDim,
-          valueDim,
-          batchAttentionOutput,
-          batch * attentionOutputDim);
+      if (!parallelAttention) {
+        computeAttention(
+            sequenceCache,
+            layer,
+            position,
+            batchQuery,
+            queryOffset,
+            queryDim,
+            keyDim,
+            valueDim,
+            batchAttentionOutput,
+            batch * attentionOutputDim,
+            attentionScores,
+            0);
+      }
+    }
+    if (parallelAttention) {
+      parallelFor(
+          batchSize,
+          batch -> {
+            int position = startPosition + batch;
+            computeAttention(
+                sequenceCache,
+                layer,
+                position,
+                batchQuery,
+                batch * queryDim,
+                queryDim,
+                keyDim,
+                valueDim,
+                batchAttentionOutput,
+                batch * attentionOutputDim,
+                batchAttentionScores,
+                batch * sequenceCache.maxSeqLen());
+          });
     }
 
     projectBatched(
@@ -634,17 +691,19 @@ final class Gemma4ForwardPass {
         batchSharedUp,
         batchNormalized,
         batchSize);
-    for (int batch = 0; batch < batchSize; batch++) {
-      int hiddenOffset = batch * hidden;
-      TensorOps.geluGlu(
-          batchSharedActivation,
-          hiddenOffset,
-          batchSharedGate,
-          hiddenOffset,
-          batchSharedUp,
-          hiddenOffset,
-          hidden);
-    }
+    parallelFor(
+        batchSize,
+        batch -> {
+          int hiddenOffset = batch * hidden;
+          TensorOps.geluGlu(
+              batchSharedActivation,
+              hiddenOffset,
+              batchSharedGate,
+              hiddenOffset,
+              batchSharedUp,
+              hiddenOffset,
+              hidden);
+        });
     projectBatched(
         layer.sharedDownProjection(), batchSharedActivation, batchSize, batchSharedOutput);
     normalizeBatchInPlace(batchSharedOutput, batchSize, dim, layer.sharedFfnPostNorm());
@@ -749,26 +808,28 @@ final class Gemma4ForwardPass {
       }
       projectRaggedIndependentGroup(groupedExpertGateUps, groupedExpertInputs, groupSize, dim);
 
-      for (int groupIndex = 0; groupIndex < groupSize; groupIndex++) {
-        int expertIndex = expertStart + groupIndex;
-        int expert = prefillExpertOrder[expertIndex];
-        int batchSize = groupedExpertBatchSizes[groupIndex];
-        for (int batch = 0; batch < batchSize; batch++) {
-          int gateOffset = batch * 2 * hidden;
-          TensorOps.geluGlu(
-              groupedExpertActivations[groupIndex],
-              batch * hidden,
-              groupedExpertGateUps[groupIndex],
-              gateOffset,
-              groupedExpertGateUps[groupIndex],
-              gateOffset + hidden,
-              hidden);
-        }
-        ExpertWeights source = weights.expertLayout().layer(layerIndex).expert(expert);
-        groupedExpertWeights[groupIndex] = expertLeases[groupIndex].down();
-        groupedExpertTypes[groupIndex] = source.down().type();
-        groupedExpertRows[groupIndex] = dim;
-      }
+      parallelFor(
+          groupSize,
+          groupIndex -> {
+            int expertIndex = expertStart + groupIndex;
+            int expert = prefillExpertOrder[expertIndex];
+            int batchSize = groupedExpertBatchSizes[groupIndex];
+            for (int batch = 0; batch < batchSize; batch++) {
+              int gateOffset = batch * 2 * hidden;
+              TensorOps.geluGlu(
+                  groupedExpertActivations[groupIndex],
+                  batch * hidden,
+                  groupedExpertGateUps[groupIndex],
+                  gateOffset,
+                  groupedExpertGateUps[groupIndex],
+                  gateOffset + hidden,
+                  hidden);
+            }
+            ExpertWeights source = weights.expertLayout().layer(layerIndex).expert(expert);
+            groupedExpertWeights[groupIndex] = expertLeases[groupIndex].down();
+            groupedExpertTypes[groupIndex] = source.down().type();
+            groupedExpertRows[groupIndex] = dim;
+          });
       projectRaggedIndependentGroup(
           groupedExpertOutputs, groupedExpertActivations, groupSize, hidden);
 
@@ -1035,7 +1096,18 @@ final class Gemma4ForwardPass {
       int valueDim,
       float[] attentionOutput) {
     computeAttention(
-        sequenceCache, layer, position, query, 0, queryDim, keyDim, valueDim, attentionOutput, 0);
+        sequenceCache,
+        layer,
+        position,
+        query,
+        0,
+        queryDim,
+        keyDim,
+        valueDim,
+        attentionOutput,
+        0,
+        attentionScores,
+        0);
   }
 
   private void computeAttention(
@@ -1048,7 +1120,9 @@ final class Gemma4ForwardPass {
       int keyDim,
       int valueDim,
       float[] attentionOutput,
-      int attentionOutputOffset) {
+      int attentionOutputOffset,
+      float[] scoreScratch,
+      int scoreOffset) {
     int headDim = config.headDim(layer);
     int groupSize = config.numHeads() / config.numKvHeads(layer);
     int fromPosition = config.attentionStartPosition(layer, position);
@@ -1068,13 +1142,13 @@ final class Gemma4ForwardPass {
         AttentionSpan span = view.span(spanIndex);
         for (int row = 0; row < span.positionCount(); row++) {
           int keyOffset = span.keyOffset() + row * keyDim + kvHead * headDim;
-          attentionScores[scoreCount++] =
+          scoreScratch[scoreOffset + scoreCount++] =
               VectorUtil.dotProduct(
                       querySource, queryOffset + queryHead * headDim, keys, keyOffset, headDim)
                   * config.attentionScale();
         }
       }
-      TensorOps.softmax(attentionScores, 0, scoreCount);
+      TensorOps.softmax(scoreScratch, scoreOffset, scoreCount);
 
       int score = 0;
       int outputOffset = attentionOutputOffset + queryHead * headDim;
@@ -1082,10 +1156,9 @@ final class Gemma4ForwardPass {
         AttentionSpan span = view.span(spanIndex);
         for (int row = 0; row < span.positionCount(); row++) {
           int valueOffset = span.valueOffset() + row * valueDim + kvHead * headDim;
-          float probability = attentionScores[score++];
-          for (int column = 0; column < headDim; column++) {
-            attentionOutput[outputOffset + column] += probability * values[valueOffset + column];
-          }
+          float probability = scoreScratch[scoreOffset + score++];
+          VectorUtil.addScaledInPlace(
+              attentionOutput, outputOffset, values, valueOffset, headDim, probability);
         }
       }
     }
@@ -1248,11 +1321,15 @@ final class Gemma4ForwardPass {
       if (scratch == null) {
         throw new IllegalStateException("missing F32 prefill scratch for " + rows + "x" + columns);
       }
-      for (int batch = 0; batch < batchSize; batch++) {
-        System.arraycopy(input, batch * columns, scratch.input(), 0, columns);
-        TensorOps.ggufMatmul(scratch.output(), scratch.input(), matrix, type, rows, columns);
-        System.arraycopy(scratch.output(), 0, output, batch * rows, rows);
-      }
+      parallelFor(
+          batchSize,
+          batch -> {
+            float[] scratchInput = scratch.inputs()[batch];
+            float[] scratchOutput = scratch.outputs()[batch];
+            System.arraycopy(input, batch * columns, scratchInput, 0, columns);
+            TensorOps.ggufMatmul(scratchOutput, scratchInput, matrix, type, rows, columns);
+            System.arraycopy(scratchOutput, 0, output, batch * rows, rows);
+          });
       return;
     }
     throw new IllegalStateException(
@@ -1336,11 +1413,13 @@ final class Gemma4ForwardPass {
 
   private void normalizeBatch(
       float[] output, float[] input, int batchSize, int width, float[] normalizationWeight) {
-    for (int batch = 0; batch < batchSize; batch++) {
-      int offset = batch * width;
-      TensorOps.rmsNorm(
-          output, offset, input, offset, normalizationWeight, width, config.rmsNormEps());
-    }
+    parallelFor(
+        batchSize,
+        batch -> {
+          int offset = batch * width;
+          TensorOps.rmsNorm(
+              output, offset, input, offset, normalizationWeight, width, config.rmsNormEps());
+        });
   }
 
   private void normalizeBatchInPlace(
@@ -1422,25 +1501,27 @@ final class Gemma4ForwardPass {
     return recency != 0 ? recency : Integer.compare(first, second);
   }
 
-  private static F32Scratch[] createF32Scratch(Gemma4Config config, Gemma4Weights weights) {
+  private static F32Scratch[] createF32Scratch(
+      Gemma4Config config, Gemma4Weights weights, int batchCapacity) {
     List<F32Scratch> scratch = new ArrayList<>();
     for (int layer = 0; layer < config.numLayers(); layer++) {
       Gemma4Weights.LayerWeights layerWeights = weights.layer(layer);
-      registerF32Scratch(scratch, layerWeights.queryProjection());
-      registerF32Scratch(scratch, layerWeights.keyProjection());
+      registerF32Scratch(scratch, layerWeights.queryProjection(), batchCapacity);
+      registerF32Scratch(scratch, layerWeights.keyProjection(), batchCapacity);
       if (layerWeights.valueProjection() != null) {
-        registerF32Scratch(scratch, layerWeights.valueProjection());
+        registerF32Scratch(scratch, layerWeights.valueProjection(), batchCapacity);
       }
-      registerF32Scratch(scratch, layerWeights.attentionOutputProjection());
-      registerF32Scratch(scratch, layerWeights.sharedGateProjection());
-      registerF32Scratch(scratch, layerWeights.sharedUpProjection());
-      registerF32Scratch(scratch, layerWeights.sharedDownProjection());
-      registerF32Scratch(scratch, layerWeights.routerProjection());
+      registerF32Scratch(scratch, layerWeights.attentionOutputProjection(), batchCapacity);
+      registerF32Scratch(scratch, layerWeights.sharedGateProjection(), batchCapacity);
+      registerF32Scratch(scratch, layerWeights.sharedUpProjection(), batchCapacity);
+      registerF32Scratch(scratch, layerWeights.sharedDownProjection(), batchCapacity);
+      registerF32Scratch(scratch, layerWeights.routerProjection(), batchCapacity);
     }
     return scratch.toArray(F32Scratch[]::new);
   }
 
-  private static void registerF32Scratch(List<F32Scratch> scratch, Gemma4Weights.Matrix matrix) {
+  private static void registerF32Scratch(
+      List<F32Scratch> scratch, Gemma4Weights.Matrix matrix, int batchCapacity) {
     if (matrix.type() != GgufTensorType.F32) {
       return;
     }
@@ -1453,8 +1534,8 @@ final class Gemma4ForwardPass {
         new F32Scratch(
             matrix.rows(),
             matrix.columns(),
-            new float[matrix.columns()],
-            new float[matrix.rows()]));
+            matrixBuffer(batchCapacity, matrix.columns()),
+            matrixBuffer(batchCapacity, matrix.rows())));
   }
 
   private F32Scratch findF32Scratch(int rows, int columns) {
@@ -1539,10 +1620,18 @@ final class Gemma4ForwardPass {
     return result;
   }
 
-  private static void addBatch(float[] target, float[] addition, int length) {
-    for (int index = 0; index < length; index++) {
-      target[index] += addition[index];
+  private static void parallelFor(int size, IntConsumer action) {
+    if (size < MIN_PARALLEL_BATCH_SIZE) {
+      for (int index = 0; index < size; index++) {
+        action.accept(index);
+      }
+      return;
     }
+    IntStream.range(0, size).parallel().forEach(action);
+  }
+
+  private static void addBatch(float[] target, float[] addition, int length) {
+    VectorUtil.addScaledInPlace(target, 0, addition, 0, length, 1.0f);
   }
 
   private static void scaleBatch(float[] values, int length, float scale) {
@@ -1552,15 +1641,11 @@ final class Gemma4ForwardPass {
   }
 
   private static void add(float[] target, float[] addition, int length) {
-    for (int index = 0; index < length; index++) {
-      target[index] += addition[index];
-    }
+    VectorUtil.addScaledInPlace(target, 0, addition, 0, length, 1.0f);
   }
 
   private static void addScaled(float[] target, float[] addition, float scale, int length) {
-    for (int index = 0; index < length; index++) {
-      target[index] += addition[index] * scale;
-    }
+    VectorUtil.addScaledInPlace(target, 0, addition, 0, length, scale);
   }
 
   private static void addScaled(
@@ -1570,9 +1655,7 @@ final class Gemma4ForwardPass {
       int additionOffset,
       float scale,
       int length) {
-    for (int index = 0; index < length; index++) {
-      target[targetOffset + index] += addition[additionOffset + index] * scale;
-    }
+    VectorUtil.addScaledInPlace(target, targetOffset, addition, additionOffset, length, scale);
   }
 
   private static void multiply(float[] values, float scale) {

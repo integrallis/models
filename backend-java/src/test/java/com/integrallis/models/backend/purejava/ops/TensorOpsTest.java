@@ -1633,6 +1633,26 @@ class TensorOpsTest {
       assertThat(out[3]).isEqualTo(94.0f);
     }
 
+    @Test
+    void lookupApproximationStaysWithinFloatPrecisionAcrossTheActivationRange() {
+      int samples = 40_001;
+      float[] gate = new float[samples];
+      float[] up = new float[samples];
+      float[] out = new float[samples];
+      for (int index = 0; index < samples; index++) {
+        gate[index] = -20.0f + index * 0.001f;
+        up[index] = 1.0f;
+      }
+
+      TensorOps.geluGlu(out, gate, up, samples);
+
+      for (int index = 0; index < samples; index++) {
+        assertThat(out[index])
+            .as("gate[%s]=%s", index, gate[index])
+            .isCloseTo(gelu(gate[index]), within(2.0e-6f));
+      }
+    }
+
     private static float gelu(float value) {
       return 0.5f
           * value

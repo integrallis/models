@@ -4,12 +4,11 @@
 
 Models now supports the pinned Gemma 4 26B-A4B Instruct Q4_K_M graph through
 its Java transformer and Rust/FFM projection backend. Exact generation and all
-three application adapters pass. The production qualification does not: all
-27 guarded-RAG requests are correct, but 3,793.7 ms p95 TTFT exceeds the
-2,000 ms usable ceiling. This is a supported, integration-tested artifact, not
-a qualified performance profile.
+three application adapters pass. Production qualification now passes: all 27
+guarded-RAG requests are correct and 1,834.7 ms p95 TTFT clears the 2,000 ms
+usable ceiling. The pinned `.2` artifact is qualified at the `USABLE` tier.
 
-The implementation is `5ec2c5d446e60baa955ef58bd7e4e3dd52281747`. The retained
+The implementation is `37fc4a8b9d421505487b678c7ce841d1baa20eb4`. The retained
 machine-readable evidence is in
 [`benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/`](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/).
 
@@ -31,10 +30,10 @@ not its code or platform assumptions.
 | --- | --- | --- |
 | Preserve exact Gemma 4 semantics before optimizing | Dedicated graph for hybrid local/full attention, shared plus routed MoE, asymmetric K/V details, learned scaling, and logit softcap | Scalar-reference graph tests and exact pinned-model generation |
 | Bound expert residency | Zero-copy mapped GGUF expert slices; no copied expert-slot cache or custom repack | Stable mapped-slice tests and 15.58 GB peak RSS on a 32 GB host |
-| Batch tokens that route to the same expert | 32-token prefill, grouped route construction, and ragged independent native projection dispatch | `gemma4-batched-prefill=ENABLED`, batch size 32 |
+| Batch tokens that route to the same expert | 128-token prefill, grouped route construction, and ragged independent native projection dispatch | `gemma4-batched-prefill=ENABLED`, batch size 128 |
 | Expose independent projection work to persistent workers | ABI 4 dispatches different projection shapes in one worker generation across eight workers | Native boundary tests and `rust-ffm-v12` diagnostics |
 | Pay compilation cost during load | A resettable warmup prefill runs while loading and clears sequence state before the first request | Load-warmup unit test and `load-warmup=ENABLED` |
-| Validate each optimization against its numerical claim | Lossless graph changes retain exact outputs; SIMD reduction reordering uses narrow, explicit tolerances | Full Java check, 17 Rust tests, Clippy, native boundary tests, exact integration output |
+| Validate each optimization against its numerical claim | Lossless graph changes retain exact outputs; the bounded GELU table has an explicit error limit; SIMD reduction reordering uses narrow, explicit tolerances | Full Gradle check, 18 Rust tests, Clippy, native boundary tests, exact integration output |
 
 The storage decision deliberately differs from TurboFieldfare. Its bounded
 `pread` slot cache solves an 8 GB-class Apple memory problem around a repacked
@@ -65,28 +64,34 @@ cases.
 | Successful and correct | 27/27 | pass |
 | Correct retained model answers | 21/21 | pass |
 | Retrieval recall / MRR | 1.0 / 1.0 | pass |
-| p95 retrieval | 1.91 ms | pass |
-| p95 TTFT | 3,793.7 ms | **fail**; usable ceiling 2,000 ms |
-| p95 TPOT | 104.62 ms | pass |
-| p95 end to end | 6,497.5 ms | pass |
-| Median prefill / decode | 25.00 / 10.86 tok/s | diagnostic |
+| p95 retrieval | 1.89 ms | pass |
+| p95 TTFT | 1,834.7 ms | pass; usable ceiling 2,000 ms |
+| p95 TPOT | 89.05 ms | pass |
+| p95 end to end | 4,503.1 ms | pass |
+| Median prefill / decode | 50.91 / 12.84 tok/s | diagnostic |
 
 Plain Java runtime, LangChain4j, and Spring AI each generated the exact expected
 adapter answer with one shared backend. Separate nine-case runs were 9/9
 correct through every framework. These checks establish API integration; their
 roughly 5.9-6.2 second p95 TTFT values do not establish production readiness.
 
-## Publication decision and next gap
+Matched 27-attempt llama.cpp and Ollama controls were also 27/27 correct. Models
+achieved 80.59% and 94.03% of their respective median decode throughput, while
+its p95 end-to-end latency was 77.01% and 68.68% of theirs. Both comparisons
+pass `production-rag-model-contribution-v4`, producing a `QUALIFIED` verdict.
 
-The decoder, prompt template, artifact fixture, and adapters can be released as
-supported functionality. ModelJars should record Rust/FFM and the native local
-engines as supported backends, and should retain a
-`FAILED_ABSOLUTE_GATE`/`OFFLINE` qualification record whose measured failure is
-latency. It should not publish an automatic performance profile for this
-artifact.
+## Performance work and publication decision
 
-Clearing the present gate requires about a 1.9x reduction in p95 TTFT without
-changing the prompt, model, generation controls, or quality policy. The next
-credible work is shape-specific projection and attention/FFN fusion, including
-native attention where measurement justifies it. Relaxing the qualification
-threshold would conceal the gap rather than close it.
+The qualifying implementation parallelizes safe Gemma prefill regions, uses
+retained per-row scratch storage for F32 projections, vectorizes accumulation,
+precomputes RoPE frequencies, and replaces hot GELU evaluation with a bounded
+lookup table. Its Rust projection workers use stack-backed scratch storage for
+the 128-row qualification batch, eliminating per-dispatch heap allocation.
+Attention remains sequential after a sliding-window cache wraps, preserving
+the cache dependency boundary.
+
+The standard report is bound to the implementation commit, exact artifact,
+generation controls, and qualification host. ModelJars can therefore publish
+`org.modeljars.huggingface:ggml-org.gemma-4-26b-a4b-it-gguf.q4_k_m:4.0.0-q4_k_m.2`
+with a `QUALIFIED`/`USABLE` record. The `.1` attempt remains historical evidence
+and must not be relabeled.

@@ -2073,11 +2073,13 @@ class CertifiedRagEvidenceTest {
   }
 
   @Test
-  void gemma426BA4BPassesQualityAndIntegrationButFailsTheAbsoluteLatencyGate() throws Exception {
+  void gemma426BA4BQualifiesAtTheUsableTier() throws Exception {
     RagBenchmarkReport candidate = report(GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport llama = report(GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE, "llama.cpp.json");
+    RagBenchmarkReport ollama = report(GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE, "ollama.json");
 
     RagProductionQualification qualification =
-        RagProductionQualificationPolicy.assess(candidate, List.of());
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
 
     assertThat(candidate.modelId()).isEqualTo("ggml_org_gemma_4_26b_a4b_it_gguf_q4_k_m");
     assertThat(candidate.artifactSha256())
@@ -2088,17 +2090,19 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.summary().correctAnswerRate()).isEqualTo(1.0);
     assertThat(candidate.summary().retrievalRecall()).isEqualTo(1.0);
     assertThat(candidate.summary().abstentionAccuracy()).isEqualTo(1.0);
-    assertThat(candidate.summary().ttftMillis().p95()).isGreaterThan(2_000.0);
-    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.OFFLINE);
-    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.FAILED_ABSOLUTE_GATE);
-    assertThat(qualification.qualified()).isFalse();
-    assertThat(qualification.modelAnswerCount()).isEqualTo(21);
-    assertThat(qualification.modelAnswerRate()).isEqualTo(21.0 / 27.0);
+    assertThat(candidate.summary().ttftMillis().p95()).isLessThanOrEqualTo(2_000.0);
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(18);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(18.0 / 27.0);
     assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
     assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v12");
     assertThat(candidate.backendDiagnostics().environment())
         .containsEntry("model-architecture", "gemma4")
-        .containsEntry("architecture-prefill-batch-size", "32")
+        .containsEntry("architecture-prefill-batch-size", "128")
         .containsEntry("native-kernel-abi", "4");
     assertThat(candidate.backendDiagnostics().optimization("gemma4-batched-prefill"))
         .get()

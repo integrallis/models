@@ -365,7 +365,7 @@ class Gemma4ForwardPassTest {
               config, weights, Gemma4KvCache.create(config, 8, 2), acceleratedExperts, kernel);
 
       assertThat(baseline.prefillBatchSize()).isEqualTo(1);
-      assertThat(accelerated.prefillBatchSize()).isEqualTo(32);
+      assertThat(accelerated.prefillBatchSize()).isEqualTo(128);
       assertClose(accelerated.forward(0, 0), baseline.forward(0, 0));
       assertThat(invocations).hasValueGreaterThan(0);
       assertThat(dualInvocations).hasValueGreaterThan(0);
@@ -376,9 +376,10 @@ class Gemma4ForwardPassTest {
       accelerated.reset();
       baseline.reset();
       maximumBatchSize.set(0);
-      assertClose(accelerated.prefill(new int[] {0, 1}, 0), baseline.prefill(new int[] {0, 1}, 0));
+      int[] prompt = {0, 1, 1, 0, 1, 0, 0, 1};
+      assertClose(accelerated.prefill(prompt, 0), baseline.prefill(prompt, 0));
       assertThat(raggedIndependentInvocations).hasValueGreaterThan(0);
-      assertThat(maximumBatchSize).hasValue(2);
+      assertThat(maximumBatchSize).hasValue(8);
     }
   }
 

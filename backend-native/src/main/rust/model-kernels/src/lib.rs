@@ -94,6 +94,20 @@ const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 const WORKER_SPIN_ITERS: usize = 4_000;
 const COMPLETION_SPIN_ITERS: usize = 4_000;
 const MAX_GROUPED_MATRICES: usize = 16;
+const STACK_BATCH_CAPACITY: usize = 128;
+
+macro_rules! batch_scratch {
+    ($name:ident, $batch_size:expr, $initial:expr, $element:ty) => {
+        let mut stack_scratch = [$initial; STACK_BATCH_CAPACITY];
+        let mut heap_scratch = Vec::<$element>::new();
+        let $name: &mut [$element] = if $batch_size <= STACK_BATCH_CAPACITY {
+            &mut stack_scratch[..$batch_size]
+        } else {
+            heap_scratch.resize($batch_size, $initial);
+            heap_scratch.as_mut_slice()
+        };
+    };
+}
 
 #[derive(Clone, Copy)]
 enum DotKernel {
@@ -1860,7 +1874,7 @@ unsafe fn compute_q4_batched_row_range_scalar(
     end_row: usize,
 ) {
     let blocks_per_row = cols / QK_0;
-    let mut sums = vec![0_f32; batch_size];
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     for row in start_row..end_row {
         sums.fill(0.0);
         for block in 0..blocks_per_row {
@@ -1903,7 +1917,7 @@ unsafe fn compute_q4_batched_row_range_avx2(
     end_row: usize,
 ) {
     let blocks_per_row = cols / QK_0;
-    let mut sums = vec![0_f32; batch_size];
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     for row in start_row..end_row {
         sums.fill(0.0);
         for block in 0..blocks_per_row {
@@ -1950,7 +1964,7 @@ unsafe fn compute_q5_batched_row_range_scalar(
     end_row: usize,
 ) {
     let blocks_per_row = cols / QK_0;
-    let mut sums = vec![0_f32; batch_size];
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     for row in start_row..end_row {
         sums.fill(0.0);
         for block in 0..blocks_per_row {
@@ -2014,7 +2028,7 @@ unsafe fn compute_q5_batched_row_range_avx2(
     }
 
     let blocks_per_row = cols / QK_0;
-    let mut sums = vec![_mm256_setzero_ps(); batch_size];
+    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
     for row in start_row..end_row {
         sums.fill(_mm256_setzero_ps());
         for block in 0..blocks_per_row {
@@ -2074,7 +2088,7 @@ unsafe fn compute_q8_batched_row_range_scalar(
     end_row: usize,
 ) {
     let blocks_per_row = cols / QK_0;
-    let mut sums = vec![0_f32; batch_size];
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     for row in start_row..end_row {
         sums.fill(0.0);
         for block in 0..blocks_per_row {
@@ -2131,7 +2145,7 @@ unsafe fn compute_q8_batched_row_range_avx2(
     }
 
     let blocks_per_row = cols / QK_0;
-    let mut sums = vec![_mm256_setzero_ps(); batch_size];
+    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
     for row in start_row..end_row {
         sums.fill(_mm256_setzero_ps());
         for block in 0..blocks_per_row {
@@ -2204,7 +2218,7 @@ unsafe fn compute_q4_k_batched_row_range_scalar(
 
     let blocks_per_row = cols / QK_K;
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
-    let mut sums = vec![0_f32; batch_size];
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     let mut decoded = [0_u8; QK_K];
     let mut group_scales = [0_i32; 8];
     let mut group_mins = [0_i32; 8];
@@ -2300,7 +2314,7 @@ unsafe fn compute_q5_k_batched_row_range_scalar(
 
     let blocks_per_row = cols / QK_K;
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
-    let mut sums = vec![0_f32; batch_size];
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     let mut decoded = [0_u8; QK_K];
     let mut group_scales = [0_i32; 8];
     let mut group_mins = [0_i32; 8];
@@ -2393,7 +2407,7 @@ unsafe fn compute_q6_k_batched_row_range_scalar(
     }
 
     let blocks_per_row = cols / QK_K;
-    let mut lane_sums = vec![[0_f32; 8]; batch_size];
+    batch_scratch!(lane_sums, batch_size, [0_f32; 8], [f32; 8]);
     let mut decoded = [0_i8; QK_K];
     let mut group_scales = [0_i32; 16];
     for row in start_row..end_row {
@@ -2510,7 +2524,7 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
     let blocks_per_row = cols / QK_K;
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
     let nibble_mask = _mm256_set1_epi8(0x0f);
-    let mut sums = vec![_mm256_setzero_ps(); batch_size];
+    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
     let mut decoded = [_mm256_setzero_si256(); 8];
     let mut group_scales = [0_i32; 8];
     let mut group_mins = [0_i32; 8];
@@ -2642,7 +2656,7 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
     let nibble_mask = _mm256_set1_epi8(0x0f);
     let high_value = _mm256_set1_epi8(16);
-    let mut sums = vec![0_f32; batch_size];
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     let mut decoded = [_mm256_setzero_si256(); 8];
     let mut group_scales = [0_i32; 8];
     let mut group_mins = [0_i32; 8];
@@ -2788,7 +2802,7 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
     let blocks_per_row = cols / QK_K;
     let low_mask = _mm256_set1_epi8(0x0f);
     let high_two_mask = _mm256_set1_epi8(0x03);
-    let mut sums = vec![_mm256_setzero_ps(); batch_size];
+    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
     let mut decoded = [_mm256_setzero_si256(); 8];
     for row in start_row..end_row {
         sums.fill(_mm256_setzero_ps());
@@ -5095,5 +5109,16 @@ mod tests {
         assert_eq!(f16_to_f32(0x03ff).to_bits(), 0x387f_c000);
         assert_eq!(f16_to_f32(0x8001).to_bits(), 0xb380_0000);
         assert_eq!(f16_to_f32(0x83ff).to_bits(), 0xb87f_c000);
+    }
+
+    #[test]
+    fn batch_scratch_uses_stack_capacity_and_heap_fallback() {
+        for batch_size in [1, STACK_BATCH_CAPACITY, STACK_BATCH_CAPACITY + 1] {
+            batch_scratch!(scratch, batch_size, 7_u32, u32);
+            assert_eq!(scratch.len(), batch_size);
+            assert!(scratch.iter().all(|&value| value == 7));
+            scratch[batch_size - 1] = 11;
+            assert_eq!(scratch[batch_size - 1], 11);
+        }
     }
 }
