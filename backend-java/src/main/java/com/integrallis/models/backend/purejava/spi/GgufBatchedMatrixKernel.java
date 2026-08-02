@@ -116,6 +116,65 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
     throw new UnsupportedOperationException("injected kernel does not support triple projections");
   }
 
+  /** Returns whether several projections can share one activation preparation. */
+  default boolean isGroupedEligible(
+      GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
+    return false;
+  }
+
+  /** Computes several projections from the same batch-major input. */
+  default void multiplyGrouped(
+      float[][] outputs,
+      MemorySegment[] weights,
+      GgufTensorType[] types,
+      int[] rows,
+      int matrixCount,
+      float[] input,
+      int batchSize,
+      int cols) {
+    throw new UnsupportedOperationException("injected kernel does not support grouped projections");
+  }
+
+  /** Returns whether several projections with distinct inputs can share one native dispatch. */
+  default boolean isIndependentEligible(
+      GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
+    return false;
+  }
+
+  /** Computes several independent projections in one dispatch. */
+  default void multiplyIndependent(
+      float[][] outputs,
+      MemorySegment[] weights,
+      GgufTensorType[] types,
+      int[] rows,
+      int matrixCount,
+      float[][] inputs,
+      int batchSize,
+      int cols) {
+    throw new UnsupportedOperationException(
+        "injected kernel does not support independent projections");
+  }
+
+  /** Returns whether independent projections may use different batch sizes in one dispatch. */
+  default boolean isRaggedIndependentEligible(
+      GgufTensorType[] types, int[] rows, int[] batchSizes, int matrixCount, int cols) {
+    return false;
+  }
+
+  /** Computes independent projections with one batch size per matrix in one dispatch. */
+  default void multiplyRaggedIndependent(
+      float[][] outputs,
+      MemorySegment[] weights,
+      GgufTensorType[] types,
+      int[] rows,
+      int[] batchSizes,
+      int matrixCount,
+      float[][] inputs,
+      int cols) {
+    throw new UnsupportedOperationException(
+        "injected kernel does not support ragged independent projections");
+  }
+
   /** Computes batch-major matrix multiplication for a supported mapped GGUF tensor. */
   void multiply(
       float[] output,

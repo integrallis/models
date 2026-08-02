@@ -75,6 +75,29 @@ class Gemma4ExpertCacheTest {
   }
 
   @Test
+  void weightedAcquirePreservesAnExpertUsedBySeveralPromptTokens() throws IOException {
+    CountingReader reader = new CountingReader(sequence(64));
+    try (Gemma4ExpertCache cache = cache(reader, 2, CachePolicy.LFU)) {
+      try (Gemma4ExpertCache.Lease ignored = cache.acquire(0, 0, 5)) {
+        assertThat(ignored.expert()).isZero();
+      }
+      try (Gemma4ExpertCache.Lease ignored = cache.acquire(0, 1, 1)) {
+        assertThat(ignored.expert()).isEqualTo(1);
+      }
+      try (Gemma4ExpertCache.Lease ignored = cache.acquire(0, 2, 1)) {
+        assertThat(ignored.expert()).isEqualTo(2);
+      }
+      try (Gemma4ExpertCache.Lease frequent = cache.acquire(0, 0)) {
+        assertThat(frequent.expert()).isZero();
+      }
+
+      assertThat(cache.stats().hits()).isEqualTo(1);
+      assertThat(cache.stats().misses()).isEqualTo(3);
+      assertThat(cache.stats().evictions()).isEqualTo(1);
+    }
+  }
+
+  @Test
   void aLiveLeasePreventsTheOnlySlotFromBeingReused() throws Exception {
     CountingReader reader = new CountingReader(sequence(64));
     try (Gemma4ExpertCache cache = cache(reader, 1, CachePolicy.LFU);
