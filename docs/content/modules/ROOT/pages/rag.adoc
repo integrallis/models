@@ -15,14 +15,15 @@ LangChain4j, Spring AI, or another caller of a Models runtime.
 
 == Retrieval Validation
 
-Retrieved documents are untrusted input. Call `assess` before placing them in a
-prompt:
+Retrieved documents are untrusted input. Prepare the canonical prompt before
+generation; preparation calls `assess` and does not expose rejected context as
+prompt text:
 
 [source,java]
 ----
 var policy = GroundedAnswerPolicy.productionDefault();
-GroundingContextDecision context = policy.assess(question, evidence);
-if (!context.generationAllowed()) {
+GroundedRagPrompt prompt = GroundedRagPrompt.prepare(policy, question, evidence);
+if (!prompt.generationAllowed()) {
     return GroundedAnswerPolicy.ABSTENTION;
 }
 ----
@@ -107,11 +108,9 @@ higher assurance requirement should add domain validation or human review.
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.rag.GroundedAnswerPolicy;
+import com.integrallis.models.rag.GroundedRagPrompt;
 import com.integrallis.models.rag.GroundingDocument;
-import com.integrallis.models.runtime.chat.ChatMessage;
-import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 final class RagAnswerService {
     static String answer(
@@ -120,20 +119,12 @@ final class RagAnswerService {
             List<GroundingDocument> evidence,
             SamplingOptions options) {
         var policy = GroundedAnswerPolicy.productionDefault();
-        if (!policy.assess(question, evidence).generationAllowed()) {
+        var prompt = GroundedRagPrompt.prepare(policy, question, evidence);
+        if (!prompt.generationAllowed()) {
             return GroundedAnswerPolicy.ABSTENTION;
         }
 
-        String context = evidence.stream()
-            .map(document ->
-                "[" + document.id() + "] " + document.title() + "\n" + document.text())
-            .collect(Collectors.joining("\n\n"));
-        var prompt = ChatTemplate.CHATML_NO_THINK.render(List.of(
-            ChatMessage.system(
-                "Answer only from the context and cite source IDs in brackets."),
-            ChatMessage.user("Context:\n" + context + "\n\nQuestion:\n" + question)));
-
-        String rawModelText = model.generate(prompt, options);
+        String rawModelText = model.generate(prompt.text(), options);
         return policy.apply(question, evidence, rawModelText).text();
     }
 }
@@ -177,9 +168,11 @@ var policy = new GroundedAnswerPolicy(0.78f, limits);
 
 == Framework Placement
 
-Run retrieval through the framework integration, call `assess`, add only
-accepted evidence to the prompt, generate through the local model, and call
-`apply` before returning the answer. See xref:langchain4j.adoc[LangChain4j],
+Run retrieval through the framework integration, call `GroundedRagPrompt.prepare`,
+add only accepted evidence to the prompt, generate through the local model, and
+call `apply` before returning the answer. Framework chat APIs can place
+`prompt.instructions()` in a system message and `prompt.request()` in a user
+message. See xref:langchain4j.adoc[LangChain4j],
 xref:spring-ai.adoc[Spring AI], xref:spring-boot.adoc[Spring Boot], and
 xref:vectors.adoc[Vectors] for adapter wiring.
 

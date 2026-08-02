@@ -24,9 +24,9 @@ artifact rather than chosen from a file name.
 == Load and Generate
 
 Instruction-tuned models require the control tokens and role boundaries defined
-by their chat template. Use the template recorded for the exact qualified model
-artifact; selecting a template from the architecture name alone is not
-reliable. This example formats a ChatML conversation before generation.
+by their chat template. `openRuntime` returns the template recorded for the
+exact qualified artifact, so application code does not guess from an
+architecture name.
 
 [source,java]
 ----
@@ -34,23 +34,22 @@ import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.runtime.chat.ChatMessage;
-import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.List;
 import org.modeljars.ModelJars;
 
-try (var model = ModelJars.open(MODEL)) {
+try (var runtime = ModelJars.openRuntime(MODEL)) {
     var options = SamplingOptions.builder()
         .temperature(0.0f)
-        .maxTokens(64)
+        .maxTokens(128)
         .build();
 
-    var prompt = ChatTemplate.CHATML.render(List.of(
+    var prompt = runtime.chatTemplate().render(List.of(
         ChatMessage.system("Classify the user's intent in one phrase."),
         ChatMessage.user("I want to cancel my order")));
 
-    String answer = model.generate(prompt, options);
+    String answer = runtime.model().generate(prompt, options);
     System.out.println(answer);
-    System.out.println(model.diagnostics().optimizations());
+    System.out.println(runtime.model().diagnostics().optimizations());
 }
 ----
 
@@ -61,7 +60,7 @@ Plain `String` prompts are also encoded as ordinary text. Use
 `ModelPrompt.control(...)` only for a complete, trusted template supplied by
 the application.
 
-`ModelJars.open` resolves the marker already present on the classpath, downloads
+`ModelJars.openRuntime` resolves the marker already present on the classpath, downloads
 the pinned weights when they are absent, verifies size and SHA-256, selects the
 qualified backend, and applies a performance profile only when its artifact,
 backend, JVM, and hardware selectors match.
@@ -86,8 +85,10 @@ promptly and must not re-enter the same non-thread-safe model.
 ----
 import com.integrallis.models.api.TokenStream;
 
-try (var model = ModelJars.open(MODEL)) {
-    model.generate(prompt, options, new TokenStream() {
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var prompt = runtime.chatTemplate().render(
+        List.of(ChatMessage.user("Explain local inference in one sentence.")));
+    runtime.model().generate(prompt, options, new TokenStream() {
         @Override
         public void onToken(String token) {
             System.out.print(token);
@@ -113,9 +114,9 @@ optimizations, and reasons why another path was not selected:
 
 [source,java]
 ----
-try (var model = ModelJars.open(MODEL)) {
-    System.out.println(model.diagnostics().backend());
-    model.diagnostics().optimizations().forEach(System.out::println);
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    System.out.println(runtime.model().diagnostics().backend());
+    runtime.model().diagnostics().optimizations().forEach(System.out::println);
 }
 ----
 

@@ -37,7 +37,6 @@ inject template control tokens.
 import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
 import com.integrallis.models.api.SamplingOptions;
-import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
 import java.util.List;
 import org.modeljars.ModelJars;
@@ -48,10 +47,10 @@ var defaults = SamplingOptions.builder()
     .stopSequences(List.of("</answer>"))
     .build();
 
-try (var runtime = ModelJars.open(MODEL)) {
+try (var runtime = ModelJars.openRuntime(MODEL)) {
     var model = new ModelsSpringAiChatModel(
-        runtime,
-        ChatTemplate.CHATML_NO_THINK,
+        runtime.model(),
+        runtime.chatTemplate(),
         defaults);
 
     String answer = model.call("Answer using only the supplied context.");

@@ -38,7 +38,6 @@ import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.langchain4j.ModelsChatModel;
-import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.List;
 import org.modeljars.ModelJars;
 
@@ -48,10 +47,10 @@ var defaults = SamplingOptions.builder()
     .stopSequences(List.of("</answer>"))
     .build();
 
-try (var runtime = ModelJars.open(MODEL)) {
+try (var runtime = ModelJars.openRuntime(MODEL)) {
     var model = new ModelsChatModel(
-        runtime,
-        ChatTemplate.CHATML_NO_THINK,
+        runtime.model(),
+        runtime.chatTemplate(),
         defaults);
 
     String answer = model.chat("Answer using only the supplied context.");
@@ -110,8 +109,8 @@ import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import java.util.List;
 
 var streaming = new ModelsStreamingChatModel(
-    runtime,
-    ChatTemplate.CHATML_NO_THINK,
+    runtime.model(),
+    runtime.chatTemplate(),
     defaults);
 var request = ChatRequest.builder()
     .messages(List.of(UserMessage.from("List the retrieved facts.")))
@@ -165,7 +164,7 @@ var collection = VectorCollection.builder()
     .indexType(IndexType.HNSW)
     .build();
 
-try (var runtime = ModelJars.open(MODEL);
+try (var runtime = ModelJars.openRuntime(MODEL);
      var store = JavaVectorsEmbeddingStore.builder(collection)
          .commitAfterAdd(true)
          .build()) {
@@ -177,8 +176,8 @@ try (var runtime = ModelJars.open(MODEL);
 
     var assistant = AiServices.builder(Assistant.class)
         .chatModel(new ModelsChatModel(
-            runtime,
-            ChatTemplate.CHATML_NO_THINK,
+            runtime.model(),
+            runtime.chatTemplate(),
             defaults))
         .contentRetriever(retriever)
         .build();

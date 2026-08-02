@@ -87,6 +87,7 @@ the qualification ledger for those exact details.
 | Llama 3.2 1B | General |
 | Llama 3.2 3B | General |
 | Gemma 3 1B | General |
+| Gemma 4 26B-A4B Instruct | General |
 | H2O Danube2 1.8B | General |
 | DeepSeek-R1-Distill-Qwen 1.5B | General |
 | TinyLlama 1.1B Chat | General |
@@ -104,11 +105,10 @@ the qualification ledger for those exact details.
 | Nexus Finance | Finance |
 | Nexus Medical | Healthcare |
 
-Gemma 4 26B-A4B Instruct Q4_K_M is integration-tested through plain Java,
-LangChain4j, and Spring AI, but it is intentionally absent from the qualified
-table. Its exact-artifact run passed every correctness gate and failed the
-2-second usable TTFT ceiling. See the [qualification analysis](GEMMA4_QUALIFICATION.md)
-and [retained evidence](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/README.md).
+Gemma 4 26B-A4B Instruct Q4_K_M is qualified at the usable tier through plain
+Java, LangChain4j, and Spring AI. See the
+[qualification analysis](GEMMA4_QUALIFICATION.md) and
+[retained evidence](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/README.md).
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)
@@ -121,7 +121,7 @@ JAR for the selected model:
 
 ```kotlin
 dependencies {
-    implementation("org.modeljars:modeljars:0.1.0")
+    implementation("org.modeljars:modeljars:0.1.2")
     implementation(
         "org.modeljars.huggingface:" +
             "ggml-org.qwen3-0.6b-gguf.q4_0:" +
@@ -136,8 +136,8 @@ directly:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:models:0.2.2")
-    implementation("com.integrallis:backend-java:0.2.2") // or backend-native
+    implementation("com.integrallis:models:0.2.3")
+    implementation("com.integrallis:backend-java:0.2.3") // or backend-native
 }
 ```
 
@@ -145,7 +145,7 @@ Use Apple's on-device system model on a supported Apple Silicon Mac:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:backend-apple:0.2.2")
+    implementation("com.integrallis:backend-apple:0.2.3")
 }
 ```
 
@@ -159,22 +159,23 @@ catalog dependency.
 ```java
 import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
-var prompt = ChatTemplate.CHATML_NO_THINK.render(List.of(
-    ChatMessage.system("Classify the user's intent in one phrase."),
-    ChatMessage.user("I want to cancel my order")));
 var options = SamplingOptions.builder()
     .temperature(0.0f)
-    .maxTokens(20)
+    .maxTokens(128)
     .build();
 
-try (var model = ModelJars.open(MODEL)) {
-    String result = model.generate(prompt, options);
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var prompt = runtime.chatTemplate().render(List.of(
+        ChatMessage.system("Classify the user's intent in one phrase."),
+        ChatMessage.user("I want to cancel my order")));
+    String result = runtime.model().generate(prompt, options);
     System.out.println(result);
 }
 ```
 
-`ModelJars.open` resolves the pinned artifact, downloads and verifies it when needed, chooses its
-qualified Models backend, and applies a matching performance profile. Applications that manage
+`ModelJars.openRuntime` resolves the pinned artifact, downloads and verifies it when needed, chooses
+its qualified Models backend and chat template, and applies a matching performance profile.
+Applications that manage
 their own GGUF files can use the lower-level `PureJavaBackend.load(Path)` and
 `RustFfmBackend.load(Path)` APIs described in the
 [Using Models guide](https://integrallis.github.io/models/docs/models/current/using-models.html).
@@ -182,8 +183,10 @@ their own GGUF files can use the lower-level `PureJavaBackend.load(Path)` and
 Streaming uses the same loaded model:
 
 ```java
-try (var model = ModelJars.open(MODEL)) {
-    model.generate(prompt, options, new TokenStream() {
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var prompt = runtime.chatTemplate().render(
+        List.of(ChatMessage.user("Explain local inference in one sentence.")));
+    runtime.model().generate(prompt, options, new TokenStream() {
         @Override
         public void onToken(String token) {
             System.out.print(token);
@@ -205,8 +208,8 @@ try (var model = ModelJars.open(MODEL)) {
 Backend diagnostics expose the exact plan selected for the loaded model:
 
 ```java
-try (var model = ModelJars.open(MODEL)) {
-    model.diagnostics().optimizations().forEach(System.out::println);
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    runtime.model().diagnostics().optimizations().forEach(System.out::println);
 }
 ```
 
