@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-02
+
 ### Added
 
 - Added Gemma 4 decoder support for hybrid attention, shared and routed MoE,
