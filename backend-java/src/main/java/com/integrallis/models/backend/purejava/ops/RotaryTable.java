@@ -21,9 +21,9 @@ import java.util.Arrays;
 public final class RotaryTable {
 
   private final int rotaryDim;
-  private final float theta;
   private final float frequencyScale;
   private final float[] frequencyFactors;
+  private final float[] frequencies;
   private final float[] cosine;
   private final float[] sine;
   private float[] batchCosine = new float[0];
@@ -65,8 +65,11 @@ public final class RotaryTable {
       this.frequencyFactors = null;
     }
     this.rotaryDim = rotaryDim;
-    this.theta = theta;
     this.frequencyScale = frequencyScale;
+    this.frequencies = new float[pairCount];
+    for (int pair = 0; pair < pairCount; pair++) {
+      frequencies[pair] = (float) (1.0 / Math.pow(theta, (double) (pair * 2) / rotaryDim));
+    }
     this.cosine = new float[pairCount];
     this.sine = new float[pairCount];
   }
@@ -175,9 +178,8 @@ public final class RotaryTable {
       int position, float[] cosineDestination, float[] sineDestination, int destinationOffset) {
     float scaledPosition = position * frequencyScale;
     for (int pair = 0; pair < cosine.length; pair++) {
-      float frequency = (float) (1.0 / Math.pow(theta, (double) (pair * 2) / rotaryDim));
       float divisor = frequencyFactors == null ? 1.0f : frequencyFactors[pair];
-      float angle = scaledPosition * frequency / divisor;
+      float angle = scaledPosition * frequencies[pair] / divisor;
       cosineDestination[destinationOffset + pair] = (float) Math.cos(angle);
       sineDestination[destinationOffset + pair] = (float) Math.sin(angle);
     }

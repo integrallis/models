@@ -25,6 +25,11 @@ import java.util.Objects;
 /** Core tensor operations for transformer inference. */
 public final class TensorOps {
 
+  private static final float TANH_TABLE_LIMIT = 10.0f;
+  private static final int TANH_TABLE_SIZE = 1 << 16;
+  private static final float TANH_TABLE_SCALE = TANH_TABLE_SIZE / (2.0f * TANH_TABLE_LIMIT);
+  private static final float[] TANH_TABLE = createTanhTable();
+
   enum GroupedProjectionPlan {
     NONE,
     ALL,
@@ -1433,16 +1438,37 @@ public final class TensorOps {
       float[] up,
       int upOffset,
       int size) {
-    for (int i = 0; i < size; i++) {
-      float value = gate[gateOffset + i];
+    for (int index = 0; index < size; index++) {
+      float value = gate[gateOffset + index];
       float gelu =
           0.5f
               * value
               * (1.0f
-                  + (float)
-                      Math.tanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
-      out[outOffset + i] = gelu * up[upOffset + i];
+                  + tableTanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
+      out[outOffset + index] = gelu * up[upOffset + index];
     }
+  }
+
+  private static float tableTanh(float value) {
+    if (value <= -TANH_TABLE_LIMIT) {
+      return -1.0f;
+    }
+    if (value >= TANH_TABLE_LIMIT) {
+      return 1.0f;
+    }
+    float tablePosition = (value + TANH_TABLE_LIMIT) * TANH_TABLE_SCALE;
+    int index = (int) tablePosition;
+    float lower = TANH_TABLE[index];
+    return lower + (tablePosition - index) * (TANH_TABLE[index + 1] - lower);
+  }
+
+  private static float[] createTanhTable() {
+    float[] table = new float[TANH_TABLE_SIZE + 1];
+    for (int index = 0; index <= TANH_TABLE_SIZE; index++) {
+      float value = -TANH_TABLE_LIMIT + index / TANH_TABLE_SCALE;
+      table[index] = (float) Math.tanh(value);
+    }
+    return table;
   }
 
   private static void rotatePair(float[] vector, int offset, float cos, float sin) {
