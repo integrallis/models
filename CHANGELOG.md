@@ -4,6 +4,15 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-02
+
+### Changed
+
+- Qualified Gemma 4 26B-A4B Q4_K_M at the usable tier by parallelizing safe
+  prefill regions, vectorizing accumulation, reusing projection scratch space,
+  precomputing RoPE values, bounding GELU lookup, and eliminating hot native
+  allocations.
+
 ## [0.2.1] - 2026-08-02
 
 ### Added
