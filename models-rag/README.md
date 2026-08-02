@@ -8,7 +8,7 @@ generation, then enforces source attribution, abstention, and extractive fallbac
 on the generated answer.
 
 ```kotlin
-implementation("com.integrallis:models-rag:0.2.2")
+implementation("com.integrallis:models-rag:0.2.3")
 ```
 
 ```java
@@ -17,12 +17,12 @@ var evidence = retrieved.stream()
     .map(hit -> new GroundingDocument(
         hit.id(), hit.title(), hit.text(), hit.score(), hit.rank()))
     .toList();
-
-if (!policy.assess(question, evidence).generationAllowed()) {
+var prompt = GroundedRagPrompt.prepare(policy, question, evidence);
+if (!prompt.generationAllowed()) {
     return GroundedAnswerPolicy.ABSTENTION;
 }
 
-String rawModelText = model.generate(prompt);
+String rawModelText = model.generate(prompt.text());
 GroundedAnswer answer = policy.apply(question, evidence, rawModelText);
 System.out.println(answer.text());
 System.out.println(answer.decision());

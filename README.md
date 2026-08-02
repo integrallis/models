@@ -87,6 +87,7 @@ the qualification ledger for those exact details.
 | Llama 3.2 1B | General |
 | Llama 3.2 3B | General |
 | Gemma 3 1B | General |
+| Gemma 4 26B-A4B Instruct | General |
 | H2O Danube2 1.8B | General |
 | DeepSeek-R1-Distill-Qwen 1.5B | General |
 | TinyLlama 1.1B Chat | General |
@@ -104,11 +105,10 @@ the qualification ledger for those exact details.
 | Nexus Finance | Finance |
 | Nexus Medical | Healthcare |
 
-Gemma 4 26B-A4B Instruct Q4_K_M is integration-tested through plain Java,
-LangChain4j, and Spring AI, but it is intentionally absent from the qualified
-table. Its exact-artifact run passed every correctness gate and failed the
-2-second usable TTFT ceiling. See the [qualification analysis](GEMMA4_QUALIFICATION.md)
-and [retained evidence](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/README.md).
+Gemma 4 26B-A4B Instruct Q4_K_M is qualified at the usable tier through plain
+Java, LangChain4j, and Spring AI. See the
+[qualification analysis](GEMMA4_QUALIFICATION.md) and
+[retained evidence](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/README.md).
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)
@@ -136,8 +136,8 @@ directly:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:models:0.2.2")
-    implementation("com.integrallis:backend-java:0.2.2") // or backend-native
+    implementation("com.integrallis:models:0.2.3")
+    implementation("com.integrallis:backend-java:0.2.3") // or backend-native
 }
 ```
 
@@ -145,7 +145,7 @@ Use Apple's on-device system model on a supported Apple Silicon Mac:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:backend-apple:0.2.2")
+    implementation("com.integrallis:backend-apple:0.2.3")
 }
 ```
 
