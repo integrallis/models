@@ -86,17 +86,19 @@
                             <div class="code-title">// Generated reference to a qualified artifact</div>
                             <pre><code class="language-java hljs" data-lang="java">import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
-try (var model = ModelJars.open(MODEL)) {
-    String answer = model.generate(prompt, options);
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var prompt = runtime.chatTemplate().render(messages);
+    String answer = runtime.model().generate(prompt, options);
 }</code></pre>
                         </div>
                         <div class="code-panel" data-code="native">
                             <div class="code-title">// Exact Maven-style marker coordinate</div>
-                            <pre><code class="language-java hljs" data-lang="java">try (var model = ModelJars.open(
+                            <pre><code class="language-java hljs" data-lang="java">try (var runtime = ModelJars.openRuntime(
         "org.modeljars.huggingface:" +
         "ggml-org.qwen3-0.6b-gguf.q4_0:" +
         "3.0.0-q4_0.1")) {
-    String answer = model.generate(prompt, options);
+    var prompt = runtime.chatTemplate().render(messages);
+    String answer = runtime.model().generate(prompt, options);
 }</code></pre>
                         </div>
                         <div class="code-panel" data-code="apple">
@@ -134,7 +136,7 @@ try (var model = ModelJars.open(MODEL)) {
                         <button class="install-tab" data-target="sbt">sbt</button>
                     </div>
                     <div class="install-cmd">
-                        <code id="install-text">implementation("org.modeljars:modeljars:0.1.0")
+                        <code id="install-text">implementation("org.modeljars:modeljars:0.1.2")
 implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")</code>
                         <button class="install-copy" id="install-copy" aria-label="Copy dependencies" title="Copy">
                             <svg class="clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v12"/></svg>

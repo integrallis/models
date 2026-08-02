@@ -54,19 +54,18 @@ import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.runtime.chat.ChatMessage;
-import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.List;
 import org.modeljars.ModelJars;
 
-var prompt = ChatTemplate.CHATML_NO_THINK.render(
-    List.of(ChatMessage.user("Why is local inference useful?")));
 var options = SamplingOptions.builder()
     .temperature(0.0f)
     .maxTokens(64)
     .build();
 
-try (var model = ModelJars.open(MODEL)) {
-    System.out.println(model.generate(prompt, options));
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var prompt = runtime.chatTemplate().render(
+        List.of(ChatMessage.user("Why is local inference useful?")));
+    System.out.println(runtime.model().generate(prompt, options));
 }
 ----
 
