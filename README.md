@@ -161,7 +161,7 @@ import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
 var options = SamplingOptions.builder()
     .temperature(0.0f)
-    .maxTokens(20)
+    .maxTokens(128)
     .build();
 
 try (var runtime = ModelJars.openRuntime(MODEL)) {

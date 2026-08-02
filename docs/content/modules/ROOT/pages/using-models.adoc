@@ -40,7 +40,7 @@ import org.modeljars.ModelJars;
 try (var runtime = ModelJars.openRuntime(MODEL)) {
     var options = SamplingOptions.builder()
         .temperature(0.0f)
-        .maxTokens(64)
+        .maxTokens(128)
         .build();
 
     var prompt = runtime.chatTemplate().render(List.of(
