@@ -81,6 +81,7 @@ execution path identify it explicitly, for example `Gemma31BQ4KMNative`.
 ./gradlew :models:DeepSeekR1DistillQwen7BQ4KM
 ./gradlew :models:Qwen25Math15BQ4KMNative
 ./gradlew :models:SqlCoder7B2Q5KM
+./gradlew :models:Gemma426BA4BQ4KM
 ----
 
 Run `./gradlew :models:tasks --group "model acquisition"` for the
@@ -89,7 +90,7 @@ complete list. Downloaded artifacts are cached under `~/.jvllm/models`.
 == Large-Model Tasks
 
 Large fixtures run as dedicated strict tasks so CI workers do not cache
-several 4-5 GB artifacts at once:
+several multi-gigabyte artifacts at once:
 
 [source,bash]
 ----
@@ -98,6 +99,9 @@ several 4-5 GB artifacts at once:
 ./gradlew :backend-java:qwen38BSlowTest
 ./gradlew :backend-java:deepSeekR1DistillQwen7BSlowTest
 ./gradlew :backend-java:sqlCoder7B2SlowTest
+./gradlew :backend-java:gemma426BA4BSlowTest
+./gradlew :backend-native:gemma426BA4BNativeSlowTest
+./gradlew :models-rag-bench:gemma426BA4BFrameworkSlowTest
 ./gradlew :backend-java:slowTest
 ----
 

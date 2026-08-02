@@ -15,7 +15,7 @@ A model family name alone is not a production qualification.
 
 == Supported Runtime Surface
 
-The decoder currently recognizes `llama`, `qwen2`, and `qwen3` GGUF
+The decoder currently recognizes `llama`, `qwen2`, `qwen3`, and `gemma4` GGUF
 metadata prefixes.
 
 Projection kernels support:
@@ -72,6 +72,22 @@ and correctness. Individual report directories under
 {url-models-github}/tree/main/benchmark-results[`benchmark-results/`^]
 contain the machine-readable qualification records.
 
+== Integration-Tested But Not Qualified
+
+Gemma 4 26B-A4B Instruct Q4_K_M is supported by the Java transformer and
+Models Rust/FFM projection backend. The exact 16,796,015,136-byte artifact
+passed pinned-artifact installation, deterministic generation, direct runtime,
+LangChain4j, Spring AI, and guarded-RAG checks. All 27 qualification requests
+were correct, including all 21 retained model answers.
+
+The same run is classified `OFFLINE`: p95 TTFT was 3,793.7 ms, above the
+2,000 ms usable ceiling. It is therefore integration-tested but intentionally
+excluded from the qualified identities above. The
+{url-models-github}/blob/main/GEMMA4_QUALIFICATION.md[transfer and qualification
+analysis^] and
+{url-models-github}/tree/main/benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m[retained reports^]
+record the result without promoting a failed latency profile.
+
 == Strict Integration Fixtures
 
 The default and dedicated integration suites include:
@@ -86,6 +102,7 @@ and 7B Q4_0
 * Qwen2.5-Math 1.5B Q4_K_M
 * DeepSeek-R1-Distill-Qwen 7B Q4_K_M
 * SQLCoder-7B-2 Q5_K_M
+* Gemma 4 26B-A4B Instruct Q4_K_M
 
 The DeepSeek-Coder fixture exercises mixed
 Q4_K/Q5_0/Q8_0/Q6_K tensors and legacy linear RoPE

@@ -59,7 +59,7 @@ for the exact boundary and migration policy.
 Implemented functionality includes:
 
 - GGUF v2/v3 parsing with memory-mapped tensor access
-- Llama, Qwen2, and Qwen3 decoder architectures
+- Llama, Qwen2, Qwen3, and Gemma 4 decoder architectures
 - F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
 - byte-level BPE and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
@@ -103,6 +103,12 @@ the qualification ledger for those exact details.
 | Nexus Legal | Legal |
 | Nexus Finance | Finance |
 | Nexus Medical | Healthcare |
+
+Gemma 4 26B-A4B Instruct Q4_K_M is integration-tested through plain Java,
+LangChain4j, and Spring AI, but it is intentionally absent from the qualified
+table. Its exact-artifact run passed every correctness gate and failed the
+2-second usable TTFT ceiling. See the [qualification analysis](GEMMA4_QUALIFICATION.md)
+and [retained evidence](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/README.md).
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)
