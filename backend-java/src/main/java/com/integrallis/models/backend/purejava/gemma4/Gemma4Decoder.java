@@ -17,11 +17,11 @@ package com.integrallis.models.backend.purejava.gemma4;
 
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Objects;
 
-/** Owns one loaded Gemma 4 decoder, including its bounded streamed-expert cache. */
+/** Owns one loaded Gemma 4 decoder and its zero-copy mapped expert views. */
 public final class Gemma4Decoder implements AutoCloseable {
 
   /** Independent sequence state that shares this decoder's immutable weights. */
@@ -42,44 +42,43 @@ public final class Gemma4Decoder implements AutoCloseable {
   }
 
   private final Gemma4Config config;
-  private final Gemma4ExpertCache expertCache;
+  private final Gemma4Experts experts;
   private final Gemma4ForwardPass forwardPass;
   private Gemma4ForwardPass.Session[] sessionBatch = new Gemma4ForwardPass.Session[0];
   private boolean closed;
 
-  private Gemma4Decoder(
-      Gemma4Config config, Gemma4ExpertCache expertCache, Gemma4ForwardPass forwardPass) {
+  private Gemma4Decoder(Gemma4Config config, Gemma4Experts experts, Gemma4ForwardPass forwardPass) {
     this.config = config;
-    this.expertCache = expertCache;
+    this.experts = experts;
     this.forwardPass = forwardPass;
   }
 
   /** Opens an exact text-only Gemma 4 GGUF decoder. */
   public static Gemma4Decoder load(
-      Path modelPath, GgufFile file, int runtimeContextLength, int expertSlotsPerLayer)
+      GgufFile file, int runtimeContextLength, GgufBatchedMatrixKernel batchedMatrixKernel)
       throws IOException {
-    Objects.requireNonNull(modelPath, "modelPath");
     Objects.requireNonNull(file, "file");
+    Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
     Gemma4Config config = Gemma4Config.fromMetadata(file.metadata());
     Gemma4Weights weights = Gemma4Weights.fromGgufFile(file, config);
     Gemma4TensorLayout layout = weights.expertLayout();
-    Gemma4ExpertLoader loader = Gemma4ExpertLoader.open(modelPath);
-    Gemma4ExpertCache expertCache = null;
+    Gemma4Experts experts =
+        new Gemma4MappedExperts(
+            file.fileSegment(),
+            config.numLayers(),
+            config.numExperts(),
+            (layer, expert) -> layout.layer(layer).expert(expert));
     try {
-      expertCache =
-          new Gemma4ExpertCache(
-              loader,
-              config.numLayers(),
-              config.numExperts(),
-              expertSlotsPerLayer,
-              (layer, expert) -> layout.layer(layer).expert(expert),
-              Gemma4ExpertCache.CachePolicy.LFU);
       Gemma4ForwardPass forwardPass =
           new Gemma4ForwardPass(
-              config, weights, Gemma4KvCache.create(config, runtimeContextLength, 1), expertCache);
-      return new Gemma4Decoder(config, expertCache, forwardPass);
+              config,
+              weights,
+              Gemma4KvCache.create(config, runtimeContextLength, 1),
+              experts,
+              batchedMatrixKernel);
+      return new Gemma4Decoder(config, experts, forwardPass);
     } catch (RuntimeException | Error failure) {
-      closeAfterFailure(loader, expertCache, failure);
+      closeAfterFailure(experts, failure);
       throw failure;
     }
   }
@@ -94,6 +93,12 @@ public final class Gemma4Decoder implements AutoCloseable {
   public int maxBatchSize() {
     checkOpen();
     return forwardPass.maxSessionBatchSize();
+  }
+
+  /** Returns the prompt batch size selected for the loaded tensor topology and kernel. */
+  public int prefillBatchSize() {
+    checkOpen();
+    return forwardPass.prefillBatchSize();
   }
 
   /** Executes one default-sequence token and returns stable logits. */
@@ -189,7 +194,7 @@ public final class Gemma4Decoder implements AutoCloseable {
   public void close() throws IOException {
     if (!closed) {
       closed = true;
-      expertCache.close();
+      experts.close();
     }
   }
 
@@ -220,14 +225,9 @@ public final class Gemma4Decoder implements AutoCloseable {
     }
   }
 
-  private static void closeAfterFailure(
-      Gemma4ExpertLoader loader, Gemma4ExpertCache cache, Throwable failure) {
+  private static void closeAfterFailure(Gemma4Experts experts, Throwable failure) {
     try {
-      if (cache == null) {
-        loader.close();
-      } else {
-        cache.close();
-      }
+      experts.close();
     } catch (IOException | RuntimeException closeFailure) {
       failure.addSuppressed(closeFailure);
     }

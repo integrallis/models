@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Versioned FFM access to Models-owned native inference kernels. */
 @SuppressWarnings("restricted")
 public final class NativeKernelLibrary implements AutoCloseable {
-  public static final int ABI_VERSION = 2;
+  public static final int ABI_VERSION = 4;
   public static final String THREAD_COUNT_PROPERTY = "models.native.kernels.threads";
 
   private static final int STATUS_OK = 0;
@@ -77,6 +77,21 @@ public final class NativeKernelLibrary implements AutoCloseable {
           ValueLayout.JAVA_LONG,
           ValueLayout.JAVA_INT,
           ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor QUANTIZED_INDEPENDENT_BATCHED_WITH_CONTEXT_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT);
 
   private final Arena libraryArena;
   private final long capabilities;
@@ -84,6 +99,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle contextDestroyHandle;
   private final MethodHandle quantizedBatchedHandle;
   private final MethodHandle quantizedGroupedBatchedHandle;
+  private final MethodHandle quantizedIndependentBatchedHandle;
   private final int threadCount;
   private boolean closed;
 
@@ -94,6 +110,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle contextDestroyHandle,
       MethodHandle quantizedBatchedHandle,
       MethodHandle quantizedGroupedBatchedHandle,
+      MethodHandle quantizedIndependentBatchedHandle,
       int threadCount) {
     this.libraryArena = libraryArena;
     this.capabilities = capabilities;
@@ -101,6 +118,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.contextDestroyHandle = contextDestroyHandle;
     this.quantizedBatchedHandle = quantizedBatchedHandle;
     this.quantizedGroupedBatchedHandle = quantizedGroupedBatchedHandle;
+    this.quantizedIndependentBatchedHandle = quantizedIndependentBatchedHandle;
     this.threadCount = threadCount;
   }
 
@@ -148,6 +166,11 @@ public final class NativeKernelLibrary implements AutoCloseable {
               lookup,
               "jmodels_quantized_f32_grouped_batched_matmul_with_context",
               QUANTIZED_GROUPED_BATCHED_WITH_CONTEXT_DESCRIPTOR);
+      MethodHandle quantizedIndependentBatched =
+          downcall(
+              lookup,
+              "jmodels_quantized_f32_independent_batched_matmul_with_context",
+              QUANTIZED_INDEPENDENT_BATCHED_WITH_CONTEXT_DESCRIPTOR);
       MemorySegment context = invokeAddress(contextCreate, threadCount, "create worker context");
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
@@ -159,6 +182,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
           contextDestroy,
           quantizedBatched,
           quantizedGroupedBatched,
+          quantizedIndependentBatched,
           threadCount);
     } catch (RuntimeException | LinkageError failure) {
       arena.close();
@@ -461,6 +485,49 @@ public final class NativeKernelLibrary implements AutoCloseable {
         outputElements,
         batchSize,
         cols);
+  }
+
+  void quantizedF32IndependentBatchedMatmul(
+      MemorySegment formats,
+      MemorySegment weightPointers,
+      MemorySegment weightBytes,
+      MemorySegment rows,
+      MemorySegment batchSizes,
+      int matrixCount,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int cols) {
+    if (!supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)) {
+      throw new UnsupportedOperationException(
+          "loaded native library has no independent batched kernel");
+    }
+    try {
+      int status =
+          (int)
+              quantizedIndependentBatchedHandle.invokeExact(
+                  context,
+                  formats,
+                  weightPointers,
+                  weightBytes,
+                  rows,
+                  batchSizes,
+                  matrixCount,
+                  nativeInput,
+                  inputElements,
+                  nativeOutput,
+                  outputElements,
+                  cols);
+      if (status != STATUS_OK) {
+        throw new IllegalStateException(
+            "native independent batched kernel failed: " + statusName(status));
+      }
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("independent batched matmul", failure);
+    }
   }
 
   private void f32BatchedMatmul(

@@ -25,19 +25,34 @@ import com.integrallis.models.backend.purejava.gguf.GgufHeader;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorInfo;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.io.ByteArrayOutputStream;
 import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("unit")
 class Gemma4ForwardPassTest {
+
+  @Test
+  void batchedExpertOrderLeavesTheMostRecentPromptRoutesLast() {
+    int[] selectedExperts = {2, 0, 1, 2, 3, 1};
+    int[] order = new int[4];
+
+    int count = Gemma4ForwardPass.orderExpertsByLastRoute(selectedExperts, 3, 2, 4, order);
+
+    assertThat(count).isEqualTo(4);
+    assertThat(Arrays.copyOf(order, count)).containsExactly(0, 2, 1, 3);
+  }
 
   @Test
   void completeToyGraphMatchesAnIndependentScalarReference() throws Exception {
@@ -118,10 +133,275 @@ class Gemma4ForwardPassTest {
     }
   }
 
+  @Test
+  void injectedKernelExecutesEligibleGemmaProjections() throws Exception {
+    ToyModel model = ToyModel.create();
+    Gemma4Config config = model.withExpertsUsed(2);
+    Gemma4Weights weights = Gemma4Weights.fromGgufFile(model.file(), config);
+    Gemma4TensorLayout layout = weights.expertLayout();
+    AtomicInteger invocations = new AtomicInteger();
+    AtomicInteger dualInvocations = new AtomicInteger();
+    AtomicInteger tripleInvocations = new AtomicInteger();
+    AtomicInteger groupedInvocations = new AtomicInteger();
+    AtomicInteger independentInvocations = new AtomicInteger();
+    AtomicInteger raggedIndependentInvocations = new AtomicInteger();
+    AtomicInteger maximumBatchSize = new AtomicInteger();
+    GgufBatchedMatrixKernel kernel =
+        new GgufBatchedMatrixKernel() {
+          @Override
+          public boolean supports(GgufTensorType type) {
+            return type == GgufTensorType.F32;
+          }
+
+          @Override
+          public void multiply(
+              float[] output,
+              float[] input,
+              MemorySegment matrix,
+              GgufTensorType type,
+              int batchSize,
+              int rows,
+              int cols) {
+            invocations.incrementAndGet();
+            maximumBatchSize.accumulateAndGet(batchSize, Math::max);
+            matmulBatch(output, input, matrix, type, batchSize, rows, cols);
+          }
+
+          @Override
+          public boolean isDualEligible(
+              GgufTensorType firstType,
+              int firstRows,
+              GgufTensorType secondType,
+              int secondRows,
+              int batchSize,
+              int cols) {
+            return supports(firstType) && supports(secondType);
+          }
+
+          @Override
+          public void multiplyDual(
+              float[] firstOutput,
+              MemorySegment firstWeights,
+              GgufTensorType firstType,
+              int firstRows,
+              float[] secondOutput,
+              MemorySegment secondWeights,
+              GgufTensorType secondType,
+              int secondRows,
+              float[] input,
+              int batchSize,
+              int cols) {
+            dualInvocations.incrementAndGet();
+            maximumBatchSize.accumulateAndGet(batchSize, Math::max);
+            matmulBatch(firstOutput, input, firstWeights, firstType, batchSize, firstRows, cols);
+            matmulBatch(
+                secondOutput, input, secondWeights, secondType, batchSize, secondRows, cols);
+          }
+
+          @Override
+          public boolean isTripleEligible(
+              GgufTensorType firstType,
+              int firstRows,
+              GgufTensorType secondType,
+              int secondRows,
+              GgufTensorType thirdType,
+              int thirdRows,
+              int batchSize,
+              int cols) {
+            return supports(firstType) && supports(secondType) && supports(thirdType);
+          }
+
+          @Override
+          public void multiplyTriple(
+              float[] firstOutput,
+              MemorySegment firstWeights,
+              GgufTensorType firstType,
+              int firstRows,
+              float[] secondOutput,
+              MemorySegment secondWeights,
+              GgufTensorType secondType,
+              int secondRows,
+              float[] thirdOutput,
+              MemorySegment thirdWeights,
+              GgufTensorType thirdType,
+              int thirdRows,
+              float[] input,
+              int batchSize,
+              int cols) {
+            tripleInvocations.incrementAndGet();
+            maximumBatchSize.accumulateAndGet(batchSize, Math::max);
+            matmulBatch(firstOutput, input, firstWeights, firstType, batchSize, firstRows, cols);
+            matmulBatch(
+                secondOutput, input, secondWeights, secondType, batchSize, secondRows, cols);
+            matmulBatch(thirdOutput, input, thirdWeights, thirdType, batchSize, thirdRows, cols);
+          }
+
+          @Override
+          public boolean isGroupedEligible(
+              GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
+            for (int index = 0; index < matrixCount; index++) {
+              if (!supports(types[index])) {
+                return false;
+              }
+            }
+            return matrixCount > 1;
+          }
+
+          @Override
+          public void multiplyGrouped(
+              float[][] outputs,
+              MemorySegment[] matrices,
+              GgufTensorType[] types,
+              int[] rows,
+              int matrixCount,
+              float[] input,
+              int batchSize,
+              int cols) {
+            groupedInvocations.incrementAndGet();
+            maximumBatchSize.accumulateAndGet(batchSize, Math::max);
+            for (int index = 0; index < matrixCount; index++) {
+              matmulBatch(
+                  outputs[index],
+                  input,
+                  matrices[index],
+                  types[index],
+                  batchSize,
+                  rows[index],
+                  cols);
+            }
+          }
+
+          @Override
+          public boolean isIndependentEligible(
+              GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
+            for (int index = 0; index < matrixCount; index++) {
+              if (!supports(types[index])) {
+                return false;
+              }
+            }
+            return matrixCount > 1;
+          }
+
+          @Override
+          public void multiplyIndependent(
+              float[][] outputs,
+              MemorySegment[] matrices,
+              GgufTensorType[] types,
+              int[] rows,
+              int matrixCount,
+              float[][] inputs,
+              int batchSize,
+              int cols) {
+            independentInvocations.incrementAndGet();
+            maximumBatchSize.accumulateAndGet(batchSize, Math::max);
+            for (int index = 0; index < matrixCount; index++) {
+              matmulBatch(
+                  outputs[index],
+                  inputs[index],
+                  matrices[index],
+                  types[index],
+                  batchSize,
+                  rows[index],
+                  cols);
+            }
+          }
+
+          @Override
+          public boolean isRaggedIndependentEligible(
+              GgufTensorType[] types, int[] rows, int[] batchSizes, int matrixCount, int cols) {
+            for (int index = 0; index < matrixCount; index++) {
+              if (!supports(types[index]) || batchSizes[index] < 1) {
+                return false;
+              }
+            }
+            return matrixCount > 1;
+          }
+
+          @Override
+          public void multiplyRaggedIndependent(
+              float[][] outputs,
+              MemorySegment[] matrices,
+              GgufTensorType[] types,
+              int[] rows,
+              int[] batchSizes,
+              int matrixCount,
+              float[][] inputs,
+              int cols) {
+            raggedIndependentInvocations.incrementAndGet();
+            for (int index = 0; index < matrixCount; index++) {
+              matmulBatch(
+                  outputs[index],
+                  inputs[index],
+                  matrices[index],
+                  types[index],
+                  batchSizes[index],
+                  rows[index],
+                  cols);
+            }
+          }
+        };
+
+    try (Gemma4ExpertCache baselineExperts =
+            new Gemma4ExpertCache(
+                new Gemma4ExpertLoader(reader(model.file().fileSegment())),
+                config.numLayers(),
+                config.numExperts(),
+                2,
+                (layer, expert) -> layout.layer(layer).expert(expert),
+                Gemma4ExpertCache.CachePolicy.LFU);
+        Gemma4ExpertCache acceleratedExperts =
+            new Gemma4ExpertCache(
+                new Gemma4ExpertLoader(reader(model.file().fileSegment())),
+                config.numLayers(),
+                config.numExperts(),
+                2,
+                (layer, expert) -> layout.layer(layer).expert(expert),
+                Gemma4ExpertCache.CachePolicy.LFU)) {
+      Gemma4ForwardPass baseline =
+          new Gemma4ForwardPass(
+              config, weights, Gemma4KvCache.create(config, 8, 2), baselineExperts);
+      Gemma4ForwardPass accelerated =
+          new Gemma4ForwardPass(
+              config, weights, Gemma4KvCache.create(config, 8, 2), acceleratedExperts, kernel);
+
+      assertThat(baseline.prefillBatchSize()).isEqualTo(1);
+      assertThat(accelerated.prefillBatchSize()).isEqualTo(32);
+      assertClose(accelerated.forward(0, 0), baseline.forward(0, 0));
+      assertThat(invocations).hasValueGreaterThan(0);
+      assertThat(dualInvocations).hasValueGreaterThan(0);
+      assertThat(tripleInvocations).hasValueGreaterThan(0);
+      assertThat(groupedInvocations).hasValueGreaterThan(0);
+      assertThat(independentInvocations).hasValueGreaterThan(0);
+
+      accelerated.reset();
+      baseline.reset();
+      maximumBatchSize.set(0);
+      assertClose(accelerated.prefill(new int[] {0, 1}, 0), baseline.prefill(new int[] {0, 1}, 0));
+      assertThat(raggedIndependentInvocations).hasValueGreaterThan(0);
+      assertThat(maximumBatchSize).hasValue(2);
+    }
+  }
+
   private static void assertClose(float[] actual, float[] expected) {
     assertThat(actual).hasSameSizeAs(expected);
     for (int index = 0; index < actual.length; index++) {
       assertThat(actual[index]).as("logit %s", index).isCloseTo(expected[index], offset(2.0e-5f));
+    }
+  }
+
+  private static void matmulBatch(
+      float[] output,
+      float[] input,
+      MemorySegment matrix,
+      GgufTensorType type,
+      int batchSize,
+      int rows,
+      int cols) {
+    for (int batch = 0; batch < batchSize; batch++) {
+      float[] inputRow = Arrays.copyOfRange(input, batch * cols, (batch + 1) * cols);
+      float[] outputRow = new float[rows];
+      TensorOps.ggufMatmul(outputRow, inputRow, matrix, type, rows, cols);
+      System.arraycopy(outputRow, 0, output, batch * rows, rows);
     }
   }
 
@@ -138,6 +418,32 @@ class Gemma4ForwardPassTest {
   }
 
   private record ToyModel(Gemma4Config config, GgufFile file, Map<String, float[]> tensors) {
+
+    private Gemma4Config withExpertsUsed(int expertsUsed) {
+      return new Gemma4Config(
+          config.embeddingDim(),
+          config.numLayers(),
+          config.numHeads(),
+          config.kvHeadsByLayer(),
+          config.fullKeyLength(),
+          config.slidingKeyLength(),
+          config.fullValueLength(),
+          config.slidingValueLength(),
+          config.vocabSize(),
+          config.contextLength(),
+          config.sharedHiddenDim(),
+          config.expertHiddenDim(),
+          config.numExperts(),
+          expertsUsed,
+          config.fullRopeTheta(),
+          config.slidingRopeTheta(),
+          config.fullRopeDimension(),
+          config.slidingRopeDimension(),
+          config.rmsNormEps(),
+          config.slidingWindow(),
+          config.slidingWindowByLayer(),
+          config.finalLogitSoftcap());
+    }
 
     private static ToyModel create() {
       Gemma4Config config =

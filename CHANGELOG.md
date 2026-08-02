@@ -4,6 +4,19 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added Gemma 4 decoder support for hybrid attention, shared and routed MoE,
+  mapped experts, the role-aware chat template, and pinned 26B-A4B integration
+  fixtures across plain Java, LangChain4j, and Spring AI.
+- Added native ABI 4 independent projection dispatch and retained 32-token
+  Gemma 4 prefill batching.
+
+### Changed
+
+- Recorded Gemma 4 26B-A4B as integration-tested but not production-qualified;
+  all quality gates passed, while p95 TTFT exceeded the usable latency ceiling.
+
 ## [0.2.0] - 2026-07-29
 
 ### Added

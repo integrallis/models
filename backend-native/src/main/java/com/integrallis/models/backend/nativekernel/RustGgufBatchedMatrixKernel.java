@@ -29,6 +29,7 @@ import java.util.Objects;
 public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   public static final String NATIVE_DECODE_PROPERTY = "models.native.quantizedDecode";
   public static final String Q5_0_GROUPED_PROPERTY = "models.native.q5_0.grouped";
+  private static final int MAX_GROUPED_MATRICES = 16;
 
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
@@ -51,6 +52,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private MemorySegment nativeWeightPointers = MemorySegment.NULL;
   private MemorySegment nativeWeightBytes = MemorySegment.NULL;
   private MemorySegment nativeRows = MemorySegment.NULL;
+  private MemorySegment nativeBatchSizes = MemorySegment.NULL;
+  private final int[] groupedOutputElements = new int[MAX_GROUPED_MATRICES];
+  private final int[] uniformBatchSizes = new int[MAX_GROUPED_MATRICES];
   private int inputCapacity;
   private int outputCapacity;
   private boolean closed;
@@ -87,6 +91,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public String implementation() {
+    if (library.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)) {
+      return "rust-ffm-quantized-v12";
+    }
     if (library.supports(NativeKernelCapability.Q4_K_BATCH_VECTOR_ACCUMULATION)) {
       return "rust-ffm-quantized-v10";
     }
@@ -243,6 +250,212 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public boolean isGroupedEligible(
+      GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
+    if (!eligibleBatch(batchSize)
+        || matrixCount < 2
+        || matrixCount > MAX_GROUPED_MATRICES
+        || types == null
+        || rows == null
+        || types.length < matrixCount
+        || rows.length < matrixCount
+        || !library.supports(NativeKernelCapability.MANY_GROUPED_BATCHED_MATMUL)) {
+      return false;
+    }
+    GgufTensorType firstType = types[0];
+    for (int index = 0; index < matrixCount; index++) {
+      if (rows[index] < 1
+          || !supportsGrouped(types[index])
+          || !q5_0GroupEligible(firstType, types[index])
+          || !compatibleGroup(firstType, types[index])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public synchronized void multiplyGrouped(
+      float[][] outputs,
+      MemorySegment[] weights,
+      GgufTensorType[] types,
+      int[] rows,
+      int matrixCount,
+      float[] input,
+      int batchSize,
+      int cols) {
+    requireOpen();
+    if (!isGroupedEligible(types, rows, matrixCount, batchSize, cols)) {
+      throw new UnsupportedOperationException(
+          "Rust kernel does not support this grouped projection");
+    }
+    Objects.requireNonNull(outputs, "outputs");
+    Objects.requireNonNull(weights, "weights");
+    if (outputs.length < matrixCount || weights.length < matrixCount) {
+      throw new IllegalArgumentException("grouped projection arrays are smaller than matrixCount");
+    }
+    int totalOutputElements = 0;
+    for (int index = 0; index < matrixCount; index++) {
+      groupedOutputElements[index] =
+          validateGroupedProjection(
+              outputs[index], weights[index], types[index], batchSize, rows[index], cols);
+      totalOutputElements = Math.addExact(totalOutputElements, groupedOutputElements[index]);
+    }
+    int inputElements = prepareGroupedWorkspace(input, batchSize, cols, totalOutputElements);
+    for (int index = 0; index < matrixCount; index++) {
+      configureGroupedProjection(index, weights[index], types[index], rows[index], cols);
+    }
+    invokeGrouped(types, matrixCount, inputElements, batchSize, cols, totalOutputElements);
+    int outputOffset = 0;
+    for (int index = 0; index < matrixCount; index++) {
+      copyOutput(outputs[index], outputOffset, groupedOutputElements[index]);
+      outputOffset += groupedOutputElements[index];
+    }
+  }
+
+  @Override
+  public boolean isIndependentEligible(
+      GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
+    if (!eligibleBatch(batchSize)
+        || matrixCount < 2
+        || matrixCount > MAX_GROUPED_MATRICES
+        || types == null
+        || rows == null
+        || types.length < matrixCount
+        || rows.length < matrixCount
+        || !library.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)) {
+      return false;
+    }
+    GgufTensorType firstType = types[0];
+    for (int index = 0; index < matrixCount; index++) {
+      if (rows[index] < 1
+          || !supportsGrouped(types[index])
+          || !q5_0GroupEligible(firstType, types[index])
+          || !compatibleGroup(firstType, types[index])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public synchronized void multiplyIndependent(
+      float[][] outputs,
+      MemorySegment[] weights,
+      GgufTensorType[] types,
+      int[] rows,
+      int matrixCount,
+      float[][] inputs,
+      int batchSize,
+      int cols) {
+    for (int index = 0; index < matrixCount; index++) {
+      uniformBatchSizes[index] = batchSize;
+    }
+    multiplyRaggedIndependent(
+        outputs, weights, types, rows, uniformBatchSizes, matrixCount, inputs, cols);
+  }
+
+  @Override
+  public boolean isRaggedIndependentEligible(
+      GgufTensorType[] types, int[] rows, int[] batchSizes, int matrixCount, int cols) {
+    if (matrixCount < 2
+        || matrixCount > MAX_GROUPED_MATRICES
+        || types == null
+        || rows == null
+        || batchSizes == null
+        || types.length < matrixCount
+        || rows.length < matrixCount
+        || batchSizes.length < matrixCount
+        || !library.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)) {
+      return false;
+    }
+    GgufTensorType firstType = types[0];
+    for (int index = 0; index < matrixCount; index++) {
+      if (!eligibleBatch(batchSizes[index])
+          || rows[index] < 1
+          || !supportsGrouped(types[index])
+          || !q5_0GroupEligible(firstType, types[index])
+          || !compatibleGroup(firstType, types[index])) {
+        return false;
+      }
+    }
+    return cols > 0;
+  }
+
+  @Override
+  public synchronized void multiplyRaggedIndependent(
+      float[][] outputs,
+      MemorySegment[] weights,
+      GgufTensorType[] types,
+      int[] rows,
+      int[] batchSizes,
+      int matrixCount,
+      float[][] inputs,
+      int cols) {
+    requireOpen();
+    if (!isRaggedIndependentEligible(types, rows, batchSizes, matrixCount, cols)) {
+      throw new UnsupportedOperationException(
+          "Rust kernel does not support this ragged independent projection");
+    }
+    Objects.requireNonNull(outputs, "outputs");
+    Objects.requireNonNull(weights, "weights");
+    Objects.requireNonNull(inputs, "inputs");
+    if (outputs.length < matrixCount
+        || weights.length < matrixCount
+        || inputs.length < matrixCount) {
+      throw new IllegalArgumentException(
+          "independent projection arrays are smaller than matrixCount");
+    }
+    int totalInputElements = 0;
+    int totalOutputElements = 0;
+    for (int index = 0; index < matrixCount; index++) {
+      int inputElements = Math.multiplyExact(batchSizes[index], cols);
+      Objects.requireNonNull(inputs[index], "inputs[" + index + "]");
+      if (inputs[index].length < inputElements) {
+        throw new IllegalArgumentException(
+            "independent projection input " + index + " is smaller than its shape");
+      }
+      groupedOutputElements[index] =
+          validateGroupedProjection(
+              outputs[index], weights[index], types[index], batchSizes[index], rows[index], cols);
+      totalInputElements = Math.addExact(totalInputElements, inputElements);
+      totalOutputElements = Math.addExact(totalOutputElements, groupedOutputElements[index]);
+    }
+    ensureCapacity(totalInputElements, totalOutputElements);
+    int inputOffset = 0;
+    for (int index = 0; index < matrixCount; index++) {
+      int inputElements = Math.multiplyExact(batchSizes[index], cols);
+      MemorySegment.copy(
+          inputs[index],
+          0,
+          nativeInput,
+          ValueLayout.JAVA_FLOAT,
+          Math.multiplyExact((long) inputOffset, Float.BYTES),
+          inputElements);
+      configureGroupedProjection(index, weights[index], types[index], rows[index], cols);
+      nativeBatchSizes.setAtIndex(ValueLayout.JAVA_INT, index, batchSizes[index]);
+      inputOffset += inputElements;
+    }
+    library.quantizedF32IndependentBatchedMatmul(
+        nativeFormats,
+        nativeWeightPointers,
+        nativeWeightBytes,
+        nativeRows,
+        nativeBatchSizes,
+        matrixCount,
+        nativeInput,
+        totalInputElements,
+        nativeOutput,
+        totalOutputElements,
+        cols);
+    int outputOffset = 0;
+    for (int index = 0; index < matrixCount; index++) {
+      copyOutput(outputs[index], outputOffset, groupedOutputElements[index]);
+      outputOffset += groupedOutputElements[index];
+    }
+  }
+
+  @Override
   public synchronized void multiply(
       float[] output,
       float[] input,
@@ -392,10 +605,11 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     scratchArena = Arena.ofShared();
     nativeInput = scratchArena.allocate(ValueLayout.JAVA_FLOAT, newInputCapacity);
     nativeOutput = scratchArena.allocate(ValueLayout.JAVA_FLOAT, newOutputCapacity);
-    nativeFormats = scratchArena.allocate(ValueLayout.JAVA_INT, 3);
-    nativeWeightPointers = scratchArena.allocate(ValueLayout.ADDRESS, 3);
-    nativeWeightBytes = scratchArena.allocate(ValueLayout.JAVA_LONG, 3);
-    nativeRows = scratchArena.allocate(ValueLayout.JAVA_INT, 3);
+    nativeFormats = scratchArena.allocate(ValueLayout.JAVA_INT, MAX_GROUPED_MATRICES);
+    nativeWeightPointers = scratchArena.allocate(ValueLayout.ADDRESS, MAX_GROUPED_MATRICES);
+    nativeWeightBytes = scratchArena.allocate(ValueLayout.JAVA_LONG, MAX_GROUPED_MATRICES);
+    nativeRows = scratchArena.allocate(ValueLayout.JAVA_INT, MAX_GROUPED_MATRICES);
+    nativeBatchSizes = scratchArena.allocate(ValueLayout.JAVA_INT, MAX_GROUPED_MATRICES);
     inputCapacity = newInputCapacity;
     outputCapacity = newOutputCapacity;
   }
@@ -493,6 +707,38 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     String type = mixed ? "mixed K-quant" : firstType.toString();
     library.quantizedF32GroupedBatchedMatmul(
         type,
+        capability,
+        nativeFormats,
+        nativeWeightPointers,
+        nativeWeightBytes,
+        nativeRows,
+        matrixCount,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        cols);
+  }
+
+  private void invokeGrouped(
+      GgufTensorType[] types,
+      int matrixCount,
+      int inputElements,
+      int batchSize,
+      int cols,
+      int outputElements) {
+    GgufTensorType firstType = types[0];
+    boolean mixed = false;
+    for (int index = 1; index < matrixCount; index++) {
+      mixed |= firstType != types[index];
+    }
+    NativeKernelCapability capability =
+        mixed
+            ? NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL
+            : groupedCapability(firstType);
+    library.quantizedF32GroupedBatchedMatmul(
+        mixed ? "mixed K-quant" : firstType.toString(),
         capability,
         nativeFormats,
         nativeWeightPointers,

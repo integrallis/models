@@ -27,21 +27,16 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 /** Bounded per-layer routed-expert cache with lease-safe LFU or LRU eviction. */
-final class Gemma4ExpertCache implements AutoCloseable {
+final class Gemma4ExpertCache implements Gemma4Experts {
 
   enum CachePolicy {
     LFU,
     LRU
   }
 
-  @FunctionalInterface
-  interface ExpertResolver {
-    ExpertWeights resolve(int layer, int expert);
-  }
-
   record Stats(long hits, long misses, long bytesRead, long evictions, long waits) {}
 
-  final class Lease implements AutoCloseable {
+  final class Lease implements Gemma4Experts.Lease {
     private final Slot slot;
     private final LoadedExpert loaded;
     private final AtomicBoolean released = new AtomicBoolean();
@@ -51,22 +46,22 @@ final class Gemma4ExpertCache implements AutoCloseable {
       this.loaded = loaded;
     }
 
-    int layer() {
+    public int layer() {
       requireLive();
       return loaded.weights().layer();
     }
 
-    int expert() {
+    public int expert() {
       requireLive();
       return loaded.weights().expert();
     }
 
-    MemorySegment gateUp() {
+    public MemorySegment gateUp() {
       requireLive();
       return loaded.gateUp();
     }
 
-    MemorySegment down() {
+    public MemorySegment down() {
       requireLive();
       return loaded.down();
     }
@@ -111,7 +106,7 @@ final class Gemma4ExpertCache implements AutoCloseable {
   }
 
   private final Gemma4ExpertLoader loader;
-  private final ExpertResolver resolver;
+  private final Gemma4Experts.ExpertResolver resolver;
   private final CachePolicy policy;
   private final int numExperts;
   private final LayerState[] layers;
@@ -135,7 +130,7 @@ final class Gemma4ExpertCache implements AutoCloseable {
       int numLayers,
       int numExperts,
       int slotsPerLayer,
-      ExpertResolver resolver,
+      Gemma4Experts.ExpertResolver resolver,
       CachePolicy policy) {
     this.loader = Objects.requireNonNull(loader, "loader");
     this.resolver = Objects.requireNonNull(resolver, "resolver");
@@ -157,8 +152,17 @@ final class Gemma4ExpertCache implements AutoCloseable {
     }
   }
 
-  Lease acquire(int layer, int expert) throws IOException {
+  @Override
+  public Lease acquire(int layer, int expert) throws IOException {
+    return acquire(layer, expert, 1);
+  }
+
+  @Override
+  public Lease acquire(int layer, int expert, int useCount) throws IOException {
     requireCoordinates(layer, expert);
+    if (useCount <= 0) {
+      throw new IllegalArgumentException("useCount must be > 0: " + useCount);
+    }
     ExpertWeights weights = requireResolved(layer, expert);
     LayerState layerState = layers[layer];
     if (weights.totalBytes() != layerState.slotBytes) {
@@ -181,7 +185,7 @@ final class Gemma4ExpertCache implements AutoCloseable {
         requireOpen();
         Slot hit = findHit(layerState, expert);
         if (hit != null) {
-          recordUse(layerState, hit, expert);
+          recordUse(layerState, hit, expert, useCount);
           hit.leases++;
           hits++;
           return new Lease(hit, hit.loaded);
@@ -229,7 +233,7 @@ final class Gemma4ExpertCache implements AutoCloseable {
         reserved.loading = false;
         reserved.loadingExpert = -1;
         reserved.leases = 1;
-        recordUse(layerState, reserved, expert);
+        recordUse(layerState, reserved, expert, useCount);
         misses++;
         bytesRead = Math.addExact(bytesRead, weights.totalBytes());
         if (replacesResidentExpert) {
@@ -271,6 +275,11 @@ final class Gemma4ExpertCache implements AutoCloseable {
     } finally {
       lock.unlock();
     }
+  }
+
+  @Override
+  public int concurrentLeasesPerLayer() {
+    return layers[0].slots.length;
   }
 
   private MemorySegment ensureStorage(Slot slot, long requiredBytes) {
@@ -337,10 +346,10 @@ final class Gemma4ExpertCache implements AutoCloseable {
     return candidate.lastUse < current.lastUse;
   }
 
-  private void recordUse(LayerState layer, Slot slot, int expert) {
-    if (layer.expertUseCount[expert] != Integer.MAX_VALUE) {
-      layer.expertUseCount[expert]++;
-    }
+  private void recordUse(LayerState layer, Slot slot, int expert, int useCount) {
+    int current = layer.expertUseCount[expert];
+    layer.expertUseCount[expert] =
+        useCount >= Integer.MAX_VALUE - current ? Integer.MAX_VALUE : current + useCount;
     slot.lastUse = ++clock;
   }
 

@@ -22,12 +22,14 @@ import java.util.Properties;
 import java.util.Set;
 
 /** Validated native settings selected from deployment overrides and exact ModelJar profiles. */
-record NativeKernelSettings(boolean nativeDecode, boolean q5_0Grouped, int threadCount) {
+record NativeKernelSettings(
+    boolean nativeDecode, boolean q5_0Grouped, boolean loadWarmup, int threadCount) {
   private static final String PROPERTY_PREFIX = "models.native.";
   private static final Set<String> SUPPORTED_SETTINGS =
       Set.of(
           RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
           RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
+          RustFfmBackend.LOAD_WARMUP_PROPERTY,
           NativeKernelLibrary.THREAD_COUNT_PROPERTY);
 
   NativeKernelSettings {
@@ -69,6 +71,9 @@ record NativeKernelSettings(boolean nativeDecode, boolean q5_0Grouped, int threa
             RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
             configured(
                 RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY, deployment, recommendations)),
+        booleanSetting(
+            RustFfmBackend.LOAD_WARMUP_PROPERTY,
+            configured(RustFfmBackend.LOAD_WARMUP_PROPERTY, deployment, recommendations)),
         threadCount(
             configured(NativeKernelLibrary.THREAD_COUNT_PROPERTY, deployment, recommendations),
             defaultThreadCount));

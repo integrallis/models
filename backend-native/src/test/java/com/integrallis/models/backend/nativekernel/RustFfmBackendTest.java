@@ -17,6 +17,7 @@ package com.integrallis.models.backend.nativekernel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,7 +39,7 @@ class RustFfmBackendTest {
 
   @Test
   void versionsAutomaticNativeProfileSelection() {
-    assertThat(RustFfmBackend.PLAN_VERSION).isEqualTo("rust-ffm-v10");
+    assertThat(RustFfmBackend.PLAN_VERSION).isEqualTo("rust-ffm-v12");
   }
 
   @Test
@@ -50,6 +51,8 @@ class RustFfmBackendTest {
                 "true",
                 RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
                 "true",
+                RustFfmBackend.LOAD_WARMUP_PROPERTY,
+                "true",
                 NativeKernelLibrary.THREAD_COUNT_PROPERTY,
                 "4",
                 "models.purejava.prefillBatchSize",
@@ -59,6 +62,7 @@ class RustFfmBackendTest {
 
     assertThat(settings.nativeDecode()).isTrue();
     assertThat(settings.q5_0Grouped()).isTrue();
+    assertThat(settings.loadWarmup()).isTrue();
     assertThat(settings.threadCount()).isEqualTo(4);
   }
 
@@ -71,6 +75,8 @@ class RustFfmBackendTest {
                 "true",
                 RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
                 "true",
+                RustFfmBackend.LOAD_WARMUP_PROPERTY,
+                "true",
                 NativeKernelLibrary.THREAD_COUNT_PROPERTY,
                 "4"),
             Map.of(
@@ -78,13 +84,31 @@ class RustFfmBackendTest {
                 "false",
                 RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
                 "false",
+                RustFfmBackend.LOAD_WARMUP_PROPERTY,
+                "false",
                 NativeKernelLibrary.THREAD_COUNT_PROPERTY,
                 "8"),
             16);
 
     assertThat(settings.nativeDecode()).isFalse();
     assertThat(settings.q5_0Grouped()).isFalse();
+    assertThat(settings.loadWarmup()).isFalse();
     assertThat(settings.threadCount()).isEqualTo(8);
+  }
+
+  @Test
+  void loadWarmupCompilesPrefillAndRestoresAnEmptySequence() {
+    PureJavaBackend delegate = mock(PureJavaBackend.class);
+    Tokenizer tokenizer = mock(Tokenizer.class);
+    int[] warmupTokens = {1, 2, 3};
+    when(delegate.tokenizer()).thenReturn(tokenizer);
+    when(tokenizer.encode(any(com.integrallis.models.api.ModelPrompt.class)))
+        .thenReturn(warmupTokens);
+
+    RustFfmBackend.warmup(delegate);
+
+    verify(delegate).prefill(warmupTokens, 0);
+    verify(delegate).reset();
   }
 
   @Test

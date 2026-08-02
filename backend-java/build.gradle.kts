@@ -48,6 +48,10 @@ val modelFixtures =
             "qwen3_8b_q4_k_m",
         ),
         modelFixture(
+            "downloadGemma426BA4BQ4KMModel",
+            "gemma4_26b_a4b_it_q4_k_m",
+        ),
+        modelFixture(
             "downloadQwen25Coder05BQ40Model",
             "qwen2_5_coder_0_5b_instruct_q4_0",
         ),
@@ -131,6 +135,16 @@ dependencies {
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
 
     testImplementation(project(":models-runtime"))
+}
+
+val fixtureDirectory = providers.systemProperty("models.fixtures.directory")
+
+tasks.withType<Test>().configureEach {
+    fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
 }
 
 modelFixtures.forEach { fixture ->
@@ -300,6 +314,12 @@ listOf(
         "downloadFinR17BQ4KMModel",
         "com.integrallis.models.backend.purejava.FinR1LargeModelFixtureSlowTest",
     ),
+    LargeModelTest(
+        "gemma426BA4BSlowTest",
+        "Gemma 4 26B-A4B IT",
+        "downloadGemma426BA4BQ4KMModel",
+        "com.integrallis.models.backend.purejava.gemma4.Gemma4LargeModelFixtureSlowTest",
+    ),
 ).forEach { largeModelTest ->
     tasks.register<Test>(largeModelTest.taskName) {
         group = "verification"
@@ -316,6 +336,10 @@ listOf(
         }
         outputs.upToDateWhen { false }
         maxParallelForks = 1
-        maxHeapSize = "8g"
+        maxHeapSize = if (largeModelTest.taskName == "gemma426BA4BSlowTest") "4g" else "8g"
+        if (largeModelTest.taskName == "gemma426BA4BSlowTest") {
+            systemProperty("models.gemma4.expertCacheSlots", "8")
+            systemProperty("models.purejava.maxContextLength", "128")
+        }
     }
 }

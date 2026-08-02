@@ -65,20 +65,40 @@ final class Gemma4Math {
         || routerScale.length != hidden.length) {
       throw new IllegalArgumentException("router input, output, and scale lengths must match");
     }
+    normalizeRouterInput(output, 0, hidden, 0, routerScale, hidden.length, epsilon);
+  }
+
+  /** Applies router normalization over matching source and destination slices. */
+  static void normalizeRouterInput(
+      float[] output,
+      int outputOffset,
+      float[] hidden,
+      int hiddenOffset,
+      float[] routerScale,
+      int length,
+      float epsilon) {
+    Objects.requireNonNull(output, "output");
+    Objects.requireNonNull(hidden, "hidden");
+    Objects.requireNonNull(routerScale, "routerScale");
+    if (length <= 0 || routerScale.length != length) {
+      throw new IllegalArgumentException("router scale length must match the normalized slice");
+    }
+    Objects.checkFromIndexSize(outputOffset, length, output.length);
+    Objects.checkFromIndexSize(hiddenOffset, length, hidden.length);
     if (!(epsilon > 0.0f) || !Float.isFinite(epsilon)) {
       throw new IllegalArgumentException("epsilon must be finite and > 0: " + epsilon);
     }
 
-    float sumSquares = VectorUtil.dotProduct(hidden, hidden);
-    float rmsInverse = (float) (1.0 / Math.sqrt(sumSquares / hidden.length + epsilon));
-    float dimensionScale = (float) (1.0 / Math.sqrt(hidden.length));
+    float sumSquares = VectorUtil.dotProduct(hidden, hiddenOffset, hidden, hiddenOffset, length);
+    float rmsInverse = (float) (1.0 / Math.sqrt(sumSquares / length + epsilon));
+    float dimensionScale = (float) (1.0 / Math.sqrt(length));
     float normalization = rmsInverse * dimensionScale;
-    for (int index = 0; index < hidden.length; index++) {
+    for (int index = 0; index < length; index++) {
       float scale = routerScale[index];
       if (!Float.isFinite(scale)) {
         throw new IllegalArgumentException("routerScale[" + index + "] must be finite: " + scale);
       }
-      output[index] = hidden[index] * normalization * scale;
+      output[outputOffset + index] = hidden[hiddenOffset + index] * normalization * scale;
     }
   }
 

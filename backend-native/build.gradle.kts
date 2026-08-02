@@ -12,7 +12,7 @@ import org.gradle.jvm.tasks.Jar
 
 apply(plugin = "maven-publish")
 
-val nativeAbi = 2
+val nativeAbi = 4
 
 dependencies {
     api(project(":models-api"))
@@ -36,6 +36,8 @@ val nativeLibraryName =
     }
 val nativeLibrary =
     rustTargetDirectory.map { directory -> directory.file("release/$nativeLibraryName") }
+val nativeDebugSymbols =
+    providers.gradleProperty("modelsNativeDebugSymbols").map(String::toBoolean).getOrElse(false)
 
 data class NativePlatformSpec(val id: String, val libraryFileName: String)
 
@@ -89,15 +91,28 @@ val cargoBuildRelease by tasks.registering(Exec::class) {
     group = "build"
     description = "Build the release Models Rust kernel library for the host platform"
     inputs.files(rustSources)
+    inputs.property("debugSymbols", nativeDebugSymbols)
     outputs.file(nativeLibrary)
     environment("CARGO_TARGET_DIR", rustTargetDirectory.get().asFile.absolutePath)
-    commandLine(
-        "cargo",
-        "build",
-        "--release",
-        "--manifest-path",
-        rustManifest.asFile.absolutePath,
-    )
+    val arguments =
+        mutableListOf(
+            "cargo",
+            "build",
+            "--release",
+            "--manifest-path",
+            rustManifest.asFile.absolutePath,
+        )
+    if (nativeDebugSymbols) {
+        arguments.addAll(
+            listOf(
+                "--config",
+                "profile.release.strip=false",
+                "--config",
+                "profile.release.debug=true",
+            )
+        )
+    }
+    commandLine(arguments)
 }
 
 val cargoTest by tasks.registering(Exec::class) {
@@ -259,10 +274,32 @@ tasks.withType<Test>().configureEach {
     inputs.file(nativeLibrary)
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("models.native.kernels.library", nativeLibrary.get().asFile.absolutePath)
+    providers.systemProperty("models.fixtures.directory").orNull?.let {
+        systemProperty("models.fixtures.directory", it)
+    }
     systemProperty(
         "models.native.test.artifact",
         nativePlatformJar.get().archiveFile.get().asFile.absolutePath,
     )
+}
+
+tasks.register<Test>("gemma426BA4BNativeSlowTest") {
+    group = "verification"
+    description = "Run the pinned Gemma 4 26B-A4B Q4_K_M Rust/FFM qualification test"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("slow")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.nativekernel.Gemma4NativeLargeModelFixtureSlowTest",
+        )
+    }
+    dependsOn(project(":backend-java").tasks.named("downloadGemma426BA4BQ4KMModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
 }
 
 tasks.named("check") {

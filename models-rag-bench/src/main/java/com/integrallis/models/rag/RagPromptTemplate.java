@@ -27,6 +27,7 @@ public enum RagPromptTemplate {
   ZEPHYR("zephyr"),
   LLAMA3("llama3"),
   GEMMA("gemma"),
+  GEMMA4("gemma4"),
   PHI3("phi3"),
   DEEPSEEK("deepseek"),
   H2O("h2o"),
@@ -66,6 +67,8 @@ public enum RagPromptTemplate {
               + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
       case GEMMA ->
           "<start_of_turn>user\n" + prompt.strip() + "<end_of_turn>\n<start_of_turn>model\n";
+      case GEMMA4 ->
+          "<|turn>user\n" + prompt.strip() + "<turn|>\n<|turn>model\n<|channel>thought\n<channel|>";
       case PHI3 -> "<|user|>\n" + prompt.strip() + "<|end|>\n<|assistant|>\n";
       case DEEPSEEK -> "### Instruction:\n" + prompt + "\n### Response:\n";
       case H2O -> "<|prompt|>" + prompt.strip() + "</s><|answer|>";
@@ -123,6 +126,12 @@ public enum RagPromptTemplate {
               + "\n\n"
               + userPrompt.strip()
               + "<end_of_turn>\n<start_of_turn>model\n";
+      case GEMMA4 ->
+          "<|turn>system\n"
+              + systemPrompt.strip()
+              + "<turn|>\n<|turn>user\n"
+              + userPrompt.strip()
+              + "<turn|>\n<|turn>model\n<|channel>thought\n<channel|>";
       case PHI3 ->
           "<|system|>\n"
               + systemPrompt.strip()
@@ -161,7 +170,7 @@ public enum RagPromptTemplate {
     }
     throw new IllegalArgumentException(
         "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
-            + "chatml-no-think, zephyr, llama3, gemma, phi3, deepseek, h2o, h2o-direct, "
+            + "chatml-no-think, zephyr, llama3, gemma, gemma4, phi3, deepseek, h2o, h2o-direct, "
             + "minicpm5-no-think");
   }
 }

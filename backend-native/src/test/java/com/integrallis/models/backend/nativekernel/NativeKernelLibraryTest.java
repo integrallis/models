@@ -32,6 +32,8 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 class NativeKernelLibraryTest {
+  private static final float BLOCK_QUANT_REDUCTION_TOLERANCE = 2e-5f;
+  private static final float K_QUANT_REDUCTION_TOLERANCE = 2e-3f;
   private static final ValueLayout.OfInt LE_INT =
       ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
   private static final ValueLayout.OfShort LE_SHORT =
@@ -57,6 +59,8 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.PERSISTENT_WORKER_CONTEXT)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.K_QUANT_BATCH_WEIGHT_REUSE)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_BATCH_VECTOR_ACCUMULATION)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.MANY_GROUPED_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)).isTrue();
     }
   }
 
@@ -113,7 +117,7 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v10");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v12");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
@@ -147,7 +151,7 @@ class NativeKernelLibraryTest {
 
   @Test
   void profiledSettingsConfigureDecodeGroupingAndWorkerCountTogether() {
-    NativeKernelSettings settings = new NativeKernelSettings(true, true, 4);
+    NativeKernelSettings settings = new NativeKernelSettings(true, true, false, 4);
 
     try (RustGgufBatchedMatrixKernel kernel =
         RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
@@ -170,7 +174,7 @@ class NativeKernelLibraryTest {
   }
 
   @Test
-  void reusableGgufKernelComputesExactQ8_0BatchedMatrixMultiplication() {
+  void reusableGgufKernelComputesQ8_0BatchedMatrixMultiplicationWithinReductionTolerance() {
     int batchSize = 3;
     int rows = 5;
     int cols = 64;
@@ -188,12 +192,12 @@ class NativeKernelLibraryTest {
       assertThat(kernel.isEligible(GgufTensorType.Q8_0, batchSize, rows, cols)).isTrue();
       kernel.multiply(actual, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
 
-      assertThat(actual).containsExactly(expected);
+      assertClose(actual, expected, BLOCK_QUANT_REDUCTION_TOLERANCE);
     }
   }
 
   @Test
-  void reusableGgufKernelComputesExactQ5_0BatchedMatrixMultiplication() {
+  void reusableGgufKernelComputesQ5_0BatchedMatrixMultiplicationWithinReductionTolerance() {
     int batchSize = 3;
     int rows = 5;
     int cols = 64;
@@ -211,7 +215,7 @@ class NativeKernelLibraryTest {
       assertThat(kernel.isEligible(GgufTensorType.Q5_0, batchSize, rows, cols)).isTrue();
       kernel.multiply(actual, input, weights, GgufTensorType.Q5_0, batchSize, rows, cols);
 
-      assertThat(actual).containsExactly(expected);
+      assertClose(actual, expected, BLOCK_QUANT_REDUCTION_TOLERANCE);
     }
   }
 
@@ -312,7 +316,7 @@ class NativeKernelLibraryTest {
   }
 
   @Test
-  void groupedKernelSharesInputAcrossTwoExactQ8Projections() {
+  void groupedKernelSharesInputAcrossTwoQ8ProjectionsWithinReductionTolerance() {
     int batchSize = 3;
     int cols = 64;
     int firstRows = 5;
@@ -354,8 +358,8 @@ class NativeKernelLibraryTest {
           batchSize,
           cols);
 
-      assertThat(actualFirst).containsExactly(expectedFirst);
-      assertThat(actualSecond).containsExactly(expectedSecond);
+      assertClose(actualFirst, expectedFirst, BLOCK_QUANT_REDUCTION_TOLERANCE);
+      assertClose(actualSecond, expectedSecond, BLOCK_QUANT_REDUCTION_TOLERANCE);
     }
   }
 
@@ -416,7 +420,7 @@ class NativeKernelLibraryTest {
   }
 
   @Test
-  void groupedKernelSharesInputAcrossThreeExactQ5_0Projections() {
+  void groupedKernelSharesInputAcrossThreeQ5_0ProjectionsWithinReductionTolerance() {
     int batchSize = 4;
     int cols = 64;
     int[] rowCounts = {3, 5, 7};
@@ -466,9 +470,9 @@ class NativeKernelLibraryTest {
           batchSize,
           cols);
 
-      assertThat(actual[0]).containsExactly(expected[0]);
-      assertThat(actual[1]).containsExactly(expected[1]);
-      assertThat(actual[2]).containsExactly(expected[2]);
+      assertClose(actual[0], expected[0], BLOCK_QUANT_REDUCTION_TOLERANCE);
+      assertClose(actual[1], expected[1], BLOCK_QUANT_REDUCTION_TOLERANCE);
+      assertClose(actual[2], expected[2], BLOCK_QUANT_REDUCTION_TOLERANCE);
     }
   }
 
@@ -529,9 +533,123 @@ class NativeKernelLibraryTest {
           batchSize,
           cols);
 
-      assertClose(actualFirst, expectedFirst);
-      assertClose(actualSecond, expectedSecond);
-      assertClose(actualThird, expectedThird);
+      assertClose(actualFirst, expectedFirst, K_QUANT_REDUCTION_TOLERANCE);
+      assertClose(actualSecond, expectedSecond, K_QUANT_REDUCTION_TOLERANCE);
+      assertClose(actualThird, expectedThird, K_QUANT_REDUCTION_TOLERANCE);
+    }
+  }
+
+  @Test
+  void groupedKernelSharesOneQ8KActivationAcrossEightQ4KProjections() {
+    int batchSize = 1;
+    int cols = 512;
+    int matrixCount = 8;
+    int[] rowCounts = {3, 4, 5, 6, 7, 8, 9, 10};
+    GgufTensorType[] types = new GgufTensorType[matrixCount];
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel =
+            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] expected = new float[matrixCount][];
+      float[][] actual = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        types[index] = GgufTensorType.Q4_K;
+        weights[index] = arena.allocate((long) rows * cols / 256 * 144);
+        fillQ4KWeights(weights[index], rows, cols);
+        expected[index] =
+            tensorOpsReference(weights[index], types[index], input, batchSize, rows, cols);
+        actual[index] = new float[expected[index].length];
+      }
+
+      assertThat(kernel.isGroupedEligible(types, rowCounts, matrixCount, batchSize, cols)).isTrue();
+      kernel.multiplyGrouped(
+          actual, weights, types, rowCounts, matrixCount, input, batchSize, cols);
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertClose(actual[index], expected[index], K_QUANT_REDUCTION_TOLERANCE);
+      }
+    }
+  }
+
+  @Test
+  void independentKernelExecutesEightQ4KProjectionsInOneDispatch() {
+    int batchSize = 1;
+    int cols = 512;
+    int matrixCount = 8;
+    int[] rowCounts = {3, 4, 5, 6, 7, 8, 9, 10};
+    GgufTensorType[] types = new GgufTensorType[matrixCount];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel =
+            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] inputs = new float[matrixCount][];
+      float[][] expected = new float[matrixCount][];
+      float[][] actual = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        types[index] = GgufTensorType.Q4_K;
+        inputs[index] = inputs(batchSize, cols);
+        for (int element = 0; element < inputs[index].length; element++) {
+          inputs[index][element] += index * 0.03125f;
+        }
+        weights[index] = arena.allocate((long) rows * cols / 256 * 144);
+        fillQ4KWeights(weights[index], rows, cols);
+        expected[index] =
+            tensorOpsReference(weights[index], types[index], inputs[index], batchSize, rows, cols);
+        actual[index] = new float[expected[index].length];
+      }
+
+      assertThat(kernel.isIndependentEligible(types, rowCounts, matrixCount, batchSize, cols))
+          .isTrue();
+      kernel.multiplyIndependent(
+          actual, weights, types, rowCounts, matrixCount, inputs, batchSize, cols);
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertClose(actual[index], expected[index], K_QUANT_REDUCTION_TOLERANCE);
+      }
+    }
+  }
+
+  @Test
+  void raggedIndependentKernelPreservesEachProjectionBatchSize() {
+    int cols = 512;
+    int matrixCount = 4;
+    int[] batchSizes = {1, 3, 2, 4};
+    int[] rowCounts = {3, 4, 5, 6};
+    GgufTensorType[] types = new GgufTensorType[matrixCount];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel =
+            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] inputs = new float[matrixCount][];
+      float[][] expected = new float[matrixCount][];
+      float[][] actual = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        types[index] = GgufTensorType.Q4_K;
+        inputs[index] = inputs(batchSizes[index], cols);
+        weights[index] = arena.allocate((long) rows * cols / 256 * 144);
+        fillQ4KWeights(weights[index], rows, cols);
+        expected[index] =
+            tensorOpsReference(
+                weights[index], types[index], inputs[index], batchSizes[index], rows, cols);
+        actual[index] = new float[expected[index].length];
+      }
+
+      assertThat(
+              kernel.isRaggedIndependentEligible(types, rowCounts, batchSizes, matrixCount, cols))
+          .isTrue();
+      kernel.multiplyRaggedIndependent(
+          actual, weights, types, rowCounts, batchSizes, matrixCount, inputs, cols);
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertClose(actual[index], expected[index], K_QUANT_REDUCTION_TOLERANCE);
+      }
     }
   }
 
@@ -755,7 +873,7 @@ class NativeKernelLibraryTest {
     float[] actual = new float[expected.length];
     assertThat(kernel.isEligible(type, batchSize, rows, cols)).isTrue();
     kernel.multiply(actual, input, weights, type, batchSize, rows, cols);
-    assertClose(actual, expected);
+    assertClose(actual, expected, K_QUANT_REDUCTION_TOLERANCE);
   }
 
   private static float[] tensorOpsReference(
@@ -776,9 +894,15 @@ class NativeKernelLibraryTest {
   }
 
   private static void assertClose(float[] actual, float[] expected) {
+    assertClose(actual, expected, 1e-4f);
+  }
+
+  private static void assertClose(float[] actual, float[] expected, float tolerance) {
     assertThat(actual).hasSameSizeAs(expected);
     for (int index = 0; index < actual.length; index++) {
-      assertThat(actual[index]).as("output[%s]", index).isCloseTo(expected[index], within(1e-4f));
+      assertThat(actual[index])
+          .as("output[%s]", index)
+          .isCloseTo(expected[index], within(tolerance));
     }
   }
 

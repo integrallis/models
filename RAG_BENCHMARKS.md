@@ -1,6 +1,6 @@
 # Production RAG Benchmarks
 
-Last updated: 2026-07-26
+Last updated: 2026-08-02
 
 ## Result
 
@@ -74,7 +74,14 @@ output, decision type, artifact SHA-256, corpus SHA-256, workload ID, runtime
 controls, and same-host comparator evidence. Exact reports are under
 `benchmark-results/certified-20260724/rag/`,
 `benchmark-results/certified-20260725/rag/`, and
-`benchmark-results/certified-20260726/rag/`.
+`benchmark-results/certified-20260726/rag/`. The separate failed qualification
+record for Gemma 4 26B-A4B is under
+`benchmark-results/certified-20260802/rag/`; it does not increase the qualified
+artifact or identity counts.
+
+Gemma 4 26B-A4B Q4_K_M completed 27 of 27 requests correctly and retained 21
+of 21 correct model answers. It is not listed as qualified because its 3,793.7
+ms p95 TTFT exceeds the 2,000 ms usable ceiling.
 
 Quantization variants are retained as independently qualified artifacts but do
 not increase the distinct-model launch count. The current launch count is
@@ -203,6 +210,34 @@ separately measured 64-token prefill and batched-attention candidate was
 rejected because it was slower. The raw reports and executable evidence test
 are under
 `benchmark-results/certified-20260726/rag/gemma-3-1b-q4_k_m/`.
+
+## Gemma 4 26B-A4B Support And Qualification Attempt
+
+The exact 16,796,015,136-byte Gemma 4 26B-A4B Instruct Q4_K_M artifact has
+SHA-256
+`88f4a13b0bb95f031a7fad973e10854122fb67ebc34d214d39a2f65053046abc`.
+The standard run used one complete warmup, three measured iterations over the
+nine-case general workload, a 2,048-token context, 64-token output cap, the
+`gemma4` prompt template, top-1 retrieval, and eight threads.
+
+| Path | Requests | Tier | p95 TTFT | Median decode | p95 end to end | Grounded quality |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| Models Rust/FFM qualification run | 27 | OFFLINE | 3,793.7 ms | 10.86 tok/s | 6,497.5 ms | 100% |
+| Plain Java API integration | 9 | OFFLINE | 6,199.2 ms | 10.75 tok/s | 9,159.4 ms | 100% |
+| LangChain4j integration | 9 | OFFLINE | 5,902.8 ms | 10.83 tok/s | 8,871.7 ms | 100% |
+| Spring AI integration | 9 | OFFLINE | 6,175.1 ms | 10.87 tok/s | 9,127.2 ms | 100% |
+
+The standard run produced 21 validated model answers, three extractive
+fallbacks, and three correct retrieval abstentions. Retrieval recall, MRR,
+fact coverage, citation recall and precision, abstention accuracy, and complete
+answer accuracy were all 1.0. Diagnostics record ABI 4, native plan
+`rust-ffm-v12`, eight persistent workers, mapped expert weights, and a 32-token
+Gemma 4 batched-prefill path.
+
+Support and framework integration therefore pass, but production qualification
+fails the absolute latency gate. No ModelJars performance profile is selected
+from this evidence. The retained JSON and transfer analysis explain the
+remaining gap without weakening the policy.
 
 ## What Acceptable Means
 

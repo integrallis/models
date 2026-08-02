@@ -158,6 +158,23 @@ class RagPromptRendererTest {
   }
 
   @Test
+  void gemma4ProfileUsesItsNativeSystemUserAndThoughtChannelEnvelope() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.GEMMA4);
+
+    assertThat(prompt)
+        .startsWith("<|turn>system\nYou answer questions")
+        .contains("<turn|>\n<|turn>user\nCONTEXT\n[source-1] Policy")
+        .endsWith("ANSWER<turn|>\n<|turn>model\n<|channel>thought\n<channel|>");
+    assertThat(RagPromptTemplate.parse("gemma4")).isEqualTo(RagPromptTemplate.GEMMA4);
+  }
+
+  @Test
   void phi3ProfileUsesRoleAndEndTokens() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 

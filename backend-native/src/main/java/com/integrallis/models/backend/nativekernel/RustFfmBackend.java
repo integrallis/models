@@ -19,6 +19,7 @@ import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -39,7 +40,8 @@ import java.util.Objects;
 public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String PLAN_VERSION = "rust-ffm-v10";
+  public static final String LOAD_WARMUP_PROPERTY = "models.native.loadWarmup";
+  public static final String PLAN_VERSION = "rust-ffm-v12";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -77,12 +79,38 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     Objects.requireNonNull(modelPath, "modelPath");
     Objects.requireNonNull(libraryPath, "libraryPath");
     Objects.requireNonNull(backendConfiguration, "backendConfiguration");
-    RustGgufBatchedMatrixKernel kernel =
-        RustGgufBatchedMatrixKernel.open(
-            libraryPath,
-            NativeKernelSettings.fromSystemProperties(backendConfiguration.recommendations()));
+    NativeKernelSettings settings =
+        NativeKernelSettings.fromSystemProperties(backendConfiguration.recommendations());
+    RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath, settings);
     PureJavaBackend engine = PureJavaBackend.load(modelPath, backendConfiguration, kernel);
-    return new RustFfmBackend(engine, diagnostics(engine.diagnostics(), kernel));
+    try {
+      if (settings.loadWarmup()) {
+        warmup(engine);
+      }
+      return new RustFfmBackend(
+          engine, diagnostics(engine.diagnostics(), kernel, settings.loadWarmup()));
+    } catch (RuntimeException | Error failure) {
+      try {
+        engine.close();
+      } catch (RuntimeException | Error closeFailure) {
+        failure.addSuppressed(closeFailure);
+      }
+      throw failure;
+    }
+  }
+
+  static void warmup(PureJavaBackend delegate) {
+    Objects.requireNonNull(delegate, "delegate");
+    Tokenizer tokenizer = delegate.tokenizer();
+    int[] tokens = tokenizer.encode(ModelPrompt.text("Compile the in-process inference path."));
+    if (tokens.length < 2) {
+      tokens = new int[] {tokenizer.bosToken(), tokenizer.bosToken()};
+    }
+    try {
+      delegate.prefill(tokens, 0);
+    } finally {
+      delegate.reset();
+    }
   }
 
   @Override
@@ -157,6 +185,11 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
 
   static BackendDiagnostics diagnostics(
       BackendDiagnostics javaDiagnostics, RustGgufBatchedMatrixKernel kernel) {
+    return diagnostics(javaDiagnostics, kernel, false);
+  }
+
+  private static BackendDiagnostics diagnostics(
+      BackendDiagnostics javaDiagnostics, RustGgufBatchedMatrixKernel kernel, boolean loadWarmup) {
     Map<String, String> environment = new LinkedHashMap<>(javaDiagnostics.environment());
     environment.put("transformer-runtime", "java");
     environment.put("kernel-runtime", "rust-ffm");
@@ -165,7 +198,16 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     environment.put("native-kernel-threads", Integer.toString(kernel.threadCount()));
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
     environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
+    environment.put("native-load-warmup", Boolean.toString(loadWarmup));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
+    optimizations.add(
+        new OptimizationDecision(
+            "load-warmup",
+            loadWarmup ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            loadWarmup
+                ? "one resettable prefill executes during model loading so the first request does not pay JIT compilation cost"
+                : "disabled by " + LOAD_WARMUP_PROPERTY,
+            Map.of("property", LOAD_WARMUP_PROPERTY, "sequence-state", "reset-after-warmup")));
     optimizations.add(
         nativeQuantizedDecision(
             "rust-q4-0-batched-matmul",

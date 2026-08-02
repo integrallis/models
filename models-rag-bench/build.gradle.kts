@@ -30,6 +30,57 @@ tasks.withType<Test> {
     systemProperty("models.repositoryRoot", rootProject.projectDir.absolutePath)
 }
 
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("slow")
+    }
+}
+
+val nativeLibraryName =
+    when {
+        System.getProperty("os.name").startsWith("Mac", ignoreCase = true) ->
+            "libjmodels_kernels.dylib"
+        System.getProperty("os.name").startsWith("Windows", ignoreCase = true) ->
+            "jmodels_kernels.dll"
+        else -> "libjmodels_kernels.so"
+    }
+val nativeLibrary =
+    project(":backend-native")
+        .layout.buildDirectory.file("rust-target/release/$nativeLibraryName")
+
+tasks.register<Test>("gemma426BA4BFrameworkSlowTest") {
+    group = "verification"
+    description =
+        "Run the pinned Gemma 4 26B-A4B Q4_K_M plain-Java, LangChain4j, and Spring AI test"
+    dependsOn(
+        project(":backend-java").tasks.named("downloadGemma426BA4BQ4KMModel"),
+        project(":backend-native").tasks.named("cargoBuildRelease"),
+    )
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("slow")
+    }
+    filter {
+        includeTestsMatching("com.integrallis.models.rag.Gemma4FrameworkAdaptersSlowTest")
+    }
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    systemProperty("models.native.kernels.library", nativeLibrary.get().asFile.absolutePath)
+    listOf(
+        "models.fixtures.directory",
+        "models.native.quantizedDecode",
+        "models.native.loadWarmup",
+        "models.native.kernels.threads",
+    ).forEach { propertyName ->
+        providers.systemProperty(propertyName).orNull?.let { value ->
+            systemProperty(propertyName, value)
+        }
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
 tasks.named("spotbugsTest") {
     enabled = false
 }

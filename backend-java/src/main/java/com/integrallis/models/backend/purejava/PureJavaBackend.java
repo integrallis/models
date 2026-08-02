@@ -21,6 +21,8 @@ import com.integrallis.models.api.BatchInferenceBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.OptimizationDecision;
+import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.cache.KvCache;
@@ -56,8 +58,6 @@ import java.util.Objects;
 public final class PureJavaBackend implements SpeculativeInferenceBackend, BatchInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
-  public static final String GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY = "models.gemma4.expertCacheSlots";
-  private static final int DEFAULT_GEMMA4_EXPERT_CACHE_SLOTS = 16;
 
   private final Arena arena;
   private final GgufTokenizer tokenizer;
@@ -197,7 +197,8 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
                   modelPath, file, modelFamily, runtime, planConfiguration, batchedMatrixKernel);
 
       BackendDiagnostics diagnostics =
-          backendConfiguration.enrich(loaded.executionPlan().diagnostics());
+          backendConfiguration.enrich(
+              architectureDiagnostics(loaded.executionPlan().diagnostics(), loaded.decoder()));
 
       return new PureJavaBackend(
           arena,
@@ -277,11 +278,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
             config.numHeads(),
             config.numKvHeads(0));
     Gemma4Decoder decoder =
-        Gemma4Decoder.load(
-            modelPath,
-            file,
-            runtimeContextLength(config.contextLength()),
-            gemma4ExpertCacheSlots(backendConfiguration));
+        Gemma4Decoder.load(file, runtimeContextLength(config.contextLength()), batchedMatrixKernel);
     return new LoadedDecoder(new Gemma4DecoderAdapter(decoder), metadata, executionPlan);
   }
 
@@ -522,28 +519,29 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     return new ModelTopology("gemma4", queryRows, keyRows, valueRows, layers, true);
   }
 
-  private static GgufTensorType tensorType(GgufFile file, String name) {
-    return file.getTensor(name).type();
+  private static BackendDiagnostics architectureDiagnostics(
+      BackendDiagnostics diagnostics, PureJavaDecoder decoder) {
+    if (!(decoder instanceof Gemma4DecoderAdapter gemma4)) {
+      return diagnostics;
+    }
+    int batchSize = gemma4.prefillBatchSize();
+    Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
+    environment.put("architecture-prefill-batch-size", Integer.toString(batchSize));
+    List<OptimizationDecision> optimizations = new ArrayList<>(diagnostics.optimizations());
+    optimizations.add(
+        new OptimizationDecision(
+            "gemma4-batched-prefill",
+            batchSize > 1 ? OptimizationStatus.ENABLED : OptimizationStatus.UNSUPPORTED,
+            batchSize > 1
+                ? "Gemma 4 attention, shared FFN, router, and routed experts use retained batched kernels"
+                : "at least one Gemma 4 projection or routed-expert tensor lacks a retained batched kernel",
+            Map.of("batch-size", Integer.toString(batchSize))));
+    return new BackendDiagnostics(
+        diagnostics.backend(), diagnostics.planVersion(), environment, optimizations);
   }
 
-  private static int gemma4ExpertCacheSlots(BackendConfiguration backendConfiguration) {
-    String configured = System.getProperty(GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY);
-    if (configured == null) {
-      configured = backendConfiguration.recommendations().get(GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY);
-    }
-    if (configured == null || configured.isBlank()) {
-      return DEFAULT_GEMMA4_EXPERT_CACHE_SLOTS;
-    }
-    try {
-      int slots = Integer.parseInt(configured);
-      if (slots > 0) {
-        return slots;
-      }
-    } catch (NumberFormatException ignored) {
-      // Report one stable configuration error below.
-    }
-    throw new IllegalArgumentException(
-        GEMMA4_EXPERT_CACHE_SLOTS_PROPERTY + " must be a positive integer: " + configured);
+  private static GgufTensorType tensorType(GgufFile file, String name) {
+    return file.getTensor(name).type();
   }
 
   private static String modelName(Path modelPath, GgufFile file) {

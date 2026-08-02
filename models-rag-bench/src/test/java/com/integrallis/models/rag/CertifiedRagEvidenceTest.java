@@ -105,6 +105,9 @@ class CertifiedRagEvidenceTest {
   private static final Path YI_CODER_1_5B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260726/rag/" + "yi-coder-1.5b-q4_k_m");
+  private static final Path GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -2067,6 +2070,41 @@ class CertifiedRagEvidenceTest {
           .extracting(run -> run.grounding().rawText())
           .containsExactlyElementsOf(expectedRawOutputs);
     }
+  }
+
+  @Test
+  void gemma426BA4BPassesQualityAndIntegrationButFailsTheAbsoluteLatencyGate() throws Exception {
+    RagBenchmarkReport candidate = report(GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of());
+
+    assertThat(candidate.modelId()).isEqualTo("ggml_org_gemma_4_26b_a4b_it_gguf_q4_k_m");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("88f4a13b0bb95f031a7fad973e10854122fb67ebc34d214d39a2f65053046abc");
+    assertThat(candidate.artifactSizeBytes()).isEqualTo(16_796_015_136L);
+    assertThat(candidate.settings().promptTemplate()).isEqualTo("gemma4");
+    assertThat(candidate.summary().successfulAttempts()).isEqualTo(27);
+    assertThat(candidate.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(candidate.summary().retrievalRecall()).isEqualTo(1.0);
+    assertThat(candidate.summary().abstentionAccuracy()).isEqualTo(1.0);
+    assertThat(candidate.summary().ttftMillis().p95()).isGreaterThan(2_000.0);
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.OFFLINE);
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.FAILED_ABSOLUTE_GATE);
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(21);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(21.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v12");
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("model-architecture", "gemma4")
+        .containsEntry("architecture-prefill-batch-size", "32")
+        .containsEntry("native-kernel-abi", "4");
+    assertThat(candidate.backendDiagnostics().optimization("gemma4-batched-prefill"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
   }
 
   private RagProductionQualification assertQualifiedMarkerEvidence(

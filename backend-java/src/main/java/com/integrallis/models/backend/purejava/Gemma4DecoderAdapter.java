@@ -48,6 +48,10 @@ final class Gemma4DecoderAdapter implements PureJavaDecoder {
     return decoder.maxBatchSize();
   }
 
+  int prefillBatchSize() {
+    return decoder.prefillBatchSize();
+  }
+
   @Override
   public float[] forward(int token, int position) {
     return decoder.forward(token, position);
