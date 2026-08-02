@@ -1446,12 +1446,13 @@ tasks.register("verifyDocumentation") {
         }
         val usingModels = usingModelsFile.readText()
         require(
-            "ChatTemplate.CHATML.render(" in usingModels &&
+            "ModelJars.openRuntime(MODEL)" in usingModels &&
+                "runtime.chatTemplate().render(" in usingModels &&
                 "ChatMessage.system(" in usingModels &&
                 "ChatMessage.user(" in usingModels &&
                 "new TokenStream()" in usingModels
         ) {
-            "Using Models must show role-aware prompting and token streaming"
+            "Using Models must show qualification-owned role-aware prompting and token streaming"
         }
         require("xref:using-models.adoc[Using Models]" in documentationNavigation) {
             "Documentation navigation must expose the Using Models page"
@@ -1459,8 +1460,8 @@ tasks.register("verifyDocumentation") {
 
         require(
             "xref:using-models.adoc[Using Models]" in docsIndex &&
-                "ModelJars.open(MODEL)" in docsIndex &&
-                "ChatTemplate.CHATML_NO_THINK.render(" in docsIndex
+                "ModelJars.openRuntime(MODEL)" in docsIndex &&
+                "runtime.chatTemplate().render(" in docsIndex
         ) {
             "The Models opening page must link to Using Models and show a complete quick example"
         }
@@ -1520,7 +1521,8 @@ tasks.register("verifyDocumentation") {
         listOf(
             "$modelJarsGroup:modeljars:{modeljars-version}",
             "$modelJarsGroup.catalog.Qwen3_0_6b_Q4_0.MODEL",
-            "$modelJarsFacade.open(MODEL)",
+            "$modelJarsFacade.openRuntime(MODEL)",
+            "runtime.chatTemplate()",
             "new ModelsChatModel(",
             "new ModelsStreamingChatModel(",
             "StreamingChatResponseHandler",
@@ -1538,7 +1540,8 @@ tasks.register("verifyDocumentation") {
         listOf(
             "$modelJarsGroup:modeljars:{modeljars-version}",
             "$modelJarsGroup.catalog.Qwen3_0_6b_Q4_0.MODEL",
-            "$modelJarsFacade.open(MODEL)",
+            "$modelJarsFacade.openRuntime(MODEL)",
+            "runtime.chatTemplate()",
             "new ModelsSpringAiChatModel(",
             "model.stream(new Prompt(",
             "ChatOptions.builder()",
