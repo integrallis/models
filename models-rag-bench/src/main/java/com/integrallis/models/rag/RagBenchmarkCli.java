@@ -219,6 +219,7 @@ public final class RagBenchmarkCli {
             System.out.printf(
                 "iteration %d/%d case=%s failed: %s%n",
                 iteration + 1, configuration.iterations(), testCase.id(), describeFailure(failure));
+            failure.printStackTrace(System.err);
           }
         }
       }
