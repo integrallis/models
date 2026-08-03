@@ -383,6 +383,67 @@ class Gemma4ForwardPassTest {
     }
   }
 
+  @Test
+  void singletonQuantizedExpertProjectionFallsBackWhenNativeKernelRequiresBatching()
+      throws Exception {
+    ToyModel model = ToyModel.create();
+    Gemma4Weights weights = Gemma4Weights.fromGgufFile(model.file(), model.config());
+    Gemma4TensorLayout layout = weights.expertLayout();
+    GgufBatchedMatrixKernel batchOnlyKernel =
+        new GgufBatchedMatrixKernel() {
+          @Override
+          public boolean supports(GgufTensorType type) {
+            return type == GgufTensorType.Q4_K;
+          }
+
+          @Override
+          public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
+            return batchSize > 1 && supports(type);
+          }
+
+          @Override
+          public void multiply(
+              float[] output,
+              float[] input,
+              MemorySegment matrix,
+              GgufTensorType type,
+              int batchSize,
+              int rows,
+              int cols) {
+            throw new AssertionError("singleton projection must use the Java fallback");
+          }
+        };
+
+    try (Gemma4ExpertCache experts =
+        new Gemma4ExpertCache(
+            new Gemma4ExpertLoader(reader(model.file().fileSegment())),
+            model.config().numLayers(),
+            model.config().numExperts(),
+            1,
+            (layer, expert) -> layout.layer(layer).expert(expert),
+            Gemma4ExpertCache.CachePolicy.LFU)) {
+      Gemma4ForwardPass forwardPass =
+          new Gemma4ForwardPass(
+              model.config(),
+              weights,
+              Gemma4KvCache.create(model.config(), 8, 2),
+              experts,
+              batchOnlyKernel);
+      float[] input = new float[256];
+      for (int index = 0; index < input.length; index++) {
+        input[index] = (index - 128) * 0.0078125f;
+      }
+      MemorySegment matrix = MemorySegment.ofArray(q4KBlock(0.125f, 0.0625f, 7));
+      float[] expected = new float[1];
+      float[] actual = new float[1];
+      TensorOps.ggufMatmul(expected, input, matrix, GgufTensorType.Q4_K, 1, 256);
+
+      forwardPass.projectBatched(matrix, GgufTensorType.Q4_K, 1, 256, input, 1, actual);
+
+      assertThat(actual).containsExactly(expected);
+    }
+  }
+
   private static void assertClose(float[] actual, float[] expected) {
     assertThat(actual).hasSameSizeAs(expected);
     for (int index = 0; index < actual.length; index++) {
@@ -788,6 +849,21 @@ class Gemma4ForwardPassTest {
     System.arraycopy(first, 0, result, 0, first.length);
     System.arraycopy(second, 0, result, first.length, second.length);
     return result;
+  }
+
+  private static byte[] q4KBlock(float scale, float minScale, int quant) {
+    byte[] block = new byte[144];
+    ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+    buffer.putShort(0, Float.floatToFloat16(scale));
+    buffer.putShort(2, Float.floatToFloat16(minScale));
+    for (int group = 0; group < 4; group++) {
+      block[4 + group] = 1;
+    }
+    for (int group = 4; group < 8; group++) {
+      block[4 + group + 4] = 1;
+    }
+    Arrays.fill(block, 16, block.length, (byte) (quant | (quant << 4)));
+    return block;
   }
 
   private static final class FixtureBuilder {

@@ -198,8 +198,10 @@ final class Gemma4ForwardPass {
     int maxAttentionOutputDim = maxLength(attentionOutputs);
     int maxProjectionInput =
         Math.max(
-            Math.max(dim, maxAttentionOutputDim),
-            Math.max(config.sharedHiddenDim(), config.expertHiddenDim()));
+            256,
+            Math.max(
+                Math.max(dim, maxAttentionOutputDim),
+                Math.max(config.sharedHiddenDim(), config.expertHiddenDim())));
 
     this.state = new float[dim];
     this.normalized = new float[dim];
@@ -1304,7 +1306,7 @@ final class Gemma4ForwardPass {
         matrix.data(), matrix.type(), matrix.rows(), matrix.columns(), input, batchSize, output);
   }
 
-  private void projectBatched(
+  void projectBatched(
       MemorySegment matrix,
       GgufTensorType type,
       int rows,
@@ -1314,6 +1316,10 @@ final class Gemma4ForwardPass {
       float[] output) {
     if (batchedMatrixKernel.isEligible(type, batchSize, rows, columns)) {
       batchedMatrixKernel.multiply(output, input, matrix, type, batchSize, rows, columns);
+      return;
+    }
+    if (batchSize == 1) {
+      project(matrix, type, rows, columns, input, output);
       return;
     }
     if (type == GgufTensorType.F32) {
