@@ -102,6 +102,11 @@ class CertifiedRagEvidenceTest {
   private static final Path H2O_DANUBE2_1_8B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260726/rag/" + "h2o-danube2-1.8b-q4_k_m");
+  private static final Path H2O_DANUBE3_500M_Q4_K_M_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260803/rag/" + "h2o-danube3-500m-q4_k_m");
+  private static final Path H2O_DANUBE3_500M_Q4_K_M_DEFAULT_EVIDENCE =
+      H2O_DANUBE3_500M_Q4_K_M_EVIDENCE.resolve("default-correctness");
   private static final Path YI_CODER_1_5B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260726/rag/" + "yi-coder-1.5b-q4_k_m");
@@ -2014,6 +2019,108 @@ class CertifiedRagEvidenceTest {
               assertThat(comparison.decodeThroughputRatio()).isBetween(1.07, 1.08);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.26, 1.27);
             });
+  }
+
+  @Test
+  void h2oDanubeThree500MQualifiesAtTheProductionReadyTier() throws Exception {
+    RagBenchmarkReport baseline =
+        report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "models-rust-ffm-baseline.json");
+    RagBenchmarkReport candidate = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
+    RagBenchmarkReport llama = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "llama.cpp.json");
+    RagBenchmarkReport ollama = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "ollama.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
+
+    assertThat(candidate.backendVersion())
+        .startsWith("models@3d312534241dd80feee84d043c8727a874da9719 ");
+    assertThat(candidate.modelId()).isEqualTo("h2o_danube3_500m_chat_q4_k_m");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("021f78849c5670ecb2aa4cd7c5972eee0a3c9e41e33e5902c408a2ab989f0b43");
+    assertThat(candidate.artifactSizeBytes()).isEqualTo(317_877_408L);
+    assertThat(candidate.settings().workload()).isEqualTo(RagWorkload.GENERAL.id());
+    assertThat(candidate.settings().promptTemplate()).isEqualTo("h2o");
+    assertThat(candidate.summary().successfulAttempts()).isEqualTo(27);
+    assertThat(candidate.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(candidate.summary().retrievalRecall()).isEqualTo(1.0);
+    assertThat(candidate.summary().abstentionAccuracy()).isEqualTo(1.0);
+    assertThat(candidate.summary().ttftMillis().p95()).isLessThanOrEqualTo(1_000.0);
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(9);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(9.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.61, 0.62);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.23, 1.25);
+            });
+    assertThat(qualification.comparisons())
+        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(2.01, 2.03);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.42, 0.43);
+            });
+    assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v12");
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("model-architecture", "llama")
+        .containsEntry("native-quantized-decode", "true")
+        .containsEntry("native-kernel-threads", "8")
+        .containsEntry("native-kernel-abi", "4");
+    assertThat(candidate.backendDiagnostics().optimization("batched-prefill"))
+        .get()
+        .satisfies(
+            optimization ->
+                assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(baseline.settings()).isEqualTo(candidate.settings());
+    assertThat(baseline.runs())
+        .extracting(RagRun::promptSha256)
+        .containsExactlyElementsOf(candidate.runs().stream().map(RagRun::promptSha256).toList());
+    assertThat(baseline.runs())
+        .extracting(run -> run.grounding().rawText())
+        .containsExactlyElementsOf(
+            candidate.runs().stream().map(run -> run.grounding().rawText()).toList());
+    assertThat(baseline.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            candidate.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(baseline.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(candidate.runs().stream().map(RagRun::evaluation).toList());
+  }
+
+  @Test
+  void h2oDanubeThree500MPassesTheLibraryDefaultCorrectnessGate() throws Exception {
+    RagBenchmarkReport report =
+        report(H2O_DANUBE3_500M_Q4_K_M_DEFAULT_EVIDENCE, "models-rust-ffm.json");
+
+    assertThat(report.backendVersion())
+        .startsWith("models@3d312534241dd80feee84d043c8727a874da9719 ");
+    assertThat(report.modelId()).isEqualTo("h2oai_h2o_danube3_500m_chat_gguf_q4_k_m");
+    assertThat(report.artifactSha256())
+        .isEqualTo("021f78849c5670ecb2aa4cd7c5972eee0a3c9e41e33e5902c408a2ab989f0b43");
+    assertThat(report.settings().promptTemplate()).isEqualTo("h2o");
+    assertThat(report.settings().warmups()).isZero();
+    assertThat(report.settings().iterations()).isOne();
+    assertThat(report.settings().generationControls())
+        .containsEntry("promptCache", "longest-common-prefix");
+    assertThat(report.summary().totalAttempts()).isEqualTo(9);
+    assertThat(report.summary().successfulAttempts()).isEqualTo(9);
+    assertThat(report.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(report.summary().abstentionAccuracy()).isEqualTo(1.0);
+    assertThat(report.summary().totalCacheReadInputTokens()).isPositive();
+    assertThat(report.failures()).isEmpty();
+    assertThat(report.backendDiagnostics().environment())
+        .containsEntry("native-quantized-decode", "false")
+        .containsEntry("native-load-warmup", "false");
   }
 
   @Test

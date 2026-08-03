@@ -67,6 +67,9 @@ Ollama comparison:
 - **TinyLlama 1.1B Chat Q4_0** is `USABLE` for general guarded RAG. Its
   marker-selected Rust/FFM path reaches 108.9% of Ollama and 53.5% of
   llama.cpp decode throughput, with 9 of 9 retained model answers correct.
+- **H2O Danube3 500M Chat Q4_K_M** is `PRODUCTION_READY` for general guarded
+  RAG. Its Rust/FFM path reaches 201.9% of Ollama and 61.3% of llama.cpp
+  decode throughput, with 9 of 9 retained model answers correct.
 
 These are guarded, workload-specific qualifications, not claims of unrestricted
 question-answering quality. Every report preserves raw output, final grounded
@@ -74,18 +77,15 @@ output, decision type, artifact SHA-256, corpus SHA-256, workload ID, runtime
 controls, and same-host comparator evidence. Exact reports are under
 `benchmark-results/certified-20260724/rag/`,
 `benchmark-results/certified-20260725/rag/`, and
-`benchmark-results/certified-20260726/rag/`. The separate failed qualification
-record for Gemma 4 26B-A4B is under
-`benchmark-results/certified-20260802/rag/`; it does not increase the qualified
-artifact or identity counts.
-
-Gemma 4 26B-A4B Q4_K_M completed 27 of 27 requests correctly and retained 21
-of 21 correct model answers. It is not listed as qualified because its 3,793.7
-ms p95 TTFT exceeds the 2,000 ms usable ceiling.
+`benchmark-results/certified-20260726/rag/`. Gemma 4 qualification and default
+correctness evidence is under `benchmark-results/certified-20260802/rag/` and
+`benchmark-results/certified-20260803/rag/`; H2O Danube3 500M evidence is also
+under the latter path.
 
 Quantization variants are retained as independently qualified artifacts but do
-not increase the distinct-model launch count. The current launch count is
-therefore nineteen, not twenty-one.
+not increase the distinct-model launch count. The generated ModelJars
+qualification ledger is authoritative for the current published artifact and
+identity counts.
 
 The older Qwen3 framework and hosted-provider tables below remain useful
 historical diagnostics, but they predate cross-request KV reuse and the current
@@ -211,7 +211,28 @@ rejected because it was slower. The raw reports and executable evidence test
 are under
 `benchmark-results/certified-20260726/rag/gemma-3-1b-q4_k_m/`.
 
-## Gemma 4 26B-A4B Support And Qualification Attempt
+## H2O Danube3 500M Qualification
+
+The exact 317,877,408-byte H2O Danube3 500M Chat Q4_K_M artifact has SHA-256
+`021f78849c5670ecb2aa4cd7c5972eee0a3c9e41e33e5902c408a2ab989f0b43`.
+All rows ran sequentially on the same 8-vCPU EPYC-Milan host with one complete
+warmup and 27 measured requests.
+
+| Backend | Tier | p95 TTFT | Median decode | p95 end to end | Grounded quality |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Models Rust/FFM v12 | PRODUCTION_READY; qualified | 415.6 ms | 82.09 tok/s | 1,131.7 ms | 100% |
+| Ollama 0.32.0 | PRODUCTION_READY | 234.8 ms | 40.65 tok/s | 2,662.7 ms | 100% |
+| llama.cpp b10012 | PRODUCTION_READY | 437.6 ms | 134.00 tok/s | 913.6 ms | 100% |
+
+The canonical `h2o` prompt template retains nine correct model answers and
+clears the one-third contribution gate. An exploratory `h2o-direct` run
+retained only six model answers and was rejected, which is why the published
+configuration deliberately uses `h2o`. A separate default-settings smoke also
+passes all nine cases with native quantized decode disabled. Exact reports and
+the decision record are under
+`benchmark-results/certified-20260803/rag/h2o-danube3-500m-q4_k_m/`.
+
+## Gemma 4 26B-A4B Support And Qualification
 
 The exact 16,796,015,136-byte Gemma 4 26B-A4B Instruct Q4_K_M artifact has
 SHA-256
@@ -222,22 +243,21 @@ nine-case general workload, a 2,048-token context, 64-token output cap, the
 
 | Path | Requests | Tier | p95 TTFT | Median decode | p95 end to end | Grounded quality |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
-| Models Rust/FFM qualification run | 27 | OFFLINE | 3,793.7 ms | 10.86 tok/s | 6,497.5 ms | 100% |
+| Models Rust/FFM qualification run | 27 | USABLE; qualified | 1,834.7 ms | 12.84 tok/s | 4,503.1 ms | 100% |
 | Plain Java API integration | 9 | OFFLINE | 6,199.2 ms | 10.75 tok/s | 9,159.4 ms | 100% |
 | LangChain4j integration | 9 | OFFLINE | 5,902.8 ms | 10.83 tok/s | 8,871.7 ms | 100% |
 | Spring AI integration | 9 | OFFLINE | 6,175.1 ms | 10.87 tok/s | 9,127.2 ms | 100% |
 
-The standard run produced 21 validated model answers, three extractive
+The qualifying run produced 18 validated model answers, six extractive
 fallbacks, and three correct retrieval abstentions. Retrieval recall, MRR,
 fact coverage, citation recall and precision, abstention accuracy, and complete
 answer accuracy were all 1.0. Diagnostics record ABI 4, native plan
-`rust-ffm-v12`, eight persistent workers, mapped expert weights, and a 32-token
+`rust-ffm-v12`, eight persistent workers, mapped expert weights, and a 128-token
 Gemma 4 batched-prefill path.
 
-Support and framework integration therefore pass, but production qualification
-fails the absolute latency gate. No ModelJars performance profile is selected
-from this evidence. The retained JSON and transfer analysis explain the
-remaining gap without weakening the policy.
+Support, framework integration, default correctness, and production
+qualification therefore pass. The retained JSON and executable evidence tests
+preserve the exact artifact, settings, comparator bindings, and decision.
 
 ## What Acceptable Means
 
