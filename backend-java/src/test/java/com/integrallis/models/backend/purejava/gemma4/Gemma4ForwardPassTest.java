@@ -429,18 +429,24 @@ class Gemma4ForwardPassTest {
               Gemma4KvCache.create(model.config(), 8, 2),
               experts,
               batchOnlyKernel);
-      float[] input = new float[256];
-      for (int index = 0; index < input.length; index++) {
-        input[index] = (index - 128) * 0.0078125f;
+      float[] expectedInput = new float[256];
+      for (int index = 0; index < expectedInput.length; index++) {
+        expectedInput[index] = (index - 128) * 0.0078125f;
+      }
+      float[] oversizedInput = new float[128 * 256];
+      System.arraycopy(expectedInput, 0, oversizedInput, 0, expectedInput.length);
+      for (int index = expectedInput.length; index < oversizedInput.length; index++) {
+        oversizedInput[index] = 1.0f;
       }
       MemorySegment matrix = MemorySegment.ofArray(q4KBlock(0.125f, 0.0625f, 7));
       float[] expected = new float[1];
-      float[] actual = new float[1];
-      TensorOps.ggufMatmul(expected, input, matrix, GgufTensorType.Q4_K, 1, 256);
+      float[] actual = new float[128];
+      TensorOps.ggufMatmul(expected, expectedInput, matrix, GgufTensorType.Q4_K, 1, 256);
 
-      forwardPass.projectBatched(matrix, GgufTensorType.Q4_K, 1, 256, input, 1, actual);
+      forwardPass.projectBatched(matrix, GgufTensorType.Q4_K, 1, 256, oversizedInput, 1, actual);
 
-      assertThat(actual).containsExactly(expected);
+      assertThat(actual[0]).isEqualTo(expected[0]);
+      assertThat(Arrays.copyOfRange(actual, 1, actual.length)).containsOnly(0.0f);
     }
   }
 

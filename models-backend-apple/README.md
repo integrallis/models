@@ -5,7 +5,7 @@
 Java FFM bridge to Apple's on-device Foundation Models runtime.
 
 ```kotlin
-implementation("com.integrallis:backend-apple:0.2.4")
+implementation("com.integrallis:backend-apple:0.2.5")
 ```
 
 This module is intentionally separate from `backend-java`. The core

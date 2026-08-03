@@ -15,6 +15,7 @@ PROMPT_TEMPLATE=$4
 OUTPUT_DIR=${5:-"$ROOT_DIR/build/reports/rag/qualification/$MODEL_ID"}
 THREADS=${RAG_THREADS:-$(nproc)}
 NATIVE_THREADS=${RAG_NATIVE_THREADS:-$THREADS}
+MODELS_BACKEND=${RAG_MODELS_BACKEND:-rust-ffm}
 CONTEXT=${RAG_CONTEXT:-2048}
 MAX_TOKENS=${RAG_MAX_TOKENS:-64}
 STOP_SEQUENCE=${RAG_STOP_SEQUENCE:-}
@@ -25,6 +26,18 @@ LLAMA_PORT=${LLAMA_PORT:-18081}
 LLAMA_SERVER=${LLAMA_SERVER:-llama-server}
 OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://127.0.0.1:11434}
 NATIVE_LIBRARY=${MODELS_NATIVE_LIBRARY:-"$ROOT_DIR/backend-native/build/rust-target/release/libjmodels_kernels.so"}
+
+if [[ "$MODELS_BACKEND" != "pure-java" && "$MODELS_BACKEND" != "rust-ffm" ]]; then
+  echo "RAG_MODELS_BACKEND must be pure-java or rust-ffm" >&2
+  exit 2
+fi
+for option_source in JAVA_OPTS JAVA_TOOL_OPTIONS JDK_JAVA_OPTIONS _JAVA_OPTIONS; do
+  if [[ "${!option_source:-}" == *-Dmodels.* ]]; then
+    echo "$option_source must not contain Models tuning properties during qualification" >&2
+    echo "use RAG_TUNED_JAVA_OPTS for the performance phase" >&2
+    exit 2
+  fi
+done
 
 if [[ $(uname -s) != Linux ]]; then
   echo "controlled qualification currently requires Linux" >&2
@@ -112,12 +125,17 @@ assert_no_competing_inference_processes() {
   fi
 }
 
-"$ROOT_DIR/gradlew" \
-  --no-daemon \
-  -p "$ROOT_DIR" \
-  :backend-native:cargoBuildRelease \
+GRADLE_TASKS=(
   :models-rag-bench:installDist
-if [[ ! -f "$NATIVE_LIBRARY" ]]; then
+)
+if [[ "$MODELS_BACKEND" == "rust-ffm" ]]; then
+  GRADLE_TASKS=(
+    :backend-native:cargoBuildRelease
+    "${GRADLE_TASKS[@]}"
+  )
+fi
+"$ROOT_DIR/gradlew" --no-daemon -p "$ROOT_DIR" "${GRADLE_TASKS[@]}"
+if [[ "$MODELS_BACKEND" == "rust-ffm" && ! -f "$NATIVE_LIBRARY" ]]; then
   echo "Models native library not found: $NATIVE_LIBRARY" >&2
   exit 1
 fi
@@ -130,11 +148,11 @@ MODELS_COMMIT=$(git -C "$ROOT_DIR" rev-parse HEAD)
 VECTORS_VERSION=$(sed -n -E 's/^vectorsVersion[[:space:]]*=[[:space:]]*//p' "$ROOT_DIR/gradle.properties")
 MODELS_VERSION="models@$MODELS_COMMIT com.integrallis:vectors-core@$VECTORS_VERSION"
 
-export JAVA_OPTS="${JAVA_OPTS:-} --enable-native-access=ALL-UNNAMED"
-export JAVA_OPTS="$JAVA_OPTS -XX:ActiveProcessorCount=$THREADS"
-export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.library=$NATIVE_LIBRARY"
-export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.quantizedDecode=true"
-export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.threads=$NATIVE_THREADS"
+DEFAULT_JAVA_OPTS="${JAVA_OPTS:-} --enable-native-access=ALL-UNNAMED"
+DEFAULT_JAVA_OPTS="$DEFAULT_JAVA_OPTS -XX:ActiveProcessorCount=$THREADS"
+if [[ "$MODELS_BACKEND" == "rust-ffm" ]]; then
+  DEFAULT_JAVA_OPTS="$DEFAULT_JAVA_OPTS -Dmodels.native.kernels.library=$NATIVE_LIBRARY"
+fi
 
 COMMON_ARGS=(
   --framework plain-java
@@ -145,21 +163,96 @@ COMMON_ARGS=(
   --threads "$THREADS"
   --top-k 1
   --max-tokens "$MAX_TOKENS"
-  --warmups "$WARMUPS"
-  --iterations "$ITERATIONS"
 )
 if [[ -n "$STOP_SEQUENCE" ]]; then
   COMMON_ARGS+=(--stop-sequence "$STOP_SEQUENCE")
 fi
 
+# Correctness is qualified against the public library defaults before any
+# model- or host-specific performance properties are applied. One measured
+# iteration covers every case in the workload, including prefix-cache reuse.
+DEFAULT_CORRECTNESS_DIR="$OUTPUT_DIR/default-correctness"
+DEFAULT_REPORT="$DEFAULT_CORRECTNESS_DIR/models-$MODELS_BACKEND.json"
+mkdir -p "$DEFAULT_CORRECTNESS_DIR"
+export JAVA_OPTS="$DEFAULT_JAVA_OPTS"
 assert_no_competing_inference_processes
 drop_file_cache
 "$RAG_CLI" \
-  --backend rust-ffm \
+  --backend "$MODELS_BACKEND" \
   --backend-version "$MODELS_VERSION" \
   --model "$MODEL_PATH" \
-  --output "$OUTPUT_DIR/models-rust-ffm.json" \
-  "${COMMON_ARGS[@]}"
+  --output "$DEFAULT_REPORT" \
+  "${COMMON_ARGS[@]}" \
+  --warmups 0 \
+  --iterations 1
+
+if ! jq -e \
+  --arg backend "$MODELS_BACKEND" \
+  --arg model_id "$MODEL_ID" \
+  --arg artifact_sha "$MODEL_SHA" \
+  '.backend == $backend
+   and .modelId == $model_id
+   and .artifactSha256 == $artifact_sha
+   and .settings.warmups == 0
+   and .settings.iterations == 1
+   and .settings.generationControls.promptCache == "longest-common-prefix"
+   and .summary.totalAttempts > 0
+   and .summary.successfulAttempts == .summary.totalAttempts
+   and .summary.correctAnswerRate == 1
+   and .summary.abstentionAccuracy == 1
+   and (.failures | length) == 0' \
+  "$DEFAULT_REPORT" >/dev/null; then
+  echo "library-default correctness smoke failed: $DEFAULT_REPORT" >&2
+  exit 1
+fi
+if [[ "$MODELS_BACKEND" == "rust-ffm" ]] &&
+   ! jq -e '.backendDiagnostics.environment["native-quantized-decode"] == "false"' \
+     "$DEFAULT_REPORT" >/dev/null; then
+  echo "default smoke unexpectedly enabled models.native.quantizedDecode" >&2
+  exit 1
+fi
+DEFAULT_REPORT_SHA=$(sha256sum "$DEFAULT_REPORT" | awk '{print $1}')
+jq -n \
+  --arg backend "$MODELS_BACKEND" \
+  --arg model_id "$MODEL_ID" \
+  --arg artifact_sha "$MODEL_SHA" \
+  --arg report "default-correctness/models-$MODELS_BACKEND.json" \
+  --arg report_sha "$DEFAULT_REPORT_SHA" \
+  --argjson total_attempts "$(jq '.summary.totalAttempts' "$DEFAULT_REPORT")" \
+  '{schemaVersion: 1,
+    kind: "model-backend-default-correctness-smoke",
+    configuration: "library-defaults",
+    backend: $backend,
+    modelId: $model_id,
+    artifactSha256: $artifact_sha,
+    report: $report,
+    reportSha256: $report_sha,
+    totalAttempts: $total_attempts,
+    successfulAttempts: $total_attempts,
+    tuningSystemProperties: []}' \
+  >"$DEFAULT_CORRECTNESS_DIR/smoke.json"
+
+# Performance qualification is deliberately separate and may use explicitly
+# recorded tuning. It cannot compensate for a failed default-correctness smoke.
+export JAVA_OPTS="$DEFAULT_JAVA_OPTS"
+if [[ "$MODELS_BACKEND" == "rust-ffm" ]]; then
+  export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.quantizedDecode=true"
+  export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.threads=$NATIVE_THREADS"
+fi
+if [[ -n "${RAG_TUNED_JAVA_OPTS:-}" ]]; then
+  export JAVA_OPTS="$JAVA_OPTS $RAG_TUNED_JAVA_OPTS"
+fi
+
+assert_no_competing_inference_processes
+drop_file_cache
+"$RAG_CLI" \
+  --backend "$MODELS_BACKEND" \
+  --backend-version "$MODELS_VERSION" \
+  --model "$MODEL_PATH" \
+  --output "$OUTPUT_DIR/models-$MODELS_BACKEND.json" \
+  "${COMMON_ARGS[@]}" \
+  --warmups "$WARMUPS" \
+  --iterations "$ITERATIONS"
 
 if ! curl -fsS "$OLLAMA_ENDPOINT/api/version" >/dev/null 2>&1; then
   ollama serve >"$OUTPUT_DIR/ollama.log" 2>&1 &
@@ -199,7 +292,9 @@ drop_file_cache
   --endpoint "$OLLAMA_ENDPOINT" \
   --pid "$OLLAMA_PID" \
   --output "$OUTPUT_DIR/ollama.json" \
-  "${COMMON_ARGS[@]}"
+  "${COMMON_ARGS[@]}" \
+  --warmups "$WARMUPS" \
+  --iterations "$ITERATIONS"
 ollama stop "$OLLAMA_MODEL" >/dev/null
 
 assert_no_competing_inference_processes
@@ -237,16 +332,18 @@ LLAMA_VERSION=$("$LLAMA_SERVER" --version 2>&1 | head -n 1)
   --endpoint "http://127.0.0.1:$LLAMA_PORT" \
   --pid "$LLAMA_PID" \
   --output "$OUTPUT_DIR/llama.cpp.json" \
-  "${COMMON_ARGS[@]}"
+  "${COMMON_ARGS[@]}" \
+  --warmups "$WARMUPS" \
+  --iterations "$ITERATIONS"
 
 "$RAG_CLI" qualify \
-  --candidate "$OUTPUT_DIR/models-rust-ffm.json" \
+  --candidate "$OUTPUT_DIR/models-$MODELS_BACKEND.json" \
   --comparator "$OUTPUT_DIR/llama.cpp.json" \
   --comparator "$OUTPUT_DIR/ollama.json" \
   --output "$OUTPUT_DIR/qualification.json" \
   --require-qualified
 
-for report in models-rust-ffm.json llama.cpp.json ollama.json; do
+for report in "models-$MODELS_BACKEND.json" llama.cpp.json ollama.json; do
   report_sha=$(jq -r '.artifactSha256' "$OUTPUT_DIR/$report")
   if [[ "$report_sha" != "$MODEL_SHA" ]]; then
     echo "artifact mismatch in $report" >&2
@@ -254,4 +351,5 @@ for report in models-rust-ffm.json llama.cpp.json ollama.json; do
   fi
 done
 
-echo "qualified RAG evidence: $OUTPUT_DIR"
+echo "library-default correctness evidence: $DEFAULT_CORRECTNESS_DIR"
+echo "qualified tuned RAG evidence: $OUTPUT_DIR"

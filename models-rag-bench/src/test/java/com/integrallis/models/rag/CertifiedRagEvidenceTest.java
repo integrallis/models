@@ -108,6 +108,11 @@ class CertifiedRagEvidenceTest {
   private static final Path GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m");
+  private static final Path GEMMA_4_26B_A4B_Q4_K_M_DEFAULT_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve(
+              "benchmark-results/certified-20260803/rag/"
+                  + "gemma4-26b-a4b-q4_k_m/default-correctness");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -2109,6 +2114,31 @@ class CertifiedRagEvidenceTest {
         .satisfies(
             optimization ->
                 assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+  }
+
+  @Test
+  void gemma426BA4BPassesTheLibraryDefaultCorrectnessGate() throws Exception {
+    RagBenchmarkReport report =
+        report(GEMMA_4_26B_A4B_Q4_K_M_DEFAULT_EVIDENCE, "models-rust-ffm.json");
+
+    assertThat(report.backendVersion())
+        .startsWith("models@37dec2680637eb22b5ee59001e53af11d8d3946b ");
+    assertThat(report.modelId()).isEqualTo("ggml_org_gemma_4_26b_a4b_it_gguf_q4_k_m");
+    assertThat(report.artifactSha256())
+        .isEqualTo("88f4a13b0bb95f031a7fad973e10854122fb67ebc34d214d39a2f65053046abc");
+    assertThat(report.settings().warmups()).isZero();
+    assertThat(report.settings().iterations()).isOne();
+    assertThat(report.settings().generationControls())
+        .containsEntry("promptCache", "longest-common-prefix");
+    assertThat(report.summary().totalAttempts()).isEqualTo(9);
+    assertThat(report.summary().successfulAttempts()).isEqualTo(9);
+    assertThat(report.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(report.summary().abstentionAccuracy()).isEqualTo(1.0);
+    assertThat(report.summary().totalCacheReadInputTokens()).isPositive();
+    assertThat(report.failures()).isEmpty();
+    assertThat(report.backendDiagnostics().environment())
+        .containsEntry("native-quantized-decode", "false")
+        .containsEntry("native-load-warmup", "false");
   }
 
   private RagProductionQualification assertQualifiedMarkerEvidence(

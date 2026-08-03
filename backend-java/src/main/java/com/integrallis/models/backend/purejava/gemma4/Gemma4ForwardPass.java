@@ -31,7 +31,9 @@ import java.io.UncheckedIOException;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.IntConsumer;
 import java.util.stream.IntStream;
@@ -61,6 +63,10 @@ final class Gemma4ForwardPass {
   }
 
   private record F32Scratch(int rows, int columns, float[][] inputs, float[][] outputs) {}
+
+  private record ProjectionShape(int rows, int columns) {}
+
+  private record ProjectionScratch(float[] input, float[] output) {}
 
   private final Gemma4Config config;
   private final Gemma4Weights weights;
@@ -134,6 +140,7 @@ final class Gemma4ForwardPass {
   private final float[][] groupedExpertActivations;
   private final float[][] groupedExpertOutputs;
   private final F32Scratch[] batchF32Scratch;
+  private final Map<ProjectionShape, ProjectionScratch> singletonProjectionScratch;
 
   private float[] verificationLogits = new float[0];
   private float[] sessionBatchLogits = new float[0];
@@ -280,6 +287,7 @@ final class Gemma4ForwardPass {
         batchedPrefill
             ? createF32Scratch(config, weights, prefillBatchCapacity)
             : new F32Scratch[0];
+    this.singletonProjectionScratch = new HashMap<>();
   }
 
   /** Executes one token and returns stable logits. */
@@ -1319,7 +1327,17 @@ final class Gemma4ForwardPass {
       return;
     }
     if (batchSize == 1) {
-      project(matrix, type, rows, columns, input, output);
+      if (input.length == columns && output.length == rows) {
+        project(matrix, type, rows, columns, input, output);
+        return;
+      }
+      ProjectionScratch scratch =
+          singletonProjectionScratch.computeIfAbsent(
+              new ProjectionShape(rows, columns),
+              ignored -> new ProjectionScratch(new float[columns], new float[rows]));
+      System.arraycopy(input, 0, scratch.input(), 0, columns);
+      project(matrix, type, rows, columns, scratch.input(), scratch.output());
+      System.arraycopy(scratch.output(), 0, output, 0, rows);
       return;
     }
     if (type == GgufTensorType.F32) {
