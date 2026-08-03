@@ -214,10 +214,11 @@ public final class RagBenchmarkCli {
             runs.add(run);
             printTrial(iteration, configuration.iterations(), run);
           } catch (RuntimeException failure) {
-            failures.add(new RagBenchmarkFailure(iteration, testCase.id(), failure.toString()));
+            failures.add(
+                new RagBenchmarkFailure(iteration, testCase.id(), describeFailure(failure)));
             System.out.printf(
                 "iteration %d/%d case=%s failed: %s%n",
-                iteration + 1, configuration.iterations(), testCase.id(), failure);
+                iteration + 1, configuration.iterations(), testCase.id(), describeFailure(failure));
           }
         }
       }
@@ -257,6 +258,17 @@ public final class RagBenchmarkCli {
         RagPerformancePolicy.classify(summary.policyMetrics()),
         runs,
         failures);
+  }
+
+  private static String describeFailure(Throwable failure) {
+    StringBuilder description = new StringBuilder();
+    for (Throwable current = failure; current != null; current = current.getCause()) {
+      if (!description.isEmpty()) {
+        description.append("; caused by: ");
+      }
+      description.append(current);
+    }
+    return description.toString();
   }
 
   private static GenerationClient generationClient(RagBenchmarkConfiguration configuration) {
