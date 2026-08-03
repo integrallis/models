@@ -4,6 +4,13 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-08-02
+
+### Fixed
+
+- Fixed Gemma 4 native batched prefill when MoE routing assigns a single token
+  to a Q4_K expert projection by falling back to the Java projection kernel.
+
 ## [0.2.3] - 2026-08-02
 
 ### Added
