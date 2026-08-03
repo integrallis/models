@@ -511,6 +511,14 @@ Python environment is locked by `uv.lock`; the direct Python binding is labeled
 separately because its bundled llama.cpp revision may differ from the pinned
 server.
 
+`scripts/run-controlled-rag-qualification.sh` now writes two distinct classes
+of evidence. `default-correctness/` is an untuned, one-iteration smoke of every
+workload case for the exact Models backend; it must have no failures and 100%
+deterministic correctness. The reports at the qualification root are the
+separate, tuned performance comparison. A performance profile can improve a
+qualified deployment, but it cannot make a model/backend pair eligible when
+the public library defaults fail.
+
 Related framework references:
 
 - [LangChain4j RAG](https://docs.langchain4j.dev/tutorials/rag/)

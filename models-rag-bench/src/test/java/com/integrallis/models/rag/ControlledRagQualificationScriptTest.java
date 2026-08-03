@@ -25,8 +25,32 @@ import org.junit.jupiter.api.Test;
 class ControlledRagQualificationScriptTest {
 
   @Test
-  void permitsModelSpecificNativeDecodeThreadCountWithoutChangingComparatorThreads()
+  void gatesTunedQualificationOnLibraryDefaultCorrectness()
       throws IOException {
+    String script = Files.readString(qualificationScript());
+
+    assertThat(script)
+        .contains("DEFAULT_CORRECTNESS_DIR=\"$OUTPUT_DIR/default-correctness\"")
+        .contains("--warmups 0")
+        .contains("--iterations 1")
+        .contains(".settings.generationControls.promptCache == \"longest-common-prefix\"")
+        .contains(".summary.successfulAttempts == .summary.totalAttempts")
+        .contains("and (.failures | length) == 0")
+        .contains("tuningSystemProperties: []")
+        .contains("RAG_MODELS_BACKEND must be pure-java or rust-ffm")
+        .contains("for option_source in JAVA_OPTS JAVA_TOOL_OPTIONS JDK_JAVA_OPTIONS _JAVA_OPTIONS")
+        .contains("must not contain Models tuning properties during qualification");
+
+    int defaultRun = script.indexOf("--output \"$DEFAULT_REPORT\"");
+    int tunedProperty = script.indexOf("-Dmodels.native.quantizedDecode=true");
+    int tunedRun = script.indexOf("--output \"$OUTPUT_DIR/models-$MODELS_BACKEND.json\"");
+    assertThat(defaultRun).isPositive();
+    assertThat(tunedProperty).isGreaterThan(defaultRun);
+    assertThat(tunedRun).isGreaterThan(tunedProperty);
+  }
+
+  @Test
+  void permitsTunedNativeDecodeThreadCountWithoutChangingComparatorThreads() throws IOException {
     String script = Files.readString(qualificationScript());
 
     assertThat(script)

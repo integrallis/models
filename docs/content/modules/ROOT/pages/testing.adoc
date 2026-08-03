@@ -143,6 +143,18 @@ scripts/run-controlled-inference-benchmarks.sh
 scripts/run-controlled-rag-qualification.sh
 ----
 
+RAG qualification is ordered deliberately. The exact model/backend pair must
+first pass every workload case with library-default Models properties, one
+measured iteration, prefix-cache reuse, no generation failures, and perfect
+deterministic correctness. Only after that gate passes does the script enable
+recorded performance tuning and compare Models with Ollama and llama.cpp.
+Tuned evidence cannot qualify a pair that fails the default-correctness smoke.
+Set `RAG_MODELS_BACKEND` to `pure-java` or `rust-ffm`; do not put
+`-Dmodels.*` settings in `JAVA_OPTS` during a qualification run.
+
+The controlled inference script is a performance measurement harness. It does
+not replace the default-correctness gate in the RAG qualification script.
+
 Acceptance policy and reproduction details live in:
 
 * {url-models-github}/blob/main/INFERENCE_BENCHMARKS.md[Controlled inference benchmarks^]
