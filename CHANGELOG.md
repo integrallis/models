@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-08-03
+
+### Changed
+
+- Made the release qualification gate exercise the public default Gemma 4
+  runtime before any benchmark-only tuning and retain nested benchmark failures.
+
+### Fixed
+
+- Fixed singleton Gemma 4 routed-expert prefill projections by copying
+  capacity-sized batched buffers through exact-shape reusable scratch arrays.
+
 ## [0.2.4] - 2026-08-02
 
 ### Fixed
