@@ -2104,7 +2104,8 @@ class CertifiedRagEvidenceTest {
 
     assertThat(report.backendVersion())
         .startsWith("models@3d312534241dd80feee84d043c8727a874da9719 ");
-    assertThat(report.modelId()).isEqualTo("h2o_danube3_500m_chat_q4_k_m");
+    assertThat(report.modelId())
+        .isEqualTo("h2oai_h2o_danube3_500m_chat_gguf_q4_k_m");
     assertThat(report.artifactSha256())
         .isEqualTo("021f78849c5670ecb2aa4cd7c5972eee0a3c9e41e33e5902c408a2ab989f0b43");
     assertThat(report.settings().promptTemplate()).isEqualTo("h2o");
