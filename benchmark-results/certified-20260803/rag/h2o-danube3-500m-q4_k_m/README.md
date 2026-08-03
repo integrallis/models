@@ -46,6 +46,10 @@ one-third model-contribution gate, so it is not the published configuration.
 
 The tuned Models run enabled native quantized decode, eight native kernel
 workers, a 32-token prefill batch, and single-row attention score/value paths.
+`models-rust-ffm-baseline.json` repeats that exact profile for 27 requests; all
+prompt hashes, raw model outputs, grounding decisions, and evaluations match
+the qualified candidate byte for byte. This deterministic pair makes the
+artifact-bound profile safe for automatic ModelJars selection.
 `default-correctness/` separately proves the same artifact and template pass
 all nine cases with library defaults and native quantized decode disabled.
 `qualification.json` binds the tuned report to both comparator reports, and

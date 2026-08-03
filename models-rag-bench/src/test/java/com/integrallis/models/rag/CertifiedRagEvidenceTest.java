@@ -2023,6 +2023,8 @@ class CertifiedRagEvidenceTest {
 
   @Test
   void h2oDanubeThree500MQualifiesAtTheProductionReadyTier() throws Exception {
+    RagBenchmarkReport baseline =
+        report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "models-rust-ffm-baseline.json");
     RagBenchmarkReport candidate = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
     RagBenchmarkReport llama = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "llama.cpp.json");
     RagBenchmarkReport ollama = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "ollama.json");
@@ -2078,6 +2080,21 @@ class CertifiedRagEvidenceTest {
         .satisfies(
             optimization ->
                 assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(baseline.settings()).isEqualTo(candidate.settings());
+    assertThat(baseline.runs())
+        .extracting(RagRun::promptSha256)
+        .containsExactlyElementsOf(candidate.runs().stream().map(RagRun::promptSha256).toList());
+    assertThat(baseline.runs())
+        .extracting(run -> run.grounding().rawText())
+        .containsExactlyElementsOf(
+            candidate.runs().stream().map(run -> run.grounding().rawText()).toList());
+    assertThat(baseline.runs())
+        .extracting(run -> run.grounding().decision())
+        .containsExactlyElementsOf(
+            candidate.runs().stream().map(run -> run.grounding().decision()).toList());
+    assertThat(baseline.runs())
+        .extracting(RagRun::evaluation)
+        .containsExactlyElementsOf(candidate.runs().stream().map(RagRun::evaluation).toList());
   }
 
   @Test
