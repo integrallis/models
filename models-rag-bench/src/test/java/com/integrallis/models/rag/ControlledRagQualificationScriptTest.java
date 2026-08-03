@@ -25,8 +25,7 @@ import org.junit.jupiter.api.Test;
 class ControlledRagQualificationScriptTest {
 
   @Test
-  void gatesTunedQualificationOnLibraryDefaultCorrectness()
-      throws IOException {
+  void gatesTunedQualificationOnLibraryDefaultCorrectness() throws IOException {
     String script = Files.readString(qualificationScript());
 
     assertThat(script)
