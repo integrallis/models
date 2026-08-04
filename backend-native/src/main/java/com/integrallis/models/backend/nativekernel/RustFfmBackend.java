@@ -123,6 +123,11 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     return delegate.metadata();
   }
 
+  @Override
+  public int contextCapacity() {
+    return delegate.contextCapacity();
+  }
+
   /** Returns the Java transformer execution plan surrounding the native kernels. */
   public PureJavaExecutionPlan executionPlan() {
     return delegate.executionPlan();

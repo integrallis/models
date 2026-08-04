@@ -63,6 +63,16 @@ public final class GenerationLoop {
     return lastPromptCacheMetrics;
   }
 
+  /**
+   * Forgets the prompt-token view retained by the high-level generation path.
+   *
+   * <p>Package-level pipeline operations invoke this before changing backend context directly so a
+   * later generation never reuses a prefix that no longer describes the backend state.
+   */
+  void invalidatePromptCache() {
+    cachedPromptTokens = null;
+  }
+
   /** Generates text from a prompt, returning the complete generated string. */
   public String generate(String prompt, SamplingOptions options) {
     return generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options);

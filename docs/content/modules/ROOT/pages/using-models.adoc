@@ -32,6 +32,7 @@ architecture name.
 ----
 import static org.modeljars.catalog.Qwen3_0_6b_Q4_0.MODEL;
 
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import java.util.List;
@@ -43,7 +44,7 @@ try (var runtime = ModelJars.openRuntime(MODEL)) {
         .maxTokens(128)
         .build();
 
-    var prompt = runtime.chatTemplate().render(List.of(
+    ModelPrompt prompt = runtime.chatTemplate().render(List.of(
         ChatMessage.system("Classify the user's intent in one phrase."),
         ChatMessage.user("I want to cancel my order")));
 
@@ -137,15 +138,21 @@ dependencies {
 ----
 Path gguf = Path.of("/opt/models/private-model.gguf");
 
-try (var backend = PureJavaBackend.load(gguf)) {
-    var model = new RuntimeTextGenerationModel(backend);
-    String answer = model.generate(prompt, options);
+try (InferencePipeline pipeline =
+        new InferencePipeline(PureJavaBackend.load(gguf))) {
+    ModelMetadata metadata = pipeline.metadata();
+    Tokenizer tokenizer = pipeline.tokenizer();
+    InferenceContextWindow context = pipeline.contextWindow();
+    String answer = pipeline.generate(prompt, options);
 }
 ----
 
 This API intentionally accepts a filesystem path because Models cannot verify
 an unmanaged artifact against ModelJars metadata. Use `backend-native` and
-`RustFfmBackend.load(gguf)` for explicit native-kernel loading.
+`RustFfmBackend.load(gguf)` for explicit native-kernel loading. The pipeline
+owns and closes the supplied backend. See xref:inference-pipeline.adoc[Inference
+Pipeline] for structured tokenization, context capacity and position, prefill,
+forward-pass logits, checkpoint, and rewind.
 
 See xref:model-support.adoc[Model Support] for the qualification boundary,
 xref:execution-planning.adoc[Execution Planning] for profile selection, and
