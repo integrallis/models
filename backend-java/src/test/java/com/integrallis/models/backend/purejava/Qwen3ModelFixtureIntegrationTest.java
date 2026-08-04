@@ -86,7 +86,20 @@ class Qwen3ModelFixtureIntegrationTest {
                   ChatMessage.user("Reply with exactly: JAVA")));
       SamplingOptions sampling = SamplingOptions.builder().temperature(0.0f).maxTokens(16).build();
 
-      assertThat(pipeline.tokenize(prompt)).hasSize(30);
+      int[] promptTokens = pipeline.tokenize(prompt);
+      assertThat(promptTokens).hasSize(30);
+      assertThat(pipeline.contextWindow().capacity()).isEqualTo(INTEGRATION_CONTEXT_LENGTH);
+      assertThat(pipeline.contextWindow().position()).hasValue(0);
+
+      float[] logits = pipeline.prefill(prompt, 0);
+      int firstToken = argmax(logits);
+      assertThat(pipeline.tokenizer().decode(firstToken)).isEqualTo("JAVA");
+      assertThat(pipeline.contextWindow().position()).hasValue(promptTokens.length);
+
+      pipeline.forward(firstToken, promptTokens.length);
+      assertThat(pipeline.contextWindow().position()).hasValue(promptTokens.length + 1);
+      pipeline.resetContext();
+      assertThat(pipeline.contextWindow().position()).hasValue(0);
       assertThat(pipeline.generate(prompt, sampling)).isEqualTo("JAVA");
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
