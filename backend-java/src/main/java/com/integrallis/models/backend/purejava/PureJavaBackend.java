@@ -63,6 +63,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   private final GgufTokenizer tokenizer;
   private final PureJavaDecoder decoder;
   private final ModelMetadata modelMetadata;
+  private final int contextCapacity;
   private final PureJavaExecutionPlan executionPlan;
   private final BackendDiagnostics diagnostics;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
@@ -70,7 +71,10 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   private boolean closed;
 
   private record LoadedDecoder(
-      PureJavaDecoder decoder, ModelMetadata metadata, PureJavaExecutionPlan executionPlan) {}
+      PureJavaDecoder decoder,
+      ModelMetadata metadata,
+      int contextCapacity,
+      PureJavaExecutionPlan executionPlan) {}
 
   private static final class PureJavaInferenceSession implements InferenceSession {
     private final PureJavaBackend owner;
@@ -104,6 +108,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
       GgufTokenizer tokenizer,
       PureJavaDecoder decoder,
       ModelMetadata modelMetadata,
+      int contextCapacity,
       PureJavaExecutionPlan executionPlan,
       BackendDiagnostics diagnostics,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
@@ -111,6 +116,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     this.tokenizer = tokenizer;
     this.decoder = decoder;
     this.modelMetadata = modelMetadata;
+    this.contextCapacity = contextCapacity;
     this.executionPlan = executionPlan;
     this.diagnostics = diagnostics;
     this.batchedMatrixKernel = batchedMatrixKernel;
@@ -205,6 +211,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
           tokenizer,
           loaded.decoder(),
           loaded.metadata(),
+          loaded.contextCapacity(),
           loaded.executionPlan(),
           diagnostics,
           batchedMatrixKernel);
@@ -232,12 +239,9 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
             ModelTopology.from(modelFamily, config, weights),
             planConfiguration,
             batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength());
     KvCache cache =
-        new KvCache(
-            config.numLayers(),
-            runtimeContextLength(config.contextLength()),
-            config.keyDim(),
-            config.valueDim());
+        new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
     PureJavaDecoder decoder =
         new LlamaDecoder(
             new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel));
@@ -251,7 +255,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
             config.numLayers(),
             config.numHeads(),
             config.numKvHeads());
-    return new LoadedDecoder(decoder, metadata, executionPlan);
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
   }
 
   private static LoadedDecoder loadGemma4(
@@ -277,9 +281,10 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
             config.numLayers(),
             config.numHeads(),
             config.numKvHeads(0));
-    Gemma4Decoder decoder =
-        Gemma4Decoder.load(file, runtimeContextLength(config.contextLength()), batchedMatrixKernel);
-    return new LoadedDecoder(new Gemma4DecoderAdapter(decoder), metadata, executionPlan);
+    int contextCapacity = runtimeContextLength(config.contextLength());
+    Gemma4Decoder decoder = Gemma4Decoder.load(file, contextCapacity, batchedMatrixKernel);
+    return new LoadedDecoder(
+        new Gemma4DecoderAdapter(decoder), metadata, contextCapacity, executionPlan);
   }
 
   @Override
@@ -290,6 +295,11 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   @Override
   public ModelMetadata metadata() {
     return modelMetadata;
+  }
+
+  @Override
+  public int contextCapacity() {
+    return contextCapacity;
   }
 
   /** Returns the immutable execution plan selected while loading this model. */

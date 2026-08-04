@@ -22,8 +22,12 @@ import com.integrallis.models.backend.purejava.fixture.ModelFixtureDescriptor;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.InferencePipeline;
 import com.integrallis.models.runtime.SpeculativeGenerationOptions;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.nio.file.Files;
+import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -63,6 +67,43 @@ class Qwen3ModelFixtureIntegrationTest {
         "The quick brown fox",
         new int[] {785, 3974, 13876, 38835},
         new int[] {34208, 916, 279, 15678});
+  }
+
+  @Test
+  void structuredChatMlPipelineMatchesLlamaCppForQwen306BQ40() {
+    ModelFixtureDescriptor descriptor =
+        ModelFixtureRegistry.fromClasspath().resolve(QWEN3_0_6B_Q4_0).orElseThrow();
+    String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+
+    try (InferencePipeline pipeline =
+        new InferencePipeline(PureJavaBackend.load(descriptor.localPath().orElseThrow()))) {
+      var prompt =
+          ChatTemplate.CHATML_NO_THINK.render(
+              List.of(
+                  ChatMessage.system("Follow the user's output format exactly."),
+                  ChatMessage.user("Reply with exactly: JAVA")));
+      SamplingOptions sampling = SamplingOptions.builder().temperature(0.0f).maxTokens(16).build();
+
+      int[] promptTokens = pipeline.tokenize(prompt);
+      assertThat(promptTokens).hasSize(30);
+      assertThat(pipeline.contextWindow().capacity()).isEqualTo(INTEGRATION_CONTEXT_LENGTH);
+      assertThat(pipeline.contextWindow().position()).hasValue(0);
+
+      float[] logits = pipeline.prefill(prompt, 0);
+      int firstToken = argmax(logits);
+      assertThat(pipeline.tokenizer().decode(firstToken)).isEqualTo("JAVA");
+      assertThat(pipeline.contextWindow().position()).hasValue(promptTokens.length);
+
+      pipeline.forward(firstToken, promptTokens.length);
+      assertThat(pipeline.contextWindow().position()).hasValue(promptTokens.length + 1);
+      pipeline.resetContext();
+      assertThat(pipeline.contextWindow().position()).hasValue(0);
+      assertThat(pipeline.generate(prompt, sampling)).isEqualTo("JAVA");
+    } finally {
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+    }
   }
 
   @Test

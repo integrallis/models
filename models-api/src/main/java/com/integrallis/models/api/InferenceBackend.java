@@ -34,6 +34,17 @@ public interface InferenceBackend extends AutoCloseable {
   /** Returns metadata about the loaded model. */
   ModelMetadata metadata();
 
+  /**
+   * Returns the number of token positions allocated for this loaded inference context.
+   *
+   * <p>The active capacity can be smaller than {@link ModelMetadata#contextLength()} when runtime
+   * configuration intentionally caps memory use. Backends without a separate runtime limit inherit
+   * the model-declared context length.
+   */
+  default int contextCapacity() {
+    return metadata().contextLength();
+  }
+
   /** Returns the deterministic runtime decisions exposed by this backend. */
   default BackendDiagnostics diagnostics() {
     return BackendDiagnostics.unavailable(name());

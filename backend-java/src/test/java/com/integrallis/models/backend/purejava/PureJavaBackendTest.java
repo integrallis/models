@@ -271,6 +271,7 @@ class PureJavaBackendTest {
 
       try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
         assertThat(backend.metadata().contextLength()).isEqualTo(CONTEXT);
+        assertThat(backend.contextCapacity()).isEqualTo(4);
         for (int position = 0; position <= 3; position++) {
           assertThat(backend.forward(5, position)).hasSize(VOCAB_SIZE);
         }

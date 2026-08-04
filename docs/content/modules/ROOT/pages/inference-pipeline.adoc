@@ -1,0 +1,127 @@
+= Inference Pipeline
+:navtitle: Inference Pipeline
+
+`InferencePipeline` is the advanced Models API for applications that need more
+than complete-text generation. It owns one loaded backend and provides access
+to the tokenizer, model metadata, active context window, structured prompt
+encoding, prefill, forward-pass logits, reset, checkpoint, and rewind.
+
+The same object also implements `TextGenerationModel`, so an application can
+use low-level operations and the normal blocking or streaming generation API
+without maintaining two independent views of backend state.
+
+== Load a Pipeline
+
+Applications that manage their own GGUF file can load either Models backend:
+
+[source,java]
+----
+import com.integrallis.models.api.InferenceContextWindow;
+import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.InferencePipeline;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.nio.file.Path;
+import java.util.List;
+
+Path gguf = Path.of("/opt/models/private-model.gguf");
+
+try (InferencePipeline pipeline =
+        new InferencePipeline(PureJavaBackend.load(gguf))) {
+    ModelMetadata metadata = pipeline.metadata();
+    Tokenizer tokenizer = pipeline.tokenizer();
+    InferenceContextWindow context = pipeline.contextWindow();
+
+    ModelPrompt prompt = ChatTemplate.CHATML.render(
+        List.of(ChatMessage.user("Name one JVM language.")));
+    int[] tokens = pipeline.tokenize(prompt);
+
+    System.out.printf(
+        "%s: model context %,d; active capacity %,d%n",
+        metadata.modelName(), metadata.contextLength(), context.capacity());
+}
+----
+
+`InferencePipeline` owns the backend passed to its constructor. Closing the
+pipeline closes the mapped GGUF file, native resources, and inference context.
+Do not close or operate the backend separately after transferring it to the
+pipeline.
+
+`ModelMetadata.contextLength()` is the maximum declared by the model.
+`InferenceContextWindow.capacity()` is the number of positions allocated by
+the loaded backend. The latter can be smaller when
+`models.purejava.maxContextLength` caps runtime memory use.
+
+== Drive Inference Directly
+
+Structured prompts retain the boundary between template-owned control tokens
+and ordinary message text. Tokenize the `ModelPrompt` rather than flattening it
+to a `String`:
+
+[source,java]
+----
+pipeline.resetContext();
+
+ModelPrompt prompt = ChatTemplate.CHATML.render(
+    List.of(ChatMessage.user("Name one JVM language.")));
+int[] promptTokens = pipeline.tokenize(prompt);
+float[] logits = pipeline.prefill(promptTokens, 0);
+
+int nextToken = argmax(logits);
+String tokenText = pipeline.tokenizer().decode(nextToken);
+logits = pipeline.forward(nextToken, promptTokens.length);
+
+InferenceContextWindow afterStep = pipeline.contextWindow();
+System.out.println("next position: " + afterStep.position().orElseThrow());
+----
+
+`prefill` and `forward` return stable logits owned by the caller. The token ID
+passed to `forward` must be in the model vocabulary, and its position must be
+the next contiguous context position.
+
+The pipeline serializes state-changing operations. Calling `prefill`,
+`forward`, `resetContext`, or `rewind` invalidates the high-level generation
+prefix cache, preventing a later `generate` call from reusing stale context.
+
+== Checkpoint and Rewind
+
+The Java and Rust/FFM GGUF backends retain an exact token prefix and support
+rollback:
+
+[source,java]
+----
+if (pipeline.rewindable()) {
+    int acceptedPrefix = pipeline.checkpoint();
+
+    int candidate = chooseCandidate(logits);
+    pipeline.forward(candidate, acceptedPrefix);
+
+    // Reject the candidate and restore the accepted prefix.
+    pipeline.rewind(acceptedPrefix);
+}
+----
+
+`contextWindow().position()` reports the next token position when the active
+backend is rewindable. It is empty for a backend that cannot expose its current
+position. `remaining()` follows the same rule.
+
+== Use High-Level Generation
+
+The owning pipeline remains a normal text-generation model:
+
+[source,java]
+----
+ModelPrompt prompt = ChatTemplate.CHATML.render(
+    List.of(ChatMessage.user("Name one JVM language.")));
+
+String answer = pipeline.generate(prompt, options);
+----
+
+For qualified artifacts, ModelJars selects the proven chat template and
+backend rather than requiring an application to choose them. See
+xref:using-models.adoc[Using Models] for that entry point and
+xref:session-batching.adoc[Concurrent Session Batching] for several independent
+contexts sharing one loaded model.

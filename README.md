@@ -136,8 +136,8 @@ directly:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:models:0.2.5")
-    implementation("com.integrallis:backend-java:0.2.5") // or backend-native
+    implementation("com.integrallis:models:0.2.6")
+    implementation("com.integrallis:backend-java:0.2.6") // or backend-native
 }
 ```
 
@@ -145,7 +145,7 @@ Use Apple's on-device system model on a supported Apple Silicon Mac:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:backend-apple:0.2.5")
+    implementation("com.integrallis:backend-apple:0.2.6")
 }
 ```
 
@@ -165,7 +165,7 @@ var options = SamplingOptions.builder()
     .build();
 
 try (var runtime = ModelJars.openRuntime(MODEL)) {
-    var prompt = runtime.chatTemplate().render(List.of(
+    ModelPrompt prompt = runtime.chatTemplate().render(List.of(
         ChatMessage.system("Classify the user's intent in one phrase."),
         ChatMessage.user("I want to cancel my order")));
     String result = runtime.model().generate(prompt, options);
@@ -179,6 +179,9 @@ Applications that manage
 their own GGUF files can use the lower-level `PureJavaBackend.load(Path)` and
 `RustFfmBackend.load(Path)` APIs described in the
 [Using Models guide](https://integrallis.github.io/models/docs/models/current/using-models.html).
+Wrap either backend in `InferencePipeline` for ownership-safe access to the
+tokenizer, model metadata, active context window, structured prefill,
+forward-pass logits, reset, checkpoint, and rewind.
 
 Streaming uses the same loaded model:
 

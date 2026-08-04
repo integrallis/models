@@ -4,6 +4,16 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-08-04
+
+### Added
+
+- Added an owning `InferencePipeline` for coordinated access to structured
+  tokenization, model metadata, active context capacity and position, prefill,
+  forward-pass logits, reset, checkpoint, rewind, and high-level generation.
+- Exposed the runtime-allocated context capacity separately from the maximum
+  context length declared by model metadata.
+
 ## [0.2.5] - 2026-08-03
 
 ### Changed
