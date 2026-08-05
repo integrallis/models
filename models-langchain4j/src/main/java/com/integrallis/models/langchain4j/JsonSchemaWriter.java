@@ -23,7 +23,6 @@ import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
 import dev.langchain4j.model.chat.request.json.JsonNullSchema;
 import dev.langchain4j.model.chat.request.json.JsonNumberSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
-import dev.langchain4j.model.chat.request.json.JsonRawSchema;
 import dev.langchain4j.model.chat.request.json.JsonReferenceSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
@@ -58,9 +57,10 @@ final class JsonSchemaWriter {
   }
 
   private static void append(StringBuilder json, JsonSchemaElement schema) {
-    // JsonRawSchema is already JSON Schema text, so re-encoding it would only risk corrupting it.
-    if (schema instanceof JsonRawSchema raw) {
-      json.append(raw.schema());
+    // Already JSON Schema text, so re-encoding it would only risk corrupting it.
+    String raw = rawSchemaText(schema);
+    if (raw != null) {
+      json.append(raw);
       return;
     }
     json.append('{');
@@ -134,6 +134,25 @@ final class JsonSchemaWriter {
     first = appendField(json, first, "type", quoted(scalarType(schema)));
     appendDescription(json, first, description(schema));
     json.append('}');
+  }
+
+  /**
+   * Returns the verbatim text of a {@code JsonRawSchema}, or null for any other element.
+   *
+   * <p>Resolved reflectively rather than by type: {@code JsonRawSchema} arrived after LangChain4j
+   * 1.0.0, which this module still compiles against, so naming it directly breaks the oldest
+   * supported version.
+   */
+  private static String rawSchemaText(JsonSchemaElement schema) {
+    if (!"JsonRawSchema".equals(schema.getClass().getSimpleName())) {
+      return null;
+    }
+    try {
+      Object value = schema.getClass().getMethod("schema").invoke(schema);
+      return value instanceof String text ? text : null;
+    } catch (ReflectiveOperationException unavailable) {
+      return null;
+    }
   }
 
   private static String scalarType(JsonSchemaElement schema) {

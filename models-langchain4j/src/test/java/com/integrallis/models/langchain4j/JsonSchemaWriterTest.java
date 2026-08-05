@@ -23,8 +23,8 @@ import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
 import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
 import dev.langchain4j.model.chat.request.json.JsonNumberSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
-import dev.langchain4j.model.chat.request.json.JsonRawSchema;
 import dev.langchain4j.model.chat.request.json.JsonReferenceSchema;
+import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import java.util.List;
 import org.junit.jupiter.api.Nested;
@@ -105,11 +105,22 @@ class JsonSchemaWriterTest {
     }
 
     @Test
-    void passesRawSchemaThroughVerbatim() {
-      // A caller who already has JSON Schema text should get it back unaltered.
+    void passesRawSchemaThroughVerbatim() throws Exception {
+      // A caller who already has JSON Schema text should get it back unaltered. JsonRawSchema
+      // postdates LangChain4j 1.0.0, which this module still supports, so it is built reflectively
+      // and the case is skipped where the type does not exist.
       String raw = "{\"type\":\"object\",\"additionalProperties\":false}";
+      Class<?> rawSchemaType;
+      try {
+        rawSchemaType = Class.forName("dev.langchain4j.model.chat.request.json.JsonRawSchema");
+      } catch (ClassNotFoundException unsupported) {
+        org.junit.jupiter.api.Assumptions.abort("JsonRawSchema not available in this LangChain4j");
+        return;
+      }
+      JsonSchemaElement schema =
+          (JsonSchemaElement) rawSchemaType.getMethod("from", String.class).invoke(null, raw);
 
-      assertThat(JsonSchemaWriter.write(JsonRawSchema.from(raw))).isEqualTo(raw);
+      assertThat(JsonSchemaWriter.write(schema)).isEqualTo(raw);
     }
 
     @Test
