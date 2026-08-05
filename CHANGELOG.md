@@ -4,6 +4,48 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-05
+
+### Added
+
+- Added tool calling. `ToolSpec` and `ToolCall` describe declarations and
+  invocations without introducing a JSON dependency, because argument text is
+  carried verbatim rather than parsed. `ToolSyntax` records how each model family
+  expresses calls, taken from its published chat template, and drives both
+  rendering and recovery so no per-family parser is required. `ChatTemplate`
+  gained `render(messages, tools)`, `toolSyntax()`, `supportsTools()`, and
+  `canParseToolCalls()`.
+- Added tool-call recovery through `ToolCallScanner`, which strips markdown code
+  fences, accepts either the `arguments` or `parameters` spelling, and degrades
+  to plain text rather than failing a turn on malformed output.
+- Surfaced tool calls natively in both framework adapters: Spring AI through
+  `AssistantMessage.getToolCalls()`, and LangChain4j through
+  `AiMessage.toolExecutionRequests()` with `FinishReason.TOOL_EXECUTION`.
+- Added embedding support. `EmbeddingBackend` and `Pooling` define the contract,
+  `GgufEmbeddingBackend` implements it over the pure-Java forward pass, and both
+  the Llama-family and Gemma 4 decoders can now return the final normalized
+  hidden state instead of vocabulary logits. Producing an embedding skips the
+  vocabulary projection, so it costs less per token than generating one.
+- Added `ModelsSpringAiEmbeddingModel` and `ModelsEmbeddingModel`, letting a
+  Spring AI or LangChain4j application keep embeddings inside the JVM.
+- Added `Tokenizer.tokenId(String)` for resolving a token id from its exact
+  vocabulary text, needed because families disagree on the ids behind identical
+  tool-call delimiters.
+
+### Changed
+
+- **Breaking:** moved `EmbeddingBackend` from `com.integrallis.models.embedding`
+  to `com.integrallis.models.api`. It is a contract, and leaving it in
+  `models-embedding` would have forced every backend implementing it to depend on
+  `vectors-db`. No published artifact implemented it.
+- `ChatMessage` now carries `toolCalls`. Blank text remains invalid except on an
+  assistant turn consisting solely of a tool call. The two-argument constructor
+  and the factory methods are unchanged.
+- Replaced the sampler's full-vocabulary sort with a bounded-heap top-k
+  selection, measured at 19.251 ms to 0.848 ms per sampled token at a
+  151,936-token vocabulary. Tie-breaking still prefers the lower token id, so
+  seeded output is unchanged.
+
 ## [0.2.6] - 2026-08-04
 
 ### Added

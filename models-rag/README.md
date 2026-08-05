@@ -8,7 +8,7 @@ generation, then enforces source attribution, abstention, and extractive fallbac
 on the generated answer.
 
 ```kotlin
-implementation("com.integrallis:models-rag:0.2.6")
+implementation("com.integrallis:models-rag:0.3.0")
 ```
 
 ```java

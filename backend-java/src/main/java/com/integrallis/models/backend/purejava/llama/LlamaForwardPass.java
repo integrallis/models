@@ -334,7 +334,7 @@ public final class LlamaForwardPass {
    * call.
    */
   public float[] forwardTransient(int token, int position) {
-    return forwardInternal(token, position, true);
+    return forwardInternal(token, position, Head.LOGITS);
   }
 
   /** Processes prompt tokens while computing the vocabulary projection only for the final token. */
@@ -353,9 +353,49 @@ public final class LlamaForwardPass {
 
     int finalIndex = tokens.length - 1;
     for (int index = 0; index < finalIndex; index++) {
-      forwardInternal(tokens[index], Math.addExact(startPosition, index), false);
+      forwardInternal(tokens[index], Math.addExact(startPosition, index), Head.NONE);
     }
-    return forwardInternal(tokens[finalIndex], Math.addExact(startPosition, finalIndex), true);
+    return forwardInternal(
+        tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
+  }
+
+  /**
+   * Runs one step and returns the final normalized hidden state rather than logits.
+   *
+   * <p>This is the activation the vocabulary projection would consume. Omitting that projection is
+   * the entire saving — it is the widest matmul in the pass — which makes embedding strictly
+   * cheaper per token than generation on the same model.
+   *
+   * <p>The returned array is backend-owned scratch, valid until the next call. Copy it to keep it.
+   */
+  public float[] hiddenState(int token, int position) {
+    return forwardInternal(token, position, Head.HIDDEN);
+  }
+
+  /**
+   * Prefills a sequence and returns the hidden state of its final position.
+   *
+   * <p>Suits last-token pooling, which is what Qwen3-Embedding and most decoder-only embedding
+   * models use. Mean pooling is a caller-side loop over {@link #hiddenState(int, int)}: pooling is
+   * a property of the embedding model, not of the forward pass.
+   *
+   * <p>Deliberately walks tokens one at a time rather than using batched prefill, whose fast path
+   * is built around producing logits for the final token only.
+   */
+  public float[] prefillHiddenState(int[] tokens, int startPosition) {
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (startPosition < 0) {
+      throw new IllegalArgumentException("startPosition must be >= 0");
+    }
+    int finalIndex = tokens.length - 1;
+    for (int index = 0; index < finalIndex; index++) {
+      forwardInternal(tokens[index], Math.addExact(startPosition, index), Head.NONE);
+    }
+    return forwardInternal(
+        tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.HIDDEN);
   }
 
   /** Opens independent sequence state backed by the same loaded weights and execution plan. */
@@ -378,7 +418,7 @@ public final class LlamaForwardPass {
   /** Runs one independent session step using reusable logits storage. */
   public float[] forwardTransient(Session session, int token, int position) {
     requireSession(session);
-    return forwardSessionInternal(session, token, position, true);
+    return forwardSessionInternal(session, token, position, Head.LOGITS);
   }
 
   /** Prefills one independent session without changing the default sequence. */
@@ -402,10 +442,11 @@ public final class LlamaForwardPass {
 
     int finalIndex = tokens.length - 1;
     for (int index = 0; index < finalIndex; index++) {
-      forwardSessionInternal(session, tokens[index], Math.addExact(startPosition, index), false);
+      forwardSessionInternal(
+          session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
     }
     return forwardSessionInternal(
-        session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), true);
+        session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
   }
 
   /** Runs one decode token for each independent session and returns stable logits. */
@@ -421,7 +462,8 @@ public final class LlamaForwardPass {
     validateSessionBatch(sessions, tokens);
     if (sessions.length == 1) {
       ensureSessionBatchLogits(config.vocabSize());
-      float[] row = forwardSessionInternal(sessions[0], tokens[0], sessions[0].nextPosition, true);
+      float[] row =
+          forwardSessionInternal(sessions[0], tokens[0], sessions[0].nextPosition, Head.LOGITS);
       System.arraycopy(row, 0, sessionBatchLogits, 0, config.vocabSize());
       return new LogitBatch(1, config.vocabSize(), sessionBatchLogits);
     }
@@ -461,7 +503,7 @@ public final class LlamaForwardPass {
       int batchSize = Math.min(prefillBatchCapacity, tokens.length - tokenOffset);
       boolean finalBatch = tokenOffset + batchSize == tokens.length;
       if (batchSize == 1) {
-        return forwardInternal(tokens[tokenOffset], startPosition + tokenOffset, true);
+        return forwardInternal(tokens[tokenOffset], startPosition + tokenOffset, Head.LOGITS);
       }
       prefillBatch(
           tokens, tokenOffset, batchSize, startPosition + tokenOffset, finalBatch, null, 0);
@@ -921,23 +963,38 @@ public final class LlamaForwardPass {
     }
   }
 
-  private float[] forwardInternal(int token, int position, boolean computeLogits) {
-    float[] result = forwardSequenceInternal(token, position, computeLogits, cache, nextPosition);
+  /**
+   * What a forward step should produce.
+   *
+   * <p>This was a {@code boolean computeLogits}, which conflated two independent decisions: whether
+   * to project to the vocabulary, and whether the final layer's activation is needed at all. Prompt
+   * prefill discards that activation, which is why it can skip most of the last layer; embedding
+   * needs precisely that activation while skipping the projection. Three states, not two.
+   */
+  private enum Head {
+    /** Project to the vocabulary and return logits. */
+    LOGITS,
+    /** Discard the activation; only key/value state must reach the cache. */
+    NONE,
+    /** Return the final normalized hidden state without the vocabulary projection. */
+    HIDDEN
+  }
+
+  private float[] forwardInternal(int token, int position, Head head) {
+    float[] result = forwardSequenceInternal(token, position, head, cache, nextPosition);
     nextPosition++;
     return result;
   }
 
-  private float[] forwardSessionInternal(
-      Session session, int token, int position, boolean computeLogits) {
+  private float[] forwardSessionInternal(Session session, int token, int position, Head head) {
     float[] result =
-        forwardSequenceInternal(
-            token, position, computeLogits, session.cache, session.nextPosition);
+        forwardSequenceInternal(token, position, head, session.cache, session.nextPosition);
     session.nextPosition++;
     return result;
   }
 
   private float[] forwardSequenceInternal(
-      int token, int position, boolean computeLogits, KvCache sequenceCache, int expectedPosition) {
+      int token, int position, Head head, KvCache sequenceCache, int expectedPosition) {
     if (position != expectedPosition) {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + expectedPosition + ", got " + position);
@@ -964,8 +1021,9 @@ public final class LlamaForwardPass {
       // Attention norm
       TensorOps.rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
 
+      // Only safe when the activation is genuinely discarded; HIDDEN needs the full final layer.
       if (finalLayerKvOnlyPrefill
-          && !computeLogits
+          && head == Head.NONE
           && layerObserver == null
           && layer == config.numLayers() - 1) {
         finishFinalLayerKvOnlyToken(lw, layer, position, keyLength, numKvHeads, sequenceCache);
@@ -1069,8 +1127,10 @@ public final class LlamaForwardPass {
         x[i] += attnProjected[i];
       }
 
+      // Second pruning shortcut: the last layer's FFN cannot change a discarded activation.
+      // HIDDEN consumes that activation, so it must run the FFN.
       if (finalLayerPrefillPruning
-          && !computeLogits
+          && head == Head.NONE
           && layerObserver == null
           && layer == config.numLayers() - 1) {
         return null;
@@ -1111,14 +1171,19 @@ public final class LlamaForwardPass {
       }
     }
 
-    if (computeLogits) {
-      TensorOps.rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
-      matmulDispatch(
-          logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
-      softcapLogits(logits);
+    if (head == Head.NONE) {
+      return null;
     }
-
-    return computeLogits ? logits : null;
+    TensorOps.rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
+    if (head == Head.HIDDEN) {
+      // The normalized activation the vocabulary projection would consume. Skipping that matmul
+      // is the entire saving: it is the widest one in the pass.
+      return xNorm;
+    }
+    matmulDispatch(
+        logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+    softcapLogits(logits);
+    return logits;
   }
 
   /** Verifies a contiguous speculative continuation and returns logits for every consumed token. */
@@ -1154,7 +1219,8 @@ public final class LlamaForwardPass {
           batchedPrefill ? Math.min(prefillBatchCapacity, tokens.length - tokenOffset) : 1;
       if (batchSize == 1) {
         float[] row =
-            forwardInternal(tokens[tokenOffset], Math.addExact(startPosition, tokenOffset), true);
+            forwardInternal(
+                tokens[tokenOffset], Math.addExact(startPosition, tokenOffset), Head.LOGITS);
         System.arraycopy(row, 0, verificationLogits, tokenOffset * vocabSize, vocabSize);
       } else {
         prefillBatch(

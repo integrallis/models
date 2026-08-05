@@ -72,6 +72,24 @@ public interface Tokenizer {
    */
   String decode(int token);
 
+  /**
+   * Resolves a token id from its exact vocabulary text, or {@code -1} when no such token exists.
+   *
+   * <p>Tool-call delimiters have to be addressed by id rather than by string. Families disagree on
+   * the ids behind identical text — Hermes 2 and Hermes 3 swap the ids of {@code <tool_call>} and
+   * {@code </tool_call>} between releases — so the mapping can only be resolved against the loaded
+   * vocabulary.
+   *
+   * <p>Returning {@code -1} rather than throwing keeps callers on a fallback path instead of
+   * failing a request over a token the model simply does not define.
+   *
+   * @param text exact token text, as it appears in the vocabulary
+   * @return the token id, or {@code -1} if absent
+   */
+  default int tokenId(String text) {
+    return -1;
+  }
+
   /** Returns the vocabulary size. */
   int vocabSize();
 

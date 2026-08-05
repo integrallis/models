@@ -88,6 +88,38 @@ class GgufTokenizerTest {
     return new GgufMetadata(entries);
   }
 
+  @Nested
+  class TokenIdLookup {
+
+    @Test
+    void resolvesTokensByTheirExactVocabularyText() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
+
+      assertThat(tokenizer.tokenId("hello")).isEqualTo(11);
+      assertThat(tokenizer.tokenId("world")).isEqualTo(12);
+      assertThat(tokenizer.tokenId("<s>")).isEqualTo(14);
+      assertThat(tokenizer.tokenId("</s>")).isEqualTo(15);
+    }
+
+    @Test
+    void returnsMinusOneRatherThanThrowingForAbsentText() {
+      // Callers fall back rather than fail a request over a token the model does not define.
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
+
+      assertThat(tokenizer.tokenId("<tool_call>")).isEqualTo(-1);
+      assertThat(tokenizer.tokenId("")).isEqualTo(-1);
+      assertThat(tokenizer.tokenId(null)).isEqualTo(-1);
+    }
+
+    @Test
+    void agreesWithControlEncodingForSingleTokens() {
+      // The contract that matters: a token resolved by id is exactly what encodeControl emits.
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
+
+      assertThat(tokenizer.encodeControl("<s>")).containsExactly(tokenizer.tokenId("<s>"));
+    }
+  }
+
   private GgufMetadata createByteLevelMetadata() {
     return createByteLevelMetadata(false, false);
   }

@@ -19,8 +19,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.SamplingOptions;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -179,6 +182,107 @@ class SamplerTest {
       int fromBatch = new Sampler(options).sample(batch, 1, List.of(0, 1));
 
       assertThat(fromBatch).isEqualTo(fromArray);
+    }
+  }
+
+  @Nested
+  static class Selection {
+
+    @Test
+    void topKBoundaryPrefersLowerTokenIdsAmongTies() {
+      // All four tokens are equally likely; topK=2 must keep the two lowest ids.
+      float[] logits = {1.0f, 1.0f, 1.0f, 1.0f};
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(1.0f).topK(2).topP(1.0f).seed(42L).build();
+      Sampler sampler = new Sampler(options);
+
+      Set<Integer> sampled = new HashSet<>();
+      for (int index = 0; index < 200; index++) {
+        sampled.add(sampler.sample(logits, List.of()));
+      }
+
+      assertThat(sampled).isSubsetOf(Set.of(0, 1));
+    }
+
+    @Test
+    void matchesFullSortReferenceAcrossRandomInputs() {
+      Random generator = new Random(20260804L);
+      for (int trial = 0; trial < 500; trial++) {
+        int vocabulary = 2 + generator.nextInt(64);
+        float[] logits = new float[vocabulary];
+        for (int index = 0; index < vocabulary; index++) {
+          // Coarse values so ties occur often and exercise tie-breaking.
+          logits[index] = generator.nextInt(5) - 2.0f;
+        }
+        long seed = generator.nextLong();
+        SamplingOptions options =
+            SamplingOptions.builder()
+                .temperature(0.1f + generator.nextFloat() * 2.0f)
+                .topK(1 + generator.nextInt(vocabulary + 4))
+                .topP(0.05f + generator.nextFloat() * 0.94f)
+                .seed(seed)
+                .build();
+
+        int expected = fullSortReference(options, logits.clone(), new Random(seed));
+        int actual = new Sampler(options).sample(logits.clone(), List.of());
+
+        assertThat(actual).as("trial %d, vocabulary %d", trial, vocabulary).isEqualTo(expected);
+      }
+    }
+
+    /** Mirrors the original stable-full-sort implementation, as an oracle for the fast path. */
+    private static int fullSortReference(SamplingOptions options, float[] adjusted, Random rng) {
+      for (int index = 0; index < adjusted.length; index++) {
+        adjusted[index] /= options.temperature();
+      }
+      float max = Float.NEGATIVE_INFINITY;
+      for (float value : adjusted) {
+        if (value > max) max = value;
+      }
+      float sum = 0;
+      for (int index = 0; index < adjusted.length; index++) {
+        adjusted[index] = (float) Math.exp(adjusted[index] - max);
+        sum += adjusted[index];
+      }
+      for (int index = 0; index < adjusted.length; index++) {
+        adjusted[index] /= sum;
+      }
+
+      record TokenProb(int id, float prob) {}
+      List<TokenProb> sorted = new ArrayList<>(adjusted.length);
+      for (int index = 0; index < adjusted.length; index++) {
+        sorted.add(new TokenProb(index, adjusted[index]));
+      }
+      sorted.sort(Comparator.comparingDouble(TokenProb::prob).reversed());
+
+      int topK = Math.min(options.topK(), sorted.size());
+      sorted = new ArrayList<>(sorted.subList(0, topK));
+
+      float cumulative = 0;
+      int cutoff = sorted.size();
+      for (int index = 0; index < sorted.size(); index++) {
+        cumulative += sorted.get(index).prob();
+        if (cumulative >= options.topP()) {
+          cutoff = index + 1;
+          break;
+        }
+      }
+      sorted = new ArrayList<>(sorted.subList(0, cutoff));
+
+      float totalProb = 0;
+      for (TokenProb tokenProb : sorted) {
+        totalProb += tokenProb.prob();
+      }
+
+      float target = rng.nextFloat() * totalProb;
+      float accumulated = 0;
+      for (TokenProb tokenProb : sorted) {
+        accumulated += tokenProb.prob();
+        if (accumulated >= target) {
+          return tokenProb.id();
+        }
+      }
+      return sorted.getLast().id();
     }
   }
 

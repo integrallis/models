@@ -17,8 +17,6 @@ package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.SamplingOptions;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
@@ -93,46 +91,116 @@ public final class Sampler {
       adjusted[i] /= sum;
     }
 
-    // Build sorted index for top-k/top-p
-    List<TokenProb> sorted = new ArrayList<>(adjusted.length);
-    for (int i = 0; i < adjusted.length; i++) {
-      sorted.add(new TokenProb(i, adjusted[i]));
-    }
-    sorted.sort(Comparator.comparingDouble(TokenProb::prob).reversed());
-
-    // Top-K filtering
-    int topK = Math.min(options.topK(), sorted.size());
-    sorted = new ArrayList<>(sorted.subList(0, topK));
+    // Top-K selection. A bounded heap keeps this O(vocab log k) instead of sorting the whole
+    // vocabulary; at Qwen3's 151,936 tokens the full sort dominated per-token cost.
+    int topK = Math.min(options.topK(), adjusted.length);
+    int[] candidates = selectTopK(adjusted, topK);
 
     // Top-P (nucleus) filtering
     float cumulative = 0;
-    int cutoff = sorted.size();
-    for (int i = 0; i < sorted.size(); i++) {
-      cumulative += sorted.get(i).prob;
+    int cutoff = candidates.length;
+    for (int i = 0; i < candidates.length; i++) {
+      cumulative += adjusted[candidates[i]];
       if (cumulative >= options.topP()) {
         cutoff = i + 1;
         break;
       }
     }
-    sorted = new ArrayList<>(sorted.subList(0, cutoff));
 
     // Re-normalize
     float totalProb = 0;
-    for (TokenProb tp : sorted) {
-      totalProb += tp.prob;
+    for (int i = 0; i < cutoff; i++) {
+      totalProb += adjusted[candidates[i]];
     }
 
     // Sample from the filtered distribution
     float r = rng.nextFloat() * totalProb;
     float acc = 0;
-    for (TokenProb tp : sorted) {
-      acc += tp.prob;
+    for (int i = 0; i < cutoff; i++) {
+      acc += adjusted[candidates[i]];
       if (acc >= r) {
-        return tp.id;
+        return candidates[i];
       }
     }
 
-    return sorted.getLast().id;
+    return candidates[cutoff - 1];
+  }
+
+  /**
+   * Returns the {@code k} highest-probability token ids, most likely first.
+   *
+   * <p>Ties resolve to the lower token id, matching the stable descending sort this replaced. That
+   * ordering is observable: it decides which tokens survive the top-k cut and the top-p boundary,
+   * so seeded runs stay reproducible.
+   */
+  private static int[] selectTopK(float[] probabilities, int k) {
+    int[] heap = new int[k];
+    int size = 0;
+    for (int id = 0; id < probabilities.length; id++) {
+      if (size < k) {
+        heap[size] = id;
+        siftUp(heap, probabilities, size);
+        size++;
+      } else if (isWorse(probabilities, heap[0], id)) {
+        heap[0] = id;
+        siftDown(heap, probabilities, size);
+      }
+    }
+    // The root is the weakest survivor, so draining it fills the result back to front.
+    int count = size;
+    int[] ordered = new int[count];
+    for (int index = count - 1; index >= 0; index--) {
+      ordered[index] = heap[0];
+      heap[0] = heap[size - 1];
+      size--;
+      siftDown(heap, probabilities, size);
+    }
+    return ordered;
+  }
+
+  /** Strict order over token ids: lower probability is worse, and ties prefer the lower id. */
+  private static boolean isWorse(float[] probabilities, int left, int right) {
+    if (probabilities[left] != probabilities[right]) {
+      return probabilities[left] < probabilities[right];
+    }
+    return left > right;
+  }
+
+  private static void siftUp(int[] heap, float[] probabilities, int index) {
+    while (index > 0) {
+      int parent = (index - 1) >>> 1;
+      if (!isWorse(probabilities, heap[index], heap[parent])) {
+        break;
+      }
+      swap(heap, index, parent);
+      index = parent;
+    }
+  }
+
+  private static void siftDown(int[] heap, float[] probabilities, int size) {
+    int index = 0;
+    while (true) {
+      int left = 2 * index + 1;
+      if (left >= size) {
+        break;
+      }
+      int weakest = left;
+      int right = left + 1;
+      if (right < size && isWorse(probabilities, heap[right], heap[left])) {
+        weakest = right;
+      }
+      if (!isWorse(probabilities, heap[weakest], heap[index])) {
+        break;
+      }
+      swap(heap, index, weakest);
+      index = weakest;
+    }
+  }
+
+  private static void swap(int[] heap, int left, int right) {
+    int value = heap[left];
+    heap[left] = heap[right];
+    heap[right] = value;
   }
 
   private static int argmax(float[] arr) {
@@ -144,6 +212,4 @@ public final class Sampler {
     }
     return best;
   }
-
-  private record TokenProb(int id, float prob) {}
 }

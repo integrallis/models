@@ -20,13 +20,19 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
+import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.models.runtime.chat.ToolCallScanner;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import dev.langchain4j.model.output.FinishReason;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -76,24 +82,25 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     Objects.requireNonNull(handler, "handler");
     StringBuilder accumulated = new StringBuilder();
     AtomicBoolean terminalSignalSent = new AtomicBoolean();
+    // A tool call means nothing until it is complete, and its delimiters are not user-facing text.
+    // So when tools are declared, deltas are withheld and the result is delivered once, whole.
+    boolean toolsDeclared = !LangChain4jChatRequestMapper.tools(request).isEmpty();
     TokenStream stream =
         new TokenStream() {
           @Override
           public void onToken(String token) {
             if (!terminalSignalSent.get()) {
               accumulated.append(token);
-              handler.onPartialResponse(token);
+              if (!toolsDeclared) {
+                handler.onPartialResponse(token);
+              }
             }
           }
 
           @Override
           public void onComplete() {
             if (terminalSignalSent.compareAndSet(false, true)) {
-              handler.onCompleteResponse(
-                  ChatResponse.builder()
-                      .aiMessage(AiMessage.from(accumulated.toString()))
-                      .modelName(model.modelName())
-                      .build());
+              handler.onCompleteResponse(completed(accumulated.toString(), toolsDeclared));
             }
           }
 
@@ -117,5 +124,33 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
         throw failure;
       }
     }
+  }
+
+  /** Builds the terminal response, recovering any tool calls the model produced. */
+  private ChatResponse completed(String output, boolean toolsDeclared) {
+    ToolCallScanner.Result scan =
+        toolsDeclared
+            ? ToolCallScanner.scan(output, template.toolSyntax())
+            : ToolCallScanner.Result.plainText(output);
+    if (!scan.hasCalls()) {
+      return ChatResponse.builder()
+          .aiMessage(AiMessage.from(scan.content()))
+          .modelName(model.modelName())
+          .build();
+    }
+    List<ToolExecutionRequest> requests = new ArrayList<>(scan.toolCalls().size());
+    for (ToolCall call : scan.toolCalls()) {
+      requests.add(
+          ToolExecutionRequest.builder()
+              .id(call.id())
+              .name(call.name())
+              .arguments(call.argumentsJson())
+              .build());
+    }
+    return ChatResponse.builder()
+        .aiMessage(new AiMessage(scan.content(), requests))
+        .finishReason(FinishReason.TOOL_EXECUTION)
+        .modelName(model.modelName())
+        .build();
   }
 }

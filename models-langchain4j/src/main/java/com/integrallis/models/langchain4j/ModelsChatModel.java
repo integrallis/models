@@ -19,12 +19,18 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.models.runtime.chat.ToolCallScanner;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.output.FinishReason;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /** LangChain4J {@link ChatModel} backed by the models runtime generation loop. */
@@ -66,15 +72,51 @@ public final class ModelsChatModel implements ChatModel {
     return model.diagnostics();
   }
 
+  /**
+   * Whether this model can take part in tool calling.
+   *
+   * <p>Narrower than "the family has a tool format". Gemma 4 and MiniCPM5 do, but encode arguments
+   * as tagged pairs the runtime cannot yet turn into JSON without the declared schemas.
+   */
+  public boolean supportsTools() {
+    return template.canParseToolCalls();
+  }
+
   @Override
   public ChatResponse doChat(ChatRequest request) {
     Objects.requireNonNull(request, "request");
+    boolean toolsDeclared = !LangChain4jChatRequestMapper.tools(request).isEmpty();
     String output =
         model.generate(
             LangChain4jChatRequestMapper.prompt(request, template),
             LangChain4jChatRequestMapper.options(request, defaults));
+
+    // Without declared tools, output that merely resembles a call is ordinary text.
+    ToolCallScanner.Result scan =
+        toolsDeclared
+            ? ToolCallScanner.scan(output, template.toolSyntax())
+            : ToolCallScanner.Result.plainText(output);
+    if (!scan.hasCalls()) {
+      return ChatResponse.builder()
+          .aiMessage(AiMessage.from(scan.content()))
+          .modelName(model.modelName())
+          .build();
+    }
+
+    List<ToolExecutionRequest> requests = new ArrayList<>(scan.toolCalls().size());
+    for (ToolCall call : scan.toolCalls()) {
+      requests.add(
+          ToolExecutionRequest.builder()
+              .id(call.id())
+              .name(call.name())
+              .arguments(call.argumentsJson())
+              .build());
+    }
+    // LangChain4j drives its tool loop off the finish reason; Spring AI 2.0 keys on the message
+    // carrying calls instead, so this has to be set explicitly here and not there.
     return ChatResponse.builder()
-        .aiMessage(AiMessage.from(output))
+        .aiMessage(new AiMessage(scan.content(), requests))
+        .finishReason(FinishReason.TOOL_EXECUTION)
         .modelName(model.modelName())
         .build();
   }

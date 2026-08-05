@@ -18,6 +18,7 @@ package com.integrallis.models.embedding;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.EmbeddingBackend;
 import com.integrallis.vectors.core.SimilarityFunction;
 import com.integrallis.vectors.db.IndexType;
 import com.integrallis.vectors.db.SearchRequest;

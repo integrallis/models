@@ -68,6 +68,21 @@ final class Gemma4DecoderAdapter implements PureJavaDecoder {
   }
 
   @Override
+  public float[] prefillHiddenState(int[] tokens, int startPosition) {
+    return decoder.prefillHiddenState(tokens, startPosition);
+  }
+
+  @Override
+  public float[] hiddenState(int token, int position) {
+    return decoder.hiddenState(token, position);
+  }
+
+  @Override
+  public boolean supportsHiddenState() {
+    return true;
+  }
+
+  @Override
   public Session openSession() {
     return new Gemma4Session(decoder.openSession());
   }

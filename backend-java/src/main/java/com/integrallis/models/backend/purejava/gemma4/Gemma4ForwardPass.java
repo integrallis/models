@@ -305,6 +305,53 @@ final class Gemma4ForwardPass {
     return prefill(defaultSession, tokens, startPosition);
   }
 
+  /**
+   * What a forward step should produce.
+   *
+   * <p>Mirrors the Llama path so both architectures answer one backend contract. Unlike that path,
+   * no layer work is skipped for {@link Head#NONE} here — every layer runs regardless — so this
+   * only selects what happens at the head.
+   */
+  private enum Head {
+    /** Project to the vocabulary and return logits. */
+    LOGITS,
+    /** Discard the activation; only key/value state must reach the cache. */
+    NONE,
+    /** Return the final normalized hidden state without the vocabulary projection. */
+    HIDDEN
+  }
+
+  /**
+   * Evaluates a prompt and returns the final position's hidden state.
+   *
+   * <p>Walks tokens one at a time rather than using batched prefill, whose fast path is built
+   * around producing logits for the final token only.
+   */
+  float[] prefillHiddenState(int[] tokens, int startPosition) {
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    Session sequence = defaultSession;
+    if (startPosition != sequence.nextPosition) {
+      throw new IllegalArgumentException(
+          "position must be sequential: expected "
+              + sequence.nextPosition
+              + ", got "
+              + startPosition);
+    }
+    for (int index = 0; index < tokens.length - 1; index++) {
+      forwardInternal(sequence, tokens[index], startPosition + index, Head.NONE);
+    }
+    return forwardInternal(
+        sequence, tokens[tokens.length - 1], startPosition + tokens.length - 1, Head.HIDDEN);
+  }
+
+  /** Executes one token and returns its hidden state rather than logits. */
+  float[] hiddenState(int token, int position) {
+    return forwardInternal(defaultSession, token, position, Head.HIDDEN);
+  }
+
   /** Opens independent sequence state backed by the same weights and expert cache. */
   Session openSession() {
     return new Session(this, Gemma4KvCache.create(config, defaultSession.cache.maxSeqLen(), 1));
@@ -327,7 +374,7 @@ final class Gemma4ForwardPass {
 
   /** Executes one token for an independent session using reusable logits storage. */
   float[] forwardTransient(Session session, int token, int position) {
-    return forwardInternal(requireSession(session), token, position, true);
+    return forwardInternal(requireSession(session), token, position, Head.LOGITS);
   }
 
   /** Evaluates a prompt without changing the graph's default sequence. */
@@ -352,10 +399,10 @@ final class Gemma4ForwardPass {
       return prefillBatched(sequence, tokens, startPosition);
     }
     for (int index = 0; index < tokens.length - 1; index++) {
-      forwardInternal(sequence, tokens[index], startPosition + index, false);
+      forwardInternal(sequence, tokens[index], startPosition + index, Head.NONE);
     }
     return forwardInternal(
-            sequence, tokens[tokens.length - 1], startPosition + tokens.length - 1, true)
+            sequence, tokens[tokens.length - 1], startPosition + tokens.length - 1, Head.LOGITS)
         .clone();
   }
 
@@ -374,7 +421,7 @@ final class Gemma4ForwardPass {
     }
     for (int index = 0; index < sessions.length; index++) {
       Session session = sessions[index];
-      float[] row = forwardInternal(session, tokens[index], session.nextPosition, true);
+      float[] row = forwardInternal(session, tokens[index], session.nextPosition, Head.LOGITS);
       System.arraycopy(row, 0, sessionBatchLogits, index * vocabSize, vocabSize);
     }
     return new LogitBatch(sessions.length, vocabSize, sessionBatchLogits);
@@ -408,7 +455,8 @@ final class Gemma4ForwardPass {
       verificationLogits = new float[resultLength];
     }
     for (int index = 0; index < tokens.length; index++) {
-      float[] row = forwardInternal(defaultSession, tokens[index], startPosition + index, true);
+      float[] row =
+          forwardInternal(defaultSession, tokens[index], startPosition + index, Head.LOGITS);
       System.arraycopy(row, 0, verificationLogits, index * vocabSize, vocabSize);
     }
     return new LogitBatch(tokens.length, vocabSize, verificationLogits);
@@ -447,8 +495,7 @@ final class Gemma4ForwardPass {
     sequence.nextPosition = 0;
   }
 
-  private float[] forwardInternal(
-      Session sequence, int token, int position, boolean computeLogits) {
+  private float[] forwardInternal(Session sequence, int token, int position, Head head) {
     if (position != sequence.nextPosition) {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + sequence.nextPosition + ", got " + position);
@@ -469,11 +516,16 @@ final class Gemma4ForwardPass {
       throw failure;
     }
 
-    if (!computeLogits) {
+    if (head == Head.NONE) {
       return null;
     }
     TensorOps.rmsNorm(
         normalized, state, weights.outputNorm(), config.embeddingDim(), config.rmsNormEps());
+    if (head == Head.HIDDEN) {
+      // The activation the vocabulary projection would consume. Unlike the Llama path there are
+      // no final-layer prefill shortcuts here, so every layer has already run.
+      return normalized;
+    }
     project(
         weights.tokenEmbedding(),
         weights.tokenEmbeddingType(),
@@ -491,7 +543,10 @@ final class Gemma4ForwardPass {
       int batchSize = Math.min(prefillBatchCapacity, tokens.length - tokenOffset);
       if (batchSize == 1) {
         return forwardInternal(
-                sequence, tokens[tokenOffset], Math.addExact(startPosition, tokenOffset), true)
+                sequence,
+                tokens[tokenOffset],
+                Math.addExact(startPosition, tokenOffset),
+                Head.LOGITS)
             .clone();
       }
       int batchStartPosition = Math.addExact(startPosition, tokenOffset);
