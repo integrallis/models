@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.embedding;
+package com.integrallis.models.api;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,9 +22,9 @@ import java.util.Objects;
 /**
  * Embedding model SPI that produces fixed-dimension float vectors.
  *
- * <p>Distinct from {@code com.integrallis.models.api.InferenceBackend}: that SPI runs a generative
- * forward pass (token in → logits out). This SPI is for embedding models — input text in, fixed
- * sentence-level vector out — which has different lifecycle and batching semantics.
+ * <p>Distinct from {@link InferenceBackend}: that SPI runs a generative forward pass (token in →
+ * logits out). This SPI is for embedding models — input text in, fixed sentence-level vector out —
+ * which has different lifecycle and batching semantics.
  *
  * <h2>Vector ownership</h2>
  *

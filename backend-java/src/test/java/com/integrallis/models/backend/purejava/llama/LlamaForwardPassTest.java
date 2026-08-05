@@ -485,6 +485,120 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void hiddenStateHasEmbeddingWidthNotVocabularyWidth() {
+      // The whole point of the embedding path: skip the vocabulary projection, which is both the
+      // widest matmul in the pass and meaningless for a sentence vector.
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass forwardPass =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+
+      float[] hidden = forwardPass.hiddenState(1, 0);
+
+      assertThat(hidden).hasSize(DIM);
+      assertThat(DIM).isNotEqualTo(VOCAB_SIZE);
+    }
+
+    @Test
+    void hiddenStateIsDeterministicAndInputDependent() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+
+      float[] first = freshPass(config, weights).hiddenState(5, 0);
+      float[] repeat = freshPass(config, weights).hiddenState(5, 0);
+      float[] other = freshPass(config, weights).hiddenState(9, 0);
+
+      assertThat(first).containsExactly(repeat);
+      assertThat(first).isNotEqualTo(other);
+    }
+
+    @Test
+    void hiddenStateRunsTheFinalLayerRatherThanTheKeyValueOnlyShortcut() {
+      // Prefill skips the last layer's attention output and FFN when logits are discarded. The
+      // embedding path needs exactly that discarded activation, so it must not take the shortcut:
+      // if it did, this would come back null or all-zero.
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+
+      float[] hidden = freshPass(config, weights).prefillHiddenState(new int[] {5, 7, 11}, 0);
+
+      assertThat(hidden).hasSize(DIM);
+      assertThat(hidden).isNotNull();
+      boolean allZero = true;
+      for (float value : hidden) {
+        assertThat(Float.isFinite(value)).isTrue();
+        if (value != 0.0f) {
+          allZero = false;
+        }
+      }
+      assertThat(allZero).isFalse();
+    }
+
+    @Test
+    void prefillHiddenStateMatchesSteppingTokenAtATime() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13};
+
+      LlamaForwardPass stepwise = freshPass(config, weights);
+      float[] expected = null;
+      for (int index = 0; index < tokens.length; index++) {
+        expected = stepwise.hiddenState(tokens[index], index);
+      }
+
+      float[] actual = freshPass(config, weights).prefillHiddenState(tokens, 0);
+
+      assertThat(actual).containsExactly(expected);
+    }
+
+    @Test
+    void hiddenStateLeavesTheSequenceUsableForGeneration() {
+      // Embedding a prompt must advance cache state exactly like an ordinary prefill, so a caller
+      // can keep generating afterwards.
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11};
+
+      LlamaForwardPass forwardPass = freshPass(config, weights);
+      forwardPass.prefillHiddenState(tokens, 0);
+
+      assertThat(forwardPass.forward(17, tokens.length)).hasSize(VOCAB_SIZE);
+    }
+
+    @Test
+    void logitsPathIsUnchangedByTheEmbeddingPath() {
+      // Regression guard for the shared internal switch: asking for a hidden state must not alter
+      // what the logits path produces for the same input.
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13};
+
+      float[] before = freshPass(config, weights).prefill(tokens, 0);
+      freshPass(config, weights).prefillHiddenState(tokens, 0);
+      float[] after = freshPass(config, weights).prefill(tokens, 0);
+
+      assertThat(after).containsExactly(before);
+    }
+
+    private LlamaForwardPass freshPass(LlamaConfig config, LlamaWeights weights) {
+      return new LlamaForwardPass(
+          config,
+          weights,
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+    }
+
+    @Test
     void q4PrefillUsesBatchedKernelAndPreservesAutoregressiveState() {
       GgufFile file = buildQ4NanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
@@ -1422,7 +1536,6 @@ class LlamaForwardPassTest {
       assertThat(weights.layer(0).wvType()).isEqualTo(GgufTensorType.Q6_K);
       assertThat(weights.layer(0).woType()).isEqualTo(GgufTensorType.Q6_K);
       assertThat(weights.layer(0).ffnDownType()).isEqualTo(GgufTensorType.Q6_K);
-
       LlamaForwardPass sequential =
           new LlamaForwardPass(
               config,
@@ -1440,9 +1553,18 @@ class LlamaForwardPassTest {
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
-      assertThat(actual).containsExactly(expected);
-      assertThat(batched.forward(3, tokens.length))
-          .containsExactly(sequential.forward(3, tokens.length));
+      // Sequential and batched prefill are differently shaped float reductions, so bit-exact
+      // equality is not something the platform offers here: Vector API lane reductions have
+      // implementation-defined ordering, and the C2-intrinsified path can differ from the
+      // non-intrinsified one by an ULP. Verified by running this class under
+      // -XX:TieredStopAtLevel=1, where the two agree bit-for-bit. The tolerance below is still
+      // orders of magnitude tighter than any real kernel defect would produce.
+      assertNumericallyClose(expected, actual, 1.0e-5f, 1.0e-6f);
+      assertNumericallyClose(
+          sequential.forward(3, tokens.length),
+          batched.forward(3, tokens.length),
+          1.0e-5f,
+          1.0e-6f);
     }
 
     @Test

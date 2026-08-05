@@ -44,6 +44,10 @@ val modelFixtures =
             "qwen3_1_7b_q8_0",
         ),
         modelFixture(
+            "downloadQwen3Embedding06BQ80Model",
+            "qwen3_embedding_0_6b_q8_0",
+        ),
+        modelFixture(
             "downloadQwen38BQ4KMModel",
             "qwen3_8b_q4_k_m",
         ),
@@ -205,6 +209,25 @@ tasks.register<Test>("qwen306BQ40IntegrationTest") {
         )
     }
     dependsOn(tasks.named("downloadQwen306BQ40Model"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
+tasks.register<Test>("qwen3EmbeddingIntegrationTest") {
+    description = "Run the pinned Qwen3-Embedding 0.6B pure-Java embedding integration tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.Qwen3EmbeddingModelFixtureIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadQwen3Embedding06BQ80Model"))
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "4g"

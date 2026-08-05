@@ -16,6 +16,8 @@
 package com.integrallis.models.runtime.chat;
 
 import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.api.ToolCall;
+import com.integrallis.models.api.ToolSpec;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -27,20 +29,34 @@ import java.util.Objects;
  * instruction format.
  */
 public enum ChatTemplate {
-  RAW("raw"),
-  CHATML("chatml"),
-  CHATML_DIRECT("chatml-direct"),
-  CHATML_ANSWER("chatml-answer"),
-  CHATML_NO_THINK("chatml-no-think"),
-  ZEPHYR("zephyr"),
-  LLAMA3("llama3"),
-  GEMMA("gemma"),
-  GEMMA4("gemma4"),
-  PHI3("phi3"),
-  DEEPSEEK("deepseek"),
-  H2O("h2o"),
-  H2O_DIRECT("h2o-direct"),
-  MINICPM5_NO_THINK("minicpm5-no-think");
+  RAW("raw", ToolSyntax.NONE),
+  CHATML("chatml", ToolSyntax.QWEN),
+  CHATML_DIRECT("chatml-direct", ToolSyntax.QWEN),
+  CHATML_ANSWER("chatml-answer", ToolSyntax.QWEN),
+  CHATML_NO_THINK("chatml-no-think", ToolSyntax.QWEN),
+  ZEPHYR("zephyr", ToolSyntax.NONE),
+  LLAMA3("llama3", ToolSyntax.LLAMA3),
+  GEMMA("gemma", ToolSyntax.NONE),
+  GEMMA4("gemma4", ToolSyntax.GEMMA4),
+  PHI3("phi3", ToolSyntax.NONE),
+  DEEPSEEK("deepseek", ToolSyntax.NONE),
+  H2O("h2o", ToolSyntax.NONE),
+  H2O_DIRECT("h2o-direct", ToolSyntax.NONE),
+  MINICPM5_NO_THINK("minicpm5-no-think", ToolSyntax.MINICPM5);
+
+  // Verbatim from Qwen's published chat template; the wording is part of what the model was
+  // trained on, so it is reproduced exactly rather than paraphrased.
+  private static final String QWEN_TOOLS_PREAMBLE =
+      "# Tools\n\nYou may call one or more functions to assist with the user query.\n\n"
+          + "You are provided with function signatures within <tools></tools> XML tags:\n<tools>";
+  private static final String QWEN_TOOLS_EPILOGUE =
+      "\n</tools>\n\nFor each function call, return a json object with function name and arguments"
+          + " within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>,"
+          + " \"arguments\": <args-json-object>}\n</tool_call><|im_end|>\n";
+  private static final String LLAMA3_TOOLS_PREAMBLE =
+      "You have access to the following functions. To call a function, please respond with JSON"
+          + " for a function call.\n\nRespond in the format {\"name\": function name,"
+          + " \"parameters\": dictionary of argument name and its value}.\n\n";
 
   private static final String DEEPSEEK_BOS = "<｜begin▁of▁sentence｜>";
   private static final String DEEPSEEK_DEFAULT_SYSTEM =
@@ -50,14 +66,43 @@ public enum ChatTemplate {
           + "non-computer science questions, you will refuse to answer";
 
   private final String id;
+  private final ToolSyntax toolSyntax;
 
-  ChatTemplate(String id) {
+  ChatTemplate(String id, ToolSyntax toolSyntax) {
     this.id = id;
+    this.toolSyntax = toolSyntax;
   }
 
   /** Stable identifier recorded by ModelJars qualification metadata. */
   public String id() {
     return id;
+  }
+
+  /**
+   * How this family expresses tool calls, in both directions.
+   *
+   * <p>Values are taken from each family's published chat template. Families with no trained format
+   * map to {@link ToolSyntax#NONE}; emitting an invented format would produce output the model was
+   * never trained on, which looks plausible and never parses.
+   */
+  public ToolSyntax toolSyntax() {
+    return toolSyntax;
+  }
+
+  /** Whether this family has a trained tool-call format at all. */
+  public boolean supportsTools() {
+    return toolSyntax.supportsTools();
+  }
+
+  /**
+   * Whether this runtime can recover tool calls from this family's output.
+   *
+   * <p>This is the check adapters should gate on. It is narrower than {@link #supportsTools()}:
+   * Gemma 4 and MiniCPM5 have real tool formats, but both encode arguments as tagged pairs that
+   * cannot be turned into JSON without the declared tool schemas.
+   */
+  public boolean canParseToolCalls() {
+    return toolSyntax.parsable();
   }
 
   /** Renders a conversation while keeping template controls separate from ordinary message text. */
@@ -81,6 +126,47 @@ public enum ChatTemplate {
     };
   }
 
+  /**
+   * Renders a conversation that declares tools.
+   *
+   * <p>Delegates to {@link #render(List)} when nothing tool-related is present, so callers can use
+   * this overload unconditionally.
+   *
+   * <p>Trust boundary: template-owned delimiters are emitted as {@code CONTROL} so they tokenize to
+   * the single ids the model was trained on, while everything supplied from outside — tool schemas,
+   * call arguments, and above all tool results — is emitted as {@code TEXT}. Because the tokenizer
+   * only recognises registered tokens inside {@code CONTROL}, a tool result that spells out control
+   * markers cannot close a span or open a turn.
+   *
+   * @throws IllegalArgumentException if this family cannot express tool calls
+   */
+  public ModelPrompt render(List<ChatMessage> messages, List<ToolSpec> tools) {
+    List<ChatMessage> conversation = validated(messages);
+    List<ToolSpec> declared = tools == null ? List.of() : List.copyOf(tools);
+    boolean conversationCallsTools = conversation.stream().anyMatch(ChatMessage::hasToolCalls);
+    if (declared.isEmpty() && !conversationCallsTools) {
+      return render(messages);
+    }
+    if (!canParseToolCalls()) {
+      throw new IllegalArgumentException(
+          "chat template " + id + " cannot express tool calls; check canParseToolCalls() first");
+    }
+    return switch (this) {
+      case CHATML -> renderChatMlWithTools(conversation, "", "", declared);
+      case CHATML_DIRECT ->
+          renderChatMlWithTools(conversation, "", "The context states that ", declared);
+      case CHATML_ANSWER -> renderChatMlWithTools(conversation, "", "Answer: ", declared);
+      case CHATML_NO_THINK ->
+          renderChatMlWithTools(conversation, "", "<think>\n\n</think>\n\n", declared);
+      case LLAMA3 -> renderLlama3WithTools(conversation, declared);
+      default ->
+          throw new IllegalArgumentException(
+              "chat template "
+                  + id
+                  + " cannot express tool calls; check canParseToolCalls() first");
+    };
+  }
+
   /** Resolves the stable identifier recorded in ModelJars metadata. */
   public static ChatTemplate parse(String value) {
     if (value != null) {
@@ -92,6 +178,164 @@ public enum ChatTemplate {
       }
     }
     throw new IllegalArgumentException("Unknown chat template: " + value);
+  }
+
+  private static ModelPrompt renderChatMlWithTools(
+      List<ChatMessage> messages, String prefix, String assistantPrefix, List<ToolSpec> tools) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder().control(prefix);
+
+    int start = 0;
+    if (!tools.isEmpty()) {
+      // The tool declarations and any caller system prompt share a single system turn.
+      prompt.control("<|im_start|>system\n");
+      if (messages.get(0).role() == ChatRole.SYSTEM) {
+        prompt.text(messages.get(0).text()).control("\n\n");
+        start = 1;
+      }
+      prompt.control(QWEN_TOOLS_PREAMBLE);
+      for (ToolSpec tool : tools) {
+        prompt.control("\n");
+        appendToolJson(prompt, tool);
+      }
+      prompt.control(QWEN_TOOLS_EPILOGUE);
+    }
+
+    for (int index = start; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      if (message.role() == ChatRole.TOOL) {
+        boolean firstOfRun = index == start || messages.get(index - 1).role() != ChatRole.TOOL;
+        boolean lastOfRun =
+            index == messages.size() - 1 || messages.get(index + 1).role() != ChatRole.TOOL;
+        if (firstOfRun) {
+          prompt.control("<|im_start|>user");
+        }
+        prompt.control("\n<tool_response>\n").text(message.text()).control("\n</tool_response>");
+        if (lastOfRun) {
+          prompt.control("<|im_end|>\n");
+        }
+        continue;
+      }
+
+      prompt.control("<|im_start|>" + message.role().templateName() + "\n");
+      if (!message.text().isEmpty()) {
+        prompt.text(message.text());
+      }
+      boolean firstCall = true;
+      for (ToolCall call : message.toolCalls()) {
+        if (!firstCall || !message.text().isEmpty()) {
+          prompt.control("\n");
+        }
+        firstCall = false;
+        prompt
+            .control("<tool_call>\n{\"name\": \"")
+            .text(call.name())
+            .control("\", \"arguments\": ")
+            .text(call.argumentsJson())
+            .control("}\n</tool_call>");
+      }
+      prompt.control("<|im_end|>\n");
+    }
+    return prompt.control("<|im_start|>assistant\n" + assistantPrefix).build();
+  }
+
+  private static ModelPrompt renderLlama3WithTools(
+      List<ChatMessage> messages, List<ToolSpec> tools) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+
+    int start = 0;
+    if (messages.get(0).role() == ChatRole.SYSTEM) {
+      prompt.control("<|start_header_id|>system<|end_header_id|>\n\n");
+      if (!tools.isEmpty()) {
+        prompt.control("Environment: ipython\n\n");
+      }
+      prompt.text(messages.get(0).text().strip()).control("<|eot_id|>");
+      start = 1;
+    } else if (!tools.isEmpty()) {
+      prompt.control(
+          "<|start_header_id|>system<|end_header_id|>\n\nEnvironment: ipython<|eot_id|>");
+    }
+
+    boolean toolsRendered = tools.isEmpty();
+    for (int index = start; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      if (message.role() == ChatRole.TOOL) {
+        // Llama 3.x returns results under `ipython` rather than a `tool` role.
+        prompt
+            .control("<|start_header_id|>ipython<|end_header_id|>\n\n")
+            .text(message.text().strip())
+            .control("<|eot_id|>");
+        continue;
+      }
+
+      prompt.control(
+          "<|start_header_id|>" + message.role().templateName() + "<|end_header_id|>\n\n");
+      if (!toolsRendered && message.role() == ChatRole.USER) {
+        // Schemas ride in the first user turn, not the system prompt.
+        prompt.control(LLAMA3_TOOLS_PREAMBLE);
+        for (ToolSpec tool : tools) {
+          appendToolJson(prompt, tool);
+          prompt.control("\n\n");
+        }
+        toolsRendered = true;
+      }
+      if (!message.text().isEmpty()) {
+        prompt.text(message.text().strip());
+      }
+      if (message.toolCalls().size() > 1) {
+        throw new IllegalArgumentException(
+            "chat template " + ChatTemplate.LLAMA3.id + " renders at most one tool call per turn");
+      }
+      for (ToolCall call : message.toolCalls()) {
+        prompt
+            .control("{\"name\": \"")
+            .text(call.name())
+            .control("\", \"parameters\": ")
+            .text(call.argumentsJson())
+            .control("}");
+      }
+      prompt.control("<|eot_id|>");
+    }
+    return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
+  }
+
+  /**
+   * Appends one tool declaration in the OpenAI shape both families render.
+   *
+   * <p>The wrapper is template-owned so it stays {@code CONTROL}; the caller's name, description
+   * and schema are {@code TEXT}. The schema is copied verbatim because it is already JSON.
+   */
+  private static void appendToolJson(ModelPrompt.Builder prompt, ToolSpec tool) {
+    prompt
+        .control("{\"type\": \"function\", \"function\": {\"name\": \"")
+        .text(escapeJson(tool.name()))
+        .control("\", \"description\": \"")
+        .text(escapeJson(tool.description()))
+        .control("\", \"parameters\": ")
+        .text(tool.inputSchema())
+        .control("}}");
+  }
+
+  /** Escapes a value for inclusion in a JSON string literal. */
+  private static String escapeJson(String value) {
+    StringBuilder escaped = new StringBuilder(value.length());
+    for (int index = 0; index < value.length(); index++) {
+      char current = value.charAt(index);
+      switch (current) {
+        case '"' -> escaped.append("\\\"");
+        case '\\' -> escaped.append("\\\\");
+        case '\n' -> escaped.append("\\n");
+        case '\r' -> escaped.append("\\r");
+        case '\t' -> escaped.append("\\t");
+        default -> {
+          if (current < 0x20) {
+            escaped.append(String.format("\\u%04x", (int) current));
+          } else {
+            escaped.append(current);
+          }
+        }
+      }
+    }
+    return escaped.toString();
   }
 
   private static List<ChatMessage> validated(List<ChatMessage> messages) {

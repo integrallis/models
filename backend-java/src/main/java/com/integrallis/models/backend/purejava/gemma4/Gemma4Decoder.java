@@ -119,6 +119,18 @@ public final class Gemma4Decoder implements AutoCloseable {
     return forwardPass.prefill(tokens, startPosition);
   }
 
+  /** Evaluates a prompt and returns the final position's hidden state. */
+  public float[] prefillHiddenState(int[] tokens, int startPosition) {
+    checkOpen();
+    return forwardPass.prefillHiddenState(tokens, startPosition);
+  }
+
+  /** Executes one token and returns its hidden state rather than logits. */
+  public float[] hiddenState(int token, int position) {
+    checkOpen();
+    return forwardPass.hiddenState(token, position);
+  }
+
   /** Opens independent KV state that shares loaded weights and routed experts. */
   public Session openSession() {
     checkOpen();

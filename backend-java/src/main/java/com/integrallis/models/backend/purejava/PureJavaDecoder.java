@@ -33,6 +33,29 @@ interface PureJavaDecoder extends AutoCloseable {
 
   float[] prefill(int[] tokens, int startPosition);
 
+  /**
+   * Runs the stack over a sequence and returns the final position's hidden state, skipping the
+   * vocabulary projection.
+   *
+   * <p>Architectures without an embedding path may refuse; callers should check {@link
+   * #supportsHiddenState()} first.
+   */
+  default float[] prefillHiddenState(int[] tokens, int startPosition) {
+    throw new UnsupportedOperationException(
+        "this decoder does not expose hidden states for embedding");
+  }
+
+  /** Runs one step and returns its hidden state, skipping the vocabulary projection. */
+  default float[] hiddenState(int token, int position) {
+    throw new UnsupportedOperationException(
+        "this decoder does not expose hidden states for embedding");
+  }
+
+  /** Whether {@link #prefillHiddenState(int[], int)} is implemented for this architecture. */
+  default boolean supportsHiddenState() {
+    return false;
+  }
+
   Session openSession();
 
   float[] forward(Session session, int token, int position);

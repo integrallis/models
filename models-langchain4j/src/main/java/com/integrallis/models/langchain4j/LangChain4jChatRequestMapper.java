@@ -17,7 +17,11 @@ package com.integrallis.models.langchain4j;
 
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.ToolCall;
+import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -25,6 +29,7 @@ import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import java.util.ArrayList;
+import java.util.List;
 
 final class LangChain4jChatRequestMapper {
 
@@ -36,7 +41,30 @@ final class LangChain4jChatRequestMapper {
     for (ChatMessage message : request.messages()) {
       messages.add(render(message));
     }
-    return template.render(messages);
+    List<ToolSpec> tools = tools(request);
+    return tools.isEmpty() ? template.render(messages) : template.render(messages, tools);
+  }
+
+  /**
+   * Flattens the request's tool specifications.
+   *
+   * <p>LangChain4j models parameters as a typed {@code JsonObjectSchema}, unlike Spring AI which
+   * supplies schema text directly, so they are serialised here before crossing into the runtime.
+   */
+  static List<ToolSpec> tools(ChatRequest request) {
+    List<ToolSpecification> specifications = request.toolSpecifications();
+    if (specifications == null || specifications.isEmpty()) {
+      return List.of();
+    }
+    List<ToolSpec> tools = new ArrayList<>(specifications.size());
+    for (ToolSpecification specification : specifications) {
+      tools.add(
+          new ToolSpec(
+              specification.name(),
+              specification.description(),
+              JsonSchemaWriter.write(specification.parameters())));
+    }
+    return List.copyOf(tools);
   }
 
   static SamplingOptions options(ChatRequest request, SamplingOptions defaults) {
@@ -77,7 +105,18 @@ final class LangChain4jChatRequestMapper {
       return com.integrallis.models.runtime.chat.ChatMessage.system(systemMessage.text());
     }
     if (message instanceof AiMessage aiMessage) {
-      return com.integrallis.models.runtime.chat.ChatMessage.assistant(aiMessage.text());
+      String text = aiMessage.text() == null ? "" : aiMessage.text();
+      if (!aiMessage.hasToolExecutionRequests()) {
+        return com.integrallis.models.runtime.chat.ChatMessage.assistant(text);
+      }
+      // An assistant turn may be nothing but a call, so this path must tolerate absent text.
+      List<ToolCall> calls = new ArrayList<>(aiMessage.toolExecutionRequests().size());
+      for (ToolExecutionRequest executionRequest : aiMessage.toolExecutionRequests()) {
+        calls.add(
+            new ToolCall(
+                executionRequest.id(), executionRequest.name(), executionRequest.arguments()));
+      }
+      return com.integrallis.models.runtime.chat.ChatMessage.assistantToolCalls(text, calls);
     }
     if (message instanceof ToolExecutionResultMessage toolMessage) {
       return com.integrallis.models.runtime.chat.ChatMessage.tool(toolMessage.text());

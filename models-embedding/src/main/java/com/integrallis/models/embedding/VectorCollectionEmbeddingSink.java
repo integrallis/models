@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.embedding;
 
+import com.integrallis.models.api.EmbeddingBackend;
 import com.integrallis.vectors.core.Document;
 import com.integrallis.vectors.db.VectorCollection;
 import java.util.ArrayList;

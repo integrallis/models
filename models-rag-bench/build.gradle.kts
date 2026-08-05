@@ -30,6 +30,25 @@ tasks.withType<Test> {
     systemProperty("models.repositoryRoot", rootProject.projectDir.absolutePath)
 }
 
+tasks.register<Test>("embeddingAdaptersIntegrationTest") {
+    description = "Run the framework embedding adapters against real Qwen3-Embedding weights"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.rag.EmbeddingFrameworkAdaptersIntegrationTest",
+        )
+    }
+    dependsOn(":backend-java:downloadQwen3Embedding06BQ80Model")
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
 tasks.named<Test>("test") {
     useJUnitPlatform {
         excludeTags("slow")

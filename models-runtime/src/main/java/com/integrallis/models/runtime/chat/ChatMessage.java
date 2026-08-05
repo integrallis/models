@@ -15,16 +15,26 @@
  */
 package com.integrallis.models.runtime.chat;
 
+import com.integrallis.models.api.ToolCall;
+import java.util.List;
 import java.util.Objects;
 
 /** One role-aware message rendered into a model's required chat template. */
-public record ChatMessage(ChatRole role, String text) {
+public record ChatMessage(ChatRole role, String text, List<ToolCall> toolCalls) {
 
   public ChatMessage {
     role = Objects.requireNonNull(role, "role");
-    if (text == null || text.isBlank()) {
+    toolCalls = toolCalls == null ? List.of() : List.copyOf(toolCalls);
+    text = text == null ? "" : text;
+    // An assistant turn may be nothing but a tool call, so blank text is valid there and
+    // nowhere else.
+    if (text.isBlank() && toolCalls.isEmpty()) {
       throw new IllegalArgumentException("text must not be blank");
     }
+  }
+
+  public ChatMessage(ChatRole role, String text) {
+    this(role, text, List.of());
   }
 
   public static ChatMessage system(String text) {
@@ -41,5 +51,18 @@ public record ChatMessage(ChatRole role, String text) {
 
   public static ChatMessage tool(String text) {
     return new ChatMessage(ChatRole.TOOL, text);
+  }
+
+  /** An assistant turn that invokes tools, optionally alongside prose. */
+  public static ChatMessage assistantToolCalls(String text, List<ToolCall> toolCalls) {
+    if (toolCalls == null || toolCalls.isEmpty()) {
+      throw new IllegalArgumentException("toolCalls must not be empty");
+    }
+    return new ChatMessage(ChatRole.ASSISTANT, text, toolCalls);
+  }
+
+  /** Whether this message invokes any tools. */
+  public boolean hasToolCalls() {
+    return !toolCalls.isEmpty();
   }
 }

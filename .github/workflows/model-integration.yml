@@ -94,6 +94,7 @@ jobs:
           :backend-java:downloadMiniCpm51BQ4KMModel
           :backend-java:downloadQwen25Math15BQ4KMModel
           :backend-java:downloadEuroLlm17BQ4KMModel
+          :backend-java:downloadQwen3Embedding06BQ80Model
           --no-daemon
           --stacktrace
 
@@ -110,6 +111,15 @@ jobs:
           --tests com.integrallis.models.backend.purejava.MiniCpm5ModelFixtureIntegrationTest
           --tests com.integrallis.models.backend.purejava.Qwen25MathModelFixtureIntegrationTest
           --tests com.integrallis.models.backend.purejava.EuroLlmModelFixtureIntegrationTest
+          --tests com.integrallis.models.backend.purejava.Qwen3EmbeddingModelFixtureIntegrationTest
+          --no-daemon
+          --stacktrace
+
+      - name: Run framework embedding adapter integration tests
+        working-directory: models
+        run: >
+          ./gradlew
+          :models-rag-bench:embeddingAdaptersIntegrationTest
           --no-daemon
           --stacktrace
 

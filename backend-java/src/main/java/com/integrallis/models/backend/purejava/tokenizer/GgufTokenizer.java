@@ -982,6 +982,15 @@ public final class GgufTokenizer implements Tokenizer {
   private record SpecialToken(String text, int id) {}
 
   @Override
+  public int tokenId(String text) {
+    if (text == null) {
+      return -1;
+    }
+    Integer id = tokenToId.get(text);
+    return id == null ? -1 : id;
+  }
+
+  @Override
   public int vocabSize() {
     return vocab.length;
   }

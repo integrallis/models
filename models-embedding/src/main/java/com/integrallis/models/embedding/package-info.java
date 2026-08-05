@@ -17,9 +17,9 @@
 /**
  * Bridge from {@code models} embedders into {@code java-vectors} storage.
  *
- * <p>{@link com.integrallis.models.embedding.EmbeddingBackend} is the minimal SPI an embedding
- * model implements. {@link com.integrallis.models.embedding.VectorCollectionEmbeddingSink} consumes
- * that SPI and routes the produced {@code float[]} directly into a {@link
+ * <p>{@link com.integrallis.models.api.EmbeddingBackend} is the minimal SPI an embedding model
+ * implements. {@link com.integrallis.models.embedding.VectorCollectionEmbeddingSink} consumes that
+ * SPI and routes the produced {@code float[]} directly into a {@link
  * com.integrallis.vectors.db.VectorCollection}, validates backend output, and owns the backend
  * lifecycle.
  */

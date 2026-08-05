@@ -341,6 +341,36 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     return decoder.prefill(tokens, startPosition);
   }
 
+  /**
+   * Runs the stack over a sequence and returns the final position's hidden state.
+   *
+   * <p>Skips the vocabulary projection, which is the widest matmul in the pass — so producing an
+   * embedding costs less per token than generating one.
+   *
+   * <p>The array is backend-owned scratch, valid until the next call. Copy it to keep it.
+   */
+  public float[] prefillHiddenState(int[] tokens, int startPosition) {
+    checkOpen();
+    return decoder.prefillHiddenState(tokens, startPosition);
+  }
+
+  /**
+   * Runs one step and returns its hidden state instead of logits.
+   *
+   * <p>Needed for mean pooling, which reduces over every position rather than only the last.
+   *
+   * <p>The array is backend-owned scratch, valid until the next call.
+   */
+  public float[] hiddenState(int token, int position) {
+    checkOpen();
+    return decoder.hiddenState(token, position);
+  }
+
+  /** Whether this model's architecture exposes hidden states for embedding. */
+  public boolean supportsHiddenState() {
+    return decoder.supportsHiddenState();
+  }
+
   @Override
   public InferenceSession openSession() {
     checkOpen();
