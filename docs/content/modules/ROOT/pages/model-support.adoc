@@ -13,6 +13,11 @@ correctness and latency gates on a recorded runtime and host.
 
 A model family name alone is not a production qualification.
 
+Generators are graded on how well they answer. For embedders we test that
+Models produces the same vectors as llama.cpp, since retrieval quality is a
+published property of the weights. See
+xref:embeddings.adoc#equivalence-gating[Equivalence Gating].
+
 == Supported Runtime Surface
 
 The decoder currently recognizes `llama`, `qwen2`, `qwen3`, and `gemma4` GGUF

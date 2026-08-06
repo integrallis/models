@@ -152,11 +152,16 @@ dependencies {
 }
 ----
 
+`ModelsEmbeddingModel` supplies the `EmbeddingModel`. See
+xref:embeddings.adoc[Embeddings] for producing the backend it wraps.
+
 [source,java]
 ----
 interface Assistant {
     String answer(String question);
 }
+
+var embeddingModel = new ModelsEmbeddingModel(embeddingBackend);
 
 var collection = VectorCollection.builder()
     .dimension(embeddingModel.dimension())

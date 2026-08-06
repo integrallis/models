@@ -155,6 +155,21 @@ Set `RAG_MODELS_BACKEND` to `pure-java` or `rust-ffm`; do not put
 The controlled inference script is a performance measurement harness. It does
 not replace the default-correctness gate in the RAG qualification script.
 
+== Embedding Equivalence
+
+We test that Models produces the same vectors as llama.cpp:
+
+[source,bash]
+----
+./gradlew :models-bench:run --args="embedding-equivalence \
+  --model /path/to/model.gguf \
+  --report benchmark-results/embedding/model.json"
+----
+
+Exit `0` reproduced, `1` not reproduced, `2` usage or integrity problem. It
+runs in seconds: the llama.cpp reference vectors are committed. See
+xref:embeddings.adoc#equivalence-gating[Equivalence Gating] for the floors.
+
 Acceptance policy and reproduction details live in:
 
 * {url-models-github}/blob/main/INFERENCE_BENCHMARKS.md[Controlled inference benchmarks^]

@@ -115,6 +115,26 @@ application or Spring bean lifecycle owns it. Apple's system model implements
 the same contract, but currently emits its complete response as one streaming
 element because Apple's API returns a complete response to the bridge.
 
+== Embeddings
+
+`ModelsSpringAiEmbeddingModel` adapts a Models `EmbeddingBackend` to Spring
+AI's `EmbeddingModel`.
+
+[source,java]
+----
+import com.integrallis.models.api.EmbeddingBackend;
+import com.integrallis.models.spring.ai.ModelsSpringAiEmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingModel;
+
+@Bean(destroyMethod = "close")
+EmbeddingModel localEmbeddingModel(EmbeddingBackend backend) {
+    return new ModelsSpringAiEmbeddingModel(backend);
+}
+----
+
+This adapter owns the backend it wraps and closes it. See
+xref:embeddings.adoc[Embeddings] for producing the backend.
+
 For auto-configuration, named-bean behavior, and combined Models/Vectors setup,
 continue with xref:spring-boot.adoc[Spring Boot]. For validation after
 retrieval, see xref:rag.adoc[RAG Validation].

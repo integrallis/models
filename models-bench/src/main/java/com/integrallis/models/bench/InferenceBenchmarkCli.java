@@ -91,6 +91,11 @@ public final class InferenceBenchmarkCli {
       DeterminismAuditCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "embedding-equivalence".equals(args[0])) {
+      // A gate rather than a benchmark, so its verdict travels in the exit status.
+      System.exit(EmbeddingEquivalenceCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);
