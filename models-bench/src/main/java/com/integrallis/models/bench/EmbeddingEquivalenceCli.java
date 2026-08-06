@@ -210,6 +210,8 @@ public final class EmbeddingEquivalenceCli {
     root.put("normalizationHeld", result.normalizationHeld());
     root.put("qualified", result.passed());
 
+    // Raw per-probe timings, not percentiles. Eight samples cannot support a p95, and dressing
+    // them up as one invites reading a throughput claim into evidence that carries none.
     ArrayNode perProbe = root.putArray("perProbe");
     for (int probe = 0; probe < probes.size(); probe++) {
       ObjectNode entry = perProbe.addObject();
@@ -218,27 +220,8 @@ public final class EmbeddingEquivalenceCli {
       entry.put("embedMillis", millis.get(probe));
     }
 
-    // Latency is recorded as diagnostics only. Eight probes cannot establish a throughput floor,
-    // and this gate deliberately does not claim to; that axis belongs to the benchmark harness.
-    List<Double> sorted = millis.stream().sorted().toList();
-    ObjectNode latency = root.putObject("latencyDiagnostics");
-    latency.put("p50EmbedMillis", percentile(sorted, 0.50));
-    latency.put("p95EmbedMillis", percentile(sorted, 0.95));
-    latency.put(
-        "p50EmbedTextsPerSecond",
-        percentile(sorted, 0.50) == 0 ? 0 : 1000.0 / percentile(sorted, 0.50));
-
     root.set("environment", mapper.valueToTree(BenchmarkEnvironment.capture()));
-    root.set("memory", mapper.valueToTree(JvmMemorySnapshot.capture()));
     return root;
-  }
-
-  private static double percentile(List<Double> sorted, double quantile) {
-    if (sorted.isEmpty()) {
-      return 0;
-    }
-    int index = (int) Math.ceil(quantile * sorted.size()) - 1;
-    return sorted.get(Math.clamp(index, 0, sorted.size() - 1));
   }
 
   private static void write(Path report, ObjectNode node) throws IOException {
