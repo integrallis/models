@@ -30,8 +30,7 @@ import java.util.Objects;
  * same probe texts and the same model bytes.
  *
  * <p>Retrieval quality is a published property of the weights. What a runtime can get wrong is
- * pooling, rotary embeddings, dequantization, and normalization, so agreement with a reference is
- * what this measures.
+ * pooling, rotary embeddings, dequantization, and normalization.
  *
  * <p>The reference vectors are committed. They cannot drift unless the oracle build or the probe
  * set changes, and both are pinned by digest.
@@ -41,9 +40,9 @@ public final class EmbeddingEquivalence {
   /**
    * Agreement below which the runtime is not considered to reproduce the model.
    *
-   * <p>Mirrors {@code ModelEmbeddingQualification.MINIMUM_ORACLE_COSINE} in ModelJars. Duplicated
-   * because ModelJars depends on this project, not the other way round; {@link
-   * EmbeddingEquivalenceCli} writes the value into every report so the two cannot diverge silently.
+   * <p>Mirrors {@code ModelEmbeddingQualification.MINIMUM_ORACLE_COSINE} in ModelJars, duplicated
+   * because ModelJars depends on this project. {@link EmbeddingEquivalenceCli} writes the value
+   * into every report, so the two stay in step.
    *
    * <p>Sits below the measured 0.99950 agreement and far above the 0.66156 a wrong pooling
    * produces.
@@ -226,8 +225,7 @@ public final class EmbeddingEquivalence {
   /**
    * Computes cosine similarity in double precision.
    *
-   * <p>Does not assume the inputs are normalized, so a missing normalization shows up rather than
-   * being silently corrected.
+   * <p>Computed from the raw components, so a missing normalization surfaces as disagreement.
    *
    * @param left first vector
    * @param right second vector, of the same length

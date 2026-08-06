@@ -13,13 +13,11 @@ pure-Java backend, and the embedding equivalence gate.
   --report benchmark-results/embedding/model.json"
 ```
 
-Measures whether the runtime reproduces an embedding model. Retrieval quality is a published
-property of the weights; what a runtime can get wrong is pooling, rotary embeddings,
-dequantization, and normalization.
+Tests that Models produces the same vectors as llama.cpp, for eight pinned probes over the same
+model bytes.
 
-Eight probes compared against a pinned llama.cpp build. Exit `0` reproduced, `1` not reproduced,
-`2` usage or integrity problem. Runs in seconds: the reference vectors are committed, so no machine
-running it needs a local llama.cpp build.
+Exit `0` reproduced, `1` not reproduced, `2` usage or integrity problem. Runs in seconds: the
+reference vectors are committed, so no machine running it needs a local llama.cpp build.
 
 Two floors, both placed against measurements:
 
@@ -31,7 +29,7 @@ Two floors, both placed against measurements:
 | *floor* | *0.999* | *1e-3* |
 
 Cosine is scale-invariant, so an unnormalized runtime agrees with a normalized reference at exactly
-1.0. Vector length is checked separately. Probe set, oracle pin, and the reference-regeneration
+1.0, and vector length is checked separately. Probe set, oracle pin, and the reference-regeneration
 procedure are in
 [`src/main/resources/embedding-equivalence/README.md`](src/main/resources/embedding-equivalence/README.md).
 

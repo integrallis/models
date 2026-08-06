@@ -65,8 +65,8 @@ Implemented functionality includes:
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
 - tool calling across Qwen, Hermes, Llama 3, Gemma 4, and MiniCPM5 formats
-- in-JVM text embeddings with last-token and mean pooling, gated on
-  reproducing llama.cpp
+- in-JVM text embeddings with last-token and mean pooling, tested to produce the
+  same vectors as llama.cpp
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
 - Apple Foundation Models on supported Apple Silicon Macs
 - framework-neutral guarded RAG

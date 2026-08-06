@@ -30,15 +30,13 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Gates a release on whether this runtime reproduces an embedding model.
+ * Tests that this runtime produces the same vectors as a reference implementation.
  *
  * <p>Embeds eight pinned probes — single token, long input, non-Latin script, code, rare tokens,
  * ordinary prose — and compares the vectors against ones a pinned reference build produced from the
  * same model bytes. Runs in seconds because the reference side is committed.
  *
- * <p>Passing proves the vectors are the model's, not that they are good. Two identically broken
- * implementations would agree perfectly, so the claim rests on the reference being an independent
- * implementation.
+ * <p>The claim rests on the reference being an independent implementation.
  *
  * <pre>{@code
  * ./gradlew :models-bench:run --args="embedding-equivalence --model /path/to/model.gguf"

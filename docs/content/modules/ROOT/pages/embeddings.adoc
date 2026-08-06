@@ -5,8 +5,8 @@ Models turns text into vectors in the JVM, from the same GGUF artifacts it
 generates from.
 
 An embedding model runs the decoder stack, stops before the vocabulary
-projection, reduces the per-position hidden states to one vector, and scales
-that vector to unit length.
+projection, reduces the per-position hidden states to one vector, and scales it
+to unit length.
 
 == Producing A Backend
 
@@ -61,7 +61,7 @@ Path gguf = new ModelJarLocator(ModelJarRegistry.fromClasspath())
 == Pooling
 
 Pooling reduces one hidden state per token to one vector per text. The correct
-choice is a property of how the model was trained.
+choice follows from how the model was trained.
 
 `Pooling.LAST_TOKEN`:: The default. Causal decoder-only embedders such as the
 Qwen3-Embedding family, where attention is one-directional and only the final
@@ -107,12 +107,9 @@ xref:vectors.adoc[Vectors].
 
 == Equivalence Gating
 
-Retrieval quality is a published property of the weights. What a runtime can get
-wrong is pooling, rotary embeddings, dequantization, and normalization, so the
-gate measures whether it reproduces a reference implementation.
-
-`models-bench` embeds a pinned probe set and compares the vectors against ones a
-pinned llama.cpp build produced from the same model bytes:
+We test that Models produces the same vectors as llama.cpp. `models-bench`
+embeds a pinned probe set and compares the result against a pinned llama.cpp
+build over the same model bytes:
 
 [source,bash]
 ----
@@ -152,8 +149,7 @@ Two floors, both placed against measurements:
 |===
 
 Cosine is scale-invariant, so a runtime that skips L2 normalization agrees with
-a normalized reference at exactly 1.0. Vector length is therefore checked
-separately.
+a normalized reference at exactly 1.0, and vector length is checked separately.
 
-The gate refuses to run when the probe-set or artifact digest has moved, so a
-stale reference fails rather than comparing different inputs.
+The gate verifies the probe-set and artifact digests before comparing, and
+exits `2` when either has moved.

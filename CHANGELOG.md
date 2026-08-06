@@ -7,11 +7,10 @@ All notable changes to models are documented here.
 ### Added
 
 - Added an embedding equivalence gate to `models-bench`, run with
-  `embedding-equivalence --model <artifact.gguf>`. It embeds eight pinned probes
-  and compares the vectors against ones a pinned llama.cpp build produced from
-  the same model bytes, exiting non-zero when they diverge. The reference
-  vectors are committed, so it runs in seconds and needs no local llama.cpp
-  build.
+  `embedding-equivalence --model <artifact.gguf>`. It tests that Models produces
+  the same vectors as llama.cpp, for eight pinned probes over the same model
+  bytes, exiting non-zero when they diverge. The reference vectors are
+  committed, so it runs in seconds and needs no local llama.cpp build.
 
   Agreement is gated at 0.999 cosine, where a correct run measures 0.99950 and
   mean pooling in place of last-token measures 0.66156. Vector length is gated

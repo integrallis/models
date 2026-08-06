@@ -1,11 +1,10 @@
 # Embedding equivalence gate
 
-Compares vectors this runtime produces against ones a pinned reference build produced from the
-same model bytes and the same probes.
+Tests that Models produces the same vectors as llama.cpp, for a pinned probe set over the same
+model bytes.
 
 Retrieval quality is a published property of the weights. What a runtime can get wrong is pooling,
-rotary embeddings, dequantization, and normalization. Passing means the vectors are the model's,
-not that they are good.
+rotary embeddings, dequantization, and normalization.
 
 ## Running it
 
@@ -85,8 +84,7 @@ Wrong pooling scores 0.66 against a 0.9995 good band, so the agreement floor has
 either side.
 
 Cosine is scale-invariant, so an unnormalized runtime agrees with a normalized reference at
-*exactly* 1.0 — measured via `llama-embedding --embd-normalize -1`. Callers that use a bare dot
-product as a cosine shortcut, as `vectors` does, would be wrong while the gate reported perfection.
-Hence the length check.
+*exactly* 1.0 — measured via `llama-embedding --embd-normalize -1`. `vectors` uses a bare dot
+product as a cosine shortcut and depends on unit length, hence the second floor.
 
 The gate takes the worst probe: averaging lets one broken case hide behind seven good ones.
