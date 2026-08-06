@@ -1,0 +1,159 @@
+= Embeddings
+:navtitle: Embeddings
+
+Models turns text into vectors in the JVM, from the same GGUF artifacts it
+generates from.
+
+An embedding model runs the decoder stack, stops before the vocabulary
+projection, reduces the per-position hidden states to one vector, and scales
+that vector to unit length.
+
+== Producing A Backend
+
+`GgufEmbeddingBackend` implements `EmbeddingBackend` over a loaded GGUF model:
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models-api:{models-version}")
+    implementation("com.integrallis:backend-java:{models-version}")
+}
+----
+
+[source,java]
+----
+import com.integrallis.models.api.EmbeddingBackend;
+import com.integrallis.models.api.Pooling;
+import com.integrallis.models.backend.purejava.GgufEmbeddingBackend;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import java.nio.file.Path;
+import java.util.List;
+
+static void embed(Path gguf) {
+    try (PureJavaBackend backend = PureJavaBackend.load(gguf);
+            EmbeddingBackend embeddings =
+                    GgufEmbeddingBackend.builder(backend)
+                            .pooling(Pooling.LAST_TOKEN)
+                            .normalize(true)
+                            .build()) {
+        float[] vector = embeddings.embed("How do I reset my password?");
+        float[][] batch = embeddings.embedAll(
+                List.of("Database backups are retained for 30 days.",
+                        "Rotate credentials every 90 days."));
+    }
+}
+----
+
+`EmbeddingBackend` lives in `models-api`, so a backend implements it without
+inheriting a dependency on Vectors storage.
+
+Resolve the artifact through its marker JAR:
+
+[source,java]
+----
+import org.modeljars.ModelJarLocator;
+import org.modeljars.ModelJarRegistry;
+
+Path gguf = new ModelJarLocator(ModelJarRegistry.fromClasspath())
+        .requireLocalPath(MODEL);
+----
+
+== Pooling
+
+Pooling reduces one hidden state per token to one vector per text. The correct
+choice is a property of how the model was trained.
+
+`Pooling.LAST_TOKEN`:: The default. Causal decoder-only embedders such as the
+Qwen3-Embedding family, where attention is one-directional and only the final
+position has seen the whole input.
+
+`Pooling.MEAN`:: Bidirectional encoders, where every position has seen the whole
+input.
+
+Mean pooling on a last-token model returns vectors that agree with the correct
+ones at 0.66 cosine. Take the pooling the model card specifies.
+
+`normalize(true)` is also the default. Unit vectors let a bare dot product stand
+in for cosine similarity.
+
+== Framework Adapters
+
+For LangChain4j, `ModelsEmbeddingModel` adapts an `EmbeddingBackend` to
+`EmbeddingModel`:
+
+[source,java]
+----
+import com.integrallis.models.langchain4j.ModelsEmbeddingModel;
+
+try (var model = new ModelsEmbeddingModel(embeddings)) {
+    Response<List<Embedding>> response =
+            model.embedAll(List.of(TextSegment.from("a document")));
+}
+----
+
+For Spring AI, `ModelsSpringAiEmbeddingModel` adapts the same backend:
+
+[source,java]
+----
+import com.integrallis.models.spring.ai.ModelsSpringAiEmbeddingModel;
+
+try (var model = new ModelsSpringAiEmbeddingModel(embeddings)) {
+    float[] vector = model.embed("How do I reset my password?");
+}
+----
+
+Both adapters own the backend they wrap and close it. To store the vectors, see
+xref:vectors.adoc[Vectors].
+
+== Equivalence Gating
+
+Retrieval quality is a published property of the weights. What a runtime can get
+wrong is pooling, rotary embeddings, dequantization, and normalization, so the
+gate measures whether it reproduces a reference implementation.
+
+`models-bench` embeds a pinned probe set and compares the vectors against ones a
+pinned llama.cpp build produced from the same model bytes:
+
+[source,bash]
+----
+./gradlew :models-bench:run --args="embedding-equivalence \
+  --model /path/to/model.gguf \
+  --report benchmark-results/embedding/model.json"
+----
+
+Exit `0` reproduced, `1` not reproduced, `2` usage or integrity problem. It runs
+in seconds: the reference vectors are committed, so the gate needs no local
+llama.cpp build.
+
+Eight probes cover single token, long input, non-Latin script, code, rare
+tokens, and ordinary prose. The gate takes the worst probe.
+
+Two floors, both placed against measurements:
+
+[cols="3,1,1", options="header"]
+|===
+| Run | Min cosine | Max abs(norm - 1)
+
+| Correct runtime against the reference
+| 0.99950
+| 2.7e-09
+
+| Mean pooling instead of last-token
+| 0.66156
+| —
+
+| L2 normalization skipped
+| *1.00000*
+| ~11
+
+| _floor_
+| _0.999_
+| _1e-3_
+|===
+
+Cosine is scale-invariant, so a runtime that skips L2 normalization agrees with
+a normalized reference at exactly 1.0. Vector length is therefore checked
+separately.
+
+The gate refuses to run when the probe-set or artifact digest has moved, so a
+stale reference fails rather than comparing different inputs.

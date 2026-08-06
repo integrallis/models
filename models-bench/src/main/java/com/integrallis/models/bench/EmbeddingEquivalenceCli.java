@@ -32,15 +32,13 @@ import java.util.List;
 /**
  * Gates a release on whether this runtime reproduces an embedding model.
  *
- * <p>Embeds a pinned probe set and compares the vectors against ones a pinned reference build
- * produced from the same model bytes. It is deliberately a gate and not a benchmark: eight probes
- * chosen to exercise the paths a runtime gets wrong — single token, long input, non-Latin script,
- * code, ordinary prose — and no corpus, no retrieval metric, no scoring. Runs in seconds because
- * the reference side is committed rather than recomputed.
+ * <p>Embeds eight pinned probes — single token, long input, non-Latin script, code, rare tokens,
+ * ordinary prose — and compares the vectors against ones a pinned reference build produced from the
+ * same model bytes. Runs in seconds because the reference side is committed.
  *
- * <p>Passing does not prove the embeddings are good; it proves they are the model's. Two
- * identically broken implementations would agree perfectly, which is why the equivalence claim
- * rests on the reference being an independent implementation.
+ * <p>Passing proves the vectors are the model's, not that they are good. Two identically broken
+ * implementations would agree perfectly, so the claim rests on the reference being an independent
+ * implementation.
  *
  * <pre>{@code
  * ./gradlew :models-bench:run --args="embedding-equivalence --model /path/to/model.gguf"

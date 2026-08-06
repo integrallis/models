@@ -10,12 +10,12 @@ core runtime.
 
 For LangChain4j, `vectors-langchain4j` implements
 `EmbeddingStore<TextSegment>` while `models-langchain4j` implements the chat
-model. See xref:langchain4j.adoc#_rag_with_vectors[LangChain4j RAG with
+model. See xref:langchain4j.adoc#rag-with-vectors[LangChain4j RAG with
 Vectors].
 
 For Spring Boot, `vectors-spring-boot-starter` contributes a Spring AI
 `VectorStore` and `models-spring-boot-starter` contributes the named local
-`ChatModel`. See xref:spring-boot.adoc#_add_vectors_for_rag[Spring Boot with
+`ChatModel`. See xref:spring-boot.adoc#add-vectors-for-rag[Spring Boot with
 Vectors].
 
 == Direct Embedding Storage
@@ -30,6 +30,9 @@ dependencies {
 }
 ----
 
+See xref:embeddings.adoc[Embeddings] for producing the `EmbeddingBackend`
+these examples take as a parameter.
+
 The backend and collection must use the same vector dimension. The sink owns
 and closes the embedding backend; the application retains ownership of the
 collection. Batch documents, commit once, and embed the query through the same
@@ -37,7 +40,7 @@ backend:
 
 [source,java]
 ----
-import com.integrallis.models.embedding.EmbeddingBackend;
+import com.integrallis.models.api.EmbeddingBackend;
 import com.integrallis.models.embedding.VectorCollectionEmbeddingSink;
 import com.integrallis.vectors.db.SearchRequest;
 import com.integrallis.vectors.db.VectorCollection;

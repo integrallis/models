@@ -29,14 +29,12 @@ import java.util.Objects;
  * Compares embeddings produced here against vectors a reference implementation produced from the
  * same probe texts and the same model bytes.
  *
- * <p>This exists because retrieval quality is a published property of the weights rather than
- * something a runtime can improve on. What a runtime can get wrong is reproducing the model:
- * pooling, rotary embeddings, dequantization, normalization. Agreement with a reference has an
- * unambiguous correct answer, so it is what this gates on.
+ * <p>Retrieval quality is a published property of the weights. What a runtime can get wrong is
+ * pooling, rotary embeddings, dequantization, and normalization, so agreement with a reference is
+ * what this measures.
  *
- * <p>The reference vectors are committed rather than recomputed. They cannot drift unless the
- * oracle build or the probe set changes, both of which are pinned by digest, and running the oracle
- * is not on the critical path of a gate meant to finish in seconds.
+ * <p>The reference vectors are committed. They cannot drift unless the oracle build or the probe
+ * set changes, and both are pinned by digest.
  */
 public final class EmbeddingEquivalence {
 
@@ -44,25 +42,22 @@ public final class EmbeddingEquivalence {
    * Agreement below which the runtime is not considered to reproduce the model.
    *
    * <p>Mirrors {@code ModelEmbeddingQualification.MINIMUM_ORACLE_COSINE} in ModelJars. Duplicated
-   * rather than imported because ModelJars depends on this project, not the other way round; {@link
-   * EmbeddingEquivalenceCli} writes the value into every report so the two cannot silently diverge.
+   * because ModelJars depends on this project, not the other way round; {@link
+   * EmbeddingEquivalenceCli} writes the value into every report so the two cannot diverge silently.
    *
-   * <p>Set beneath the measured 0.99946 floor so ordinary floating-point divergence between two
-   * independent implementations passes, and far above where a pooling or dequantization defect
-   * lands.
+   * <p>Sits below the measured 0.99950 agreement and far above the 0.66156 a wrong pooling
+   * produces.
    */
   public static final double MINIMUM_COSINE = 0.999;
 
   /**
    * How far a vector's length may sit from one before normalization is considered broken.
    *
-   * <p>Cosine cannot police this. It is scale-invariant, so a runtime that skips L2 normalization
-   * entirely agrees with a normalized reference at exactly 1.0 — measured, not assumed. Length is
-   * therefore checked separately, because callers that use a dot product as a similarity shortcut
-   * depend on the vectors already being unit length.
+   * <p>Cosine is scale-invariant, so a runtime that skips L2 normalization agrees with a normalized
+   * reference at exactly 1.0. Length is therefore checked separately: callers that use a dot
+   * product as a similarity shortcut depend on the vectors being unit length.
    *
-   * <p>Loose enough for float32 accumulation, tight enough that an unnormalized vector, whose
-   * length runs well above one, cannot slip through.
+   * <p>Loose enough for float32 accumulation, tight enough to catch an unnormalized vector.
    */
   public static final double MAX_NORM_DEVIATION = 1.0e-3;
 
@@ -172,8 +167,7 @@ public final class EmbeddingEquivalence {
   /**
    * Measures agreement between two aligned sets of vectors.
    *
-   * <p>Gates on the worst probe rather than the mean: averaging lets one broken case hide behind
-   * seven good ones, and a defect that only shows up on, say, single-token input is still a defect.
+   * <p>Gates on the worst probe: averaging lets one broken case hide behind seven good ones.
    *
    * @param reference vectors from the reference implementation, in probe order
    * @param actual vectors produced here, in the same order
@@ -232,8 +226,8 @@ public final class EmbeddingEquivalence {
   /**
    * Computes cosine similarity in double precision.
    *
-   * <p>Both inputs are normalized in practice, but this does not assume it: an implementation that
-   * forgot to normalize should show up as disagreement rather than be silently corrected.
+   * <p>Does not assume the inputs are normalized, so a missing normalization shows up rather than
+   * being silently corrected.
    *
    * @param left first vector
    * @param right second vector, of the same length

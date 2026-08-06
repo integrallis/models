@@ -1,13 +1,11 @@
 # Embedding equivalence gate
 
-Proves that this runtime reproduces an embedding model, by comparing vectors it produces
-against ones a pinned reference build produced from the same model bytes and the same probes.
+Compares vectors this runtime produces against ones a pinned reference build produced from the
+same model bytes and the same probes.
 
-It is a gate, not a benchmark. Retrieval quality is a published property of the weights —
-Qwen3-Embedding-0.6B scores what it scores whoever runs it. What a runtime can get wrong is
-reproducing the model: pooling, rotary embeddings, dequantization, normalization. That has an
-unambiguous correct answer, so it is what this tests. Passing does not mean the embeddings are
-good; it means they are the model's.
+Retrieval quality is a published property of the weights. What a runtime can get wrong is pooling,
+rotary embeddings, dequantization, and normalization. Passing means the vectors are the model's,
+not that they are good.
 
 ## Running it
 
@@ -17,19 +15,18 @@ good; it means they are the model's.
   --report benchmark-results/embedding/qwen3-embedding-0.6b-q8_0.json"
 ```
 
-Exits `0` when every probe cleared the floor, `1` when any probe did not, `2` on a usage or
-integrity problem. Takes seconds: only this side runs, because the reference side is committed.
+Exits `0` when every probe cleared the floors, `1` when any did not, `2` on a usage or integrity
+problem. Takes seconds: only this side runs.
 
 ## Why the reference is committed
 
 The reference vectors cannot drift unless the oracle build or the probe set changes, and both are
-pinned by digest. Recomputing them each run would mean requiring a built llama.cpp on every machine
-that runs the gate, to re-derive a constant. The CLI refuses to run if either digest has moved, so
-a stale reference fails loudly rather than passing against the wrong inputs.
+pinned by digest. Recomputing them each run would require a built llama.cpp on every machine that
+runs the gate, to re-derive a constant. The CLI refuses to run if either digest has moved.
 
 ## The probe set
 
-Eight probes, chosen to exercise the paths a runtime gets wrong rather than to sample a corpus:
+Eight probes covering the paths a runtime gets wrong:
 
 | Probe | What it exercises |
 | --- | --- |
@@ -57,10 +54,9 @@ git rev-parse --short HEAD          # goes into oracleVersion
   --pooling last --embd-output-format array --embd-normalize 2 -c 512 -ngl 0
 ```
 
-The flags are not incidental. `--pooling last` matches how Qwen3-Embedding reduces states to a
-vector; `--embd-normalize 2` is L2; `-ngl 0` keeps it on CPU so the reference does not vary with
-the GPU it was generated on. Changing any of them changes what the vectors mean, so they must
-match the `pooling` and `normalized` fields recorded alongside.
+`--pooling last` matches how Qwen3-Embedding reduces states to a vector, `--embd-normalize 2` is
+L2, and `-ngl 0` keeps it on CPU so the reference does not vary with the GPU. Changing any of them
+changes what the vectors mean, so they must match the recorded `pooling` and `normalized`.
 
 Write the output into `reference-<model>.json` with `oracleVersion`, `probeSetSha256`
 (`sha256sum probes.txt`), and `artifactSha256` updated. Regenerate against the *unmodified*
@@ -68,17 +64,15 @@ runtime — a reference generated to accommodate a change proves nothing.
 
 ## The floors
 
-Two, because one is not enough.
+**Cosine >= 0.999**, mirroring `ModelEmbeddingQualification.MINIMUM_ORACLE_COSINE` in ModelJars.
+Duplicated because ModelJars depends on this project, not the reverse; every report writes the
+value it used so the two cannot diverge silently.
 
-**Cosine ≥ 0.999**, mirroring `ModelEmbeddingQualification.MINIMUM_ORACLE_COSINE` in ModelJars.
-Duplicated rather than imported because ModelJars depends on this project, not the reverse; every
-report writes the value it used so the two cannot silently diverge.
+**Unit length within 1e-3**, checked separately.
 
-**Unit length within 1e-3**, checked separately because cosine cannot police it.
-
-The floors were placed against measurements, not intuition. Agreement is not bit-exact and should
-not be — two independent implementations accumulate floating point differently — so the question
-is whether the good band and the broken band are far enough apart to put a line between them:
+Both were placed against measurements. Agreement is not bit-exact — two independent
+implementations accumulate floating point differently — so what matters is the distance between
+the good band and the broken band:
 
 | Run | Min cosine | Max ‖v‖ − 1 |
 | --- | --- | --- |
@@ -87,13 +81,12 @@ is whether the good band and the broken band are far enough apart to put a line 
 | L2 normalization skipped | **1.00000** | ~11 |
 | *floor* | *0.999* | *1e-3* |
 
-Two things follow. A real defect lands nowhere near the floor — wrong pooling scores 0.66 against
-a 0.9995 good band, so there is no threshold-tuning judgment call to get wrong. And cosine is
-blind to a missing normalization: it is scale-invariant, so an unnormalized runtime agrees with a
-normalized reference at *exactly* 1.0. That number is measured, via
-`llama-embedding --embd-normalize -1`, not assumed. Callers that use a bare dot product as a
-cosine shortcut — as `vectors` does — would be silently wrong while the gate reported perfection.
+Wrong pooling scores 0.66 against a 0.9995 good band, so the agreement floor has wide margin
+either side.
+
+Cosine is scale-invariant, so an unnormalized runtime agrees with a normalized reference at
+*exactly* 1.0 — measured via `llama-embedding --embd-normalize -1`. Callers that use a bare dot
+product as a cosine shortcut, as `vectors` does, would be wrong while the gate reported perfection.
 Hence the length check.
 
-The gate takes the worst probe, not the mean, because averaging lets one broken case hide behind
-seven good ones.
+The gate takes the worst probe: averaging lets one broken case hide behind seven good ones.

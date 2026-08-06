@@ -2,8 +2,38 @@
 
 [![MFCQI](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/models/main/models-bench/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-java)
 
-`models-bench` contains the controlled comparison harness and a decode-only JFR profiler for the
-pure-Java backend.
+`models-bench` contains the controlled comparison harness, a decode-only JFR profiler for the
+pure-Java backend, and the embedding equivalence gate.
+
+## Embedding equivalence gate
+
+```bash
+./gradlew :models-bench:run --args="embedding-equivalence \
+  --model /path/to/model.gguf \
+  --report benchmark-results/embedding/model.json"
+```
+
+Measures whether the runtime reproduces an embedding model. Retrieval quality is a published
+property of the weights; what a runtime can get wrong is pooling, rotary embeddings,
+dequantization, and normalization.
+
+Eight probes compared against a pinned llama.cpp build. Exit `0` reproduced, `1` not reproduced,
+`2` usage or integrity problem. Runs in seconds: the reference vectors are committed, so no machine
+running it needs a local llama.cpp build.
+
+Two floors, both placed against measurements:
+
+| Run | Min cosine | Max abs(norm - 1) |
+| --- | ---: | ---: |
+| Correct runtime against the reference | 0.99950 | 2.7e-09 |
+| Mean pooling instead of last-token | 0.66156 | — |
+| L2 normalization skipped | **1.00000** | ~11 |
+| *floor* | *0.999* | *1e-3* |
+
+Cosine is scale-invariant, so an unnormalized runtime agrees with a normalized reference at exactly
+1.0. Vector length is checked separately. Probe set, oracle pin, and the reference-regeneration
+procedure are in
+[`src/main/resources/embedding-equivalence/README.md`](src/main/resources/embedding-equivalence/README.md).
 
 ## Retained profiled Q6_K prefill gate
 
