@@ -57,11 +57,20 @@ public final class TaskIndexCli {
     }
   }
 
+  /**
+   * Opens the model for embedding, leaving pooling to it where pooling is not ours to choose.
+   *
+   * <p>An encoder reads its pooling from its own metadata and refuses to be told otherwise, so
+   * {@code --pooling} applies only to the decoder-only embedders where the caller genuinely has to
+   * supply it.
+   */
   private static GgufEmbeddingBackend embedding(Path model, String pooling) {
-    return GgufEmbeddingBackend.builder(PureJavaBackend.load(model))
-        .pooling(Pooling.valueOf(pooling.toUpperCase(Locale.ROOT)))
-        .normalize(true)
-        .build();
+    PureJavaBackend backend = PureJavaBackend.load(model);
+    GgufEmbeddingBackend.Builder builder = GgufEmbeddingBackend.builder(backend);
+    if (!backend.supportsSequenceEmbedding()) {
+      builder.pooling(Pooling.valueOf(pooling.toUpperCase(Locale.ROOT)));
+    }
+    return builder.normalize(true).build();
   }
 
   private static int build(Map<String, String> options) throws IOException {
