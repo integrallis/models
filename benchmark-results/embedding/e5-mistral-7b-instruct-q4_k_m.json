@@ -1,0 +1,67 @@
+{
+  "workload" : "oracle-equivalence-v1",
+  "model" : "E5-Mistral-7B-Instruct Q4_K_M",
+  "backend" : "pure-java",
+  "artifactSha256" : "96f5b8305d2091b48dc1191c082e61cca1f0fc7181650106bed3dd5a495ab5e4",
+  "artifactSizeBytes" : 4368439520,
+  "probeSetSha256" : "a25952a4cb80e57c099291dda9b44ad2b713c0688c386015a1e0000bf6fbf8b9",
+  "probes" : 8,
+  "embeddingDimension" : 4096,
+  "pooling" : "last-token",
+  "normalized" : true,
+  "oracleBackend" : "llama.cpp",
+  "oracleVersion" : "6ea215d17",
+  "minimumOracleCosine" : 0.9995117362682604,
+  "meanOracleCosine" : 0.9996140137272909,
+  "maxComponentDelta" : 0.004982158541679382,
+  "maxNormDeviation" : 5.542114434042844E-9,
+  "minimumOracleCosineFloor" : 0.999,
+  "maxNormDeviationFloor" : 0.001,
+  "normalizationHeld" : true,
+  "qualified" : true,
+  "perProbe" : [ {
+    "probe" : "The cat sat on the mat.",
+    "cosine" : 0.9996254135885395,
+    "embedMillis" : 2574.312301
+  }, {
+    "probe" : "How do I reset my password?",
+    "cosine" : 0.9996566332252969,
+    "embedMillis" : 2493.382404
+  }, {
+    "probe" : "Quantum chromodynamics describes the strong interaction.",
+    "cosine" : 0.9995748110871204,
+    "embedMillis" : 3950.757927
+  }, {
+    "probe" : "a",
+    "cosine" : 0.9996833646648101,
+    "embedMillis" : 666.914917
+  }, {
+    "probe" : "The quick brown fox jumps over the lazy dog near the riverbank at dawn while birds sing overhead.",
+    "cosine" : 0.9995117362682604,
+    "embedMillis" : 8140.317039
+  }, {
+    "probe" : "Database backups are retained for 30 days.",
+    "cosine" : 0.9997086208948631,
+    "embedMillis" : 3919.615697
+  }, {
+    "probe" : "def add(a, b): return a + b",
+    "cosine" : 0.9995684641736909,
+    "embedMillis" : 4287.585216
+  }, {
+    "probe" : "¿Dónde está la biblioteca?",
+    "cosine" : 0.9995830659157456,
+    "embedMillis" : 3839.16599
+  } ],
+  "environment" : {
+    "host" : "rockhopper",
+    "osName" : "Linux",
+    "osVersion" : "7.0.11-76070011-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "Intel(R) Core(TM) i9-14900HX",
+    "processors" : 32,
+    "physicalMemoryBytes" : 101073932288,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Azul Systems, Inc.",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  }
+}

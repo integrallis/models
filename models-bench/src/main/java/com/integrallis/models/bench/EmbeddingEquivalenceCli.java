@@ -82,27 +82,27 @@ public final class EmbeddingEquivalenceCli {
       return usage("artifact does not exist: " + artifact);
     }
 
-    EmbeddingEquivalence.Reference reference = EmbeddingEquivalence.loadReference();
     List<String> probes = EmbeddingEquivalence.loadProbes();
 
-    // Both digests must hold or the comparison is against vectors from different inputs. Checking
-    // them is the difference between proving equivalence and proving nothing at all.
+    // The reference is chosen by artifact digest, so a model can only ever be compared against
+    // vectors generated from its own exact bytes.
+    String artifactSha256 = Hashing.sha256(artifact);
+    EmbeddingEquivalence.Reference reference =
+        EmbeddingEquivalence.referenceFor(artifactSha256).orElse(null);
+    if (reference == null) {
+      return usage(
+          "no committed reference matches this artifact"
+              + System.lineSeparator()
+              + "  artifact "
+              + artifactSha256
+              + System.lineSeparator()
+              + "  generate one, see embedding-equivalence/README.md");
+    }
     String probeSetSha256 = EmbeddingEquivalence.sha256(EmbeddingEquivalence.loadProbesRaw());
     if (!probeSetSha256.equals(reference.probeSetSha256())) {
       return usage(
           "probe set has changed since the reference was generated; regenerate it (see"
               + " embedding-equivalence/README.md)");
-    }
-    String artifactSha256 = Hashing.sha256(artifact);
-    if (!artifactSha256.equals(reference.artifactSha256())) {
-      return usage(
-          "artifact does not match the one the reference was generated from"
-              + System.lineSeparator()
-              + "  expected "
-              + reference.artifactSha256()
-              + System.lineSeparator()
-              + "  actual   "
-              + artifactSha256);
     }
 
     List<float[]> measured = new ArrayList<>(probes.size());
