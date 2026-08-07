@@ -239,6 +239,46 @@ class EncoderPathTest {
   }
 
   @Test
+  void truncatesToAMatryoshkaPrefixAndRescalesIt(@TempDir Path dir) throws IOException {
+    try (PureJavaBackend backend = PureJavaBackend.load(nanoEncoder(dir));
+        GgufEmbeddingBackend full =
+            GgufEmbeddingBackend.builder(backend).normalize(false).build()) {
+      float[] whole = full.embed(TEXT);
+
+      try (PureJavaBackend truncatedBackend = PureJavaBackend.load(nanoEncoder(dir));
+          GgufEmbeddingBackend truncated =
+              GgufEmbeddingBackend.builder(truncatedBackend)
+                  .matryoshkaDimensions(DIM / 2)
+                  .normalize(true)
+                  .build()) {
+        assertThat(truncated.dimension()).isEqualTo(DIM / 2);
+        float[] prefix = truncated.embed(TEXT);
+
+        assertThat(prefix).hasSize(DIM / 2);
+        // Rescaled to its own length, not the full vector's: a prefix of a unit vector is shorter
+        // than one, and comparing it by cosine against other prefixes needs it renormalized.
+        assertThat(magnitude(prefix)).isCloseTo(1.0, org.assertj.core.data.Offset.offset(1e-5));
+
+        // Same direction as the untruncated prefix — truncation drops components, it does not
+        // recompute them.
+        float[] expected = java.util.Arrays.copyOf(whole, DIM / 2);
+        assertThat(cosine(prefix, expected))
+            .isCloseTo(1.0f, org.assertj.core.data.Offset.offset(1e-5f));
+      }
+    }
+  }
+
+  @Test
+  void refusesToTruncateWiderThanTheModel(@TempDir Path dir) throws IOException {
+    try (PureJavaBackend backend = PureJavaBackend.load(nanoEncoder(dir))) {
+      assertThatThrownBy(
+              () -> GgufEmbeddingBackend.builder(backend).matryoshkaDimensions(DIM + 1).build())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("the model produces");
+    }
+  }
+
+  @Test
   void rejectsAPoolingChoiceTheModelAlreadyMakes(@TempDir Path dir) throws IOException {
     try (PureJavaBackend backend = PureJavaBackend.load(nanoEncoder(dir))) {
       // Honouring it would return a vector of the right width computed the wrong way, which
@@ -289,6 +329,18 @@ class EncoderPathTest {
             GgufEmbeddingBackend.builder(backend).normalize(true).build()) {
       return embedding.embed(TEXT);
     }
+  }
+
+  private static float cosine(float[] left, float[] right) {
+    double dot = 0;
+    double leftNorm = 0;
+    double rightNorm = 0;
+    for (int index = 0; index < left.length; index++) {
+      dot += (double) left[index] * right[index];
+      leftNorm += (double) left[index] * left[index];
+      rightNorm += (double) right[index] * right[index];
+    }
+    return (float) (dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm)));
   }
 
   private static double magnitude(float[] vector) {

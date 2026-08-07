@@ -54,7 +54,15 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
     this.pooling = builder.pooling;
     this.normalize = builder.normalize;
     this.modelOwnsPooling = backend.supportsSequenceEmbedding();
-    this.dimension = backend.metadata().embeddingDim();
+    int full = backend.metadata().embeddingDim();
+    if (builder.matryoshkaDimensions > full) {
+      throw new IllegalArgumentException(
+          "cannot truncate to "
+              + builder.matryoshkaDimensions
+              + " dimensions: the model produces "
+              + full);
+    }
+    this.dimension = builder.matryoshkaDimensions > 0 ? builder.matryoshkaDimensions : full;
     if (!modelOwnsPooling && !backend.supportsHiddenState()) {
       throw new IllegalArgumentException(
           "model architecture "
@@ -96,6 +104,12 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
       pooled = backend.embedSequence(tokens);
     } else {
       pooled = pooling == Pooling.MEAN ? meanPooled(tokens) : lastTokenPooled(tokens);
+    }
+    // Truncate before normalizing: a Matryoshka prefix is only a unit vector once rescaled to its
+    // own length, and cosine over an unrescaled prefix is not the similarity the model was
+    // trained to produce.
+    if (dimension != pooled.length) {
+      pooled = java.util.Arrays.copyOf(pooled, dimension);
     }
     if (normalize) {
       l2Normalize(pooled);
@@ -181,6 +195,31 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
     private Pooling pooling = Pooling.LAST_TOKEN;
     private boolean poolingRequested;
     private boolean normalize = true;
+    private int matryoshkaDimensions;
+
+    /**
+     * Keeps only the first {@code dimensions} components, rescaling to unit length afterwards.
+     *
+     * <p>Valid <em>only</em> for models trained with Matryoshka Representation Learning, which
+     * arranges the vector so that each prefix is itself a usable embedding. Truncating any other
+     * model discards trained dimensions and degrades retrieval without failing.
+     *
+     * <p>No GGUF metadata records whether a model was trained this way, so nothing here can check
+     * it. Hence the name: a caller who does not already know what Matryoshka means will not reach
+     * for this method by accident, which a plain {@code dimensions()} would invite.
+     *
+     * <p>EmbeddingGemma publishes 768, 512, 256 and 128. Sizes between those are not wrong so much
+     * as unmeasured — the published quality figures only cover the listed widths.
+     *
+     * @param dimensions the prefix length to keep, at most the model's full width
+     */
+    public Builder matryoshkaDimensions(int dimensions) {
+      if (dimensions <= 0) {
+        throw new IllegalArgumentException("dimensions must be > 0: " + dimensions);
+      }
+      this.matryoshkaDimensions = dimensions;
+      return this;
+    }
 
     private Builder(PureJavaBackend backend) {
       this.backend = Objects.requireNonNull(backend, "backend");

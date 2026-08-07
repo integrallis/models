@@ -64,13 +64,20 @@ public final class TaskIndexCli {
    * {@code --pooling} applies only to the decoder-only embedders where the caller genuinely has to
    * supply it.
    */
-  private static GgufEmbeddingBackend embedding(Path model, String pooling) {
+  private static GgufEmbeddingBackend embedding(Path model, String pooling, int dimensions) {
     PureJavaBackend backend = PureJavaBackend.load(model);
     GgufEmbeddingBackend.Builder builder = GgufEmbeddingBackend.builder(backend);
     if (!backend.supportsSequenceEmbedding()) {
       builder.pooling(Pooling.valueOf(pooling.toUpperCase(Locale.ROOT)));
     }
+    if (dimensions > 0) {
+      builder.matryoshkaDimensions(dimensions);
+    }
     return builder.normalize(true).build();
+  }
+
+  private static int dimensions(Map<String, String> options) {
+    return Integer.parseInt(options.getOrDefault("dimensions", "0"));
   }
 
   private static int build(Map<String, String> options) throws IOException {
@@ -80,7 +87,7 @@ public final class TaskIndexCli {
     TaskExemplars exemplars = corpus(Path.of(required(options, "corpus")));
 
     try (GgufEmbeddingBackend backend =
-        embedding(model, options.getOrDefault("pooling", "last_token"))) {
+        embedding(model, options.getOrDefault("pooling", "last_token"), dimensions(options))) {
       long started = System.nanoTime();
       int indexed = TaskIndexBuilder.build(exemplars, backend::embed, modelId, out);
       long millis = (System.nanoTime() - started) / 1_000_000;
@@ -105,7 +112,7 @@ public final class TaskIndexCli {
     }
 
     try (GgufEmbeddingBackend backend =
-            embedding(model, options.getOrDefault("pooling", "last_token"));
+            embedding(model, options.getOrDefault("pooling", "last_token"), dimensions(options));
         TaskIndex index = TaskIndex.open(indexDirectory)) {
       PretrainedTaskClassifier classifier =
           PretrainedTaskClassifier.using(index, backend::embed, threshold);
@@ -192,7 +199,9 @@ public final class TaskIndexCli {
           """
           usage:
             build     --model M.gguf --model-id ID --corpus C.tsv --out DIR [--pooling last_token]
+                      [--dimensions N]
             evaluate  --model M.gguf --corpus C.tsv --index DIR [--threshold T] [--min-accuracy A]
+                      [--dimensions N]
           """);
       return 2;
     }
