@@ -225,6 +225,40 @@ class EmbeddingEquivalenceTest {
     }
 
     @Test
+    void listsEveryCommittedReference() {
+      // The gate covers more than one model, so the reference set is an index rather than a
+      // single pinned file.
+      assertThat(EmbeddingEquivalence.referenceNames()).isNotEmpty();
+      for (String name : EmbeddingEquivalence.referenceNames()) {
+        assertThat(EmbeddingEquivalence.loadReference(name).vectors()).isNotEmpty();
+      }
+    }
+
+    @Test
+    void selectsTheReferenceGeneratedFromTheSameArtifact() {
+      EmbeddingEquivalence.Reference reference = EmbeddingEquivalence.loadReference();
+
+      assertThat(EmbeddingEquivalence.referenceFor(reference.artifactSha256()))
+          .isPresent()
+          .get()
+          .extracting(EmbeddingEquivalence.Reference::artifactSha256)
+          .isEqualTo(reference.artifactSha256());
+    }
+
+    @Test
+    void hasNoReferenceForAnUnknownArtifact() {
+      assertThat(EmbeddingEquivalence.referenceFor("f".repeat(64))).isEmpty();
+    }
+
+    @Test
+    void everyReferenceCoversTheSameProbeSet() {
+      String probeSet = EmbeddingEquivalence.sha256(EmbeddingEquivalence.loadProbesRaw());
+      for (String name : EmbeddingEquivalence.referenceNames()) {
+        assertThat(EmbeddingEquivalence.loadReference(name).probeSetSha256()).isEqualTo(probeSet);
+      }
+    }
+
+    @Test
     void probeCountMatchesTheReferenceVectorCount() {
       assertThat(EmbeddingEquivalence.loadProbes())
           .hasSameSizeAs(EmbeddingEquivalence.loadReference().vectors());

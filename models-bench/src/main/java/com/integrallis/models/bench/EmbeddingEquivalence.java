@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Compares embeddings produced here against vectors a reference implementation produced from the
@@ -62,8 +63,7 @@ public final class EmbeddingEquivalence {
 
   private static final String RESOURCE_ROOT = "/embedding-equivalence/";
   private static final String PROBES_RESOURCE = RESOURCE_ROOT + "probes.txt";
-  private static final String REFERENCE_RESOURCE =
-      RESOURCE_ROOT + "reference-qwen3-embedding-0.6b-q8_0.json";
+  private static final String REFERENCE_INDEX = RESOURCE_ROOT + "references.txt";
 
   private EmbeddingEquivalence() {}
 
@@ -266,16 +266,65 @@ public final class EmbeddingEquivalence {
   }
 
   /**
-   * Loads the committed reference vectors.
+   * Lists every committed reference set, in index order.
    *
-   * @return the pinned reference
+   * @return reference resource names
+   */
+  public static List<String> referenceNames() {
+    return readResource(REFERENCE_INDEX)
+        .lines()
+        .map(String::trim)
+        .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+        .toList();
+  }
+
+  /**
+   * Finds the reference generated from an exact model artifact.
+   *
+   * <p>Selecting by digest rather than by name means the gate cannot compare a model against
+   * another model's vectors.
+   *
+   * @param artifactSha256 SHA-256 digest of a model artifact
+   * @return the matching reference, when one is committed
+   */
+  public static Optional<Reference> referenceFor(String artifactSha256) {
+    if (artifactSha256 == null || artifactSha256.isBlank()) {
+      return Optional.empty();
+    }
+    for (String name : referenceNames()) {
+      Reference reference = loadReference(name);
+      if (reference.artifactSha256().equalsIgnoreCase(artifactSha256)) {
+        return Optional.of(reference);
+      }
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * Loads the first committed reference set.
+   *
+   * @return the first reference in the index
    */
   public static Reference loadReference() {
+    List<String> names = referenceNames();
+    if (names.isEmpty()) {
+      throw new IllegalStateException("no reference sets are committed");
+    }
+    return loadReference(names.get(0));
+  }
+
+  /**
+   * Loads one committed reference set by resource name.
+   *
+   * @param name file name under the embedding-equivalence resource directory
+   * @return the pinned reference
+   */
+  public static Reference loadReference(String name) {
     JsonNode root;
     try {
-      root = new ObjectMapper().readTree(readResource(REFERENCE_RESOURCE));
+      root = new ObjectMapper().readTree(readResource(RESOURCE_ROOT + name));
     } catch (IOException failure) {
-      throw new UncheckedIOException("reference vectors are not valid JSON", failure);
+      throw new UncheckedIOException("reference vectors are not valid JSON: " + name, failure);
     }
     JsonNode rows = root.get("vectors");
     List<float[]> vectors = new ArrayList<>(rows.size());
