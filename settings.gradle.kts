@@ -13,6 +13,7 @@ include("models-runtime")
 include("models")
 include("models-rag")
 include("models-semantic-order")
+include("models-router")
 
 // --- Backends ---
 include("backend-java")
