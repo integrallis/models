@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.cache;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -274,5 +275,28 @@ class KvCacheTest {
       assertThatThrownBy(() -> cache.store(2, 0, new float[] {1, 2}, new float[] {3, 4}))
           .isInstanceOf(IllegalArgumentException.class);
     }
+  }
+
+  @Test
+  void roundsThroughHalfPrecisionWhenTheReferenceModeIsEnabled() {
+    // llama.cpp holds cache_k/cache_v as F16. This runtime keeps F32 by default because enabling
+    // the rounding flips a greedy token on the pinned SQLCoder fixture, so only the arithmetic is
+    // asserted here; models.purejava.halfPrecisionKvCache selects it at runtime.
+    float value = 1.0f / 3.0f;
+    float rounded = Float.float16ToFloat(Float.floatToFloat16(value));
+
+    assertThat(rounded).isNotEqualTo(value);
+    assertThat(rounded).isCloseTo(value, within(1.0e-3f));
+  }
+
+  @Test
+  void keepsExactlyRepresentableValuesUnchanged() {
+    KvCache cache = new KvCache(1, 2, 2, 2);
+    float[] exact = {0.5f, -2.25f};
+
+    cache.store(0, 0, exact, exact);
+
+    assertThat(cache.keySlice(0, 0, 1)).containsExactly(exact);
+    assertThat(cache.valueSlice(0, 0, 1)).containsExactly(exact);
   }
 }
