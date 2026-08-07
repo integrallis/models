@@ -60,6 +60,44 @@ class TaskExemplarsTest {
   }
 
   @Test
+  void keepsTasksAndPromptsInCorpusOrder() {
+    // The index derives document ids and its corpus digest from this iteration order. Map.copyOf
+    // and the other immutable collections randomise their order per JVM run, which would make
+    // every build produce a different index from identical input.
+    TaskExemplars exemplars =
+        TaskExemplars.parse(
+            new StringReader(
+                "train\tsql\tgretel\tselect the top ten customers\n"
+                    + "train\tcode\tmbpp\twrite a parser\n"
+                    + "train\tcode\tmbpp\tsort a list\n"
+                    + "train\tmath\tgsm8k\tadd two numbers\n"));
+
+    assertThat(exemplars.taskNames()).containsExactly("sql", "code", "math");
+    assertThat(exemplars.trainingPrompts().get("code"))
+        .extracting(TaskExemplars.Labelled::prompt)
+        .containsExactly("write a parser", "sort a list");
+  }
+
+  @Test
+  void digestsTheCorpusIdenticallyForIdenticalInput() {
+    String text = "train\tcode\tmbpp\twrite a parser\ntrain\tmath\tgsm8k\tadd two numbers\n";
+
+    assertThat(TaskIndexBuilder.corpusDigest(TaskExemplars.parse(new StringReader(text))))
+        .isEqualTo(TaskIndexBuilder.corpusDigest(TaskExemplars.parse(new StringReader(text))));
+  }
+
+  @Test
+  void digestChangesWhenAPromptIsReplaced() {
+    // A prompt count alone would miss a swap, which is the edit most likely to be made by hand
+    // and forgotten before rebuilding the index.
+    String before = "train\tcode\tmbpp\twrite a parser\ntrain\tcode\tmbpp\tsort a list\n";
+    String after = "train\tcode\tmbpp\twrite a parser\ntrain\tcode\tmbpp\tsort an array\n";
+
+    assertThat(TaskIndexBuilder.corpusDigest(TaskExemplars.parse(new StringReader(before))))
+        .isNotEqualTo(TaskIndexBuilder.corpusDigest(TaskExemplars.parse(new StringReader(after))));
+  }
+
+  @Test
   void rejectsAMalformedLine() {
     assertThatThrownBy(() -> TaskExemplars.parse(new StringReader("train\tcode\tmbpp\n")))
         .isInstanceOf(IllegalStateException.class)

@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +100,11 @@ public final class TaskExemplars {
     }
     Map<String, List<Labelled>> frozen = new LinkedHashMap<>();
     train.forEach((task, prompts) -> frozen.put(task, List.copyOf(prompts)));
-    return new TaskExemplars(Map.copyOf(frozen), List.copyOf(evaluation));
+    // Collections.unmodifiableMap over a LinkedHashMap rather than Map.copyOf: the immutable
+    // collections randomise iteration order per JVM run, which would give the index different
+    // document ids and the corpus a different digest on every build.
+    return new TaskExemplars(
+        Collections.unmodifiableMap(frozen), Collections.unmodifiableList(evaluation));
   }
 
   /**
@@ -108,9 +113,9 @@ public final class TaskExemplars {
    * @return an immutable map from task name to its prompts
    */
   public Map<String, List<Labelled>> trainingPrompts() {
-    // Already immutable; copyOf on an immutable map returns the same instance, so this is a
-    // statement of intent rather than a copy.
-    return Map.copyOf(train);
+    // Wrapped again at the return: the field is already unmodifiable, but wrapping here is what
+    // marks the boundary, and it keeps LinkedHashMap ordering that Map.copyOf would discard.
+    return Collections.unmodifiableMap(train);
   }
 
   /**
@@ -119,7 +124,7 @@ public final class TaskExemplars {
    * @return an immutable list of labelled prompts
    */
   public List<Labelled> evaluationPrompts() {
-    return List.copyOf(evaluation);
+    return Collections.unmodifiableList(evaluation);
   }
 
   /**

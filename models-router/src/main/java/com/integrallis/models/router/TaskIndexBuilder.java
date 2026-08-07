@@ -25,7 +25,10 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -136,6 +139,38 @@ public final class TaskIndexBuilder {
     return prompts.size();
   }
 
+  /**
+   * Digest of the training prompts this index was built from.
+   *
+   * <p>Lets a build detect an index left behind by a corpus edit. A prompt count alone would miss
+   * an edit that replaced one prompt with another, which is exactly the change most likely to be
+   * made by hand and forgotten.
+   *
+   * @param exemplars the corpus
+   * @return a hex SHA-256 over every training prompt, in task then insertion order
+   */
+  public static String corpusDigest(TaskExemplars exemplars) {
+    Objects.requireNonNull(exemplars, "exemplars");
+    MessageDigest digest;
+    try {
+      digest = MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 is required by the platform", e);
+    }
+    exemplars
+        .trainingPrompts()
+        .forEach(
+            (task, prompts) ->
+                prompts.forEach(
+                    labelled -> {
+                      digest.update(task.getBytes(StandardCharsets.UTF_8));
+                      digest.update((byte) 0);
+                      digest.update(labelled.prompt().getBytes(StandardCharsets.UTF_8));
+                      digest.update((byte) 0);
+                    }));
+    return HexFormat.of().formatHex(digest.digest());
+  }
+
   private static void writeManifest(
       Path directory, String modelId, int dimension, int count, TaskExemplars exemplars) {
     String text =
@@ -146,6 +181,8 @@ public final class TaskIndexBuilder {
             + dimension
             + "\nprompts="
             + count
+            + "\ncorpusSha256="
+            + corpusDigest(exemplars)
             + "\ntasks="
             + String.join(",", exemplars.taskNames())
             + "\n";
