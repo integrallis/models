@@ -275,4 +275,34 @@ class KvCacheTest {
           .isInstanceOf(IllegalArgumentException.class);
     }
   }
+
+  @Test
+  void storesAtHalfPrecisionToMatchTheReferenceRuntime() {
+    // llama.cpp holds cache_k/cache_v as F16. Keeping F32 here made this runtime *more* precise
+    // than the reference, which showed up as an equivalence failure on qwen3 K-quant models.
+    KvCache cache = new KvCache(1, 4, 2, 2);
+    float[] key = {1.0f / 3.0f, 12345.678f};
+    float[] value = {-1.0f / 7.0f, 0.1234567f};
+
+    cache.store(0, 0, key, value);
+
+    float[] storedKey = cache.keySlice(0, 0, 1);
+    float[] storedValue = cache.valueSlice(0, 0, 1);
+    for (int i = 0; i < key.length; i++) {
+      assertThat(storedKey[i]).isEqualTo(Float.float16ToFloat(Float.floatToFloat16(key[i])));
+      assertThat(storedValue[i]).isEqualTo(Float.float16ToFloat(Float.floatToFloat16(value[i])));
+    }
+    assertThat(storedKey[0]).isNotEqualTo(key[0]);
+  }
+
+  @Test
+  void keepsHalfPrecisionValuesExactlyRepresentable() {
+    KvCache cache = new KvCache(1, 2, 2, 2);
+    float[] exact = {0.5f, -2.25f};
+
+    cache.store(0, 0, exact, exact);
+
+    assertThat(cache.keySlice(0, 0, 1)).containsExactly(exact);
+    assertThat(cache.valueSlice(0, 0, 1)).containsExactly(exact);
+  }
 }

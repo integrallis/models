@@ -62,9 +62,24 @@ public final class KvCache {
     checkVectorRange("value", value, valueOffset, valueDim);
     ensureCapacity(position + 1);
     int slot = slotIndex(layer, position);
-    System.arraycopy(key, keyOffset, keys, slot * keyDim, keyDim);
-    System.arraycopy(value, valueOffset, values, slot * valueDim, valueDim);
+    storeHalfPrecision(key, keyOffset, keys, slot * keyDim, keyDim);
+    storeHalfPrecision(value, valueOffset, values, slot * valueDim, valueDim);
     populated[slot] = true;
+  }
+
+  /**
+   * Copies a vector into the cache at half precision.
+   *
+   * <p>llama.cpp holds {@code cache_k} and {@code cache_v} as F16, so attention there reads back
+   * rounded keys and values. Storing F32 made this runtime more precise than the reference rather
+   * than equivalent to it, which the embedding equivalence gate reports as a failure.
+   */
+  private static void storeHalfPrecision(
+      float[] source, int sourceOffset, float[] destination, int destinationOffset, int length) {
+    for (int index = 0; index < length; index++) {
+      destination[destinationOffset + index] =
+          Float.float16ToFloat(Float.floatToFloat16(source[sourceOffset + index]));
+    }
   }
 
   /**
