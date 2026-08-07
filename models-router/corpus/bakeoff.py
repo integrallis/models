@@ -143,6 +143,11 @@ def main():
             result = evaluate(name, train, evaluation)
             if result:
                 results.append(result)
+                # Written after every model: each takes minutes, and a run interrupted
+                # partway would otherwise report nothing at all.
+                pathlib.Path(args.out).write_text(json.dumps(
+                    {"train": len(train), "eval": len(evaluation),
+                     "results": sorted(results, key=lambda r: -r["accuracy"])}, indent=2) + "\n")
         except Exception as error:
             print("  %-20s ERROR %s" % (name, str(error)[:200]))
 
