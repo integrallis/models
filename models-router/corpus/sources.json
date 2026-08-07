@@ -13,14 +13,14 @@
       "train": 200
     },
     "creative": {
-      "total": 249,
-      "eval": 49,
-      "train": 200
+      "total": 243,
+      "eval": 48,
+      "train": 195
     },
     "extraction": {
-      "total": 246,
-      "eval": 49,
-      "train": 197
+      "total": 250,
+      "eval": 50,
+      "train": 200
     },
     "math": {
       "total": 250,
@@ -28,9 +28,9 @@
       "train": 200
     },
     "reasoning": {
-      "total": 250,
-      "eval": 50,
-      "train": 200
+      "total": 211,
+      "eval": 42,
+      "train": 169
     },
     "sql": {
       "total": 250,
@@ -100,29 +100,29 @@
       "split": "test",
       "field": "input",
       "license": "MIT",
-      "kept": 125,
+      "kept": 86,
       "wrapped": false,
-      "note": "BIG-Bench Hard, boolean_expressions config"
+      "note": "BIG-Bench Hard across causal_judgement, date_understanding, logical_deduction_three_objects, navigate, temporal_sequences, boolean_expressions"
     },
     {
       "task": "summarization",
-      "dataset": "databricks-dolly-15k + EdinburghNLP/xsum",
+      "dataset": "EdinburghNLP/xsum",
       "split": "train",
-      "field": "instruction | document",
-      "license": "CC-BY-SA-3.0 / CC-BY-SA-4.0",
+      "field": "document",
+      "license": "CC-BY-SA-4.0",
       "kept": 250,
-      "wrapped": false,
-      "note": "0 of these are XSum documents wrapped in a summarize instruction"
+      "wrapped": true,
+      "note": "250 XSum documents wrapped in a summarize instruction; dolly's summarization category was dropped because its instructions read as question-answering once separated from their context"
     },
     {
       "task": "extraction",
       "dataset": "databricks/databricks-dolly-15k",
       "split": "train",
-      "field": "instruction",
+      "field": "instruction + context",
       "license": "CC-BY-SA-3.0",
       "kept": 250,
-      "wrapped": false,
-      "note": "category=information_extraction"
+      "wrapped": true,
+      "note": "category=information_extraction; passage appended and truncated to 60 words, since extraction needs something to extract from"
     },
     {
       "task": "translation",
@@ -142,7 +142,7 @@
       "license": "CC-BY-SA-3.0",
       "kept": 250,
       "wrapped": false,
-      "note": "category=creative_writing"
+      "note": "category=creative_writing, filtered to rows asking for text to be written"
     },
     {
       "task": "tool-use",
@@ -156,13 +156,13 @@
     },
     {
       "task": "chat",
-      "dataset": "OpenAssistant/oasst1",
+      "dataset": "databricks/databricks-dolly-15k",
       "split": "train",
-      "field": "text",
-      "license": "Apache-2.0",
+      "field": "instruction",
+      "license": "CC-BY-SA-3.0",
       "kept": 250,
       "wrapped": false,
-      "note": "role=prompter, lang=en, conversation roots only"
+      "note": "categories open_qa, general_qa and brainstorming with no context; OpenAssistant roots were dropped because they span every task"
     }
   ]
 }

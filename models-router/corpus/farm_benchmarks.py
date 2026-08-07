@@ -151,20 +151,99 @@ def hermes(wanted):
 
 
 def summarization(wanted, rng):
-    """Dolly's human-written summarization instructions, topped up with XSum."""
-    out = field("databricks/databricks-dolly-15k", "default", "train",
-                "instruction", wanted,
-                keep=lambda r: r.get("category") == "summarization")
-    wrapped = 0
-    if len(out) < wanted:
-        for row in parquet_rows("EdinburghNLP/xsum", "default", "train"):
-            snippet = clean(" ".join((row.get("document") or "").split()[:60]))
-            if snippet:
-                out.append(rng.choice(SUMMARY_WRAPPERS).format(snippet))
-                wrapped += 1
-            if len(out) >= wanted:
-                break
-    return out, wrapped
+    """XSum documents wrapped in an explicit summarize instruction.
+
+    Dolly's `summarization` category is not used: every one of its rows carries the
+    text in a separate `context` field, and the instruction alone reads as ordinary
+    question-answering ("What is a dispersive prism?"), which is a different task.
+    """
+    out = []
+    for row in parquet_rows("EdinburghNLP/xsum", "default", "train"):
+        snippet = clean(" ".join((row.get("document") or "").split()[:60]), 60, 400)
+        if snippet:
+            out.append(rng.choice(SUMMARY_WRAPPERS).format(snippet))
+        if len(out) >= wanted:
+            break
+    return out, len(out)
+
+
+EXTRACT_VERBS = ("extract", "list", "identify", "from the passage", "from the text",
+                 "from this", "pull out", "give me the", "what are the names")
+
+
+def extraction(wanted):
+    """Dolly information-extraction requests, instruction *and* passage.
+
+    Every row in this category carries its passage in `context`. Extraction is
+    defined by having something to extract from, so dropping the passage leaves a
+    prompt that is not an extraction request at all. The passage is truncated: the
+    request is recognisable from its opening, and the embedding model has a limited
+    window anyway.
+    """
+    out = []
+    for row in parquet_rows("databricks/databricks-dolly-15k", "default", "train"):
+        if row.get("category") != "information_extraction":
+            continue
+        instruction = (row.get("instruction") or "").strip()
+        if not any(verb in instruction.lower() for verb in EXTRACT_VERBS):
+            continue
+        passage = " ".join((row.get("context") or "").split()[:60])
+        text = clean(instruction + " " + passage, 40, 500)
+        if text:
+            out.append(text)
+        if len(out) >= wanted:
+            break
+    return out
+
+
+WRITE_VERBS = ("write", "compose", "draft", "create a", "come up with", "invent",
+               "tell me a story", "make a story", "generate a poem")
+
+
+def creative(wanted):
+    """Dolly creative-writing rows that actually ask for something to be written.
+
+    The category also holds open-ended musings ("Why is music so special?") and even
+    arithmetic word problems, which belong to other tasks; requiring a writing verb
+    keeps the ones that are requests to produce text.
+    """
+    out = []
+    for row in parquet_rows("databricks/databricks-dolly-15k", "default", "train"):
+        if row.get("category") != "creative_writing":
+            continue
+        instruction = (row.get("instruction") or "").strip()
+        if not any(verb in instruction.lower() for verb in WRITE_VERBS):
+            continue
+        text = clean(instruction)
+        if text:
+            out.append(text)
+        if len(out) >= wanted:
+            break
+    return out
+
+
+def chat(wanted):
+    """Dolly's open-ended question categories.
+
+    OpenAssistant conversation roots are not used: they are arbitrary user requests
+    spanning every task in this taxonomy — code, creative writing, tool use — so
+    labelling them all `chat` teaches the classifier that any request is chat. Dolly's
+    open_qa, general_qa and brainstorming rows carry no context and are genuinely
+    open-ended general questions, which is what this task means here.
+    """
+    wanted_categories = {"open_qa", "general_qa", "brainstorming"}
+    out = []
+    for row in parquet_rows("databricks/databricks-dolly-15k", "default", "train"):
+        if row.get("category") not in wanted_categories:
+            continue
+        if (row.get("context") or "").strip():
+            continue
+        text = clean(row.get("instruction"))
+        if text:
+            out.append(text)
+        if len(out) >= wanted:
+            break
+    return out
 
 
 def translation(wanted, rng):
@@ -214,44 +293,43 @@ def build(per_task):
     record("reasoning", field("allenai/ai2_arc", "ARC-Challenge", "train",
                               "question", half),
            "allenai/ai2_arc", "question", "CC-BY-SA-4.0")
-    record("reasoning", field("lukaemon/bbh", "boolean_expressions", "test",
-                              "input", per_task - half),
-           "lukaemon/bbh", "input", "MIT", split="test",
-           note="BIG-Bench Hard, boolean_expressions config")
+    bbh = []
+    bbh_configs = ["causal_judgement", "date_understanding", "logical_deduction_three_objects",
+                   "navigate", "temporal_sequences", "boolean_expressions"]
+    for config in bbh_configs:
+        share = (per_task - half) // len(bbh_configs) + 1
+        bbh.extend(field("lukaemon/bbh", config, "test", "input", share))
+    record("reasoning", bbh[: per_task - half], "lukaemon/bbh", "input", "MIT", split="test",
+           note="BIG-Bench Hard across " + ", ".join(bbh_configs))
 
     summaries, wrapped_count = summarization(per_task, rng)
-    record("summarization", summaries, "databricks-dolly-15k + EdinburghNLP/xsum",
-           "instruction | document", "CC-BY-SA-3.0 / CC-BY-SA-4.0",
-           wrapped=wrapped_count > 0,
-           note="%d of these are XSum documents wrapped in a summarize instruction"
-                % wrapped_count)
+    record("summarization", summaries, "EdinburghNLP/xsum", "document", "CC-BY-SA-4.0",
+           wrapped=True,
+           note="%d XSum documents wrapped in a summarize instruction; dolly's summarization "
+                "category was dropped because its instructions read as question-answering once "
+                "separated from their context" % wrapped_count)
 
-    record("extraction", field("databricks/databricks-dolly-15k", "default", "train",
-                               "instruction", per_task,
-                               keep=lambda r: r.get("category") == "information_extraction"),
-           "databricks/databricks-dolly-15k", "instruction", "CC-BY-SA-3.0",
-           note="category=information_extraction")
+    record("extraction", extraction(per_task), "databricks/databricks-dolly-15k",
+           "instruction + context", "CC-BY-SA-3.0", wrapped=True,
+           note="category=information_extraction; passage appended and truncated to 60 words, "
+                "since extraction needs something to extract from")
 
     record("translation", translation(per_task, rng), "Helsinki-NLP/opus-100",
            "translation.en", "CC-BY-4.0 (OPUS; per-corpus terms vary)",
            wrapped=True, note="English side wrapped in a translate instruction")
 
-    record("creative", field("databricks/databricks-dolly-15k", "default", "train",
-                             "instruction", per_task,
-                             keep=lambda r: r.get("category") == "creative_writing"),
-           "databricks/databricks-dolly-15k", "instruction", "CC-BY-SA-3.0",
-           note="category=creative_writing")
+    record("creative", creative(per_task), "databricks/databricks-dolly-15k",
+           "instruction", "CC-BY-SA-3.0",
+           note="category=creative_writing, filtered to rows asking for text to be written")
 
     record("tool-use", hermes(per_task), "NousResearch/hermes-function-calling-v1",
            "conversations[human][0]", "Apache-2.0",
            note="length bound raised to 700 characters for this source")
 
-    record("chat", field("OpenAssistant/oasst1", "default", "train", "text", per_task,
-                         keep=lambda r: r.get("role") == "prompter"
-                         and r.get("lang") == "en"
-                         and not r.get("parent_id")),
-           "OpenAssistant/oasst1", "text", "Apache-2.0",
-           note="role=prompter, lang=en, conversation roots only")
+    record("chat", chat(per_task), "databricks/databricks-dolly-15k", "instruction",
+           "CC-BY-SA-3.0",
+           note="categories open_qa, general_qa and brainstorming with no context; "
+                "OpenAssistant roots were dropped because they span every task")
 
     # Collapse repeats inside a task first: the same prompt arriving twice from
     # two configs of one source is a duplicate, not a labelling conflict.
