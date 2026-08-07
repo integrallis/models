@@ -18,6 +18,7 @@ package com.integrallis.models.router;
 import com.integrallis.vectors.core.MetadataValue;
 import com.integrallis.vectors.core.SimilarityFunction;
 import com.integrallis.vectors.db.IndexType;
+import com.integrallis.vectors.db.QuantizerKind;
 import com.integrallis.vectors.db.SearchRequest;
 import com.integrallis.vectors.db.SearchResult;
 import com.integrallis.vectors.db.VectorCollection;
@@ -76,12 +77,16 @@ public final class TaskIndex implements AutoCloseable {
     String modelId = require(manifest, "embeddingModelId", manifestFile);
     int dimension = Integer.parseInt(require(manifest, "dimension", manifestFile));
     List<String> tasks = List.of(require(manifest, "tasks", manifestFile).split(","));
+    // Absent in indexes written before quantization was an option, which were all full precision.
+    QuantizerKind quantizer =
+        QuantizerKind.valueOf(manifest.getProperty("quantizer", QuantizerKind.NONE.name()));
 
     VectorCollection collection =
         VectorCollection.builder()
             .dimension(dimension)
             .metric(SimilarityFunction.COSINE)
             .indexType(IndexType.FLAT)
+            .quantizer(quantizer)
             .storagePath(directory.toAbsolutePath())
             .build();
     return new TaskIndex(collection, modelId, dimension, tasks);

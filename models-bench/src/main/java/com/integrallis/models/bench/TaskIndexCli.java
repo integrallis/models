@@ -22,6 +22,7 @@ import com.integrallis.models.router.PretrainedTaskClassifier;
 import com.integrallis.models.router.TaskExemplars;
 import com.integrallis.models.router.TaskIndex;
 import com.integrallis.models.router.TaskIndexBuilder;
+import com.integrallis.vectors.db.QuantizerKind;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -80,20 +81,45 @@ public final class TaskIndexCli {
     return Integer.parseInt(options.getOrDefault("dimensions", "0"));
   }
 
+  /**
+   * Opens the embedding cache when one was asked for.
+   *
+   * <p>Scoped by model and width so a cache written for one configuration cannot answer for another
+   * — the vectors would be silently incomparable.
+   */
+  private static EmbeddingCache cache(Map<String, String> options, String modelId, int dimension) {
+    String path = options.get("embeddings");
+    return path == null ? null : EmbeddingCache.open(Path.of(path), modelId + "@" + dimension);
+  }
+
   private static int build(Map<String, String> options) throws IOException {
     Path model = Path.of(required(options, "model"));
     Path out = Path.of(required(options, "out"));
     String modelId = required(options, "model-id");
     TaskExemplars exemplars = corpus(Path.of(required(options, "corpus")));
 
+    QuantizerKind quantizer =
+        QuantizerKind.valueOf(options.getOrDefault("quantizer", "NONE").toUpperCase(Locale.ROOT));
+
     try (GgufEmbeddingBackend backend =
         embedding(model, options.getOrDefault("pooling", "last_token"), dimensions(options))) {
+      EmbeddingCache cache = cache(options, modelId, backend.dimension());
       long started = System.nanoTime();
-      int indexed = TaskIndexBuilder.build(exemplars, backend::embed, modelId, out);
+      int indexed =
+          TaskIndexBuilder.build(
+              exemplars,
+              cache == null ? backend::embed : cache.wrap(backend::embed),
+              modelId,
+              out,
+              quantizer);
       long millis = (System.nanoTime() - started) / 1_000_000;
+      if (cache != null) {
+        cache.save();
+        System.out.printf("embedding cache: %d reused, %d total%n", cache.loaded(), cache.size());
+      }
       System.out.printf(
-          "indexed %d prompts over %d tasks from %s in %d ms -> %s%n",
-          indexed, exemplars.taskNames().size(), modelId, millis, out);
+          "indexed %d prompts over %d tasks from %s (%s) in %d ms -> %s%n",
+          indexed, exemplars.taskNames().size(), modelId, quantizer, millis, out);
     }
     return 0;
   }
@@ -114,8 +140,10 @@ public final class TaskIndexCli {
     try (GgufEmbeddingBackend backend =
             embedding(model, options.getOrDefault("pooling", "last_token"), dimensions(options));
         TaskIndex index = TaskIndex.open(indexDirectory)) {
+      EmbeddingCache cache = cache(options, index.embeddingModelId(), backend.dimension());
       PretrainedTaskClassifier classifier =
-          PretrainedTaskClassifier.using(index, backend::embed, threshold);
+          PretrainedTaskClassifier.using(
+              index, cache == null ? backend::embed : cache.wrap(backend::embed), threshold);
 
       Map<String, int[]> perTask = new TreeMap<>();
       List<String> misses = new ArrayList<>();
@@ -155,6 +183,9 @@ public final class TaskIndexCli {
         misses.forEach(System.out::println);
       }
 
+      if (cache != null) {
+        cache.save();
+      }
       if (accuracy < floor) {
         System.err.printf("FAIL accuracy %.4f is below the floor of %.4f%n", accuracy, floor);
         return 1;
@@ -199,9 +230,9 @@ public final class TaskIndexCli {
           """
           usage:
             build     --model M.gguf --model-id ID --corpus C.tsv --out DIR [--pooling last_token]
-                      [--dimensions N]
+                      [--dimensions N] [--quantizer NONE|SQ8|SQ4|FP16|PQ|BQ] [--embeddings CACHE]
             evaluate  --model M.gguf --corpus C.tsv --index DIR [--threshold T] [--min-accuracy A]
-                      [--dimensions N]
+                      [--dimensions N] [--embeddings CACHE]
           """);
       return 2;
     }

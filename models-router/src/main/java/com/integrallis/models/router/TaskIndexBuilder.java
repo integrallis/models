@@ -19,6 +19,7 @@ import com.integrallis.vectors.core.Document;
 import com.integrallis.vectors.core.MetadataValue;
 import com.integrallis.vectors.core.SimilarityFunction;
 import com.integrallis.vectors.db.IndexType;
+import com.integrallis.vectors.db.QuantizerKind;
 import com.integrallis.vectors.db.VectorCollection;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -70,7 +71,29 @@ public final class TaskIndexBuilder {
    */
   public static int build(
       TaskExemplars exemplars, TaskEmbedder embedder, String modelId, Path directory) {
+    return build(exemplars, embedder, modelId, directory, QuantizerKind.NONE);
+  }
+
+  /**
+   * Embeds a corpus's training split and writes it as a persistent collection.
+   *
+   * @param exemplars the labelled corpus
+   * @param embedder embeds prompts; must be the model the classifier will later query with
+   * @param modelId identifier of that model, recorded in the manifest
+   * @param directory an empty or absent directory to write the index into
+   * @param quantizer how stored vectors are compressed; recorded in the manifest so the index is
+   *     reopened the way it was written
+   * @return how many prompts were indexed
+   * @throws IllegalArgumentException if the corpus is empty or the embedder returns nothing
+   */
+  public static int build(
+      TaskExemplars exemplars,
+      TaskEmbedder embedder,
+      String modelId,
+      Path directory,
+      QuantizerKind quantizer) {
     Objects.requireNonNull(exemplars, "exemplars");
+    Objects.requireNonNull(quantizer, "quantizer");
     Objects.requireNonNull(embedder, "embedder");
     Objects.requireNonNull(modelId, "modelId");
     Objects.requireNonNull(directory, "directory");
@@ -117,6 +140,7 @@ public final class TaskIndexBuilder {
             .dimension(dimension)
             .metric(SimilarityFunction.COSINE)
             .indexType(IndexType.FLAT)
+            .quantizer(quantizer)
             .storagePath(directory.toAbsolutePath())
             .build()) {
       List<Document> documents = new ArrayList<>(prompts.size());
@@ -135,7 +159,7 @@ public final class TaskIndexBuilder {
       collection.commit();
     }
 
-    writeManifest(directory, modelId, dimension, prompts.size(), exemplars);
+    writeManifest(directory, modelId, dimension, prompts.size(), exemplars, quantizer);
     return prompts.size();
   }
 
@@ -172,7 +196,12 @@ public final class TaskIndexBuilder {
   }
 
   private static void writeManifest(
-      Path directory, String modelId, int dimension, int count, TaskExemplars exemplars) {
+      Path directory,
+      String modelId,
+      int dimension,
+      int count,
+      TaskExemplars exemplars,
+      QuantizerKind quantizer) {
     String text =
         "# Written by TaskIndexBuilder. Describes the index in this directory.\n"
             + "embeddingModelId="
@@ -183,6 +212,8 @@ public final class TaskIndexBuilder {
             + count
             + "\ncorpusSha256="
             + corpusDigest(exemplars)
+            + "\nquantizer="
+            + quantizer.name()
             + "\ntasks="
             + String.join(",", exemplars.taskNames())
             + "\n";
