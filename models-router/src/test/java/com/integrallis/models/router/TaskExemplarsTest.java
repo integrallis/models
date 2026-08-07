@@ -76,7 +76,8 @@ class TaskExemplarsTest {
 
   @Test
   void rejectsACorpusWithNoTrainingPrompts() {
-    assertThatThrownBy(() -> TaskExemplars.parse(new StringReader("eval\tcode\tmbpp\tsort a list\n")))
+    assertThatThrownBy(
+            () -> TaskExemplars.parse(new StringReader("eval\tcode\tmbpp\tsort a list\n")))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("no training prompts");
   }

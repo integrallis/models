@@ -108,7 +108,9 @@ public final class TaskExemplars {
    * @return an immutable map from task name to its prompts
    */
   public Map<String, List<Labelled>> trainingPrompts() {
-    return train;
+    // Already immutable; copyOf on an immutable map returns the same instance, so this is a
+    // statement of intent rather than a copy.
+    return Map.copyOf(train);
   }
 
   /**
@@ -117,7 +119,7 @@ public final class TaskExemplars {
    * @return an immutable list of labelled prompts
    */
   public List<Labelled> evaluationPrompts() {
-    return evaluation;
+    return List.copyOf(evaluation);
   }
 
   /**
