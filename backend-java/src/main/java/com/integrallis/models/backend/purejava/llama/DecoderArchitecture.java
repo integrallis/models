@@ -17,13 +17,23 @@ package com.integrallis.models.backend.purejava.llama;
 
 import java.util.Locale;
 
-/** Decoder semantics implemented by the Java transformer graph. */
+/**
+ * Transformer semantics implemented by the Java graph.
+ *
+ * <p>Listing an architecture here asserts that its semantics are implemented end to end. An entry
+ * added ahead of its implementation is worse than no entry at all: the backend would accept the
+ * model and emit activations computed by the wrong graph, with nothing anywhere to fail on.
+ *
+ * <p>Most entries are causal decoders. {@link #GEMMA_EMBEDDING} is not — it is an encoder and runs
+ * a separate pass; {@link LlamaConfig#usesBidirectionalAttention()} is what tells them apart.
+ */
 public enum DecoderArchitecture {
   LLAMA("llama"),
   QWEN2("qwen2"),
   QWEN3("qwen3"),
   SMOLLM3("smollm3"),
-  GEMMA3("gemma3");
+  GEMMA3("gemma3"),
+  GEMMA_EMBEDDING("gemma-embedding");
 
   private final String metadataId;
 
@@ -36,7 +46,7 @@ public enum DecoderArchitecture {
     return metadataId;
   }
 
-  /** Resolves only architectures whose complete decoder semantics are implemented. */
+  /** Resolves only architectures whose complete semantics are implemented. */
   public static DecoderArchitecture parse(String value) {
     String normalized = value == null ? LLAMA.metadataId : value.trim().toLowerCase(Locale.ROOT);
     for (DecoderArchitecture architecture : values()) {
@@ -44,9 +54,14 @@ public enum DecoderArchitecture {
         return architecture;
       }
     }
+    StringBuilder supported = new StringBuilder();
+    for (DecoderArchitecture architecture : values()) {
+      supported.append(supported.isEmpty() ? "" : ", ").append(architecture.metadataId);
+    }
     throw new IllegalArgumentException(
-        "Unsupported GGUF decoder architecture: "
+        "Unsupported GGUF architecture: "
             + normalized
-            + "; supported architectures are llama, qwen2, qwen3, smollm3, gemma3");
+            + "; supported architectures are "
+            + supported);
   }
 }

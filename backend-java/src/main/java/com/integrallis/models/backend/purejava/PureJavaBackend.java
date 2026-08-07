@@ -31,6 +31,8 @@ import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
+import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
@@ -240,11 +242,23 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
             planConfiguration,
             batchedMatrixKernel);
     int contextCapacity = runtimeContextLength(config.contextLength());
-    KvCache cache =
-        new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
-    PureJavaDecoder decoder =
-        new LlamaDecoder(
-            new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel));
+    PureJavaDecoder decoder;
+    if (config.usesBidirectionalAttention()) {
+      // An encoder holds no KV cache: every position depends on every other, so there is nothing
+      // from a previous step to reuse.
+      decoder =
+          new EncoderDecoderAdapter(
+              new EncoderForwardPass(
+                  config,
+                  weights,
+                  DenseProjectionHead.load(file, modelFamily, config.embeddingDim()).orElse(null)));
+    } else {
+      KvCache cache =
+          new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
+      decoder =
+          new LlamaDecoder(
+              new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel));
+    }
     ModelMetadata metadata =
         new ModelMetadata(
             modelFamily,
@@ -369,6 +383,25 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   /** Whether this model's architecture exposes hidden states for embedding. */
   public boolean supportsHiddenState() {
     return decoder.supportsHiddenState();
+  }
+
+  /**
+   * Encodes a whole sequence into one vector using the model's own pooling and projection.
+   *
+   * <p>Available only where the model owns its embedding pipeline; check {@link
+   * #supportsSequenceEmbedding()} first.
+   *
+   * @param tokens the tokenized text
+   * @return a newly allocated pooled embedding, not normalized
+   */
+  public float[] embedSequence(int[] tokens) {
+    checkOpen();
+    return decoder.embedSequence(tokens);
+  }
+
+  /** Whether this model encodes whole sequences rather than exposing per-position states. */
+  public boolean supportsSequenceEmbedding() {
+    return decoder.supportsSequenceEmbedding();
   }
 
   @Override

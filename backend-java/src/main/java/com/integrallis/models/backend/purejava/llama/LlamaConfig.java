@@ -94,11 +94,35 @@ public record LlamaConfig(
     return valueLength * numHeads;
   }
 
+  /**
+   * Whether this architecture shares the Gemma 3 block layout.
+   *
+   * <p>EmbeddingGemma is Gemma 3's block repeated 24 times: same scaled embeddings, same GELU-gated
+   * feed-forward, same pair of post-norms, same interleaved sliding window. It differs only in how
+   * attention is masked and in what happens after the stack, so every structural flag below is
+   * shared rather than duplicated per architecture.
+   */
+  private boolean isGemmaFamily() {
+    return architecture == DecoderArchitecture.GEMMA3
+        || architecture == DecoderArchitecture.GEMMA_EMBEDDING;
+  }
+
+  /**
+   * Whether every position attends to the whole sequence rather than only to what precedes it.
+   *
+   * <p>True for encoders. This is not a tunable: a bidirectional model run causally produces a
+   * vector that looks entirely reasonable and is wrong, so the two passes are kept separate and
+   * this predicate is what routes between them.
+   */
+  public boolean usesBidirectionalAttention() {
+    return architecture == DecoderArchitecture.GEMMA_EMBEDDING;
+  }
+
   /** Whether the GGUF architecture uses the NeoX split-half rotary layout. */
   public boolean usesNeoxRope() {
     return architecture == DecoderArchitecture.QWEN2
         || architecture == DecoderArchitecture.QWEN3
-        || architecture == DecoderArchitecture.GEMMA3;
+        || isGemmaFamily();
   }
 
   /** Whether the zero-based transformer layer applies rotary position embeddings. */
@@ -111,29 +135,29 @@ public record LlamaConfig(
 
   /** Model-specific token embedding multiplier. */
   public float embeddingScale() {
-    return architecture == DecoderArchitecture.GEMMA3 ? (float) Math.sqrt(embeddingDim) : 1.0f;
+    return isGemmaFamily() ? (float) Math.sqrt(embeddingDim) : 1.0f;
   }
 
-  /** Whether this decoder uses GELU-gated rather than SiLU-gated feed-forward layers. */
+  /** Whether this architecture uses GELU-gated rather than SiLU-gated feed-forward layers. */
   public boolean usesGeluFfn() {
-    return architecture == DecoderArchitecture.GEMMA3;
+    return isGemmaFamily();
   }
 
   /** Whether attention output is normalized before its residual addition. */
   public boolean usesPostAttentionNorm() {
-    return architecture == DecoderArchitecture.GEMMA3;
+    return isGemmaFamily();
   }
 
   /** Whether feed-forward output is normalized before its residual addition. */
   public boolean usesPostFfnNorm() {
-    return architecture == DecoderArchitecture.GEMMA3;
+    return isGemmaFamily();
   }
 
   /** Whether this layer uses bounded sliding-window attention. */
   public boolean usesSlidingWindow(int layer) {
     requireLayer(layer);
     return slidingWindow > 0
-        && architecture == DecoderArchitecture.GEMMA3
+        && isGemmaFamily()
         && layer % slidingWindowPattern < slidingWindowPattern - 1;
   }
 
@@ -148,18 +172,57 @@ public record LlamaConfig(
     return usesSlidingWindow(layer) ? 1.0f : ropeFrequencyScale;
   }
 
-  /** First cache position visible to the selected attention layer. */
+  /**
+   * First cache position visible to the selected attention layer.
+   *
+   * <p>The two window shapes are not the same width. A causal window of {@code n_swa} spans the
+   * {@code n_swa} positions ending at the query. A bidirectional one is centred on the query and
+   * reaches {@code n_swa / 2} in each direction — llama.cpp's {@code LLAMA_SWA_TYPE_SYMMETRIC},
+   * which masks a key exactly when {@code |p1 - p0| > n_swa / 2}. Reading the causal bound as the
+   * symmetric one would silently widen the backward reach to twice its size.
+   */
   public int attentionStartPosition(int layer, int position) {
     requireLayer(layer);
     if (position < 0) {
       throw new IllegalArgumentException("position must be >= 0");
     }
-    return usesSlidingWindow(layer) ? Math.max(0, position - slidingWindow + 1) : 0;
+    if (!usesSlidingWindow(layer)) {
+      return 0;
+    }
+    return usesBidirectionalAttention()
+        ? Math.max(0, position - slidingWindow / 2)
+        : Math.max(0, position - slidingWindow + 1);
+  }
+
+  /**
+   * Last position visible to the selected attention layer, bounded by the sequence.
+   *
+   * <p>Always the query position itself under causal attention: nothing later exists yet.
+   *
+   * @param layer zero-based transformer layer
+   * @param position the querying position
+   * @param lastPosition the final position of the sequence being encoded
+   * @return the highest key position this query may attend to
+   */
+  public int attentionEndPosition(int layer, int position, int lastPosition) {
+    requireLayer(layer);
+    if (position < 0) {
+      throw new IllegalArgumentException("position must be >= 0");
+    }
+    if (lastPosition < position) {
+      throw new IllegalArgumentException("lastPosition must be >= position");
+    }
+    if (!usesBidirectionalAttention()) {
+      return position;
+    }
+    return usesSlidingWindow(layer)
+        ? Math.min(lastPosition, position + slidingWindow / 2)
+        : lastPosition;
   }
 
   /** Whether Llama-only staged/pruned layer implementations preserve this architecture. */
   public boolean usesStandardLlamaLayerSemantics() {
-    return architecture != DecoderArchitecture.GEMMA3;
+    return !isGemmaFamily();
   }
 
   private void requireLayer(int layer) {

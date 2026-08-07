@@ -110,8 +110,7 @@ public final class EmbeddingEquivalenceCli {
     long start = System.nanoTime();
     try (PureJavaBackend backend = PureJavaBackend.load(artifact);
         GgufEmbeddingBackend embedding =
-            GgufEmbeddingBackend.builder(backend)
-                .pooling(pooling(reference.pooling()))
+            requestedPooling(GgufEmbeddingBackend.builder(backend), backend, reference)
                 .normalize(reference.normalized())
                 .build()) {
       if (embedding.dimension() != reference.embeddingDimension()) {
@@ -137,6 +136,22 @@ public final class EmbeddingEquivalenceCli {
       System.out.println("report: " + report.toAbsolutePath());
     }
     return result.passed() ? PASS : FAIL;
+  }
+
+  /**
+   * Applies the reference's pooling only where pooling is the caller's to choose.
+   *
+   * <p>An encoder reads its pooling from its own metadata and rejects being told otherwise. That
+   * still leaves the reference honest: the oracle read the same metadata, so a disagreement would
+   * show up as vectors that do not match rather than as a setting quietly overridden.
+   */
+  private static GgufEmbeddingBackend.Builder requestedPooling(
+      GgufEmbeddingBackend.Builder builder,
+      PureJavaBackend backend,
+      EmbeddingEquivalence.Reference reference) {
+    return backend.supportsSequenceEmbedding()
+        ? builder
+        : builder.pooling(pooling(reference.pooling()));
   }
 
   private static void printSummary(
