@@ -171,12 +171,13 @@ public final class TaskIndexCli {
   }
 
   /**
-   * Entry point.
+   * Runs one subcommand.
    *
    * @param args {@code build} or {@code evaluate} followed by options
+   * @return process exit status; non-zero when a gate fails or usage is wrong
    * @throws IOException if the corpus or index cannot be read
    */
-  public static void main(String[] args) throws IOException {
+  public static int run(String[] args) throws IOException {
     if (args.length == 0) {
       System.err.println(
           """
@@ -184,8 +185,7 @@ public final class TaskIndexCli {
             build     --model M.gguf --model-id ID --corpus C.tsv --out DIR [--pooling last_token]
             evaluate  --model M.gguf --corpus C.tsv --index DIR [--threshold T] [--min-accuracy A]
           """);
-      System.exit(2);
-      return;
+      return 2;
     }
     int status;
     try {
@@ -202,6 +202,6 @@ public final class TaskIndexCli {
       System.err.println(e.getMessage());
       status = 2;
     }
-    System.exit(status);
+    return status;
   }
 }
