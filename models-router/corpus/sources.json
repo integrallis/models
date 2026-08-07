@@ -1,0 +1,168 @@
+{
+  "generator": "corpus/farm_benchmarks.py",
+  "per_task_target": 250,
+  "counts": {
+    "chat": {
+      "total": 250,
+      "eval": 50,
+      "train": 200
+    },
+    "code": {
+      "total": 250,
+      "eval": 50,
+      "train": 200
+    },
+    "creative": {
+      "total": 249,
+      "eval": 49,
+      "train": 200
+    },
+    "extraction": {
+      "total": 246,
+      "eval": 49,
+      "train": 197
+    },
+    "math": {
+      "total": 250,
+      "eval": 50,
+      "train": 200
+    },
+    "reasoning": {
+      "total": 250,
+      "eval": 50,
+      "train": 200
+    },
+    "sql": {
+      "total": 250,
+      "eval": 50,
+      "train": 200
+    },
+    "summarization": {
+      "total": 250,
+      "eval": 50,
+      "train": 200
+    },
+    "tool-use": {
+      "total": 146,
+      "eval": 29,
+      "train": 117
+    },
+    "translation": {
+      "total": 250,
+      "eval": 50,
+      "train": 200
+    }
+  },
+  "sources": [
+    {
+      "task": "code",
+      "dataset": "google-research/mbpp",
+      "split": "train",
+      "field": "text",
+      "license": "CC-BY-4.0",
+      "kept": 250,
+      "wrapped": false,
+      "note": ""
+    },
+    {
+      "task": "math",
+      "dataset": "openai/gsm8k",
+      "split": "train",
+      "field": "question",
+      "license": "MIT",
+      "kept": 250,
+      "wrapped": false,
+      "note": ""
+    },
+    {
+      "task": "sql",
+      "dataset": "gretelai/synthetic_text_to_sql",
+      "split": "train",
+      "field": "sql_prompt",
+      "license": "Apache-2.0",
+      "kept": 250,
+      "wrapped": false,
+      "note": ""
+    },
+    {
+      "task": "reasoning",
+      "dataset": "allenai/ai2_arc",
+      "split": "train",
+      "field": "question",
+      "license": "CC-BY-SA-4.0",
+      "kept": 125,
+      "wrapped": false,
+      "note": ""
+    },
+    {
+      "task": "reasoning",
+      "dataset": "lukaemon/bbh",
+      "split": "test",
+      "field": "input",
+      "license": "MIT",
+      "kept": 125,
+      "wrapped": false,
+      "note": "BIG-Bench Hard, boolean_expressions config"
+    },
+    {
+      "task": "summarization",
+      "dataset": "databricks-dolly-15k + EdinburghNLP/xsum",
+      "split": "train",
+      "field": "instruction | document",
+      "license": "CC-BY-SA-3.0 / CC-BY-SA-4.0",
+      "kept": 250,
+      "wrapped": false,
+      "note": "0 of these are XSum documents wrapped in a summarize instruction"
+    },
+    {
+      "task": "extraction",
+      "dataset": "databricks/databricks-dolly-15k",
+      "split": "train",
+      "field": "instruction",
+      "license": "CC-BY-SA-3.0",
+      "kept": 250,
+      "wrapped": false,
+      "note": "category=information_extraction"
+    },
+    {
+      "task": "translation",
+      "dataset": "Helsinki-NLP/opus-100",
+      "split": "train",
+      "field": "translation.en",
+      "license": "CC-BY-4.0 (OPUS; per-corpus terms vary)",
+      "kept": 250,
+      "wrapped": true,
+      "note": "English side wrapped in a translate instruction"
+    },
+    {
+      "task": "creative",
+      "dataset": "databricks/databricks-dolly-15k",
+      "split": "train",
+      "field": "instruction",
+      "license": "CC-BY-SA-3.0",
+      "kept": 250,
+      "wrapped": false,
+      "note": "category=creative_writing"
+    },
+    {
+      "task": "tool-use",
+      "dataset": "NousResearch/hermes-function-calling-v1",
+      "split": "train",
+      "field": "conversations[human][0]",
+      "license": "Apache-2.0",
+      "kept": 250,
+      "wrapped": false,
+      "note": "length bound raised to 700 characters for this source"
+    },
+    {
+      "task": "chat",
+      "dataset": "OpenAssistant/oasst1",
+      "split": "train",
+      "field": "text",
+      "license": "Apache-2.0",
+      "kept": 250,
+      "wrapped": false,
+      "note": "role=prompter, lang=en, conversation roots only"
+    }
+  ]
+}
