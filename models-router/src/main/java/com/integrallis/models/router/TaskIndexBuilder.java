@@ -141,6 +141,10 @@ public final class TaskIndexBuilder {
             .metric(SimilarityFunction.COSINE)
             .indexType(IndexType.FLAT)
             .quantizer(quantizer)
+            // Without this a quantizer only adds a compressed copy beside the full-precision
+            // vectors and makes the artifact bigger. This index ships inside a jar and is never
+            // read for its scores, only for which label won, so the exact copy is dead weight.
+            .quantizedOnly(quantizer != QuantizerKind.NONE)
             .storagePath(directory.toAbsolutePath())
             .build()) {
       List<Document> documents = new ArrayList<>(prompts.size());
