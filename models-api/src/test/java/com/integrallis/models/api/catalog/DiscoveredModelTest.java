@@ -43,6 +43,7 @@ class DiscoveredModelTest {
         contextWindow,
         0.0,
         0.0,
+        1024L,
         new DiscoveredModel.Performance(100, 30.0),
         Map.of("code", 0.8),
         successRate);
@@ -63,7 +64,7 @@ class DiscoveredModelTest {
   @Test
   void treatsAbsentPerformanceAsUnmeasuredRatherThanZero() {
     DiscoveredModel model =
-        new DiscoveredModel("m", true, Set.of(), 4096, 0.0, 0.0, null, Map.of(), 1.0);
+        new DiscoveredModel("m", true, Set.of(), 4096, 0.0, 0.0, 0L, null, Map.of(), 1.0);
 
     // Null means nothing was measured on this hardware. A zeroed Performance would read as a model
     // that answers instantly, which is the opposite of the truth.
@@ -82,6 +83,7 @@ class DiscoveredModelTest {
             4096,
             0.0,
             0.0,
+            1024L,
             new DiscoveredModel.Performance(100, 30.0),
             quality,
             1.0);
@@ -103,11 +105,11 @@ class DiscoveredModelTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("contextWindow");
     assertThatThrownBy(
-            () -> new DiscoveredModel(" ", true, Set.of(), 10, 0, 0, null, Map.of(), 1.0))
+            () -> new DiscoveredModel(" ", true, Set.of(), 10, 0, 0, 0L, null, Map.of(), 1.0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("blank");
     assertThatThrownBy(
-            () -> new DiscoveredModel("m", false, Set.of(), 10, -1, 0, null, Map.of(), 1.0))
+            () -> new DiscoveredModel("m", false, Set.of(), 10, -1, 0, 0L, null, Map.of(), 1.0))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("costs");
   }
@@ -126,9 +128,11 @@ class DiscoveredModelTest {
 
   @Test
   void rejectsNullsRatherThanCarryingThem() {
-    assertThatThrownBy(() -> new DiscoveredModel("m", true, null, 10, 0, 0, null, Map.of(), 1.0))
+    assertThatThrownBy(
+            () -> new DiscoveredModel("m", true, null, 10, 0, 0, 0L, null, Map.of(), 1.0))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> new DiscoveredModel("m", true, Set.of(), 10, 0, 0, null, null, 1.0))
+    assertThatThrownBy(
+            () -> new DiscoveredModel("m", true, Set.of(), 10, 0, 0, 0L, null, null, 1.0))
         .isInstanceOf(NullPointerException.class);
   }
 }

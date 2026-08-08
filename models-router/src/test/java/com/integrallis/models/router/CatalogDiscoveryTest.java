@@ -16,6 +16,7 @@
 package com.integrallis.models.router;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.api.catalog.DiscoveredModel;
 import com.integrallis.models.api.catalog.ModelCatalogProvider;
@@ -30,8 +31,22 @@ import org.junit.jupiter.api.Test;
 class CatalogDiscoveryTest {
 
   private static DiscoveredModel model(String id, DiscoveredModel.Performance performance) {
+    return model(id, performance, 4L * 1024 * 1024 * 1024);
+  }
+
+  private static DiscoveredModel model(
+      String id, DiscoveredModel.Performance performance, long sizeBytes) {
     return new DiscoveredModel(
-        id, true, Set.of("code"), 32768, 0.0, 0.0, performance, Map.of("code", 0.82), 0.99);
+        id,
+        true,
+        Set.of("code"),
+        32768,
+        0.0,
+        0.0,
+        sizeBytes,
+        performance,
+        Map.of("code", 0.82),
+        0.99);
   }
 
   private record FakeCatalog(String name, List<DiscoveredModel> models)
@@ -62,14 +77,78 @@ class CatalogDiscoveryTest {
   }
 
   @Test
-  void skipsModelsWithNoProfileForThisHardware() {
-    // Defaulting instead would let the router prefer this model on invented latency, confidently
-    // and silently. Absent is the honest answer, and CatalogDiscovery says so at WARNING.
+  void estimatesRatherThanDroppingModelsWithNoProfile() {
+    // A model absent from the fleet cannot be chosen at all, and the usual reason it has no
+    // profile is that it was installed recently rather than that it is unusable.
     List<ModelCandidate> candidates =
         CatalogDiscovery.discover(
             List.of(new FakeCatalog("fake", List.of(model("unprofiled", null)))));
 
-    assertThat(candidates).isEmpty();
+    assertThat(candidates).extracting(ModelCandidate::id).containsExactly("unprofiled");
+    assertThat(candidates.get(0).tokensPerSecond()).isPositive();
+    assertThat(candidates.get(0).timeToFirstTokenMillis()).isPositive();
+  }
+
+  @Test
+  void calibratesEstimatesAgainstWhatThisMachineMeasured() {
+    long fourGb = 4L * 1024 * 1024 * 1024;
+    // Generation reads the whole weight file per token, so tokensPerSecond x sizeBytes is roughly
+    // fixed on one machine. A measured 4 GB model at 40 tok/s implies half that for an 8 GB one.
+    DiscoveredModel measured =
+        model("measured", new DiscoveredModel.Performance(200, 40.0), fourGb);
+    DiscoveredModel unmeasured = model("unmeasured", null, fourGb * 2);
+
+    List<ModelCandidate> candidates =
+        CatalogDiscovery.discover(List.of(new FakeCatalog("fake", List.of(measured, unmeasured))));
+
+    ModelCandidate estimated =
+        candidates.stream().filter(c -> c.id().equals("unmeasured")).findFirst().orElseThrow();
+    assertThat(estimated.tokensPerSecond()).isCloseTo(20.0, within(0.5));
+    assertThat(estimated.timeToFirstTokenMillis()).isEqualTo(400);
+  }
+
+  @Test
+  void aMeasuredModelKeepsItsOwnFigures() {
+    DiscoveredModel measured =
+        model("measured", new DiscoveredModel.Performance(180, 42.0), 4L * 1024 * 1024 * 1024);
+
+    List<ModelCandidate> candidates =
+        CatalogDiscovery.discover(List.of(new FakeCatalog("fake", List.of(measured))));
+
+    // Estimation must never overwrite a real measurement.
+    assertThat(candidates.get(0).timeToFirstTokenMillis()).isEqualTo(180);
+    assertThat(candidates.get(0).tokensPerSecond()).isEqualTo(42.0);
+  }
+
+  @Test
+  void estimatesConservativelyWhenNothingHasBeenMeasured() {
+    // With no calibration point the estimate is deliberately pessimistic: understating a model
+    // loses it ties against measured ones, while flattering it wins latency-sensitive routing it
+    // has never demonstrated.
+    List<ModelCandidate> small =
+        CatalogDiscovery.discover(
+            List.of(
+                new FakeCatalog("fake", List.of(model("small", null, 1L * 1024 * 1024 * 1024)))));
+    List<ModelCandidate> large =
+        CatalogDiscovery.discover(
+            List.of(
+                new FakeCatalog("fake", List.of(model("large", null, 16L * 1024 * 1024 * 1024)))));
+
+    assertThat(small.get(0).tokensPerSecond()).isGreaterThan(large.get(0).tokensPerSecond());
+    assertThat(small.get(0).timeToFirstTokenMillis())
+        .isLessThan(large.get(0).timeToFirstTokenMillis());
+  }
+
+  @Test
+  void survivesACatalogReportingAnAbsurdSize() {
+    // A bad number must not become a failed discovery: Performance rejects a non-positive rate, so
+    // the arithmetic is guarded rather than trusted.
+    List<ModelCandidate> candidates =
+        CatalogDiscovery.discover(
+            List.of(new FakeCatalog("fake", List.of(model("huge", null, Long.MAX_VALUE)))));
+
+    assertThat(candidates).hasSize(1);
+    assertThat(candidates.get(0).tokensPerSecond()).isPositive();
   }
 
   @Test

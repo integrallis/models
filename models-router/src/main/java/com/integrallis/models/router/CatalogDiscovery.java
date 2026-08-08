@@ -79,9 +79,10 @@ public final class CatalogDiscovery {
   static List<ModelCandidate> discover(
       Iterable<ModelCatalogProvider> providers, boolean includeOnDeviceIntelligence) {
     Objects.requireNonNull(providers, "providers");
-    List<ModelCandidate> candidates = new ArrayList<>();
+    // Collected first so estimates can be calibrated against everything this machine has actually
+    // measured, whichever catalog reported it.
+    List<DiscoveredModel> discoveredModels = new ArrayList<>();
     int catalogs = 0;
-    int skipped = 0;
 
     for (ModelCatalogProvider provider : providers) {
       if (provider.requiresOptIn() && !includeOnDeviceIntelligence) {
@@ -107,23 +108,33 @@ public final class CatalogDiscovery {
       if (discovered == null) {
         continue;
       }
-      for (DiscoveredModel model : discovered) {
-        if (model.performance() == null) {
-          // Skipped rather than defaulted. The router's whole value is scoring on measurements, so
-          // inventing a latency here would make it prefer the wrong model with total confidence.
-          // Loud, because the alternative is a model quietly missing from the fleet.
-          LOG.log(
-              Level.WARNING,
-              "skipping {0} from catalog {1}: no performance profile for this hardware."
-                  + " Benchmark it, or register it explicitly with ModelCandidate.builder(\"{0}\")"
-                  + " if you can supply the figures.",
-              model.id(),
-              provider.name());
-          skipped++;
-          continue;
-        }
-        candidates.add(toCandidate(model));
+      discoveredModels.addAll(discovered);
+    }
+
+    PerformanceEstimator estimator = PerformanceEstimator.from(discoveredModels);
+    List<ModelCandidate> candidates = new ArrayList<>();
+    List<String> estimated = new ArrayList<>();
+    for (DiscoveredModel model : discoveredModels) {
+      DiscoveredModel.Performance performance = model.performance();
+      if (performance == null) {
+        // Estimated rather than skipped: a model absent from the fleet cannot be chosen at all, and
+        // the usual reason it lacks a profile is that it was installed recently.
+        performance = estimator.estimate(model);
+        estimated.add(model.id());
       }
+      candidates.add(toCandidate(model, performance));
+    }
+    if (!estimated.isEmpty()) {
+      // Named, because an estimate that scores like a measurement is the thing worth knowing about.
+      LOG.log(
+          Level.INFO,
+          "estimated throughput for {0} model(s) with no profile for this hardware: {1}."
+              + " Estimates are {2}; benchmark them for measured figures.",
+          estimated.size(),
+          String.join(", ", estimated),
+          estimator.calibrated()
+              ? "calibrated against models measured here"
+              : "conservative defaults, since nothing on this machine has been measured");
     }
 
     if (catalogs == 0) {
@@ -134,23 +145,19 @@ public final class CatalogDiscovery {
               + " automatically, or register candidates explicitly with"
               + " ModelCandidate.builder(id).");
     } else if (candidates.isEmpty()) {
-      LOG.log(
-          Level.INFO,
-          "{0} catalog(s) found but no usable models ({1} skipped for want of a performance"
-              + " profile).",
-          catalogs,
-          skipped);
+      LOG.log(Level.INFO, "{0} catalog(s) found but none reported any models.", catalogs);
     }
     return List.copyOf(candidates);
   }
 
-  private static ModelCandidate toCandidate(DiscoveredModel model) {
+  private static ModelCandidate toCandidate(
+      DiscoveredModel model, DiscoveredModel.Performance performance) {
     return ModelCandidate.builder(model.id())
         .local(model.local())
         .tags(model.tags())
         .costPerMillionTokens(model.costPerMillionInputTokens(), model.costPerMillionOutputTokens())
-        .timeToFirstTokenMillis(model.performance().timeToFirstTokenMillis())
-        .tokensPerSecond(model.performance().tokensPerSecond())
+        .timeToFirstTokenMillis(performance.timeToFirstTokenMillis())
+        .tokensPerSecond(performance.tokensPerSecond())
         .contextWindow(model.contextWindow())
         .quality(model.quality())
         .successRate(model.successRate())

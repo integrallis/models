@@ -32,6 +32,8 @@ import java.util.Set;
  * @param contextWindow maximum tokens the model accepts
  * @param costPerMillionInputTokens currency-neutral input price; zero for local models
  * @param costPerMillionOutputTokens currency-neutral output price; zero for local models
+ * @param sizeBytes on-disk size of the weights, or zero when unknown; the strongest available
+ *     predictor of local generation speed, which is bounded by memory bandwidth
  * @param performance measured throughput on this machine, or null when nothing was measured for
  *     this hardware
  * @param quality per-task scores in [0, 1], keyed by the same labels as {@code tags}
@@ -44,6 +46,7 @@ public record DiscoveredModel(
     int contextWindow,
     double costPerMillionInputTokens,
     double costPerMillionOutputTokens,
+    long sizeBytes,
     Performance performance,
     Map<String, Double> quality,
     double successRate) {
@@ -61,6 +64,9 @@ public record DiscoveredModel(
     }
     if (costPerMillionInputTokens < 0 || costPerMillionOutputTokens < 0) {
       throw new IllegalArgumentException("costs must not be negative");
+    }
+    if (sizeBytes < 0) {
+      throw new IllegalArgumentException("sizeBytes must not be negative: " + sizeBytes);
     }
     if (successRate < 0.0 || successRate > 1.0) {
       throw new IllegalArgumentException("successRate must be within [0, 1]: " + successRate);

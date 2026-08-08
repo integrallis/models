@@ -64,10 +64,10 @@ public final class AppleFoundationModelsCatalog implements ModelCatalogProvider 
       if (!client.availability().available()) {
         return List.of();
       }
+      // Still measured rather than left to the estimator: the estimator calibrates on weight size,
+      // and Apple's model has no weight file to reason about. A real number beats an estimate that
+      // has nothing to work from.
       DiscoveredModel.Performance performance = measure(client);
-      if (performance == null) {
-        return List.of();
-      }
       return List.of(
           new DiscoveredModel(
               MODEL_ID,
@@ -76,6 +76,7 @@ public final class AppleFoundationModelsCatalog implements ModelCatalogProvider 
               CONTEXT_WINDOW,
               0.0,
               0.0,
+              0L,
               performance,
               Map.of(),
               1.0));
