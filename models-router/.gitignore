@@ -1,1 +1,6 @@
 corpus/
+
+# The shipped classifier index. Force-included: a global gitignore with *.zip silently kept this
+# out of a commit once, and the failure only surfaced in CI, because a local build reads the file
+# straight off disk whether or not git knows about it.
+!src/main/resources/com/integrallis/models/router/task-index.zip
