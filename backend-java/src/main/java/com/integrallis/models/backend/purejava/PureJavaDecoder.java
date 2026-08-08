@@ -56,6 +56,27 @@ interface PureJavaDecoder extends AutoCloseable {
     return false;
   }
 
+  /**
+   * Encodes a whole sequence into one vector using the model's own pooling and projection.
+   *
+   * <p>Distinct from {@link #prefillHiddenState(int[], int)}, which returns one position's state
+   * and leaves pooling to the caller. Models that own their embedding pipeline — an encoder with a
+   * declared pooling type, a sentence-transformer with a dense head — cannot express it that way,
+   * because the vector they were trained to produce is a function of the whole sequence.
+   *
+   * @param tokens the tokenized text
+   * @return the pooled embedding, not normalized
+   */
+  default float[] embedSequence(int[] tokens) {
+    throw new UnsupportedOperationException(
+        "this architecture does not encode whole sequences; pool its hidden states instead");
+  }
+
+  /** Whether {@link #embedSequence(int[])} is implemented for this architecture. */
+  default boolean supportsSequenceEmbedding() {
+    return false;
+  }
+
   Session openSession();
 
   float[] forward(Session session, int token, int position);

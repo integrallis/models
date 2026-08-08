@@ -17,6 +17,49 @@ All notable changes to models are documented here.
   separately at 1e-3: cosine is scale-invariant, so a runtime that skips L2
   normalization agrees with a normalized reference at exactly 1.0.
 
+## [0.3.1] - 2026-08-08
+
+### Added
+
+- Added the `gemma-embedding` encoder architecture, which makes EmbeddingGemma-300M
+  runnable on the pure-Java backend. Bidirectional attention inverts the loop
+  nesting rather than changing a mask: every position needs every other
+  position's key at the same layer, so the sequence is the unit of work and
+  there is no KV cache. Verified against llama.cpp at 0.99956 minimum cosine,
+  where forcing causal masking measures 0.57266.
+
+- Added a pretrained task classifier for `models-router`, shipped as a
+  quantized index inside the jar. 1929 prompts over ten tasks, 0.9019 accuracy
+  on a held-out split, 0.65 MB. Training prompts live in
+  integrallis/model-router-corpus; what ships here is the derived index.
+
+- Added `ModelCatalogProvider`, a ServiceLoader SPI in `models-api` that lets
+  installed models describe themselves so callers need not hand-write price,
+  latency and per-task quality. `ModelRouter.discoverLocal()` consumes it.
+  Models without a performance profile for the current hardware are estimated
+  from measured peers rather than dropped, because local generation is
+  memory-bandwidth bound and so `tokensPerSecond * sizeBytes` is roughly fixed
+  on one machine.
+
+- Added `AppleFoundationModelsCatalog`, reporting Apple's on-device model when
+  the machine has one. Opt-in via `discoverLocal(true)`: it is present because
+  of the hardware, so discovering it by default would make identical code route
+  differently on a Mac than in production.
+
+- Added `matryoshkaDimensions` to `GgufEmbeddingBackend`, for models trained
+  with Matryoshka Representation Learning. Named for the technique rather than
+  called `dimensions` so that truncating a model never trained that way is not
+  something a caller reaches for by accident.
+
+### Changed
+
+- Encoder positions within a layer now run concurrently, taking a full router
+  index build from 1522 s to 300 s. Bit-exact: the parallel build produces a
+  `quantized.bin` with the same SHA-256 as the sequential one.
+
+- Raised the vectors dependency to 0.1.7 for quantized-only collections, which
+  store the classifier index as 4-bit codes with no full-precision copy.
+
 ## [0.3.0] - 2026-08-05
 
 ### Added
