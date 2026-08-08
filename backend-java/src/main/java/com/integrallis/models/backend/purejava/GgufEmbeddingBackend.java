@@ -32,6 +32,11 @@ import java.util.Objects;
  * embedding model. Getting them wrong does not fail; it quietly degrades retrieval, which is a far
  * worse failure mode than an exception.
  *
+ * <p>Some models leave no such choice. An encoder declares its pooling in metadata and may carry a
+ * dense projection head, so the vector it was trained to produce is a function of the whole
+ * sequence and of weights the caller cannot see. Those models are handed the sequence whole and
+ * pool themselves; only normalization stays a caller decision.
+ *
  * <p>Not thread-safe: each call drives one sequence through shared backend state and resets it
  * between texts. Use one instance per thread, or guard it.
  */
@@ -40,6 +45,7 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
   private final PureJavaBackend backend;
   private final Pooling pooling;
   private final boolean normalize;
+  private final boolean modelOwnsPooling;
   private final int dimension;
   private boolean closed;
 
@@ -47,12 +53,31 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
     this.backend = builder.backend;
     this.pooling = builder.pooling;
     this.normalize = builder.normalize;
-    this.dimension = backend.metadata().embeddingDim();
-    if (!backend.supportsHiddenState()) {
+    this.modelOwnsPooling = backend.supportsSequenceEmbedding();
+    int full = backend.metadata().embeddingDim();
+    if (builder.matryoshkaDimensions > full) {
+      throw new IllegalArgumentException(
+          "cannot truncate to "
+              + builder.matryoshkaDimensions
+              + " dimensions: the model produces "
+              + full);
+    }
+    this.dimension = builder.matryoshkaDimensions > 0 ? builder.matryoshkaDimensions : full;
+    if (!modelOwnsPooling && !backend.supportsHiddenState()) {
       throw new IllegalArgumentException(
           "model architecture "
               + backend.metadata().modelFamily()
               + " does not expose hidden states for embedding");
+    }
+    if (modelOwnsPooling && builder.poolingRequested) {
+      // Honouring the request would produce a vector of the right width computed the wrong way,
+      // which retrieval absorbs as slightly worse results rather than reporting.
+      throw new IllegalArgumentException(
+          "model architecture "
+              + backend.metadata().modelFamily()
+              + " pools internally and cannot be told to use "
+              + builder.pooling
+              + "; drop the pooling() call and let the model decide");
     }
   }
 
@@ -74,7 +99,18 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
     // Every text is an independent sequence; without this the previous one stays in the KV cache
     // and results depend on call order.
     backend.reset();
-    float[] pooled = pooling == Pooling.MEAN ? meanPooled(tokens) : lastTokenPooled(tokens);
+    float[] pooled;
+    if (modelOwnsPooling) {
+      pooled = backend.embedSequence(tokens);
+    } else {
+      pooled = pooling == Pooling.MEAN ? meanPooled(tokens) : lastTokenPooled(tokens);
+    }
+    // Truncate before normalizing: a Matryoshka prefix is only a unit vector once rescaled to its
+    // own length, and cosine over an unrescaled prefix is not the similarity the model was
+    // trained to produce.
+    if (dimension != pooled.length) {
+      pooled = java.util.Arrays.copyOf(pooled, dimension);
+    }
     if (normalize) {
       l2Normalize(pooled);
     }
@@ -157,15 +193,48 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
 
     private final PureJavaBackend backend;
     private Pooling pooling = Pooling.LAST_TOKEN;
+    private boolean poolingRequested;
     private boolean normalize = true;
+    private int matryoshkaDimensions;
+
+    /**
+     * Keeps only the first {@code dimensions} components, rescaling to unit length afterwards.
+     *
+     * <p>Valid <em>only</em> for models trained with Matryoshka Representation Learning, which
+     * arranges the vector so that each prefix is itself a usable embedding. Truncating any other
+     * model discards trained dimensions and degrades retrieval without failing.
+     *
+     * <p>No GGUF metadata records whether a model was trained this way, so nothing here can check
+     * it. Hence the name: a caller who does not already know what Matryoshka means will not reach
+     * for this method by accident, which a plain {@code dimensions()} would invite.
+     *
+     * <p>EmbeddingGemma publishes 768, 512, 256 and 128. Sizes between those are not wrong so much
+     * as unmeasured — the published quality figures only cover the listed widths.
+     *
+     * @param dimensions the prefix length to keep, at most the model's full width
+     */
+    public Builder matryoshkaDimensions(int dimensions) {
+      if (dimensions <= 0) {
+        throw new IllegalArgumentException("dimensions must be > 0: " + dimensions);
+      }
+      this.matryoshkaDimensions = dimensions;
+      return this;
+    }
 
     private Builder(PureJavaBackend backend) {
       this.backend = Objects.requireNonNull(backend, "backend");
     }
 
-    /** Defaults to {@link Pooling#LAST_TOKEN}, correct for causal decoder-only embedders. */
+    /**
+     * Defaults to {@link Pooling#LAST_TOKEN}, correct for causal decoder-only embedders.
+     *
+     * <p>Rejected by models that pool internally. Tracked separately from the value so that the
+     * default never counts as a request — a model that owns its pooling should not have to reject a
+     * choice the caller never made.
+     */
     public Builder pooling(Pooling pooling) {
       this.pooling = Objects.requireNonNull(pooling, "pooling");
+      this.poolingRequested = true;
       return this;
     }
 

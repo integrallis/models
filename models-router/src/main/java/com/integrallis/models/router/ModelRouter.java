@@ -190,7 +190,38 @@ public final class ModelRouter {
   }
 
   /**
-   * Starts building a router.
+   * Starts a router over every model the installed catalogs report.
+   *
+   * <p>Equivalent to {@code builder().candidates(CatalogDiscovery.discover())}, which is what most
+   * callers want: describing a fleet by hand means inventing latency and quality figures nobody
+   * has. Add hosted models to the discovered ones with {@link Builder#candidates(List)}.
+   *
+   * <p>Logs and returns an empty fleet when no catalog is installed rather than failing — routing
+   * between hosted models only is a legitimate use.
+   *
+   * @return a builder preloaded with the discovered models
+   */
+  public static Builder discoverLocal() {
+    return discoverLocal(false);
+  }
+
+  /**
+   * Starts a router over the installed catalogs, optionally including on-device intelligence.
+   *
+   * <p>Apple Foundation Models is present because of the hardware, not because anyone installed it,
+   * so it stays out of the fleet unless asked for. Defaulting the other way would make the same
+   * code route differently on a developer's Mac than in production, and that difference would
+   * surface as unexplained behaviour rather than as a decision.
+   *
+   * @param includeOnDeviceIntelligence whether to include platform-provided models
+   * @return a builder preloaded with the discovered models
+   */
+  public static Builder discoverLocal(boolean includeOnDeviceIntelligence) {
+    return builder().candidates(CatalogDiscovery.discover(includeOnDeviceIntelligence));
+  }
+
+  /**
+   * Starts building a router with no candidates registered.
    *
    * @return a new builder
    */

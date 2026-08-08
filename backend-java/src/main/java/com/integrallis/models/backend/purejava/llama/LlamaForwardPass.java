@@ -186,6 +186,16 @@ public final class LlamaForwardPass {
     this.weights = weights;
     this.cache = cache;
     this.layerObserver = layerObserver;
+    if (config.usesBidirectionalAttention()) {
+      // This pass is causal throughout: it walks one token at a time and reads keys from a cache of
+      // positions already visited. Given encoder weights it would run to completion and return
+      // activations that are wrong in a way nothing downstream can detect.
+      throw new IllegalArgumentException(
+          "architecture "
+              + config.architecture()
+              + " attends bidirectionally and cannot be run through the causal pass; use"
+              + " EncoderForwardPass");
+    }
     Objects.requireNonNull(executionPlan, "executionPlan");
     ModelTopology actualTopology =
         ModelTopology.from(executionPlan.topology().architecture(), config, weights);
