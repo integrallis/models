@@ -48,4 +48,19 @@ public interface ModelCatalogProvider {
    * @return the models, or an empty list when none are installed
    */
   List<DiscoveredModel> discover();
+
+  /**
+   * Whether a caller has to ask for this catalog by name before it contributes anything.
+   *
+   * <p>False for catalogs of models the caller installed deliberately. True for on-device platform
+   * intelligence — Apple Foundation Models and its equivalents — which is present by virtue of the
+   * hardware rather than by anyone's choice. Silently routing to it would make the same code select
+   * a different model on a developer's laptop than in production, and the difference would only
+   * surface as a behaviour change nobody asked for.
+   *
+   * @return true when this catalog contributes only on explicit opt-in
+   */
+  default boolean requiresOptIn() {
+    return false;
+  }
 }

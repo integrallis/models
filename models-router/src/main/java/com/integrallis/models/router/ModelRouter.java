@@ -202,7 +202,22 @@ public final class ModelRouter {
    * @return a builder preloaded with the discovered models
    */
   public static Builder discoverLocal() {
-    return builder().candidates(CatalogDiscovery.discover());
+    return discoverLocal(false);
+  }
+
+  /**
+   * Starts a router over the installed catalogs, optionally including on-device intelligence.
+   *
+   * <p>Apple Foundation Models is present because of the hardware, not because anyone installed it,
+   * so it stays out of the fleet unless asked for. Defaulting the other way would make the same
+   * code route differently on a developer's Mac than in production, and that difference would
+   * surface as unexplained behaviour rather than as a decision.
+   *
+   * @param includeOnDeviceIntelligence whether to include platform-provided models
+   * @return a builder preloaded with the discovered models
+   */
+  public static Builder discoverLocal(boolean includeOnDeviceIntelligence) {
+    return builder().candidates(CatalogDiscovery.discover(includeOnDeviceIntelligence));
   }
 
   /**

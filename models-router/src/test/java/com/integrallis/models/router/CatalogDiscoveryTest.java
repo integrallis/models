@@ -103,6 +103,51 @@ class CatalogDiscoveryTest {
     assertThat(CatalogDiscovery.discover(List.of())).isEmpty();
   }
 
+  private record OptInCatalog(String name, List<DiscoveredModel> models)
+      implements ModelCatalogProvider {
+    @Override
+    public List<DiscoveredModel> discover() {
+      return models;
+    }
+
+    @Override
+    public boolean requiresOptIn() {
+      return true;
+    }
+  }
+
+  @Test
+  void leavesOnDeviceIntelligenceOutUnlessAskedFor() {
+    OptInCatalog apple =
+        new OptInCatalog(
+            "apple-foundation-models",
+            List.of(model("apple-foundation-model", new DiscoveredModel.Performance(90, 20.0))));
+
+    // Default off: hardware that happens to be present must not change which model the same code
+    // selects between a developer's Mac and production.
+    assertThat(CatalogDiscovery.discover(List.of(apple), false)).isEmpty();
+    assertThat(CatalogDiscovery.discover(List.of(apple), true))
+        .extracting(ModelCandidate::id)
+        .containsExactly("apple-foundation-model");
+  }
+
+  @Test
+  void optingInDoesNotDisturbOrdinaryCatalogs() {
+    ModelCatalogProvider installed =
+        new FakeCatalog("fake", List.of(model("qwen", new DiscoveredModel.Performance(180, 42.0))));
+    OptInCatalog apple =
+        new OptInCatalog(
+            "apple",
+            List.of(model("apple-foundation-model", new DiscoveredModel.Performance(90, 20.0))));
+
+    assertThat(CatalogDiscovery.discover(List.of(installed, apple), false))
+        .extracting(ModelCandidate::id)
+        .containsExactly("qwen");
+    assertThat(CatalogDiscovery.discover(List.of(installed, apple), true))
+        .extracting(ModelCandidate::id)
+        .containsExactly("qwen", "apple-foundation-model");
+  }
+
   @Test
   void discoveredModelRejectsFiguresThatCannotBeMeasurements() {
     assertThat(

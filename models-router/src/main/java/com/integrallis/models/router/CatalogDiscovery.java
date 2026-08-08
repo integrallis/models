@@ -45,7 +45,18 @@ public final class CatalogDiscovery {
    * @return candidates in catalog order, or empty when no catalog is installed
    */
   public static List<ModelCandidate> discover() {
-    return discover(ServiceLoader.load(ModelCatalogProvider.class));
+    return discover(false);
+  }
+
+  /**
+   * Finds every model the installed catalogs report.
+   *
+   * @param includeOnDeviceIntelligence whether to include catalogs that require opting in, which
+   *     today means on-device platform intelligence such as Apple Foundation Models
+   * @return candidates in catalog order, or empty when no catalog is installed
+   */
+  public static List<ModelCandidate> discover(boolean includeOnDeviceIntelligence) {
+    return discover(ServiceLoader.load(ModelCatalogProvider.class), includeOnDeviceIntelligence);
   }
 
   /**
@@ -55,12 +66,34 @@ public final class CatalogDiscovery {
    * @return candidates in catalog order
    */
   static List<ModelCandidate> discover(Iterable<ModelCatalogProvider> providers) {
+    return discover(providers, false);
+  }
+
+  /**
+   * Finds every model the supplied catalogs report.
+   *
+   * @param providers the catalogs to read
+   * @param includeOnDeviceIntelligence whether opt-in catalogs contribute
+   * @return candidates in catalog order
+   */
+  static List<ModelCandidate> discover(
+      Iterable<ModelCatalogProvider> providers, boolean includeOnDeviceIntelligence) {
     Objects.requireNonNull(providers, "providers");
     List<ModelCandidate> candidates = new ArrayList<>();
     int catalogs = 0;
     int skipped = 0;
 
     for (ModelCatalogProvider provider : providers) {
+      if (provider.requiresOptIn() && !includeOnDeviceIntelligence) {
+        // Silently present hardware is exactly what should not be silently routed to: the same
+        // code would otherwise pick a different model on a Mac than in production.
+        LOG.log(
+            Level.DEBUG,
+            "skipping opt-in catalog {0}; pass discoverLocal(true) to include on-device"
+                + " intelligence",
+            provider.name());
+        continue;
+      }
       catalogs++;
       List<DiscoveredModel> discovered;
       try {
