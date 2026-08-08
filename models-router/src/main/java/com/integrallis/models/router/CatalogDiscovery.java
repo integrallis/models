@@ -140,10 +140,9 @@ public final class CatalogDiscovery {
     if (catalogs == 0) {
       LOG.log(
           Level.INFO,
-          "No ModelJars catalog found locally, install with"
-              + " 'implementation(\"org.modeljars:modeljars\")' to discover installed models"
-              + " automatically, or register candidates explicitly with"
-              + " ModelCandidate.builder(id).");
+          "No model catalog found locally. Add a catalog provider to the classpath — ModelJars"
+              + " publishes one — to discover installed models automatically, or register"
+              + " candidates explicitly with ModelCandidate.builder(id).");
     } else if (candidates.isEmpty()) {
       LOG.log(Level.INFO, "{0} catalog(s) found but none reported any models.", catalogs);
     }
