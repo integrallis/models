@@ -41,9 +41,9 @@ class BundledTaskIndexTest {
 
   /** The corpus the shipped index was built from; a rebuild against a different one must show. */
   private static final String EXPECTED_CORPUS_SHA256 =
-      "aeb0fb6ec86d8a6d4dfed8b407bc6c36c0d5147aaaaf88789430a33afa62bfae";
+      "639d305a2c4fee52779cb16832f365d91bea621d0908f97d501df74872121299";
 
-  private static final int EXPECTED_PROMPTS = 1881;
+  private static final int EXPECTED_PROMPTS = 1929;
   private static final int EXPECTED_DIMENSION = 768;
 
   @Test

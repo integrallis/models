@@ -11,7 +11,7 @@ derived index — embeddings, not prompts — at
 
 The index records the corpus digest it was built from, so the two cannot drift apart unnoticed:
 
-    corpusSha256 = aeb0fb6ec86d8a6d4dfed8b407bc6c36c0d5147aaaaf88789430a33afa62bfae
+    corpusSha256 = 639d305a2c4fee52779cb16832f365d91bea621d0908f97d501df74872121299
 
 To rebuild the index, clone that repository and follow its README, or point the build at a checkout:
 
