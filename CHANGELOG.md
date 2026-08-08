@@ -17,6 +17,16 @@ All notable changes to models are documented here.
   separately at 1e-3: cosine is scale-invariant, so a runtime that skips L2
   normalization agrees with a normalized reference at exactly 1.0.
 
+## [0.3.2] - 2026-08-08
+
+### Added
+
+- `models-router` is now published. It was absent from the release allowlist, so
+  every version until now built it and shipped it nowhere: the pretrained task
+  classifier, the packaged index, `ModelRouter.discoverLocal()` and the catalog
+  discovery added in 0.3.1 were all unreachable from a dependency. The catalog
+  SPI itself was never affected, since it lives in the published `models-api`.
+
 ## [0.3.1] - 2026-08-08
 
 ### Added

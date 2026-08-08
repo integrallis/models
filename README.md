@@ -139,8 +139,8 @@ directly:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:models:0.3.1")
-    implementation("com.integrallis:backend-java:0.3.1") // or backend-native
+    implementation("com.integrallis:models:0.3.2")
+    implementation("com.integrallis:backend-java:0.3.2") // or backend-native
 }
 ```
 
@@ -148,7 +148,7 @@ Use Apple's on-device system model on a supported Apple Silicon Mac:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:backend-apple:0.3.1")
+    implementation("com.integrallis:backend-apple:0.3.2")
 }
 ```
 
