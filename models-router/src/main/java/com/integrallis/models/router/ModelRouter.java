@@ -190,7 +190,23 @@ public final class ModelRouter {
   }
 
   /**
-   * Starts building a router.
+   * Starts a router over every model the installed catalogs report.
+   *
+   * <p>Equivalent to {@code builder().candidates(CatalogDiscovery.discover())}, which is what most
+   * callers want: describing a fleet by hand means inventing latency and quality figures nobody
+   * has. Add hosted models to the discovered ones with {@link Builder#candidates(List)}.
+   *
+   * <p>Logs and returns an empty fleet when no catalog is installed rather than failing — routing
+   * between hosted models only is a legitimate use.
+   *
+   * @return a builder preloaded with the discovered models
+   */
+  public static Builder discoverLocal() {
+    return builder().candidates(CatalogDiscovery.discover());
+  }
+
+  /**
+   * Starts building a router with no candidates registered.
    *
    * @return a new builder
    */
