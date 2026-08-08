@@ -32,8 +32,19 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 class TaskExemplarsTest {
 
-  /** The farmed corpus lives beside the module rather than on the classpath. */
-  private static final Path CORPUS = Path.of("corpus", "benchmark-prompts.tsv");
+  /**
+   * Where to find the farmed corpus, which lives in its own repository.
+   *
+   * <p>See {@code models-router/CORPUS.md}. It is third-party text under a mix of source licences,
+   * so it is not vendored here; what ships is the derived index. These tests run against it when a
+   * checkout is available and skip otherwise, which keeps them useful without making the build
+   * depend on a second repository.
+   */
+  private static final String CORPUS_PROPERTY = "models.router.corpus";
+
+  private static final Path CORPUS =
+      Path.of(
+          System.getProperty(CORPUS_PROPERTY, "../../model-router-corpus/benchmark-prompts.tsv"));
 
   static boolean corpusPresent() {
     return Files.isReadable(CORPUS);

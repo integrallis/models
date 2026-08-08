@@ -27,7 +27,7 @@ import java.util.Objects;
  *
  * <p>Pre-trained means the labelled corpus, the index built from it, and the decision threshold are
  * fixed and measured, not that weights ship as a binary. The corpus and its provenance live under
- * {@code models-router/corpus}; what ships is the index.
+ * its own repository (see {@code models-router/CORPUS.md}); what ships is the index.
  *
  * <p>A query whose nearest neighbour is farther than the threshold classifies as {@code null}, and
  * {@link ModelRouter} then routes on cost, latency and reliability with quality averaged across
