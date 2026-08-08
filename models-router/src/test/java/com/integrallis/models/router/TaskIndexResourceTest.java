@@ -26,13 +26,13 @@ import org.junit.jupiter.api.io.TempDir;
 class TaskIndexResourceTest {
 
   @Test
-  void saysWhatToDoWhenNoIndexIsPackaged(@TempDir Path cache) {
-    // The index is produced by a build step. Until it runs, the jar has no resource, and the
-    // message has to point at the step rather than read as a missing-file error.
-    assertThatThrownBy(() -> TaskIndexResource.extractTo(cache))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("no task index packaged")
-        .hasMessageContaining("TaskIndexBuilder");
+  void expandsTheIndexPackagedInThisJar(@TempDir Path cache) {
+    // This asserted the opposite until an index was actually packaged: that extractTo failed with
+    // a message naming the build step that produces one. models-router now ships an index, so the
+    // absent case is unreachable from the classpath these tests run on. BundledTaskIndexTest
+    // covers what the artifact contains.
+    assertThat(TaskIndexResource.extractTo(cache).resolve(TaskIndexBuilder.MANIFEST))
+        .satisfies(manifest -> assertThat(Files.isReadable(manifest)).isTrue());
   }
 
   @Test

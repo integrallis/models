@@ -22,6 +22,7 @@ import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Whole-sequence forward pass for encoder models, whose positions attend in both directions.
@@ -47,6 +48,9 @@ import java.util.Objects;
  */
 public final class EncoderForwardPass {
 
+  /** Overrides how many positions are computed at once; mainly so tests can pin it to one. */
+  public static final String PARALLELISM_PROPERTY = "models.encoder.threads";
+
   private final LlamaConfig config;
   private final LlamaWeights weights;
   private final DenseProjectionHead denseHead;
@@ -54,27 +58,66 @@ public final class EncoderForwardPass {
   private final RotaryTable slidingWindowRopeTable;
   private final int maxSequenceLength;
 
-  private final float[] normed;
-  private final float[] attentionOut;
-  private final float[] attentionProjected;
-  private final float[] ffnGate;
-  private final float[] ffnUp;
-  private final float[] ffnActivated;
-  private final float[] ffnProjected;
   private final float[] pooled;
   private final double[] pooledSum;
+  private final Scratch[] workers;
 
-  private final byte[] quantizedActivation;
-  private final float[] quantizedActivationScales;
-  private final int[] quantizedActivationZeroPointCorrections;
-  private final short[] quantizedActivationSums;
+  /**
+   * The buffers one position needs while it is being computed.
+   *
+   * <p>Positions within a layer are independent — each reads the whole sequence's keys and values
+   * and writes only its own hidden state — so the only thing preventing them from running at once
+   * was sharing these. One bundle per worker makes the loops parallel without changing any
+   * arithmetic.
+   */
+  private static final class Scratch {
+    final float[] normed;
+    final float[] attentionOut;
+    final float[] attentionProjected;
+    final float[] ffnGate;
+    final float[] ffnUp;
+    final float[] ffnActivated;
+    final float[] ffnProjected;
+    final byte[] quantizedActivation;
+    final float[] quantizedActivationScales;
+    final int[] quantizedActivationZeroPointCorrections;
+    final short[] quantizedActivationSums;
+    float[] scores = new float[0];
+    float[] projection = new float[0];
+
+    Scratch(int dim, int hiddenDim, int attentionOutputDim, int widestActivation) {
+      this.normed = new float[dim];
+      this.attentionOut = new float[attentionOutputDim];
+      this.attentionProjected = new float[dim];
+      this.ffnGate = new float[hiddenDim];
+      this.ffnUp = new float[hiddenDim];
+      this.ffnActivated = new float[hiddenDim];
+      this.ffnProjected = new float[dim];
+      this.quantizedActivation = new byte[widestActivation];
+      this.quantizedActivationScales = new float[widestActivation / 32];
+      this.quantizedActivationZeroPointCorrections = new int[(widestActivation + 3) / 4];
+      this.quantizedActivationSums = new short[(widestActivation + 15) / 16];
+    }
+
+    float[] scores(int sequenceLength) {
+      if (scores.length < sequenceLength) {
+        scores = new float[sequenceLength];
+      }
+      return scores;
+    }
+
+    float[] projection(int rows) {
+      if (projection.length < rows) {
+        projection = new float[rows];
+      }
+      return projection;
+    }
+  }
 
   private float[] hidden = new float[0];
   private float[] queries = new float[0];
   private float[] keys = new float[0];
   private float[] values = new float[0];
-  private float[] scores = new float[0];
-  private float[] projectionScratch = new float[0];
   private int capacity;
 
   /**
@@ -114,13 +157,6 @@ public final class EncoderForwardPass {
     this.maxSequenceLength = config.contextLength();
 
     int dim = config.embeddingDim();
-    this.normed = new float[dim];
-    this.attentionOut = new float[config.attentionOutputDim()];
-    this.attentionProjected = new float[dim];
-    this.ffnGate = new float[config.hiddenDim()];
-    this.ffnUp = new float[config.hiddenDim()];
-    this.ffnActivated = new float[config.hiddenDim()];
-    this.ffnProjected = new float[dim];
     this.pooled = new float[dim];
     this.pooledSum = new double[dim];
 
@@ -128,10 +164,86 @@ public final class EncoderForwardPass {
     // allocate mid-pass. Scales are sized at the smaller of the two GGUF block widths, which is
     // the count a 32-wide block needs and an upper bound for a 256-wide one.
     int widestActivation = Math.max(dim, Math.max(config.hiddenDim(), config.attentionOutputDim()));
-    this.quantizedActivation = new byte[widestActivation];
-    this.quantizedActivationScales = new float[widestActivation / 32];
-    this.quantizedActivationZeroPointCorrections = new int[(widestActivation + 3) / 4];
-    this.quantizedActivationSums = new short[(widestActivation + 15) / 16];
+    this.workers = new Scratch[resolveParallelism()];
+    for (int worker = 0; worker < workers.length; worker++) {
+      workers[worker] =
+          new Scratch(dim, config.hiddenDim(), config.attentionOutputDim(), widestActivation);
+    }
+  }
+
+  /**
+   * How many positions to compute at once.
+   *
+   * <p>Defaults to the available processors. The projections here are too narrow to trip vectors'
+   * own parallel-matmul threshold — the widest is under a million elements — so without this the
+   * whole encode runs on one core however many are free.
+   *
+   * <p>Settable to one via {@code -Dmodels.encoder.threads}, which is how a test pins the schedule
+   * when it wants to prove the result does not depend on it.
+   */
+  private static int resolveParallelism() {
+    String configured = System.getProperty(PARALLELISM_PROPERTY);
+    if (configured != null && !configured.isBlank()) {
+      int requested = Integer.parseInt(configured.trim());
+      if (requested < 1) {
+        throw new IllegalArgumentException(PARALLELISM_PROPERTY + " must be >= 1: " + requested);
+      }
+      return requested;
+    }
+    return Math.max(1, Runtime.getRuntime().availableProcessors());
+  }
+
+  /**
+   * Runs {@code body} over every position, splitting them across workers.
+   *
+   * <p>Strided rather than blocked so a sliding window, whose cost varies with position, does not
+   * leave one worker with all the expensive rows.
+   */
+  private void forEachPosition(int sequenceLength, PositionWork body) {
+    int parallelism = Math.min(workers.length, sequenceLength);
+    if (parallelism == 1) {
+      for (int position = 0; position < sequenceLength; position++) {
+        body.run(position, workers[0]);
+      }
+      return;
+    }
+    Thread[] threads = new Thread[parallelism];
+    AtomicReference<RuntimeException> failure = new AtomicReference<>();
+    for (int worker = 0; worker < parallelism; worker++) {
+      int index = worker;
+      threads[worker] =
+          Thread.ofVirtual()
+              .start(
+                  () -> {
+                    try {
+                      for (int position = index;
+                          position < sequenceLength;
+                          position += parallelism) {
+                        body.run(position, workers[index]);
+                      }
+                    } catch (RuntimeException e) {
+                      failure.compareAndSet(null, e);
+                    }
+                  });
+    }
+    for (Thread thread : threads) {
+      try {
+        thread.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("interrupted while encoding", e);
+      }
+    }
+    RuntimeException thrown = failure.get();
+    if (thrown != null) {
+      throw thrown;
+    }
+  }
+
+  /** One position's share of a layer. */
+  @FunctionalInterface
+  private interface PositionWork {
+    void run(int position, Scratch scratch);
   }
 
   /** Longest sequence this encoder accepts, from the model's trained context length. */
@@ -186,13 +298,15 @@ public final class EncoderForwardPass {
   private void embedTokens(int[] tokens, int sequenceLength) {
     int dim = config.embeddingDim();
     float scale = config.embeddingScale();
-    for (int position = 0; position < sequenceLength; position++) {
-      weights.embedToken(tokens[position], normed);
-      int base = position * dim;
-      for (int index = 0; index < dim; index++) {
-        hidden[base + index] = normed[index] * scale;
-      }
-    }
+    forEachPosition(
+        sequenceLength,
+        (position, scratch) -> {
+          weights.embedToken(tokens[position], scratch.normed);
+          int base = position * dim;
+          for (int index = 0; index < dim; index++) {
+            hidden[base + index] = scratch.normed[index] * scale;
+          }
+        });
   }
 
   private void prepareRotaryFactors(int sequenceLength) {
@@ -220,42 +334,69 @@ public final class EncoderForwardPass {
     boolean rope = config.usesRope(layer);
     RotaryTable rotary = config.usesSlidingWindow(layer) ? slidingWindowRopeTable : globalRopeTable;
 
-    for (int position = 0; position < sequenceLength; position++) {
-      TensorOps.rmsNorm(
-          normed,
-          0,
-          hidden,
-          position * dim,
-          layerWeights.attentionNorm(),
-          dim,
-          config.rmsNormEps());
+    forEachPosition(
+        sequenceLength,
+        (position, scratch) -> {
+          float[] normed = scratch.normed;
+          TensorOps.rmsNorm(
+              normed,
+              0,
+              hidden,
+              position * dim,
+              layerWeights.attentionNorm(),
+              dim,
+              config.rmsNormEps());
 
-      int queryOffset = position * queryDim;
-      int keyOffset = position * keyDim;
-      int valueOffset = position * valueDim;
-      matmul(queries, queryOffset, normed, layerWeights.wq(), layerWeights.wqType(), queryDim, dim);
-      matmul(keys, keyOffset, normed, layerWeights.wk(), layerWeights.wkType(), keyDim, dim);
-      matmul(values, valueOffset, normed, layerWeights.wv(), layerWeights.wvType(), valueDim, dim);
-      addOptionalBias(queries, queryOffset, layerWeights.qBias());
-      addOptionalBias(keys, keyOffset, layerWeights.kBias());
-      addOptionalBias(values, valueOffset, layerWeights.vBias());
+          int queryOffset = position * queryDim;
+          int keyOffset = position * keyDim;
+          int valueOffset = position * valueDim;
+          matmul(
+              scratch,
+              queries,
+              queryOffset,
+              normed,
+              layerWeights.wq(),
+              layerWeights.wqType(),
+              queryDim,
+              dim);
+          matmul(
+              scratch,
+              keys,
+              keyOffset,
+              normed,
+              layerWeights.wk(),
+              layerWeights.wkType(),
+              keyDim,
+              dim);
+          matmul(
+              scratch,
+              values,
+              valueOffset,
+              normed,
+              layerWeights.wv(),
+              layerWeights.wvType(),
+              valueDim,
+              dim);
+          addOptionalBias(queries, queryOffset, layerWeights.qBias());
+          addOptionalBias(keys, keyOffset, layerWeights.kBias());
+          addOptionalBias(values, valueOffset, layerWeights.vBias());
 
-      // Per-head norms precede the rotation, matching llama.cpp's build_qkv → norm → rope order.
-      for (int head = 0; head < config.numHeads(); head++) {
-        int offset = queryOffset + head * keyLength;
-        normalizeHead(queries, offset, layerWeights.qNorm(), keyLength);
-        if (rope) {
-          rotary.applyBatch(queries, offset, position, neox);
-        }
-      }
-      for (int head = 0; head < config.numKvHeads(); head++) {
-        int offset = keyOffset + head * keyLength;
-        normalizeHead(keys, offset, layerWeights.kNorm(), keyLength);
-        if (rope) {
-          rotary.applyBatch(keys, offset, position, neox);
-        }
-      }
-    }
+          // Per-head norms precede the rotation, matching llama.cpp's build_qkv -> norm -> rope.
+          for (int head = 0; head < config.numHeads(); head++) {
+            int offset = queryOffset + head * keyLength;
+            normalizeHead(queries, offset, layerWeights.qNorm(), keyLength);
+            if (rope) {
+              rotary.applyBatch(queries, offset, position, neox);
+            }
+          }
+          for (int head = 0; head < config.numKvHeads(); head++) {
+            int offset = keyOffset + head * keyLength;
+            normalizeHead(keys, offset, layerWeights.kNorm(), keyLength);
+            if (rope) {
+              rotary.applyBatch(keys, offset, position, neox);
+            }
+          }
+        });
   }
 
   /**
@@ -277,93 +418,107 @@ public final class EncoderForwardPass {
     float scale = (float) (1.0 / Math.sqrt(keyLength));
     int lastPosition = sequenceLength - 1;
 
-    for (int position = 0; position < sequenceLength; position++) {
-      java.util.Arrays.fill(attentionOut, 0.0f);
-      int firstVisible = config.attentionStartPosition(layer, position);
-      int lastVisible = config.attentionEndPosition(layer, position, lastPosition);
-      int visibleCount = lastVisible - firstVisible + 1;
+    forEachPosition(
+        sequenceLength,
+        (position, scratch) -> {
+          float[] attentionOut = scratch.attentionOut;
+          float[] scores = scratch.scores(sequenceLength);
+          java.util.Arrays.fill(attentionOut, 0.0f);
+          int firstVisible = config.attentionStartPosition(layer, position);
+          int lastVisible = config.attentionEndPosition(layer, position, lastPosition);
+          int visibleCount = lastVisible - firstVisible + 1;
 
-      for (int head = 0; head < numHeads; head++) {
-        int kvHead = head / groupSize;
-        int queryOffset = position * queryDim + head * keyLength;
+          for (int head = 0; head < numHeads; head++) {
+            int kvHead = head / groupSize;
+            int queryOffset = position * queryDim + head * keyLength;
 
-        VectorUtil.batchDotProductExact(
-            queries,
-            queryOffset,
-            keys,
-            firstVisible * keyDim + kvHead * keyLength,
-            keyDim,
-            visibleCount,
-            keyLength,
-            scores,
-            firstVisible);
-        for (int visible = firstVisible; visible <= lastVisible; visible++) {
-          scores[visible] *= scale;
-        }
+            VectorUtil.batchDotProductExact(
+                queries,
+                queryOffset,
+                keys,
+                firstVisible * keyDim + kvHead * keyLength,
+                keyDim,
+                visibleCount,
+                keyLength,
+                scores,
+                firstVisible);
+            for (int visible = firstVisible; visible <= lastVisible; visible++) {
+              scores[visible] *= scale;
+            }
 
-        TensorOps.softmax(scores, firstVisible, visibleCount);
+            TensorOps.softmax(scores, firstVisible, visibleCount);
 
-        VectorUtil.addWeightedRowsInPlace(
-            attentionOut,
-            head * valueLength,
-            values,
-            firstVisible * valueDim + kvHead * valueLength,
-            valueDim,
-            scores,
-            firstVisible,
-            visibleCount,
-            valueLength);
-      }
+            VectorUtil.addWeightedRowsInPlace(
+                attentionOut,
+                head * valueLength,
+                values,
+                firstVisible * valueDim + kvHead * valueLength,
+                valueDim,
+                scores,
+                firstVisible,
+                visibleCount,
+                valueLength);
+          }
 
-      matmul(
-          attentionProjected,
-          0,
-          attentionOut,
-          layerWeights.wo(),
-          layerWeights.woType(),
-          dim,
-          config.attentionOutputDim());
-      normalizeProjection(attentionProjected, layerWeights.attentionPostNorm(), dim);
-      int base = position * dim;
-      for (int index = 0; index < dim; index++) {
-        hidden[base + index] += attentionProjected[index];
-      }
+          float[] attentionProjected = scratch.attentionProjected;
+          matmul(
+              scratch,
+              attentionProjected,
+              0,
+              attentionOut,
+              layerWeights.wo(),
+              layerWeights.woType(),
+              dim,
+              config.attentionOutputDim());
+          normalizeProjection(attentionProjected, layerWeights.attentionPostNorm(), dim);
+          int base = position * dim;
+          for (int index = 0; index < dim; index++) {
+            hidden[base + index] += attentionProjected[index];
+          }
 
-      TensorOps.rmsNorm(normed, 0, hidden, base, layerWeights.ffnNorm(), dim, config.rmsNormEps());
-      matmul(
-          ffnGate,
-          0,
-          normed,
-          layerWeights.ffnGate(),
-          layerWeights.ffnGateType(),
-          config.hiddenDim(),
-          dim);
-      matmul(
-          ffnUp,
-          0,
-          normed,
-          layerWeights.ffnUp(),
-          layerWeights.ffnUpType(),
-          config.hiddenDim(),
-          dim);
-      if (config.usesGeluFfn()) {
-        TensorOps.geluGlu(ffnActivated, ffnGate, ffnUp, config.hiddenDim());
-      } else {
-        TensorOps.swiGlu(ffnActivated, ffnGate, ffnUp, config.hiddenDim());
-      }
-      matmul(
-          ffnProjected,
-          0,
-          ffnActivated,
-          layerWeights.ffnDown(),
-          layerWeights.ffnDownType(),
-          dim,
-          config.hiddenDim());
-      normalizeProjection(ffnProjected, layerWeights.ffnPostNorm(), dim);
-      for (int index = 0; index < dim; index++) {
-        hidden[base + index] += ffnProjected[index];
-      }
-    }
+          float[] normed = scratch.normed;
+          TensorOps.rmsNorm(
+              normed, 0, hidden, base, layerWeights.ffnNorm(), dim, config.rmsNormEps());
+          matmul(
+              scratch,
+              scratch.ffnGate,
+              0,
+              normed,
+              layerWeights.ffnGate(),
+              layerWeights.ffnGateType(),
+              config.hiddenDim(),
+              dim);
+          matmul(
+              scratch,
+              scratch.ffnUp,
+              0,
+              normed,
+              layerWeights.ffnUp(),
+              layerWeights.ffnUpType(),
+              config.hiddenDim(),
+              dim);
+          if (config.usesGeluFfn()) {
+            TensorOps.geluGlu(
+                scratch.ffnActivated, scratch.ffnGate, scratch.ffnUp, config.hiddenDim());
+          } else {
+            TensorOps.swiGlu(
+                scratch.ffnActivated, scratch.ffnGate, scratch.ffnUp, config.hiddenDim());
+          }
+          float[] ffnProjected = scratch.ffnProjected;
+          matmul(
+              scratch,
+              ffnProjected,
+              0,
+              scratch.ffnActivated,
+              layerWeights.ffnDown(),
+              layerWeights.ffnDownType(),
+              dim,
+              config.hiddenDim());
+          normalizeProjection(ffnProjected, layerWeights.ffnPostNorm(), dim);
+          for (int index = 0; index < dim; index++) {
+            hidden[base + index] += ffnProjected[index];
+          }
+        });
   }
 
   /**
@@ -378,9 +533,15 @@ public final class EncoderForwardPass {
     java.util.Arrays.fill(pooledSum, 0.0);
     for (int position = 0; position < sequenceLength; position++) {
       TensorOps.rmsNorm(
-          normed, 0, hidden, position * dim, weights.outputNormWeight(), dim, config.rmsNormEps());
+          workers[0].normed,
+          0,
+          hidden,
+          position * dim,
+          weights.outputNormWeight(),
+          dim,
+          config.rmsNormEps());
       for (int index = 0; index < dim; index++) {
-        pooledSum[index] += normed[index];
+        pooledSum[index] += workers[0].normed[index];
       }
     }
     for (int index = 0; index < dim; index++) {
@@ -400,11 +561,13 @@ public final class EncoderForwardPass {
     queries = new float[Math.multiplyExact(sequenceLength, config.queryDim())];
     keys = new float[Math.multiplyExact(sequenceLength, config.keyDim())];
     values = new float[Math.multiplyExact(sequenceLength, config.valueDim())];
-    scores = new float[sequenceLength];
+    // Scores are per-worker rather than shared: each position writes the whole array while
+    // scanning its own visible window.
     capacity = sequenceLength;
   }
 
   private void matmul(
+      Scratch scratch,
       float[] out,
       int outOffset,
       float[] input,
@@ -414,7 +577,7 @@ public final class EncoderForwardPass {
       int cols) {
     // The kernels write from index zero, so a projection landing inside a per-position buffer goes
     // through a scratch row first.
-    float[] destination = outOffset == 0 ? out : projectionScratch(rows);
+    float[] destination = outOffset == 0 ? out : scratch.projection(rows);
     TensorOps.ggufMatmul(
         destination,
         input,
@@ -422,21 +585,14 @@ public final class EncoderForwardPass {
         type,
         rows,
         cols,
-        quantizedActivation,
-        quantizedActivationScales,
-        quantizedActivationZeroPointCorrections,
-        quantizedActivationSums,
+        scratch.quantizedActivation,
+        scratch.quantizedActivationScales,
+        scratch.quantizedActivationZeroPointCorrections,
+        scratch.quantizedActivationSums,
         GgufQ4Kernel.WIDENED);
     if (destination != out) {
       System.arraycopy(destination, 0, out, outOffset, rows);
     }
-  }
-
-  private float[] projectionScratch(int rows) {
-    if (projectionScratch.length < rows) {
-      projectionScratch = new float[rows];
-    }
-    return projectionScratch;
   }
 
   private void normalizeHead(float[] vector, int offset, float[] weight, int headDim) {

@@ -43,8 +43,15 @@ public final class TaskIndexResource {
   /** Classpath location of the packaged index. */
   public static final String RESOURCE = "/com/integrallis/models/router/task-index.zip";
 
-  /** Guards against an archive that expands to an implausible size. */
-  private static final long MAX_TOTAL_BYTES = 512L * 1024 * 1024;
+  /**
+   * Guards against an archive that expands to an implausible size.
+   *
+   * <p>Set against the real artifact rather than guessed: the shipped index is under a megabyte of
+   * 4-bit codes, so 64 MiB leaves room for a corpus many times larger or a return to full-precision
+   * vectors, while still refusing anything pathological. The original 512 MiB was picked before
+   * anything had been built and would have let a corrupt archive fill a cache directory.
+   */
+  private static final long MAX_TOTAL_BYTES = 64L * 1024 * 1024;
 
   private TaskIndexResource() {}
 
