@@ -18,7 +18,9 @@ package com.integrallis.models.runtime;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.SamplingOptions;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
+import java.util.function.IntPredicate;
 
 /** Samples the next token from logits using configurable strategies. */
 public final class Sampler {
@@ -41,6 +43,18 @@ public final class Sampler {
     return sampleAdjusted(adjusted);
   }
 
+  /** Samples the next token ID after excluding tokens rejected by {@code allowedToken}. */
+  public int sample(float[] logits, List<Integer> previousTokens, IntPredicate allowedToken) {
+    Objects.requireNonNull(allowedToken, "allowedToken");
+    if (options.temperature() == 0.0f && options.repetitionPenalty() == 1.0f) {
+      return constrainedArgmax(logits, allowedToken);
+    }
+    float[] adjusted = logits.clone();
+    applyRepetitionPenalty(adjusted, previousTokens);
+    maskRejectedTokens(adjusted, allowedToken);
+    return sampleAdjusted(adjusted);
+  }
+
   /** Samples one row without copying transient logits for unpenalized greedy generation. */
   public int sample(LogitBatch logits, int tokenIndex, List<Integer> previousTokens) {
     if (options.temperature() == 0.0f && options.repetitionPenalty() == 1.0f) {
@@ -48,6 +62,16 @@ public final class Sampler {
     }
     float[] adjusted = logits.copyRow(tokenIndex);
     applyRepetitionPenalty(adjusted, previousTokens);
+    return sampleAdjusted(adjusted);
+  }
+
+  /** Samples one row after excluding tokens rejected by {@code allowedToken}. */
+  public int sample(
+      LogitBatch logits, int tokenIndex, List<Integer> previousTokens, IntPredicate allowedToken) {
+    Objects.requireNonNull(allowedToken, "allowedToken");
+    float[] adjusted = logits.copyRow(tokenIndex);
+    applyRepetitionPenalty(adjusted, previousTokens);
+    maskRejectedTokens(adjusted, allowedToken);
     return sampleAdjusted(adjusted);
   }
 
@@ -124,6 +148,20 @@ public final class Sampler {
     }
 
     return candidates[cutoff - 1];
+  }
+
+  private static void maskRejectedTokens(float[] logits, IntPredicate allowedToken) {
+    int allowed = 0;
+    for (int token = 0; token < logits.length; token++) {
+      if (allowedToken.test(token)) {
+        allowed++;
+      } else {
+        logits[token] = Float.NEGATIVE_INFINITY;
+      }
+    }
+    if (allowed == 0) {
+      throw new IllegalStateException("token constraint rejected every token");
+    }
   }
 
   /**
@@ -209,6 +247,22 @@ public final class Sampler {
       if (arr[i] > arr[best]) {
         best = i;
       }
+    }
+    return best;
+  }
+
+  private static int constrainedArgmax(float[] logits, IntPredicate allowedToken) {
+    int best = -1;
+    for (int token = 0; token < logits.length; token++) {
+      if (!allowedToken.test(token)) {
+        continue;
+      }
+      if (best < 0 || logits[token] > logits[best]) {
+        best = token;
+      }
+    }
+    if (best < 0) {
+      throw new IllegalStateException("token constraint rejected every token");
     }
     return best;
   }

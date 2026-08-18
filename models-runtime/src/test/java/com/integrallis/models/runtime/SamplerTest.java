@@ -16,6 +16,7 @@
 package com.integrallis.models.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.SamplingOptions;
@@ -31,6 +32,42 @@ import org.junit.jupiter.api.Test;
 
 @Tag("unit")
 class SamplerTest {
+
+  @Nested
+  static class Constraints {
+
+    @Test
+    void greedySelectsBestAllowedToken() {
+      float[] logits = {1.0f, 100.0f, 5.0f};
+      Sampler sampler = new Sampler(SamplingOptions.builder().temperature(0.0f).build());
+
+      assertThat(sampler.sample(logits, List.of(), token -> token != 1)).isEqualTo(2);
+    }
+
+    @Test
+    void probabilisticSamplingOnlyReturnsAllowedTokens() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(1.0f).topK(4).topP(1.0f).seed(42L).build();
+      Sampler sampler = new Sampler(options);
+      Set<Integer> sampled = new HashSet<>();
+
+      for (int index = 0; index < 200; index++) {
+        sampled.add(
+            sampler.sample(new float[] {10.0f, 9.0f, 8.0f, 7.0f}, List.of(), token -> token >= 2));
+      }
+
+      assertThat(sampled).isSubsetOf(Set.of(2, 3));
+    }
+
+    @Test
+    void rejectsAConstraintWithNoAllowedTokens() {
+      Sampler sampler = new Sampler(SamplingOptions.builder().temperature(0.0f).build());
+
+      assertThatThrownBy(() -> sampler.sample(new float[] {1.0f, 2.0f}, List.of(), token -> false))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("rejected every token");
+    }
+  }
 
   @Nested
   static class Greedy {

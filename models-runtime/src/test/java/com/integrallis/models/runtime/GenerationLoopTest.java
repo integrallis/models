@@ -303,6 +303,45 @@ class GenerationLoopTest {
     }
 
     @Test
+    void tokenConstraintForcesTheGeneratedSequence() {
+      InferenceBackend backend = mockBackend(new int[] {5, 5, 5});
+      GenerationLoop loop = new GenerationLoop(backend);
+
+      String result =
+          loop.generate(
+              "hello",
+              SamplingOptions.builder().temperature(0.0f).maxTokens(5).build(),
+              TokenSequenceConstraint.of(3, 4));
+
+      assertThat(result).isEqualTo(" world");
+    }
+
+    @Test
+    void tokenConstraintFailureIsReportedToTheStream() {
+      InferenceBackend backend = mockBackend(new int[] {5, 5, 5});
+      GenerationLoop loop = new GenerationLoop(backend);
+
+      assertThatThrownBy(
+              () ->
+                  loop.generate(
+                      "hello",
+                      SamplingOptions.builder().temperature(0.0f).maxTokens(5).build(),
+                      new TokenConstraint() {
+                        @Override
+                        public boolean allows(int token) {
+                          return false;
+                        }
+
+                        @Override
+                        public void accept(int token) {}
+                      }))
+          .isInstanceOf(RuntimeException.class)
+          .hasMessageContaining("Generation error")
+          .hasRootCauseInstanceOf(IllegalStateException.class)
+          .hasRootCauseMessage("token constraint rejected every token");
+    }
+
+    @Test
     void doesNotForwardTheFinalTokenWhenTheLimitIsReached() {
       AtomicInteger forwardCalls = new AtomicInteger();
       InferenceBackend backend =
