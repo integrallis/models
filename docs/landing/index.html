@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Models - In-process language-model inference for Java 25</title>
-    <meta name="description" content="Models runs qualified GGUF language models inside Java 25 applications with a shared Vector API pipeline and selective Models-owned Rust kernel acceleration through FFM.">
+    <meta name="description" content="Models runs qualified GGUF language models inside Java 25 applications with Spring AI adapters, schema-constrained tool calls, and selective Models-owned Rust kernel acceleration through FFM.">
     <meta property="og:title" content="Models - In-process language-model inference for Java 25">
-    <meta property="og:description" content="Load, run, stream, and integrate qualified GGUF models inside the JVM.">
+    <meta property="og:description" content="Load, run, stream, and integrate qualified GGUF models inside the JVM, including Spring AI schema-constrained tool calls.">
     <meta property="og:type" content="website">
     <script>
         (function () {
@@ -207,7 +207,7 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                 <div class="section-header reveal">
                     <span class="section-label">integrations</span>
                     <h2 class="section-title">Application-facing Java APIs</h2>
-                    <p class="section-description">The same backend and diagnostics contracts serve plain Java, LangChain4j, Spring AI, Spring Boot, and guarded RAG.</p>
+                    <p class="section-description">The same backend and diagnostics contracts serve plain Java, LangChain4j, Spring AI, Spring Boot, and guarded RAG. Spring AI tool calls can be constrained from enumerable JSON Schema arguments during decoding.</p>
                 </div>
                 <div class="cards-grid">
                     <article class="card reveal">
@@ -224,7 +224,7 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                     </article>
                     <article class="card reveal">
                         <h3 class="card-title">Tool calling</h3>
-                        <p class="card-description">Qwen, Hermes, Llama 3, Gemma 4, and MiniCPM5 call formats behind one contract, with argument text carried verbatim.</p>
+                        <p class="card-description">Qwen, Hermes, Llama 3, Gemma 4, and MiniCPM5 call formats behind one contract, with Spring AI schema-constrained decoding for enumerable arguments.</p>
                     </article>
                     <article class="card reveal">
                         <h3 class="card-title">Guarded RAG</h3>
