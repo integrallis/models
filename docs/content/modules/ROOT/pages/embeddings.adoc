@@ -96,13 +96,19 @@ For Spring AI, `ModelsSpringAiEmbeddingModel` adapts the same backend:
 [source,java]
 ----
 import com.integrallis.models.spring.ai.ModelsSpringAiEmbeddingModel;
+import io.micrometer.observation.ObservationRegistry;
 
-try (var model = new ModelsSpringAiEmbeddingModel(embeddings)) {
+try (var model = new ModelsSpringAiEmbeddingModel(
+        embeddings,
+        "embeddinggemma-300m-q8_0",
+        observationRegistry)) {
     float[] vector = model.embed("How do I reset my password?");
 }
 ----
 
-Both adapters own the backend they wrap and close it. To store the vectors, see
+Both adapters own the backend they wrap and close it. The Spring AI constructor
+that accepts an `ObservationRegistry` emits the framework's standard embedding
+observations with the supplied model identity. To store the vectors, see
 xref:vectors.adoc[Vectors].
 
 == Equivalence Gating

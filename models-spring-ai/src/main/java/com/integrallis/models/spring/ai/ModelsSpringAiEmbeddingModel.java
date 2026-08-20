@@ -16,14 +16,21 @@
 package com.integrallis.models.spring.ai;
 
 import com.integrallis.models.api.EmbeddingBackend;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingOptions;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.embedding.EmbeddingResponseMetadata;
+import org.springframework.ai.embedding.observation.DefaultEmbeddingModelObservationConvention;
+import org.springframework.ai.embedding.observation.EmbeddingModelObservationContext;
+import org.springframework.ai.embedding.observation.EmbeddingModelObservationConvention;
+import org.springframework.ai.embedding.observation.EmbeddingModelObservationDocumentation;
 
 /**
  * Spring AI {@link EmbeddingModel} backed by an in-process {@link EmbeddingBackend}.
@@ -39,38 +46,69 @@ import org.springframework.ai.embedding.EmbeddingResponse;
  */
 public final class ModelsSpringAiEmbeddingModel implements EmbeddingModel, AutoCloseable {
 
+  private static final String DEFAULT_MODEL_NAME = "local";
+  private static final String PROVIDER = "integrallis";
+  private static final EmbeddingModelObservationConvention DEFAULT_OBSERVATION_CONVENTION =
+      new DefaultEmbeddingModelObservationConvention();
+
   private final EmbeddingBackend backend;
+  private final String modelName;
+  private final ObservationRegistry observationRegistry;
+  private EmbeddingModelObservationConvention observationConvention =
+      DEFAULT_OBSERVATION_CONVENTION;
 
   public ModelsSpringAiEmbeddingModel(EmbeddingBackend backend) {
+    this(backend, DEFAULT_MODEL_NAME, ObservationRegistry.NOOP);
+  }
+
+  public ModelsSpringAiEmbeddingModel(
+      EmbeddingBackend backend, String modelName, ObservationRegistry observationRegistry) {
     this.backend = Objects.requireNonNull(backend, "backend");
+    this.modelName = requireText(modelName, "modelName");
+    this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
   }
 
   @Override
   public EmbeddingResponse call(EmbeddingRequest request) {
     Objects.requireNonNull(request, "request");
-    List<String> instructions = request.getInstructions();
-    List<Embedding> embeddings = new ArrayList<>(instructions.size());
-    for (int index = 0; index < instructions.size(); index++) {
-      // The index correlates each vector with its input; callers depend on it to match rows.
-      embeddings.add(new Embedding(backend.embed(instructions.get(index)), index));
-    }
-    return new EmbeddingResponse(embeddings);
+    var observedRequest =
+        new EmbeddingRequest(
+            request.getInstructions(),
+            EmbeddingOptions.builder().model(modelName).dimensions(dimensions()).build());
+    var context =
+        EmbeddingModelObservationContext.builder()
+            .embeddingRequest(observedRequest)
+            .provider(PROVIDER)
+            .build();
+    return EmbeddingModelObservationDocumentation.EMBEDDING_MODEL_OPERATION
+        .observation(
+            observationConvention,
+            DEFAULT_OBSERVATION_CONVENTION,
+            () -> context,
+            observationRegistry)
+        .observe(() -> embedAll(observedRequest, context));
   }
 
   @Override
   public float[] embed(String text) {
-    return backend.embed(Objects.requireNonNull(text, "text"));
+    Objects.requireNonNull(text, "text");
+    return call(new EmbeddingRequest(List.of(text), null)).getResult().getOutput();
   }
 
   @Override
   public float[] embed(Document document) {
     Objects.requireNonNull(document, "document");
-    return backend.embed(getEmbeddingContent(document));
+    return embed(getEmbeddingContent(document));
   }
 
   @Override
   public int dimensions() {
     return backend.dimension();
+  }
+
+  public void setObservationConvention(EmbeddingModelObservationConvention observationConvention) {
+    this.observationConvention =
+        Objects.requireNonNull(observationConvention, "observationConvention");
   }
 
   /** Releases the underlying model. */
@@ -83,5 +121,27 @@ public final class ModelsSpringAiEmbeddingModel implements EmbeddingModel, AutoC
     } catch (Exception failure) {
       throw new IllegalStateException("failed to close embedding backend", failure);
     }
+  }
+
+  private EmbeddingResponse embedAll(
+      EmbeddingRequest request, EmbeddingModelObservationContext context) {
+    List<String> instructions = request.getInstructions();
+    List<Embedding> embeddings = new ArrayList<>(instructions.size());
+    for (int index = 0; index < instructions.size(); index++) {
+      // The index correlates each vector with its input; callers depend on it to match rows.
+      embeddings.add(new Embedding(backend.embed(instructions.get(index)), index));
+    }
+    var response =
+        new EmbeddingResponse(embeddings, new EmbeddingResponseMetadata(modelName, null));
+    context.setResponse(response);
+    return response;
+  }
+
+  private static String requireText(String value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value.isBlank()) {
+      throw new IllegalArgumentException(name + " must not be blank");
+    }
+    return value;
   }
 }

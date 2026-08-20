@@ -213,16 +213,23 @@ AI's `EmbeddingModel`.
 ----
 import com.integrallis.models.api.EmbeddingBackend;
 import com.integrallis.models.spring.ai.ModelsSpringAiEmbeddingModel;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.embedding.EmbeddingModel;
 
 @Bean(destroyMethod = "close")
-EmbeddingModel localEmbeddingModel(EmbeddingBackend backend) {
-    return new ModelsSpringAiEmbeddingModel(backend);
+EmbeddingModel localEmbeddingModel(
+        EmbeddingBackend backend,
+        ObservationRegistry observations) {
+    return new ModelsSpringAiEmbeddingModel(
+            backend, "embeddinggemma-300m-q8_0", observations);
 }
 ----
 
 This adapter owns the backend it wraps and closes it. See
-xref:embeddings.adoc[Embeddings] for producing the backend.
+xref:embeddings.adoc[Embeddings] for producing the backend. Passing Spring's
+`ObservationRegistry` records standard `gen_ai.client.operation` observations
+for direct, document, and batch embedding calls. The pinned model name and
+backend dimension are attached to each observation and response.
 
 For auto-configuration, named-bean behavior, and combined Models/Vectors setup,
 continue with xref:spring-boot.adoc[Spring Boot]. For validation after

@@ -19,6 +19,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.EmbeddingBackend;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Nested;
@@ -27,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.embedding.observation.EmbeddingModelObservationContext;
 
 @Tag("unit")
 class ModelsSpringAiEmbeddingModelTest {
@@ -146,6 +150,48 @@ class ModelsSpringAiEmbeddingModelTest {
     void rejectsANullBackend() {
       assertThatThrownBy(() -> new ModelsSpringAiEmbeddingModel(null))
           .isInstanceOf(NullPointerException.class);
+    }
+  }
+
+  @Nested
+  static class Observability {
+
+    @Test
+    void observesConvenienceEmbeddingCallsWithThePinnedModelIdentity() {
+      ScriptedBackend backend = new ScriptedBackend();
+      ObservationRegistry registry = ObservationRegistry.create();
+      List<EmbeddingModelObservationContext> stopped = new ArrayList<>();
+      registry
+          .observationConfig()
+          .observationHandler(
+              new ObservationHandler<EmbeddingModelObservationContext>() {
+                @Override
+                public boolean supportsContext(Observation.Context context) {
+                  return context instanceof EmbeddingModelObservationContext;
+                }
+
+                @Override
+                public void onStop(EmbeddingModelObservationContext context) {
+                  stopped.add(context);
+                }
+              });
+      var embedding =
+          new ModelsSpringAiEmbeddingModel(backend, "embeddinggemma-300m-q8_0", registry);
+
+      embedding.embed("hello");
+
+      assertThat(stopped)
+          .singleElement()
+          .satisfies(
+              context -> {
+                assertThat(context.getOperationMetadata().provider()).isEqualTo("integrallis");
+                assertThat(context.getRequest().getOptions().getModel())
+                    .isEqualTo("embeddinggemma-300m-q8_0");
+                assertThat(context.getRequest().getOptions().getDimensions()).isEqualTo(DIM);
+                assertThat(context.getResponse().getMetadata().getModel())
+                    .isEqualTo("embeddinggemma-300m-q8_0");
+              });
+      assertThat(backend.seen).containsExactly("hello");
     }
   }
 }
