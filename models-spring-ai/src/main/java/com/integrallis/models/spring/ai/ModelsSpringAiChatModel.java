@@ -22,13 +22,16 @@ import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -80,7 +83,15 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   public ChatResponse call(Prompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
     List<ToolSpec> tools = declaredTools(prompt);
-    String output = model.generate(render(prompt, tools), options(prompt));
+    ModelPrompt rendered = render(prompt, tools);
+    SamplingOptions requested = options(prompt);
+    String output =
+        toolConstraint(tools)
+            .map(
+                constraint ->
+                    ((ConstrainedTextGenerationModel) model)
+                        .generate(rendered, requested, constraint))
+            .orElseGet(() -> model.generate(rendered, requested));
     return tools.isEmpty() ? response(output) : toolAwareResponse(output);
   }
 
@@ -95,9 +106,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
               // A tool call only means anything once it is complete, so when tools are in play the
               // output is accumulated and emitted as one response rather than surfaced in pieces.
               StringBuilder accumulated = tools.isEmpty() ? null : new StringBuilder();
-              model.generate(
-                  rendered,
-                  requested,
+              TokenStream stream =
                   new TokenStream() {
                     @Override
                     public void onToken(String token) {
@@ -120,7 +129,14 @@ public final class ModelsSpringAiChatModel implements ChatModel {
                     public void onError(Throwable failure) {
                       sink.error(failure);
                     }
-                  });
+                  };
+              Optional<TokenConstraint> constraint = toolConstraint(tools);
+              if (constraint.isPresent()) {
+                ((ConstrainedTextGenerationModel) model)
+                    .generate(rendered, requested, stream, constraint.get());
+              } else {
+                model.generate(rendered, requested, stream);
+              }
             })
         .subscribeOn(Schedulers.boundedElastic());
   }
@@ -203,6 +219,14 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       }
     }
     return tools.isEmpty() ? template.render(messages) : template.render(messages, tools);
+  }
+
+  private Optional<TokenConstraint> toolConstraint(List<ToolSpec> tools) {
+    if (tools.isEmpty() || !(model instanceof ConstrainedTextGenerationModel constrainedModel)) {
+      return Optional.empty();
+    }
+    return SpringAiToolCallConstraint.compile(
+        constrainedModel.tokenizer(), template.toolSyntax(), tools);
   }
 
   /** Carries any tool calls the assistant previously made back into the rendered history. */

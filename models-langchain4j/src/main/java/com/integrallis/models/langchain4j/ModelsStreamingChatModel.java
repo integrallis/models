@@ -17,11 +17,15 @@ package com.integrallis.models.langchain4j;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
+import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -34,6 +38,7 @@ import dev.langchain4j.model.output.FinishReason;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** LangChain4j {@link StreamingChatModel} backed by the Models runtime generation loop. */
@@ -84,7 +89,10 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     AtomicBoolean terminalSignalSent = new AtomicBoolean();
     // A tool call means nothing until it is complete, and its delimiters are not user-facing text.
     // So when tools are declared, deltas are withheld and the result is delivered once, whole.
-    boolean toolsDeclared = !LangChain4jChatRequestMapper.tools(request).isEmpty();
+    List<ToolSpec> tools = LangChain4jChatRequestMapper.tools(request);
+    boolean toolsDeclared = !tools.isEmpty();
+    ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template);
+    SamplingOptions requested = LangChain4jChatRequestMapper.options(request, defaults);
     TokenStream stream =
         new TokenStream() {
           @Override
@@ -113,10 +121,13 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
         };
 
     try {
-      model.generate(
-          LangChain4jChatRequestMapper.prompt(request, template),
-          LangChain4jChatRequestMapper.options(request, defaults),
-          stream);
+      Optional<TokenConstraint> constraint = toolConstraint(tools);
+      if (constraint.isPresent()) {
+        ((ConstrainedTextGenerationModel) model)
+            .generate(prompt, requested, stream, constraint.get());
+      } else {
+        model.generate(prompt, requested, stream);
+      }
     } catch (RuntimeException | Error failure) {
       if (terminalSignalSent.compareAndSet(false, true)) {
         handler.onError(failure);
@@ -152,5 +163,13 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
         .finishReason(FinishReason.TOOL_EXECUTION)
         .modelName(model.modelName())
         .build();
+  }
+
+  private Optional<TokenConstraint> toolConstraint(List<ToolSpec> tools) {
+    if (tools.isEmpty() || !(model instanceof ConstrainedTextGenerationModel constrainedModel)) {
+      return Optional.empty();
+    }
+    return LangChain4jToolCallConstraint.compile(
+        constrainedModel.tokenizer(), template.toolSyntax(), tools);
   }
 }

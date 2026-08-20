@@ -64,7 +64,9 @@ Implemented functionality includes:
 - byte-level BPE and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
-- tool calling across Qwen, Hermes, Llama 3, Gemma 4, and MiniCPM5 formats
+- tool calling across Qwen, Hermes, Llama 3, Gemma 4, and MiniCPM5 formats,
+  with LangChain4j and Spring AI schema-constrained tool decoding for
+  enumerable arguments
 - in-JVM text embeddings with last-token and mean pooling, tested to produce the
   same vectors as llama.cpp
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
@@ -231,8 +233,8 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Integration | Module | Surface |
 |---|---|---|
 | Plain Java | `models-runtime` | `GenerationLoop` and `TokenStream` |
-| LangChain4j | `models-langchain4j` | blocking and streaming chat models |
-| Spring AI | `models-spring-ai` | blocking and streaming chat models |
+| LangChain4j | `models-langchain4j` | blocking and streaming chat models with schema-constrained tool calls |
+| Spring AI | `models-spring-ai` | blocking and streaming chat models with schema-constrained tool calls |
 | Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel` auto-configuration |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |

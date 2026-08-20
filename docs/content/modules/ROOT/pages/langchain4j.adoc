@@ -63,6 +63,75 @@ Use the template recorded by the exact ModelJar. Models does not infer a chat
 template from an architecture family because two instruction-tuned artifacts
 with the same architecture can require different role delimiters.
 
+== Tool Calling
+
+When a `ChatRequest` declares LangChain4j `ToolSpecification` instances, the
+adapter serializes LangChain4j's typed `JsonSchemaElement` tree to JSON Schema
+text and renders the tools into the selected Models chat template. Model output
+is scanned back into LangChain4j `ToolExecutionRequest` values, and the response
+finish reason is set to `TOOL_EXECUTION` so LangChain4j's tool loop can proceed.
+
+[source,java]
+----
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import java.util.List;
+
+var setModeTool = ToolSpecification.builder()
+    .name("set_mode")
+    .description("Set the HVAC mode")
+    .parameters(JsonObjectSchema.builder()
+        .addProperty("mode", JsonEnumSchema.builder()
+            .enumValues(List.of("cool", "heat"))
+            .build())
+        .required("mode")
+        .build())
+    .build();
+
+var request = ChatRequest.builder()
+    .messages(UserMessage.from("Switch the thermostat to cooling."))
+    .toolSpecifications(setModeTool)
+    .build();
+
+ChatResponse response = model.chat(request);
+
+if (response.aiMessage().hasToolExecutionRequests()) {
+    response.aiMessage().toolExecutionRequests()
+        .forEach(call -> System.out.println(call.name() + " " + call.arguments()));
+}
+----
+
+The streaming adapter uses the same declaration and recovery path. When tools
+are declared, it buffers generated text until the tool call is complete and then
+delivers one terminal response, because LangChain4j cannot execute a partial
+tool request.
+
+== Schema-Constrained Tool Decoding
+
+If the wrapped Models runtime implements `ConstrainedTextGenerationModel`, the
+LangChain4j adapter compiles supported tool parameter schemas into a token
+constraint and passes it into the generation loop. Sampling then admits only
+tokens that keep the output on a valid tool-call string. For supported schemas,
+this prevents invalid enumerable tool-call syntax from being decoded rather
+than only asking the model to follow the schema.
+
+Today the LangChain4j adapter constrains finite tool-call spaces:
+
+* tool syntax must be one of the Models JSON-shaped formats, such as ChatML or
+  Llama 3 JSON-native tool calls
+* argument properties must be string `enum` values, or absent
+* every `required` property must be one of those enumerable properties
+* the compiled call set is capped to keep decoding checks bounded
+
+Schemas that require open text, numbers, arrays, nested objects, conditionals,
+references, or any other value space the adapter cannot enumerate are not
+partially constrained. The adapter falls back to ordinary tool calling for those
+schemas, leaving LangChain4j tool execution behavior unchanged.
+
 == Request Options
 
 Non-null LangChain4j request values override adapter defaults for temperature,

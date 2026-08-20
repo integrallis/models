@@ -19,12 +19,12 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
-import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
+import com.integrallis.models.api.Tokenizer;
 import java.util.Objects;
 
 /** High-level generation adapter for a pure-Java {@link InferenceBackend}. */
-public final class RuntimeTextGenerationModel implements TextGenerationModel {
+public final class RuntimeTextGenerationModel implements ConstrainedTextGenerationModel {
   private final InferenceBackend backend;
   private final GenerationLoop generationLoop;
 
@@ -41,6 +41,11 @@ public final class RuntimeTextGenerationModel implements TextGenerationModel {
   @Override
   public BackendDiagnostics diagnostics() {
     return backend.diagnostics();
+  }
+
+  @Override
+  public Tokenizer tokenizer() {
+    return backend.tokenizer();
   }
 
   @Override
@@ -61,5 +66,11 @@ public final class RuntimeTextGenerationModel implements TextGenerationModel {
   @Override
   public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
     generationLoop.generate(prompt, options, stream);
+  }
+
+  @Override
+  public void generate(
+      ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+    generationLoop.generate(prompt, options, stream, constraint);
   }
 }

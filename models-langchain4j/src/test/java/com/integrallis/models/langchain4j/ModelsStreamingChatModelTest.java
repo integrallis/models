@@ -19,15 +19,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
+import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
+import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import dev.langchain4j.model.output.FinishReason;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +44,18 @@ import org.junit.jupiter.api.Test;
 
 @Tag("unit")
 class ModelsStreamingChatModelTest {
+
+  private static final ToolSpecification MODE =
+      ToolSpecification.builder()
+          .name("set_mode")
+          .description("Set the HVAC mode")
+          .parameters(
+              JsonObjectSchema.builder()
+                  .addProperty(
+                      "mode", JsonEnumSchema.builder().enumValues(List.of("cool", "heat")).build())
+                  .required("mode")
+                  .build())
+          .build();
 
   @Test
   void streamsDeltasAndCompletesWithTheAccumulatedResponse() {
@@ -113,6 +133,37 @@ class ModelsStreamingChatModelTest {
   }
 
   @Test
+  void usesASchemaConstraintForStreamingToolCalls() {
+    ConstraintRecordingStreamingModel delegate = new ConstraintRecordingStreamingModel();
+    ModelsStreamingChatModel model =
+        new ModelsStreamingChatModel(
+            delegate, ChatTemplate.CHATML, SamplingOptions.builder().build());
+    ChatRequest request =
+        ChatRequest.builder()
+            .messages(UserMessage.from("switch to cooling"))
+            .toolSpecifications(MODE)
+            .build();
+    List<String> partials = new ArrayList<>();
+    AtomicReference<ChatResponse> completed = new AtomicReference<>();
+    AtomicReference<Throwable> failed = new AtomicReference<>();
+
+    model.doChat(request, handler(partials, completed, failed));
+
+    assertThat(delegate.constrainedCalls).isEqualTo(1);
+    assertThat(delegate.unconstrainedCalls).isZero();
+    assertThat(partials).isEmpty();
+    assertThat(failed).hasValue(null);
+    assertThat(completed.get().finishReason()).isEqualTo(FinishReason.TOOL_EXECUTION);
+    assertThat(completed.get().aiMessage().toolExecutionRequests())
+        .singleElement()
+        .satisfies(
+            call -> {
+              assertThat(call.name()).isEqualTo("set_mode");
+              assertThat(call.arguments()).isEqualTo("{\"mode\":\"cool\"}");
+            });
+  }
+
+  @Test
   void rejectsNullDependenciesAndRequests() {
     RecordingStreamingModel delegate = new RecordingStreamingModel(List.of("answer"));
     assertThatNullPointerException()
@@ -183,6 +234,91 @@ class ModelsStreamingChatModelTest {
       this.prompt = prompt;
       this.options = options;
       tokens.forEach(stream::onToken);
+      stream.onComplete();
+    }
+  }
+
+  private static final class ConstraintRecordingStreamingModel
+      implements ConstrainedTextGenerationModel {
+    private int constrainedCalls;
+    private int unconstrainedCalls;
+    private final Tokenizer tokenizer =
+        new Tokenizer() {
+          @Override
+          public int[] encode(String text) {
+            return text.chars().toArray();
+          }
+
+          @Override
+          public String decode(int[] tokens) {
+            StringBuilder decoded = new StringBuilder();
+            for (int token : tokens) {
+              decoded.append(decode(token));
+            }
+            return decoded.toString();
+          }
+
+          @Override
+          public String decode(int token) {
+            return String.valueOf((char) token);
+          }
+
+          @Override
+          public int vocabSize() {
+            return Character.MAX_VALUE + 1;
+          }
+
+          @Override
+          public int bosToken() {
+            return 0;
+          }
+
+          @Override
+          public int eosToken() {
+            return 1;
+          }
+        };
+
+    @Override
+    public String modelName() {
+      return "ConstraintRecordingStreamingModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("stream-constraint-recording");
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return tokenizer;
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      unconstrainedCalls++;
+      stream.onToken("unconstrained");
+      stream.onComplete();
+    }
+
+    @Override
+    public void generate(
+        ModelPrompt prompt,
+        SamplingOptions options,
+        TokenStream stream,
+        TokenConstraint constraint) {
+      constrainedCalls++;
+      String output =
+          "<tool_call>{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}</tool_call>";
+      for (int index = 0; index < output.length(); index++) {
+        int token = output.charAt(index);
+        if (!constraint.allows(token)) {
+          stream.onError(new AssertionError("constraint rejected token " + token));
+          return;
+        }
+        constraint.accept(token);
+        stream.onToken(String.valueOf((char) token));
+      }
       stream.onComplete();
     }
   }

@@ -78,10 +78,22 @@ public final class GenerationLoop {
     return generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options);
   }
 
+  /** Generates text from a prompt while enforcing a token-level constraint. */
+  public String generate(String prompt, SamplingOptions options, TokenConstraint constraint) {
+    return generate(
+        ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options, constraint);
+  }
+
   /** Generates text from a segmented prompt, returning the complete generated string. */
   public String generate(ModelPrompt prompt, SamplingOptions options) {
+    return generate(prompt, options, TokenConstraint.unrestricted());
+  }
+
+  /** Generates text from a segmented prompt while enforcing a token-level constraint. */
+  public String generate(ModelPrompt prompt, SamplingOptions options, TokenConstraint constraint) {
     requirePrompt(prompt);
     Objects.requireNonNull(options, "options");
+    Objects.requireNonNull(constraint, "constraint");
 
     StringBuilder result = new StringBuilder();
     generate(
@@ -100,7 +112,8 @@ public final class GenerationLoop {
           public void onError(Throwable t) {
             throw new RuntimeException("Generation error", t);
           }
-        });
+        },
+        constraint);
     return result.toString();
   }
 
@@ -109,11 +122,25 @@ public final class GenerationLoop {
     generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options, stream);
   }
 
+  /** Generates text with streaming output while enforcing a token-level constraint. */
+  public void generate(
+      String prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+    generate(
+        ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options, stream, constraint);
+  }
+
   /** Generates text from a segmented prompt with streaming output via a callback. */
   public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+    generate(prompt, options, stream, TokenConstraint.unrestricted());
+  }
+
+  /** Generates text from a segmented prompt with streaming output and a token-level constraint. */
+  public void generate(
+      ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
     requirePrompt(prompt);
     Objects.requireNonNull(options, "options");
     Objects.requireNonNull(stream, "stream");
+    Objects.requireNonNull(constraint, "constraint");
 
     synchronized (backend) {
       Tokenizer tokenizer = backend.tokenizer();
@@ -127,7 +154,9 @@ public final class GenerationLoop {
       StopSequenceEmitter emitter = new StopSequenceEmitter(stream, options.stopSequences());
       List<Integer> allTokens = new ArrayList<>();
       boolean speculativeActive =
-          speculativeOptions.enabled() && backend instanceof SpeculativeInferenceBackend;
+          constraint == TokenConstraint.unrestricted()
+              && speculativeOptions.enabled()
+              && backend instanceof SpeculativeInferenceBackend;
       MutableSpeculativeMetrics speculativeMetrics =
           new MutableSpeculativeMetrics(speculativeActive, speculativeOptions.maximumDraftTokens());
 
@@ -152,7 +181,14 @@ public final class GenerationLoop {
               speculativeMetrics);
         } else {
           generateSequentially(
-              tokenizer, sampler, emitter, allTokens, logits, position, options.maxTokens());
+              tokenizer,
+              sampler,
+              emitter,
+              allTokens,
+              logits,
+              position,
+              options.maxTokens(),
+              constraint);
         }
 
         emitter.finish();
@@ -216,15 +252,20 @@ public final class GenerationLoop {
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
-      int maxTokens) {
+      int maxTokens,
+      TokenConstraint constraint) {
     float[] logits = initialLogits;
     int position = initialPosition;
     for (int generated = 0; generated < maxTokens; generated++) {
-      int nextToken = sampler.sample(logits, allTokens);
+      int nextToken = sampler.sample(logits, allTokens, constraint::allows);
       if (tokenizer.isEndOfGeneration(nextToken)) {
         return;
       }
       if (emit(tokenizer, emitter, allTokens, nextToken)) {
+        return;
+      }
+      constraint.accept(nextToken);
+      if (constraint.isComplete()) {
         return;
       }
       if (generated + 1 == maxTokens) {

@@ -61,6 +61,95 @@ try (var runtime = ModelJars.openRuntime(MODEL)) {
 Use the chat template recorded by the exact qualified ModelJar rather than
 selecting one from the architecture name.
 
+== Tool Calling
+
+When a `Prompt` declares Spring AI `ToolCallback` instances, the adapter renders
+their names, descriptions, and input schemas into the selected Models chat
+template. Model output is scanned back into Spring AI `AssistantMessage`
+tool calls, so Spring AI advisors and tool execution see the same
+`hasToolCalls()` and `ToolCall` surface they expect from hosted providers.
+
+[source,java]
+----
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+
+var prompt = new Prompt(
+    List.of(new UserMessage("Switch the thermostat to cooling.")),
+    ToolCallingChatOptions.builder()
+        .toolCallbacks(List.of(setModeTool))
+        .build());
+
+ChatResponse response = model.call(prompt);
+
+if (response.hasToolCalls()) {
+    response.getResult().getOutput().getToolCalls()
+        .forEach(call -> System.out.println(call.name() + " " + call.arguments()));
+}
+----
+
+The same declaration path is used for blocking and streaming chat. Streaming
+with declared tools buffers generated text until the tool call is complete,
+because Spring AI can only act on a complete tool request.
+
+== Schema-Constrained Tool Decoding
+
+If the wrapped Models runtime implements `ConstrainedTextGenerationModel`, the
+Spring AI adapter compiles supported tool input schemas into a token constraint
+and passes it into the generation loop. Sampling then admits only tokens that
+keep the output on a valid tool-call string. This changes tool calling from
+"ask the model to follow the schema" to "prevent invalid enumerable tool-call
+syntax from being decoded" for the supported schema subset.
+
+Today the Spring AI adapter constrains finite tool-call spaces:
+
+* tool syntax must be one of the Models JSON-shaped formats, such as ChatML or
+  Llama 3 JSON-native tool calls
+* argument properties must be string `enum` values, or absent
+* every `required` property must be one of those enumerable properties
+* the compiled call set is capped to keep decoding checks bounded
+
+For example, this Spring AI input schema can be enforced during decoding:
+
+[source,json]
+----
+{
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["cool", "heat"]
+    }
+  },
+  "required": ["mode"]
+}
+----
+
+With a compatible chat template, the runtime constrains output to valid calls
+such as:
+
+[source,json]
+----
+{"name":"set_mode","arguments":{"mode":"cool"}}
+----
+
+or the template's tagged equivalent, for example:
+
+[source,text]
+----
+<tool_call>{"name":"set_mode","arguments":{"mode":"cool"}}</tool_call>
+----
+
+Schemas that require open text, numbers, arrays, nested objects, conditionals,
+references, or any other value space the adapter cannot enumerate are not
+partially constrained. The adapter deliberately falls back to ordinary tool
+calling for those schemas, leaving the generated call parser and Spring AI tool
+execution path unchanged. That fallback preserves correctness for ordinary
+Spring AI applications while keeping the enforced path honest about what it can
+guarantee.
+
 == Request Options
 
 Non-null `ChatOptions` values override adapter defaults for temperature, top-p,

@@ -19,10 +19,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
+import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
+import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,6 +49,10 @@ class ModelsSpringAiToolCallingTest {
 
   private static final String SCHEMA =
       "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}}}";
+  private static final String REQUIRED_CITY_SCHEMA =
+      "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}";
+  private static final String MODE_SCHEMA =
+      "{\"type\":\"object\",\"properties\":{\"mode\":{\"type\":\"string\",\"enum\":[\"cool\",\"heat\"]}},\"required\":[\"mode\"]}";
 
   /** Records the rendered prompt and replays a canned completion. */
   private static final class ScriptedModel implements TextGenerationModel {
@@ -96,11 +105,19 @@ class ModelsSpringAiToolCallingTest {
   }
 
   private static ToolCallback weatherCallback() {
+    return weatherCallback(SCHEMA);
+  }
+
+  private static ToolCallback requiredWeatherCallback() {
+    return weatherCallback(REQUIRED_CITY_SCHEMA);
+  }
+
+  private static ToolCallback weatherCallback(String inputSchema) {
     ToolDefinition definition =
         DefaultToolDefinition.builder()
             .name("get_weather")
             .description("Look up the forecast")
-            .inputSchema(SCHEMA)
+            .inputSchema(inputSchema)
             .build();
     return new ToolCallback() {
       @Override
@@ -115,11 +132,44 @@ class ModelsSpringAiToolCallingTest {
     };
   }
 
+  private static ToolCallback modeCallback() {
+    ToolDefinition definition =
+        DefaultToolDefinition.builder()
+            .name("set_mode")
+            .description("Set the HVAC mode")
+            .inputSchema(MODE_SCHEMA)
+            .build();
+    return new ToolCallback() {
+      @Override
+      public ToolDefinition getToolDefinition() {
+        return definition;
+      }
+
+      @Override
+      public String call(String toolInput) {
+        return "{}";
+      }
+    };
+  }
+
   private static Prompt promptWithTools(
       List<org.springframework.ai.chat.messages.Message> messages) {
     return new Prompt(
         messages,
         ToolCallingChatOptions.builder().toolCallbacks(List.of(weatherCallback())).build());
+  }
+
+  private static Prompt promptWithModeTool(
+      List<org.springframework.ai.chat.messages.Message> messages) {
+    return new Prompt(
+        messages, ToolCallingChatOptions.builder().toolCallbacks(List.of(modeCallback())).build());
+  }
+
+  private static Prompt promptWithRequiredWeatherTool(
+      List<org.springframework.ai.chat.messages.Message> messages) {
+    return new Prompt(
+        messages,
+        ToolCallingChatOptions.builder().toolCallbacks(List.of(requiredWeatherCallback())).build());
   }
 
   @Nested
@@ -235,6 +285,70 @@ class ModelsSpringAiToolCallingTest {
   }
 
   @Nested
+  static class ConstrainedDecoding {
+
+    @Test
+    void passesASchemaConstraintToConstrainedModelsWhenToolsAreDeclared() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel();
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+
+      ChatResponse response =
+          chat.call(promptWithModeTool(List.of(new UserMessage("switch to cooling"))));
+
+      assertThat(model.constrainedCalls).isEqualTo(1);
+      assertThat(model.unconstrainedCalls).isZero();
+      assertThat(response.hasToolCalls()).isTrue();
+      assertThat(response.getResult().getOutput().getToolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("set_mode");
+                assertThat(call.arguments()).isEqualTo("{\"mode\":\"cool\"}");
+              });
+    }
+
+    @Test
+    void fallsBackWhenASchemaRequiresOpenTextArguments() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel();
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+
+      ChatResponse response =
+          chat.call(promptWithRequiredWeatherTool(List.of(new UserMessage("weather in Austin?"))));
+
+      assertThat(model.constrainedCalls).isZero();
+      assertThat(model.unconstrainedCalls).isEqualTo(1);
+      assertThat(response.hasToolCalls()).isFalse();
+      assertThat(response.getResult().getOutput().getText()).isEqualTo("unconstrained");
+    }
+
+    @Test
+    @Tag("integration")
+    void constrainsRuntimeGenerationFromSpringToolSchemas() {
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              new CharacterLogitBackend(),
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().temperature(0.0f).maxTokens(80).build());
+
+      ChatResponse response =
+          chat.call(promptWithModeTool(List.of(new UserMessage("switch to cooling"))));
+
+      assertThat(response.hasToolCalls()).isTrue();
+      assertThat(response.getResult().getOutput().getToolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("set_mode");
+                assertThat(call.arguments()).isEqualTo("{\"mode\":\"cool\"}");
+              });
+    }
+  }
+
+  @Nested
   static class ResultsComingBack {
 
     @Test
@@ -257,6 +371,173 @@ class ModelsSpringAiToolCallingTest {
 
       assertThat(model.lastPrompt()).contains("<tool_response>");
       assertThat(model.lastPrompt()).contains("{\"tempF\":88}");
+    }
+  }
+
+  private static final class ConstraintRecordingModel implements ConstrainedTextGenerationModel {
+    private int constrainedCalls;
+    private int unconstrainedCalls;
+    private final Tokenizer tokenizer =
+        new Tokenizer() {
+          @Override
+          public int[] encode(String text) {
+            return text.chars().toArray();
+          }
+
+          @Override
+          public String decode(int[] tokens) {
+            StringBuilder decoded = new StringBuilder();
+            for (int token : tokens) {
+              decoded.append(decode(token));
+            }
+            return decoded.toString();
+          }
+
+          @Override
+          public String decode(int token) {
+            return String.valueOf((char) token);
+          }
+
+          @Override
+          public int vocabSize() {
+            return Character.MAX_VALUE + 1;
+          }
+
+          @Override
+          public int bosToken() {
+            return 0;
+          }
+
+          @Override
+          public int eosToken() {
+            return 1;
+          }
+        };
+
+    @Override
+    public String modelName() {
+      return "ConstraintRecordingModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("constraint-recording");
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return tokenizer;
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      unconstrainedCalls++;
+      stream.onToken("unconstrained");
+      stream.onComplete();
+    }
+
+    @Override
+    public void generate(
+        ModelPrompt prompt,
+        SamplingOptions options,
+        TokenStream stream,
+        TokenConstraint constraint) {
+      constrainedCalls++;
+      String output =
+          "<tool_call>{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}</tool_call>";
+      for (int index = 0; index < output.length(); index++) {
+        int token = output.charAt(index);
+        if (!constraint.allows(token)) {
+          stream.onError(new AssertionError("constraint rejected token " + token));
+          return;
+        }
+        constraint.accept(token);
+        stream.onToken(String.valueOf((char) token));
+      }
+      stream.onComplete();
+    }
+  }
+
+  private static final class CharacterLogitBackend implements InferenceBackend {
+    private final Tokenizer tokenizer =
+        new Tokenizer() {
+          @Override
+          public int[] encode(String text) {
+            return text.chars().toArray();
+          }
+
+          @Override
+          public int[] encode(ModelPrompt prompt) {
+            return prompt.text().chars().toArray();
+          }
+
+          @Override
+          public int[] encodeControl(String text) {
+            return encode(text);
+          }
+
+          @Override
+          public String decode(int[] tokens) {
+            StringBuilder decoded = new StringBuilder();
+            for (int token : tokens) {
+              decoded.append(decode(token));
+            }
+            return decoded.toString();
+          }
+
+          @Override
+          public String decode(int token) {
+            return String.valueOf((char) token);
+          }
+
+          @Override
+          public int vocabSize() {
+            return Character.MAX_VALUE + 1;
+          }
+
+          @Override
+          public int bosToken() {
+            return 0;
+          }
+
+          @Override
+          public int eosToken() {
+            return 1;
+          }
+        };
+
+    @Override
+    public String name() {
+      return "character-logit";
+    }
+
+    @Override
+    public ModelMetadata metadata() {
+      return new ModelMetadata("test", "CharacterLogit", 256, tokenizer.vocabSize(), 8, 1, 1, 1);
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return tokenizer;
+    }
+
+    @Override
+    public float[] prefill(int[] tokens, int startPosition) {
+      return logits();
+    }
+
+    @Override
+    public float[] forward(int token, int position) {
+      return logits();
+    }
+
+    @Override
+    public void close() {}
+
+    private static float[] logits() {
+      float[] logits = new float[Character.MAX_VALUE + 1];
+      logits['x'] = 100.0f;
+      return logits;
     }
   }
 }

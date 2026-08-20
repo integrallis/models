@@ -17,10 +17,14 @@ package com.integrallis.models.langchain4j;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.ToolCall;
+import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -32,6 +36,7 @@ import dev.langchain4j.model.output.FinishReason;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /** LangChain4J {@link ChatModel} backed by the models runtime generation loop. */
 public final class ModelsChatModel implements ChatModel {
@@ -85,11 +90,17 @@ public final class ModelsChatModel implements ChatModel {
   @Override
   public ChatResponse doChat(ChatRequest request) {
     Objects.requireNonNull(request, "request");
-    boolean toolsDeclared = !LangChain4jChatRequestMapper.tools(request).isEmpty();
+    List<ToolSpec> tools = LangChain4jChatRequestMapper.tools(request);
+    boolean toolsDeclared = !tools.isEmpty();
+    ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template);
+    SamplingOptions requested = LangChain4jChatRequestMapper.options(request, defaults);
     String output =
-        model.generate(
-            LangChain4jChatRequestMapper.prompt(request, template),
-            LangChain4jChatRequestMapper.options(request, defaults));
+        toolConstraint(tools)
+            .map(
+                constraint ->
+                    ((ConstrainedTextGenerationModel) model)
+                        .generate(prompt, requested, constraint))
+            .orElseGet(() -> model.generate(prompt, requested));
 
     // Without declared tools, output that merely resembles a call is ordinary text.
     ToolCallScanner.Result scan =
@@ -119,5 +130,13 @@ public final class ModelsChatModel implements ChatModel {
         .finishReason(FinishReason.TOOL_EXECUTION)
         .modelName(model.modelName())
         .build();
+  }
+
+  private Optional<TokenConstraint> toolConstraint(List<ToolSpec> tools) {
+    if (tools.isEmpty() || !(model instanceof ConstrainedTextGenerationModel constrainedModel)) {
+      return Optional.empty();
+    }
+    return LangChain4jToolCallConstraint.compile(
+        constrainedModel.tokenizer(), template.toolSyntax(), tools);
   }
 }
