@@ -15,16 +15,17 @@
  */
 package com.integrallis.models.spring.ai;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ToolSyntax;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 final class SpringAiToolCallConstraint {
 
@@ -42,7 +43,7 @@ final class SpringAiToolCallConstraint {
     JsonNode root;
     try {
       root = JSON.readTree(schema);
-    } catch (RuntimeException e) {
+    } catch (IOException | RuntimeException e) {
       return List.of();
     }
     JsonNode propertiesNode = root.path("properties");
@@ -82,10 +83,10 @@ final class SpringAiToolCallConstraint {
     }
     List<String> required = new ArrayList<>();
     for (JsonNode value : requiredNode) {
-      if (!value.isString()) {
+      if (!value.isTextual()) {
         return List.of();
       }
-      required.add(value.asString());
+      required.add(value.asText());
     }
     return required;
   }
@@ -93,10 +94,10 @@ final class SpringAiToolCallConstraint {
   private static List<String> enumValues(JsonNode enumNode) {
     List<String> values = new ArrayList<>();
     for (JsonNode value : enumNode) {
-      if (!value.isString()) {
+      if (!value.isTextual()) {
         return List.of();
       }
-      values.add(value.asString());
+      values.add(value.asText());
     }
     return values;
   }
