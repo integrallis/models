@@ -123,8 +123,10 @@ Models requires Java 25 or newer. For a versioned, qualified artifact, add Model
 JAR for the selected model:
 
 ```kotlin
+val modeljarsVersion = providers.gradleProperty("modeljarsVersion").get()
+
 dependencies {
-    implementation("org.modeljars:modeljars:0.1.2")
+    implementation("org.modeljars:modeljars:$modeljarsVersion")
     implementation(
         "org.modeljars.huggingface:" +
             "ggml-org.qwen3-0.6b-gguf.q4_0:" +
@@ -138,9 +140,11 @@ for that exact artifact. Applications that manage their own GGUF files can depen
 directly:
 
 ```kotlin
+val modelsVersion = providers.gradleProperty("modelsVersion").get()
+
 dependencies {
-    implementation("com.integrallis:models:0.3.2")
-    implementation("com.integrallis:backend-java:0.3.2") // or backend-native
+    implementation("com.integrallis:models:$modelsVersion")
+    implementation("com.integrallis:backend-java:$modelsVersion") // or backend-native
 }
 ```
 
@@ -148,7 +152,7 @@ Use Apple's on-device system model on a supported Apple Silicon Mac:
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:backend-apple:0.3.2")
+    implementation("com.integrallis:backend-apple:$modelsVersion")
 }
 ```
 

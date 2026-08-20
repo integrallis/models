@@ -1404,6 +1404,22 @@ tasks.register("verifyDocumentation") {
         }
 
         val readme = readmeFile.readText()
+        val hardcodedReadmeModelsCoordinate =
+            Regex(
+                """com\.integrallis:(?:models(?:-[A-Za-z0-9.-]+)?|backend-[A-Za-z0-9.-]+):""" +
+                    """\d+\.\d+\.\d+(?:[-+][A-Za-z0-9._-]+)?"""
+            )
+        require(!hardcodedReadmeModelsCoordinate.containsMatchIn(readme)) {
+            "README must use the modelsVersion property in dependency snippets, not hardcoded Models versions"
+        }
+        require("\$modelsVersion" in readme) {
+            "README dependency snippets must pull the Models version from modelsVersion"
+        }
+        val hardcodedReadmeModelJarsCoordinate =
+            Regex("""org\.modeljars:modeljars:\d+\.\d+\.\d+(?:[-+][A-Za-z0-9._-]+)?""")
+        require(!hardcodedReadmeModelJarsCoordinate.containsMatchIn(readme)) {
+            "README must use the modeljarsVersion property in ModelJars dependency snippets"
+        }
         require("https://integrallis.github.io/models/" in readme) {
             "README must link to the published documentation site"
         }
