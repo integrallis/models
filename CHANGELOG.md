@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-08-21
+
 ### Fixed
 
 - `ModelsSpringAiChatModel` now emits Spring AI's standard
@@ -12,6 +14,8 @@ All notable changes to models are documented here.
   The Spring Boot starter passes the application's `ObservationRegistry` into
   its auto-configured adapter, so local chat calls no longer disappear from
   Spring AI metrics.
+- Corrected the Spring Boot starter and ModelJars versions shown in the module
+  README and generated documentation.
 
 ## [0.3.3] - 2026-08-20
 

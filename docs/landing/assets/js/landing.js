@@ -78,37 +78,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const COORDS = {
     'gradle-kts': {
       copy:
-        'implementation("org.modeljars:modeljars:0.1.2")\n' +
+        'implementation("org.modeljars:modeljars:0.1.11")\n' +
         'implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")',
       show:
-        'implementation("org.modeljars:modeljars:0.1.2")\n' +
+        'implementation("org.modeljars:modeljars:0.1.11")\n' +
         'implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1")',
     },
     'gradle-groovy': {
       copy:
-        "implementation 'org.modeljars:modeljars:0.1.2'\n" +
+        "implementation 'org.modeljars:modeljars:0.1.11'\n" +
         "implementation 'org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1'",
       show:
-        "implementation 'org.modeljars:modeljars:0.1.2'\n" +
+        "implementation 'org.modeljars:modeljars:0.1.11'\n" +
         "implementation 'org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1'",
     },
     maven: {
       copy:
         '<dependency>\n  <groupId>org.modeljars</groupId>\n' +
-        '  <artifactId>modeljars</artifactId>\n  <version>0.1.2</version>\n</dependency>\n' +
+        '  <artifactId>modeljars</artifactId>\n  <version>0.1.11</version>\n</dependency>\n' +
         '<dependency>\n  <groupId>org.modeljars.huggingface</groupId>\n' +
         '  <artifactId>ggml-org.qwen3-0.6b-gguf.q4_0</artifactId>\n' +
         '  <version>3.0.0-q4_0.1</version>\n</dependency>',
       show:
-        '<dependency>org.modeljars:modeljars:0.1.2</dependency>\n' +
+        '<dependency>org.modeljars:modeljars:0.1.11</dependency>\n' +
         '<dependency>org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4_0.1</dependency>',
     },
     sbt: {
       copy:
-        'libraryDependencies += "org.modeljars" % "modeljars" % "0.1.2"\n' +
+        'libraryDependencies += "org.modeljars" % "modeljars" % "0.1.11"\n' +
         'libraryDependencies += "org.modeljars.huggingface" % "ggml-org.qwen3-0.6b-gguf.q4_0" % "3.0.0-q4_0.1"',
       show:
-        'libraryDependencies += "org.modeljars" % "modeljars" % "0.1.2"\n' +
+        'libraryDependencies += "org.modeljars" % "modeljars" % "0.1.11"\n' +
         'libraryDependencies += "org.modeljars.huggingface" % "ggml-org.qwen3-0.6b-gguf.q4_0" % "3.0.0-q4_0.1"',
     },
   };
