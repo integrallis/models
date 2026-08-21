@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.api.Pooling;
 import java.io.IOException;
@@ -37,6 +38,7 @@ class GgufEmbeddingBackendTest {
   // The nano vocabulary is t0..t31, so inputs are written in its own tokens.
   private static final String TEXT = "t5 t7 t11";
   private static final String OTHER_TEXT = "t13 t17";
+  private static final float FLOAT_REDUCTION_TOLERANCE = 1.0e-7f;
 
   private static Path modelPath;
 
@@ -87,13 +89,14 @@ class GgufEmbeddingBackendTest {
     }
 
     @Test
-    void embedAllPreservesRowOrder() {
+    void embedAllPreservesRowOrderWithinFloatTolerance() {
       try (GgufEmbeddingBackend embed = embedding(Pooling.LAST_TOKEN, true)) {
         float[][] rows = embed.embedAll(List.of(TEXT, OTHER_TEXT, TEXT));
 
         assertThat(rows).hasDimensions(3, embed.dimension());
-        // Identical input embeds identically regardless of batch position.
-        assertThat(rows[0]).containsExactly(rows[2]);
+        // A row may cross the JVM's interpreted/JIT boundary, which can change the final bit of a
+        // floating-point reduction without changing the embedding.
+        assertThat(rows[0]).containsExactly(rows[2], within(FLOAT_REDUCTION_TOLERANCE));
         assertThat(rows[0]).isNotEqualTo(rows[1]);
       }
     }
