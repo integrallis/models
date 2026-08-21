@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-08-21
+
 ### Fixed
 
 - The Spring AI and LangChain4j embedding adapters now serialize access to the
