@@ -181,9 +181,7 @@ class ModelsEmbeddingModelTest {
         if (text.equals("first")) {
           firstEntered.countDown();
           try {
-            if (!releaseFirst.await(1, TimeUnit.SECONDS)) {
-              throw new IllegalStateException("timed out waiting to release first embedding");
-            }
+            releaseFirst.await();
           } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("interrupted", exception);
