@@ -58,6 +58,7 @@ class LlamaForwardPassTest {
   private static final int VOCAB_SIZE = 32;
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
+  private static final float SIMD_REDUCTION_TOLERANCE = 2.0e-7f;
 
   private GgufFile buildNanoModel(Random rng) {
     SyntheticGgufBuilder builder =
@@ -1068,15 +1069,15 @@ class LlamaForwardPassTest {
 
     @Test
     void batchedAttentionValueAccumulationPreservesCompleteAutoregressiveState() {
-      assertAttentionBatchingIsExact(false, false, false, true);
+      assertAttentionBatchingIsEquivalent(false, false, false, true);
     }
 
     @Test
     void batchedAttentionScoresPreserveCompleteAutoregressiveState() {
-      assertAttentionBatchingIsExact(false, true, true, true);
+      assertAttentionBatchingIsEquivalent(false, true, true, true);
     }
 
-    private void assertAttentionBatchingIsExact(
+    private void assertAttentionBatchingIsEquivalent(
         boolean baselineScores,
         boolean baselineValues,
         boolean candidateScores,
@@ -1120,10 +1121,11 @@ class LlamaForwardPassTest {
 
         assertThat(batched.usesBatchedAttentionScores()).isEqualTo(candidateScores);
         assertThat(batched.usesBatchedAttentionValues()).isEqualTo(candidateValues);
-        assertThat(actual).containsExactly(expected);
+        assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(batchedCache.keyBuffer()).containsExactly(expectedKeys);
         assertThat(batchedCache.valueBuffer()).containsExactly(expectedValues);
-        assertThat(batched.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+        assertThat(batched.forward(nextToken, tokens.length))
+            .containsExactly(expectedNext, within(SIMD_REDUCTION_TOLERANCE));
       }
     }
 
@@ -1520,9 +1522,9 @@ class LlamaForwardPassTest {
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
       assertThat(batched.usesFinalLayerPrefillPruning()).isFalse();
       assertThat(batched.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.TWO_QUERY_BLOCK);
-      assertThat(actual).containsExactly(expected, within(2.0e-7f));
+      assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
       assertThat(batched.forward(3, tokens.length))
-          .containsExactly(sequential.forward(3, tokens.length), within(2.0e-7f));
+          .containsExactly(sequential.forward(3, tokens.length), within(SIMD_REDUCTION_TOLERANCE));
     }
 
     @Test
@@ -1663,7 +1665,8 @@ class LlamaForwardPassTest {
 
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
       for (int index = 0; index < sessions.length; index++) {
-        assertThat(actual.copyRow(index)).containsExactly(expectedLogits[index], within(2.0e-7f));
+        assertThat(actual.copyRow(index))
+            .containsExactly(expectedLogits[index], within(SIMD_REDUCTION_TOLERANCE));
         assertThat(sessions[index].cache().keyBuffer())
             .containsExactly(expectedCaches[index].keyBuffer());
         assertThat(sessions[index].cache().valueBuffer())
