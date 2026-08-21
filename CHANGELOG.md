@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-08-21
+
 ### Added
 
 - `ModelsSpringAiChatModel` now accepts an explicit logical model name for
