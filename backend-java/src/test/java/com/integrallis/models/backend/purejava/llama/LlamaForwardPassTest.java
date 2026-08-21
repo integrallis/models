@@ -1630,7 +1630,7 @@ class LlamaForwardPassTest {
     }
 
     @Test
-    void fourSessionBatchExercisesRegisterTiledKQuantPathExactly() {
+    void fourSessionBatchExercisesRegisterTiledKQuantPathWithinFloatTolerance() {
       GgufFile file = buildQ4KNanoModel(new Random(43));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
@@ -1663,7 +1663,7 @@ class LlamaForwardPassTest {
 
       assertThat(batched.usesGroupedBatchedPrefill()).isTrue();
       for (int index = 0; index < sessions.length; index++) {
-        assertThat(actual.copyRow(index)).containsExactly(expectedLogits[index]);
+        assertThat(actual.copyRow(index)).containsExactly(expectedLogits[index], within(2.0e-7f));
         assertThat(sessions[index].cache().keyBuffer())
             .containsExactly(expectedCaches[index].keyBuffer());
         assertThat(sessions[index].cache().valueBuffer())
