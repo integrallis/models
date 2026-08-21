@@ -191,21 +191,24 @@ class ModelsSpringAiChatModelTest {
     var model =
         new ModelsSpringAiChatModel(
             delegate,
+            "qualified-model-alias",
             ChatTemplate.CHATML,
             SamplingOptions.builder().temperature(0).maxTokens(32).build(),
             registry);
 
     var response = model.call(new Prompt("question"));
 
-    assertThat(response.getMetadata().getModel()).isEqualTo("RecordingModel");
+    assertThat(model.getOptions().getModel()).isEqualTo("qualified-model-alias");
+    assertThat(response.getMetadata().getModel()).isEqualTo("qualified-model-alias");
     assertThat(stopped)
         .singleElement()
         .satisfies(
             context -> {
               assertThat(context.getOperationMetadata().provider()).isEqualTo("integrallis");
-              assertThat(context.getRequest().getOptions().getModel()).isEqualTo("RecordingModel");
+              assertThat(context.getRequest().getOptions().getModel())
+                  .isEqualTo("qualified-model-alias");
               assertThat(context.getResponse().getMetadata().getModel())
-                  .isEqualTo("RecordingModel");
+                  .isEqualTo("qualified-model-alias");
             });
   }
 
@@ -302,6 +305,23 @@ class ModelsSpringAiChatModelTest {
                     highLevelModel("answer"),
                     (ChatTemplate) null,
                     SamplingOptions.builder().build()));
+    assertThatNullPointerException()
+        .isThrownBy(
+            () ->
+                new ModelsSpringAiChatModel(
+                    highLevelModel("answer"),
+                    null,
+                    ChatTemplate.CHATML,
+                    SamplingOptions.builder().build()));
+    assertThatThrownBy(
+            () ->
+                new ModelsSpringAiChatModel(
+                    highLevelModel("answer"),
+                    "  ",
+                    ChatTemplate.CHATML,
+                    SamplingOptions.builder().build()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("modelName");
     ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(highLevelModel("answer"));
     assertThatNullPointerException().isThrownBy(() -> model.call((Prompt) null));
     assertThatNullPointerException().isThrownBy(() -> model.stream((Prompt) null));

@@ -59,6 +59,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
 
   private final SamplingOptions defaults;
   private final TextGenerationModel model;
+  private final String modelName;
   private final ChatTemplate template;
   private final ObservationRegistry observationRegistry;
   private ChatModelObservationConvention observationConvention = DEFAULT_OBSERVATION_CONVENTION;
@@ -99,10 +100,38 @@ public final class ModelsSpringAiChatModel implements ChatModel {
 
   public ModelsSpringAiChatModel(
       TextGenerationModel model,
+      String modelName,
+      ChatTemplate template,
+      SamplingOptions defaults) {
+    this(model, modelName, template, defaults, ObservationRegistry.NOOP);
+  }
+
+  public ModelsSpringAiChatModel(
+      TextGenerationModel model,
       ChatTemplate template,
       SamplingOptions defaults,
       ObservationRegistry observationRegistry) {
+    this(model, null, template, defaults, observationRegistry, true);
+  }
+
+  public ModelsSpringAiChatModel(
+      TextGenerationModel model,
+      String modelName,
+      ChatTemplate template,
+      SamplingOptions defaults,
+      ObservationRegistry observationRegistry) {
+    this(model, modelName, template, defaults, observationRegistry, false);
+  }
+
+  private ModelsSpringAiChatModel(
+      TextGenerationModel model,
+      String modelName,
+      ChatTemplate template,
+      SamplingOptions defaults,
+      ObservationRegistry observationRegistry,
+      boolean useRuntimeModelName) {
     this.model = Objects.requireNonNull(model, "model");
+    this.modelName = useRuntimeModelName ? null : requireModelName(modelName);
     this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
     this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
@@ -204,7 +233,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
 
   public ChatOptions getOptions() {
     return ChatOptions.builder()
-        .model(model.modelName())
+        .model(resolvedModelName())
         .temperature((double) defaults.temperature())
         .topP((double) defaults.topP())
         .topK(defaults.topK())
@@ -228,7 +257,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     if (requested == null) {
       return getOptions();
     }
-    var builder = ChatOptions.builder().model(model.modelName());
+    var builder = ChatOptions.builder().model(resolvedModelName());
     if (requested.getFrequencyPenalty() != null) {
       builder.frequencyPenalty(requested.getFrequencyPenalty());
     }
@@ -365,7 +394,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   private ChatResponse response(String text) {
     return new ChatResponse(
         List.of(new Generation(new AssistantMessage(text))),
-        ChatResponseMetadata.builder().model(model.modelName()).build());
+        ChatResponseMetadata.builder().model(resolvedModelName()).build());
   }
 
   /** Builds a response that surfaces any recovered tool calls to Spring AI's advisor. */
@@ -383,6 +412,18 @@ public final class ModelsSpringAiChatModel implements ChatModel {
         AssistantMessage.builder().content(scan.content()).toolCalls(calls).build();
     return new ChatResponse(
         List.of(new Generation(assistant)),
-        ChatResponseMetadata.builder().model(model.modelName()).build());
+        ChatResponseMetadata.builder().model(resolvedModelName()).build());
+  }
+
+  private String resolvedModelName() {
+    return modelName == null ? model.modelName() : modelName;
+  }
+
+  private static String requireModelName(String modelName) {
+    Objects.requireNonNull(modelName, "modelName");
+    if (modelName.isBlank()) {
+      throw new IllegalArgumentException("modelName must not be blank");
+    }
+    return modelName.strip();
   }
 }

@@ -4,6 +4,14 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- `ModelsSpringAiChatModel` now accepts an explicit logical model name for
+  Spring AI response metadata, default options, and observations. ModelJars
+  applications can report the selected qualified catalog alias even when a
+  GGUF file embeds a generic name such as `Gguf Output`; existing constructors
+  continue to use the runtime's model name.
+
 ## [0.3.5] - 2026-08-21
 
 ### Fixed

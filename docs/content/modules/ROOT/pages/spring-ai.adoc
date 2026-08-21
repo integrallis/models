@@ -50,6 +50,7 @@ var defaults = SamplingOptions.builder()
 try (var runtime = ModelJars.openRuntime(MODEL)) {
     var model = new ModelsSpringAiChatModel(
         runtime.model(),
+        runtime.descriptor().alias(),
         runtime.chatTemplate(),
         defaults);
 
@@ -70,6 +71,7 @@ streaming inference on Spring AI's standard `gen_ai.client.operation` surface:
 ----
 var model = new ModelsSpringAiChatModel(
     runtime.model(),
+    runtime.descriptor().alias(),
     runtime.chatTemplate(),
     defaults,
     observationRegistry);
@@ -79,6 +81,10 @@ The adapter reports `gen_ai.system=integrallis`, the Models runtime identity as
 the request and response model, the operation duration, and failures. Every
 `ChatResponse` carries the same model identity. Models does not fabricate token
 usage when a backend does not expose exact prompt and completion counts.
+
+Pass the selected catalog alias explicitly when the model file's embedded
+metadata is generic or ambiguous. Constructors without that argument retain
+the runtime's `modelName()` for source compatibility.
 
 `setObservationConvention(...)` accepts an application-specific Spring AI
 `ChatModelObservationConvention`. Constructors without an
