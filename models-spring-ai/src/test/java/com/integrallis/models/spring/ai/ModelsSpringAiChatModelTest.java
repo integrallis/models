@@ -28,6 +28,9 @@ import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,6 +41,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.observation.ChatModelObservationContext;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
@@ -163,6 +167,88 @@ class ModelsSpringAiChatModelTest {
     model.call(new Prompt("question"));
 
     assertThat(delegate.options).isEqualTo(defaults);
+  }
+
+  @Test
+  void observesBlockingCallsWithTheLocalModelIdentity() {
+    RecordingModel delegate = new RecordingModel("local answer", null);
+    ObservationRegistry registry = ObservationRegistry.create();
+    List<ChatModelObservationContext> stopped = new ArrayList<>();
+    registry
+        .observationConfig()
+        .observationHandler(
+            new ObservationHandler<ChatModelObservationContext>() {
+              @Override
+              public boolean supportsContext(Observation.Context context) {
+                return context instanceof ChatModelObservationContext;
+              }
+
+              @Override
+              public void onStop(ChatModelObservationContext context) {
+                stopped.add(context);
+              }
+            });
+    var model =
+        new ModelsSpringAiChatModel(
+            delegate,
+            ChatTemplate.CHATML,
+            SamplingOptions.builder().temperature(0).maxTokens(32).build(),
+            registry);
+
+    var response = model.call(new Prompt("question"));
+
+    assertThat(response.getMetadata().getModel()).isEqualTo("RecordingModel");
+    assertThat(stopped)
+        .singleElement()
+        .satisfies(
+            context -> {
+              assertThat(context.getOperationMetadata().provider()).isEqualTo("integrallis");
+              assertThat(context.getRequest().getOptions().getModel()).isEqualTo("RecordingModel");
+              assertThat(context.getResponse().getMetadata().getModel())
+                  .isEqualTo("RecordingModel");
+            });
+  }
+
+  @Test
+  void observesStreamingCallsOnceWithTheLocalModelIdentity() {
+    RecordingModel delegate = new RecordingModel("local answer", null);
+    ObservationRegistry registry = ObservationRegistry.create();
+    List<ChatModelObservationContext> stopped = new ArrayList<>();
+    registry
+        .observationConfig()
+        .observationHandler(
+            new ObservationHandler<ChatModelObservationContext>() {
+              @Override
+              public boolean supportsContext(Observation.Context context) {
+                return context instanceof ChatModelObservationContext;
+              }
+
+              @Override
+              public void onStop(ChatModelObservationContext context) {
+                stopped.add(context);
+              }
+            });
+    var model =
+        new ModelsSpringAiChatModel(
+            delegate,
+            ChatTemplate.CHATML,
+            SamplingOptions.builder().maxTokens(32).build(),
+            registry);
+
+    var responses = model.stream(new Prompt("question")).collectList().block();
+
+    assertThat(responses)
+        .singleElement()
+        .satisfies(
+            response -> assertThat(response.getMetadata().getModel()).isEqualTo("RecordingModel"));
+    assertThat(stopped)
+        .singleElement()
+        .satisfies(
+            context -> {
+              assertThat(context.getRequest().getOptions().getModel()).isEqualTo("RecordingModel");
+              assertThat(context.getResponse().getMetadata().getModel())
+                  .isEqualTo("RecordingModel");
+            });
   }
 
   @Test

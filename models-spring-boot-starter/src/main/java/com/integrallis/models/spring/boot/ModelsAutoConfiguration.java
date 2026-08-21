@@ -18,6 +18,7 @@ package com.integrallis.models.spring.boot;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -88,11 +89,18 @@ public class ModelsAutoConfiguration {
       definition.setInstanceSupplier(
           () -> {
             ModelsProperties properties = beanFactory.getBean(ModelsProperties.class);
+            ObservationRegistry observations =
+                beanFactory
+                    .getBeanProvider(ObservationRegistry.class)
+                    .getIfAvailable(() -> ObservationRegistry.NOOP);
             TextGenerationModel model =
                 beanFactory.getBeanProvider(TextGenerationModel.class).getIfAvailable();
             if (model != null) {
               return new ModelsSpringAiChatModel(
-                  model, properties.parsedChatTemplate(), properties.samplingOptions());
+                  model,
+                  properties.parsedChatTemplate(),
+                  properties.samplingOptions(),
+                  observations);
             }
             InferenceBackend backend =
                 beanFactory.getBeanProvider(InferenceBackend.class).getIfAvailable();
@@ -102,7 +110,10 @@ public class ModelsAutoConfiguration {
                       + MODELS_CHAT_MODEL_BEAN_NAME);
             }
             return new ModelsSpringAiChatModel(
-                backend, properties.parsedChatTemplate(), properties.samplingOptions());
+                backend,
+                properties.parsedChatTemplate(),
+                properties.samplingOptions(),
+                observations);
           });
       registry.registerBeanDefinition(MODELS_CHAT_MODEL_BEAN_NAME, definition);
     }

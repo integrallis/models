@@ -61,6 +61,29 @@ try (var runtime = ModelJars.openRuntime(MODEL)) {
 Use the chat template recorded by the exact qualified ModelJar rather than
 selecting one from the architecture name.
 
+== Observability
+
+Pass the application's `ObservationRegistry` to keep local blocking and
+streaming inference on Spring AI's standard `gen_ai.client.operation` surface:
+
+[source,java]
+----
+var model = new ModelsSpringAiChatModel(
+    runtime.model(),
+    runtime.chatTemplate(),
+    defaults,
+    observationRegistry);
+----
+
+The adapter reports `gen_ai.system=integrallis`, the Models runtime identity as
+the request and response model, the operation duration, and failures. Every
+`ChatResponse` carries the same model identity. Models does not fabricate token
+usage when a backend does not expose exact prompt and completion counts.
+
+`setObservationConvention(...)` accepts an application-specific Spring AI
+`ChatModelObservationConvention`. Constructors without an
+`ObservationRegistry` retain their source-compatible no-op behavior.
+
 == Tool Calling
 
 When a `Prompt` declares Spring AI `ToolCallback` instances, the adapter renders
@@ -180,7 +203,8 @@ System.out.println(response.getResult().getOutput().getText());
 ----
 
 `getOptions()` exposes the adapter defaults through Spring AI's `ChatOptions`
-view. Per-request overrides do not mutate those defaults.
+view, including the local Models runtime identity. Per-request overrides do not
+mutate those defaults.
 
 == Streaming Chat
 

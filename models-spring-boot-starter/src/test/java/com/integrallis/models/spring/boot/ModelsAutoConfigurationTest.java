@@ -27,6 +27,9 @@ import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
 import com.integrallis.vectors.db.VectorCollection;
 import com.integrallis.vectors.spring.ai.JavaVectorsVectorStore;
 import com.integrallis.vectors.spring.boot.JavaVectorsAutoConfiguration;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.observation.ChatModelObservationContext;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.BatchingStrategy;
@@ -68,6 +72,46 @@ class ModelsAutoConfigurationTest {
               assertThat(context).hasSingleBean(ChatModel.class);
               assertThat(context.getBean(ChatModel.class).call("question"))
                   .isEqualTo("local answer");
+            });
+  }
+
+  @Test
+  void passesTheApplicationObservationRegistryToTheChatAdapter() {
+    ObservationRegistry registry = ObservationRegistry.create();
+    List<ChatModelObservationContext> stopped = new ArrayList<>();
+    registry
+        .observationConfig()
+        .observationHandler(
+            new ObservationHandler<ChatModelObservationContext>() {
+              @Override
+              public boolean supportsContext(Observation.Context context) {
+                return context instanceof ChatModelObservationContext;
+              }
+
+              @Override
+              public void onStop(ChatModelObservationContext context) {
+                stopped.add(context);
+              }
+            });
+
+    runner
+        .withBean(ObservationRegistry.class, () -> registry)
+        .withUserConfiguration(LocalModelConfiguration.class)
+        .run(
+            context -> {
+              context.getBean(ChatModel.class).call("question");
+
+              assertThat(stopped)
+                  .singleElement()
+                  .satisfies(
+                      observation -> {
+                        assertThat(observation.getOperationMetadata().provider())
+                            .isEqualTo("integrallis");
+                        assertThat(observation.getRequest().getOptions().getModel())
+                            .isEqualTo("spring-interoperability-test");
+                        assertThat(observation.getResponse().getMetadata().getModel())
+                            .isEqualTo("spring-interoperability-test");
+                      });
             });
   }
 

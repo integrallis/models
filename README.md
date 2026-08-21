@@ -234,8 +234,8 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 |---|---|---|
 | Plain Java | `models-runtime` | `GenerationLoop` and `TokenStream` |
 | LangChain4j | `models-langchain4j` | blocking and streaming chat models with schema-constrained tool calls |
-| Spring AI | `models-spring-ai` | blocking and streaming chat models with schema-constrained tool calls |
-| Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel` auto-configuration |
+| Spring AI | `models-spring-ai` | observed blocking and streaming chat models with schema-constrained tool calls |
+| Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel` and observation auto-configuration |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 | Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |

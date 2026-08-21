@@ -56,6 +56,12 @@ When a `TextGenerationModel` bean is present, the starter registers
 `TextGenerationModel` takes precedence when both exist. If neither exists, the
 starter does not create a phantom chat-model bean.
 
+When Spring Boot provides an `ObservationRegistry`, the starter passes it to
+the adapter automatically. Blocking and streaming local inference therefore
+emit Spring AI's standard `gen_ai.client.operation` observations with
+`gen_ai.system=integrallis` and the local model identity. No application-side
+counter or wrapper is required.
+
 Other Spring AI model-provider beans can coexist. Inject the local model by
 name when an application has more than one `ChatModel`:
 

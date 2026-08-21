@@ -4,6 +4,15 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `ModelsSpringAiChatModel` now emits Spring AI's standard
+  `gen_ai.client.operation` observations for blocking and streaming inference,
+  with the local runtime identity attached to request and response metadata.
+  The Spring Boot starter passes the application's `ObservationRegistry` into
+  its auto-configured adapter, so local chat calls no longer disappear from
+  Spring AI metrics.
+
 ## [0.3.3] - 2026-08-20
 
 ### Added
