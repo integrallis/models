@@ -106,10 +106,12 @@ try (var model = new ModelsSpringAiEmbeddingModel(
 }
 ----
 
-Both adapters own the backend they wrap and close it. The Spring AI constructor
-that accepts an `ObservationRegistry` emits the framework's standard embedding
-observations with the supplied model identity. To store the vectors, see
-xref:vectors.adoc[Vectors].
+Both adapters own the backend they wrap and close it. They serialize backend
+access, so a singleton framework model can safely receive a live query while
+another request is ingesting documents even though the local GGUF backend uses
+shared encoder scratch state. The Spring AI constructor that accepts an
+`ObservationRegistry` emits the framework's standard embedding observations
+with the supplied model identity. To store the vectors, see xref:vectors.adoc[Vectors].
 
 == Equivalence Gating
 

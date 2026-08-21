@@ -4,6 +4,13 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Spring AI and LangChain4j embedding adapters now serialize access to the
+  non-thread-safe local backend. Concurrent corpus ingestion and live queries
+  can no longer corrupt shared encoder scratch state or fail in rotary-table
+  batching.
+
 ## [0.3.4] - 2026-08-21
 
 ### Fixed

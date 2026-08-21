@@ -253,7 +253,9 @@ This adapter owns the backend it wraps and closes it. See
 xref:embeddings.adoc[Embeddings] for producing the backend. Passing Spring's
 `ObservationRegistry` records standard `gen_ai.client.operation` observations
 for direct, document, and batch embedding calls. The pinned model name and
-backend dimension are attached to each observation and response.
+backend dimension are attached to each observation and response. Concurrent
+framework calls are serialized around the backend because the local encoder
+reuses mutable scratch state between sequences.
 
 For auto-configuration, named-bean behavior, and combined Models/Vectors setup,
 continue with xref:spring-boot.adoc[Spring Boot]. For validation after

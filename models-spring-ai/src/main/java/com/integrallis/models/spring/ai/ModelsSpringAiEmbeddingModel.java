@@ -52,6 +52,7 @@ public final class ModelsSpringAiEmbeddingModel implements EmbeddingModel, AutoC
       new DefaultEmbeddingModelObservationConvention();
 
   private final EmbeddingBackend backend;
+  private final Object backendMonitor = new Object();
   private final String modelName;
   private final ObservationRegistry observationRegistry;
   private EmbeddingModelObservationConvention observationConvention =
@@ -114,12 +115,14 @@ public final class ModelsSpringAiEmbeddingModel implements EmbeddingModel, AutoC
   /** Releases the underlying model. */
   @Override
   public void close() {
-    try {
-      backend.close();
-    } catch (RuntimeException failure) {
-      throw failure;
-    } catch (Exception failure) {
-      throw new IllegalStateException("failed to close embedding backend", failure);
+    synchronized (backendMonitor) {
+      try {
+        backend.close();
+      } catch (RuntimeException failure) {
+        throw failure;
+      } catch (Exception failure) {
+        throw new IllegalStateException("failed to close embedding backend", failure);
+      }
     }
   }
 
@@ -127,9 +130,11 @@ public final class ModelsSpringAiEmbeddingModel implements EmbeddingModel, AutoC
       EmbeddingRequest request, EmbeddingModelObservationContext context) {
     List<String> instructions = request.getInstructions();
     List<Embedding> embeddings = new ArrayList<>(instructions.size());
-    for (int index = 0; index < instructions.size(); index++) {
-      // The index correlates each vector with its input; callers depend on it to match rows.
-      embeddings.add(new Embedding(backend.embed(instructions.get(index)), index));
+    synchronized (backendMonitor) {
+      for (int index = 0; index < instructions.size(); index++) {
+        // The index correlates each vector with its input; callers depend on it to match rows.
+        embeddings.add(new Embedding(backend.embed(instructions.get(index)), index));
+      }
     }
     var response =
         new EmbeddingResponse(embeddings, new EmbeddingResponseMetadata(modelName, null));

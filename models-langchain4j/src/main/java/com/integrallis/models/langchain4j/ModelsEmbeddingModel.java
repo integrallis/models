@@ -38,6 +38,7 @@ import java.util.Objects;
 public final class ModelsEmbeddingModel implements EmbeddingModel, AutoCloseable {
 
   private final EmbeddingBackend backend;
+  private final Object backendMonitor = new Object();
 
   public ModelsEmbeddingModel(EmbeddingBackend backend) {
     this.backend = Objects.requireNonNull(backend, "backend");
@@ -47,9 +48,11 @@ public final class ModelsEmbeddingModel implements EmbeddingModel, AutoCloseable
   public Response<List<Embedding>> embedAll(List<TextSegment> segments) {
     Objects.requireNonNull(segments, "segments");
     List<Embedding> embeddings = new ArrayList<>(segments.size());
-    for (TextSegment segment : segments) {
-      embeddings.add(
-          new Embedding(backend.embed(Objects.requireNonNull(segment, "segment").text())));
+    synchronized (backendMonitor) {
+      for (TextSegment segment : segments) {
+        embeddings.add(
+            new Embedding(backend.embed(Objects.requireNonNull(segment, "segment").text())));
+      }
     }
     return Response.from(embeddings);
   }
@@ -62,12 +65,14 @@ public final class ModelsEmbeddingModel implements EmbeddingModel, AutoCloseable
   /** Releases the underlying model. */
   @Override
   public void close() {
-    try {
-      backend.close();
-    } catch (RuntimeException failure) {
-      throw failure;
-    } catch (Exception failure) {
-      throw new IllegalStateException("failed to close embedding backend", failure);
+    synchronized (backendMonitor) {
+      try {
+        backend.close();
+      } catch (RuntimeException failure) {
+        throw failure;
+      } catch (Exception failure) {
+        throw new IllegalStateException("failed to close embedding backend", failure);
+      }
     }
   }
 }

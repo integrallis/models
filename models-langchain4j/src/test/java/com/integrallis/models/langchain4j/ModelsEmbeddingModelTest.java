@@ -23,6 +23,11 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -84,6 +89,30 @@ class ModelsEmbeddingModelTest {
 
       assertThat(backend.seen).containsExactly("the text");
     }
+
+    @Test
+    void serializesConcurrentCallsToANonThreadSafeBackend() throws Exception {
+      var backend = new RejectConcurrentBackend();
+      var embedding = new ModelsEmbeddingModel(backend);
+
+      try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+        try {
+          var first = executor.submit(() -> embedding.embed("first"));
+          assertThat(backend.firstEntered.await(1, TimeUnit.SECONDS)).isTrue();
+          var second = executor.submit(() -> embedding.embed("second"));
+
+          assertThatThrownBy(() -> second.get(200, TimeUnit.MILLISECONDS))
+              .isInstanceOf(TimeoutException.class);
+          backend.releaseFirst.countDown();
+
+          assertThat(first.get().content().vector()).hasSize(DIM);
+          assertThat(second.get().content().vector()).hasSize(DIM);
+          assertThat(backend.concurrentEntry).isFalse();
+        } finally {
+          backend.releaseFirst.countDown();
+        }
+      }
+    }
   }
 
   @Nested
@@ -128,6 +157,42 @@ class ModelsEmbeddingModelTest {
     void rejectsANullBackend() {
       assertThatThrownBy(() -> new ModelsEmbeddingModel(null))
           .isInstanceOf(NullPointerException.class);
+    }
+  }
+
+  private static final class RejectConcurrentBackend implements EmbeddingBackend {
+    private final AtomicBoolean active = new AtomicBoolean();
+    private final CountDownLatch firstEntered = new CountDownLatch(1);
+    private final CountDownLatch releaseFirst = new CountDownLatch(1);
+    private volatile boolean concurrentEntry;
+
+    @Override
+    public int dimension() {
+      return DIM;
+    }
+
+    @Override
+    public float[] embed(String text) {
+      if (!active.compareAndSet(false, true)) {
+        concurrentEntry = true;
+        throw new IllegalStateException("concurrent backend entry");
+      }
+      try {
+        if (text.equals("first")) {
+          firstEntered.countDown();
+          try {
+            if (!releaseFirst.await(1, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("timed out waiting to release first embedding");
+            }
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted", exception);
+          }
+        }
+        return new float[DIM];
+      } finally {
+        active.set(false);
+      }
     }
   }
 }
