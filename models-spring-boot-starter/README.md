@@ -31,6 +31,6 @@ integrallis:
       max-tokens: 128
 ```
 
-For local RAG, add `com.integrallis:vectors-spring-boot-starter:0.1.4` and provide a Spring AI
+For local RAG, add `com.integrallis:vectors-spring-boot-starter:0.1.9` and provide a Spring AI
 `EmbeddingModel`. Vectors contributes `JavaVectorsVectorStore` while this starter contributes the
 local chat model. Both starters are verified together on Spring AI 1.1 and 2.0.

@@ -4,8 +4,17 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-08-20
+
 ### Added
 
+- Added schema-constrained tool-call decoding to the Spring AI and LangChain4j
+  adapters. Supported finite JSON Schema argument spaces are compiled into token
+  constraints, preventing invalid enumerable calls during sampling; unsupported
+  or partially constrained schemas continue through the existing tool-call path.
+- Added runtime token constraints, generation-confidence signals, prompt
+  visibility planning, and embedding-backed tool selection as framework-neutral
+  building blocks.
 - Added an embedding equivalence gate to `models-bench`, run with
   `embedding-equivalence --model <artifact.gguf>`. It tests that Models produces
   the same vectors as llama.cpp, for eight pinned probes over the same model
@@ -16,6 +25,18 @@ All notable changes to models are documented here.
   mean pooling in place of last-token measures 0.66156. Vector length is gated
   separately at 1e-3: cosine is scale-invariant, so a runtime that skips L2
   normalization agrees with a normalized reference at exactly 1.0.
+
+### Changed
+
+- Raised the Vectors baseline to 0.1.9, including Spring observation wiring and
+  semantic-cache response metadata.
+
+### Fixed
+
+- `ModelsSpringAiEmbeddingModel` now emits Spring AI's standard
+  `gen_ai.client.operation` observations for direct, document, and batch calls.
+  The adapter attaches its pinned model identity and backend dimension, so local
+  embedding work remains visible when an application replaces a hosted model.
 
 ## [0.3.2] - 2026-08-08
 
