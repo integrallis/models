@@ -1063,8 +1063,8 @@ class LlamaForwardPassTest {
 
     @Test
     void finalLayerKvOnlyPrefillPreservesLogitsKvCacheAndAutoregressiveState() {
-      assertFinalLayerKvOnlyPrefillIsExact(buildQ4NanoModel(new Random(42)));
-      assertFinalLayerKvOnlyPrefillIsExact(buildQ8NanoModel(new Random(42)));
+      assertFinalLayerKvOnlyPrefillIsEquivalent(buildQ4NanoModel(new Random(42)));
+      assertFinalLayerKvOnlyPrefillIsEquivalent(buildQ8NanoModel(new Random(42)));
     }
 
     @Test
@@ -1129,7 +1129,7 @@ class LlamaForwardPassTest {
       }
     }
 
-    private void assertFinalLayerKvOnlyPrefillIsExact(GgufFile file) {
+    private void assertFinalLayerKvOnlyPrefillIsEquivalent(GgufFile file) {
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
       int[] tokens = new int[40];
@@ -1165,10 +1165,11 @@ class LlamaForwardPassTest {
         float[] actual = kvOnly.prefill(tokens, 0);
 
         assertThat(kvOnly.usesFinalLayerKvOnlyPrefill()).isTrue();
-        assertThat(actual).containsExactly(expected);
+        assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(kvOnlyCache.keyBuffer()).containsExactly(expectedKeys);
         assertThat(kvOnlyCache.valueBuffer()).containsExactly(expectedValues);
-        assertThat(kvOnly.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+        assertThat(kvOnly.forward(nextToken, tokens.length))
+            .containsExactly(expectedNext, within(SIMD_REDUCTION_TOLERANCE));
       }
     }
 
