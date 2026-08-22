@@ -50,12 +50,17 @@ class ModelsSpringAiChatModelTest {
 
   @Test
   void springAiChatModelUsesModelsRuntime() {
-    ChatModel model =
+    ModelsSpringAiChatModel model =
         new ModelsSpringAiChatModel(
             backendGenerating(new int[] {3, 4, 1}),
             SamplingOptions.builder().temperature(0.0f).maxTokens(10).build());
 
-    assertThat(model.call("hello")).isEqualTo(" world");
+    ChatResponse response = model.call(new Prompt("hello"));
+
+    assertThat(response.getResult().getOutput().getText()).isEqualTo(" world");
+    assertThat(response.getMetadata().getUsage().getPromptTokens()).isEqualTo(1);
+    assertThat(response.getMetadata().getUsage().getCompletionTokens()).isEqualTo(2);
+    assertThat(response.getMetadata().getUsage().getTotalTokens()).isEqualTo(3);
   }
 
   @Test
@@ -65,24 +70,29 @@ class ModelsSpringAiChatModelTest {
             backendGenerating(new int[] {3, 4, 5, 1}),
             SamplingOptions.builder().temperature(0.0f).maxTokens(10).build());
 
+    List<ChatResponse> responses =
+        model.stream(new Prompt("hello")).collectList().blockOptional().orElseThrow();
     String streamed =
-        model.stream(new Prompt("hello"))
+        responses.stream()
             .map(ChatResponse::getResult)
             .map(generation -> generation.getOutput().getText())
-            .collectList()
-            .blockOptional()
-            .orElseThrow()
-            .stream()
             .reduce("", String::concat);
 
     assertThat(streamed).isEqualTo(" world!");
+    assertThat(responses.getLast().getMetadata().getUsage().getPromptTokens()).isEqualTo(1);
+    assertThat(responses.getLast().getMetadata().getUsage().getCompletionTokens()).isEqualTo(3);
+    assertThat(responses.getLast().getMetadata().getUsage().getTotalTokens()).isEqualTo(4);
   }
 
   @Test
   void springAiChatModelAcceptsTheSharedLocalEngineContract() {
-    ChatModel model = new ModelsSpringAiChatModel(highLevelModel("local answer"));
+    ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(highLevelModel("local answer"));
 
-    assertThat(model.call("hello")).isEqualTo("local answer");
+    ChatResponse response = model.call(new Prompt("hello"));
+
+    assertThat(response.getResult().getOutput().getText()).isEqualTo("local answer");
+    assertThat(response.getMetadata().getUsage().getPromptTokens()).isZero();
+    assertThat(response.getMetadata().getUsage().getCompletionTokens()).isZero();
   }
 
   @Test

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
@@ -90,6 +91,7 @@ class ModelsStreamingChatModelTest {
     assertThat(partials).containsExactly("mapped ", "answer");
     assertThat(completed.get().aiMessage().text()).isEqualTo("mapped answer");
     assertThat(completed.get().modelName()).isEqualTo("RecordingStreamingModel");
+    assertThat(completed.get().tokenUsage()).isNull();
     assertThat(failed).hasValue(null);
     assertThat(delegate.prompt)
         .isEqualTo(
@@ -108,6 +110,29 @@ class ModelsStreamingChatModelTest {
     assertThat(delegate.options.seed()).isEqualTo(42L);
     assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(model.diagnostics().backend()).isEqualTo("stream-recording");
+  }
+
+  @Test
+  void reportsPromptAndCompletionUsageOnTheTerminalResponse() {
+    TextGenerationModel delegate =
+        new RecordingStreamingModel(List.of()) {
+          @Override
+          public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+            stream.onToken("mapped ");
+            stream.onToken("answer");
+            stream.onComplete(new GenerationUsage(5, 2));
+          }
+        };
+    ModelsStreamingChatModel model = new ModelsStreamingChatModel(delegate);
+    AtomicReference<ChatResponse> completed = new AtomicReference<>();
+
+    model.doChat(
+        ChatRequest.builder().messages(UserMessage.from("question")).build(),
+        handler(new ArrayList<>(), completed, new AtomicReference<>()));
+
+    assertThat(completed.get().tokenUsage().inputTokenCount()).isEqualTo(5);
+    assertThat(completed.get().tokenUsage().outputTokenCount()).isEqualTo(2);
+    assertThat(completed.get().tokenUsage().totalTokenCount()).isEqualTo(7);
   }
 
   @Test

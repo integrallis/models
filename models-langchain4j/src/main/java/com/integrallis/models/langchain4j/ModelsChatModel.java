@@ -16,10 +16,13 @@
 package com.integrallis.models.langchain4j;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelGenerationException;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
+import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
@@ -33,10 +36,12 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.FinishReason;
+import dev.langchain4j.model.output.TokenUsage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** LangChain4J {@link ChatModel} backed by the models runtime generation loop. */
 public final class ModelsChatModel implements ChatModel {
@@ -94,24 +99,20 @@ public final class ModelsChatModel implements ChatModel {
     boolean toolsDeclared = !tools.isEmpty();
     ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template);
     SamplingOptions requested = LangChain4jChatRequestMapper.options(request, defaults);
-    String output =
-        toolConstraint(tools)
-            .map(
-                constraint ->
-                    ((ConstrainedTextGenerationModel) model)
-                        .generate(prompt, requested, constraint))
-            .orElseGet(() -> model.generate(prompt, requested));
+    GenerationOutput generated = generate(prompt, requested, tools);
 
     // Without declared tools, output that merely resembles a call is ordinary text.
     ToolCallScanner.Result scan =
         toolsDeclared
-            ? ToolCallScanner.scan(output, template.toolSyntax())
-            : ToolCallScanner.Result.plainText(output);
+            ? ToolCallScanner.scan(generated.text(), template.toolSyntax())
+            : ToolCallScanner.Result.plainText(generated.text());
     if (!scan.hasCalls()) {
-      return ChatResponse.builder()
-          .aiMessage(AiMessage.from(scan.content()))
-          .modelName(model.modelName())
-          .build();
+      var response =
+          ChatResponse.builder()
+              .aiMessage(AiMessage.from(scan.content()))
+              .modelName(model.modelName());
+      addUsage(response, generated.usage());
+      return response.build();
     }
 
     List<ToolExecutionRequest> requests = new ArrayList<>(scan.toolCalls().size());
@@ -125,11 +126,67 @@ public final class ModelsChatModel implements ChatModel {
     }
     // LangChain4j drives its tool loop off the finish reason; Spring AI 2.0 keys on the message
     // carrying calls instead, so this has to be set explicitly here and not there.
-    return ChatResponse.builder()
-        .aiMessage(new AiMessage(scan.content(), requests))
-        .finishReason(FinishReason.TOOL_EXECUTION)
-        .modelName(model.modelName())
-        .build();
+    var response =
+        ChatResponse.builder()
+            .aiMessage(new AiMessage(scan.content(), requests))
+            .finishReason(FinishReason.TOOL_EXECUTION)
+            .modelName(model.modelName());
+    addUsage(response, generated.usage());
+    return response.build();
+  }
+
+  private GenerationOutput generate(
+      ModelPrompt prompt, SamplingOptions options, List<ToolSpec> tools) {
+    StringBuilder output = new StringBuilder();
+    AtomicReference<GenerationUsage> usage = new AtomicReference<>();
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    TokenStream stream =
+        new TokenStream() {
+          @Override
+          public void onToken(String token) {
+            output.append(token);
+          }
+
+          @Override
+          public void onComplete() {}
+
+          @Override
+          public void onComplete(GenerationUsage completedUsage) {
+            usage.set(completedUsage);
+          }
+
+          @Override
+          public void onError(Throwable generationFailure) {
+            failure.compareAndSet(null, generationFailure);
+          }
+        };
+    Optional<TokenConstraint> constraint = toolConstraint(tools);
+    if (constraint.isPresent()) {
+      ((ConstrainedTextGenerationModel) model).generate(prompt, options, stream, constraint.get());
+    } else {
+      model.generate(prompt, options, stream);
+    }
+    throwFailure(failure.get());
+    return new GenerationOutput(output.toString(), usage.get());
+  }
+
+  private static void addUsage(ChatResponse.Builder response, GenerationUsage usage) {
+    if (usage != null) {
+      response.tokenUsage(
+          new TokenUsage(usage.promptTokens(), usage.completionTokens(), usage.totalTokens()));
+    }
+  }
+
+  private static void throwFailure(Throwable failure) {
+    if (failure instanceof RuntimeException runtimeFailure) {
+      throw runtimeFailure;
+    }
+    if (failure instanceof Error error) {
+      throw error;
+    }
+    if (failure != null) {
+      throw new ModelGenerationException("text generation failed", failure);
+    }
   }
 
   private Optional<TokenConstraint> toolConstraint(List<ToolSpec> tools) {
@@ -139,4 +196,6 @@ public final class ModelsChatModel implements ChatModel {
     return LangChain4jToolCallConstraint.compile(
         constrainedModel.tokenizer(), template.toolSyntax(), tools);
   }
+
+  private record GenerationOutput(String text, GenerationUsage usage) {}
 }

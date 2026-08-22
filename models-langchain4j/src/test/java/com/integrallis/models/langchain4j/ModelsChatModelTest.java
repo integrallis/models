@@ -47,7 +47,12 @@ class ModelsChatModelTest {
             backendGenerating(new int[] {3, 4, 1}),
             SamplingOptions.builder().temperature(0.0f).maxTokens(10).build());
 
-    assertThat(model.chat("hello")).isEqualTo(" world");
+    var response = model.doChat(ChatRequest.builder().messages(UserMessage.from("hello")).build());
+
+    assertThat(response.aiMessage().text()).isEqualTo(" world");
+    assertThat(response.tokenUsage().inputTokenCount()).isEqualTo(1);
+    assertThat(response.tokenUsage().outputTokenCount()).isEqualTo(2);
+    assertThat(response.tokenUsage().totalTokenCount()).isEqualTo(3);
     assertThat(model.diagnostics().backend()).isEqualTo("test");
     assertThat(model.diagnostics().planVersion()).isEqualTo("unavailable");
   }
@@ -56,7 +61,10 @@ class ModelsChatModelTest {
   void langChain4jChatModelAcceptsTheSharedLocalEngineContract() {
     ModelsChatModel model = new ModelsChatModel(highLevelModel("local answer"));
 
-    assertThat(model.chat("hello")).isEqualTo("local answer");
+    var response = model.doChat(ChatRequest.builder().messages(UserMessage.from("hello")).build());
+
+    assertThat(response.aiMessage().text()).isEqualTo("local answer");
+    assertThat(response.tokenUsage()).isNull();
     assertThat(model.diagnostics().backend()).isEqualTo("local-test");
   }
 

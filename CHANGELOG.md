@@ -4,6 +4,17 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added exact prompt and completion token counts to the Models generation
+  terminal signal while preserving existing `TokenStream` consumers.
+
+### Fixed
+
+- Spring AI blocking and streaming responses now publish local runtime counts
+  through `Usage`, and LangChain4j blocking and streaming responses publish the
+  same counts through `TokenUsage`.
+
 ## [0.3.6] - 2026-08-21
 
 ### Added

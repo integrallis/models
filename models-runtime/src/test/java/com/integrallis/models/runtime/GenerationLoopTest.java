@@ -18,6 +18,7 @@ package com.integrallis.models.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.RewindableInferenceBackend;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -193,6 +195,42 @@ class GenerationLoopTest {
           loop.generate("hello", SamplingOptions.builder().temperature(0.0f).maxTokens(10).build());
 
       assertThat(result).isEqualTo(" world");
+    }
+
+    @Test
+    void reportsExactPromptAndCompletionTokenCounts() {
+      InferenceBackend backend = mockBackend(new int[] {3, 4, 1});
+      GenerationLoop loop = new GenerationLoop(backend);
+      StringBuilder output = new StringBuilder();
+      AtomicReference<GenerationUsage> usage = new AtomicReference<>();
+
+      loop.generate(
+          "hello",
+          SamplingOptions.builder().temperature(0.0f).maxTokens(10).build(),
+          new TokenStream() {
+            @Override
+            public void onToken(String token) {
+              output.append(token);
+            }
+
+            @Override
+            public void onComplete() {}
+
+            @Override
+            public void onComplete(GenerationUsage completedUsage) {
+              usage.set(completedUsage);
+            }
+
+            @Override
+            public void onError(Throwable failure) {
+              throw new AssertionError(failure);
+            }
+          });
+
+      assertThat(output).hasToString(" world");
+      assertThat(usage.get().promptTokens()).isEqualTo(1);
+      assertThat(usage.get().completionTokens()).isEqualTo(2);
+      assertThat(usage.get().totalTokens()).isEqualTo(3);
     }
 
     @Test
