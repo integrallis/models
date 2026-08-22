@@ -27,6 +27,8 @@ import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
 import com.integrallis.vectors.db.VectorCollection;
 import com.integrallis.vectors.spring.ai.JavaVectorsVectorStore;
 import com.integrallis.vectors.spring.boot.JavaVectorsAutoConfiguration;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
@@ -38,6 +40,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.observation.ChatModelMeterObservationHandler;
 import org.springframework.ai.chat.observation.ChatModelObservationContext;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
@@ -47,6 +50,7 @@ import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingOptions;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.embedding.observation.EmbeddingModelMeterObservationHandler;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -61,6 +65,17 @@ class ModelsAutoConfigurationTest {
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
           .withConfiguration(AutoConfigurations.of(ModelsAutoConfiguration.class));
+
+  @Test
+  void registersSpringAiTokenMeterHandlersWhenTheApplicationHasMetrics() {
+    runner
+        .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(ChatModelMeterObservationHandler.class);
+              assertThat(context).hasSingleBean(EmbeddingModelMeterObservationHandler.class);
+            });
+  }
 
   @Test
   void createsSpringAiChatModelFromModelsRuntime() {
