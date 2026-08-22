@@ -4,6 +4,14 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Ordered the Spring Boot starter after Boot's metrics and observation
+  auto-configuration on both supported Boot generations. Actuator-created
+  meter registries now receive the Spring AI chat and embedding handlers, so
+  exact local prompt and completion counts reach
+  `gen_ai.client.token.usage` without application wiring.
+
 ## [0.3.8] - 2026-08-22
 
 ### Fixed

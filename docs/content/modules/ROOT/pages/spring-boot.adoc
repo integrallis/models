@@ -64,7 +64,10 @@ counter or wrapper is required.
 
 When application metrics are available, the starter registers Spring AI's
 standard chat and embedding meter handlers unless another provider already
-supplied them. Exact prompt and completion counts from the local adapter are
+supplied them. The Models auto-configuration runs after the metrics and
+observation configuration supplied by both supported Spring Boot generations,
+so an Actuator-created registry is detected without application ordering or
+wiring. Exact prompt and completion counts from the local adapter are
 exported as standard `gen_ai.client.token.usage` counters with
 `gen_ai.token.type=input` and `gen_ai.token.type=output`. Applications replacing
 a hosted provider do not need to retain that provider's starter merely to keep

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
@@ -75,6 +76,62 @@ class ModelsAutoConfigurationTest {
               assertThat(context).hasSingleBean(ChatModelMeterObservationHandler.class);
               assertThat(context).hasSingleBean(EmbeddingModelMeterObservationHandler.class);
             });
+  }
+
+  @Test
+  void registersTokenMetersAfterBootAutoConfiguresTheMeterRegistry() {
+    new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(metricsAutoConfigurations()))
+        .withUserConfiguration(LocalModelConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(ChatModelMeterObservationHandler.class);
+              assertThat(context).hasSingleBean(EmbeddingModelMeterObservationHandler.class);
+              context.getBean(ChatModel.class).call("question");
+              MeterRegistry meters = context.getBean(MeterRegistry.class);
+              assertThat(
+                      meters
+                          .get("gen_ai.client.token.usage")
+                          .tag("gen_ai.operation.name", "chat")
+                          .tag("gen_ai.token.type", "input")
+                          .counter()
+                          .count())
+                  .isEqualTo(1);
+              assertThat(
+                      meters
+                          .get("gen_ai.client.token.usage")
+                          .tag("gen_ai.operation.name", "chat")
+                          .tag("gen_ai.token.type", "output")
+                          .counter()
+                          .count())
+                  .isEqualTo(2);
+            });
+  }
+
+  private static Class<?>[] metricsAutoConfigurations() {
+    return new Class<?>[] {
+      ModelsAutoConfiguration.class,
+      loadBootAutoConfiguration(
+          "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
+          "org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration"),
+      loadBootAutoConfiguration(
+          "org.springframework.boot.micrometer.metrics.autoconfigure.export.simple.SimpleMetricsExportAutoConfiguration",
+          "org.springframework.boot.actuate.autoconfigure.metrics.export.simple.SimpleMetricsExportAutoConfiguration"),
+      loadBootAutoConfiguration(
+          "org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration",
+          "org.springframework.boot.actuate.autoconfigure.observation.ObservationAutoConfiguration")
+    };
+  }
+
+  private static Class<?> loadBootAutoConfiguration(String... candidates) {
+    for (String candidate : candidates) {
+      try {
+        return Class.forName(candidate);
+      } catch (ClassNotFoundException ignored) {
+        // Try the package used by the other supported Spring Boot generation.
+      }
+    }
+    throw new IllegalStateException("No supported Spring Boot auto-configuration was found");
   }
 
   @Test
@@ -335,7 +392,7 @@ class ModelsAutoConfigurationTest {
           PROMPT.set(prompt);
           OPTIONS.set(options);
           stream.onToken("local answer");
-          stream.onComplete();
+          stream.onComplete(new GenerationUsage(1, 2));
         }
       };
     }

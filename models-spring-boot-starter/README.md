@@ -34,3 +34,10 @@ integrallis:
 For local RAG, add `com.integrallis:vectors-spring-boot-starter:0.1.9` and provide a Spring AI
 `EmbeddingModel`. Vectors contributes `JavaVectorsVectorStore` while this starter contributes the
 local chat model. Both starters are verified together on Spring AI 1.1 and 2.0.
+
+With Spring Boot Actuator on the application classpath, the starter registers
+Spring AI's standard chat and embedding meter handlers after Boot creates its
+meter registry. Local prompt and completion counts are then available through
+`gen_ai.client.token.usage` with `gen_ai.token.type=input` and
+`gen_ai.token.type=output`; no hosted-provider starter or custom handler is
+required.
