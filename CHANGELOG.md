@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-08-22
+
 ### Fixed
 
 - `models-spring-boot-starter` now registers Spring AI's standard chat and
