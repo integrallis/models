@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-08-21
+
 ### Added
 
 - Added exact prompt and completion token counts to the Models generation
