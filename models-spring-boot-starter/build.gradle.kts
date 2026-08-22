@@ -17,6 +17,7 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-test:$springBootVersion")
     testImplementation("org.springframework.boot:spring-boot-autoconfigure:$springBootVersion")
+    testImplementation("org.springframework.boot:spring-boot-starter-actuator:$springBootVersion")
     testImplementation("org.springframework:spring-test:$springFrameworkVersion")
     testImplementation("org.springframework.ai:spring-ai-model:$springAiVersion")
     testImplementation("org.springframework.ai:spring-ai-vector-store:$springAiVersion")

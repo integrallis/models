@@ -53,7 +53,13 @@ import org.springframework.context.annotation.Bean;
 @AutoConfigureAfter(
     name = {
       "org.springframework.ai.model.chat.observation.autoconfigure.ChatObservationAutoConfiguration",
-      "org.springframework.ai.model.embedding.observation.autoconfigure.EmbeddingObservationAutoConfiguration"
+      "org.springframework.ai.model.embedding.observation.autoconfigure.EmbeddingObservationAutoConfiguration",
+      "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
+      "org.springframework.boot.micrometer.metrics.autoconfigure.export.simple.SimpleMetricsExportAutoConfiguration",
+      "org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration",
+      "org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration",
+      "org.springframework.boot.actuate.autoconfigure.metrics.export.simple.SimpleMetricsExportAutoConfiguration",
+      "org.springframework.boot.actuate.autoconfigure.observation.ObservationAutoConfiguration"
     })
 @ConditionalOnClass(name = "org.springframework.ai.chat.model.ChatModel")
 @EnableConfigurationProperties(ModelsProperties.class)
