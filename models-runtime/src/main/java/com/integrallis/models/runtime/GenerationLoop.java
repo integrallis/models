@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.runtime;
 
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelPrompt;
@@ -194,7 +195,8 @@ public final class GenerationLoop {
         emitter.finish();
         cachedPromptTokens =
             backend instanceof RewindableInferenceBackend ? promptTokens.clone() : null;
-        stream.onComplete();
+        stream.onComplete(
+            new GenerationUsage(promptTokens.length, allTokens.size() - promptTokens.length));
       } catch (Exception e) {
         cachedPromptTokens = null;
         stream.onError(e);

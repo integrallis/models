@@ -19,9 +19,10 @@ package com.integrallis.models.api;
  * Push callback for one generation.
  *
  * <p>The producer invokes callbacks serially and in token order. It invokes exactly one terminal
- * callback, either {@link #onComplete()} or {@link #onError(Throwable)}, and invokes nothing
- * afterward. The callback thread is implementation-specific; consumers should return promptly and
- * must not reenter the same non-thread-safe model.
+ * callback, either {@link #onComplete()}, {@link #onComplete(GenerationUsage)}, or {@link
+ * #onError(Throwable)}, and invokes nothing afterward. The callback thread is
+ * implementation-specific; consumers should return promptly and must not reenter the same
+ * non-thread-safe model.
  */
 public interface TokenStream {
 
@@ -30,6 +31,17 @@ public interface TokenStream {
 
   /** Called when generation is complete. */
   void onComplete();
+
+  /**
+   * Called when generation is complete with exact token counts.
+   *
+   * <p>The default preserves compatibility with consumers that only need the original terminal
+   * callback. Producers that can measure usage should invoke this method instead of {@link
+   * #onComplete()}.
+   */
+  default void onComplete(GenerationUsage usage) {
+    onComplete();
+  }
 
   /** Called with the non-null failure that ended generation. */
   void onError(Throwable failure);

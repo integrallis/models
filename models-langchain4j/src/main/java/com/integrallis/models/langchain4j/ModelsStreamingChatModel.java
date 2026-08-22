@@ -16,6 +16,7 @@
 package com.integrallis.models.langchain4j;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
@@ -35,6 +36,7 @@ import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
+import dev.langchain4j.model.output.TokenUsage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -107,8 +109,17 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
 
           @Override
           public void onComplete() {
+            complete(null);
+          }
+
+          @Override
+          public void onComplete(GenerationUsage usage) {
+            complete(usage);
+          }
+
+          private void complete(GenerationUsage usage) {
             if (terminalSignalSent.compareAndSet(false, true)) {
-              handler.onCompleteResponse(completed(accumulated.toString(), toolsDeclared));
+              handler.onCompleteResponse(completed(accumulated.toString(), toolsDeclared, usage));
             }
           }
 
@@ -138,16 +149,18 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
   }
 
   /** Builds the terminal response, recovering any tool calls the model produced. */
-  private ChatResponse completed(String output, boolean toolsDeclared) {
+  private ChatResponse completed(String output, boolean toolsDeclared, GenerationUsage usage) {
     ToolCallScanner.Result scan =
         toolsDeclared
             ? ToolCallScanner.scan(output, template.toolSyntax())
             : ToolCallScanner.Result.plainText(output);
     if (!scan.hasCalls()) {
-      return ChatResponse.builder()
-          .aiMessage(AiMessage.from(scan.content()))
-          .modelName(model.modelName())
-          .build();
+      var response =
+          ChatResponse.builder()
+              .aiMessage(AiMessage.from(scan.content()))
+              .modelName(model.modelName());
+      addUsage(response, usage);
+      return response.build();
     }
     List<ToolExecutionRequest> requests = new ArrayList<>(scan.toolCalls().size());
     for (ToolCall call : scan.toolCalls()) {
@@ -158,11 +171,20 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
               .arguments(call.argumentsJson())
               .build());
     }
-    return ChatResponse.builder()
-        .aiMessage(new AiMessage(scan.content(), requests))
-        .finishReason(FinishReason.TOOL_EXECUTION)
-        .modelName(model.modelName())
-        .build();
+    var response =
+        ChatResponse.builder()
+            .aiMessage(new AiMessage(scan.content(), requests))
+            .finishReason(FinishReason.TOOL_EXECUTION)
+            .modelName(model.modelName());
+    addUsage(response, usage);
+    return response.build();
+  }
+
+  private static void addUsage(ChatResponse.Builder response, GenerationUsage usage) {
+    if (usage != null) {
+      response.tokenUsage(
+          new TokenUsage(usage.promptTokens(), usage.completionTokens(), usage.totalTokens()));
+    }
   }
 
   private Optional<TokenConstraint> toolConstraint(List<ToolSpec> tools) {

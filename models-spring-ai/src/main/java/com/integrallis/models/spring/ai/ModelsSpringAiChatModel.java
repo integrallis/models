@@ -15,7 +15,9 @@
  */
 package com.integrallis.models.spring.ai;
 
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
+import com.integrallis.models.api.ModelGenerationException;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
@@ -33,9 +35,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -154,14 +158,11 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     List<ToolSpec> tools = declaredTools(prompt);
     ModelPrompt rendered = render(prompt, tools);
     SamplingOptions requested = options(prompt);
-    String output =
-        toolConstraint(tools)
-            .map(
-                constraint ->
-                    ((ConstrainedTextGenerationModel) model)
-                        .generate(rendered, requested, constraint))
-            .orElseGet(() -> model.generate(rendered, requested));
-    ChatResponse response = tools.isEmpty() ? response(output) : toolAwareResponse(output);
+    GenerationOutput generated = generate(rendered, requested, tools);
+    ChatResponse response =
+        tools.isEmpty()
+            ? response(generated.text(), generated.usage())
+            : toolAwareResponse(generated.text(), generated.usage());
     context.setResponse(response);
     return response;
   }
@@ -202,7 +203,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
                 @Override
                 public void onToken(String token) {
                   if (accumulated == null) {
-                    sink.next(response(token));
+                    sink.next(response(token, null));
                   } else {
                     accumulated.append(token);
                   }
@@ -210,8 +211,19 @@ public final class ModelsSpringAiChatModel implements ChatModel {
 
                 @Override
                 public void onComplete() {
+                  complete(null);
+                }
+
+                @Override
+                public void onComplete(GenerationUsage usage) {
+                  complete(usage);
+                }
+
+                private void complete(GenerationUsage usage) {
                   if (accumulated != null) {
-                    sink.next(toolAwareResponse(accumulated.toString()));
+                    sink.next(toolAwareResponse(accumulated.toString(), usage));
+                  } else if (usage != null) {
+                    sink.next(response("", usage));
                   }
                   sink.complete();
                 }
@@ -391,17 +403,62 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     messages.add(ChatMessage.tool(message.getText()));
   }
 
-  private ChatResponse response(String text) {
-    return new ChatResponse(
-        List.of(new Generation(new AssistantMessage(text))),
-        ChatResponseMetadata.builder().model(resolvedModelName()).build());
+  private GenerationOutput generate(
+      ModelPrompt prompt, SamplingOptions options, List<ToolSpec> tools) {
+    StringBuilder output = new StringBuilder();
+    AtomicReference<GenerationUsage> usage = new AtomicReference<>();
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    TokenStream stream =
+        new TokenStream() {
+          @Override
+          public void onToken(String token) {
+            output.append(token);
+          }
+
+          @Override
+          public void onComplete() {}
+
+          @Override
+          public void onComplete(GenerationUsage completedUsage) {
+            usage.set(completedUsage);
+          }
+
+          @Override
+          public void onError(Throwable generationFailure) {
+            failure.compareAndSet(null, generationFailure);
+          }
+        };
+    Optional<TokenConstraint> constraint = toolConstraint(tools);
+    if (constraint.isPresent()) {
+      ((ConstrainedTextGenerationModel) model).generate(prompt, options, stream, constraint.get());
+    } else {
+      model.generate(prompt, options, stream);
+    }
+    throwFailure(failure.get());
+    return new GenerationOutput(output.toString(), usage.get());
+  }
+
+  private static void throwFailure(Throwable failure) {
+    if (failure instanceof RuntimeException runtimeFailure) {
+      throw runtimeFailure;
+    }
+    if (failure instanceof Error error) {
+      throw error;
+    }
+    if (failure != null) {
+      throw new ModelGenerationException("text generation failed", failure);
+    }
+  }
+
+  private ChatResponse response(String text, GenerationUsage usage) {
+    return new ChatResponse(List.of(new Generation(new AssistantMessage(text))), metadata(usage));
   }
 
   /** Builds a response that surfaces any recovered tool calls to Spring AI's advisor. */
-  private ChatResponse toolAwareResponse(String output) {
+  private ChatResponse toolAwareResponse(String output, GenerationUsage usage) {
     ToolCallScanner.Result scan = ToolCallScanner.scan(output, template.toolSyntax());
     if (!scan.hasCalls()) {
-      return response(scan.content());
+      return response(scan.content(), usage);
     }
     List<AssistantMessage.ToolCall> calls = new ArrayList<>(scan.toolCalls().size());
     for (ToolCall call : scan.toolCalls()) {
@@ -410,9 +467,15 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     }
     AssistantMessage assistant =
         AssistantMessage.builder().content(scan.content()).toolCalls(calls).build();
-    return new ChatResponse(
-        List.of(new Generation(assistant)),
-        ChatResponseMetadata.builder().model(resolvedModelName()).build());
+    return new ChatResponse(List.of(new Generation(assistant)), metadata(usage));
+  }
+
+  private ChatResponseMetadata metadata(GenerationUsage usage) {
+    var metadata = ChatResponseMetadata.builder().model(resolvedModelName());
+    if (usage != null) {
+      metadata.usage(new DefaultUsage(usage.promptTokens(), usage.completionTokens()));
+    }
+    return metadata.build();
   }
 
   private String resolvedModelName() {
@@ -426,4 +489,6 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     }
     return modelName.strip();
   }
+
+  private record GenerationOutput(String text, GenerationUsage usage) {}
 }
