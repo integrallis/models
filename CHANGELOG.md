@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-08-22
+
 ### Fixed
 
 - Ordered the Spring Boot starter after Boot's metrics and observation
