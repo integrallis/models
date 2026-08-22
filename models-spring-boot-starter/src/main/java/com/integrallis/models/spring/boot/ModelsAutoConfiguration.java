@@ -18,7 +18,10 @@ package com.integrallis.models.spring.boot;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.spring.ai.ModelsSpringAiChatModel;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
+import org.springframework.ai.chat.observation.ChatModelMeterObservationHandler;
+import org.springframework.ai.embedding.observation.EmbeddingModelMeterObservationHandler;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -26,7 +29,10 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
@@ -44,6 +50,11 @@ import org.springframework.context.annotation.Bean;
  * local runtime exists.
  */
 @AutoConfiguration
+@AutoConfigureAfter(
+    name = {
+      "org.springframework.ai.model.chat.observation.autoconfigure.ChatObservationAutoConfiguration",
+      "org.springframework.ai.model.embedding.observation.autoconfigure.EmbeddingObservationAutoConfiguration"
+    })
 @ConditionalOnClass(name = "org.springframework.ai.chat.model.ChatModel")
 @EnableConfigurationProperties(ModelsProperties.class)
 public class ModelsAutoConfiguration {
@@ -59,6 +70,22 @@ public class ModelsAutoConfiguration {
   @Bean
   static BeanDefinitionRegistryPostProcessor modelsChatModelBeanDefinitionRegistrar() {
     return new ModelsChatModelBeanDefinitionRegistrar();
+  }
+
+  @Bean
+  @ConditionalOnBean(MeterRegistry.class)
+  @ConditionalOnMissingBean(ChatModelMeterObservationHandler.class)
+  ChatModelMeterObservationHandler modelsChatModelMeterObservationHandler(
+      MeterRegistry meterRegistry) {
+    return new ChatModelMeterObservationHandler(meterRegistry);
+  }
+
+  @Bean
+  @ConditionalOnBean(MeterRegistry.class)
+  @ConditionalOnMissingBean(EmbeddingModelMeterObservationHandler.class)
+  EmbeddingModelMeterObservationHandler modelsEmbeddingModelMeterObservationHandler(
+      MeterRegistry meterRegistry) {
+    return new EmbeddingModelMeterObservationHandler(meterRegistry);
   }
 
   private static final class ModelsChatModelBeanDefinitionRegistrar

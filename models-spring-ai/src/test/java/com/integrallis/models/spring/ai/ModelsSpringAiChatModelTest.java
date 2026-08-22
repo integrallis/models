@@ -28,6 +28,7 @@ import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
@@ -41,6 +42,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.observation.ChatModelMeterObservationHandler;
 import org.springframework.ai.chat.observation.ChatModelObservationContext;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -61,6 +63,40 @@ class ModelsSpringAiChatModelTest {
     assertThat(response.getMetadata().getUsage().getPromptTokens()).isEqualTo(1);
     assertThat(response.getMetadata().getUsage().getCompletionTokens()).isEqualTo(2);
     assertThat(response.getMetadata().getUsage().getTotalTokens()).isEqualTo(3);
+  }
+
+  @Test
+  void springAiObservabilityReportsPromptAndCompletionTokens() {
+    var meters = new SimpleMeterRegistry();
+    var observations = ObservationRegistry.create();
+    observations
+        .observationConfig()
+        .observationHandler(new ChatModelMeterObservationHandler(meters));
+    var model =
+        new ModelsSpringAiChatModel(
+            backendGenerating(new int[] {3, 4, 1}),
+            ChatTemplate.CHATML,
+            SamplingOptions.builder().temperature(0.0f).maxTokens(10).build(),
+            observations);
+
+    model.call(new Prompt("hello"));
+
+    assertThat(
+            meters
+                .get("gen_ai.client.token.usage")
+                .tag("gen_ai.operation.name", "chat")
+                .tag("gen_ai.token.type", "input")
+                .counter()
+                .count())
+        .isEqualTo(1);
+    assertThat(
+            meters
+                .get("gen_ai.client.token.usage")
+                .tag("gen_ai.operation.name", "chat")
+                .tag("gen_ai.token.type", "output")
+                .counter()
+                .count())
+        .isEqualTo(2);
   }
 
   @Test

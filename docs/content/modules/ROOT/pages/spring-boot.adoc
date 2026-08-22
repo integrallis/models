@@ -62,6 +62,14 @@ emit Spring AI's standard `gen_ai.client.operation` observations with
 `gen_ai.system=integrallis` and the local model identity. No application-side
 counter or wrapper is required.
 
+When application metrics are available, the starter registers Spring AI's
+standard chat and embedding meter handlers unless another provider already
+supplied them. Exact prompt and completion counts from the local adapter are
+exported as standard `gen_ai.client.token.usage` counters with
+`gen_ai.token.type=input` and `gen_ai.token.type=output`. Applications replacing
+a hosted provider do not need to retain that provider's starter merely to keep
+token metrics, and Models does not pin the application-owned Spring AI version.
+
 Other Spring AI model-provider beans can coexist. Inject the local model by
 name when an application has more than one `ChatModel`:
 

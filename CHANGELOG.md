@@ -4,6 +4,15 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `models-spring-boot-starter` now registers Spring AI's standard chat and
+  embedding meter handlers when the application enables metrics. Exact local
+  `Usage` values are therefore exported through the
+  `gen_ai.client.token.usage` input/output counters without retaining an
+  unrelated hosted-provider starter or pinning the application's Spring AI
+  version.
+
 ## [0.3.7] - 2026-08-21
 
 ### Added
