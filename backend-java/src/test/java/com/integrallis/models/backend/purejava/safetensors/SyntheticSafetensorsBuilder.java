@@ -22,19 +22,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-final class SyntheticSafetensorsBuilder {
+public final class SyntheticSafetensorsBuilder {
 
   private record Tensor(String name, String dtype, long[] shape, byte[] data) {}
 
   private final List<Tensor> tensors = new ArrayList<>();
   private String metadata;
 
-  SyntheticSafetensorsBuilder metadata(String key, String value) {
+  public SyntheticSafetensorsBuilder metadata(String key, String value) {
     metadata = "\"__metadata__\":{\"" + key + "\":\"" + value + "\"}";
     return this;
   }
 
-  SyntheticSafetensorsBuilder add(String name, String dtype, long[] shape, int... values) {
+  public SyntheticSafetensorsBuilder add(String name, String dtype, long[] shape, int... values) {
     byte[] data = new byte[values.length];
     for (int index = 0; index < values.length; index++) {
       if (values[index] < Byte.MIN_VALUE || values[index] > 0xff) {
@@ -46,7 +46,7 @@ final class SyntheticSafetensorsBuilder {
     return this;
   }
 
-  byte[] build() {
+  public byte[] build() {
     StringBuilder header = new StringBuilder("{");
     boolean comma = false;
     if (metadata != null) {
@@ -87,7 +87,7 @@ final class SyntheticSafetensorsBuilder {
     return output.toByteArray();
   }
 
-  static byte[] file(String rawHeader, byte[] tensorData) {
+  public static byte[] file(String rawHeader, byte[] tensorData) {
     byte[] unpadded = rawHeader.getBytes(StandardCharsets.UTF_8);
     int headerLength = Math.addExact(unpadded.length, (8 - (unpadded.length & 7)) & 7);
     ByteBuffer file =
