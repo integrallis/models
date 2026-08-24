@@ -35,6 +35,15 @@ final class SyntheticCactBuilder {
     return add(CactTensorType.FP16, shape, new byte[Math.toIntExact(elements * Short.BYTES)], 0, 0);
   }
 
+  SyntheticCactBuilder addFp16Values(float... values) {
+    ByteBuffer blob =
+        ByteBuffer.allocate(values.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+    for (float value : values) {
+      blob.putShort(Float.floatToFloat16(value));
+    }
+    return add(CactTensorType.FP16, new int[] {values.length}, blob.array(), 0, 0);
+  }
+
   SyntheticCactBuilder addCq(int rows, int columns, int groupSize, int recordBits) {
     int padded = Math.ceilDiv(columns, groupSize) * groupSize;
     int packedBits = recordBits == 5 ? 2 : recordBits;
