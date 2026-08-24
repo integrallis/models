@@ -78,7 +78,8 @@ class ModelFixtureInstallerTest {
         "F32",
         Set.of("text-generation"),
         Set.of(),
-        false);
+        false,
+        "gguf");
   }
 
   private static String sha256(byte[] content) throws Exception {

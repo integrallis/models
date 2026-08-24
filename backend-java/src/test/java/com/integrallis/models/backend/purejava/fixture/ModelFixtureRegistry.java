@@ -29,7 +29,8 @@ import java.util.Set;
 /** Classpath registry for Models-owned, pinned integration-test artifacts. */
 public final class ModelFixtureRegistry {
   private static final String RESOURCE = "model-fixtures.properties";
-  private static final int FIELD_COUNT = 15;
+  private static final int LEGACY_FIELD_COUNT = 15;
+  private static final int FORMAT_FIELD_COUNT = 16;
 
   private final List<ModelFixtureDescriptor> descriptors;
 
@@ -79,9 +80,16 @@ public final class ModelFixtureRegistry {
 
   private static ModelFixtureDescriptor parse(String id, String encoded, Path directory) {
     String[] fields = encoded.split("\\|", -1);
-    if (fields.length != FIELD_COUNT) {
+    if (fields.length != LEGACY_FIELD_COUNT && fields.length != FORMAT_FIELD_COUNT) {
       throw new IllegalStateException(
-          "Fixture " + id + " has " + fields.length + " fields; expected " + FIELD_COUNT);
+          "Fixture "
+              + id
+              + " has "
+              + fields.length
+              + " fields; expected "
+              + LEGACY_FIELD_COUNT
+              + " or "
+              + FORMAT_FIELD_COUNT);
     }
     return new ModelFixtureDescriptor(
         id,
@@ -98,7 +106,8 @@ public final class ModelFixtureRegistry {
         fields[11],
         commaSeparated(fields[12]),
         commaSeparated(fields[13]),
-        Boolean.parseBoolean(fields[14]));
+        Boolean.parseBoolean(fields[14]),
+        fields.length == FORMAT_FIELD_COUNT ? fields[15] : "gguf");
   }
 
   private static Set<String> commaSeparated(String value) {

@@ -1,3 +1,4 @@
+import java.nio.file.Path
 import java.util.Properties
 
 // backend-java - GGUF parser, vectors-backed inference kernels, and KV cache
@@ -21,8 +22,8 @@ fun modelFixture(taskName: String, id: String): ModelFixture {
             "No pinned model fixture is declared for $id"
         }
     val fields = encoded.split('|')
-    require(fields.size == 15) {
-        "Pinned model fixture $id has ${fields.size} fields; expected 15"
+    require(fields.size in 15..16) {
+        "Pinned model fixture $id has ${fields.size} fields; expected 15 or 16"
     }
     return ModelFixture(
         taskName = taskName,
@@ -133,6 +134,8 @@ val modelFixtures =
         ),
     )
 
+val needle2CactFixture = modelFixture("downloadNeedle2Cact", "needle2_cq2")
+
 dependencies {
     api(project(":models-api"))
 
@@ -142,13 +145,48 @@ dependencies {
 }
 
 val fixtureDirectory = providers.systemProperty("models.fixtures.directory")
+val configuredNeedle2CactPath = providers.systemProperty("models.fixtures.needle2Cact")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
+    configuredNeedle2CactPath.orNull?.let {
+        systemProperty("models.fixtures.needle2Cact", it)
+    }
 }
 
 tasks.withType<JavaExec>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
+}
+
+tasks.register<JavaExec>(needle2CactFixture.taskName) {
+    description = "Download and verify the pinned ${needle2CactFixture.displayName} parser fixture"
+    group = "model acquisition"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.backend.purejava.fixture.ModelFixtureInstallerCli")
+    args(needle2CactFixture.id)
+}
+
+tasks.register<Test>("needle2CactParserTest") {
+    description = "Parse and verify the pinned official Needle 2 .cact artifact"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.cact.CactParserTest.parsesPinnedOfficialNeedle2ArtifactWhenProvided",
+        )
+    }
+    val directory =
+        fixtureDirectory.orNull
+            ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString()
+    systemProperty(
+        "models.fixtures.needle2Cact",
+        Path.of(directory, "needle2.cact").toString(),
+    )
+    dependsOn(tasks.named(needle2CactFixture.taskName))
+    outputs.upToDateWhen { false }
 }
 
 modelFixtures.forEach { fixture ->

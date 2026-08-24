@@ -38,6 +38,7 @@ public final class ModelFixtureDescriptor {
   private final Set<String> capabilities;
   private final Set<String> features;
   private final boolean slow;
+  private final String format;
 
   ModelFixtureDescriptor(
       String id,
@@ -54,7 +55,8 @@ public final class ModelFixtureDescriptor {
       String quantization,
       Set<String> capabilities,
       Set<String> features,
-      boolean slow) {
+      boolean slow,
+      String format) {
     this.id = Objects.requireNonNull(id, "id");
     this.displayName = Objects.requireNonNull(displayName, "displayName");
     this.modelVersion = Objects.requireNonNull(modelVersion, "modelVersion");
@@ -70,6 +72,7 @@ public final class ModelFixtureDescriptor {
     this.capabilities = Set.copyOf(capabilities);
     this.features = Set.copyOf(features);
     this.slow = slow;
+    this.format = Objects.requireNonNull(format, "format");
   }
 
   public String id() {
@@ -121,7 +124,7 @@ public final class ModelFixtureDescriptor {
   }
 
   public String format() {
-    return "gguf";
+    return format;
   }
 
   public Set<String> capabilities() {
