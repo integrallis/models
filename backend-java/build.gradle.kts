@@ -140,17 +140,23 @@ dependencies {
     api(project(":models-api"))
 
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.21.4")
 
     testImplementation(project(":models-runtime"))
 }
 
 val fixtureDirectory = providers.systemProperty("models.fixtures.directory")
 val configuredNeedle2CactPath = providers.systemProperty("models.fixtures.needle2Cact")
+val configuredSafetensorsReferencePath =
+    providers.systemProperty("models.fixtures.safetensorsReference")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
     configuredNeedle2CactPath.orNull?.let {
         systemProperty("models.fixtures.needle2Cact", it)
+    }
+    configuredSafetensorsReferencePath.orNull?.let {
+        systemProperty("models.fixtures.safetensorsReference", it)
     }
 }
 
