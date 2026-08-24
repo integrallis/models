@@ -98,8 +98,12 @@ public final class ExecutionPlanner {
         new OptimizationDecision(
             "mapped-model-weights",
             OptimizationStatus.ENABLED,
-            "GGUF tensors remain mapped for model-scale streaming locality",
-            Map.of("storage", "memory-segment")));
+            "model tensors remain mapped for model-scale streaming locality",
+            Map.of(
+                "storage",
+                "memory-segment",
+                "artifact-format",
+                "needle2".equals(topology.architecture()) ? "cact" : "gguf")));
     decisions.add(vectorFma(runtime));
     decisions.add(persistentExecutor(runtime));
 

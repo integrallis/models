@@ -155,6 +155,30 @@ public record ModelTopology(
         threadShareableProjectionWeights(config, weights));
   }
 
+  /** Builds a conservative plan topology for a mapped non-GGUF architecture. */
+  public static ModelTopology mappedArchitecture(
+      String architecture, int queryRows, int keyRows, int valueRows, int layerCount) {
+    if (layerCount <= 0) {
+      throw new IllegalArgumentException("layerCount must be > 0");
+    }
+    LayerTopology neutral =
+        new LayerTopology(
+            GgufTensorType.F32,
+            GgufTensorType.F32,
+            GgufTensorType.F32,
+            GgufTensorType.F32,
+            GgufTensorType.F32,
+            GgufTensorType.F32,
+            GgufTensorType.F32);
+    return new ModelTopology(
+        architecture,
+        queryRows,
+        keyRows,
+        valueRows,
+        java.util.Collections.nCopies(layerCount, neutral),
+        true);
+  }
+
   boolean supportsBatchedPrefill() {
     return supportsLlamaProjectionRouting()
         && layers.stream().allMatch(LayerTopology::supportsBatchedPrefill);
@@ -308,7 +332,7 @@ public record ModelTopology(
   }
 
   private boolean supportsLlamaProjectionRouting() {
-    return !"gemma4".equals(architecture);
+    return !"gemma4".equals(architecture) && !"needle2".equals(architecture);
   }
 
   String finalLayerFfnFormats() {

@@ -36,12 +36,19 @@ final class SyntheticCactBuilder {
   }
 
   SyntheticCactBuilder addFp16Values(float... values) {
+    return addFp16Values(new int[] {values.length}, values);
+  }
+
+  SyntheticCactBuilder addFp16Values(int[] shape, float... values) {
+    if (elements(shape) != values.length) {
+      throw new IllegalArgumentException("FP16 value count does not match shape");
+    }
     ByteBuffer blob =
         ByteBuffer.allocate(values.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
     for (float value : values) {
       blob.putShort(Float.floatToFloat16(value));
     }
-    return add(CactTensorType.FP16, new int[] {values.length}, blob.array(), 0, 0);
+    return add(CactTensorType.FP16, shape, blob.array(), 0, 0);
   }
 
   SyntheticCactBuilder addCq(int rows, int columns, int groupSize, int recordBits) {

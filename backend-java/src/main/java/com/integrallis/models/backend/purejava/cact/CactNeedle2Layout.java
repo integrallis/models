@@ -167,6 +167,16 @@ public final class CactNeedle2Layout {
     return tensorNames;
   }
 
+  /** Returns the validated artifact geometry. */
+  public CactHeader header() {
+    return file.header();
+  }
+
+  /** Returns a defensive copy of the artifact's shared CQ codebook. */
+  public float[] codebook() {
+    return file.codebook();
+  }
+
   /** Returns a named zero-copy tensor slice. */
   public CactTensorData tensor(String name) {
     Integer index = tensorIndices.get(Objects.requireNonNull(name, "name"));

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
@@ -42,6 +43,17 @@ public final class CactParser {
       ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   private CactParser() {}
+
+  /** Returns whether a file starts with the `.cact` magic, without parsing or mapping it. */
+  public static boolean matches(Path path) throws IOException {
+    ByteBuffer prefix = ByteBuffer.allocate(Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+    try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
+      while (prefix.hasRemaining() && channel.read(prefix) >= 0) {
+        // Keep reading until the fixed prefix is complete or EOF is reached.
+      }
+    }
+    return prefix.position() == Integer.BYTES && prefix.flip().getInt() == MAGIC;
+  }
 
   /** Maps and parses a `.cact` file in the supplied arena. */
   public static CactFile parse(Path path, Arena arena) throws IOException {
