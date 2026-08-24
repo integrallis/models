@@ -180,6 +180,9 @@ tasks.register<Test>("needle2CactCompatibilityTest") {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.cact.CactTokenizerTest.matchesPinnedOfficialNeedle2ReferenceValuesWhenProvided",
         )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.cact.CactNeedle2LayoutTest.matchesPinnedOfficialNeedle2TensorLayoutWhenProvided",
+        )
     }
     val directory =
         fixtureDirectory.orNull
