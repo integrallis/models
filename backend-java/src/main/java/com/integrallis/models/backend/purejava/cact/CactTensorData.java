@@ -23,6 +23,11 @@ public record CactTensorData(CactTensorInfo info, MemorySegment data) {
 
   public CactTensorData {
     Objects.requireNonNull(info, "info");
-    Objects.requireNonNull(data, "data");
+    data = Objects.requireNonNull(data, "data").asReadOnly();
+  }
+
+  @Override
+  public MemorySegment data() {
+    return data.asReadOnly();
   }
 }

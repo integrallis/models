@@ -72,6 +72,8 @@ class CactParserTest {
     assertThat(cq.packedCodeBytes()).isEqualTo(192);
     assertThat(cq.normBytes()).isEqualTo(12);
     assertThat(file.tensor(0).data().byteSize()).isEqualTo(204);
+    assertThat(file.fileSegment().isReadOnly()).isTrue();
+    assertThat(file.tensor(0).data().isReadOnly()).isTrue();
     assertThat(file.tensor(2).data().toArray(java.lang.foreign.ValueLayout.JAVA_BYTE))
         .containsExactly(1, 2, 3);
   }
