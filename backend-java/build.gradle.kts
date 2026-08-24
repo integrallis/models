@@ -167,8 +167,8 @@ tasks.register<JavaExec>(needle2CactFixture.taskName) {
     args(needle2CactFixture.id)
 }
 
-tasks.register<Test>("needle2CactParserTest") {
-    description = "Parse and verify the pinned official Needle 2 .cact artifact"
+tasks.register<Test>("needle2CactCompatibilityTest") {
+    description = "Verify the pinned official Needle 2 .cact artifact and tokenizer"
     group = "verification"
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
@@ -176,6 +176,9 @@ tasks.register<Test>("needle2CactParserTest") {
     filter {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.cact.CactParserTest.parsesPinnedOfficialNeedle2ArtifactWhenProvided",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.cact.CactTokenizerTest.matchesPinnedOfficialNeedle2ReferenceValuesWhenProvided",
         )
     }
     val directory =
