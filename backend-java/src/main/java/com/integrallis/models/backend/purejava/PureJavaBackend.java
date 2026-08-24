@@ -26,6 +26,12 @@ import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.cache.KvCache;
+import com.integrallis.models.backend.purejava.cact.CactFile;
+import com.integrallis.models.backend.purejava.cact.CactHeader;
+import com.integrallis.models.backend.purejava.cact.CactNeedle2Layout;
+import com.integrallis.models.backend.purejava.cact.CactParser;
+import com.integrallis.models.backend.purejava.cact.CactTokenizer;
+import com.integrallis.models.backend.purejava.cact.Needle2Weights;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Config;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
@@ -62,7 +68,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
   private final Arena arena;
-  private final GgufTokenizer tokenizer;
+  private final Tokenizer tokenizer;
   private final PureJavaDecoder decoder;
   private final ModelMetadata modelMetadata;
   private final int contextCapacity;
@@ -107,7 +113,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
 
   private PureJavaBackend(
       Arena arena,
-      GgufTokenizer tokenizer,
+      Tokenizer tokenizer,
       PureJavaDecoder decoder,
       ModelMetadata modelMetadata,
       int contextCapacity,
@@ -183,26 +189,34 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
     LoadedDecoder loaded = null;
     try {
       Objects.requireNonNull(modelPath, "modelPath");
-      GgufFile file = GgufParser.parse(modelPath, arena);
-      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(file.metadata());
-      String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
       RuntimeFingerprint runtime = RuntimeFingerprint.capture();
       Map<String, String> recommendations =
           recommendations(backendConfiguration, batchedMatrixKernel);
       PureJavaPlanConfiguration planConfiguration =
           PureJavaPlanConfiguration.fromSystemProperties(recommendations);
-      loaded =
-          "gemma4".equals(modelFamily)
-              ? loadGemma4(
-                  modelPath,
-                  file,
-                  modelFamily,
-                  runtime,
-                  planConfiguration,
-                  backendConfiguration,
-                  batchedMatrixKernel)
-              : loadLlama(
-                  modelPath, file, modelFamily, runtime, planConfiguration, batchedMatrixKernel);
+      Tokenizer tokenizer;
+      if (CactParser.matches(modelPath)) {
+        CactFile file = CactParser.parse(modelPath, arena);
+        CactNeedle2Layout layout = CactNeedle2Layout.from(file);
+        tokenizer = CactTokenizer.from(file);
+        loaded = loadNeedle2(modelPath, layout, runtime, planConfiguration, batchedMatrixKernel);
+      } else {
+        GgufFile file = GgufParser.parse(modelPath, arena);
+        tokenizer = GgufTokenizer.fromMetadata(file.metadata());
+        String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
+        loaded =
+            "gemma4".equals(modelFamily)
+                ? loadGemma4(
+                    modelPath,
+                    file,
+                    modelFamily,
+                    runtime,
+                    planConfiguration,
+                    backendConfiguration,
+                    batchedMatrixKernel)
+                : loadLlama(
+                    modelPath, file, modelFamily, runtime, planConfiguration, batchedMatrixKernel);
+      }
 
       BackendDiagnostics diagnostics =
           backendConfiguration.enrich(
@@ -224,6 +238,40 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
       closeAfterFailure(loaded == null ? null : loaded.decoder(), arena, batchedMatrixKernel, e);
       throw e;
     }
+  }
+
+  private static LoadedDecoder loadNeedle2(
+      Path modelPath,
+      CactNeedle2Layout layout,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    CactHeader config = layout.header();
+    int queryWidth = Math.multiplyExact(config.queryHeadCount(), config.headWidth());
+    int kvWidth = Math.multiplyExact(config.kvHeadCount(), config.headWidth());
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "needle2", queryWidth, kvWidth, kvWidth, config.layerCount()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.maximumSequenceLength());
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "needle2",
+            modelPath.getFileName().toString(),
+            config.maximumSequenceLength(),
+            config.vocabularySize(),
+            config.modelWidth(),
+            config.layerCount(),
+            config.queryHeadCount(),
+            config.kvHeadCount());
+    return new LoadedDecoder(
+        new Needle2DecoderAdapter(Needle2Weights.load(layout), contextCapacity),
+        metadata,
+        contextCapacity,
+        executionPlan);
   }
 
   private static LoadedDecoder loadLlama(
@@ -594,6 +642,22 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
 
   private static BackendDiagnostics architectureDiagnostics(
       BackendDiagnostics diagnostics, PureJavaDecoder decoder) {
+    if (decoder instanceof Needle2DecoderAdapter needle2) {
+      CactHeader header = needle2.header();
+      Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
+      environment.put("artifact-format", "cact");
+      environment.put("weight-encoding", "rotated-codebook");
+      environment.put("kv-bits", Integer.toString(header.kvBits()));
+      List<OptimizationDecision> optimizations = new ArrayList<>(diagnostics.optimizations());
+      optimizations.add(
+          new OptimizationDecision(
+              "cact-rotated-codebook",
+              OptimizationStatus.ENABLED,
+              "packed CQ weights execute directly from the mapped artifact",
+              Map.of("codebook-values", Integer.toString(header.codebookLength()))));
+      return new BackendDiagnostics(
+          diagnostics.backend(), diagnostics.planVersion(), environment, optimizations);
+    }
     if (!(decoder instanceof Gemma4DecoderAdapter gemma4)) {
       return diagnostics;
     }

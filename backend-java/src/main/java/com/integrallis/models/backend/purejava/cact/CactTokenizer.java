@@ -202,7 +202,7 @@ public final class CactTokenizer implements Tokenizer {
   public int[] encode(ModelPrompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
     if (prompt.isEmpty()) {
-      return new int[0];
+      return new int[] {bosToken};
     }
     List<Integer> encoded = new ArrayList<>();
     StringBuilder ordinary = new StringBuilder();
@@ -218,7 +218,12 @@ public final class CactTokenizer implements Tokenizer {
       }
     }
     flushOrdinary(encoded, ordinary);
-    return encoded.stream().mapToInt(Integer::intValue).toArray();
+    int[] tokens = new int[encoded.size() + 1];
+    tokens[0] = bosToken;
+    for (int index = 0; index < encoded.size(); index++) {
+      tokens[index + 1] = encoded.get(index);
+    }
+    return tokens;
   }
 
   private void appendTrustedControl(List<Integer> encoded, StringBuilder ordinary, String control) {

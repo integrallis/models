@@ -40,10 +40,11 @@ class CactTokenizerTest {
   void matchesTheReferenceSentencePieceMergesAndByteFallback() {
     CactTokenizer tokenizer = CactTokenizer.parse(testBlob(), 12);
 
-    assertThat(tokenizer.encode("hi")).containsExactly(9);
+    assertThat(tokenizer.encode("")).containsExactly(2);
+    assertThat(tokenizer.encode("hi")).containsExactly(2, 9);
     assertThat(tokenizer.decode(new int[] {9})).isEqualTo("hi");
     assertThat(tokenizer.decode(9)).isEqualTo(" hi");
-    assertThat(tokenizer.encode("é")).containsExactly(5, 10, 11);
+    assertThat(tokenizer.encode("é")).containsExactly(2, 5, 10, 11);
     assertThat(tokenizer.decode(new int[] {5, 10, 11})).isEqualTo("é");
   }
 
@@ -52,9 +53,9 @@ class CactTokenizerTest {
     CactTokenizer tokenizer = CactTokenizer.parse(testBlob(), 12);
     ModelPrompt prompt = ModelPrompt.builder().control("<|m|>").text("hi").build();
 
-    assertThat(tokenizer.encodeControl("<|m|>")).containsExactly(5, 4);
+    assertThat(tokenizer.encodeControl("<|m|>")).containsExactly(2, 5, 4);
     assertThat(tokenizer.encode("<|m|>")).doesNotContain(4);
-    assertThat(tokenizer.encode(prompt)).containsExactly(5, 4, 8);
+    assertThat(tokenizer.encode(prompt)).containsExactly(2, 5, 4, 8);
   }
 
   @Test
@@ -106,10 +107,10 @@ class CactTokenizerTest {
       assertThat(tokenizer.tokenId("<|im_start|>")).isEqualTo(4);
       assertThat(tokenizer.tokenId("<|im_end|>")).isEqualTo(5);
       assertThat(tokenizer.encode("Name one JVM language."))
-          .containsExactly(449, 471, 1285, 815, 8120, 8085, 2083, 8063);
-      assertThat(tokenizer.encode("weather in Lagos")).containsExactly(5329, 301, 441, 493, 370);
+          .containsExactly(2, 449, 471, 1285, 815, 8120, 8085, 2083, 8063);
+      assertThat(tokenizer.encode("weather in Lagos")).containsExactly(2, 5329, 301, 441, 493, 370);
       assertThat(tokenizer.encode("café 🚇"))
-          .containsExactly(280, 1344, 8118, 8042, 254, 173, 168, 149);
+          .containsExactly(2, 280, 1344, 8118, 8042, 254, 173, 168, 149);
 
       String prompt =
           "<|im_start|>system\n"
@@ -118,8 +119,8 @@ class CactTokenizerTest {
               + "weather in Lagos<|im_end|>\n"
               + "<|im_start|>assistant\n";
       int[] expected = {
-        8042, 4, 2204, 24, 8130, 312, 1987, 3582, 8063, 5, 24, 4, 573, 24, 685, 892, 301, 441, 493,
-        370, 5, 24, 4, 612, 24
+        2, 8042, 4, 2204, 24, 8130, 312, 1987, 3582, 8063, 5, 24, 4, 573, 24, 685, 892, 301, 441,
+        493, 370, 5, 24, 4, 612, 24
       };
       assertThat(tokenizer.encodeControl(prompt)).containsExactly(expected);
       assertThat(tokenizer.decode(expected)).isEqualTo(prompt);

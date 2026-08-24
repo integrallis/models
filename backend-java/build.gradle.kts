@@ -183,6 +183,18 @@ tasks.register<Test>("needle2CactCompatibilityTest") {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.cact.CactNeedle2LayoutTest.matchesPinnedOfficialNeedle2TensorLayoutWhenProvided",
         )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.cact.CactCqMatrixTest.multipliesPinnedOfficialCq4AndCq2MatricesWhenProvided",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.cact.Needle2ForwardPassTest.matchesPinnedNeedleJaxReferenceForBosTokenWhenProvided",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.Needle2BackendIntegrationTest.loadsCactThroughThePublicBackendContractWhenProvided",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.Needle2BackendIntegrationTest.generatesTheOfficialWeatherToolCallWhenProvided",
+        )
     }
     val directory =
         fixtureDirectory.orNull
