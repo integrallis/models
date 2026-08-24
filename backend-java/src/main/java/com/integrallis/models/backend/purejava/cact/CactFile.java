@@ -30,12 +30,17 @@ public record CactFile(
     Objects.requireNonNull(header, "header");
     codebook = codebook.clone();
     tensorInfos = List.copyOf(tensorInfos);
-    Objects.requireNonNull(fileSegment, "fileSegment");
+    fileSegment = Objects.requireNonNull(fileSegment, "fileSegment").asReadOnly();
   }
 
   @Override
   public float[] codebook() {
     return codebook.clone();
+  }
+
+  @Override
+  public MemorySegment fileSegment() {
+    return fileSegment.asReadOnly();
   }
 
   /** Returns one positional tensor as a zero-copy slice. */
