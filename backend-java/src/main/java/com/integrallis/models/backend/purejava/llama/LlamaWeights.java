@@ -19,9 +19,15 @@ import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
+import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
+import com.integrallis.models.backend.purejava.tensor.TensorSource;
+import com.integrallis.models.backend.purejava.tensor.TensorStorage;
+import com.integrallis.models.backend.purejava.tensor.TensorView;
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
+import java.util.Objects;
 
-/** Holds references to weight tensors from a parsed GGUF file for a Llama-family model. */
+/** Holds mapped weight tensors for a Llama-family model independently of its artifact container. */
 public final class LlamaWeights {
 
   private final MemorySegment tokenEmbeddingSegment;
@@ -152,6 +158,102 @@ public final class LlamaWeights {
   }
 
   /**
+   * Loads Qwen 2 weights from Hugging Face Safetensors names without expanding BF16 matrices.
+   * Vector and bias tensors are decoded once; projection, embedding, and output matrices remain
+   * mapped and read-only.
+   */
+  public static LlamaWeights fromQwen2Safetensors(
+      TensorSource source, Qwen2HuggingFaceConfig huggingFaceConfig) {
+    Objects.requireNonNull(source, "source");
+    Objects.requireNonNull(huggingFaceConfig, "huggingFaceConfig");
+    if (!"safetensors".equals(source.format())) {
+      throw new IllegalArgumentException(
+          "Qwen 2 Hugging Face weights require safetensors; got " + source.format());
+    }
+    if (huggingFaceConfig.model().architecture() != DecoderArchitecture.QWEN2) {
+      throw new IllegalArgumentException("Qwen 2 Safetensors require QWEN2 model configuration");
+    }
+    if (!"bfloat16".equals(huggingFaceConfig.torchDtype())) {
+      throw new IllegalArgumentException(
+          "Qwen 2 Safetensors runtime requires torch_dtype bfloat16; got "
+              + huggingFaceConfig.torchDtype());
+    }
+
+    LlamaConfig config = huggingFaceConfig.model();
+    TensorView tokenEmbed =
+        requireBf16(source, "model.embed_tokens.weight", config.vocabSize(), config.embeddingDim());
+    TensorView output =
+        huggingFaceConfig.tieWordEmbeddings()
+            ? tokenEmbed
+            : requireBf16(source, "lm_head.weight", config.vocabSize(), config.embeddingDim());
+    float[] outputNorm = loadBf16Vector(source, "model.norm.weight", config.embeddingDim());
+
+    LayerWeights[] layers = new LayerWeights[config.numLayers()];
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      String prefix = "model.layers." + layer + ".";
+      TensorView wq =
+          requireBf16(
+              source, prefix + "self_attn.q_proj.weight", config.queryDim(), config.embeddingDim());
+      TensorView wk =
+          requireBf16(
+              source, prefix + "self_attn.k_proj.weight", config.keyDim(), config.embeddingDim());
+      TensorView wv =
+          requireBf16(
+              source, prefix + "self_attn.v_proj.weight", config.valueDim(), config.embeddingDim());
+      TensorView wo =
+          requireBf16(
+              source,
+              prefix + "self_attn.o_proj.weight",
+              config.embeddingDim(),
+              config.attentionOutputDim());
+      TensorView gate =
+          requireBf16(
+              source, prefix + "mlp.gate_proj.weight", config.hiddenDim(), config.embeddingDim());
+      TensorView up =
+          requireBf16(
+              source, prefix + "mlp.up_proj.weight", config.hiddenDim(), config.embeddingDim());
+      TensorView down =
+          requireBf16(
+              source, prefix + "mlp.down_proj.weight", config.embeddingDim(), config.hiddenDim());
+      layers[layer] =
+          new LayerWeights(
+              loadBf16Vector(source, prefix + "input_layernorm.weight", config.embeddingDim()),
+              wq.data(),
+              GgufTensorType.BF16,
+              loadBf16Vector(source, prefix + "self_attn.q_proj.bias", config.queryDim()),
+              new float[0],
+              wk.data(),
+              GgufTensorType.BF16,
+              loadBf16Vector(source, prefix + "self_attn.k_proj.bias", config.keyDim()),
+              new float[0],
+              wv.data(),
+              GgufTensorType.BF16,
+              loadBf16Vector(source, prefix + "self_attn.v_proj.bias", config.valueDim()),
+              wo.data(),
+              GgufTensorType.BF16,
+              new float[0],
+              loadBf16Vector(
+                  source, prefix + "post_attention_layernorm.weight", config.embeddingDim()),
+              gate.data(),
+              GgufTensorType.BF16,
+              up.data(),
+              GgufTensorType.BF16,
+              down.data(),
+              GgufTensorType.BF16,
+              new float[0]);
+    }
+
+    return new LlamaWeights(
+        tokenEmbed.data(),
+        GgufTensorType.BF16,
+        config.embeddingDim(),
+        outputNorm,
+        output.data(),
+        GgufTensorType.BF16,
+        layers);
+  }
+
+  /**
    * Dequantizes a single token embedding row into the provided output buffer. Only dequantizes one
    * row of [embeddingDim] floats — avoids materializing the full vocab×dim table.
    */
@@ -208,5 +310,33 @@ public final class LlamaWeights {
       }
       throw e;
     }
+  }
+
+  private static TensorView requireBf16(TensorSource source, String name, long... expectedShape) {
+    TensorView tensor = source.tensor(name);
+    if (!Arrays.equals(tensor.shape(), expectedShape)) {
+      throw new IllegalArgumentException(
+          name
+              + " shape must be "
+              + Arrays.toString(expectedShape)
+              + "; got "
+              + Arrays.toString(tensor.shape()));
+    }
+    TensorStorage storage = tensor.storage();
+    if (!"safetensors".equals(storage.format())
+        || !"BF16".equals(storage.type())
+        || storage.blockElements() != 1
+        || storage.blockBytes() != Short.BYTES) {
+      throw new IllegalArgumentException(
+          name + " must use Safetensors BF16 storage; got " + storage);
+    }
+    return tensor;
+  }
+
+  private static float[] loadBf16Vector(TensorSource source, String name, int length) {
+    TensorView tensor = requireBf16(source, name, length);
+    float[] values = new float[length];
+    GgufTensorValues.dequantizeRow(tensor.data(), GgufTensorType.BF16, 0, length, values);
+    return values;
   }
 }
