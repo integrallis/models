@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.VectorUtil;
@@ -139,6 +140,7 @@ public final class TensorOps {
     Objects.requireNonNull(q4Kernel, "q4Kernel");
     switch (type) {
       case F32 -> VectorUtil.ggufF32BatchDotProduct(x, qWeight, rows, cols, out);
+      case BF16 -> BFloat16Matrix.of(qWeight, rows, cols).multiply(x, out);
       case Q4_0 ->
           VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
               x,
@@ -1106,6 +1108,7 @@ public final class TensorOps {
   /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
     return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.BF16
         || type == GgufTensorType.Q5_0
         || type == GgufTensorType.Q8_0
         || type == GgufTensorType.Q4_K
@@ -1167,6 +1170,7 @@ public final class TensorOps {
       throw new UnsupportedOperationException("GGUF batched matmul not supported for: " + type);
     }
     switch (type) {
+      case BF16 -> BFloat16Matrix.of(qWeight, rows, cols).multiplyBatch(x, 0, batchSize, out, 0);
       case Q4_0 ->
           VectorUtil.ggufQ4_0Q8_0BatchedMatmul(
               x,

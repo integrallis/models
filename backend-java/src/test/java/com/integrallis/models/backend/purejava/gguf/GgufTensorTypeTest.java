@@ -43,6 +43,13 @@ class GgufTensorTypeTest {
     }
 
     @Test
+    void bf16MatchesTheOfficialGgmlWireType() {
+      assertThat(GgufTensorType.BF16.id()).isEqualTo(30);
+      assertThat(GgufTensorType.BF16.blockSize()).isEqualTo(1);
+      assertThat(GgufTensorType.BF16.typeSize()).isEqualTo(2);
+    }
+
+    @Test
     void q4_0HasCorrectProperties() {
       assertThat(GgufTensorType.Q4_0.id()).isEqualTo(2);
       assertThat(GgufTensorType.Q4_0.blockSize()).isEqualTo(32);

@@ -135,6 +135,36 @@ class TensorOpsTest {
         assertThat(actual).containsExactly(5.0f, 11.0f, 17.0f);
       }
     }
+
+    @Test
+    void bf16MatrixUsesMappedVectorsKernelForSingleAndBatchedActivations() {
+      float[] singleInput = {1.0f, 2.0f};
+      float[] batchInput = {1.0f, 2.0f, -1.0f, 0.5f};
+      MemorySegment weight =
+          MemorySegment.ofArray(bf16Bits(0x3f80, 0x4000, 0x4040, 0x4080, 0x40a0, 0x40c0));
+      float[] singleOutput = new float[3];
+      float[] batchOutput = new float[6];
+
+      TensorOps.ggufMatmul(singleOutput, singleInput, weight, GgufTensorType.BF16, 3, 2);
+      TensorOps.ggufBatchedMatmul(
+          batchOutput,
+          batchInput,
+          weight,
+          GgufTensorType.BF16,
+          2,
+          3,
+          2,
+          new byte[0],
+          new float[0],
+          new int[0],
+          new short[0],
+          new float[0],
+          GgufQ4Kernel.WIDENED);
+
+      assertThat(TensorOps.supportsBatchedMatmul(GgufTensorType.BF16)).isTrue();
+      assertThat(singleOutput).containsExactly(5.0f, 11.0f, 17.0f);
+      assertThat(batchOutput).containsExactly(5.0f, 11.0f, 17.0f, 0.0f, -1.0f, -2.0f);
+    }
   }
 
   @Nested
@@ -1362,6 +1392,15 @@ class TensorOpsTest {
       MemorySegment.copy(bytes, 0, segment, ValueLayout.JAVA_BYTE, 0, bytes.length);
       return segment;
     }
+  }
+
+  private static byte[] bf16Bits(int... bits) {
+    ByteBuffer bytes =
+        ByteBuffer.allocate(bits.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+    for (int value : bits) {
+      bytes.putShort((short) value);
+    }
+    return bytes.array();
   }
 
   @Nested

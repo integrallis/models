@@ -29,6 +29,8 @@ public final class GgufTensorValues {
 
   private static final ValueLayout.OfFloat LE_FLOAT =
       ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
+  private static final ValueLayout.OfShort LE_SHORT =
+      ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   private GgufTensorValues() {}
 
@@ -75,6 +77,12 @@ public final class GgufTensorValues {
         }
       }
       case F16 -> new F16Dequantizer().dequantize(source, sourceOffset, output, 0, count);
+      case BF16 -> {
+        for (int index = 0; index < count; index++) {
+          short bits = source.get(LE_SHORT, sourceOffset + (long) index * Short.BYTES);
+          output[index] = Float.intBitsToFloat(Short.toUnsignedInt(bits) << Short.SIZE);
+        }
+      }
       case Q4_0 -> new Q4_0Dequantizer().dequantize(source, sourceOffset, output, 0, count);
       case Q5_0 -> VectorUtil.ggufQ5_0Dequantize(source, sourceOffset, output, 0, count);
       case Q8_0 -> new Q8_0Dequantizer().dequantize(source, sourceOffset, output, 0, count);

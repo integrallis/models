@@ -33,7 +33,8 @@ public enum GgufTensorType {
   Q4_K(12, 256, 144),
   Q5_K(13, 256, 176),
   Q6_K(14, 256, 210),
-  Q8_K(15, 256, 292);
+  Q8_K(15, 256, 292),
+  BF16(30, 1, 2);
 
   private static final Map<Integer, GgufTensorType> BY_ID = new HashMap<>();
 
