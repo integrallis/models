@@ -149,6 +149,8 @@ val fixtureDirectory = providers.systemProperty("models.fixtures.directory")
 val configuredNeedle2CactPath = providers.systemProperty("models.fixtures.needle2Cact")
 val configuredSafetensorsReferencePath =
     providers.systemProperty("models.fixtures.safetensorsReference")
+val configuredQwen25HuggingFaceDirectory =
+    providers.systemProperty("models.fixtures.qwen25HuggingFaceDirectory")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
@@ -157,6 +159,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredSafetensorsReferencePath.orNull?.let {
         systemProperty("models.fixtures.safetensorsReference", it)
+    }
+    configuredQwen25HuggingFaceDirectory.orNull?.let {
+        systemProperty("models.fixtures.qwen25HuggingFaceDirectory", it)
     }
 }
 

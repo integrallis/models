@@ -20,6 +20,7 @@ import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -85,6 +86,7 @@ public final class GgufTokenizer implements Tokenizer {
   private final int unknownTokenId;
   private final char[] byteToChar;
   private final int[] charToByte;
+  private final boolean normalizeNfc;
 
   private GgufTokenizer(
       String[] vocab,
@@ -102,7 +104,8 @@ public final class GgufTokenizer implements Tokenizer {
       boolean addEosToken,
       boolean addSpacePrefix,
       BpePreTokenizer bpePreTokenizer,
-      int unknownTokenId) {
+      int unknownTokenId,
+      boolean normalizeNfc) {
     this.vocab = vocab;
     this.scores = scores;
     this.tokenToId = tokenToId;
@@ -119,6 +122,7 @@ public final class GgufTokenizer implements Tokenizer {
     this.addSpacePrefix = addSpacePrefix;
     this.bpePreTokenizer = bpePreTokenizer;
     this.unknownTokenId = unknownTokenId;
+    this.normalizeNfc = normalizeNfc;
     this.byteToChar = buildBytesToUnicode();
     this.charToByte = buildUnicodeToBytes(byteToChar);
   }
@@ -231,7 +235,82 @@ public final class GgufTokenizer implements Tokenizer {
         addEosToken,
         addSpacePrefix,
         bpePreTokenizer,
-        unknownTokenId);
+        unknownTokenId,
+        false);
+  }
+
+  static GgufTokenizer fromByteLevelBpe(
+      String[] vocab,
+      List<String> merges,
+      Set<Integer> controlTokenIds,
+      int bosTokenId,
+      int eosTokenId,
+      boolean addBosToken,
+      boolean addEosToken,
+      int unknownTokenId,
+      boolean normalizeNfc) {
+    Objects.requireNonNull(vocab, "vocab");
+    Objects.requireNonNull(merges, "merges");
+    Objects.requireNonNull(controlTokenIds, "controlTokenIds");
+    String[] copiedVocab = vocab.clone();
+    Map<String, Integer> tokenToId = new HashMap<>(copiedVocab.length * 2);
+    for (int token = 0; token < copiedVocab.length; token++) {
+      String text = Objects.requireNonNull(copiedVocab[token], "vocabulary token " + token);
+      if (text.isEmpty()) {
+        continue;
+      }
+      Integer previous = tokenToId.put(text, token);
+      if (previous != null) {
+        throw new IllegalArgumentException(
+            "duplicate vocabulary token " + text + " at ids " + previous + " and " + token);
+      }
+    }
+    Map<String, Integer> mergeRanks = new HashMap<>(merges.size() * 2);
+    for (int rank = 0; rank < merges.size(); rank++) {
+      mergeRanks.put(merges.get(rank), rank);
+    }
+    boolean[] endOfGenerationTokens = new boolean[copiedVocab.length];
+    markEndOfGeneration(endOfGenerationTokens, eosTokenId);
+    for (int token = 0; token < copiedVocab.length; token++) {
+      if (END_OF_GENERATION_TOKEN_TEXTS.contains(copiedVocab[token])) {
+        endOfGenerationTokens[token] = true;
+      }
+    }
+    List<SpecialToken> controlTokens =
+        controlTokenIds.stream()
+            .map(
+                token -> {
+                  if (token < 0 || token >= copiedVocab.length) {
+                    throw new IllegalArgumentException(
+                        "control token id is outside vocabulary: " + token);
+                  }
+                  if (copiedVocab[token].isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "control token has no vocabulary text: " + token);
+                  }
+                  return new SpecialToken(copiedVocab[token], token);
+                })
+            .sorted(
+                Comparator.comparingInt((SpecialToken token) -> token.text().length()).reversed())
+            .toList();
+    return new GgufTokenizer(
+        copiedVocab,
+        new float[copiedVocab.length],
+        tokenToId,
+        mergeRanks,
+        bosTokenId,
+        eosTokenId,
+        endOfGenerationTokens,
+        controlTokens,
+        true,
+        false,
+        false,
+        addBosToken,
+        addEosToken,
+        false,
+        BpePreTokenizer.forName("qwen2"),
+        unknownTokenId,
+        normalizeNfc);
   }
 
   private static boolean[] buildEndOfGenerationTokens(
@@ -377,13 +456,14 @@ public final class GgufTokenizer implements Tokenizer {
     if (text.isEmpty()) {
       return new int[0];
     }
+    String normalized = normalizeNfc ? Normalizer.normalize(text, Normalizer.Form.NFC) : text;
     if (useSentencePiece) {
-      return encodeSentencePiece(text);
+      return encodeSentencePiece(normalized);
     }
     if (useGemma4Bpe) {
-      return encodeGemma4Bpe(text);
+      return encodeGemma4Bpe(normalized);
     }
-    return useByteLevel ? encodeByteLevelBpe(text) : encodePlainBpe(text);
+    return useByteLevel ? encodeByteLevelBpe(normalized) : encodePlainBpe(normalized);
   }
 
   private static void append(List<Integer> destination, int[] source) {
