@@ -1607,8 +1607,10 @@ class LlamaForwardPassTest {
               new LlamaForwardPass.Session[] {first, second}, new int[] {29, 31});
 
       assertThat(actual.tokenCount()).isEqualTo(2);
-      assertThat(actual.copyRow(0)).containsExactly(firstExpectedLogits);
-      assertThat(actual.copyRow(1)).containsExactly(secondExpectedLogits);
+      assertThat(actual.copyRow(0))
+          .containsExactly(firstExpectedLogits, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(actual.copyRow(1))
+          .containsExactly(secondExpectedLogits, within(SIMD_REDUCTION_TOLERANCE));
       assertThat(first.cache().keyBuffer()).containsExactly(firstExpectedCache.keyBuffer());
       assertThat(first.cache().valueBuffer()).containsExactly(firstExpectedCache.valueBuffer());
       assertThat(second.cache().keyBuffer()).containsExactly(secondExpectedCache.keyBuffer());
@@ -1624,8 +1626,10 @@ class LlamaForwardPassTest {
           batched.forwardBatchTransient(
               new LlamaForwardPass.Session[] {first, second}, new int[] {firstNext, secondNext});
 
-      assertThat(next.copyRow(0)).containsExactly(firstExpectedNext);
-      assertThat(next.copyRow(1)).containsExactly(secondExpectedNext);
+      assertThat(next.copyRow(0))
+          .containsExactly(firstExpectedNext, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(next.copyRow(1))
+          .containsExactly(secondExpectedNext, within(SIMD_REDUCTION_TOLERANCE));
       assertThat(first.cache().keyBuffer()).containsExactly(firstExpectedCache.keyBuffer());
       assertThat(first.cache().valueBuffer()).containsExactly(firstExpectedCache.valueBuffer());
       assertThat(second.cache().keyBuffer()).containsExactly(secondExpectedCache.keyBuffer());
