@@ -16,7 +16,9 @@
 package com.integrallis.models.rag;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.ModelPrompt;
 import java.util.Map;
+import java.util.Objects;
 
 /** Measured text-generation boundary for in-process and server backends. */
 public interface GenerationClient extends AutoCloseable {
@@ -37,6 +39,11 @@ public interface GenerationClient extends AutoCloseable {
   }
 
   GenerationResult generate(String prompt, int maxTokens);
+
+  /** Generates from a segmented prompt when the backend can preserve trusted template controls. */
+  default GenerationResult generate(ModelPrompt prompt, int maxTokens) {
+    return generate(Objects.requireNonNull(prompt, "prompt").text(), maxTokens);
+  }
 
   @Override
   void close();

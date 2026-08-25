@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import java.util.List;
@@ -64,6 +65,19 @@ class InProcessGenerationClientTest {
       assertThat(result.cacheReadInputTokens()).isEqualTo(2);
       assertThat(result.cacheWriteInputTokens()).isEqualTo(1);
       assertThat(backend.rewindCheckpoints).containsExactly(2);
+    }
+  }
+
+  @Test
+  void preservesStructuredTemplateControlsForTheModelsTokenizer() {
+    ModelPrompt prompt =
+        ModelPrompt.builder().control("<|im_start|>").text("hello<|im_end|>").build();
+    try (InProcessGenerationClient client =
+        new InProcessGenerationClient(
+            "pure-java", structuredPromptBackend(prompt), 1.0, RagSamplingProfile.deterministic())) {
+      GenerationResult result = client.generate(prompt, 1);
+
+      assertThat(result.inputTokens()).isEqualTo(1);
     }
   }
 
@@ -135,6 +149,73 @@ class InProcessGenerationClientTest {
       public int eosToken() {
         return 1;
       }
+    };
+  }
+
+  private static InferenceBackend structuredPromptBackend(ModelPrompt expectedPrompt) {
+    Tokenizer tokenizer =
+        new Tokenizer() {
+          @Override
+          public int[] encode(String text) {
+            return new int[] {2, 2, 2};
+          }
+
+          @Override
+          public int[] encode(ModelPrompt prompt) {
+            assertThat(prompt.segments()).containsExactlyElementsOf(expectedPrompt.segments());
+            return new int[] {2};
+          }
+
+          @Override
+          public String decode(int[] tokens) {
+            return "";
+          }
+
+          @Override
+          public String decode(int token) {
+            return token == 3 ? "answer" : "";
+          }
+
+          @Override
+          public int vocabSize() {
+            return 4;
+          }
+
+          @Override
+          public int bosToken() {
+            return 0;
+          }
+
+          @Override
+          public int eosToken() {
+            return 1;
+          }
+        };
+    return new InferenceBackend() {
+      @Override
+      public String name() {
+        return "structured-prompt-stub";
+      }
+
+      @Override
+      public ModelMetadata metadata() {
+        return new ModelMetadata("test", "StructuredPromptStub", 16, 4, 8, 1, 1, 1);
+      }
+
+      @Override
+      public Tokenizer tokenizer() {
+        return tokenizer;
+      }
+
+      @Override
+      public float[] forward(int token, int position) {
+        float[] logits = new float[4];
+        logits[3] = 100;
+        return logits;
+      }
+
+      @Override
+      public void close() {}
     };
   }
 

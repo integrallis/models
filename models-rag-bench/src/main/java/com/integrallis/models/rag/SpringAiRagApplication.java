@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.ModelPrompt;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,11 +67,12 @@ public final class SpringAiRagApplication implements RagApplication {
                 .map(SpringAiRagApplication::toDocument)
                 .toList();
     QueryAugmenter queryAugmenter =
-        (query, documents) ->
-            new Query(
-                RagPromptRenderer.render(query.text(), retrieval.hits(), promptTemplate),
-                query.history(),
-                query.context());
+        (query, documents) -> {
+          ModelPrompt rendered =
+              RagPromptRenderer.renderPrompt(query.text(), retrieval.hits(), promptTemplate);
+          generation.register(rendered);
+          return new Query(rendered.text(), query.history(), query.context());
+        };
     RetrievalAugmentationAdvisor advisor =
         RetrievalAugmentationAdvisor.builder()
             .documentRetriever(documentRetriever)

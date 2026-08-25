@@ -17,6 +17,7 @@ package com.integrallis.models.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.ModelPrompt;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -90,6 +91,7 @@ class RagFrameworkParityTest {
                     .startsWith("<|im_start|>system\n")
                     .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n")
                     .endsWith("<|im_end|>\n<|im_start|>assistant\n"));
+    assertThat(clients).allSatisfy(client -> assertThat(client.receivedStructuredPrompt).isTrue());
   }
 
   @Test
@@ -151,6 +153,7 @@ class RagFrameworkParityTest {
   private static final class RecordingGenerationClient implements GenerationClient {
     private final String answer;
     private String lastPrompt;
+    private boolean receivedStructuredPrompt;
 
     private RecordingGenerationClient() {
       this(
@@ -176,6 +179,12 @@ class RagFrameworkParityTest {
     public GenerationResult generate(String prompt, int maxTokens) {
       lastPrompt = prompt;
       return new GenerationResult(answer, 100, 18, 5, 25, 1_000, 0);
+    }
+
+    @Override
+    public GenerationResult generate(ModelPrompt prompt, int maxTokens) {
+      receivedStructuredPrompt = true;
+      return generate(prompt.text(), maxTokens);
     }
 
     @Override
