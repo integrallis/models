@@ -24,7 +24,7 @@ allprojects {
     group = "com.integrallis"
 
     repositories {
-        if (project == rootProject && notebookRepositoryUrl.isPresent) {
+        if (notebookRepositoryUrl.isPresent) {
             maven {
                 name = "notebookCandidate"
                 url = uri(notebookRepositoryUrl.get())
