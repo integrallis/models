@@ -14,13 +14,18 @@ Hugging Face snapshot of Qwen2.5-0.5B-Instruct:
 - reference: PyTorch 2.2.2 and Transformers 4.46.3, loading the same pinned
   local snapshot with remote code disabled
 
-Both reports use the same nine-case general corpus (SHA-256
+The performance and reference reports use the same nine-case general corpus (SHA-256
 `4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c`),
 top-1 retrieval, ChatML, a 2,048-token context, a 64-token output limit,
 greedy generation, one full warmup, and three measured iterations. Prompt
 hashes are identical. The Java prompt path additionally has a tokenizer test
 against the Transformers-observed 175-token first request, including the exact
 ChatML boundary-token IDs.
+
+`default-correctness/models-pure-java.json` separately runs the released
+Models 0.3.10 library defaults on the same controlled host. It uses no tuning
+system properties, zero warmups, and one measured pass across all nine cases;
+all nine succeeded with 100% correctness and abstention accuracy.
 
 ## Results
 
