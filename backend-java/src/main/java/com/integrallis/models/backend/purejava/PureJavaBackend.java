@@ -37,6 +37,7 @@ import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
 import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
@@ -47,11 +48,15 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
+import com.integrallis.models.backend.purejava.tokenizer.HuggingFaceTokenizer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -195,7 +200,23 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
       PureJavaPlanConfiguration planConfiguration =
           PureJavaPlanConfiguration.fromSystemProperties(recommendations);
       Tokenizer tokenizer;
-      if (CactParser.matches(modelPath)) {
+      if (Files.isDirectory(modelPath)) {
+        Qwen2HuggingFaceConfig config =
+            Qwen2HuggingFaceConfig.parse(modelPath.resolve("config.json"));
+        tokenizer =
+            HuggingFaceTokenizer.fromQwen2(
+                modelPath.resolve("tokenizer.json"),
+                modelPath.resolve("tokenizer_config.json"),
+                config);
+        loaded =
+            loadHuggingFaceQwen2(
+                modelPath,
+                config,
+                new SafetensorsTensorSource(SafetensorsBundle.open(modelPath, arena)),
+                runtime,
+                planConfiguration,
+                batchedMatrixKernel);
+      } else if (CactParser.matches(modelPath)) {
         CactFile file = CactParser.parse(modelPath, arena);
         CactNeedle2Layout layout = CactNeedle2Layout.from(file);
         tokenizer = CactTokenizer.from(file);
@@ -272,6 +293,41 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
         metadata,
         contextCapacity,
         executionPlan);
+  }
+
+  private static LoadedDecoder loadHuggingFaceQwen2(
+      Path modelPath,
+      Qwen2HuggingFaceConfig huggingFaceConfig,
+      SafetensorsTensorSource tensors,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    LlamaConfig config = huggingFaceConfig.model();
+    LlamaWeights weights = LlamaWeights.fromQwen2Safetensors(tensors, huggingFaceConfig);
+    String modelFamily = "qwen2";
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.from(modelFamily, config, weights),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength());
+    KvCache cache =
+        new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
+    PureJavaDecoder decoder =
+        new LlamaDecoder(
+            new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            modelFamily,
+            modelPath.getFileName().toString(),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
   }
 
   private static LoadedDecoder loadLlama(

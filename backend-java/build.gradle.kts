@@ -256,6 +256,22 @@ tasks.named<Test>("integrationTest") {
     )
 }
 
+tasks.register<Test>("qwen25HuggingFaceIntegrationTest") {
+    description = "Run the pinned Qwen 2.5 0.5B Hugging Face Safetensors compatibility test"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.Qwen2HuggingFaceBackendIntegrationTest",
+        )
+    }
+    maxHeapSize = "4g"
+}
+
 tasks.register<Test>("qwen306BQ40IntegrationTest") {
     description = "Run the pinned Qwen3 0.6B Q4_0 pure-Java integration tests"
     group = "verification"
