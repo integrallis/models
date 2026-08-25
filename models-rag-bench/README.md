@@ -151,10 +151,13 @@ The final prompt token is always replayed, so an identical prompt never relies
 on a stale logits buffer. Backends without checkpoint/rewind support continue
 to reset and prefill the complete prompt.
 
-`--model /path/to/model.gguf` identifies the exact artifact under test. Catalog
-and contribution tooling can resolve an independently published model artifact
-before invoking the benchmark. The JSON report embeds backend diagnostics so a
-published run proves which execution plan was enabled.
+`--model` accepts either a GGUF file or a Hugging Face model directory supported
+by Models. For a Hugging Face directory, the runtime reads its pinned
+`config.json`, tokenizer files, and Safetensors weights; the report binds its
+artifact identity to the exact `model.safetensors` SHA-256 and byte size. Catalog
+and contribution tooling can resolve the complete snapshot before invoking the
+benchmark. The JSON report embeds backend diagnostics so a published run proves
+which execution plan was enabled.
 
 Use the same Java application with a locally running native backend:
 
