@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.ModelPrompt;
 import java.util.List;
 
 /** Canonical prompt renderer used by every framework and backend. */
@@ -26,6 +27,12 @@ public final class RagPromptRenderer {
   }
 
   public static String render(
+      String question, List<RetrievedDocument> retrieved, RagPromptTemplate template) {
+    return renderPrompt(question, retrieved, template).text();
+  }
+
+  /** Renders with model-template controls separated from evidence and question text. */
+  public static ModelPrompt renderPrompt(
       String question, List<RetrievedDocument> retrieved, RagPromptTemplate template) {
     java.util.Objects.requireNonNull(retrieved, "retrieved");
     java.util.Objects.requireNonNull(template, "template");
@@ -41,6 +48,6 @@ public final class RagPromptRenderer {
                         hit.rank()))
             .toList();
     GroundedRagPrompt prompt = GroundedRagPrompt.formatUnchecked(question, evidence);
-    return template.apply(prompt.instructions(), prompt.request());
+    return template.applyPrompt(prompt.instructions(), prompt.request());
   }
 }

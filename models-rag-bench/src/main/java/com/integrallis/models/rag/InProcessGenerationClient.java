@@ -19,6 +19,7 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -107,6 +108,12 @@ public final class InProcessGenerationClient implements GenerationClient {
 
   @Override
   public GenerationResult generate(String prompt, int maxTokens) {
+    return generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), maxTokens);
+  }
+
+  @Override
+  public GenerationResult generate(ModelPrompt prompt, int maxTokens) {
+    Objects.requireNonNull(prompt, "prompt");
     int inputTokens = backend.tokenizer().encode(prompt).length;
     backend.begin();
     SamplingOptions options = sampling.toSamplingOptions(maxTokens);

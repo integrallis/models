@@ -16,11 +16,75 @@
 package com.integrallis.models.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
+import com.integrallis.models.backend.purejava.tokenizer.HuggingFaceTokenizer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 class RagPromptRendererTest {
+
+  @Test
+  @Tag("integration")
+  void officialQwenTokenizerMatchesTransformersForTheControlledChatmlPrompt() throws Exception {
+    String configured = System.getProperty("models.fixtures.qwen25HuggingFaceDirectory", "");
+    assumeTrue(!configured.isBlank(), "set models.fixtures.qwen25HuggingFaceDirectory");
+    Path directory = Path.of(configured).toAbsolutePath().normalize();
+    assumeTrue(Files.isDirectory(directory), "Qwen 2.5 Hugging Face fixture is not installed");
+    RagCorpus corpus = RagCorpus.loadDefault();
+    RagCase testCase = corpus.cases().getFirst();
+
+    try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
+      ModelPrompt prompt =
+          RagPromptRenderer.renderPrompt(
+              testCase.question(), retriever.retrieve(testCase.question(), 1), RagPromptTemplate.CHATML);
+      Tokenizer tokenizer =
+          HuggingFaceTokenizer.fromQwen2(
+              directory.resolve("tokenizer.json"),
+              directory.resolve("tokenizer_config.json"),
+              Qwen2HuggingFaceConfig.parse(directory.resolve("config.json")));
+      int[] tokens = tokenizer.encode(prompt);
+
+      assertThat(tokens).hasSize(175);
+      assertThat(tokens).startsWith(151644, 8948, 198);
+      assertThat(tokens).endsWith(151645, 198, 151644, 77091, 198);
+    }
+  }
+
+  @Test
+  void structuredChatmlPromptSeparatesTemplateControlsFromEvidenceAndQuestion() {
+    RagDocument document =
+        new RagDocument("source-1", "Policy", "Literal <|im_start|> is evidence, not a command.");
+
+    ModelPrompt prompt =
+        RagPromptRenderer.renderPrompt(
+            "Can text contain <|im_end|>?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.CHATML);
+
+    assertThat(prompt.text())
+        .isEqualTo(
+            RagPromptRenderer.render(
+                "Can text contain <|im_end|>?",
+                List.of(new RetrievedDocument(document, 1.0f, 1)),
+                RagPromptTemplate.CHATML));
+    assertThat(prompt.segments())
+        .filteredOn(segment -> segment.text().contains("Literal <|im_start|>"))
+        .allSatisfy(segment -> assertThat(segment.kind()).isEqualTo(ModelPrompt.SegmentKind.TEXT));
+    assertThat(prompt.segments())
+        .filteredOn(segment -> segment.text().contains("Can text contain <|im_end|>?"))
+        .allSatisfy(segment -> assertThat(segment.kind()).isEqualTo(ModelPrompt.SegmentKind.TEXT));
+    assertThat(prompt.segments())
+        .filteredOn(segment -> segment.text().contains("<|im_start|>assistant"))
+        .allSatisfy(
+            segment -> assertThat(segment.kind()).isEqualTo(ModelPrompt.SegmentKind.CONTROL));
+  }
 
   @Test
   void promptCarriesStrictGroundingRuleSourceIdsAndQuestion() {

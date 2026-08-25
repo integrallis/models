@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.ModelPrompt;
 import java.util.Locale;
 
 /** Explicit prompt envelopes used to keep native and pure-Java requests byte-identical. */
@@ -47,117 +48,180 @@ public enum RagPromptTemplate {
 
   /** Applies this model-facing envelope to the canonical RAG prompt. */
   public String apply(String prompt) {
+    return applyPrompt(prompt).text();
+  }
+
+  /** Applies a single-turn envelope while preserving trusted template-token boundaries. */
+  public ModelPrompt applyPrompt(String prompt) {
+    ModelPrompt.Builder result = ModelPrompt.builder();
     return switch (this) {
-      case RAW -> prompt;
-      case CHATML -> "<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\n";
+      case RAW -> result.text(prompt).build();
+      case CHATML ->
+          result
+              .control("<|im_start|>user\n")
+              .text(prompt)
+              .control("<|im_end|>\n<|im_start|>assistant\n")
+              .build();
       case CHATML_DIRECT ->
-          "<|im_start|>user\n"
-              + prompt
-              + "<|im_end|>\n<|im_start|>assistant\nThe context states that ";
+          result
+              .control("<|im_start|>user\n")
+              .text(prompt)
+              .control("<|im_end|>\n<|im_start|>assistant\n")
+              .text("The context states that ")
+              .build();
       case CHATML_ANSWER ->
-          "<|im_start|>user\n" + prompt + "<|im_end|>\n<|im_start|>assistant\nAnswer: ";
+          result
+              .control("<|im_start|>user\n")
+              .text(prompt)
+              .control("<|im_end|>\n<|im_start|>assistant\n")
+              .text("Answer: ")
+              .build();
       case CHATML_NO_THINK ->
-          "<|im_start|>user\n"
-              + prompt
-              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
-      case ZEPHYR -> "<|user|>\n" + prompt + "</s>\n<|assistant|>";
+          result
+              .control("<|im_start|>user\n")
+              .text(prompt)
+              .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
+              .build();
+      case ZEPHYR ->
+          result.control("<|user|>\n").text(prompt).control("</s>\n<|assistant|>").build();
       case LLAMA3 ->
-          "<|start_header_id|>user<|end_header_id|>\n\n"
-              + prompt.strip()
-              + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
+          result
+              .control("<|start_header_id|>user<|end_header_id|>\n\n")
+              .text(prompt.strip())
+              .control("<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
+              .build();
       case GEMMA ->
-          "<start_of_turn>user\n" + prompt.strip() + "<end_of_turn>\n<start_of_turn>model\n";
+          result
+              .control("<start_of_turn>user\n")
+              .text(prompt.strip())
+              .control("<end_of_turn>\n<start_of_turn>model\n")
+              .build();
       case GEMMA4 ->
-          "<|turn>user\n" + prompt.strip() + "<turn|>\n<|turn>model\n<|channel>thought\n<channel|>";
-      case PHI3 -> "<|user|>\n" + prompt.strip() + "<|end|>\n<|assistant|>\n";
-      case DEEPSEEK -> "### Instruction:\n" + prompt + "\n### Response:\n";
-      case H2O -> "<|prompt|>" + prompt.strip() + "</s><|answer|>";
-      case H2O_DIRECT -> "<|prompt|>" + prompt.strip() + "</s><|answer|>The context states that ";
+          result
+              .control("<|turn>user\n")
+              .text(prompt.strip())
+              .control("<turn|>\n<|turn>model\n<|channel>thought\n<channel|>")
+              .build();
+      case PHI3 ->
+          result
+              .control("<|user|>\n")
+              .text(prompt.strip())
+              .control("<|end|>\n<|assistant|>\n")
+              .build();
+      case DEEPSEEK ->
+          result.control("### Instruction:\n").text(prompt).control("\n### Response:\n").build();
+      case H2O ->
+          result.control("<|prompt|>").text(prompt.strip()).control("</s><|answer|>").build();
+      case H2O_DIRECT ->
+          result
+              .control("<|prompt|>")
+              .text(prompt.strip())
+              .control("</s><|answer|>")
+              .text("The context states that ")
+              .build();
       case MINICPM5_NO_THINK ->
-          "<s><|im_start|>user\n"
-              + prompt
-              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+          result
+              .control("<s><|im_start|>user\n")
+              .text(prompt)
+              .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
+              .build();
     };
   }
 
   /** Applies a role-aware envelope while retaining legacy prompt bytes for single-turn profiles. */
   public String apply(String systemPrompt, String userPrompt) {
+    return applyPrompt(systemPrompt, userPrompt).text();
+  }
+
+  /** Applies a role-aware envelope while preserving trusted template-token boundaries. */
+  public ModelPrompt applyPrompt(String systemPrompt, String userPrompt) {
+    ModelPrompt.Builder result = ModelPrompt.builder();
     return switch (this) {
-      case RAW -> systemPrompt + userPrompt;
-      case CHATML ->
-          "<|im_start|>system\n"
-              + systemPrompt.stripTrailing()
-              + "<|im_end|>\n<|im_start|>user\n"
-              + userPrompt
-              + "<|im_end|>\n<|im_start|>assistant\n";
-      case CHATML_DIRECT ->
-          "<|im_start|>system\n"
-              + systemPrompt.stripTrailing()
-              + "<|im_end|>\n<|im_start|>user\n"
-              + userPrompt
-              + "<|im_end|>\n<|im_start|>assistant\nThe context states that ";
-      case CHATML_ANSWER ->
-          "<|im_start|>system\n"
-              + systemPrompt.stripTrailing()
-              + "<|im_end|>\n<|im_start|>user\n"
-              + userPrompt
-              + "<|im_end|>\n<|im_start|>assistant\nAnswer: ";
-      case CHATML_NO_THINK ->
-          "<|im_start|>system\n"
-              + systemPrompt.stripTrailing()
-              + "<|im_end|>\n<|im_start|>user\n"
-              + userPrompt
-              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+      case RAW -> result.text(systemPrompt).text(userPrompt).build();
+      case CHATML, CHATML_DIRECT, CHATML_ANSWER, CHATML_NO_THINK -> {
+        result
+            .control("<|im_start|>system\n")
+            .text(systemPrompt.stripTrailing())
+            .control("<|im_end|>\n<|im_start|>user\n")
+            .text(userPrompt)
+            .control("<|im_end|>\n<|im_start|>assistant\n");
+        if (this == CHATML_DIRECT) {
+          result.text("The context states that ");
+        } else if (this == CHATML_ANSWER) {
+          result.text("Answer: ");
+        } else if (this == CHATML_NO_THINK) {
+          result.control("<think>\n\n</think>\n\n");
+        }
+        yield result.build();
+      }
       case ZEPHYR ->
-          "<|system|>\n"
-              + systemPrompt.stripTrailing()
-              + "</s>\n<|user|>\n"
-              + userPrompt
-              + "</s>\n<|assistant|>";
+          result
+              .control("<|system|>\n")
+              .text(systemPrompt.stripTrailing())
+              .control("</s>\n<|user|>\n")
+              .text(userPrompt)
+              .control("</s>\n<|assistant|>")
+              .build();
       case LLAMA3 ->
-          "<|start_header_id|>system<|end_header_id|>\n\n"
-              + systemPrompt.strip()
-              + "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"
-              + userPrompt.strip()
-              + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
+          result
+              .control("<|start_header_id|>system<|end_header_id|>\n\n")
+              .text(systemPrompt.strip())
+              .control("<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n")
+              .text(userPrompt.strip())
+              .control("<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
+              .build();
       case GEMMA ->
-          "<start_of_turn>user\n"
-              + systemPrompt.strip()
-              + "\n\n"
-              + userPrompt.strip()
-              + "<end_of_turn>\n<start_of_turn>model\n";
+          result
+              .control("<start_of_turn>user\n")
+              .text(systemPrompt.strip())
+              .text("\n\n")
+              .text(userPrompt.strip())
+              .control("<end_of_turn>\n<start_of_turn>model\n")
+              .build();
       case GEMMA4 ->
-          "<|turn>system\n"
-              + systemPrompt.strip()
-              + "<turn|>\n<|turn>user\n"
-              + userPrompt.strip()
-              + "<turn|>\n<|turn>model\n<|channel>thought\n<channel|>";
+          result
+              .control("<|turn>system\n")
+              .text(systemPrompt.strip())
+              .control("<turn|>\n<|turn>user\n")
+              .text(userPrompt.strip())
+              .control("<turn|>\n<|turn>model\n<|channel>thought\n<channel|>")
+              .build();
       case PHI3 ->
-          "<|system|>\n"
-              + systemPrompt.strip()
-              + "<|end|>\n<|user|>\n"
-              + userPrompt.strip()
-              + "<|end|>\n<|assistant|>\n";
+          result
+              .control("<|system|>\n")
+              .text(systemPrompt.strip())
+              .control("<|end|>\n<|user|>\n")
+              .text(userPrompt.strip())
+              .control("<|end|>\n<|assistant|>\n")
+              .build();
       case DEEPSEEK ->
-          "### Instruction:\n"
-              + systemPrompt.stripTrailing()
-              + "\n\n"
-              + userPrompt
-              + "\n### Response:\n";
-      case H2O ->
-          "<|prompt|>" + systemPrompt.strip() + "\n\n" + userPrompt.strip() + "</s><|answer|>";
-      case H2O_DIRECT ->
-          "<|prompt|>"
-              + systemPrompt.strip()
-              + "\n\n"
-              + userPrompt.strip()
-              + "</s><|answer|>The context states that ";
+          result
+              .control("### Instruction:\n")
+              .text(systemPrompt.stripTrailing())
+              .text("\n\n")
+              .text(userPrompt)
+              .control("\n### Response:\n")
+              .build();
+      case H2O, H2O_DIRECT -> {
+        result
+            .control("<|prompt|>")
+            .text(systemPrompt.strip())
+            .text("\n\n")
+            .text(userPrompt.strip())
+            .control("</s><|answer|>");
+        if (this == H2O_DIRECT) {
+          result.text("The context states that ");
+        }
+        yield result.build();
+      }
       case MINICPM5_NO_THINK ->
-          "<s><|im_start|>system\n"
-              + systemPrompt.stripTrailing()
-              + "<|im_end|>\n<|im_start|>user\n"
-              + userPrompt
-              + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+          result
+              .control("<s><|im_start|>system\n")
+              .text(systemPrompt.stripTrailing())
+              .control("<|im_end|>\n<|im_start|>user\n")
+              .text(userPrompt)
+              .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
+              .build();
     };
   }
 

@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.ModelPrompt;
 import java.util.List;
 import java.util.Objects;
 
@@ -46,11 +47,18 @@ public final class PlainJavaRagApplication implements RagApplication {
     long retrievalStart = System.nanoTime();
     List<RetrievedDocument> hits = retriever.retrieve(testCase.question(), topK);
     double retrievalMillis = elapsedMillis(retrievalStart);
-    String prompt = RagPromptRenderer.render(testCase.question(), hits, promptTemplate);
+    ModelPrompt prompt = RagPromptRenderer.renderPrompt(testCase.question(), hits, promptTemplate);
     GenerationResult generated = client.generate(prompt, maxTokens);
     double endToEndMillis = elapsedMillis(totalStart);
     return RagRunFactory.create(
-        "plain-java", client, testCase, hits, prompt, retrievalMillis, endToEndMillis, generated);
+        "plain-java",
+        client,
+        testCase,
+        hits,
+        prompt.text(),
+        retrievalMillis,
+        endToEndMillis,
+        generated);
   }
 
   private static double elapsedMillis(long start) {

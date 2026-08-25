@@ -15,8 +15,13 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.ModelPrompt;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 final class GenerationSession {
   private final GenerationClient client;
+  private final Map<String, ModelPrompt> structuredPrompts = new ConcurrentHashMap<>();
   private final ThreadLocal<Integer> maxTokens = new ThreadLocal<>();
   private final ThreadLocal<String> prompt = new ThreadLocal<>();
   private final ThreadLocal<GenerationResult> result = new ThreadLocal<>();
@@ -29,6 +34,11 @@ final class GenerationSession {
     maxTokens.set(requestedMaxTokens);
     prompt.remove();
     result.remove();
+    structuredPrompts.clear();
+  }
+
+  void register(ModelPrompt modelPrompt) {
+    structuredPrompts.put(modelPrompt.text(), modelPrompt);
   }
 
   GenerationResult generate(String renderedPrompt) {
@@ -36,7 +46,11 @@ final class GenerationSession {
     if (requestedMaxTokens == null) {
       throw new IllegalStateException("generation session was not started");
     }
-    GenerationResult generated = client.generate(renderedPrompt, requestedMaxTokens);
+    ModelPrompt modelPrompt = structuredPrompts.remove(renderedPrompt);
+    GenerationResult generated =
+        modelPrompt == null
+            ? client.generate(renderedPrompt, requestedMaxTokens)
+            : client.generate(modelPrompt, requestedMaxTokens);
     prompt.set(renderedPrompt);
     result.set(generated);
     return generated;

@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.rag;
 
+import com.integrallis.models.api.ModelPrompt;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -54,9 +55,13 @@ public final class LangChain4jRagApplication implements RagApplication {
                 .map(LangChain4jRagApplication::toContent)
                 .toList();
     ContentInjector contentInjector =
-        (contents, chatMessage) ->
-            UserMessage.from(
-                RagPromptRenderer.render(question(chatMessage), retrieval.hits(), promptTemplate));
+        (contents, chatMessage) -> {
+          ModelPrompt rendered =
+              RagPromptRenderer.renderPrompt(
+                  question(chatMessage), retrieval.hits(), promptTemplate);
+          generation.register(rendered);
+          return UserMessage.from(rendered.text());
+        };
     RetrievalAugmentor augmentor =
         DefaultRetrievalAugmentor.builder()
             .contentRetriever(contentRetriever)
