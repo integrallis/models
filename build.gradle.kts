@@ -1440,7 +1440,7 @@ tasks.register("verifyDocumentation") {
         }
         val concepts = conceptsFile.readText()
         listOf(
-            "== GGUF And Model Artifacts",
+            "== Model Artifact Formats",
             "== Tokens, Prefill, And Decode",
             "== Tensors, Kernels, And SIMD",
             "== Performance Measurements",
@@ -1448,6 +1448,11 @@ tasks.register("verifyDocumentation") {
         ).forEach { section ->
             require(section in concepts) {
                 "Inference concepts page is missing $section"
+            }
+        }
+        listOf("GGUF", "Safetensors", "CACT").forEach { format ->
+            require(format in concepts) {
+                "Inference concepts page is missing the $format artifact format"
             }
         }
         val documentationNavigation =
