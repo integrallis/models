@@ -58,6 +58,21 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
+  void safetensorsModelCanQualifyAgainstThePinnedTransformersReference() {
+    RagBenchmarkReport candidate = report("pure-java", "sha-safetensors", 15.69, 3_827.87);
+    RagBenchmarkReport transformers = report("transformers", "sha-safetensors", 2.96, 57_000.00);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(transformers));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("transformers");
+    assertThat(qualification.comparisons())
+        .extracting(RagComparatorAssessment::comparatorBackend)
+        .containsExactly("transformers");
+  }
+
+  @Test
   void rejectsReportsForDifferentArtifactsOrHosts() {
     RagBenchmarkReport candidate = report("pure-java", "sha-one", 80, 1_000);
     RagBenchmarkReport otherArtifact = report("ollama", "sha-two", 80, 1_000);
@@ -112,7 +127,7 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
-  void llamaCppPerformanceCannotSubstituteForTheRequiredOllamaFloor() {
+  void llamaCppPerformanceCannotSubstituteForAnAuthoritativeEngineFloor() {
     RagBenchmarkReport candidate = report("rust-ffm", "sha", 79, 1_000);
     RagBenchmarkReport llama = report("llama.cpp", "sha", 100, 900);
     RagBenchmarkReport ollama = report("ollama", "sha", 100, 1_000);
@@ -122,6 +137,19 @@ class RagProductionQualificationPolicyTest {
 
     assertThat(qualification.qualified()).isFalse();
     assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp");
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.FAILED_RELATIVE_GATE);
+  }
+
+  @Test
+  void aSlowCandidateDoesNotQualifyMerelyBecauseTransformersCanLoadItsFormat() {
+    RagBenchmarkReport candidate = report("pure-java", "sha", 70, 1_000);
+    RagBenchmarkReport transformers = report("transformers", "sha", 100, 1_000);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(transformers));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.qualifyingComparators()).isEmpty();
     assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.FAILED_RELATIVE_GATE);
   }
 

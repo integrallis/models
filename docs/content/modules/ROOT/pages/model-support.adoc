@@ -4,7 +4,7 @@ Models separates three different claims:
 
 [arabic]
 . *Format support* means the parser and kernels understand the required
-GGUF metadata and tensor encodings.
+artifact metadata and tensor encodings.
 . *Integration-tested* means CI downloads a pinned artifact, verifies
 its checksum, and runs parsing, tokenization, forward-pass, and
 generation tests.
@@ -20,8 +20,11 @@ xref:embeddings.adoc#equivalence-gating[Equivalence Gating].
 
 == Supported Runtime Surface
 
-The decoder currently recognizes `llama`, `qwen2`, `qwen3`, and `gemma4` GGUF
-metadata prefixes.
+The GGUF decoder recognizes `llama`, `qwen2`, `qwen3`, and `gemma4` metadata
+prefixes. The Hugging Face path supports strict Qwen 2/Qwen2.5 BF16
+Safetensors bundles with either one weight file or an indexed shard set. The
+CACT path supports the released Needle 2 architecture and mixed CQ2/CQ4
+artifact layout.
 
 Projection kernels support:
 
@@ -43,7 +46,7 @@ and arbitrary chat templates are not implied by this list.
 
 == Qualified Identities
 
-Committed evidence covers 27 exact artifacts representing 25 distinct
+Committed evidence covers 29 exact artifacts representing 26 distinct
 model identities. Multiple quantizations of one model count as one
 identity.
 
@@ -51,8 +54,9 @@ identity.
 |===
 |Domain |Qualified model identities
 |General |SmolLM2 360M, SmolLM2 1.7B, SmolLM3 3B, Qwen3 1.7B, Qwen2.5
-0.5B, Qwen2.5 1.5B, Llama 3.2 1B, Llama 3.2 3B, Gemma 3 1B, H2O Danube2
-1.8B, DeepSeek-R1-Distill-Qwen 1.5B, TinyLlama 1.1B Chat
+0.5B, Qwen2.5 1.5B, Llama 3.2 1B, Llama 3.2 3B, Gemma 3 1B,
+Gemma 4 26B-A4B, H2O Danube2 1.8B, DeepSeek-R1-Distill-Qwen 1.5B,
+TinyLlama 1.1B Chat
 
 |Coding |Qwen3 0.6B, Qwen2.5-Coder 0.5B, Qwen2.5-Coder 1.5B,
 DeepSeek-Coder 1.3B, MiniCPM5 1B, Yi-Coder 1.5B
@@ -77,21 +81,24 @@ and correctness. Individual report directories under
 {url-models-github}/tree/main/benchmark-results[`benchmark-results/`^]
 contain the machine-readable qualification records.
 
-== Integration-Tested But Not Qualified
+== Qualified Safetensors Bundle
 
-Gemma 4 26B-A4B Instruct Q4_K_M is supported by the Java transformer and
-Models Rust/FFM projection backend. The exact 16,796,015,136-byte artifact
-passed pinned-artifact installation, deterministic generation, direct runtime,
-LangChain4j, Spring AI, and guarded-RAG checks. All 27 qualification requests
-were correct, including all 21 retained model answers.
+Qwen2.5 0.5B Instruct BF16 is the first qualified Safetensors bundle. Models
+maps its pinned Hugging Face files directly and reaches the `USABLE` tier on
+the controlled EPYC host: 1,692.0 ms p95 TTFT, 14.51 tokens/second median
+decode, and 3,629.7 ms p95 end-to-end latency. All 27 grounded answers are
+correct; 15 retain model text, nine use validated extractive fallback, and
+three correctly abstain. A pinned Transformers 4.46.3 run over the same bytes,
+host, prompts, and greedy controls supplies the reference comparator. See the
+{url-models-github}/tree/main/benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16[retained reports^].
 
-The same run is classified `OFFLINE`: p95 TTFT was 3,793.7 ms, above the
-2,000 ms usable ceiling. It is therefore integration-tested but intentionally
-excluded from the qualified identities above. The
-{url-models-github}/blob/main/GEMMA4_QUALIFICATION.md[transfer and qualification
-analysis^] and
-{url-models-github}/tree/main/benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m[retained reports^]
-record the result without promoting a failed latency profile.
+== Supported But Not RAG-Qualified
+
+H2O Danube3 500M Q4_K_M remains integration-tested, but its corrected
+structured-prompt run retains model output for only 3 of 27 requests. That
+11.1% rate fails the 33.3% contribution floor, so it is excluded from the
+qualified identities above. See the
+{url-models-github}/tree/main/benchmark-results/certified-20260825/rag/h2o-danube3-500m-q4_k_m[superseding evidence^].
 
 == Strict Integration Fixtures
 
@@ -108,6 +115,8 @@ and 7B Q4_0
 * DeepSeek-R1-Distill-Qwen 7B Q4_K_M
 * SQLCoder-7B-2 Q5_K_M
 * Gemma 4 26B-A4B Instruct Q4_K_M
+* Qwen2.5 0.5B Instruct BF16 Safetensors
+* Needle 2 CACT
 
 The DeepSeek-Coder fixture exercises mixed
 Q4_K/Q5_0/Q8_0/Q6_K tensors and legacy linear RoPE
@@ -115,9 +124,11 @@ scaling. MiniCPM5 exercises explicit Q/K/V head widths, 131K context
 metadata, and Llama-style byte BPE. Qwen2.5-Math exercises Q6_K
 token embeddings.
 
-Pinned greedy-token references compare selected fixtures with a recorded
-llama.cpp revision. llama.cpp is a test oracle and benchmark comparator,
-not a runtime dependency.
+Pinned greedy-token references compare selected GGUF fixtures with a recorded
+llama.cpp revision. Safetensors fixtures use pinned Hugging Face Transformers
+token/logit and same-host RAG references. Needle 2 uses the checksum-pinned
+official CACT artifact and engine behavior. These are test oracles and
+benchmark comparators, not runtime dependencies.
 
 == Backend Qualification
 
@@ -126,10 +137,10 @@ qualify with pure Java on one JDK and host and use a native kernel on
 another. The ModelJars profile adapter supplies recommendations only
 when the model SHA and complete selector match.
 
-Most qualified artifacts use the Models Rust/FFM backend to stay near
-local-runtime latency. Qwen3 0.6B Q4_0 has a qualified pure-Java
-path. Newer JDKs are re-evaluated so profiles can move back to pure Java
-when they clear the same gate.
+Most qualified GGUF artifacts use the Models Rust/FFM backend to stay near
+local-runtime latency. Qwen3 0.6B Q4_0 and Qwen2.5 0.5B BF16 have qualified
+pure-Java paths. Newer JDKs are re-evaluated so profiles can move back to pure
+Java when they clear the same gate.
 
 == Catalog Metadata
 

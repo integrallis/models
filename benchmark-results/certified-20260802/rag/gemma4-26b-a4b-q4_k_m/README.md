@@ -1,5 +1,10 @@
 # Gemma 4 26B-A4B Instruct Q4_K_M qualification
 
+> Superseded on 2026-08-25: this Models run did not preserve trusted prompt
+> segments through tokenization. Corrected evidence confirms the qualification;
+> see
+> [`certified-20260825/rag/gemma4-26b-a4b-q4_k_m/`](../../../certified-20260825/rag/gemma4-26b-a4b-q4_k_m/).
+
 This directory retains the support and qualification evidence for one exact
 artifact. The commit-bound standard report passes model integration,
 guarded-RAG quality, and every absolute usable performance gate.

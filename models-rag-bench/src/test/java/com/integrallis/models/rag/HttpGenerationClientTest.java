@@ -67,6 +67,28 @@ class HttpGenerationClientTest {
   }
 
   @Test
+  void transformersReferenceUsesTheRawCompletionContract() {
+    RagSamplingProfile sampling = new RagSamplingProfile(0, 1, 1, 42L, 1, List.of());
+    try (HttpGenerationClient client =
+        new HttpGenerationClient(
+            "transformers",
+            "qwen-hf",
+            URI.create("http://localhost:8081"),
+            2_048,
+            8,
+            0,
+            sampling)) {
+      var body = client.requestBody("<|im_start|>user\nhello", 32);
+
+      assertThat(body.path("prompt").asText()).isEqualTo("<|im_start|>user\nhello");
+      assertThat(body.path("cache_prompt").asBoolean()).isFalse();
+      assertThat(body.path("n_predict").asInt()).isEqualTo(32);
+      assertThat(client.backend()).isEqualTo("transformers");
+      assertThat(client.generationControls()).containsEntry("promptCache", "false");
+    }
+  }
+
+  @Test
   void retriesOneTransportFailureBeforeResponseHeaders() throws Exception {
     AtomicInteger attempts = new AtomicInteger();
 

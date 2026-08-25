@@ -104,6 +104,9 @@ class CertifiedRagEvidenceTest {
           .resolve("benchmark-results/certified-20260726/rag/" + "h2o-danube2-1.8b-q4_k_m");
   private static final Path H2O_DANUBE3_500M_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260825/rag/" + "h2o-danube3-500m-q4_k_m");
+  private static final Path H2O_DANUBE3_500M_Q4_K_M_COMPARATOR_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260803/rag/" + "h2o-danube3-500m-q4_k_m");
   private static final Path H2O_DANUBE3_500M_Q4_K_M_DEFAULT_EVIDENCE =
       H2O_DANUBE3_500M_Q4_K_M_EVIDENCE.resolve("default-correctness");
@@ -112,12 +115,15 @@ class CertifiedRagEvidenceTest {
           .resolve("benchmark-results/certified-20260726/rag/" + "yi-coder-1.5b-q4_k_m");
   private static final Path GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260825/rag/gemma4-26b-a4b-q4_k_m");
+  private static final Path GEMMA_4_26B_A4B_Q4_K_M_COMPARATOR_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m");
   private static final Path GEMMA_4_26B_A4B_Q4_K_M_DEFAULT_EVIDENCE =
+      GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE.resolve("default-correctness");
+  private static final Path QWEN2_5_0_5B_BF16_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
-          .resolve(
-              "benchmark-results/certified-20260803/rag/"
-                  + "gemma4-26b-a4b-q4_k_m/default-correctness");
+          .resolve("benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -2022,19 +2028,18 @@ class CertifiedRagEvidenceTest {
   }
 
   @Test
-  void h2oDanubeThree500MQualifiesAtTheProductionReadyTier() throws Exception {
-    RagBenchmarkReport baseline =
-        report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "models-rust-ffm-baseline.json");
+  void h2oDanubeThree500MFailsTheContributionGateWithStructuredPromptTokens() throws Exception {
     RagBenchmarkReport candidate = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
-    RagBenchmarkReport llama = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "llama.cpp.json");
-    RagBenchmarkReport ollama = report(H2O_DANUBE3_500M_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama =
+        report(H2O_DANUBE3_500M_Q4_K_M_COMPARATOR_EVIDENCE, "llama.cpp.json");
+    RagBenchmarkReport ollama = report(H2O_DANUBE3_500M_Q4_K_M_COMPARATOR_EVIDENCE, "ollama.json");
 
     RagProductionQualification qualification =
         RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
 
     assertThat(candidate.backendVersion())
-        .startsWith("models@3d312534241dd80feee84d043c8727a874da9719 ");
-    assertThat(candidate.modelId()).isEqualTo("h2o_danube3_500m_chat_q4_k_m");
+        .startsWith("models@ac80da9f89d908c1ac4b69cb95fa63c6b21cc890 ");
+    assertThat(candidate.modelId()).isEqualTo("h2oai_h2o_danube3_500m_chat_gguf_q4_k_m");
     assertThat(candidate.artifactSha256())
         .isEqualTo("021f78849c5670ecb2aa4cd7c5972eee0a3c9e41e33e5902c408a2ab989f0b43");
     assertThat(candidate.artifactSizeBytes()).isEqualTo(317_877_408L);
@@ -2046,29 +2051,21 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.summary().abstentionAccuracy()).isEqualTo(1.0);
     assertThat(candidate.summary().ttftMillis().p95()).isLessThanOrEqualTo(1_000.0);
     assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
-    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
-    assertThat(qualification.qualified()).isTrue();
-    assertThat(qualification.qualifyingComparators()).containsExactly("llama.cpp", "ollama");
+    assertThat(qualification.verdict())
+        .isEqualTo(RagQualificationVerdict.FAILED_MODEL_CONTRIBUTION_GATE);
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.qualifyingComparators()).isEmpty();
     assertThat(qualification.exclusions()).isEmpty();
-    assertThat(qualification.modelAnswerCount()).isEqualTo(9);
-    assertThat(qualification.modelAnswerRate()).isEqualTo(9.0 / 27.0);
+    assertThat(qualification.modelAnswerCount()).isEqualTo(3);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(3.0 / 27.0);
     assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
-    assertThat(qualification.comparisons())
-        .filteredOn(comparison -> comparison.comparatorBackend().equals("llama.cpp"))
-        .singleElement()
-        .satisfies(
-            comparison -> {
-              assertThat(comparison.decodeThroughputRatio()).isBetween(0.61, 0.62);
-              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.23, 1.25);
-            });
-    assertThat(qualification.comparisons())
-        .filteredOn(comparison -> comparison.comparatorBackend().equals("ollama"))
-        .singleElement()
-        .satisfies(
-            comparison -> {
-              assertThat(comparison.decodeThroughputRatio()).isBetween(2.01, 2.03);
-              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.42, 0.43);
-            });
+    assertThat(qualification.comparisons()).isEmpty();
+    assertThat(candidate.runs().getFirst().promptSha256())
+        .isEqualTo(llama.runs().getFirst().promptSha256())
+        .isEqualTo(ollama.runs().getFirst().promptSha256());
+    assertThat(candidate.runs().getFirst().generation().inputTokens()).isEqualTo(208);
+    assertThat(llama.runs().getFirst().generation().inputTokens()).isEqualTo(208);
+    assertThat(ollama.runs().getFirst().generation().inputTokens()).isEqualTo(208);
     assertThat(candidate.backendDiagnostics().planVersion()).isEqualTo("rust-ffm-v12");
     assertThat(candidate.backendDiagnostics().environment())
         .containsEntry("model-architecture", "llama")
@@ -2080,21 +2077,6 @@ class CertifiedRagEvidenceTest {
         .satisfies(
             optimization ->
                 assertThat(optimization.status()).isEqualTo(OptimizationStatus.ENABLED));
-    assertThat(baseline.settings()).isEqualTo(candidate.settings());
-    assertThat(baseline.runs())
-        .extracting(RagRun::promptSha256)
-        .containsExactlyElementsOf(candidate.runs().stream().map(RagRun::promptSha256).toList());
-    assertThat(baseline.runs())
-        .extracting(run -> run.grounding().rawText())
-        .containsExactlyElementsOf(
-            candidate.runs().stream().map(run -> run.grounding().rawText()).toList());
-    assertThat(baseline.runs())
-        .extracting(run -> run.grounding().decision())
-        .containsExactlyElementsOf(
-            candidate.runs().stream().map(run -> run.grounding().decision()).toList());
-    assertThat(baseline.runs())
-        .extracting(RagRun::evaluation)
-        .containsExactlyElementsOf(candidate.runs().stream().map(RagRun::evaluation).toList());
   }
 
   @Test
@@ -2103,7 +2085,7 @@ class CertifiedRagEvidenceTest {
         report(H2O_DANUBE3_500M_Q4_K_M_DEFAULT_EVIDENCE, "models-rust-ffm.json");
 
     assertThat(report.backendVersion())
-        .startsWith("models@3d312534241dd80feee84d043c8727a874da9719 ");
+        .startsWith("models@ac80da9f89d908c1ac4b69cb95fa63c6b21cc890 ");
     assertThat(report.modelId()).isEqualTo("h2oai_h2o_danube3_500m_chat_gguf_q4_k_m");
     assertThat(report.artifactSha256())
         .isEqualTo("021f78849c5670ecb2aa4cd7c5972eee0a3c9e41e33e5902c408a2ab989f0b43");
@@ -2187,8 +2169,8 @@ class CertifiedRagEvidenceTest {
   @Test
   void gemma426BA4BQualifiesAtTheUsableTier() throws Exception {
     RagBenchmarkReport candidate = report(GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE, "models-rust-ffm.json");
-    RagBenchmarkReport llama = report(GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE, "llama.cpp.json");
-    RagBenchmarkReport ollama = report(GEMMA_4_26B_A4B_Q4_K_M_EVIDENCE, "ollama.json");
+    RagBenchmarkReport llama = report(GEMMA_4_26B_A4B_Q4_K_M_COMPARATOR_EVIDENCE, "llama.cpp.json");
+    RagBenchmarkReport ollama = report(GEMMA_4_26B_A4B_Q4_K_M_COMPARATOR_EVIDENCE, "ollama.json");
 
     RagProductionQualification qualification =
         RagProductionQualificationPolicy.assess(candidate, List.of(llama, ollama));
@@ -2203,6 +2185,9 @@ class CertifiedRagEvidenceTest {
     assertThat(candidate.summary().retrievalRecall()).isEqualTo(1.0);
     assertThat(candidate.summary().abstentionAccuracy()).isEqualTo(1.0);
     assertThat(candidate.summary().ttftMillis().p95()).isLessThanOrEqualTo(2_000.0);
+    assertThat(candidate.runs().getFirst().generation().inputTokens()).isEqualTo(191);
+    assertThat(llama.runs().getFirst().generation().inputTokens()).isEqualTo(191);
+    assertThat(ollama.runs().getFirst().generation().inputTokens()).isEqualTo(191);
     assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
     assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
     assertThat(qualification.qualified()).isTrue();
@@ -2224,12 +2209,77 @@ class CertifiedRagEvidenceTest {
   }
 
   @Test
+  void qwen25SafetensorsQualifiesAgainstTheTransformersReference() throws Exception {
+    RagBenchmarkReport candidate = report(QWEN2_5_0_5B_BF16_EVIDENCE, "models-pure-java.json");
+    RagBenchmarkReport transformers = report(QWEN2_5_0_5B_BF16_EVIDENCE, "transformers.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(transformers));
+
+    assertThat(candidate.modelId()).isEqualTo("qwen2.5-0.5b-instruct-bf16");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe");
+    assertThat(candidate.artifactSizeBytes()).isEqualTo(988_097_824L);
+    assertThat(candidate.settings().promptTemplate()).isEqualTo("chatml");
+    assertThat(candidate.settings().corpusSha256())
+        .isEqualTo(transformers.settings().corpusSha256());
+    assertThat(candidate.settings().workload()).isEqualTo(transformers.settings().workload());
+    assertThat(candidate.settings().caseIds()).isEqualTo(transformers.settings().caseIds());
+    assertThat(candidate.settings().promptTemplate())
+        .isEqualTo(transformers.settings().promptTemplate());
+    assertThat(candidate.settings().retrievalTopK())
+        .isEqualTo(transformers.settings().retrievalTopK());
+    assertThat(candidate.settings().maxOutputTokens())
+        .isEqualTo(transformers.settings().maxOutputTokens());
+    assertThat(candidate.settings().warmups()).isEqualTo(transformers.settings().warmups());
+    assertThat(candidate.settings().iterations()).isEqualTo(transformers.settings().iterations());
+    assertThat(candidate.settings().contextLength())
+        .isEqualTo(transformers.settings().contextLength());
+    assertThat(candidate.settings().threads()).isEqualTo(transformers.settings().threads());
+    assertThat(candidate.settings().groundingPolicy())
+        .isEqualTo(transformers.settings().groundingPolicy());
+    assertThat(candidate.settings().minimumRetrievalScore())
+        .isEqualTo(transformers.settings().minimumRetrievalScore());
+    assertThat(candidate.environment()).isEqualTo(transformers.environment());
+    assertThat(candidate.summary().successfulAttempts()).isEqualTo(27);
+    assertThat(candidate.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(candidate.summary().retrievalRecall()).isEqualTo(1.0);
+    assertThat(candidate.summary().abstentionAccuracy()).isEqualTo(1.0);
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.USABLE);
+    assertThat(transformers.performanceTier()).isEqualTo(RagPerformanceTier.OFFLINE);
+    assertThat(candidate.runs())
+        .extracting(RagRun::promptSha256)
+        .containsExactlyElementsOf(transformers.runs().stream().map(RagRun::promptSha256).toList());
+    assertThat(candidate.runs())
+        .extracting(run -> run.generation().inputTokens())
+        .containsExactlyElementsOf(
+            transformers.runs().stream().map(run -> run.generation().inputTokens()).toList());
+    assertThat(candidate.runs().getFirst().generation().inputTokens()).isEqualTo(175);
+    assertThat(RagProductionQualificationPolicy.POLICY_ID)
+        .isEqualTo("production-rag-model-contribution-v5");
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.qualifyingComparators()).containsExactly("transformers");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(15);
+    assertThat(qualification.modelAnswerRate()).isEqualTo(15.0 / 27.0);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(4.88, 4.90);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.059, 0.060);
+            });
+  }
+
+  @Test
   void gemma426BA4BPassesTheLibraryDefaultCorrectnessGate() throws Exception {
     RagBenchmarkReport report =
         report(GEMMA_4_26B_A4B_Q4_K_M_DEFAULT_EVIDENCE, "models-rust-ffm.json");
 
     assertThat(report.backendVersion())
-        .startsWith("models@37dec2680637eb22b5ee59001e53af11d8d3946b ");
+        .startsWith("models@ac80da9f89d908c1ac4b69cb95fa63c6b21cc890 ");
     assertThat(report.modelId()).isEqualTo("ggml_org_gemma_4_26b_a4b_it_gguf_q4_k_m");
     assertThat(report.artifactSha256())
         .isEqualTo("88f4a13b0bb95f031a7fad973e10854122fb67ebc34d214d39a2f65053046abc");

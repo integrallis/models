@@ -20,10 +20,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Production gate combining grounded RAG SLOs with same-host local-engine comparisons. */
 public final class RagProductionQualificationPolicy {
-  public static final String POLICY_ID = "production-rag-model-contribution-v4";
+  public static final String POLICY_ID = "production-rag-model-contribution-v5";
   public static final double MINIMUM_MODEL_ANSWER_RATE = 1.0 / 3.0;
   public static final double MINIMUM_MODEL_ANSWER_CORRECT_RATE = 0.90;
 
@@ -32,7 +33,9 @@ public final class RagProductionQualificationPolicy {
   private static final Map<String, RelativeThreshold> THRESHOLDS =
       Map.of(
           "llama.cpp", new RelativeThreshold(0.45, 2.0),
-          "ollama", new RelativeThreshold(0.80, 1.5));
+          "ollama", new RelativeThreshold(0.80, 1.5),
+          "transformers", new RelativeThreshold(0.80, 1.5));
+  private static final Set<String> AUTHORITATIVE_ENGINES = Set.of("ollama", "transformers");
 
   private RagProductionQualificationPolicy() {}
 
@@ -100,7 +103,7 @@ public final class RagProductionQualificationPolicy {
             .map(RagComparatorAssessment::comparatorBackend)
             .toList();
     RagQualificationVerdict verdict =
-        !qualifyingComparators.contains("ollama")
+        qualifyingComparators.stream().noneMatch(AUTHORITATIVE_ENGINES::contains)
             ? RagQualificationVerdict.FAILED_RELATIVE_GATE
             : RagQualificationVerdict.QUALIFIED;
     return result(

@@ -43,7 +43,9 @@ class RagPromptRendererTest {
     try (LuceneRagRetriever retriever = new LuceneRagRetriever(corpus.documents())) {
       ModelPrompt prompt =
           RagPromptRenderer.renderPrompt(
-              testCase.question(), retriever.retrieve(testCase.question(), 1), RagPromptTemplate.CHATML);
+              testCase.question(),
+              retriever.retrieve(testCase.question(), 1),
+              RagPromptTemplate.CHATML);
       Tokenizer tokenizer =
           HuggingFaceTokenizer.fromQwen2(
               directory.resolve("tokenizer.json"),

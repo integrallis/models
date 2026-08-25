@@ -74,7 +74,10 @@ class InProcessGenerationClientTest {
         ModelPrompt.builder().control("<|im_start|>").text("hello<|im_end|>").build();
     try (InProcessGenerationClient client =
         new InProcessGenerationClient(
-            "pure-java", structuredPromptBackend(prompt), 1.0, RagSamplingProfile.deterministic())) {
+            "pure-java",
+            structuredPromptBackend(prompt),
+            1.0,
+            RagSamplingProfile.deterministic())) {
       GenerationResult result = client.generate(prompt, 1);
 
       assertThat(result.inputTokens()).isEqualTo(1);
