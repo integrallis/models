@@ -4,6 +4,29 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.10] - 2026-08-25
+
+### Added
+
+- Added strict mapped CACT ingestion and a dedicated Needle 2 decoder, including
+  the embedded tokenizer, mixed CQ2/CQ4 tensors, official first-token math, and
+  structured tool-call compatibility.
+- Added strict single-file and sharded Safetensors bundle ingestion, format-neutral
+  mapped tensor sources, Hugging Face Qwen 2/Qwen2.5 configuration and tokenizer
+  loading, and direct BF16 execution through Vectors 0.1.12.
+- Added RAG qualification for supported Hugging Face checkpoint directories and a
+  pinned Transformers comparator for formats outside llama.cpp and Ollama.
+
+### Fixed
+
+- RAG benchmarks now preserve segmented model prompts through plain Java, Spring AI,
+  LangChain4j, and in-process generation instead of flattening trusted template
+  controls into ordinary text.
+
+### Changed
+
+- Raised the Vectors baseline to 0.1.12.
+
 ## [0.3.9] - 2026-08-22
 
 ### Fixed
