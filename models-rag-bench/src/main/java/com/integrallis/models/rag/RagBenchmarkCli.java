@@ -114,8 +114,12 @@ public final class RagBenchmarkCli {
       model = required(values, "model");
       artifact = values.containsKey("artifact") ? Path.of(values.get("artifact")) : null;
     }
-    if (artifact != null && !Files.isRegularFile(artifact)) {
-      throw new IllegalArgumentException("artifact does not exist: " + artifact);
+    if (artifact != null) {
+      if (IN_PROCESS_BACKENDS.contains(backend)) {
+        artifactIdentity(artifact);
+      } else if (!Files.isRegularFile(artifact)) {
+        throw new IllegalArgumentException("artifact does not exist: " + artifact);
+      }
     }
     String modelId = values.getOrDefault("model-id", safeId(model));
     URI endpoint =
@@ -228,6 +232,7 @@ public final class RagBenchmarkCli {
     int totalAttempts = cases.size() * configuration.iterations();
     RagBenchmarkSummary summary = RagStatistics.summarize(runs, totalAttempts, casesById);
     Path artifact = configuration.artifact();
+    Path artifactIdentity = artifact == null ? null : artifactIdentity(artifact);
     return new RagBenchmarkReport(
         RagBenchmarkReport.CURRENT_SCHEMA_VERSION,
         Instant.now().toString(),
@@ -236,8 +241,8 @@ public final class RagBenchmarkCli {
         configuration.backendVersion(),
         configuration.modelId(),
         configuration.model(),
-        artifact == null ? null : sha256(artifact),
-        artifact == null ? 0 : Files.size(artifact),
+        artifactIdentity == null ? null : sha256(artifactIdentity),
+        artifactIdentity == null ? 0 : Files.size(artifactIdentity),
         new RagBenchmarkSettings(
             corpus.fingerprint(),
             configuration.workload().id(),
@@ -270,6 +275,21 @@ public final class RagBenchmarkCli {
       description.append(current);
     }
     return description.toString();
+  }
+
+  static Path artifactIdentity(Path artifact) {
+    if (Files.isRegularFile(artifact)) {
+      return artifact;
+    }
+    if (Files.isDirectory(artifact)) {
+      Path primaryWeights = artifact.resolve("model.safetensors");
+      if (Files.isRegularFile(primaryWeights)) {
+        return primaryWeights;
+      }
+      throw new IllegalArgumentException(
+          "Hugging Face model directory has no model.safetensors: " + artifact);
+    }
+    throw new IllegalArgumentException("artifact does not exist: " + artifact);
   }
 
   private static GenerationClient generationClient(RagBenchmarkConfiguration configuration) {

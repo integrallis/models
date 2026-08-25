@@ -102,6 +102,41 @@ class RagBenchmarkCliTest {
   }
 
   @Test
+  void acceptsAHuggingFaceDirectoryAndBindsEvidenceToItsPrimaryWeights() throws Exception {
+    Path modelDirectory = Files.createDirectories(temporaryDirectory.resolve("qwen-hf"));
+    Path weights = Files.write(modelDirectory.resolve("model.safetensors"), new byte[] {1, 2, 3});
+    Files.writeString(modelDirectory.resolve("config.json"), "{}");
+
+    RagBenchmarkConfiguration configuration =
+        RagBenchmarkCli.parse(
+            new String[] {
+              "--framework", "plain-java",
+              "--backend", "pure-java",
+              "--model", modelDirectory.toString()
+            });
+
+    assertThat(configuration.artifact()).isEqualTo(modelDirectory);
+    assertThat(RagBenchmarkCli.artifactIdentity(configuration.artifact())).isEqualTo(weights);
+  }
+
+  @Test
+  void rejectsAHuggingFaceDirectoryWithoutPrimaryWeights() throws Exception {
+    Path modelDirectory = Files.createDirectories(temporaryDirectory.resolve("incomplete-hf"));
+    Files.writeString(modelDirectory.resolve("config.json"), "{}");
+
+    assertThatThrownBy(
+            () ->
+                RagBenchmarkCli.parse(
+                    new String[] {
+                      "--framework", "plain-java",
+                      "--backend", "pure-java",
+                      "--model", modelDirectory.toString()
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("model.safetensors");
+  }
+
+  @Test
   void rejectsAnUnknownFrameworkBeforeLoadingAModel() {
     assertThatThrownBy(
             () ->
