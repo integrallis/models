@@ -28,9 +28,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-/** Benchmark-only streaming client for Ollama and llama.cpp using an identical raw prompt. */
+/** Benchmark-only streaming client for local engines using an identical raw prompt. */
 public final class HttpGenerationClient implements GenerationClient {
-  private static final Set<String> BACKENDS = Set.of("ollama", "llama.cpp");
+  private static final Set<String> BACKENDS = Set.of("ollama", "llama.cpp", "transformers");
 
   private final String backend;
   private final String model;
@@ -82,7 +82,7 @@ public final class HttpGenerationClient implements GenerationClient {
   @Override
   public Map<String, String> generationControls() {
     Map<String, String> controls = new java.util.LinkedHashMap<>(sampling.controls());
-    if ("llama.cpp".equals(backend)) {
+    if (!"ollama".equals(backend)) {
       controls.put("promptCache", "false");
     } else {
       controls.put("rawPrompt", "true");

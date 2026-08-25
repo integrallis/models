@@ -10,8 +10,9 @@ Java application paths:
 - Spring AI using `RetrievalAugmentationAdvisor`
 
 The Python general-workload baseline uses the same committed corpus and prompt
-contract with BM25S, the official Ollama client, revision-matched llama.cpp
-server HTTP, or an optional direct `llama-cpp-python` binding.
+contract with BM25S, the official Ollama client, revision-matched llama.cpp,
+or a pinned Hugging Face Transformers reference for checkpoint formats those
+native servers cannot load.
 
 ## Workload contract
 
@@ -44,7 +45,9 @@ but reports with different prompt hashes are not directly comparable.
 Use `--prompt-template chatml` for ChatML-family instruction models such as
 Qwen3 and SmolLM2. The benchmark applies the envelope itself and
 sends raw requests to native servers, ensuring every backend receives the same
-model-facing bytes. The grounding policy is a native system turn and the
+model-facing bytes. In-process Models requests retain `ModelPrompt` segment
+boundaries, so template markers are recognized as controls while evidence and
+questions remain ordinary text. The grounding policy is a native system turn and the
 retrieved evidence plus question is a native user turn. `--prompt-template raw`
 remains available for base models and is the default so template selection is
 never hidden. Use
@@ -180,9 +183,49 @@ temperature 0, sampling top-k 1, top-p 1, repetition penalty 1, and seed 42.
 The benchmark passes those controls identically to Models, Ollama, and
 llama.cpp and records them in every report.
 
+For a Hugging Face Safetensors snapshot that Ollama and llama.cpp cannot load,
+start the pinned deterministic Transformers reference:
+
+```shell
+cd models-rag-bench/python
+uv sync --extra transformers --extra test --frozen
+uv run --extra transformers --frozen models-transformers-reference \
+  --model-dir /absolute/path/to/pinned-snapshot \
+  --threads 8 \
+  --context 2048 \
+  --port 8081
+```
+
+Then run the Java harness with `--backend transformers`, the same `--model-id`,
+the primary Safetensors file as `--artifact`, and the exact Python worker PID:
+
+```shell
+models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+  --framework plain-java \
+  --backend transformers \
+  --backend-version transformers-4.46.3-torch-2.2.2 \
+  --model qwen2.5-0.5b-instruct-bf16 \
+  --model-id qwen2.5-0.5b-instruct-bf16 \
+  --artifact /absolute/path/to/pinned-snapshot/model.safetensors \
+  --endpoint http://127.0.0.1:8081 \
+  --pid 12345 \
+  --workload general \
+  --prompt-template chatml \
+  --context 2048 \
+  --threads 8 \
+  --max-tokens 64 \
+  --warmups 1 \
+  --iterations 3
+```
+
+The reference rejects sampling settings it does not implement. It is a
+correctness and artifact-format comparator, not a production serving claim;
+the Models candidate must independently clear the absolute quality and latency
+gate.
+
 Use `--stop-sequence '\n\n'` to stop at the first paragraph. The CLI decodes
 `\n`, `\r`, `\t`, and `\\` escapes, applies the sequence during in-process
-generation, sends the same stop array to Ollama and llama.cpp, and records the
+generation, sends the same stop array to local HTTP comparators, and records the
 escaped value as a matched qualification control. The controlled runner accepts
 the same value through `RAG_STOP_SEQUENCE`.
 
@@ -219,6 +262,11 @@ models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench qualify \
   --output build/reports/rag/qualification.json \
   --require-qualified
 ```
+
+Qualification requires either Ollama or the pinned Transformers reference to
+clear the authoritative-engine comparison. llama.cpp remains useful supporting
+evidence but cannot substitute for that floor. Transformers is intended for
+formats that the two native engines cannot ingest.
 
 On the controlled Linux host, the repository driver builds the Models-owned
 native library, runs the three backends sequentially against the same artifact

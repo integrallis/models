@@ -1,0 +1,31 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v5",
+  "candidate" : {
+    "path" : "benchmark-results/certified-20260825/rag/h2o-danube3-500m-q4_k_m/models-rust-ffm.json",
+    "sha256" : "f88f48bef85c926a7a5ee5bd2382f0888c0034f5c69a40ded4bd5dc07823885c"
+  },
+  "comparators" : [ {
+    "path" : "benchmark-results/certified-20260803/rag/h2o-danube3-500m-q4_k_m/llama.cpp.json",
+    "sha256" : "42322dc692413953c8f73cc312df1ec58a3ce994a70c90d2e289ca68786b345f"
+  }, {
+    "path" : "benchmark-results/certified-20260803/rag/h2o-danube3-500m-q4_k_m/ollama.json",
+    "sha256" : "61aba57b53eb4b96789f15b3d7aa25daa6a40c34e82d7b489f28586e23f93d71"
+  } ],
+  "qualification" : {
+    "modelId" : "h2oai_h2o_danube3_500m_chat_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "021f78849c5670ecb2aa4cd7c5972eee0a3c9e41e33e5902c408a2ab989f0b43",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "FAILED_MODEL_CONTRIBUTION_GATE",
+    "qualified" : false,
+    "modelAnswerCount" : 3,
+    "modelAnswerRate" : 0.1111111111111111,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ ],
+    "comparisons" : [ ],
+    "exclusions" : { }
+  }
+}

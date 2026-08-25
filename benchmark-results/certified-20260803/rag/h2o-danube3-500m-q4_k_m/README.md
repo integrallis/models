@@ -1,5 +1,10 @@
 # H2O Danube3 500M Q4_K_M general RAG qualification
 
+> Superseded on 2026-08-25: this Models run did not preserve trusted prompt
+> segments through tokenization. The corrected evidence revokes qualification;
+> see
+> [`certified-20260825/rag/h2o-danube3-500m-q4_k_m/`](../../../certified-20260825/rag/h2o-danube3-500m-q4_k_m/).
+
 This directory retains controlled, same-host qualification evidence for the
 exact H2O Danube3 500M Chat Q4_K_M artifact:
 

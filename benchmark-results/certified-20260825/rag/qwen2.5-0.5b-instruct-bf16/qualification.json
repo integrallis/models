@@ -1,0 +1,36 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v5",
+  "candidate" : {
+    "path" : "benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16/models-pure-java.json",
+    "sha256" : "782aa9fb3e9821e88dd07c0b668cb7e3278506eb2275eb41949d35810365ac02"
+  },
+  "comparators" : [ {
+    "path" : "benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16/transformers.json",
+    "sha256" : "9c012a586d5c2bc56d0a365e6bb9ea90529b954569dec2821d79556e40f39641"
+  } ],
+  "qualification" : {
+    "modelId" : "qwen2.5-0.5b-instruct-bf16",
+    "candidateBackend" : "pure-java",
+    "artifactSha256" : "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+    "absoluteTier" : "USABLE",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 15,
+    "modelAnswerRate" : 0.5555555555555556,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "transformers" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "transformers",
+      "decodeThroughputRatio" : 4.886789354443343,
+      "endToEndLatencyRatio" : 0.059407585728398896,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}

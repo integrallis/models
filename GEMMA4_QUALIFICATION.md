@@ -3,14 +3,14 @@
 ## Outcome
 
 Models now supports the pinned Gemma 4 26B-A4B Instruct Q4_K_M graph through
-its Java transformer and Rust/FFM projection backend. Exact generation and all
-three application adapters pass. Production qualification now passes: all 27
-guarded-RAG requests are correct and 1,834.7 ms p95 TTFT clears the 2,000 ms
+its Java transformer and Rust/FFM projection backend. Production qualification
+passes: all 27 guarded-RAG requests are correct and 1,861.7 ms p95 TTFT clears the 2,000 ms
 usable ceiling. The pinned `.2` artifact is qualified at the `USABLE` tier.
 
-The implementation is `37fc4a8b9d421505487b678c7ce841d1baa20eb4`. The retained
-machine-readable evidence is in
-[`benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/`](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/).
+The graph implementation is `37fc4a8b9d421505487b678c7ce841d1baa20eb4`; prompt-boundary
+correction `ac80da9f89d908c1ac4b69cb95fa63c6b21cc890` is included in the
+superseding machine-readable evidence under
+[`benchmark-results/certified-20260825/rag/gemma4-26b-a4b-q4_k_m/`](benchmark-results/certified-20260825/rag/gemma4-26b-a4b-q4_k_m/).
 
 ## Source design
 
@@ -29,7 +29,7 @@ not its code or platform assumptions.
 | TurboFieldfare principle | Models implementation | Qualification evidence |
 | --- | --- | --- |
 | Preserve exact Gemma 4 semantics before optimizing | Dedicated graph for hybrid local/full attention, shared plus routed MoE, asymmetric K/V details, learned scaling, and logit softcap | Scalar-reference graph tests and exact pinned-model generation |
-| Bound expert residency | Zero-copy mapped GGUF expert slices; no copied expert-slot cache or custom repack | Stable mapped-slice tests and 15.58 GB peak RSS on a 32 GB host |
+| Bound expert residency | Zero-copy mapped GGUF expert slices; no copied expert-slot cache or custom repack | Stable mapped-slice tests and 15.72 GB peak RSS on a 32 GB host |
 | Batch tokens that route to the same expert | 128-token prefill, grouped route construction, and ragged independent native projection dispatch | `gemma4-batched-prefill=ENABLED`, batch size 128 |
 | Expose independent projection work to persistent workers | ABI 4 dispatches different projection shapes in one worker generation across eight workers | Native boundary tests and `rust-ffm-v12` diagnostics |
 | Pay compilation cost during load | A resettable warmup prefill runs while loading and clears sequence state before the first request | Load-warmup unit test and `load-warmup=ENABLED` |
@@ -62,23 +62,22 @@ cases.
 | Result | Measurement | Gate |
 | --- | ---: | --- |
 | Successful and correct | 27/27 | pass |
-| Correct retained model answers | 21/21 | pass |
+| Correct retained model answers | 18/18 | pass |
 | Retrieval recall / MRR | 1.0 / 1.0 | pass |
 | p95 retrieval | 1.89 ms | pass |
-| p95 TTFT | 1,834.7 ms | pass; usable ceiling 2,000 ms |
-| p95 TPOT | 89.05 ms | pass |
-| p95 end to end | 4,503.1 ms | pass |
-| Median prefill / decode | 50.91 / 12.84 tok/s | diagnostic |
+| p95 TTFT | 1,861.7 ms | pass; usable ceiling 2,000 ms |
+| p95 TPOT | 89.02 ms | pass |
+| p95 end to end | 4,318.2 ms | pass |
+| Median prefill / decode | 45.10 / 12.91 tok/s | diagnostic |
 
-Plain Java runtime, LangChain4j, and Spring AI each generated the exact expected
-adapter answer with one shared backend. Separate nine-case runs were 9/9
-correct through every framework. These checks establish API integration; their
-roughly 5.9-6.2 second p95 TTFT values do not establish production readiness.
+The corrected candidate and both native controls tokenize the first `gemma4`
+prompt as 191 tokens. This verifies that template markers are controls while
+retrieved evidence and the question remain ordinary text.
 
 Matched 27-attempt llama.cpp and Ollama controls were also 27/27 correct. Models
-achieved 80.59% and 94.03% of their respective median decode throughput, while
-its p95 end-to-end latency was 77.01% and 68.68% of theirs. Both comparisons
-pass `production-rag-model-contribution-v4`, producing a `QUALIFIED` verdict.
+achieved 81.03% and 94.54% of their respective median decode throughput, while
+its p95 end-to-end latency was 73.85% and 65.86% of theirs. Both comparisons
+pass `production-rag-model-contribution-v5`, producing a `QUALIFIED` verdict.
 
 ## Performance work and publication decision
 

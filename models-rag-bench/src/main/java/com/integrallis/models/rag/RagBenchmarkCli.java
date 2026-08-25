@@ -42,7 +42,15 @@ public final class RagBenchmarkCli {
   private static final Set<String> IN_PROCESS_BACKENDS = Set.of("pure-java", "rust-ffm");
   private static final Set<String> HOSTED_BACKENDS = Set.of("openai", "anthropic", "deepseek");
   private static final Set<String> BACKENDS =
-      Set.of("pure-java", "rust-ffm", "ollama", "llama.cpp", "openai", "anthropic", "deepseek");
+      Set.of(
+          "pure-java",
+          "rust-ffm",
+          "ollama",
+          "llama.cpp",
+          "transformers",
+          "openai",
+          "anthropic",
+          "deepseek");
   private static final Set<String> OPTIONS =
       Set.of(
           "framework",
@@ -525,6 +533,7 @@ public final class RagBenchmarkCli {
     return switch (backend) {
       case "ollama" -> URI.create("http://127.0.0.1:11434");
       case "llama.cpp" -> URI.create("http://127.0.0.1:8080");
+      case "transformers" -> URI.create("http://127.0.0.1:8081");
       case "openai" -> URI.create("https://api.openai.com/v1");
       case "anthropic" -> URI.create("https://api.anthropic.com/v1");
       case "deepseek" -> URI.create("https://api.deepseek.com");

@@ -11,7 +11,7 @@ FFM are introduced in xref:concepts.adoc[Inference Concepts].
 
 Java owns the behavior that defines the model:
 
-* GGUF parsing and memory mapping
+* GGUF, supported Safetensors, and CACT parsing and memory mapping
 * tokenizer metadata and encoding
 * transformer topology and tensor routing
 * RoPE, grouped-query attention, and residual flow
@@ -100,6 +100,19 @@ The KV cache starts with 16 positions and grows geometrically. Loading a
 model therefore does not allocate its full advertised context length.
 The `models.purejava.maxContextLength` property can impose a lower hard
 runtime limit without changing the model metadata exposed to callers.
+
+== Safetensors And CACT
+
+For a supported Hugging Face directory, the pure-Java backend validates
+`config.json`, `tokenizer.json`, `tokenizer_config.json`, and either one
+`model.safetensors` file or an indexed shard set. Qwen 2 BF16 matrices remain
+mapped and execute through the Vectors BF16 batch kernel; the runtime does not
+convert the checkpoint to GGUF or load Python.
+
+The CACT path validates the container header, positional tensor inventory,
+embedded tokenizer, FP16 state, and mixed CQ2/CQ4 matrices before constructing
+the dedicated Needle 2 graph. CACT support is intentionally tied to that graph
+rather than presented as a generic tensor-name interchange format.
 
 == Relationship To Vectors
 

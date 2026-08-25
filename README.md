@@ -24,13 +24,14 @@ Models is an in-process inference library for Java applications. It loads an
 open-weight language model and generates text without Python, a separate model
 server, or a network request.
 
-Models currently reads GGUF, a local-model file format that packages model
-structure, tokenizer metadata, and trained numeric weights. Those weights are
-often quantized to reduce disk and memory requirements. Efficient inference
-must then map the weights, tokenize input, execute the transformer layers,
-maintain the attention KV cache, and sample and stream output tokens. Models
-implements that complete pipeline on Java 25 and uses the Vector API for CPU
-SIMD execution:
+Models reads GGUF files, Hugging Face Safetensors checkpoint bundles, and the
+architecture-specific CACT artifact used by Needle 2. GGUF commonly packages
+configuration, tokenizer metadata, and quantized weights in one file. A
+Safetensors model is a checked bundle of configuration, tokenizer, and one or
+more weight shards. Efficient inference must map the weights, tokenize input,
+execute the model layers, maintain context state, and sample and stream output
+tokens. Models implements that pipeline on Java 25 and uses the Vector API for
+CPU SIMD execution:
 
 - `backend-java` executes every inference kernel in Java.
 - `backend-native` runs the same Java 25 and Vector API pipeline, substituting
@@ -59,6 +60,8 @@ for the exact boundary and migration policy.
 Implemented functionality includes:
 
 - GGUF v2/v3 parsing with memory-mapped tensor access
+- strict, memory-mapped single-file and sharded Safetensors bundles
+- CACT parsing and the Needle 2 CQ2/CQ4 execution path
 - Llama, Qwen2, Qwen3, and Gemma 4 decoder architectures
 - F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
 - byte-level BPE and Llama SentencePiece tokenizers
@@ -76,7 +79,7 @@ Implemented functionality includes:
 
 ## Supported Models
 
-Committed same-host evidence covers 27 exact artifacts across the 25 model
+Committed same-host evidence covers 29 exact artifacts across 26 model
 identities below. Support is bound to an artifact SHA, workload, runtime
 selector, backend plan, correctness result, and latency measurements; consult
 the qualification ledger for those exact details.
@@ -110,10 +113,15 @@ the qualification ledger for those exact details.
 | Nexus Finance | Finance |
 | Nexus Medical | Healthcare |
 
-Gemma 4 26B-A4B Instruct Q4_K_M is qualified at the usable tier through plain
-Java, LangChain4j, and Spring AI. See the
+Gemma 4 26B-A4B Instruct Q4_K_M is qualified at the usable tier through the
+Models Rust/FFM backend. See the
 [qualification analysis](GEMMA4_QUALIFICATION.md) and
-[retained evidence](benchmark-results/certified-20260802/rag/gemma4-26b-a4b-q4_k_m/README.md).
+[retained evidence](benchmark-results/certified-20260825/rag/gemma4-26b-a4b-q4_k_m/README.md).
+
+Qwen2.5 0.5B Instruct BF16 is the first qualified Hugging Face Safetensors
+bundle. The pure-Java path is `USABLE` on the controlled EPYC host and is
+checked against the same pinned snapshot through Transformers. See the
+[retained Safetensors evidence](benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16/README.md).
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)
@@ -185,7 +193,8 @@ try (var runtime = ModelJars.openRuntime(MODEL)) {
 `ModelJars.openRuntime` resolves the pinned artifact, downloads and verifies it when needed, chooses
 its qualified Models backend and chat template, and applies a matching performance profile.
 Applications that manage
-their own GGUF files can use the lower-level `PureJavaBackend.load(Path)` and
+their own GGUF files, supported Hugging Face directories, or CACT artifacts can
+use the lower-level `PureJavaBackend.load(Path)` and
 `RustFfmBackend.load(Path)` APIs described in the
 [Using Models guide](https://integrallis.github.io/models/docs/models/current/using-models.html).
 Wrap either backend in `InferencePipeline` for ownership-safe access to the

@@ -25,7 +25,7 @@ share a model name while containing different revisions, weight
 precision, or metadata. Models therefore qualifies exact artifacts, not
 names alone.
 
-== GGUF And Model Artifacts
+== Model Artifact Formats
 
 GGUF is a file format widely used to distribute models for local
 inference. A GGUF file can contain:
@@ -40,6 +40,16 @@ memory traffic, making local inference practical on smaller machines. It
 can also change model quality and requires specialized arithmetic for
 each format. Names such as `Q4_0`, `Q5_K`, and `Q8_0` identify different
 quantized tensor layouts.
+
+Hugging Face checkpoints commonly keep `config.json`, tokenizer files, and
+either `model.safetensors` or an indexed set of Safetensors shards in one
+directory. Models validates the bundle before mapping its tensors. Runtime
+support is architecture- and dtype-specific; parsing a Safetensors file does
+not imply that every Hugging Face model can execute.
+
+CACT is a compact, architecture-specific container. The current CACT path is
+for Needle 2 and includes its tokenizer and rotated-codebook tensors. It is not
+a general replacement for GGUF or Safetensors.
 
 == Tokens, Prefill, And Decode
 

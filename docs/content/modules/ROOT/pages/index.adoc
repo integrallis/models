@@ -7,11 +7,11 @@ application can load an open-weight language model and generate text without
 starting Python, calling a separate model server, or sending prompts over the
 network.
 
-Models currently loads language models distributed as GGUF files. GGUF is a
-file format used by the local-model ecosystem to package a model's structure,
-tokenizer metadata, and trained numeric weights. Those weights are commonly
-quantized, which means they are stored with fewer bits so the model needs less
-disk space and memory.
+Models loads GGUF files, supported Hugging Face Safetensors directories, and
+the architecture-specific CACT artifact used by Needle 2. GGUF packages model
+metadata, tokenizer data, and commonly quantized weights in one file.
+Safetensors checkpoints keep configuration and tokenizer files beside one or
+more mapped weight shards.
 
 Running the file efficiently requires more than parsing it. The runtime must
 map large weight tensors into memory, convert text to tokens, execute every
@@ -93,7 +93,7 @@ image::models-0001.png[Models runtime architecture,align=center]
 |Generation loop, prompt-prefix reuse, sampling, and streaming
 
 |`backend-java`
-|GGUF model loading and Java 25 Vector API execution
+|GGUF, supported Safetensors, and CACT model loading with Java 25 Vector API execution
 
 |`backend-native`
 |The Java backend with selective Rust/FFM bottleneck-kernel substitution
