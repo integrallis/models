@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "needle2-upstream-playground-v1",
+  "sourceRepository": "https://github.com/cactus-compute/needle",
+  "sourceRevision": "7bd8a635ebb977489703b3bb916c21412e8a9cdf",
+  "sourcePath": "needle/playground/app.js",
+  "cases": [
+    {
+      "id": "home",
+      "label": "Smart home",
+      "tools": [
+        {"name":"set_lights","description":"Turn lights on or off or dim them.","parameters":{"type":"object","properties":{"room":{"type":"string","description":"Which room."},"state":{"type":"string","enum":["on","off"]},"brightness":{"type":"integer","description":"Percent 1-100."}},"required":["room","state"]}},
+        {"name":"set_thermostat","description":"Set the target temperature.","parameters":{"type":"object","properties":{"room":{"type":"string"},"temperature":{"type":"number"},"mode":{"type":"string","enum":["heat","cool","auto"]}},"required":["room","temperature"]}},
+        {"name":"lock_door","description":"Lock a door.","parameters":{"type":"object","properties":{"door":{"type":"string","description":"Which door."}},"required":["door"]}}
+      ],
+      "query": "dim the bedroom lights to 20 percent and lock the front door",
+      "expectedCalls": [
+        {"name":"set_lights","arguments":{"room":"bedroom","state":"on","brightness":20}},
+        {"name":"lock_door","arguments":{"door":"front door"}}
+      ]
+    },
+    {
+      "id": "robot",
+      "label": "Robot",
+      "tools": [
+        {"name":"move","description":"Drive the robot in a direction.","parameters":{"type":"object","properties":{"direction":{"type":"string","enum":["forward","backward","left","right"]},"distance_m":{"type":"number","description":"Distance in meters."}},"required":["direction","distance_m"]}},
+        {"name":"rotate","description":"Rotate the robot in place.","parameters":{"type":"object","properties":{"direction":{"type":"string","enum":["left","right"]},"degrees":{"type":"number"}},"required":["direction","degrees"]}},
+        {"name":"gripper","description":"Open or close the gripper.","parameters":{"type":"object","properties":{"action":{"type":"string","enum":["open","close"]}},"required":["action"]}}
+      ],
+      "query": "move forward 2 meters, turn left 90 degrees, then close the gripper",
+      "expectedCalls": [
+        {"name":"move","arguments":{"direction":"forward","distance_m":2}},
+        {"name":"rotate","arguments":{"direction":"left","degrees":90}},
+        {"name":"gripper","arguments":{"action":"close"}}
+      ]
+    },
+    {
+      "id": "device",
+      "label": "Device control",
+      "tools": [
+        {"name":"open_website","description":"Open a website in a new tab.","parameters":{"type":"object","properties":{"url":{"type":"string","description":"The site to open."}},"required":["url"]}},
+        {"name":"set_theme","description":"Change the page accent color.","parameters":{"type":"object","properties":{"accent_color":{"type":"string","description":"A color name or hex."}},"required":["accent_color"]}},
+        {"name":"speak","description":"Say something out loud through the device speakers.","parameters":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}
+      ],
+      "query": "make the accent green, open github.com, and say hello",
+      "expectedCalls": [
+        {"name":"set_theme","arguments":{"accent_color":"green"}},
+        {"name":"open_website","arguments":{"url":"github.com"}},
+        {"name":"speak","arguments":{"text":"hello"}}
+      ]
+    },
+    {
+      "id": "gallery",
+      "label": "Gallery",
+      "tools": [
+        {"name":"create_album","description":"Create a new photo album.","parameters":{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}},
+        {"name":"move_photos","description":"Move photos into an album.","parameters":{"type":"object","properties":{"album":{"type":"string"},"filter":{"type":"string","description":"Which photos, e.g. 'last weekend', 'screenshots'."}},"required":["album","filter"]}},
+        {"name":"delete_photos","description":"Delete photos.","parameters":{"type":"object","properties":{"filter":{"type":"string"}},"required":["filter"]}}
+      ],
+      "query": "create an album called Summer 2026 and move the photos from last weekend into it",
+      "expectedCalls": [
+        {"name":"create_album","arguments":{"name":"Summer 2026"}},
+        {"name":"move_photos","arguments":{"album":"Summer 2026","filter":"last weekend"}}
+      ]
+    },
+    {
+      "id": "email",
+      "label": "Extract email",
+      "tools": [
+        {"name":"send_email","description":"Send an email.","parameters":{"type":"object","properties":{"to":{"type":"string","description":"Email address."},"subject":{"type":"string"},"body":{"type":"string"}},"required":["to","subject","body"]}}
+      ],
+      "query": "send the receipt to finance@cactus.dev with subject expenses: Blue Bottle Coffee, $14.50, August 4th",
+      "expectedCalls": [
+        {"name":"send_email","arguments":{"to":"finance@cactus.dev","subject":"expenses"}}
+      ]
+    },
+    {
+      "id": "currency",
+      "label": "Currency",
+      "tools": [
+        {"name":"convert_currency","description":"Convert an amount between currencies.","parameters":{"type":"object","properties":{"amount":{"type":"number"},"from_currency":{"type":"string","description":"ISO code, e.g. USD."},"to_currency":{"type":"string","description":"ISO code, e.g. EUR."}},"required":["amount","from_currency","to_currency"]}}
+      ],
+      "query": "how much is 250 dollars in euros",
+      "expectedCalls": [
+        {"name":"convert_currency","arguments":{"amount":250,"from_currency":"USD","to_currency":"EUR"}}
+      ]
+    },
+    {
+      "id": "document",
+      "label": "Document extraction",
+      "tools": [
+        {"name":"record_booking","description":"Record the details of a hotel booking.","parameters":{"type":"object","properties":{"hotel":{"type":"string"},"confirmation_number":{"type":"string"},"guest_name":{"type":"string"},"room_type":{"type":"string"},"check_in":{"type":"string"},"check_out":{"type":"string"},"total":{"type":"number"},"currency":{"type":"string"}},"required":["confirmation_number","check_in","check_out","total"]}}
+      ],
+      "query": "extract the booking from this email: Dear Mr Okafor, thank you for choosing the Harbor Light Hotel. This email confirms reservation HL-88213 for a deluxe sea-view room, checking in on 14 September 2026 and checking out on 18 September 2026. The total for your stay is 642.50 euros, payable at checkout. Breakfast is included from 7am, and our shuttle meets the 9:40 ferry on request. We look forward to welcoming you. Warm regards, Reception.",
+      "expectedCalls": [
+        {"name":"record_booking","arguments":{"confirmation_number":"HL-88213","check_in":"14 September 2026","check_out":"18 September 2026","total":642.5}}
+      ]
+    },
+    {
+      "id": "sentiment",
+      "label": "Sentiment",
+      "tools": [
+        {"name":"classify_sentiment","description":"Classify the sentiment of a message.","parameters":{"type":"object","properties":{"sentiment":{"type":"string","enum":["positive","negative","neutral","mixed"]}},"required":["sentiment"]}}
+      ],
+      "query": "classify the sentiment of this message: this is the worst purchase I have ever made, it broke in a day and support ignored me",
+      "expectedCalls": [
+        {"name":"classify_sentiment","arguments":{"sentiment":"negative"}}
+      ]
+    },
+    {
+      "id": "crowded",
+      "label": "12 tools routing",
+      "tools": [
+        {"name":"set_lights","description":"Control lights.","parameters":{"type":"object","properties":{"room":{"type":"string"},"state":{"type":"string","enum":["on","off"]}},"required":["room","state"]}},
+        {"name":"set_thermostat","description":"Set temperature.","parameters":{"type":"object","properties":{"temperature":{"type":"number"}},"required":["temperature"]}},
+        {"name":"lock_door","description":"Lock a door.","parameters":{"type":"object","properties":{"door":{"type":"string"}},"required":["door"]}},
+        {"name":"play_music","description":"Play music.","parameters":{"type":"object","properties":{"genre":{"type":"string"}},"required":[]}},
+        {"name":"set_timer","description":"Set a timer.","parameters":{"type":"object","properties":{"time_human":{"type":"string"}},"required":["time_human"]}},
+        {"name":"send_message","description":"Send a text.","parameters":{"type":"object","properties":{"recipient":{"type":"string"},"message":{"type":"string"}},"required":["recipient","message"]}},
+        {"name":"create_note","description":"Create a note.","parameters":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
+        {"name":"start_vacuum","description":"Start the robot vacuum.","parameters":{"type":"object","properties":{"room":{"type":"string"}},"required":[]}},
+        {"name":"water_plants","description":"Run the irrigation system.","parameters":{"type":"object","properties":{"zone":{"type":"string"}},"required":[]}},
+        {"name":"open_blinds","description":"Open or close the blinds.","parameters":{"type":"object","properties":{"room":{"type":"string"},"position":{"type":"string","enum":["open","closed","half"]}},"required":["room","position"]}},
+        {"name":"preheat_oven","description":"Preheat the oven.","parameters":{"type":"object","properties":{"temperature_c":{"type":"number"}},"required":["temperature_c"]}},
+        {"name":"charge_car","description":"Start charging the car.","parameters":{"type":"object","properties":{"limit_percent":{"type":"integer"}},"required":[]}}
+      ],
+      "query": "close the bedroom blinds halfway",
+      "expectedCalls": [
+        {"name":"open_blinds","arguments":{"room":"bedroom","position":"half"}}
+      ]
+    },
+    {
+      "id": "repeat",
+      "label": "Repeated calls",
+      "tools": [
+        {"name":"add_to_list","description":"Add one item to the shopping list.","parameters":{"type":"object","properties":{"item":{"type":"string"},"quantity":{"type":"integer"}},"required":["item"]}}
+      ],
+      "query": "add 2 milk and 6 eggs to the shopping list",
+      "expectedCalls": [
+        {"name":"add_to_list","arguments":{"item":"milk","quantity":2}},
+        {"name":"add_to_list","arguments":{"item":"eggs","quantity":6}}
+      ]
+    },
+    {
+      "id": "array",
+      "label": "Array argument",
+      "tools": [
+        {"name":"add_items","description":"Add items to the shopping list.","parameters":{"type":"object","properties":{"items":{"type":"array","items":{"type":"string"}}},"required":["items"]}}
+      ],
+      "query": "add milk, eggs, and bread to the shopping list",
+      "expectedCalls": [
+        {"name":"add_items","arguments":{"items":["milk","eggs","bread"]}}
+      ]
+    },
+    {
+      "id": "flight",
+      "label": "Flight form",
+      "tools": [
+        {"name":"search_flights","description":"Search for flights.","parameters":{"type":"object","properties":{"from_city":{"type":"string"},"to_city":{"type":"string"},"date":{"type":"string"},"direct_only":{"type":"boolean","description":"Only non-stop flights."},"passengers":{"type":"integer"}},"required":["from_city","to_city"]}}
+      ],
+      "query": "find non-stop flights from lagos to nairobi on december 3rd for two passengers",
+      "expectedCalls": [
+        {"name":"search_flights","arguments":{"from_city":"lagos","to_city":"nairobi","direct_only":true,"passengers":2}}
+      ]
+    },
+    {
+      "id": "refuse",
+      "label": "Off-topic refusal",
+      "tools": [
+        {"name":"move","description":"Drive the robot in a direction.","parameters":{"type":"object","properties":{"direction":{"type":"string","enum":["forward","backward","left","right"]},"distance_m":{"type":"number","description":"Distance in meters."}},"required":["direction","distance_m"]}},
+        {"name":"rotate","description":"Rotate the robot in place.","parameters":{"type":"object","properties":{"direction":{"type":"string","enum":["left","right"]},"degrees":{"type":"number"}},"required":["direction","degrees"]}},
+        {"name":"gripper","description":"Open or close the gripper.","parameters":{"type":"object","properties":{"action":{"type":"string","enum":["open","close"]}},"required":["action"]}}
+      ],
+      "query": "write me a short poem about the moon",
+      "expectedCalls": []
+    }
+  ]
+}

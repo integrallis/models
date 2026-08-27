@@ -101,6 +101,11 @@ public final class InferenceBenchmarkCli {
       System.exit(EmbeddingEquivalenceCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "needle2-tool-qualification".equals(args[0])) {
+      // A conformance gate rather than a throughput benchmark.
+      System.exit(Needle2ToolQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);
