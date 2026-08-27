@@ -44,6 +44,8 @@ class Needle2ToolQualificationCliTest {
               report.toString(),
               "--max-tokens",
               "192",
+              "--case",
+              "robot",
               "--models-revision",
               REVISION
             });
@@ -51,6 +53,7 @@ class Needle2ToolQualificationCliTest {
     assertThat(configuration.model()).isEqualTo(artifact);
     assertThat(configuration.report()).isEqualTo(report);
     assertThat(configuration.maxTokens()).isEqualTo(192);
+    assertThat(configuration.caseId()).isEqualTo("robot");
     assertThat(configuration.modelsRevision()).isEqualTo(REVISION);
   }
 
@@ -63,6 +66,11 @@ class Needle2ToolQualificationCliTest {
                     new String[] {"--model", artifact.toString(), "--models-revision", REVISION})
                 .maxTokens())
         .isEqualTo(256);
+    assertThat(
+            Needle2ToolQualificationCli.parse(
+                    new String[] {"--model", artifact.toString(), "--models-revision", REVISION})
+                .caseId())
+        .isNull();
   }
 
   @Test

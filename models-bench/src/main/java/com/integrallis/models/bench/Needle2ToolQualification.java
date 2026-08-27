@@ -17,6 +17,7 @@ package com.integrallis.models.bench;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.integrallis.models.api.ToolSpec;
 import java.io.IOException;
@@ -424,7 +425,7 @@ final class Needle2ToolQualification {
 
   private static String writeJson(ObjectMapper mapper, JsonNode value) {
     try {
-      return mapper.writeValueAsString(value);
+      return mapper.writer().without(SerializationFeature.INDENT_OUTPUT).writeValueAsString(value);
     } catch (IOException impossible) {
       throw new IllegalArgumentException("Unable to serialize tool schema", impossible);
     }

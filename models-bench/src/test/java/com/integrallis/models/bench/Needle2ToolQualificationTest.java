@@ -18,6 +18,12 @@ package com.integrallis.models.bench;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.ToolCallTokenConstraints;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -130,6 +136,60 @@ class Needle2ToolQualificationTest {
         .isFalse();
   }
 
+  @Test
+  void everyUpstreamToolSchemaCompilesIntoTheNeedleGrammar() throws Exception {
+    Needle2ToolQualification.Suite suite = Needle2ToolQualification.loadSuite(mapper);
+
+    for (Needle2ToolQualification.Case item : suite.cases()) {
+      assertThat(
+              ToolCallTokenConstraints.compile(
+                  new CompileOnlyTokenizer(),
+                  ChatTemplate.NEEDLE2.toolSyntax(),
+                  item.toolSpecs(mapper),
+                  ignored -> List.of()))
+          .as(item.id())
+          .isPresent();
+    }
+  }
+
+  @Test
+  void robotFixturePreservesTheOfficialPromptSchemasByteForByte() throws Exception {
+    ObjectMapper reportMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    Needle2ToolQualification.Case robot =
+        Needle2ToolQualification.loadSuite(reportMapper).cases().stream()
+            .filter(item -> item.id().equals("robot"))
+            .findFirst()
+            .orElseThrow();
+
+    assertThat(robot.toolSpecs(reportMapper))
+        .containsExactly(
+            new ToolSpec(
+                "move",
+                "Drive the robot in a direction.",
+                "{\"type\":\"object\",\"properties\":{\"direction\":{\"type\":\"string\","
+                    + "\"enum\":[\"forward\",\"backward\",\"left\",\"right\"]},"
+                    + "\"distance_m\":{\"type\":\"number\",\"description\":\"Distance in meters.\"}},"
+                    + "\"required\":[\"direction\",\"distance_m\"]}"),
+            new ToolSpec(
+                "rotate",
+                "Rotate the robot in place.",
+                "{\"type\":\"object\",\"properties\":{\"direction\":{\"type\":\"string\","
+                    + "\"enum\":[\"left\",\"right\"]},\"degrees\":{\"type\":\"number\"}},"
+                    + "\"required\":[\"direction\",\"degrees\"]}"),
+            new ToolSpec(
+                "gripper",
+                "Open or close the gripper.",
+                "{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\","
+                    + "\"enum\":[\"open\",\"close\"]}},\"required\":[\"action\"]}"));
+
+    String rendered =
+        ChatTemplate.NEEDLE2
+            .render(List.of(ChatMessage.user(robot.query())), robot.toolSpecs(reportMapper))
+            .text();
+    assertThat(rendered).hasSize(829);
+    assertThat(rendered.hashCode()).isEqualTo(-849368063);
+  }
+
   private static Needle2ToolQualification.CaseResult result(
       String id,
       boolean structured,
@@ -159,5 +219,37 @@ class Needle2ToolQualificationTest {
             && matches == expected
             && (!refusalExpected || refusalCorrect),
         List.of());
+  }
+
+  private static final class CompileOnlyTokenizer implements Tokenizer {
+    @Override
+    public int[] encode(String text) {
+      throw new AssertionError("not used while compiling");
+    }
+
+    @Override
+    public String decode(int[] tokens) {
+      throw new AssertionError("not used while compiling");
+    }
+
+    @Override
+    public String decode(int token) {
+      throw new AssertionError("not used while compiling");
+    }
+
+    @Override
+    public int vocabSize() {
+      return 1;
+    }
+
+    @Override
+    public int bosToken() {
+      return 0;
+    }
+
+    @Override
+    public int eosToken() {
+      return 0;
+    }
   }
 }

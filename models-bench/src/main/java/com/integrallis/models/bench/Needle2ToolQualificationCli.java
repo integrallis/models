@@ -18,11 +18,16 @@ package com.integrallis.models.bench;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.InModelContrastiveEmbeddingBackend;
+import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.models.runtime.chat.ToolSpecRetriever;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -45,11 +50,12 @@ final class Needle2ToolQualificationCli {
   private static final int PASS = 0;
   private static final int FAIL = 1;
   private static final Set<String> OPTIONS =
-      Set.of("model", "report", "max-tokens", "models-revision");
+      Set.of("model", "report", "max-tokens", "models-revision", "case");
 
   private Needle2ToolQualificationCli() {}
 
-  record Configuration(Path model, Path report, int maxTokens, String modelsRevision) {}
+  record Configuration(
+      Path model, Path report, int maxTokens, String modelsRevision, String caseId) {}
 
   record GenerationControls(double temperature, int maxTokens, String promptTemplate) {}
 
@@ -106,7 +112,11 @@ final class Needle2ToolQualificationCli {
         Path.of(
             values.getOrDefault(
                 "report", "build/reports/tool-qualification/needle2-cact-pure-java.json"));
-    return new Configuration(model, report, maxTokens, revision);
+    String caseId = values.get("case");
+    if (caseId != null && caseId.isBlank()) {
+      throw new IllegalArgumentException("--case must not be blank");
+    }
+    return new Configuration(model, report, maxTokens, revision, caseId);
   }
 
   static int run(String[] args) throws IOException {
@@ -119,6 +129,7 @@ final class Needle2ToolQualificationCli {
 
     ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     Needle2ToolQualification.Suite suite = Needle2ToolQualification.loadSuite(mapper);
+    List<Needle2ToolQualification.Case> selectedCases = selectCases(suite, configuration.caseId());
     SuiteIdentity suiteIdentity = suiteIdentity(suite);
     String createdAt = Instant.now().toString();
     BenchmarkEnvironment environment = BenchmarkEnvironment.capture();
@@ -132,13 +143,26 @@ final class Needle2ToolQualificationCli {
       System.out.printf("loaded %s in %.1f ms%n", MODEL_ID, loadMillis);
       GenerationLoop generation = new GenerationLoop(backend);
       diagnostics = backend.diagnostics();
-      for (Needle2ToolQualification.Case item : suite.cases()) {
+      for (Needle2ToolQualification.Case item : selectedCases) {
+        List<ToolSpec> declaredTools = item.toolSpecs(mapper);
+        List<ToolSpec> tools = selectedTools(backend, item.query(), declaredTools);
+        ModelPrompt prompt =
+            ChatTemplate.NEEDLE2.render(List.of(ChatMessage.user(item.query())), tools);
+        int[] promptTokens = backend.tokenizer().encode(prompt);
+        System.out.printf(
+            "%-10s prompt=%d tokens tools=%s%n",
+            item.id(), promptTokens.length, tools.stream().map(ToolSpec::name).toList());
         long start = System.nanoTime();
         String output =
             generation.generate(
-                ChatTemplate.NEEDLE2.render(
-                    List.of(ChatMessage.user(item.query())), item.toolSpecs(mapper)),
-                options);
+                prompt,
+                options,
+                ToolCallTokenConstraints.compile(
+                        backend.tokenizer(),
+                        ChatTemplate.NEEDLE2.toolSyntax(),
+                        tools,
+                        ignored -> List.of())
+                    .orElseThrow());
         long elapsedMillis = (System.nanoTime() - start) / 1_000_000L;
         Needle2ToolQualification.CaseResult result =
             Needle2ToolQualification.evaluate(mapper, item, output, elapsedMillis);
@@ -154,6 +178,7 @@ final class Needle2ToolQualificationCli {
                 createdAt,
                 environment,
                 diagnostics,
+                selectedCases.size(),
                 results,
                 false));
         System.out.printf(
@@ -178,6 +203,7 @@ final class Needle2ToolQualificationCli {
             createdAt,
             environment,
             diagnostics,
+            selectedCases.size(),
             results,
             true);
     write(configuration.report(), mapper, report);
@@ -193,6 +219,16 @@ final class Needle2ToolQualificationCli {
         summary.refusalAccuracy(),
         configuration.report().toAbsolutePath());
     return summary.qualified() ? PASS : FAIL;
+  }
+
+  private static List<ToolSpec> selectedTools(
+      PureJavaBackend backend, String query, List<ToolSpec> declaredTools) {
+    if (declaredTools.size() <= 5) {
+      return declaredTools;
+    }
+    ToolSpecRetriever retriever =
+        new ToolSpecRetriever(new InModelContrastiveEmbeddingBackend(backend), declaredTools);
+    return retriever.select(query, 5).stream().map(ToolSpecRetriever.Match::tool).toList();
   }
 
   private static SuiteIdentity suiteIdentity(Needle2ToolQualification.Suite suite)
@@ -229,6 +265,7 @@ final class Needle2ToolQualificationCli {
       String createdAt,
       BenchmarkEnvironment environment,
       BackendDiagnostics diagnostics,
+      int plannedAttempts,
       List<Needle2ToolQualification.CaseResult> results,
       boolean complete)
       throws IOException {
@@ -247,10 +284,23 @@ final class Needle2ToolQualificationCli {
         new GenerationControls(0.0, configuration.maxTokens(), "needle2"),
         environment,
         diagnostics,
-        suite.cases().size(),
+        plannedAttempts,
         complete,
         Needle2ToolQualification.summarize(results),
         results);
+  }
+
+  private static List<Needle2ToolQualification.Case> selectCases(
+      Needle2ToolQualification.Suite suite, String caseId) {
+    if (caseId == null) {
+      return suite.cases();
+    }
+    List<Needle2ToolQualification.Case> selected =
+        suite.cases().stream().filter(item -> item.id().equals(caseId)).toList();
+    if (selected.isEmpty()) {
+      throw new IllegalArgumentException("unknown Needle qualification case: " + caseId);
+    }
+    return selected;
   }
 
   static void write(Path output, ObjectMapper mapper, Report report) throws IOException {
