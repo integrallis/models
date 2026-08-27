@@ -2,7 +2,9 @@
 
 Models runs a language-model pipeline inside the Java process. It does
 not delegate inference to an Ollama server, a llama.cpp executable,
-Python, or an HTTP sidecar.
+Python, ONNX Runtime, or an HTTP sidecar. External engines are permitted
+only in benchmark modules as pinned correctness and performance oracles;
+they are never a production inference path.
 
 Terms such as GGUF, quantization, prefill, decode, KV cache, SIMD, and
 FFM are introduced in xref:concepts.adoc[Inference Concepts].
@@ -28,6 +30,11 @@ loaded through Java's final FFM API. It does not embed or call llama.cpp
 or Ollama. The Java graph remains authoritative, so the backend boundary
 is narrow and testable.
 
+`backend-apple` is also in-process: Java reaches Apple's on-device
+Foundation Models framework through a bundled, integrity-checked FFM
+bridge. It does not launch an executable or communicate with a model
+server.
+
 image::models-0001.png[Models runtime architecture,align=center]
 
 == Why A Native Path Exists
@@ -50,6 +57,10 @@ Each native route must have:
 . A benchmark on the exact model artifact and runtime selector.
 . Diagnostics identifying that the route was selected.
 . A pure-Java fallback.
+
+This boundary also applies to future artifact formats. Supporting an ONNX
+file, for example, means parsing and executing its supported operations in
+the Models Java graph. It does not mean embedding or invoking ONNX Runtime.
 
 == Retirement Policy
 

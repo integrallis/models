@@ -69,7 +69,9 @@ Implemented functionality includes:
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
 - tool calling across Qwen, Hermes, Llama 3, Needle 2, Gemma 4, and MiniCPM5 formats,
   with LangChain4j and Spring AI schema-constrained tool decoding for
-  enumerable arguments
+  enumerable arguments; Needle 2 additionally constrains its array protocol
+  from JSON Schema and retrieves the five most relevant tools with its in-model
+  contrastive head
 - in-JVM text embeddings with last-token and mean pooling, tested to produce the
   same vectors as llama.cpp
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
@@ -205,6 +207,12 @@ Needle 2 CACT artifacts use the same public prompt and parsing APIs. The
 `ChatTemplate.NEEDLE2` renderer emits the model's raw tool-schema envelope and
 `ToolCallScanner` recovers its array-wrapped calls; callers do not need to
 reproduce the CACT reference prompt by hand.
+
+The loaded `InferencePipeline` also exposes Needle 2's trained auxiliary heads
+through `AuxiliaryTextGenerationModel`. `ToolSpecSelector` uses the contrastive
+head to reduce declarations larger than five tools and keeps a bounded cache of
+schema embeddings. The LangChain4j and Spring AI adapters apply that selection
+automatically before rendering the prompt and compiling its decoding grammar.
 
 Streaming uses the same loaded model:
 

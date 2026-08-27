@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 
-/** ONNX Runtime inference backend (Phase 2+). */
+/** Planned in-process, pure-Java ONNX artifact support; never an ONNX Runtime wrapper. */
 package com.integrallis.models.backend.onnx;

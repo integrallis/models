@@ -10,11 +10,32 @@ All notable changes to models are documented here.
   official raw-schema prompt contract, system facts, array-wrapped parallel
   calls, and plain user turns for tool results, and recovers generated calls
   through the shared runtime scanner.
+- Added schema-derived constrained decoding for Needle 2 tool calls, including
+  parallel calls, declared argument types, and the model's refusal form.
+- Exposed optional in-model contrastive and confidence heads through the backend,
+  runtime-model, and `InferencePipeline` APIs.
+- Added bounded, cached tool retrieval using Needle 2's own contrastive head.
+  The LangChain4j and Spring AI chat adapters automatically reduce declarations
+  larger than five tools before rendering both blocking and streaming requests.
+- Added a controlled Needle 2 tool-conformance qualification workload based on
+  the upstream playground cases and immutable artifact/source evidence.
 
 ### Fixed
 
 - Prevented finite single-call constraints from being applied to Needle 2's
   reasoning-prefixed call arrays.
+- Corrected the CACT attention sink and 8-bit KV-cache interpretation, loaded the
+  serialized contrastive and confidence heads, and reused compatible prepared
+  compact-matrix activations without changing model output.
+- Preserved compact JSON tool schemas in the qualification prompt; pretty-printing
+  previously changed the prompt token sequence and invalidated the reference.
+
+### Changed
+
+- Production inference remains in process and owned by the Java model graph.
+  External engines are benchmark-only correctness/performance oracles; planned
+  ONNX support will parse and execute supported operations in Java rather than
+  embedding ONNX Runtime.
 
 ## [0.3.10] - 2026-08-25
 

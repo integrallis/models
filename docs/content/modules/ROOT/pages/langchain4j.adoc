@@ -135,6 +135,12 @@ are declared, it buffers generated text until the tool call is complete and then
 delivers one terminal response, because LangChain4j cannot execute a partial
 tool request.
 
+When the wrapped model exposes a contrastive head and more than five tools are
+declared, the adapter retrieves the five most relevant schemas before it
+renders the prompt. Schema vectors are cached in a bounded per-adapter index;
+subsequent requests embed the user query without re-embedding an unchanged
+tool catalog. The selected schemas also define the decoding constraint.
+
 == Schema-Constrained Tool Decoding
 
 If the wrapped Models runtime implements `ConstrainedTextGenerationModel`, the
@@ -144,11 +150,11 @@ tokens that keep the output on a valid tool-call string. For supported schemas,
 this prevents invalid enumerable tool-call syntax from being decoded rather
 than only asking the model to follow the schema.
 
-Today the LangChain4j adapter constrains finite tool-call spaces:
+For ChatML and Llama 3, the LangChain4j adapter constrains finite tool-call
+spaces:
 
 * tool syntax must be one of the non-array-wrapped Models JSON formats, such as
-  ChatML or Llama 3 JSON-native tool calls; Needle 2 uses its normal
-  array-aware generation path
+  ChatML or Llama 3 JSON-native tool calls
 * argument properties must be string `enum` values, or absent
 * every `required` property must be one of those enumerable properties
 * the compiled call set is capped to keep decoding checks bounded
@@ -157,6 +163,11 @@ Schemas that require open text, numbers, arrays, nested objects, conditionals,
 references, or any other value space the adapter cannot enumerate are not
 partially constrained. The adapter falls back to ordinary tool calling for those
 schemas, leaving LangChain4j tool execution behavior unchanged.
+
+Needle 2 has a separate array-aware grammar compiled directly from JSON Schema.
+It supports objects, arrays, strings, integers, numbers, booleans, nulls,
+`enum`, `const`, `oneOf`, and `anyOf`, with an explicit bound on optional-object
+expansion.
 
 == Request Options
 

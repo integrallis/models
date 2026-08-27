@@ -82,6 +82,32 @@ var calls = ToolCallScanner.scan(
     generated, ChatTemplate.NEEDLE2.toolSyntax()).toolCalls();
 ----
 
+The Needle 2 artifact also carries contrastive retrieval and confidence heads.
+They are available from the same owning pipeline; no second model or service is
+loaded:
+
+[source,java]
+----
+var pipeline = runtime.pipeline();
+if (pipeline.supportsContrastiveEncoding()) {
+    var selector = new ToolSpecSelector(pipeline);
+    List<ToolSpec> promptTools = selector.select(
+        "weather in Lagos", List.of(weather));
+}
+
+if (pipeline.supportsConfidenceScoring()) {
+    ModelPrompt sequence = ModelPrompt.text("complete prompt and generated output");
+    float headScore = pipeline.scoreConfidence(sequence);
+}
+----
+
+`ToolSpecSelector` passes five or fewer declarations through unchanged. For a
+larger catalog, it embeds each schema once, retains a bounded in-memory index,
+and embeds only the current query on subsequent calls. LangChain4j and Spring
+AI perform this selection automatically when the wrapped model exposes the
+contrastive head. The selected five schemas are the only schemas rendered and
+the only schemas admitted by constrained decoding.
+
 `ModelJars.openRuntime` resolves the marker already present on the classpath, downloads
 the pinned weights when they are absent, verifies size and SHA-256, selects the
 qualified backend, and applies a performance profile only when its artifact,
@@ -142,7 +168,7 @@ try (var runtime = ModelJars.openRuntime(MODEL)) {
 }
 ----
 
-== Bring Your Own GGUF
+== Bring Your Own Artifact
 
 Applications that deliberately manage model files themselves can use the
 lower-level Models artifacts:
@@ -157,10 +183,10 @@ dependencies {
 
 [source,java]
 ----
-Path gguf = Path.of("/opt/models/private-model.gguf");
+Path artifact = Path.of("/opt/models/private-model.gguf");
 
 try (InferencePipeline pipeline =
-        new InferencePipeline(PureJavaBackend.load(gguf))) {
+        new InferencePipeline(PureJavaBackend.load(artifact))) {
     ModelMetadata metadata = pipeline.metadata();
     Tokenizer tokenizer = pipeline.tokenizer();
     InferenceContextWindow context = pipeline.contextWindow();
@@ -169,8 +195,10 @@ try (InferencePipeline pipeline =
 ----
 
 This API intentionally accepts a filesystem path because Models cannot verify
-an unmanaged artifact against ModelJars metadata. Use `backend-native` and
-`RustFfmBackend.load(gguf)` for explicit native-kernel loading. The pipeline
+an unmanaged GGUF, supported Safetensors bundle, or CACT artifact against
+ModelJars metadata. Use `backend-native` and
+`RustFfmBackend.load(artifact)` for explicit native-kernel loading where that
+artifact and graph support native kernels. The pipeline
 owns and closes the supplied backend. See xref:inference-pipeline.adoc[Inference
 Pipeline] for structured tokenization, context capacity and position, prefill,
 forward-pass logits, checkpoint, and rewind.
