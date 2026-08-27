@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +62,7 @@ final class Needle2ToolQualificationCli {
 
   record Report(
       int schemaVersion,
-      Instant createdAt,
+      String createdAt,
       String policyVersion,
       String modelsRevision,
       String modelId,
@@ -74,6 +75,8 @@ final class Needle2ToolQualificationCli {
       GenerationControls generation,
       BenchmarkEnvironment environment,
       BackendDiagnostics backendDiagnostics,
+      int plannedAttempts,
+      boolean complete,
       Needle2ToolQualification.Summary summary,
       List<Needle2ToolQualification.CaseResult> cases) {
     Report {
@@ -116,6 +119,9 @@ final class Needle2ToolQualificationCli {
 
     ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     Needle2ToolQualification.Suite suite = Needle2ToolQualification.loadSuite(mapper);
+    SuiteIdentity suiteIdentity = suiteIdentity(suite);
+    String createdAt = Instant.now().toString();
+    BenchmarkEnvironment environment = BenchmarkEnvironment.capture();
     SamplingOptions options =
         SamplingOptions.builder().temperature(0.0f).maxTokens(configuration.maxTokens()).build();
     List<Needle2ToolQualification.CaseResult> results = new ArrayList<>();
@@ -125,6 +131,7 @@ final class Needle2ToolQualificationCli {
       double loadMillis = (System.nanoTime() - loadStart) / 1_000_000.0;
       System.out.printf("loaded %s in %.1f ms%n", MODEL_ID, loadMillis);
       GenerationLoop generation = new GenerationLoop(backend);
+      diagnostics = backend.diagnostics();
       for (Needle2ToolQualification.Case item : suite.cases()) {
         long start = System.nanoTime();
         String output =
@@ -136,6 +143,19 @@ final class Needle2ToolQualificationCli {
         Needle2ToolQualification.CaseResult result =
             Needle2ToolQualification.evaluate(mapper, item, output, elapsedMillis);
         results.add(result);
+        write(
+            configuration.report(),
+            mapper,
+            report(
+                configuration,
+                artifactSha256,
+                suite,
+                suiteIdentity,
+                createdAt,
+                environment,
+                diagnostics,
+                results,
+                false));
         System.out.printf(
             "%-10s %s %6d ms  selection=%s schema=%s arguments=%d/%d%n",
             item.id(),
@@ -146,28 +166,20 @@ final class Needle2ToolQualificationCli {
             result.expectedArgumentMatches(),
             result.expectedArguments());
       }
-      diagnostics = backend.diagnostics();
     }
 
     Needle2ToolQualification.Summary summary = Needle2ToolQualification.summarize(results);
     Report report =
-        new Report(
-            1,
-            Instant.now(),
-            Needle2ToolQualification.POLICY_VERSION,
-            configuration.modelsRevision(),
-            MODEL_ID,
-            MODEL_NAME,
-            "pure-java",
-            implementationVersion(),
+        report(
+            configuration,
             artifactSha256,
-            Files.size(configuration.model()),
-            suiteIdentity(suite),
-            new GenerationControls(0.0, configuration.maxTokens(), "needle2"),
-            BenchmarkEnvironment.capture(),
+            suite,
+            suiteIdentity,
+            createdAt,
+            environment,
             diagnostics,
-            summary,
-            results);
+            results,
+            true);
     write(configuration.report(), mapper, report);
     System.out.printf(
         "%s structured=%.3f selection=%.3f schema=%.3f declared-only=%.3f "
@@ -209,11 +221,50 @@ final class Needle2ToolQualificationCli {
     return version == null || version.isBlank() ? "development" : version;
   }
 
-  private static void write(Path output, ObjectMapper mapper, Report report) throws IOException {
+  private static Report report(
+      Configuration configuration,
+      String artifactSha256,
+      Needle2ToolQualification.Suite suite,
+      SuiteIdentity suiteIdentity,
+      String createdAt,
+      BenchmarkEnvironment environment,
+      BackendDiagnostics diagnostics,
+      List<Needle2ToolQualification.CaseResult> results,
+      boolean complete)
+      throws IOException {
+    return new Report(
+        1,
+        createdAt,
+        Needle2ToolQualification.POLICY_VERSION,
+        configuration.modelsRevision(),
+        MODEL_ID,
+        MODEL_NAME,
+        "pure-java",
+        implementationVersion(),
+        artifactSha256,
+        Files.size(configuration.model()),
+        suiteIdentity,
+        new GenerationControls(0.0, configuration.maxTokens(), "needle2"),
+        environment,
+        diagnostics,
+        suite.cases().size(),
+        complete,
+        Needle2ToolQualification.summarize(results),
+        results);
+  }
+
+  static void write(Path output, ObjectMapper mapper, Report report) throws IOException {
     Path parent = output.toAbsolutePath().getParent();
     if (parent != null) {
       Files.createDirectories(parent);
     }
-    Files.writeString(output, mapper.writeValueAsString(report) + System.lineSeparator());
+    Path temporary = output.resolveSibling(output.getFileName() + ".tmp");
+    Files.writeString(temporary, mapper.writeValueAsString(report) + System.lineSeparator());
+    try {
+      Files.move(
+          temporary, output, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+      Files.move(temporary, output, StandardCopyOption.REPLACE_EXISTING);
+    }
   }
 }

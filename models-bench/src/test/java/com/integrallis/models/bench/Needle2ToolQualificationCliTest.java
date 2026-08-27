@@ -16,9 +16,12 @@
 package com.integrallis.models.bench;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -98,5 +101,45 @@ class Needle2ToolQualificationCliTest {
                   java.nio.file.Files.writeString(temporary.resolve("revision.cact"), "fixture");
               Needle2ToolQualificationCli.parse(new String[] {"--model", artifact.toString()});
             });
+  }
+
+  @Test
+  void serializesAndAtomicallyCheckpointsPartialProgressWithoutOptionalJacksonModules() {
+    var summary = new Needle2ToolQualification.Summary(1, 0, 0, 0, 0, 0, 0, 0, 1, false, "FAIL");
+    var report =
+        new Needle2ToolQualificationCli.Report(
+            1,
+            "2026-08-27T12:00:00Z",
+            "policy",
+            REVISION,
+            "model_id",
+            "Model",
+            "pure-java",
+            "development",
+            "a".repeat(64),
+            1,
+            new Needle2ToolQualificationCli.SuiteIdentity(
+                "suite", "b".repeat(64), "https://example.test/repo", REVISION, "suite.json"),
+            new Needle2ToolQualificationCli.GenerationControls(0, 256, "needle2"),
+            null,
+            null,
+            13,
+            false,
+            summary,
+            List.of());
+
+    Path output = temporary.resolve("partial-report.json");
+    ObjectMapper mapper = new ObjectMapper();
+
+    assertThatCode(() -> Needle2ToolQualificationCli.write(output, mapper, report))
+        .doesNotThrowAnyException();
+    assertThatCode(
+            () -> {
+              var persisted = mapper.readTree(output.toFile());
+              assertThat(persisted.path("createdAt").asText()).isEqualTo("2026-08-27T12:00:00Z");
+              assertThat(persisted.path("plannedAttempts").asInt()).isEqualTo(13);
+              assertThat(persisted.path("complete").asBoolean()).isFalse();
+            })
+        .doesNotThrowAnyException();
   }
 }
