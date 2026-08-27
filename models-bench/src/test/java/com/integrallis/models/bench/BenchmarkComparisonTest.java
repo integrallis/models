@@ -148,6 +148,7 @@ class BenchmarkComparisonTest {
             "EPYC",
             8,
             32L << 30,
+            8L << 30,
             "25.0.3",
             "Temurin",
             "OpenJDK");

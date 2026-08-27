@@ -18,7 +18,8 @@ All notable changes to models are documented here.
   The LangChain4j and Spring AI chat adapters automatically reduce declarations
   larger than five tools before rendering both blocking and streaming requests.
 - Added a controlled Needle 2 tool-conformance qualification workload based on
-  the upstream playground cases and immutable artifact/source evidence.
+  the upstream playground cases and immutable artifact/source evidence. Reports
+  include the JVM maximum heap alongside processor and physical-memory evidence.
 
 ### Fixed
 
