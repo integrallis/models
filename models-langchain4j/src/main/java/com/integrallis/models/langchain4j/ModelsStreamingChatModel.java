@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.langchain4j;
 
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
@@ -29,6 +30,7 @@ import com.integrallis.models.runtime.RuntimeTextGenerationModel;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
+import com.integrallis.models.runtime.chat.ToolSpecSelector;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -49,6 +51,7 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
   private final TextGenerationModel model;
   private final ChatTemplate template;
   private final SamplingOptions defaults;
+  private final ToolSpecSelector toolSelector;
 
   public ModelsStreamingChatModel(InferenceBackend backend) {
     this(new RuntimeTextGenerationModel(backend));
@@ -76,6 +79,11 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     this.model = Objects.requireNonNull(model, "model");
     this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
+    this.toolSelector =
+        model instanceof AuxiliaryTextGenerationModel auxiliary
+                && auxiliary.supportsContrastiveEncoding()
+            ? new ToolSpecSelector(auxiliary)
+            : null;
   }
 
   /** Returns the execution decisions selected by the wrapped backend. */
@@ -91,9 +99,9 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     AtomicBoolean terminalSignalSent = new AtomicBoolean();
     // A tool call means nothing until it is complete, and its delimiters are not user-facing text.
     // So when tools are declared, deltas are withheld and the result is delivered once, whole.
-    List<ToolSpec> tools = LangChain4jChatRequestMapper.tools(request);
+    List<ToolSpec> tools = selectedTools(request, LangChain4jChatRequestMapper.tools(request));
     boolean toolsDeclared = !tools.isEmpty();
-    ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template);
+    ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template, tools);
     SamplingOptions requested = LangChain4jChatRequestMapper.options(request, defaults);
     TokenStream stream =
         new TokenStream() {
@@ -193,5 +201,12 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     }
     return LangChain4jToolCallConstraint.compile(
         constrainedModel.tokenizer(), template.toolSyntax(), tools);
+  }
+
+  private List<ToolSpec> selectedTools(ChatRequest request, List<ToolSpec> tools) {
+    if (toolSelector == null || tools.size() <= ToolSpecSelector.DEFAULT_TOOL_LIMIT) {
+      return tools;
+    }
+    return toolSelector.select(LangChain4jChatRequestMapper.latestUserText(request), tools);
   }
 }

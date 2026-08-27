@@ -18,6 +18,7 @@ package com.integrallis.models.langchain4j;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.ModelPrompt;
@@ -189,6 +190,34 @@ class ModelsStreamingChatModelTest {
   }
 
   @Test
+  void retrievesToolsBeforeRenderingAStreamingRequest() {
+    RetrievalStreamingModel delegate = new RetrievalStreamingModel();
+    ModelsStreamingChatModel model =
+        new ModelsStreamingChatModel(
+            delegate, ChatTemplate.CHATML, SamplingOptions.builder().build());
+    List<ToolSpecification> tools = new ArrayList<>();
+    for (int index = 0; index < 7; index++) {
+      tools.add(
+          ToolSpecification.builder()
+              .name("tool-" + index)
+              .description("A numbered test tool " + index)
+              .parameters(JsonObjectSchema.builder().build())
+              .build());
+    }
+    ChatRequest request =
+        ChatRequest.builder()
+            .messages(UserMessage.from("use tool-6"))
+            .toolSpecifications(tools)
+            .build();
+
+    model.doChat(
+        request, handler(new ArrayList<>(), new AtomicReference<>(), new AtomicReference<>()));
+
+    assertThat(delegate.prompt).contains("tool-6").doesNotContain("tool-4", "tool-5");
+    assertThat(delegate.encoded).hasSize(8);
+  }
+
+  @Test
   void rejectsNullDependenciesAndRequests() {
     RecordingStreamingModel delegate = new RecordingStreamingModel(List.of("answer"));
     assertThatNullPointerException()
@@ -259,6 +288,68 @@ class ModelsStreamingChatModelTest {
       this.prompt = prompt;
       this.options = options;
       tokens.forEach(stream::onToken);
+      stream.onComplete();
+    }
+  }
+
+  private static final class RetrievalStreamingModel implements AuxiliaryTextGenerationModel {
+    private final List<String> encoded = new ArrayList<>();
+    private String prompt;
+
+    @Override
+    public boolean supportsContrastiveEncoding() {
+      return true;
+    }
+
+    @Override
+    public int contrastiveDimension() {
+      return 8;
+    }
+
+    @Override
+    public float[] encodeContrastive(ModelPrompt prompt) {
+      String text = prompt.text();
+      encoded.add(text);
+      float[] vector = new float[contrastiveDimension()];
+      for (int index = 0; index < vector.length; index++) {
+        if (text.contains("tool-" + index)) {
+          vector[index] = 1.0f;
+        }
+      }
+      return vector;
+    }
+
+    @Override
+    public boolean supportsConfidenceScoring() {
+      return false;
+    }
+
+    @Override
+    public float scoreConfidence(ModelPrompt sequence) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String modelName() {
+      return "RetrievalStreamingModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("retrieval-streaming");
+    }
+
+    @Override
+    public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+      this.prompt = prompt.text();
+      stream.onToken("done");
+      stream.onComplete();
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      this.prompt = prompt;
+      stream.onToken("done");
       stream.onComplete();
     }
   }

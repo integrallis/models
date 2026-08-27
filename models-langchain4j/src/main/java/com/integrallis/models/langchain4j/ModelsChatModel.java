@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.langchain4j;
 
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
@@ -30,6 +31,7 @@ import com.integrallis.models.runtime.RuntimeTextGenerationModel;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
+import com.integrallis.models.runtime.chat.ToolSpecSelector;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -48,6 +50,7 @@ public final class ModelsChatModel implements ChatModel {
   private final TextGenerationModel model;
   private final ChatTemplate template;
   private final SamplingOptions defaults;
+  private final ToolSpecSelector toolSelector;
 
   public ModelsChatModel(InferenceBackend backend) {
     this(new RuntimeTextGenerationModel(backend));
@@ -75,6 +78,11 @@ public final class ModelsChatModel implements ChatModel {
     this.model = Objects.requireNonNull(model, "model");
     this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
+    this.toolSelector =
+        model instanceof AuxiliaryTextGenerationModel auxiliary
+                && auxiliary.supportsContrastiveEncoding()
+            ? new ToolSpecSelector(auxiliary)
+            : null;
   }
 
   /** Returns the execution decisions selected by the wrapped backend. */
@@ -95,9 +103,9 @@ public final class ModelsChatModel implements ChatModel {
   @Override
   public ChatResponse doChat(ChatRequest request) {
     Objects.requireNonNull(request, "request");
-    List<ToolSpec> tools = LangChain4jChatRequestMapper.tools(request);
+    List<ToolSpec> tools = selectedTools(request, LangChain4jChatRequestMapper.tools(request));
     boolean toolsDeclared = !tools.isEmpty();
-    ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template);
+    ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template, tools);
     SamplingOptions requested = LangChain4jChatRequestMapper.options(request, defaults);
     GenerationOutput generated = generate(prompt, requested, tools);
 
@@ -195,6 +203,13 @@ public final class ModelsChatModel implements ChatModel {
     }
     return LangChain4jToolCallConstraint.compile(
         constrainedModel.tokenizer(), template.toolSyntax(), tools);
+  }
+
+  private List<ToolSpec> selectedTools(ChatRequest request, List<ToolSpec> tools) {
+    if (toolSelector == null || tools.size() <= ToolSpecSelector.DEFAULT_TOOL_LIMIT) {
+      return tools;
+    }
+    return toolSelector.select(LangChain4jChatRequestMapper.latestUserText(request), tools);
   }
 
   private record GenerationOutput(String text, GenerationUsage usage) {}
