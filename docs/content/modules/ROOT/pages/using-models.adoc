@@ -68,18 +68,25 @@ parallel calls are emitted as one JSON array inside `<tool_call>`.
 
 [source,java]
 ----
+import static org.modeljars.catalog.Cactus_Compute_Needle2_Cact_Cq2_Mixed.MODEL;
+
 var weather = new ToolSpec(
     "get_weather",
     "Get the current weather for a city.",
     "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},"
         + "\"required\":[\"city\"]}");
 
-var prompt = ChatTemplate.NEEDLE2.render(
-    List.of(ChatMessage.user("weather in Lagos")),
-    List.of(weather));
-var generated = model.generate(prompt, options);
-var calls = ToolCallScanner.scan(
-    generated, ChatTemplate.NEEDLE2.toolSyntax()).toolCalls();
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var tools = List.of(weather);
+    var prompt = runtime.chatTemplate().render(
+        List.of(ChatMessage.user("weather in Lagos")), tools);
+    var constraint = ToolCallTokenConstraints.compile(
+        runtime.tokenizer(), runtime.chatTemplate().toolSyntax(), tools,
+        ignored -> List.of()).orElseThrow();
+    var generated = runtime.pipeline().generate(prompt, options, constraint);
+    var calls = ToolCallScanner.scan(
+        generated, runtime.chatTemplate().toolSyntax()).toolCalls();
+}
 ----
 
 The Needle 2 artifact also carries contrastive retrieval and confidence heads.
@@ -88,16 +95,18 @@ loaded:
 
 [source,java]
 ----
-var pipeline = runtime.pipeline();
-if (pipeline.supportsContrastiveEncoding()) {
-    var selector = new ToolSpecSelector(pipeline);
-    List<ToolSpec> promptTools = selector.select(
-        "weather in Lagos", List.of(weather));
-}
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var pipeline = runtime.pipeline();
+    if (pipeline.supportsContrastiveEncoding()) {
+        var selector = new ToolSpecSelector(pipeline);
+        List<ToolSpec> promptTools = selector.select(
+            "weather in Lagos", List.of(weather));
+    }
 
-if (pipeline.supportsConfidenceScoring()) {
-    ModelPrompt sequence = ModelPrompt.text("complete prompt and generated output");
-    float headScore = pipeline.scoreConfidence(sequence);
+    if (pipeline.supportsConfidenceScoring()) {
+        ModelPrompt sequence = ModelPrompt.text("complete prompt and generated output");
+        float headScore = pipeline.scoreConfidence(sequence);
+    }
 }
 ----
 

@@ -208,6 +208,28 @@ Needle 2 CACT artifacts use the same public prompt and parsing APIs. The
 `ToolCallScanner` recovers its array-wrapped calls; callers do not need to
 reproduce the CACT reference prompt by hand.
 
+```java
+import static org.modeljars.catalog.Cactus_Compute_Needle2_Cact_Cq2_Mixed.MODEL;
+
+var weatherTool = new ToolSpec(
+    "get_weather", "Get weather for a city.",
+    "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},"
+        + "\"required\":[\"city\"]}");
+var options = SamplingOptions.builder().temperature(0).maxTokens(128).build();
+
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var tools = List.of(weatherTool);
+    var prompt = runtime.chatTemplate().render(
+        List.of(ChatMessage.user("weather in Lagos")), tools);
+    var constraint = ToolCallTokenConstraints.compile(
+        runtime.tokenizer(), runtime.chatTemplate().toolSyntax(), tools,
+        ignored -> List.of()).orElseThrow();
+    var output = runtime.pipeline().generate(prompt, options, constraint);
+    var calls = ToolCallScanner.scan(
+        output, runtime.chatTemplate().toolSyntax()).toolCalls();
+}
+```
+
 The loaded `InferencePipeline` also exposes Needle 2's trained auxiliary heads
 through `AuxiliaryTextGenerationModel`. `ToolSpecSelector` uses the contrastive
 head to reduce declarations larger than five tools and keeps a bounded cache of
