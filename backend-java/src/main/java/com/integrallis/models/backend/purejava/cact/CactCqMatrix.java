@@ -80,6 +80,11 @@ public final class CactCqMatrix {
     matrix.multiply(activation, output);
   }
 
+  /** Returns whether an existing prepared activation can be reused for this matrix. */
+  public boolean accepts(RotatedCodebookMatrix.PreparedActivation activation) {
+    return matrix.accepts(activation);
+  }
+
   private static Encoding encoding(int recordBits, int groupSize, float[] sharedCodebook) {
     return switch (recordBits) {
       case 2 ->

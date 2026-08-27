@@ -22,6 +22,8 @@ import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.TokenConstraint;
+import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
@@ -51,6 +53,9 @@ class Needle2BackendIntegrationTest {
           .containsEntry("artifact-format", "cact")
           .containsEntry("weight-encoding", "rotated-codebook");
       assertThat(backend.diagnostics().optimization("cact-rotated-codebook")).isPresent();
+      assertThat(backend.supportsContrastiveEncoding()).isTrue();
+      assertThat(backend.contrastiveDimension()).isEqualTo(128);
+      assertThat(backend.supportsConfidenceScoring()).isTrue();
 
       assertThat(argmax(backend.prefill(new int[] {2}, 0))).isEqualTo(2);
       assertThat(backend.checkpoint()).isEqualTo(1);
@@ -83,7 +88,15 @@ class Needle2BackendIntegrationTest {
     try (PureJavaBackend backend = PureJavaBackend.load(path)) {
       String generated =
           new GenerationLoop(backend)
-              .generate(prompt, SamplingOptions.builder().temperature(0.0f).maxTokens(64).build());
+              .generate(
+                  prompt,
+                  SamplingOptions.builder().temperature(0.0f).maxTokens(64).build(),
+                  ToolCallTokenConstraints.compile(
+                          backend.tokenizer(),
+                          ChatTemplate.NEEDLE2.toolSyntax(),
+                          List.of(weather),
+                          ignored -> List.of())
+                      .orElseThrow());
 
       ToolCallScanner.Result result =
           ToolCallScanner.scan(generated, ChatTemplate.NEEDLE2.toolSyntax());
@@ -94,6 +107,62 @@ class Needle2BackendIntegrationTest {
                 assertThat(call.name()).isEqualTo("get_weather");
                 assertThat(call.argumentsJson()).isEqualTo("{\"city\":\"Lagos\"}");
               });
+    }
+  }
+
+  @Test
+  void generatesTheOfficialRobotToolSequenceWithSchemaGrammarWhenProvided() throws IOException {
+    String configured = System.getProperty("models.fixtures.needle2Cact", "");
+    assumeTrue(!configured.isBlank(), "set -Dmodels.fixtures.needle2Cact=<needle2.cact>");
+    Path path = Path.of(configured);
+    assumeTrue(Files.isRegularFile(path), "Needle 2 fixture is not installed");
+    List<ToolSpec> tools =
+        List.of(
+            new ToolSpec(
+                "move",
+                "Drive the robot in a direction.",
+                "{\"type\":\"object\",\"properties\":{\"direction\":{\"type\":\"string\","
+                    + "\"enum\":[\"forward\",\"backward\",\"left\",\"right\"]},"
+                    + "\"distance_m\":{\"type\":\"number\",\"description\":\"Distance in meters.\"}},"
+                    + "\"required\":[\"direction\",\"distance_m\"]}"),
+            new ToolSpec(
+                "rotate",
+                "Rotate the robot in place.",
+                "{\"type\":\"object\",\"properties\":{\"direction\":{\"type\":\"string\","
+                    + "\"enum\":[\"left\",\"right\"]},\"degrees\":{\"type\":\"number\"}},"
+                    + "\"required\":[\"direction\",\"degrees\"]}"),
+            new ToolSpec(
+                "gripper",
+                "Open or close the gripper.",
+                "{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\","
+                    + "\"enum\":[\"open\",\"close\"]}},\"required\":[\"action\"]}"));
+    ModelPrompt prompt =
+        ChatTemplate.NEEDLE2.render(
+            List.of(
+                ChatMessage.user(
+                    "move forward 2 meters, turn left 90 degrees, then close the gripper")),
+            tools);
+
+    try (PureJavaBackend backend = PureJavaBackend.load(path)) {
+      TokenConstraint constraint =
+          ToolCallTokenConstraints.compile(
+                  backend.tokenizer(),
+                  ChatTemplate.NEEDLE2.toolSyntax(),
+                  tools,
+                  ignored -> List.of())
+              .orElseThrow();
+      String generated =
+          new GenerationLoop(backend)
+              .generate(
+                  prompt,
+                  SamplingOptions.builder().temperature(0.0f).maxTokens(128).build(),
+                  constraint);
+
+      ToolCallScanner.Result result =
+          ToolCallScanner.scan(generated, ChatTemplate.NEEDLE2.toolSyntax());
+      assertThat(result.toolCalls())
+          .extracting(call -> call.name())
+          .containsExactly("move", "rotate", "gripper");
     }
   }
 

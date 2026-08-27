@@ -69,8 +69,8 @@ public interface EmbeddingBackend extends AutoCloseable {
   }
 
   /**
-   * Default {@link #close()} is a no-op for backends that hold no native resources. ONNX/native
-   * implementations should override.
+   * Default {@link #close()} is a no-op for backends that hold no owned resources. Implementations
+   * with native or mapped state should override.
    */
   @Override
   default void close() {}

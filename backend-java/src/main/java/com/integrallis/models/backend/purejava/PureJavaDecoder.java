@@ -77,6 +77,26 @@ interface PureJavaDecoder extends AutoCloseable {
     return false;
   }
 
+  default boolean supportsContrastiveEncoding() {
+    return false;
+  }
+
+  default int contrastiveDimension() {
+    throw new UnsupportedOperationException("this architecture has no contrastive head");
+  }
+
+  default float[] encodeContrastive(int[] tokens) {
+    throw new UnsupportedOperationException("this architecture has no contrastive head");
+  }
+
+  default boolean supportsConfidenceScoring() {
+    return false;
+  }
+
+  default float scoreConfidence(int[] tokens) {
+    throw new UnsupportedOperationException("this architecture has no confidence head");
+  }
+
   Session openSession();
 
   float[] forward(Session session, int token, int position);

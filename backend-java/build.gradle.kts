@@ -192,6 +192,9 @@ tasks.register<Test>("needle2CactCompatibilityTest") {
             "com.integrallis.models.backend.purejava.cact.CactTokenizerTest.matchesPinnedOfficialNeedle2ReferenceValuesWhenProvided",
         )
         includeTestsMatching(
+            "com.integrallis.models.backend.purejava.cact.CactTokenizerTest.matchesPinnedNeedleReferenceForRobotToolPromptWhenProvided",
+        )
+        includeTestsMatching(
             "com.integrallis.models.backend.purejava.cact.CactNeedle2LayoutTest.matchesPinnedOfficialNeedle2TensorLayoutWhenProvided",
         )
         includeTestsMatching(
@@ -206,15 +209,21 @@ tasks.register<Test>("needle2CactCompatibilityTest") {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.Needle2BackendIntegrationTest.generatesTheOfficialWeatherToolCallWhenProvided",
         )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.Needle2BackendIntegrationTest.generatesTheOfficialRobotToolSequenceWithSchemaGrammarWhenProvided",
+        )
     }
+    val configuredArtifact = configuredNeedle2CactPath.orNull
     val directory =
         fixtureDirectory.orNull
             ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString()
     systemProperty(
         "models.fixtures.needle2Cact",
-        Path.of(directory, "needle2.cact").toString(),
+        configuredArtifact ?: Path.of(directory, "needle2.cact").toString(),
     )
-    dependsOn(tasks.named(needle2CactFixture.taskName))
+    if (configuredArtifact == null) {
+        dependsOn(tasks.named(needle2CactFixture.taskName))
+    }
     outputs.upToDateWhen { false }
 }
 

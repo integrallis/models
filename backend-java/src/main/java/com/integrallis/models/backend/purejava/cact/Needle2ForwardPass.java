@@ -15,10 +15,11 @@
  */
 package com.integrallis.models.backend.purejava.cact;
 
+import com.integrallis.vectors.core.RotatedCodebookMatrix;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Incremental scalar reference forward pass for the Needle 2 `.cact` architecture. */
+/** Incremental pure-Java forward pass for the Needle 2 `.cact` architecture. */
 public final class Needle2ForwardPass {
 
   private static final int ENGRAM_SEED = 0x9E3779B9;
@@ -27,6 +28,11 @@ public final class Needle2ForwardPass {
 
   private record EngramState(float[] key, float[] value) {}
 
+  @FunctionalInterface
+  private interface HiddenCellConsumer {
+    void accept(float[] hiddenCell);
+  }
+
   private final Needle2Weights weights;
   private final CactHeader config;
   private final int capacity;
@@ -34,12 +40,18 @@ public final class Needle2ForwardPass {
   private final int attentionWidth;
   private final int kvWidth;
   private final int[] tokenHistory;
+  private final Needle2AttentionWindow attentionWindow;
   private final float[][][] keyCache;
   private final float[][][] valueCache;
   private final float[][][] engramValueHistory;
   private int checkpoint;
 
   public Needle2ForwardPass(Needle2Weights weights, int capacity) {
+    this(weights, capacity, 9);
+  }
+
+  /** Creates a sequence using the artifact tokenizer's {@code </tools>} token as a sink marker. */
+  public Needle2ForwardPass(Needle2Weights weights, int capacity, int toolDocumentEndToken) {
     this.weights = Objects.requireNonNull(weights, "weights");
     this.config = weights.header;
     if (capacity <= 0 || capacity > config.maximumSequenceLength()) {
@@ -51,12 +63,55 @@ public final class Needle2ForwardPass {
     this.attentionWidth = Math.multiplyExact(config.queryHeadCount(), config.headWidth());
     this.kvWidth = Math.multiplyExact(config.kvHeadCount(), config.headWidth());
     this.tokenHistory = new int[capacity];
+    this.attentionWindow = new Needle2AttentionWindow(config.kvWindow(), toolDocumentEndToken);
     this.keyCache = new float[config.layerCount()][capacity][kvWidth];
     this.valueCache = new float[config.layerCount()][capacity][kvWidth];
     this.engramValueHistory = new float[config.engramSites().size()][capacity][modelWidth];
   }
 
   public float[] forward(int token, int position) {
+    return forward(token, position, null, true);
+  }
+
+  /** Encodes a sequence with Needle's serialized contrastive retrieval head. */
+  public float[] encodeContrastive(int[] tokens) {
+    Needle2ProbeHead head =
+        weights
+            .contrastiveHead()
+            .orElseThrow(
+                () -> new IllegalStateException("Needle artifact has no contrastive head"));
+    return evaluateHead(tokens, head);
+  }
+
+  /** Scores a prompt-and-call sequence with Needle's serialized confidence head. */
+  public float scoreConfidence(int[] tokens) {
+    Needle2ProbeHead head =
+        weights
+            .confidenceHead()
+            .orElseThrow(() -> new IllegalStateException("Needle artifact has no confidence head"));
+    float logit = evaluateHead(tokens, head)[0];
+    return Needle2Math.sigmoid(logit);
+  }
+
+  private float[] evaluateHead(int[] tokens, Needle2ProbeHead head) {
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("Needle auxiliary head requires at least one token");
+    }
+    if (tokens.length > config.maximumSequenceLength()) {
+      throw new IllegalArgumentException(
+          "Needle auxiliary-head sequence exceeds " + config.maximumSequenceLength());
+    }
+    Needle2ForwardPass sequence = new Needle2ForwardPass(weights, tokens.length);
+    Needle2ProbeHead.Accumulator accumulator = head.newAccumulator();
+    for (int position = 0; position < tokens.length; position++) {
+      sequence.forward(tokens[position], position, accumulator::accept, false);
+    }
+    return accumulator.finish();
+  }
+
+  private float[] forward(
+      int token, int position, HiddenCellConsumer hiddenCells, boolean projectLogits) {
     if (token < 0 || token >= config.vocabularySize()) {
       throw new IllegalArgumentException("token outside Needle vocabulary: " + token);
     }
@@ -68,33 +123,42 @@ public final class Needle2ForwardPass {
       throw new IllegalArgumentException("Needle context capacity exceeded: " + capacity);
     }
     tokenHistory[position] = token;
+    attentionWindow.accept(token, position);
+    int[] visiblePositions = attentionWindow.visiblePositions(position);
     EngramState[] engrams = prepareEngrams(position);
 
     float[][] lanes = new float[config.mhcLanes()][modelWidth];
     float[] embedding = new float[modelWidth];
     weights.embedding.decodeRow(token, embedding);
     float embeddingScale = (float) Math.sqrt(modelWidth);
+    for (int column = 0; column < modelWidth; column++) {
+      embedding[column] *= embeddingScale;
+    }
+    if (hiddenCells != null) {
+      hiddenCells.accept(embedding);
+    }
     for (int lane = 0; lane < lanes.length; lane++) {
       for (int column = 0; column < modelWidth; column++) {
-        lanes[lane][column] = embedding[column] * embeddingScale;
+        lanes[lane][column] = embedding[column];
       }
     }
 
     for (int layer = 0; layer < config.layerCount(); layer++) {
-      lanes = executeLayer(lanes, layer, position, engrams);
-    }
-
-    float[] hidden = new float[modelWidth];
-    for (float[] lane : lanes) {
-      for (int column = 0; column < modelWidth; column++) {
-        hidden[column] += lane[column] / lanes.length;
+      lanes = executeLayer(lanes, layer, position, visiblePositions, engrams);
+      if (hiddenCells != null) {
+        hiddenCells.accept(meanLanes(lanes));
       }
     }
+
+    checkpoint++;
+    if (!projectLogits) {
+      return null;
+    }
+
+    float[] hidden = meanLanes(lanes);
     float[] normalized = new float[modelWidth];
     Needle2Math.zeroCenteredRmsNorm(hidden, weights.finalNorm, normalized);
-    float[] logits = multiply(weights.embedding, normalized);
-    checkpoint++;
-    return logits;
+    return multiply(weights.embedding, normalized);
   }
 
   public int checkpoint() {
@@ -107,6 +171,7 @@ public final class Needle2ForwardPass {
           "checkpoint must be between 0 and " + checkpoint + ": " + targetCheckpoint);
     }
     checkpoint = targetCheckpoint;
+    attentionWindow.rewind(targetCheckpoint);
   }
 
   public void reset() {
@@ -114,12 +179,19 @@ public final class Needle2ForwardPass {
   }
 
   private float[][] executeLayer(
-      float[][] lanes, int layerIndex, int position, EngramState[] engrams) {
+      float[][] lanes,
+      int layerIndex,
+      int position,
+      int[] visiblePositions,
+      EngramState[] engrams) {
     int laneCount = config.mhcLanes();
     Needle2Weights.Layer layer = weights.layers[layerIndex];
     float[] normalizedLanes = rmsUnit(flatten(lanes));
 
-    float[] preProjection = multiply(layer.mhcPhiPre(), normalizedLanes);
+    float[][] routingProjections =
+        multiplyTogether(
+            normalizedLanes, layer.mhcPhiPre(), layer.mhcPhiPost(), layer.mhcPhiResidual());
+    float[] preProjection = routingProjections[0];
     float[] preWeights = new float[laneCount];
     int activeLane = layerIndex % laneCount;
     for (int lane = 0; lane < laneCount; lane++) {
@@ -143,10 +215,10 @@ public final class Needle2ForwardPass {
       addScaled(blockInput, engram.value(), alpha);
     }
 
-    float[] blockOutput = executeBlock(layer, layerIndex, blockInput, position);
+    float[] blockOutput = executeBlock(layer, layerIndex, blockInput, position, visiblePositions);
     float[] residual = subtract(blockOutput, combined);
 
-    float[] postProjection = multiply(layer.mhcPhiPost(), normalizedLanes);
+    float[] postProjection = routingProjections[1];
     float[] postWeights = new float[laneCount];
     for (int lane = 0; lane < laneCount; lane++) {
       float offset = lane == activeLane ? 0.0f : -4.0f;
@@ -158,7 +230,7 @@ public final class Needle2ForwardPass {
                       + offset);
     }
 
-    float[] mixing = multiply(layer.mhcPhiResidual(), normalizedLanes);
+    float[] mixing = routingProjections[2];
     int matrixOffset = layerIndex * laneCount * laneCount;
     for (int index = 0; index < mixing.length; index++) {
       mixing[index] =
@@ -178,22 +250,37 @@ public final class Needle2ForwardPass {
   }
 
   private float[] executeBlock(
-      Needle2Weights.Layer layer, int layerIndex, float[] input, int position) {
+      Needle2Weights.Layer layer,
+      int layerIndex,
+      float[] input,
+      int position,
+      int[] visiblePositions) {
     float[] attentionInput = new float[modelWidth];
     Needle2Math.zeroCenteredRmsNorm(input, layer.normIn(), attentionInput);
 
-    float[] query = multiply(layer.query(), attentionInput);
-    float[] key = multiply(layer.key(), attentionInput);
-    float[] value = multiply(layer.value(), attentionInput);
+    float[][] attentionProjections =
+        multiplyTogether(
+            attentionInput,
+            layer.query(),
+            layer.key(),
+            layer.value(),
+            layer.attentionGateProjection());
+    float[] query = attentionProjections[0];
+    float[] key = attentionProjections[1];
+    float[] value = attentionProjections[2];
     normalizeHeads(query, config.queryHeadCount(), layer.queryNorm());
     normalizeHeads(key, config.kvHeadCount(), layer.keyNorm());
     applyRope(query, config.queryHeadCount(), position);
     applyRope(key, config.kvHeadCount(), position);
+    if (config.kvBits() != Byte.SIZE) {
+      throw new IllegalStateException(
+          "Needle Java inference does not yet implement " + config.kvBits() + "-bit KV cache");
+    }
     System.arraycopy(key, 0, keyCache[layerIndex][position], 0, kvWidth);
     System.arraycopy(value, 0, valueCache[layerIndex][position], 0, kvWidth);
 
-    float[] attended = attention(layerIndex, query, position);
-    float[] gate = multiply(layer.attentionGateProjection(), attentionInput);
+    float[] attended = attention(layerIndex, query, key, value, position, visiblePositions);
+    float[] gate = attentionProjections[3];
     for (int index = 0; index < attended.length; index++) {
       attended[index] *= Needle2Math.sigmoid(gate[index]);
     }
@@ -217,13 +304,18 @@ public final class Needle2ForwardPass {
     return output;
   }
 
-  private float[] attention(int layer, float[] query, int position) {
+  private float[] attention(
+      int layer,
+      float[] query,
+      float[] currentKey,
+      float[] currentValue,
+      int position,
+      int[] visiblePositions) {
     int queryHeads = config.queryHeadCount();
     int kvHeads = config.kvHeadCount();
     int repeats = queryHeads / kvHeads;
     int headWidth = config.headWidth();
-    int first = config.kvWindow() == 0 ? 0 : Math.max(0, position - config.kvWindow() + 1);
-    int attendedPositions = position - first + 1;
+    int attendedPositions = visiblePositions.length;
     float[] result = new float[attentionWidth];
     float[] scores = new float[attendedPositions];
     float scale = (float) Math.sqrt(headWidth);
@@ -233,9 +325,10 @@ public final class Needle2ForwardPass {
       int kvOffset = kvHead * headWidth;
       float maximum = Float.NEGATIVE_INFINITY;
       for (int index = 0; index < attendedPositions; index++) {
-        int cachedPosition = first + index;
-        float score =
-            dot(query, queryOffset, keyCache[layer][cachedPosition], kvOffset, headWidth) / scale;
+        int cachedPosition = visiblePositions[index];
+        float[] cachedKey =
+            cachedPosition == position ? currentKey : keyCache[layer][cachedPosition];
+        float score = dot(query, queryOffset, cachedKey, kvOffset, headWidth) / scale;
         scores[index] = score;
         maximum = Math.max(maximum, score);
       }
@@ -246,10 +339,11 @@ public final class Needle2ForwardPass {
       }
       for (int index = 0; index < attendedPositions; index++) {
         float probability = scores[index] / denominator;
-        int cachedPosition = first + index;
+        int cachedPosition = visiblePositions[index];
+        float[] cachedValue =
+            cachedPosition == position ? currentValue : valueCache[layer][cachedPosition];
         for (int column = 0; column < headWidth; column++) {
-          result[queryOffset + column] +=
-              probability * valueCache[layer][cachedPosition][kvOffset + column];
+          result[queryOffset + column] += probability * cachedValue[kvOffset + column];
         }
       }
     }
@@ -277,8 +371,10 @@ public final class Needle2ForwardPass {
           System.arraycopy(tableRow, 0, concatenated, table * subDimension, subDimension);
         }
       }
-      float[] key = multiply(weightsAtSite.key(), concatenated);
-      float[] rawValue = multiply(weightsAtSite.value(), concatenated);
+      float[][] projections =
+          multiplyTogether(concatenated, weightsAtSite.key(), weightsAtSite.value());
+      float[] key = projections[0];
+      float[] rawValue = projections[1];
       System.arraycopy(rawValue, 0, engramValueHistory[site][position], 0, modelWidth);
       float[] convolvedValue = new float[modelWidth];
       for (int tap = 0; tap < config.engramConvolutionTaps(); tap++) {
@@ -332,6 +428,21 @@ public final class Needle2ForwardPass {
     return output;
   }
 
+  private static float[][] multiplyTogether(float[] input, CactCqMatrix... matrices) {
+    float[][] outputs = new float[matrices.length][];
+    RotatedCodebookMatrix.PreparedActivation activation = null;
+    for (int index = 0; index < matrices.length; index++) {
+      CactCqMatrix matrix = matrices[index];
+      if (!matrix.accepts(activation)) {
+        activation = matrix.prepare(input);
+      }
+      float[] output = new float[matrix.rows()];
+      matrix.multiply(activation, output);
+      outputs[index] = output;
+    }
+    return outputs;
+  }
+
   private static float[] flatten(float[][] values) {
     int columns = values[0].length;
     float[] result = new float[Math.multiplyExact(values.length, columns)];
@@ -345,6 +456,15 @@ public final class Needle2ForwardPass {
     float[] result = new float[lanes[0].length];
     for (int lane = 0; lane < lanes.length; lane++) {
       addScaled(result, lanes[lane], weights[lane]);
+    }
+    return result;
+  }
+
+  private static float[] meanLanes(float[][] lanes) {
+    float[] result = new float[lanes[0].length];
+    float scale = 1.0f / lanes.length;
+    for (float[] lane : lanes) {
+      addScaled(result, lane, scale);
     }
     return result;
   }
