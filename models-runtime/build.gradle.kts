@@ -2,4 +2,6 @@
 
 dependencies {
     api(project(":models-api"))
+
+    implementation("com.fasterxml.jackson.core:jackson-core:2.21.4")
 }

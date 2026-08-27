@@ -44,9 +44,10 @@ public final class ToolCallTokenConstraints {
         && syntax.mode() != ToolSyntax.Mode.JSON_NATIVE) {
       return Optional.empty();
     }
-    // Array-wrapped families generate a reasoning span before a possibly parallel call array.
-    // A finite single-call alternative would skip that trained prefix and emit the wrong shape.
     if (syntax.arrayWrapped()) {
+      if (syntax == ToolSyntax.NEEDLE2) {
+        return Optional.of(Needle2ToolCallConstraint.compile(tokenizer, tools));
+      }
       return Optional.empty();
     }
     List<String> alternatives = new ArrayList<>();

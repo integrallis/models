@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.runtime;
 
+import com.integrallis.models.api.AuxiliaryInferenceBackend;
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.InferenceContextWindow;
@@ -40,7 +42,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>The pipeline owns the backend supplied to {@link #InferencePipeline(InferenceBackend)} and
  * closes it exactly once. It must not be used after {@link #close()}.
  */
-public final class InferencePipeline implements TextGenerationModel {
+public final class InferencePipeline
+    implements ConstrainedTextGenerationModel, AuxiliaryTextGenerationModel {
   private final InferenceBackend backend;
   private final GenerationLoop generationLoop;
   private final AtomicBoolean closed = new AtomicBoolean();
@@ -193,6 +196,59 @@ public final class InferencePipeline implements TextGenerationModel {
     }
   }
 
+  @Override
+  public void generate(
+      ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+    synchronized (backend) {
+      requireOpen();
+      generationLoop.generate(prompt, options, stream, constraint);
+    }
+  }
+
+  @Override
+  public boolean supportsContrastiveEncoding() {
+    synchronized (backend) {
+      requireOpen();
+      return backend instanceof AuxiliaryInferenceBackend auxiliary
+          && auxiliary.supportsContrastiveEncoding();
+    }
+  }
+
+  @Override
+  public int contrastiveDimension() {
+    synchronized (backend) {
+      requireOpen();
+      return auxiliaryWithContrastiveHead().contrastiveDimension();
+    }
+  }
+
+  @Override
+  public float[] encodeContrastive(ModelPrompt prompt) {
+    Objects.requireNonNull(prompt, "prompt");
+    synchronized (backend) {
+      requireOpen();
+      return auxiliaryWithContrastiveHead().encodeContrastive(backend.tokenizer().encode(prompt));
+    }
+  }
+
+  @Override
+  public boolean supportsConfidenceScoring() {
+    synchronized (backend) {
+      requireOpen();
+      return backend instanceof AuxiliaryInferenceBackend auxiliary
+          && auxiliary.supportsConfidenceScoring();
+    }
+  }
+
+  @Override
+  public float scoreConfidence(ModelPrompt sequence) {
+    Objects.requireNonNull(sequence, "sequence");
+    synchronized (backend) {
+      requireOpen();
+      return auxiliaryWithConfidenceHead().scoreConfidence(backend.tokenizer().encode(sequence));
+    }
+  }
+
   /** Closes the owned backend exactly once. */
   @Override
   public void close() {
@@ -210,6 +266,22 @@ public final class InferencePipeline implements TextGenerationModel {
     }
     throw new UnsupportedOperationException(
         "Backend " + backend.name() + " does not support checkpoint and rewind");
+  }
+
+  private AuxiliaryInferenceBackend auxiliaryWithContrastiveHead() {
+    if (backend instanceof AuxiliaryInferenceBackend auxiliary
+        && auxiliary.supportsContrastiveEncoding()) {
+      return auxiliary;
+    }
+    throw new UnsupportedOperationException("model has no contrastive encoding head");
+  }
+
+  private AuxiliaryInferenceBackend auxiliaryWithConfidenceHead() {
+    if (backend instanceof AuxiliaryInferenceBackend auxiliary
+        && auxiliary.supportsConfidenceScoring()) {
+      return auxiliary;
+    }
+    throw new UnsupportedOperationException("model has no confidence head");
   }
 
   private void requireOpen() {

@@ -21,6 +21,7 @@ import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.chat.ToolSyntax;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -28,22 +29,90 @@ import org.junit.jupiter.api.Test;
 class ToolCallTokenConstraintsTest {
 
   @Test
-  void doesNotApplySingleCallConstraintsToNeedle2ArrayWrappedGeneration() {
-    var tool = new ToolSpec("set_mode", "Set the mode", "{}");
+  void compilesNeedle2ArrayGrammarFromTheDeclaredToolSchema() {
+    var tool =
+        new ToolSpec(
+            "set_mode",
+            "Set the mode",
+            """
+            {"type":"object","properties":{"mode":{"type":"string","enum":["cool","heat"]}},"required":["mode"]}
+            """);
 
-    assertThat(
-            ToolCallTokenConstraints.compile(
-                new UnusedTokenizer(),
-                ToolSyntax.NEEDLE2,
-                List.of(tool),
-                ignored -> List.of("{\"mode\":\"cool\"}")))
-        .isEmpty();
+    Optional<TokenConstraint> compiled =
+        ToolCallTokenConstraints.compile(
+            NEEDLE_TOKENIZER,
+            ToolSyntax.NEEDLE2,
+            List.of(tool),
+            ignored -> List.of("{\"mode\":\"cool\"}"));
+
+    assertThat(compiled).isPresent();
+    TokenConstraint constraint = compiled.orElseThrow();
+    constraint.accept(1);
+    constraint.accept(2);
+    constraint.accept(3);
+    assertThat(constraint.allows(4)).isTrue();
+    assertThat(constraint.allows(7)).isFalse();
+    assertThat(constraint.allows(8)).isFalse();
+    constraint.accept(4);
+    constraint.accept(5);
+    constraint.accept(6);
+    assertThat(constraint.isComplete()).isTrue();
   }
 
-  private static final class UnusedTokenizer implements Tokenizer {
+  @Test
+  void needle2GrammarAllowsARefusalAndParallelCalls() {
+    var tool =
+        new ToolSpec(
+            "echo",
+            "Echo text",
+            """
+            {"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}
+            """);
+
+    TokenConstraint refusal =
+        ToolCallTokenConstraints.compile(
+                NEEDLE_TOKENIZER, ToolSyntax.NEEDLE2, List.of(tool), ignored -> List.of())
+            .orElseThrow();
+    refusal.accept(2);
+    refusal.accept(9);
+    refusal.accept(6);
+    assertThat(refusal.isComplete()).isTrue();
+
+    TokenConstraint parallel =
+        ToolCallTokenConstraints.compile(
+                NEEDLE_TOKENIZER, ToolSyntax.NEEDLE2, List.of(tool), ignored -> List.of())
+            .orElseThrow();
+    parallel.accept(2);
+    parallel.accept(3);
+    parallel.accept(10);
+    parallel.accept(11);
+    parallel.accept(10);
+    parallel.accept(5);
+    parallel.accept(6);
+    assertThat(parallel.isComplete()).isTrue();
+  }
+
+  private static final Tokenizer NEEDLE_TOKENIZER = new NeedleTokenizer();
+
+  private static final class NeedleTokenizer implements Tokenizer {
+    private static final String[] TOKENS = {
+      "</s>",
+      "<think>because</think>\n",
+      "<tool_call>",
+      "[",
+      "{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}",
+      "]",
+      "</tool_call>",
+      "{\"name\":\"invented\",\"arguments\":{\"mode\":\"cool\"}}",
+      "{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"invalid\"}}",
+      "[]",
+      "{\"name\":\"echo\",\"arguments\":{\"text\":\"hello\"}}",
+      ","
+    };
+
     @Override
     public int[] encode(String text) {
-      throw new AssertionError("array-wrapped syntax must fall back before tokenization");
+      throw new AssertionError("not used");
     }
 
     @Override
@@ -53,12 +122,12 @@ class ToolCallTokenConstraintsTest {
 
     @Override
     public String decode(int token) {
-      throw new AssertionError("not used");
+      return TOKENS[token];
     }
 
     @Override
     public int vocabSize() {
-      return 1;
+      return TOKENS.length;
     }
 
     @Override

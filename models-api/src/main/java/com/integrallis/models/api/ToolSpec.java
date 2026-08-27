@@ -20,10 +20,10 @@ import java.util.Objects;
 /**
  * A tool the model may call, as declared by the application.
  *
- * <p>{@code inputSchema} is JSON Schema text carried verbatim. The runtime renders it into the
- * prompt but never parses it, which keeps this module dependency-free. Spring AI supplies the
- * schema as a string already; LangChain4j models it as a typed tree, so its adapter serialises
- * before constructing a {@code ToolSpec}.
+ * <p>{@code inputSchema} is JSON Schema text carried verbatim by this dependency-free API module. A
+ * runtime may parse it to compile a decoding constraint. Spring AI supplies the schema as a string
+ * already; LangChain4j models it as a typed tree, so its adapter serialises before constructing a
+ * {@code ToolSpec}.
  */
 public record ToolSpec(String name, String description, String inputSchema) {
 
