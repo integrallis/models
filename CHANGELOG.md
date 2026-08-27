@@ -2,7 +2,7 @@
 
 All notable changes to models are documented here.
 
-## [Unreleased]
+## [0.3.11] - 2026-08-27
 
 ### Added
 
@@ -37,6 +37,8 @@ All notable changes to models are documented here.
   External engines are benchmark-only correctness/performance oracles; planned
   ONNX support will parse and execute supported operations in Java rather than
   embedding ONNX Runtime.
+- Raised the Vectors baseline to 0.1.13 for reusable prepared rotated-codebook
+  activations in the Java CACT path.
 
 ## [0.3.10] - 2026-08-25
 
