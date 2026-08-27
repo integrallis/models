@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added the first-class `needle2` chat template and tool syntax. It renders the
+  official raw-schema prompt contract, system facts, array-wrapped parallel
+  calls, and plain user turns for tool results, and recovers generated calls
+  through the shared runtime scanner.
+
+### Fixed
+
+- Prevented finite single-call constraints from being applied to Needle 2's
+  reasoning-prefixed call arrays.
+
 ## [0.3.10] - 2026-08-25
 
 ### Added

@@ -24,7 +24,9 @@ The GGUF decoder recognizes `llama`, `qwen2`, `qwen3`, and `gemma4` metadata
 prefixes. The Hugging Face path supports strict Qwen 2/Qwen2.5 BF16
 Safetensors bundles with either one weight file or an indexed shard set. The
 CACT path supports the released Needle 2 architecture and mixed CQ2/CQ4
-artifact layout.
+artifact layout. `ChatTemplate.NEEDLE2` implements its official raw-schema
+prompt protocol, including optional system facts and array-wrapped parallel
+tool calls.
 
 Projection kernels support:
 
@@ -127,7 +129,8 @@ token embeddings.
 Pinned greedy-token references compare selected GGUF fixtures with a recorded
 llama.cpp revision. Safetensors fixtures use pinned Hugging Face Transformers
 token/logit and same-host RAG references. Needle 2 uses the checksum-pinned
-official CACT artifact and engine behavior. These are test oracles and
+official CACT artifact and engine behavior; CI also generates and parses the
+reference weather tool call through the public template API. These are test oracles and
 benchmark comparators, not runtime dependencies.
 
 == Backend Qualification

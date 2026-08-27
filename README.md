@@ -67,7 +67,7 @@ Implemented functionality includes:
 - byte-level BPE and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
-- tool calling across Qwen, Hermes, Llama 3, Gemma 4, and MiniCPM5 formats,
+- tool calling across Qwen, Hermes, Llama 3, Needle 2, Gemma 4, and MiniCPM5 formats,
   with LangChain4j and Spring AI schema-constrained tool decoding for
   enumerable arguments
 - in-JVM text embeddings with last-token and mean pooling, tested to produce the
@@ -200,6 +200,11 @@ use the lower-level `PureJavaBackend.load(Path)` and
 Wrap either backend in `InferencePipeline` for ownership-safe access to the
 tokenizer, model metadata, active context window, structured prefill,
 forward-pass logits, reset, checkpoint, and rewind.
+
+Needle 2 CACT artifacts use the same public prompt and parsing APIs. The
+`ChatTemplate.NEEDLE2` renderer emits the model's raw tool-schema envelope and
+`ToolCallScanner` recovers its array-wrapped calls; callers do not need to
+reproduce the CACT reference prompt by hand.
 
 Streaming uses the same loaded model:
 

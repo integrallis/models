@@ -75,7 +75,8 @@ jobs:
             ~/.jvllm/models/MiniCPM5-1B-Q4_K_M.gguf
             ~/.jvllm/models/Qwen2.5-Math-1.5B-Instruct-Q4_K_M.gguf
             ~/.jvllm/models/EuroLLM-1.7B-Instruct.Q4_K_M.gguf
-          key: purejava-model-fixtures-v5
+            ~/.jvllm/models/needle2.cact
+          key: purejava-model-fixtures-v6
 
       - name: Download pure-Java model fixtures
         working-directory: models
@@ -95,6 +96,15 @@ jobs:
           :backend-java:downloadQwen25Math15BQ4KMModel
           :backend-java:downloadEuroLlm17BQ4KMModel
           :backend-java:downloadQwen3Embedding06BQ80Model
+          :backend-java:downloadNeedle2Cact
+          --no-daemon
+          --stacktrace
+
+      - name: Run pinned Needle 2 CACT compatibility tests
+        working-directory: models
+        run: >
+          ./gradlew
+          :backend-java:needle2CactCompatibilityTest
           --no-daemon
           --stacktrace
 

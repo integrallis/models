@@ -82,6 +82,37 @@ public final class ToolCallScanner {
       }
       prose.append(text, cursor, callStart);
 
+      if (syntax.arrayWrapped()) {
+        int arrayStart = text.indexOf('[', callStart + syntax.sectionStart().length());
+        int arrayEnd = arrayStart < 0 ? -1 : matchingArray(text, arrayStart);
+        if (arrayStart < 0 || arrayEnd < 0) {
+          prose.append(text, callStart, text.length());
+          break;
+        }
+        int arrayCursor = arrayStart + 1;
+        while (arrayCursor < arrayEnd) {
+          int objectStart = text.indexOf('{', arrayCursor);
+          if (objectStart < 0 || objectStart >= arrayEnd) {
+            break;
+          }
+          int objectEnd = matchingBrace(text, objectStart);
+          if (objectEnd < 0 || objectEnd > arrayEnd) {
+            prose.append(text, callStart, text.length());
+            return Result.plainText(generated);
+          }
+          ToolCall call = toCall(text.substring(objectStart, objectEnd + 1), calls.size(), syntax);
+          if (call != null) {
+            calls.add(call);
+            if (!syntax.parallelCalls()) {
+              break;
+            }
+          }
+          arrayCursor = objectEnd + 1;
+        }
+        cursor = advancePastSectionEnd(text, arrayEnd + 1, syntax);
+        continue;
+      }
+
       int objectStart = text.indexOf('{', callStart);
       if (objectStart < 0) {
         prose.append(text, callStart, text.length());
@@ -214,6 +245,37 @@ public final class ToolCallScanner {
         }
         default -> {
           // Structural characters outside strings need no handling.
+        }
+      }
+    }
+    return -1;
+  }
+
+  /** Returns the closing bracket of a JSON array, ignoring brackets inside strings. */
+  private static int matchingArray(String text, int open) {
+    int depth = 0;
+    boolean inString = false;
+    boolean escaped = false;
+    for (int index = open; index < text.length(); index++) {
+      char current = text.charAt(index);
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (current == '\\') {
+          escaped = true;
+        } else if (current == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (current == '"') {
+        inString = true;
+      } else if (current == '[') {
+        depth++;
+      } else if (current == ']') {
+        depth--;
+        if (depth == 0) {
+          return index;
         }
       }
     }

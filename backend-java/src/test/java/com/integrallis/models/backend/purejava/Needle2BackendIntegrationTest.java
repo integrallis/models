@@ -20,20 +20,20 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.GenerationLoop;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.models.runtime.chat.ToolCallScanner;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("integration")
 class Needle2BackendIntegrationTest {
-
-  private static final String WEATHER_TOOLS =
-      "[{\"name\":\"get_weather\",\"description\":\"Get the current weather for a city.\","
-          + "\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},"
-          + "\"required\":[\"city\"]}}]";
 
   @Test
   void loadsCactThroughThePublicBackendContractWhenProvided() throws IOException {
@@ -70,24 +70,30 @@ class Needle2BackendIntegrationTest {
     assumeTrue(!configured.isBlank(), "set -Dmodels.fixtures.needle2Cact=<needle2.cact>");
     Path path = Path.of(configured);
     assumeTrue(Files.isRegularFile(path), "Needle 2 fixture is not installed");
+    ToolSpec weather =
+        new ToolSpec(
+            "get_weather",
+            "Get the current weather for a city.",
+            "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},"
+                + "\"required\":[\"city\"]}");
     ModelPrompt prompt =
-        ModelPrompt.builder()
-            .control("<|im_start|>")
-            .text("user\n")
-            .control("<tools>")
-            .text(WEATHER_TOOLS)
-            .control("</tools>")
-            .text("\nweather in Lagos")
-            .control("<|im_end|>\n<|im_start|>")
-            .text("assistant\n")
-            .build();
+        ChatTemplate.NEEDLE2.render(
+            List.of(ChatMessage.user("weather in Lagos")), List.of(weather));
 
     try (PureJavaBackend backend = PureJavaBackend.load(path)) {
       String generated =
           new GenerationLoop(backend)
               .generate(prompt, SamplingOptions.builder().temperature(0.0f).maxTokens(64).build());
 
-      assertThat(generated).contains("get_weather").contains("\"city\":\"Lagos\"");
+      ToolCallScanner.Result result =
+          ToolCallScanner.scan(generated, ChatTemplate.NEEDLE2.toolSyntax());
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.argumentsJson()).isEqualTo("{\"city\":\"Lagos\"}");
+              });
     }
   }
 

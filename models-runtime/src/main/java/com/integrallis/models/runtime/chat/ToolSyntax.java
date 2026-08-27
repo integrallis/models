@@ -60,7 +60,9 @@ public record ToolSyntax(
     /** A first-class {@code tool} turn (Hermes, Granite). */
     TOOL_ROLE,
     /** Llama 3.x's {@code ipython} role. */
-    IPYTHON
+    IPYTHON,
+    /** A normal {@code user} turn with no wrapper around the serialized result (Needle 2). */
+    USER_PLAIN
   }
 
   /** No trained tool-call format; tools must be refused rather than approximated. */
@@ -116,6 +118,23 @@ public record ToolSyntax(
           false,
           false,
           ResultStyle.IPYTHON,
+          "",
+          "");
+
+  /**
+   * Needle 2. Calls are emitted as one JSON array inside {@code <tool_call>}; tool results return
+   * as ordinary user text on the next turn.
+   */
+  public static final ToolSyntax NEEDLE2 =
+      new ToolSyntax(
+          Mode.TAG_WITH_JSON,
+          "<tool_call>",
+          "</tool_call>",
+          "name",
+          "arguments",
+          true,
+          true,
+          ResultStyle.USER_PLAIN,
           "",
           "");
 

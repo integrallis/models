@@ -48,6 +48,13 @@ class ChatTemplateToolSyntaxTest {
     }
 
     @Test
+    void needle2UsesItsArrayWrappedToolFormat() {
+      assertThat(ChatTemplate.NEEDLE2.toolSyntax()).isEqualTo(ToolSyntax.NEEDLE2);
+      assertThat(ChatTemplate.NEEDLE2.canParseToolCalls()).isTrue();
+      assertThat(ChatTemplate.NEEDLE2.toolSyntax().arrayWrapped()).isTrue();
+    }
+
+    @Test
     void familiesWithNoToolFormatDeclareNone() {
       // Verified against each family's published chat template: Gemma 2 and Phi-3.5 have no
       // `tools` variable at all, and the DeepSeek templates expose none either.

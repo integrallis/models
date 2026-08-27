@@ -61,6 +61,27 @@ Plain `String` prompts are also encoded as ordinary text. Use
 `ModelPrompt.control(...)` only for a complete, trusted template supplied by
 the application.
 
+For Needle 2, use `ChatTemplate.NEEDLE2` with ordinary `ToolSpec` values. The
+renderer follows the CACT reference protocol: schemas are placed directly in
+the `<tools>` array rather than wrapped in an OpenAI function object, and
+parallel calls are emitted as one JSON array inside `<tool_call>`.
+
+[source,java]
+----
+var weather = new ToolSpec(
+    "get_weather",
+    "Get the current weather for a city.",
+    "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},"
+        + "\"required\":[\"city\"]}");
+
+var prompt = ChatTemplate.NEEDLE2.render(
+    List.of(ChatMessage.user("weather in Lagos")),
+    List.of(weather));
+var generated = model.generate(prompt, options);
+var calls = ToolCallScanner.scan(
+    generated, ChatTemplate.NEEDLE2.toolSyntax()).toolCalls();
+----
+
 `ModelJars.openRuntime` resolves the marker already present on the classpath, downloads
 the pinned weights when they are absent, verifies size and SHA-256, selects the
 qualified backend, and applies a performance profile only when its artifact,

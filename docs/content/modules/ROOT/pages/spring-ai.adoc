@@ -152,8 +152,9 @@ syntax from being decoded" for the supported schema subset.
 
 Today the Spring AI adapter constrains finite tool-call spaces:
 
-* tool syntax must be one of the Models JSON-shaped formats, such as ChatML or
-  Llama 3 JSON-native tool calls
+* tool syntax must be one of the non-array-wrapped Models JSON formats, such as
+  ChatML or Llama 3 JSON-native tool calls; Needle 2 uses its normal
+  array-aware generation path
 * argument properties must be string `enum` values, or absent
 * every `required` property must be one of those enumerable properties
 * the compiled call set is capped to keep decoding checks bounded
