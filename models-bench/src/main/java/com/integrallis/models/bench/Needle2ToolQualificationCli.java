@@ -252,9 +252,9 @@ final class Needle2ToolQualificationCli {
         suite.sourcePath());
   }
 
-  private static String implementationVersion() {
+  static String implementationVersion(String modelsRevision) {
     String version = PureJavaBackend.class.getPackage().getImplementationVersion();
-    return version == null || version.isBlank() ? "development" : version;
+    return version == null || version.isBlank() ? "models@" + modelsRevision : version;
   }
 
   private static Report report(
@@ -277,7 +277,7 @@ final class Needle2ToolQualificationCli {
         MODEL_ID,
         MODEL_NAME,
         "pure-java",
-        implementationVersion(),
+        implementationVersion(configuration.modelsRevision()),
         artifactSha256,
         Files.size(configuration.model()),
         suiteIdentity,

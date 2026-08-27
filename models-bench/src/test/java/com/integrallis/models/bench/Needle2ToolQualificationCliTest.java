@@ -74,6 +74,12 @@ class Needle2ToolQualificationCliTest {
   }
 
   @Test
+  void identifiesAnUnpackagedQualificationByItsExactSourceRevision() {
+    assertThat(Needle2ToolQualificationCli.implementationVersion(REVISION))
+        .isEqualTo("models@" + REVISION);
+  }
+
+  @Test
   void rejectsMissingArtifactsAndUnsafeTokenLimits() {
     assertThatIllegalArgumentException()
         .isThrownBy(
