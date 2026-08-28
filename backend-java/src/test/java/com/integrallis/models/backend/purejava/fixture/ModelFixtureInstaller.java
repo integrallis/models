@@ -17,18 +17,26 @@ package com.integrallis.models.backend.purejava.fixture;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URLConnection;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Downloads one pinned fixture and installs it only after size and SHA-256 verification. */
 final class ModelFixtureInstaller {
   private static final int BUFFER_SIZE = 1024 * 1024;
+  private static final int MAX_DOWNLOAD_ATTEMPTS = 4;
+  private static final long INITIAL_RETRY_DELAY_MILLIS = 1_000;
+  private static final Pattern CONTENT_RANGE = Pattern.compile("bytes\\s+(\\d+)-(\\d+)/(\\d+)");
 
   private ModelFixtureInstaller() {}
 
@@ -41,13 +49,7 @@ final class ModelFixtureInstaller {
     Files.createDirectories(target.toAbsolutePath().getParent());
     Path temporary = Files.createTempFile(target.toAbsolutePath().getParent(), ".model-", ".part");
     try {
-      URLConnection connection = descriptor.downloadUri().toURL().openConnection();
-      connection.setRequestProperty("User-Agent", "integrallis-models-test-fixtures/0.1");
-      connection.setConnectTimeout(30_000);
-      connection.setReadTimeout(120_000);
-      try (InputStream input = connection.getInputStream()) {
-        Files.copy(input, temporary, StandardCopyOption.REPLACE_EXISTING);
-      }
+      download(descriptor, temporary);
       requireMatch(temporary, descriptor);
       try {
         Files.move(
@@ -58,6 +60,119 @@ final class ModelFixtureInstaller {
       return target;
     } finally {
       Files.deleteIfExists(temporary);
+    }
+  }
+
+  private static void download(ModelFixtureDescriptor descriptor, Path temporary)
+      throws IOException {
+    long expectedSize = descriptor.sizeBytes().orElseThrow();
+    IOException lastFailure = null;
+    for (int attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
+      long downloaded = Files.size(temporary);
+      if (downloaded >= expectedSize) {
+        return;
+      }
+      try {
+        downloadAttempt(descriptor, temporary, expectedSize);
+        downloaded = Files.size(temporary);
+        if (downloaded >= expectedSize) {
+          return;
+        }
+        lastFailure =
+            new IOException(
+                "Incomplete fixture download: expected "
+                    + expectedSize
+                    + " bytes, got "
+                    + downloaded);
+      } catch (IOException failure) {
+        lastFailure = failure;
+      }
+      if (attempt < MAX_DOWNLOAD_ATTEMPTS) {
+        pauseBeforeRetry(attempt);
+      }
+    }
+    throw new IOException(
+        "Unable to download fixture "
+            + descriptor.id()
+            + " after "
+            + MAX_DOWNLOAD_ATTEMPTS
+            + " attempts; received "
+            + Files.size(temporary)
+            + " of "
+            + expectedSize
+            + " bytes",
+        lastFailure);
+  }
+
+  private static void downloadAttempt(
+      ModelFixtureDescriptor descriptor, Path temporary, long expectedSize) throws IOException {
+    long offset = Files.size(temporary);
+    URLConnection connection = descriptor.downloadUri().toURL().openConnection();
+    connection.setRequestProperty("User-Agent", "integrallis-models-test-fixtures/0.1");
+    connection.setRequestProperty("Accept-Encoding", "identity");
+    connection.setConnectTimeout(30_000);
+    connection.setReadTimeout(120_000);
+    HttpURLConnection http =
+        connection instanceof HttpURLConnection httpConnection ? httpConnection : null;
+    try {
+      if (http != null && offset > 0) {
+        http.setRequestProperty("Range", "bytes=" + offset + "-");
+      }
+
+      boolean append = false;
+      if (http != null) {
+        int status = http.getResponseCode();
+        if (offset > 0 && status == HttpURLConnection.HTTP_PARTIAL) {
+          verifyContentRange(http.getHeaderField("Content-Range"), offset, expectedSize);
+          append = true;
+        } else if (status != HttpURLConnection.HTTP_OK) {
+          throw new IOException(
+              "Fixture download returned HTTP " + status + " for " + descriptor.id());
+        }
+      }
+
+      try (InputStream input = connection.getInputStream();
+          OutputStream output =
+              append
+                  ? Files.newOutputStream(
+                      temporary, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
+                  : Files.newOutputStream(
+                      temporary, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+        input.transferTo(output);
+      }
+    } finally {
+      if (http != null) {
+        http.disconnect();
+      }
+    }
+  }
+
+  private static void verifyContentRange(String contentRange, long offset, long expectedSize)
+      throws IOException {
+    Matcher matcher = contentRange == null ? null : CONTENT_RANGE.matcher(contentRange);
+    if (matcher == null || !matcher.matches()) {
+      throw new IOException(
+          "Invalid Content-Range for fixture download at byte " + offset + ": " + contentRange);
+    }
+    try {
+      long start = Long.parseLong(matcher.group(1));
+      long end = Long.parseLong(matcher.group(2));
+      long total = Long.parseLong(matcher.group(3));
+      if (start != offset || end < start || end >= expectedSize || total != expectedSize) {
+        throw new IOException(
+            "Invalid Content-Range for fixture download at byte " + offset + ": " + contentRange);
+      }
+    } catch (NumberFormatException malformed) {
+      throw new IOException("Invalid numeric Content-Range: " + contentRange, malformed);
+    }
+  }
+
+  private static void pauseBeforeRetry(int failedAttempt) throws IOException {
+    try {
+      Thread.sleep(INITIAL_RETRY_DELAY_MILLIS << (failedAttempt - 1));
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while waiting to retry fixture download", interrupted);
     }
   }
 
