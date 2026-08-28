@@ -2,7 +2,7 @@
 
 All notable changes to models are documented here.
 
-## Unreleased
+## [0.3.12] - 2026-08-28
 
 ### Fixed
 
