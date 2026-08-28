@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava;
 
+import com.integrallis.models.api.AuxiliaryInferenceBackend;
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.BatchInferenceBackend;
@@ -68,7 +69,8 @@ import java.util.Objects;
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
  * any native dependencies.
  */
-public final class PureJavaBackend implements SpeculativeInferenceBackend, BatchInferenceBackend {
+public final class PureJavaBackend
+    implements SpeculativeInferenceBackend, BatchInferenceBackend, AuxiliaryInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
@@ -219,8 +221,11 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
       } else if (CactParser.matches(modelPath)) {
         CactFile file = CactParser.parse(modelPath, arena);
         CactNeedle2Layout layout = CactNeedle2Layout.from(file);
-        tokenizer = CactTokenizer.from(file);
-        loaded = loadNeedle2(modelPath, layout, runtime, planConfiguration, batchedMatrixKernel);
+        CactTokenizer cactTokenizer = CactTokenizer.from(file);
+        tokenizer = cactTokenizer;
+        loaded =
+            loadNeedle2(
+                modelPath, layout, cactTokenizer, runtime, planConfiguration, batchedMatrixKernel);
       } else {
         GgufFile file = GgufParser.parse(modelPath, arena);
         tokenizer = GgufTokenizer.fromMetadata(file.metadata());
@@ -264,6 +269,7 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   private static LoadedDecoder loadNeedle2(
       Path modelPath,
       CactNeedle2Layout layout,
+      CactTokenizer tokenizer,
       RuntimeFingerprint runtime,
       PureJavaPlanConfiguration planConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
@@ -289,7 +295,8 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
             config.queryHeadCount(),
             config.kvHeadCount());
     return new LoadedDecoder(
-        new Needle2DecoderAdapter(Needle2Weights.load(layout), contextCapacity),
+        new Needle2DecoderAdapter(
+            Needle2Weights.load(layout), contextCapacity, tokenizer.tokenId("</tools>")),
         metadata,
         contextCapacity,
         executionPlan);
@@ -506,6 +513,34 @@ public final class PureJavaBackend implements SpeculativeInferenceBackend, Batch
   /** Whether this model encodes whole sequences rather than exposing per-position states. */
   public boolean supportsSequenceEmbedding() {
     return decoder.supportsSequenceEmbedding();
+  }
+
+  @Override
+  public boolean supportsContrastiveEncoding() {
+    return decoder.supportsContrastiveEncoding();
+  }
+
+  @Override
+  public int contrastiveDimension() {
+    checkOpen();
+    return decoder.contrastiveDimension();
+  }
+
+  @Override
+  public float[] encodeContrastive(int[] tokens) {
+    checkOpen();
+    return decoder.encodeContrastive(tokens);
+  }
+
+  @Override
+  public boolean supportsConfidenceScoring() {
+    return decoder.supportsConfidenceScoring();
+  }
+
+  @Override
+  public float scoreConfidence(int[] tokens) {
+    checkOpen();
+    return decoder.scoreConfidence(tokens);
   }
 
   @Override

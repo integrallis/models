@@ -25,7 +25,8 @@ import java.util.Objects;
 final class Needle2DecoderAdapter implements PureJavaDecoder {
 
   private final class Needle2Session implements Session {
-    private final Needle2ForwardPass forwardPass = new Needle2ForwardPass(weights, capacity);
+    private final Needle2ForwardPass forwardPass =
+        new Needle2ForwardPass(weights, capacity, toolDocumentEndToken);
 
     @Override
     public int checkpoint() {
@@ -35,12 +36,14 @@ final class Needle2DecoderAdapter implements PureJavaDecoder {
 
   private final Needle2Weights weights;
   private final int capacity;
+  private final int toolDocumentEndToken;
   private final Needle2ForwardPass defaultSequence;
 
-  Needle2DecoderAdapter(Needle2Weights weights, int capacity) {
+  Needle2DecoderAdapter(Needle2Weights weights, int capacity, int toolDocumentEndToken) {
     this.weights = Objects.requireNonNull(weights, "weights");
     this.capacity = capacity;
-    this.defaultSequence = new Needle2ForwardPass(weights, capacity);
+    this.toolDocumentEndToken = toolDocumentEndToken;
+    this.defaultSequence = new Needle2ForwardPass(weights, capacity, toolDocumentEndToken);
   }
 
   CactHeader header() {
@@ -65,6 +68,32 @@ final class Needle2DecoderAdapter implements PureJavaDecoder {
   @Override
   public float[] prefill(int[] tokens, int startPosition) {
     return prefill(defaultSequence, tokens, startPosition);
+  }
+
+  @Override
+  public boolean supportsContrastiveEncoding() {
+    return weights.supportsContrastiveHead();
+  }
+
+  @Override
+  public int contrastiveDimension() {
+    return weights.contrastiveDimension();
+  }
+
+  @Override
+  public float[] encodeContrastive(int[] tokens) {
+    return new Needle2ForwardPass(weights, capacity, toolDocumentEndToken)
+        .encodeContrastive(tokens);
+  }
+
+  @Override
+  public boolean supportsConfidenceScoring() {
+    return weights.supportsConfidenceHead();
+  }
+
+  @Override
+  public float scoreConfidence(int[] tokens) {
+    return new Needle2ForwardPass(weights, capacity, toolDocumentEndToken).scoreConfidence(tokens);
   }
 
   @Override

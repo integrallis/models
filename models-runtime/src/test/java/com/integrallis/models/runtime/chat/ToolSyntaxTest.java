@@ -39,6 +39,7 @@ class ToolSyntaxTest {
       assertThat(ToolSyntax.QWEN.supportsTools()).isTrue();
       assertThat(ToolSyntax.HERMES.supportsTools()).isTrue();
       assertThat(ToolSyntax.LLAMA3.supportsTools()).isTrue();
+      assertThat(ToolSyntax.NEEDLE2.supportsTools()).isTrue();
       assertThat(ToolSyntax.GEMMA4.supportsTools()).isTrue();
       assertThat(ToolSyntax.MINICPM5.supportsTools()).isTrue();
     }
@@ -48,6 +49,7 @@ class ToolSyntaxTest {
       assertThat(ToolSyntax.QWEN.parsable()).isTrue();
       assertThat(ToolSyntax.HERMES.parsable()).isTrue();
       assertThat(ToolSyntax.LLAMA3.parsable()).isTrue();
+      assertThat(ToolSyntax.NEEDLE2.parsable()).isTrue();
       // Tagged arguments carry no type information, so JSON cannot be reconstructed without
       // the declared tool schemas.
       assertThat(ToolSyntax.GEMMA4.parsable()).isFalse();
@@ -91,6 +93,16 @@ class ToolSyntaxTest {
       assertThat(syntax.argsField()).isEqualTo("parameters");
       assertThat(syntax.parallelCalls()).isFalse();
       assertThat(syntax.resultStyle()).isEqualTo(ToolSyntax.ResultStyle.IPYTHON);
+    }
+
+    @Test
+    void needle2WrapsParallelCallsInOneArrayAndUsesPlainUserResults() {
+      ToolSyntax syntax = ToolSyntax.NEEDLE2;
+
+      assertThat(syntax.mode()).isEqualTo(ToolSyntax.Mode.TAG_WITH_JSON);
+      assertThat(syntax.arrayWrapped()).isTrue();
+      assertThat(syntax.parallelCalls()).isTrue();
+      assertThat(syntax.resultStyle()).isEqualTo(ToolSyntax.ResultStyle.USER_PLAIN);
     }
   }
 

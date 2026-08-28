@@ -127,6 +127,47 @@ class CactTokenizerTest {
     }
   }
 
+  @Test
+  void matchesPinnedNeedleReferenceForRobotToolPromptWhenProvided() throws IOException {
+    String configured = System.getProperty("models.fixtures.needle2Cact", "");
+    assumeTrue(!configured.isBlank(), "set -Dmodels.fixtures.needle2Cact=<needle2.cact>");
+    Path path = Path.of(configured);
+    assumeTrue(Files.isRegularFile(path), "Needle 2 fixture is not installed");
+    String prompt =
+        "<|im_start|>user\n<tools>[{\"name\":\"move\",\"description\":\"Drive the robot in a direction.\","
+            + "\"parameters\":{\"type\":\"object\",\"properties\":{\"direction\":{\"type\":\"string\","
+            + "\"enum\":[\"forward\",\"backward\",\"left\",\"right\"]},\"distance_m\":{\"type\":\"number\","
+            + "\"description\":\"Distance in meters.\"}},\"required\":[\"direction\",\"distance_m\"]}},"
+            + "{\"name\":\"rotate\",\"description\":\"Rotate the robot in place.\",\"parameters\":{\"type\":"
+            + "\"object\",\"properties\":{\"direction\":{\"type\":\"string\",\"enum\":[\"left\",\"right\"]},"
+            + "\"degrees\":{\"type\":\"number\"}},\"required\":[\"direction\",\"degrees\"]}},{\"name\":"
+            + "\"gripper\",\"description\":\"Open or close the gripper.\",\"parameters\":{\"type\":\"object\","
+            + "\"properties\":{\"action\":{\"type\":\"string\",\"enum\":[\"open\",\"close\"]}},\"required\":"
+            + "[\"action\"]}}]</tools>\nmove forward 2 meters, turn left 90 degrees, then close the gripper"
+            + "<|im_end|>\n<|im_start|>assistant\n";
+    int[] expected = {
+      2, 8042, 4, 573, 24, 8, 1075, 598, 359, 2476, 352, 362, 473, 359, 8096, 320, 352, 306, 4930,
+      390, 301, 286, 3132, 555, 801, 433, 491, 359, 1886, 362, 1213, 433, 8053, 2355, 433, 491, 359,
+      683, 362, 2064, 1047, 4614, 362, 2629, 1178, 362, 299, 1481, 362, 2939, 3345, 6873, 8097,
+      8055, 433, 491, 359, 1888, 362, 473, 359, 8096, 1798, 301, 7872, 1525, 656, 1047, 8053, 2355,
+      362, 6873, 8097, 8055, 1875, 598, 359, 295, 8045, 378, 362, 473, 359, 8095, 390, 378, 306,
+      4930, 390, 301, 2936, 555, 801, 433, 491, 359, 1886, 362, 1213, 433, 8053, 2355, 433, 491,
+      359, 683, 362, 2064, 1047, 299, 1481, 362, 2939, 3345, 560, 8058, 5620, 433, 491, 359, 1888,
+      4844, 656, 1047, 8053, 2355, 362, 560, 8058, 5620, 1875, 598, 359, 8058, 320, 6014, 362, 473,
+      359, 8114, 6215, 461, 6392, 306, 356, 320, 6014, 555, 801, 433, 491, 359, 1886, 362, 1213,
+      433, 1646, 433, 491, 359, 683, 362, 2064, 1047, 5692, 362, 918, 1101, 4770, 656, 1047, 1646,
+      3007, 9, 24, 2476, 352, 5737, 466, 7872, 8066, 3392, 5228, 5745, 6249, 8066, 2237, 6392, 306,
+      356, 320, 6014, 5, 24, 4, 612, 24
+    };
+    assertThat(prompt).hasSize(829);
+    assertThat(prompt.hashCode()).isEqualTo(-849368063);
+
+    try (Arena arena = Arena.ofConfined()) {
+      CactTokenizer tokenizer = CactTokenizer.from(CactParser.parse(path, arena));
+      assertThat(tokenizer.encodeControl(prompt)).containsExactly(expected);
+    }
+  }
+
   private static MemorySegment testBlob() {
     List<Piece> pieces =
         List.of(

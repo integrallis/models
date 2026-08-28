@@ -141,6 +141,12 @@ The same declaration path is used for blocking and streaming chat. Streaming
 with declared tools buffers generated text until the tool call is complete,
 because Spring AI can only act on a complete tool request.
 
+When the wrapped model exposes a contrastive head and more than five tools are
+declared, the adapter retrieves the five most relevant schemas before it
+renders the prompt. Schema vectors are cached in a bounded per-adapter index;
+subsequent requests embed the user query without re-embedding an unchanged
+tool catalog. The selected schemas also define the decoding constraint.
+
 == Schema-Constrained Tool Decoding
 
 If the wrapped Models runtime implements `ConstrainedTextGenerationModel`, the
@@ -150,13 +156,19 @@ keep the output on a valid tool-call string. This changes tool calling from
 "ask the model to follow the schema" to "prevent invalid enumerable tool-call
 syntax from being decoded" for the supported schema subset.
 
-Today the Spring AI adapter constrains finite tool-call spaces:
+For ChatML and Llama 3, the Spring AI adapter constrains finite tool-call
+spaces:
 
-* tool syntax must be one of the Models JSON-shaped formats, such as ChatML or
-  Llama 3 JSON-native tool calls
+* tool syntax must be one of the non-array-wrapped Models JSON formats, such as
+  ChatML or Llama 3 JSON-native tool calls
 * argument properties must be string `enum` values, or absent
 * every `required` property must be one of those enumerable properties
 * the compiled call set is capped to keep decoding checks bounded
+
+Needle 2 has a separate array-aware grammar compiled directly from JSON Schema.
+It supports objects, arrays, strings, integers, numbers, booleans, nulls,
+`enum`, `const`, `oneOf`, and `anyOf`, with an explicit bound on optional-object
+expansion.
 
 For example, this Spring AI input schema can be enforced during decoding:
 

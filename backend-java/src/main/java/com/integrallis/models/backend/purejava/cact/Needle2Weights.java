@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.cact;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /** Executable weight views for the single Needle 2 architecture serialized by `.cact`. */
 public final class Needle2Weights {
@@ -52,6 +53,8 @@ public final class Needle2Weights {
   final float[] mhcBResidual;
   final Engram[] engrams;
   final float[] finalNorm;
+  final Needle2ProbeHead contrastiveHead;
+  final Needle2ProbeHead confidenceHead;
 
   private Needle2Weights(
       CactHeader header,
@@ -64,7 +67,9 @@ public final class Needle2Weights {
       float[] mhcBPost,
       float[] mhcBResidual,
       Engram[] engrams,
-      float[] finalNorm) {
+      float[] finalNorm,
+      Needle2ProbeHead contrastiveHead,
+      Needle2ProbeHead confidenceHead) {
     this.header = header;
     this.embedding = embedding;
     this.layers = layers;
@@ -76,6 +81,8 @@ public final class Needle2Weights {
     this.mhcBResidual = mhcBResidual;
     this.engrams = engrams;
     this.finalNorm = finalNorm;
+    this.contrastiveHead = contrastiveHead;
+    this.confidenceHead = confidenceHead;
   }
 
   public static Needle2Weights load(CactNeedle2Layout layout) {
@@ -133,12 +140,58 @@ public final class Needle2Weights {
         fp16(layout, "mhc_b_post"),
         fp16(layout, "mhc_b_res"),
         engrams,
-        fp16(layout, "final_norm"));
+        fp16(layout, "final_norm"),
+        probeHead(layout, "contrastive_head", 4, true),
+        probeHead(layout, "confidence_head", 8, false));
   }
 
   /** Returns the loaded model geometry. */
   public CactHeader header() {
     return header;
+  }
+
+  Optional<Needle2ProbeHead> contrastiveHead() {
+    return Optional.ofNullable(contrastiveHead);
+  }
+
+  Optional<Needle2ProbeHead> confidenceHead() {
+    return Optional.ofNullable(confidenceHead);
+  }
+
+  /** Whether the artifact carries Needle's contrastive retrieval head. */
+  public boolean supportsContrastiveHead() {
+    return contrastiveHead != null;
+  }
+
+  /** Returns the contrastive output dimension. */
+  public int contrastiveDimension() {
+    if (contrastiveHead == null) {
+      throw new UnsupportedOperationException("Needle artifact has no contrastive head");
+    }
+    return contrastiveHead.outputWidth();
+  }
+
+  /** Whether the artifact carries Needle's calibrated confidence head. */
+  public boolean supportsConfidenceHead() {
+    return confidenceHead != null;
+  }
+
+  private static Needle2ProbeHead probeHead(
+      CactNeedle2Layout layout, String prefix, int probeCount, boolean normalize) {
+    String probesName = prefix + ".probes";
+    if (!layout.hasTensor(probesName)) {
+      return null;
+    }
+    CactTensorData projectionTensor = layout.tensor(prefix + ".proj");
+    int outputWidth = Math.toIntExact(projectionTensor.info().shape()[0]);
+    return new Needle2ProbeHead(
+        layout.header().modelWidth(),
+        probeCount,
+        outputWidth,
+        fp16(layout, probesName),
+        CactFp16Tensor.from(projectionTensor).readAll(),
+        fp16(layout, prefix + ".bias"),
+        normalize);
   }
 
   private static CactCqMatrix cq(CactNeedle2Layout layout, float[] codebook, String tensorName) {

@@ -33,6 +33,7 @@ public record BenchmarkEnvironment(
     String cpuModel,
     int processors,
     long physicalMemoryBytes,
+    long maxHeapBytes,
     String javaVersion,
     String javaVendor,
     String vmName) {
@@ -46,6 +47,7 @@ public record BenchmarkEnvironment(
         detectCpuModel(),
         Runtime.getRuntime().availableProcessors(),
         physicalMemory(),
+        Runtime.getRuntime().maxMemory(),
         System.getProperty("java.version"),
         System.getProperty("java.vendor"),
         System.getProperty("java.vm.name"));

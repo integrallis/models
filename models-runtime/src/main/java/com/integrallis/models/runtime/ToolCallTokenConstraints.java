@@ -44,6 +44,12 @@ public final class ToolCallTokenConstraints {
         && syntax.mode() != ToolSyntax.Mode.JSON_NATIVE) {
       return Optional.empty();
     }
+    if (syntax.arrayWrapped()) {
+      if (syntax == ToolSyntax.NEEDLE2) {
+        return Optional.of(Needle2ToolCallConstraint.compile(tokenizer, tools));
+      }
+      return Optional.empty();
+    }
     List<String> alternatives = new ArrayList<>();
     for (ToolSpec tool : tools) {
       List<String> arguments = argumentAlternatives.apply(tool);

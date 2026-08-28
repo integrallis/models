@@ -186,6 +186,11 @@ public final class CactNeedle2Layout {
     return file.tensor(index);
   }
 
+  /** Returns whether this artifact carries the named optional Needle 2 tensor. */
+  public boolean hasTensor(String name) {
+    return tensorIndices.containsKey(Objects.requireNonNull(name, "name"));
+  }
+
   /** Returns the artifact's embedded tokenizer. */
   public CactTokenizer tokenizer() {
     return CactTokenizer.from(file);

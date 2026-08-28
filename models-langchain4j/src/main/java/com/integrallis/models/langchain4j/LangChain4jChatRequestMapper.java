@@ -36,13 +36,27 @@ final class LangChain4jChatRequestMapper {
   private LangChain4jChatRequestMapper() {}
 
   static ModelPrompt prompt(ChatRequest request, ChatTemplate template) {
+    return prompt(request, template, tools(request));
+  }
+
+  static ModelPrompt prompt(ChatRequest request, ChatTemplate template, List<ToolSpec> tools) {
     ArrayList<com.integrallis.models.runtime.chat.ChatMessage> messages =
         new ArrayList<>(request.messages().size());
     for (ChatMessage message : request.messages()) {
       messages.add(render(message));
     }
-    List<ToolSpec> tools = tools(request);
     return tools.isEmpty() ? template.render(messages) : template.render(messages, tools);
+  }
+
+  static String latestUserText(ChatRequest request) {
+    List<ChatMessage> messages = request.messages();
+    for (int index = messages.size() - 1; index >= 0; index--) {
+      ChatMessage message = messages.get(index);
+      if (message instanceof UserMessage userMessage && userMessage.hasSingleText()) {
+        return userMessage.singleText();
+      }
+    }
+    throw new IllegalArgumentException("tool retrieval requires a text user message");
   }
 
   /**

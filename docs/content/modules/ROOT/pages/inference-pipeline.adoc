@@ -6,9 +6,11 @@ than complete-text generation. It owns one loaded backend and provides access
 to the tokenizer, model metadata, active context window, structured prompt
 encoding, prefill, forward-pass logits, reset, checkpoint, and rewind.
 
-The same object also implements `TextGenerationModel`, so an application can
-use low-level operations and the normal blocking or streaming generation API
-without maintaining two independent views of backend state.
+The same object also implements `TextGenerationModel`,
+`ConstrainedTextGenerationModel`, and `AuxiliaryTextGenerationModel`, so an
+application can use low-level operations, schema-constrained generation, and
+trained model-specific heads without maintaining independent views of backend
+state.
 
 == Load a Pipeline
 
@@ -119,6 +121,31 @@ ModelPrompt prompt = ChatTemplate.CHATML.render(
 
 String answer = pipeline.generate(prompt, options);
 ----
+
+== Use Auxiliary Heads
+
+Architectures may carry trained heads in addition to token generation. Needle
+2 CACT carries a 128-dimensional contrastive head for tool retrieval and a
+confidence head. Capabilities are explicit, and unsupported calls fail rather
+than substituting another model:
+
+[source,java]
+----
+if (pipeline.supportsContrastiveEncoding()) {
+    float[] query = pipeline.encodeContrastive("open the bedroom blinds");
+    System.out.println(query.length);
+}
+
+if (pipeline.supportsConfidenceScoring()) {
+    ModelPrompt sequence = ModelPrompt.text("complete prompt and generated output");
+    float confidence = pipeline.scoreConfidence(sequence);
+}
+----
+
+`ToolSpecSelector` builds on the same contrastive head. It caches the declared
+schema vectors and selects the five most relevant tools for each query, matching
+the qualified Needle 2 prompt policy. All encoding still executes through the
+loaded Java backend.
 
 For qualified artifacts, ModelJars selects the proven chat template and
 backend rather than requiring an application to choose them. See

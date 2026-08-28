@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.runtime;
 
+import com.integrallis.models.api.AuxiliaryInferenceBackend;
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelPrompt;
@@ -24,7 +26,8 @@ import com.integrallis.models.api.Tokenizer;
 import java.util.Objects;
 
 /** High-level generation adapter for a pure-Java {@link InferenceBackend}. */
-public final class RuntimeTextGenerationModel implements ConstrainedTextGenerationModel {
+public final class RuntimeTextGenerationModel
+    implements ConstrainedTextGenerationModel, AuxiliaryTextGenerationModel {
   private final InferenceBackend backend;
   private final GenerationLoop generationLoop;
 
@@ -72,5 +75,54 @@ public final class RuntimeTextGenerationModel implements ConstrainedTextGenerati
   public void generate(
       ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
     generationLoop.generate(prompt, options, stream, constraint);
+  }
+
+  @Override
+  public boolean supportsContrastiveEncoding() {
+    return backend instanceof AuxiliaryInferenceBackend auxiliary
+        && auxiliary.supportsContrastiveEncoding();
+  }
+
+  @Override
+  public int contrastiveDimension() {
+    return auxiliaryWithContrastiveHead().contrastiveDimension();
+  }
+
+  @Override
+  public float[] encodeContrastive(ModelPrompt prompt) {
+    Objects.requireNonNull(prompt, "prompt");
+    synchronized (backend) {
+      return auxiliaryWithContrastiveHead().encodeContrastive(backend.tokenizer().encode(prompt));
+    }
+  }
+
+  @Override
+  public boolean supportsConfidenceScoring() {
+    return backend instanceof AuxiliaryInferenceBackend auxiliary
+        && auxiliary.supportsConfidenceScoring();
+  }
+
+  @Override
+  public float scoreConfidence(ModelPrompt sequence) {
+    Objects.requireNonNull(sequence, "sequence");
+    synchronized (backend) {
+      return auxiliaryWithConfidenceHead().scoreConfidence(backend.tokenizer().encode(sequence));
+    }
+  }
+
+  private AuxiliaryInferenceBackend auxiliaryWithContrastiveHead() {
+    if (!(backend instanceof AuxiliaryInferenceBackend auxiliary)
+        || !auxiliary.supportsContrastiveEncoding()) {
+      throw new UnsupportedOperationException("model has no contrastive encoding head");
+    }
+    return auxiliary;
+  }
+
+  private AuxiliaryInferenceBackend auxiliaryWithConfidenceHead() {
+    if (!(backend instanceof AuxiliaryInferenceBackend auxiliary)
+        || !auxiliary.supportsConfidenceScoring()) {
+      throw new UnsupportedOperationException("model has no confidence head");
+    }
+    return auxiliary;
   }
 }

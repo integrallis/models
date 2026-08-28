@@ -18,6 +18,7 @@ package com.integrallis.models.spring.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
@@ -29,6 +30,7 @@ import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
@@ -172,6 +174,31 @@ class ModelsSpringAiToolCallingTest {
         ToolCallingChatOptions.builder().toolCallbacks(List.of(requiredWeatherCallback())).build());
   }
 
+  private static List<ToolCallback> numberedCallbacks(int count) {
+    List<ToolCallback> callbacks = new ArrayList<>(count);
+    for (int index = 0; index < count; index++) {
+      ToolDefinition definition =
+          DefaultToolDefinition.builder()
+              .name("tool-" + index)
+              .description("A numbered test tool " + index)
+              .inputSchema("{\"type\":\"object\",\"properties\":{}}")
+              .build();
+      callbacks.add(
+          new ToolCallback() {
+            @Override
+            public ToolDefinition getToolDefinition() {
+              return definition;
+            }
+
+            @Override
+            public String call(String toolInput) {
+              return "{}";
+            }
+          });
+    }
+    return List.copyOf(callbacks);
+  }
+
   @Nested
   static class Declaration {
 
@@ -202,6 +229,41 @@ class ModelsSpringAiToolCallingTest {
     }
 
     @Test
+    void retrievesFiveRelevantToolsAndCachesTheirSchemaEmbeddings() {
+      RetrievalModel model = new RetrievalModel();
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+      Prompt prompt =
+          new Prompt(
+              List.of(new UserMessage("use tool-6")),
+              ToolCallingChatOptions.builder().toolCallbacks(numberedCallbacks(7)).build());
+
+      chat.call(prompt);
+      chat.call(prompt);
+
+      assertThat(model.lastPrompt()).contains("tool-6").doesNotContain("tool-4", "tool-5");
+      assertThat(model.encoded).hasSize(9);
+    }
+
+    @Test
+    void retrievesToolsBeforeRenderingAStreamingRequest() {
+      RetrievalModel model = new RetrievalModel();
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+      Prompt prompt =
+          new Prompt(
+              List.of(new UserMessage("use tool-6")),
+              ToolCallingChatOptions.builder().toolCallbacks(numberedCallbacks(7)).build());
+
+      chat.stream(prompt).collectList().block();
+
+      assertThat(model.lastPrompt()).contains("tool-6").doesNotContain("tool-4", "tool-5");
+      assertThat(model.encoded).hasSize(8);
+    }
+
+    @Test
     void refusesToolsWhenTheTemplateCannotExpressThem() {
       ScriptedModel model = new ScriptedModel("x");
       ModelsSpringAiChatModel chat =
@@ -210,6 +272,72 @@ class ModelsSpringAiToolCallingTest {
       assertThatThrownBy(() -> chat.call(promptWithTools(List.of(new UserMessage("q")))))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("gemma");
+    }
+  }
+
+  private static final class RetrievalModel implements AuxiliaryTextGenerationModel {
+    private final List<String> encoded = new ArrayList<>();
+    private String lastPrompt;
+
+    @Override
+    public boolean supportsContrastiveEncoding() {
+      return true;
+    }
+
+    @Override
+    public int contrastiveDimension() {
+      return 8;
+    }
+
+    @Override
+    public float[] encodeContrastive(ModelPrompt prompt) {
+      String text = prompt.text();
+      encoded.add(text);
+      float[] vector = new float[contrastiveDimension()];
+      for (int index = 0; index < vector.length; index++) {
+        if (text.contains("tool-" + index)) {
+          vector[index] = 1.0f;
+        }
+      }
+      return vector;
+    }
+
+    @Override
+    public boolean supportsConfidenceScoring() {
+      return false;
+    }
+
+    @Override
+    public float scoreConfidence(ModelPrompt sequence) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String modelName() {
+      return "RetrievalModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("retrieval");
+    }
+
+    @Override
+    public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+      lastPrompt = prompt.text();
+      stream.onToken("done");
+      stream.onComplete();
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      lastPrompt = prompt;
+      stream.onToken("done");
+      stream.onComplete();
+    }
+
+    String lastPrompt() {
+      return lastPrompt;
     }
   }
 

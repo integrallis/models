@@ -18,6 +18,7 @@ package com.integrallis.models.langchain4j;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
@@ -39,6 +40,7 @@ import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.FinishReason;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
@@ -124,6 +126,19 @@ class ModelsChatModelToolCallingTest {
     return new ModelsChatModel(model, template, SamplingOptions.builder().build());
   }
 
+  private static List<ToolSpecification> numberedTools(int count) {
+    List<ToolSpecification> tools = new ArrayList<>(count);
+    for (int index = 0; index < count; index++) {
+      tools.add(
+          ToolSpecification.builder()
+              .name("tool-" + index)
+              .description("A numbered test tool " + index)
+              .parameters(JsonObjectSchema.builder().build())
+              .build());
+    }
+    return List.copyOf(tools);
+  }
+
   @Nested
   static class Declaration {
 
@@ -157,6 +172,24 @@ class ModelsChatModelToolCallingTest {
     }
 
     @Test
+    void retrievesFiveRelevantToolsAndCachesTheirSchemaEmbeddings() {
+      RetrievalModel model = new RetrievalModel();
+      ModelsChatModel chat =
+          new ModelsChatModel(model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+      ChatRequest request =
+          ChatRequest.builder()
+              .messages(UserMessage.from("use tool-6"))
+              .toolSpecifications(numberedTools(7))
+              .build();
+
+      chat.chat(request);
+      chat.chat(request);
+
+      assertThat(model.lastPrompt()).contains("tool-6").doesNotContain("tool-4", "tool-5");
+      assertThat(model.encoded).hasSize(9);
+    }
+
+    @Test
     void refusesToolsWhenTheTemplateCannotExpressThem() {
       ScriptedModel model = new ScriptedModel("x");
       ChatRequest request =
@@ -165,6 +198,72 @@ class ModelsChatModelToolCallingTest {
       assertThatThrownBy(() -> chatModel(model, ChatTemplate.GEMMA).chat(request))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("gemma");
+    }
+  }
+
+  private static final class RetrievalModel implements AuxiliaryTextGenerationModel {
+    private final List<String> encoded = new ArrayList<>();
+    private String lastPrompt;
+
+    @Override
+    public boolean supportsContrastiveEncoding() {
+      return true;
+    }
+
+    @Override
+    public int contrastiveDimension() {
+      return 8;
+    }
+
+    @Override
+    public float[] encodeContrastive(ModelPrompt prompt) {
+      String text = prompt.text();
+      encoded.add(text);
+      float[] vector = new float[contrastiveDimension()];
+      for (int index = 0; index < vector.length; index++) {
+        if (text.contains("tool-" + index)) {
+          vector[index] = 1.0f;
+        }
+      }
+      return vector;
+    }
+
+    @Override
+    public boolean supportsConfidenceScoring() {
+      return false;
+    }
+
+    @Override
+    public float scoreConfidence(ModelPrompt sequence) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String modelName() {
+      return "RetrievalModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("retrieval");
+    }
+
+    @Override
+    public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+      lastPrompt = prompt.text();
+      stream.onToken("done");
+      stream.onComplete();
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      lastPrompt = prompt;
+      stream.onToken("done");
+      stream.onComplete();
+    }
+
+    String lastPrompt() {
+      return lastPrompt;
     }
   }
 

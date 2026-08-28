@@ -36,6 +36,7 @@ public enum ChatTemplate {
   CHATML_NO_THINK("chatml-no-think", ToolSyntax.QWEN),
   ZEPHYR("zephyr", ToolSyntax.NONE),
   LLAMA3("llama3", ToolSyntax.LLAMA3),
+  NEEDLE2("needle2", ToolSyntax.NEEDLE2),
   GEMMA("gemma", ToolSyntax.NONE),
   GEMMA4("gemma4", ToolSyntax.GEMMA4),
   PHI3("phi3", ToolSyntax.NONE),
@@ -116,6 +117,7 @@ public enum ChatTemplate {
       case CHATML_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n\n");
       case ZEPHYR -> renderZephyr(conversation);
       case LLAMA3 -> renderLlama3(conversation);
+      case NEEDLE2 -> renderNeedle2(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
       case GEMMA4 -> renderGemma4(conversation);
       case PHI3 -> renderPhi3(conversation);
@@ -159,6 +161,7 @@ public enum ChatTemplate {
       case CHATML_NO_THINK ->
           renderChatMlWithTools(conversation, "", "<think>\n\n</think>\n\n", declared);
       case LLAMA3 -> renderLlama3WithTools(conversation, declared);
+      case NEEDLE2 -> renderNeedle2(conversation, declared);
       default ->
           throw new IllegalArgumentException(
               "chat template "
@@ -296,6 +299,77 @@ public enum ChatTemplate {
       prompt.control("<|eot_id|>");
     }
     return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
+  }
+
+  /** Renders the protocol used by the official Needle 2 training and inference code. */
+  private static ModelPrompt renderNeedle2(List<ChatMessage> messages, List<ToolSpec> tools) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    int start = 0;
+    if (messages.getFirst().role() == ChatRole.SYSTEM) {
+      prompt
+          .control("<|im_start|>system\n")
+          .text(messages.getFirst().text())
+          .control("<|im_end|>\n");
+      start = 1;
+    }
+
+    boolean toolsRendered = false;
+    for (int index = start; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      switch (message.role()) {
+        case SYSTEM ->
+            throw new IllegalArgumentException("needle2 accepts a system turn only at the start");
+        case USER, TOOL -> {
+          prompt.control("<|im_start|>user\n");
+          if (!toolsRendered && message.role() == ChatRole.USER) {
+            appendNeedle2Tools(prompt, tools);
+            prompt.control("\n");
+            toolsRendered = true;
+          }
+          prompt.text(message.text()).control("<|im_end|>\n");
+        }
+        case ASSISTANT -> {
+          prompt.control("<|im_start|>assistant\n<think>");
+          if (!message.text().isEmpty()) {
+            prompt.text(message.text());
+          }
+          prompt.control("</think>\n<tool_call>[");
+          for (int callIndex = 0; callIndex < message.toolCalls().size(); callIndex++) {
+            if (callIndex > 0) {
+              prompt.control(",");
+            }
+            ToolCall call = message.toolCalls().get(callIndex);
+            prompt
+                .control("{\"name\":\"")
+                .text(escapeJson(call.name()))
+                .control("\",\"arguments\":")
+                .text(call.argumentsJson())
+                .control("}");
+          }
+          prompt.control("]</tool_call><|im_end|>\n");
+        }
+      }
+    }
+    return prompt.control("<|im_start|>assistant\n").build();
+  }
+
+  private static void appendNeedle2Tools(ModelPrompt.Builder prompt, List<ToolSpec> tools) {
+    prompt.control("<tools>[");
+    for (int index = 0; index < tools.size(); index++) {
+      if (index > 0) {
+        prompt.control(",");
+      }
+      ToolSpec tool = tools.get(index);
+      prompt
+          .control("{\"name\":\"")
+          .text(escapeJson(tool.name()))
+          .control("\",\"description\":\"")
+          .text(escapeJson(tool.description()))
+          .control("\",\"parameters\":")
+          .text(tool.inputSchema())
+          .control("}");
+    }
+    prompt.control("]</tools>");
   }
 
   /**

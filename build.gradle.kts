@@ -507,7 +507,8 @@ tasks.register("verifyPublishingConfigured") {
 
 tasks.register("verifyArchitectureBoundaries") {
     group = "verification"
-    description = "Verify Models has no source, build, or CI dependency on ModelJars"
+    description =
+        "Verify dependency direction and prohibit external production inference processes"
     doLast {
         val forbiddenGroup = listOf("org", "modeljars").joinToString(".")
         val forbiddenComposite = "includeBuild(\"../" + "model-jars" + "\")"
@@ -551,6 +552,39 @@ tasks.register("verifyArchitectureBoundaries") {
                 forbiddenFiles.joinToString("\n") {
                     "  - ${it.relativeTo(rootProject.projectDir)}"
                 }
+        }
+
+        val forbiddenInferenceTokens =
+            mapOf(
+                "Process" + "Builder(" to "external process launch",
+                "Runtime.getRuntime()." + "exec(" to "external process launch",
+                "127.0.0.1:11434" to "Ollama inference endpoint",
+                "localhost:11434" to "Ollama inference endpoint",
+                "127.0.0.1:8080/completion" to "llama.cpp inference endpoint",
+                "localhost:8080/completion" to "llama.cpp inference endpoint",
+            )
+        val externalInferenceViolations =
+            publishedProjects
+                .filterNot { published -> published.name.endsWith("-bench") }
+                .flatMap { production ->
+                    fileTree(production.layout.projectDirectory.dir("src/main/java")) {
+                        include("**/*.java")
+                    }.files
+                }
+                .flatMap { source ->
+                    val text = source.readText()
+                    forbiddenInferenceTokens
+                        .filterKeys(text::contains)
+                        .values
+                        .map { description ->
+                            "${source.relativeTo(rootProject.projectDir)}: $description"
+                        }
+                }
+                .sorted()
+        require(externalInferenceViolations.isEmpty()) {
+            "Published Models production modules must execute inference in process; external " +
+                "systems are benchmark-only. Violations found:\n" +
+                externalInferenceViolations.joinToString("\n") { "  - $it" }
         }
     }
 }

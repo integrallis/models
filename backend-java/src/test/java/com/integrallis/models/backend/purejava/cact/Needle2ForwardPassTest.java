@@ -38,8 +38,13 @@ class Needle2ForwardPassTest {
 
     try (Arena arena = Arena.ofConfined()) {
       CactFile file = CactParser.parse(path, arena);
-      Needle2ForwardPass forwardPass =
-          new Needle2ForwardPass(Needle2Weights.load(CactNeedle2Layout.from(file)), 8);
+      Needle2Weights weights = Needle2Weights.load(CactNeedle2Layout.from(file));
+      Needle2ForwardPass forwardPass = new Needle2ForwardPass(weights, 8);
+
+      assertThat(weights.contrastiveHead()).isPresent();
+      assertThat(weights.contrastiveHead().orElseThrow().outputWidth()).isEqualTo(128);
+      assertThat(weights.confidenceHead()).isPresent();
+      assertThat(weights.confidenceHead().orElseThrow().outputWidth()).isEqualTo(1);
 
       float[] logits = forwardPass.forward(2, 0);
 
@@ -59,6 +64,12 @@ class Needle2ForwardPassTest {
       assertThat(argmax(logits)).isEqualTo(2);
       assertThat(sum(logits)).isCloseTo(-128_023.94884, within(1.0));
       assertThat(l2(logits)).isCloseTo(1_850.20093, within(0.05));
+
+      float[] retrievalEmbedding = forwardPass.encodeContrastive(new int[] {2});
+      assertThat(retrievalEmbedding).hasSize(128);
+      assertThat(allFinite(retrievalEmbedding)).isTrue();
+      assertThat(l2(retrievalEmbedding)).isCloseTo(1.0, within(1.0e-5));
+      assertThat(forwardPass.scoreConfidence(new int[] {2})).isBetween(0.0f, 1.0f);
     }
   }
 
@@ -86,5 +97,14 @@ class Needle2ForwardPassTest {
       squared += (double) value * value;
     }
     return Math.sqrt(squared);
+  }
+
+  private static boolean allFinite(float[] values) {
+    for (float value : values) {
+      if (!Float.isFinite(value)) {
+        return false;
+      }
+    }
+    return true;
   }
 }

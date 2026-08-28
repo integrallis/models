@@ -92,6 +92,24 @@ class ToolCallScannerTest {
 
       assertThat(result.toolCalls()).extracting(ToolCall::name).containsExactly("ping");
     }
+
+    @Test
+    void extractsNeedle2ParallelCallsFromOneArrayWrappedSection() {
+      String output =
+          "<think>two actions</think>\n<tool_call>["
+              + "{\"name\":\"set_lights\",\"arguments\":{\"room\":\"bedroom\",\"brightness\":20}},"
+              + "{\"name\":\"lock_door\",\"arguments\":{\"door\":\"front\"}}"
+              + "]</tool_call><|im_end|>";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.NEEDLE2);
+
+      assertThat(result.toolCalls())
+          .extracting(ToolCall::name)
+          .containsExactly("set_lights", "lock_door");
+      assertThat(result.toolCalls())
+          .extracting(ToolCall::argumentsJson)
+          .containsExactly("{\"room\":\"bedroom\",\"brightness\":20}", "{\"door\":\"front\"}");
+    }
   }
 
   @Nested

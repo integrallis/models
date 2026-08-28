@@ -18,12 +18,18 @@ package com.integrallis.models.backend.purejava.fixture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -61,7 +67,61 @@ class ModelFixtureInstallerTest {
     assertThat(Files.readAllBytes(target)).isEqualTo(existing);
   }
 
+  @Test
+  void resumesAHttpDownloadAfterTheServerClosesTheFirstResponseEarly() throws Exception {
+    byte[] content = new byte[256 * 1024];
+    Arrays.fill(content, (byte) 42);
+    int split = content.length / 2;
+    AtomicInteger requests = new AtomicInteger();
+    HttpServer server =
+        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    server.createContext(
+        "/model.gguf",
+        exchange -> {
+          int request = requests.incrementAndGet();
+          if (request == 1) {
+            exchange.sendResponseHeaders(200, content.length);
+            exchange.getResponseBody().write(content, 0, split);
+            exchange.getResponseBody().flush();
+          } else {
+            assertThat(exchange.getRequestHeaders().getFirst("Range"))
+                .isEqualTo("bytes=" + split + "-");
+            exchange
+                .getResponseHeaders()
+                .set(
+                    "Content-Range",
+                    "bytes " + split + "-" + (content.length - 1) + "/" + content.length);
+            exchange.sendResponseHeaders(206, content.length - split);
+            exchange.getResponseBody().write(content, split, content.length - split);
+          }
+          exchange.close();
+        });
+    server.start();
+    try {
+      Path target = temporaryDirectory.resolve("installed/model.gguf");
+      URI source =
+          URI.create(
+              "http://"
+                  + server.getAddress().getHostString()
+                  + ":"
+                  + server.getAddress().getPort()
+                  + "/model.gguf");
+
+      Path installed = ModelFixtureInstaller.install(descriptor(source, target, content));
+
+      assertThat(Files.readAllBytes(installed)).isEqualTo(content);
+      assertThat(requests).hasValue(2);
+    } finally {
+      server.stop(0);
+    }
+  }
+
   private static ModelFixtureDescriptor descriptor(Path source, Path target, byte[] expected)
+      throws Exception {
+    return descriptor(source.toUri(), target, expected);
+  }
+
+  private static ModelFixtureDescriptor descriptor(URI source, Path target, byte[] expected)
       throws Exception {
     return new ModelFixtureDescriptor(
         "fixture",
@@ -70,7 +130,7 @@ class ModelFixtureInstallerTest {
         "file://fixture",
         "f32",
         "pure-java",
-        source.toUri(),
+        source,
         target,
         sha256(expected),
         expected.length,

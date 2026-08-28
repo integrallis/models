@@ -18,6 +18,8 @@ package com.integrallis.models.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
+import com.integrallis.models.api.AuxiliaryInferenceBackend;
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
@@ -86,6 +88,24 @@ class InferencePipelineTest {
   }
 
   @Test
+  void exposesConstraintsAndAuxiliaryHeadsWithoutUnwrappingThePipeline() {
+    StubBackend backend = new StubBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend)) {
+      assertThat(pipeline).isInstanceOf(ConstrainedTextGenerationModel.class);
+      assertThat(pipeline).isInstanceOf(AuxiliaryTextGenerationModel.class);
+
+      AuxiliaryTextGenerationModel auxiliary = (AuxiliaryTextGenerationModel) pipeline;
+      assertThat(auxiliary.supportsContrastiveEncoding()).isTrue();
+      assertThat(auxiliary.contrastiveDimension()).isEqualTo(2);
+      assertThat(auxiliary.encodeContrastive(ModelPrompt.text("tools")))
+          .containsExactly(1.0f, 2.0f);
+      assertThat(auxiliary.supportsConfidenceScoring()).isTrue();
+      assertThat(auxiliary.scoreConfidence(ModelPrompt.text("prompt and output"))).isEqualTo(0.75f);
+    }
+  }
+
+  @Test
   void closesTheOwnedBackendExactlyOnceAndRejectsFurtherUse() {
     StubBackend backend = new StubBackend();
     InferencePipeline pipeline = new InferencePipeline(backend);
@@ -103,7 +123,8 @@ class InferencePipelineTest {
     return SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
   }
 
-  private static final class StubBackend implements RewindableInferenceBackend {
+  private static final class StubBackend
+      implements RewindableInferenceBackend, AuxiliaryInferenceBackend {
     private final List<Integer> prefillStartPositions = new ArrayList<>();
     private int position;
     private int plainEncodes;
@@ -206,6 +227,31 @@ class InferencePipelineTest {
     @Override
     public void close() {
       closeCount++;
+    }
+
+    @Override
+    public boolean supportsContrastiveEncoding() {
+      return true;
+    }
+
+    @Override
+    public int contrastiveDimension() {
+      return 2;
+    }
+
+    @Override
+    public float[] encodeContrastive(int[] tokens) {
+      return new float[] {1.0f, 2.0f};
+    }
+
+    @Override
+    public boolean supportsConfidenceScoring() {
+      return true;
+    }
+
+    @Override
+    public float scoreConfidence(int[] tokens) {
+      return 0.75f;
     }
 
     private static float[] terminalLogits() {

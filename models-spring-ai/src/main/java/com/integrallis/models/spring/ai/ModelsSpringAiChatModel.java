@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.spring.ai;
 
+import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelGenerationException;
@@ -30,6 +31,7 @@ import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
+import com.integrallis.models.runtime.chat.ToolSpecSelector;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +40,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -66,6 +69,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   private final String modelName;
   private final ChatTemplate template;
   private final ObservationRegistry observationRegistry;
+  private final ToolSpecSelector toolSelector;
   private ChatModelObservationConvention observationConvention = DEFAULT_OBSERVATION_CONVENTION;
 
   public ModelsSpringAiChatModel(InferenceBackend backend) {
@@ -139,6 +143,11 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
     this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
+    this.toolSelector =
+        model instanceof AuxiliaryTextGenerationModel auxiliary
+                && auxiliary.supportsContrastiveEncoding()
+            ? new ToolSpecSelector(auxiliary)
+            : null;
   }
 
   @Override
@@ -155,7 +164,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private ChatResponse callObserved(Prompt prompt, ChatModelObservationContext context) {
-    List<ToolSpec> tools = declaredTools(prompt);
+    List<ToolSpec> tools = selectedTools(prompt, declaredTools(prompt));
     ModelPrompt rendered = render(prompt, tools);
     SamplingOptions requested = options(prompt);
     GenerationOutput generated = generate(rendered, requested, tools);
@@ -190,7 +199,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private Flux<ChatResponse> streamObserved(Prompt prompt) {
-    List<ToolSpec> tools = declaredTools(prompt);
+    List<ToolSpec> tools = selectedTools(prompt, declaredTools(prompt));
     ModelPrompt rendered = render(prompt, tools);
     SamplingOptions requested = options(prompt);
     return Flux.<ChatResponse>create(
@@ -349,6 +358,23 @@ public final class ModelsSpringAiChatModel implements ChatModel {
           new ToolSpec(definition.name(), definition.description(), definition.inputSchema()));
     }
     return List.copyOf(tools);
+  }
+
+  private List<ToolSpec> selectedTools(Prompt prompt, List<ToolSpec> tools) {
+    if (toolSelector == null || tools.size() <= ToolSpecSelector.DEFAULT_TOOL_LIMIT) {
+      return tools;
+    }
+    return toolSelector.select(latestUserText(prompt), tools);
+  }
+
+  private static String latestUserText(Prompt prompt) {
+    List<org.springframework.ai.chat.messages.Message> messages = prompt.getInstructions();
+    for (int index = messages.size() - 1; index >= 0; index--) {
+      if (messages.get(index) instanceof UserMessage userMessage) {
+        return userMessage.getText();
+      }
+    }
+    throw new IllegalArgumentException("tool retrieval requires a text user message");
   }
 
   private ModelPrompt render(Prompt prompt, List<ToolSpec> tools) {

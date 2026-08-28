@@ -93,6 +93,7 @@ class ChatTemplateTest {
                     "chatml-no-think",
                     "zephyr",
                     "llama3",
+                    "needle2",
                     "gemma",
                     "gemma4",
                     "phi3",
@@ -110,6 +111,7 @@ class ChatTemplateTest {
             ChatTemplate.CHATML_NO_THINK,
             ChatTemplate.ZEPHYR,
             ChatTemplate.LLAMA3,
+            ChatTemplate.NEEDLE2,
             ChatTemplate.GEMMA,
             ChatTemplate.GEMMA4,
             ChatTemplate.PHI3,
@@ -142,6 +144,10 @@ class ChatTemplateTest {
                 ChatTemplate.LLAMA3,
                 "<|start_header_id|>user<|end_header_id|>\n\n"
                     + "Prompt<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"),
+            Map.entry(
+                ChatTemplate.NEEDLE2,
+                "<|im_start|>user\n<tools>[]</tools>\n"
+                    + "Prompt<|im_end|>\n<|im_start|>assistant\n"),
             Map.entry(
                 ChatTemplate.GEMMA,
                 "<start_of_turn>user\nPrompt<end_of_turn>\n<start_of_turn>model\n"),
