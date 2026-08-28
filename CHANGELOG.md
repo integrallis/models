@@ -23,6 +23,9 @@ All notable changes to models are documented here.
 
 ### Fixed
 
+- Kept the `com.integrallis:models` facade dependency-free beyond Models API/runtime
+  by replacing the new tool-schema Jackson dependency with a bounded in-process
+  Java parser.
 - Prevented finite single-call constraints from being applied to Needle 2's
   reasoning-prefixed call arrays.
 - Corrected the CACT attention sink and 8-bit KV-cache interpretation, loaded the

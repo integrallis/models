@@ -16,6 +16,7 @@
 package com.integrallis.models.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.api.ToolSpec;
@@ -90,6 +91,72 @@ class ToolCallTokenConstraintsTest {
     parallel.accept(5);
     parallel.accept(6);
     assertThat(parallel.isComplete()).isTrue();
+  }
+
+  @Test
+  void needle2GrammarRejectsDuplicateSchemaFieldsEvenWhenTheFirstValueIsNull() {
+    var tool =
+        new ToolSpec(
+            "echo",
+            "Echo text",
+            """
+            {"type":null,"type":"object","properties":{}}
+            """);
+
+    assertThatThrownBy(
+            () ->
+                ToolCallTokenConstraints.compile(
+                    NEEDLE_TOKENIZER, ToolSyntax.NEEDLE2, List.of(tool), ignored -> List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("duplicate JSON Schema field type");
+  }
+
+  @Test
+  void needle2GrammarParsesEscapesNumbersAndNestedSchemasInProcess() {
+    var tool =
+        new ToolSpec(
+            "summarize",
+            "Summarize values",
+            """
+            {
+              "type":"object",
+              "properties":{
+                "label":{"type":"string","enum":["line\\n\\u263a"]},
+                "count":{"type":"integer"},
+                "ratio":{"type":"number"},
+                "flags":{
+                  "type":"array",
+                  "items":{"type":["boolean","null"]},
+                  "minItems":0,
+                  "maxItems":2
+                }
+              },
+              "required":["label"]
+            }
+            """);
+
+    assertThat(
+            ToolCallTokenConstraints.compile(
+                NEEDLE_TOKENIZER, ToolSyntax.NEEDLE2, List.of(tool), ignored -> List.of()))
+        .isPresent();
+  }
+
+  @Test
+  void needle2GrammarRejectsMalformedSchemaNumbersAndTrailingContent() {
+    List<String> malformed =
+        List.of(
+            "{\"type\":\"array\",\"minItems\":01,\"items\":{\"type\":\"string\"}}",
+            "{\"type\":\"object\"} true");
+
+    for (String schema : malformed) {
+      var tool = new ToolSpec("echo", "Echo text", schema);
+      assertThatThrownBy(
+              () ->
+                  ToolCallTokenConstraints.compile(
+                      NEEDLE_TOKENIZER, ToolSyntax.NEEDLE2, List.of(tool), ignored -> List.of()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("malformed tool JSON Schema");
+    }
   }
 
   private static final Tokenizer NEEDLE_TOKENIZER = new NeedleTokenizer();

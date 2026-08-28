@@ -15,12 +15,8 @@
  */
 package com.integrallis.models.runtime;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.api.ToolSpec;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -380,61 +376,226 @@ final class Needle2ToolCallConstraint implements TokenConstraint {
   private record JsonNumber(String text) {}
 
   private static final class SchemaJson {
-    private static final JsonFactory FACTORY = new JsonFactory();
+    private static final int MAX_DEPTH = 128;
 
     private SchemaJson() {}
 
     private static Object parse(String json) {
-      try (JsonParser parser = FACTORY.createParser(json)) {
-        JsonToken first = parser.nextToken();
-        if (first == null) {
-          throw new IllegalArgumentException("tool schema must not be empty");
+      Parser parser = new Parser(Objects.requireNonNull(json, "json"));
+      Object value = parser.readValue(0);
+      parser.skipWhitespace();
+      if (!parser.atEnd()) {
+        throw parser.error("trailing JSON content");
+      }
+      return value;
+    }
+
+    private static final class Parser {
+      private final String json;
+      private int offset;
+
+      private Parser(String json) {
+        this.json = json;
+      }
+
+      private Object readValue(int depth) {
+        if (depth > MAX_DEPTH) {
+          throw error("JSON nesting exceeds " + MAX_DEPTH);
         }
-        Object value = read(parser, first);
-        if (parser.nextToken() != null) {
-          throw new IllegalArgumentException("tool schema has trailing JSON content");
+        skipWhitespace();
+        if (atEnd()) {
+          throw error("expected a JSON value");
         }
+        return switch (json.charAt(offset)) {
+          case '{' -> readObject(depth);
+          case '[' -> readArray(depth);
+          case '"' -> readString();
+          case 't' -> readLiteral("true", Boolean.TRUE);
+          case 'f' -> readLiteral("false", Boolean.FALSE);
+          case 'n' -> readLiteral("null", null);
+          default -> readNumber();
+        };
+      }
+
+      private Map<String, Object> readObject(int depth) {
+        expect('{');
+        Map<String, Object> values = new LinkedHashMap<>();
+        skipWhitespace();
+        if (consume('}')) {
+          return values;
+        }
+        while (true) {
+          skipWhitespace();
+          if (atEnd() || json.charAt(offset) != '"') {
+            throw error("expected a JSON object field");
+          }
+          String name = readString();
+          skipWhitespace();
+          expect(':');
+          Object value = readValue(depth + 1);
+          if (values.containsKey(name)) {
+            throw error("duplicate JSON Schema field " + name);
+          }
+          values.put(name, value);
+          skipWhitespace();
+          if (consume('}')) {
+            return values;
+          }
+          expect(',');
+        }
+      }
+
+      private List<Object> readArray(int depth) {
+        expect('[');
+        List<Object> values = new ArrayList<>();
+        skipWhitespace();
+        if (consume(']')) {
+          return values;
+        }
+        while (true) {
+          values.add(readValue(depth + 1));
+          skipWhitespace();
+          if (consume(']')) {
+            return values;
+          }
+          expect(',');
+        }
+      }
+
+      private String readString() {
+        expect('"');
+        StringBuilder value = new StringBuilder();
+        while (!atEnd()) {
+          char ch = json.charAt(offset++);
+          if (ch == '"') {
+            return value.toString();
+          }
+          if (ch < 0x20) {
+            throw error("unescaped control character in JSON string");
+          }
+          if (ch != '\\') {
+            value.append(ch);
+            continue;
+          }
+          if (atEnd()) {
+            throw error("unfinished JSON escape");
+          }
+          char escape = json.charAt(offset++);
+          switch (escape) {
+            case '"', '\\', '/' -> value.append(escape);
+            case 'b' -> value.append('\b');
+            case 'f' -> value.append('\f');
+            case 'n' -> value.append('\n');
+            case 'r' -> value.append('\r');
+            case 't' -> value.append('\t');
+            case 'u' -> value.append(readUnicodeEscape());
+            default -> throw error("invalid JSON escape \\" + escape);
+          }
+        }
+        throw error("unterminated JSON string");
+      }
+
+      private char readUnicodeEscape() {
+        if (offset + 4 > json.length()) {
+          throw error("unfinished Unicode escape");
+        }
+        int value = 0;
+        for (int index = 0; index < 4; index++) {
+          int digit = Character.digit(json.charAt(offset++), 16);
+          if (digit < 0) {
+            throw error("invalid Unicode escape");
+          }
+          value = (value << 4) | digit;
+        }
+        return (char) value;
+      }
+
+      private JsonNumber readNumber() {
+        int start = offset;
+        if (consume('-') && atEnd()) {
+          throw error("unfinished JSON number");
+        }
+        if (consume('0')) {
+          if (!atEnd() && isDigit(json.charAt(offset))) {
+            throw error("leading zero in JSON number");
+          }
+        } else {
+          if (atEnd() || json.charAt(offset) < '1' || json.charAt(offset) > '9') {
+            throw error("expected a JSON value");
+          }
+          consumeDigits();
+        }
+        if (consume('.')) {
+          requireDigit("fraction requires a digit");
+          consumeDigits();
+        }
+        if (!atEnd() && (json.charAt(offset) == 'e' || json.charAt(offset) == 'E')) {
+          offset++;
+          if (!atEnd() && (json.charAt(offset) == '+' || json.charAt(offset) == '-')) {
+            offset++;
+          }
+          requireDigit("exponent requires a digit");
+          consumeDigits();
+        }
+        return new JsonNumber(json.substring(start, offset));
+      }
+
+      private Object readLiteral(String literal, Object value) {
+        if (!json.startsWith(literal, offset)) {
+          throw error("expected a JSON value");
+        }
+        offset += literal.length();
         return value;
-      } catch (IOException malformed) {
-        throw new IllegalArgumentException("malformed tool JSON Schema", malformed);
       }
-    }
 
-    private static Object read(JsonParser parser, JsonToken token) throws IOException {
-      return switch (token) {
-        case START_OBJECT -> readObject(parser);
-        case START_ARRAY -> readArray(parser);
-        case VALUE_STRING -> parser.getText();
-        case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> new JsonNumber(parser.getText());
-        case VALUE_TRUE -> Boolean.TRUE;
-        case VALUE_FALSE -> Boolean.FALSE;
-        case VALUE_NULL -> null;
-        default -> throw new IllegalArgumentException("unexpected JSON token " + token);
-      };
-    }
-
-    private static Map<String, Object> readObject(JsonParser parser) throws IOException {
-      Map<String, Object> values = new LinkedHashMap<>();
-      while (parser.nextToken() != JsonToken.END_OBJECT) {
-        if (parser.currentToken() != JsonToken.FIELD_NAME) {
-          throw new IllegalArgumentException("expected JSON object field");
-        }
-        String name = parser.currentName();
-        JsonToken valueToken = parser.nextToken();
-        if (values.putIfAbsent(name, read(parser, valueToken)) != null) {
-          throw new IllegalArgumentException("duplicate JSON Schema field " + name);
+      private void consumeDigits() {
+        while (!atEnd() && isDigit(json.charAt(offset))) {
+          offset++;
         }
       }
-      return values;
-    }
 
-    private static List<Object> readArray(JsonParser parser) throws IOException {
-      List<Object> values = new ArrayList<>();
-      JsonToken token;
-      while ((token = parser.nextToken()) != JsonToken.END_ARRAY) {
-        values.add(read(parser, token));
+      private void requireDigit(String message) {
+        if (atEnd() || !isDigit(json.charAt(offset))) {
+          throw error(message);
+        }
       }
-      return values;
+
+      private static boolean isDigit(char ch) {
+        return ch >= '0' && ch <= '9';
+      }
+
+      private void skipWhitespace() {
+        while (!atEnd()) {
+          char ch = json.charAt(offset);
+          if (ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r') {
+            return;
+          }
+          offset++;
+        }
+      }
+
+      private boolean consume(char expected) {
+        if (!atEnd() && json.charAt(offset) == expected) {
+          offset++;
+          return true;
+        }
+        return false;
+      }
+
+      private void expect(char expected) {
+        if (!consume(expected)) {
+          throw error("expected '" + expected + "'");
+        }
+      }
+
+      private boolean atEnd() {
+        return offset >= json.length();
+      }
+
+      private IllegalArgumentException error(String message) {
+        return new IllegalArgumentException(
+            "malformed tool JSON Schema at character " + offset + ": " + message);
+      }
     }
   }
 }
