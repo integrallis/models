@@ -39,6 +39,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
+import com.integrallis.models.backend.purejava.internal.ModelMemoryArena;
 import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
 import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
@@ -74,7 +75,7 @@ public final class PureJavaBackend
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
-  private final Arena arena;
+  private final ModelMemoryArena arenaOwner;
   private final Tokenizer tokenizer;
   private final PureJavaDecoder decoder;
   private final ModelMetadata modelMetadata;
@@ -119,7 +120,7 @@ public final class PureJavaBackend
   }
 
   private PureJavaBackend(
-      Arena arena,
+      ModelMemoryArena arenaOwner,
       Tokenizer tokenizer,
       PureJavaDecoder decoder,
       ModelMetadata modelMetadata,
@@ -127,7 +128,7 @@ public final class PureJavaBackend
       PureJavaExecutionPlan executionPlan,
       BackendDiagnostics diagnostics,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
-    this.arena = arena;
+    this.arenaOwner = arenaOwner;
     this.tokenizer = tokenizer;
     this.decoder = decoder;
     this.modelMetadata = modelMetadata;
@@ -140,14 +141,17 @@ public final class PureJavaBackend
   /** Loads a GGUF model file and returns a ready-to-use backend. */
   public static PureJavaBackend load(Path modelPath) {
     return load(
-        modelPath, Arena.ofShared(), BackendConfiguration.empty(), GgufBatchedMatrixKernel.none());
+        modelPath,
+        ModelMemoryArena.create(),
+        BackendConfiguration.empty(),
+        GgufBatchedMatrixKernel.none());
   }
 
   /** Loads a GGUF model with registry-neutral, artifact-qualified recommendations. */
   public static PureJavaBackend load(Path modelPath, BackendConfiguration backendConfiguration) {
     return load(
         modelPath,
-        Arena.ofShared(),
+        ModelMemoryArena.create(),
         Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
         GgufBatchedMatrixKernel.none());
   }
@@ -160,7 +164,7 @@ public final class PureJavaBackend
   public static PureJavaBackend load(Path modelPath, GgufBatchedMatrixKernel batchedMatrixKernel) {
     return load(
         modelPath,
-        Arena.ofShared(),
+        ModelMemoryArena.create(),
         BackendConfiguration.empty(),
         Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"));
   }
@@ -176,21 +180,25 @@ public final class PureJavaBackend
       GgufBatchedMatrixKernel batchedMatrixKernel) {
     return load(
         modelPath,
-        Arena.ofShared(),
+        ModelMemoryArena.create(),
         Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
         Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"));
   }
 
   static PureJavaBackend load(Path modelPath, Arena arena) {
-    return load(modelPath, arena, BackendConfiguration.empty(), GgufBatchedMatrixKernel.none());
+    return load(
+        modelPath,
+        ModelMemoryArena.owning(arena),
+        BackendConfiguration.empty(),
+        GgufBatchedMatrixKernel.none());
   }
 
   private static PureJavaBackend load(
       Path modelPath,
-      Arena arena,
+      ModelMemoryArena arenaOwner,
       BackendConfiguration backendConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
-    Objects.requireNonNull(arena, "arena");
+    Objects.requireNonNull(arenaOwner, "arenaOwner");
     Objects.requireNonNull(backendConfiguration, "backendConfiguration");
     Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
     LoadedDecoder loaded = null;
@@ -202,6 +210,7 @@ public final class PureJavaBackend
       PureJavaPlanConfiguration planConfiguration =
           PureJavaPlanConfiguration.fromSystemProperties(recommendations);
       Tokenizer tokenizer;
+      Arena arena = arenaOwner.arena();
       if (Files.isDirectory(modelPath)) {
         Qwen2HuggingFaceConfig config =
             Qwen2HuggingFaceConfig.parse(modelPath.resolve("config.json"));
@@ -249,7 +258,7 @@ public final class PureJavaBackend
               architectureDiagnostics(loaded.executionPlan().diagnostics(), loaded.decoder()));
 
       return new PureJavaBackend(
-          arena,
+          arenaOwner,
           tokenizer,
           loaded.decoder(),
           loaded.metadata(),
@@ -258,10 +267,11 @@ public final class PureJavaBackend
           diagnostics,
           batchedMatrixKernel);
     } catch (IOException e) {
-      closeAfterFailure(null, arena, batchedMatrixKernel, e);
+      closeAfterFailure(null, arenaOwner, batchedMatrixKernel, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
     } catch (RuntimeException | Error e) {
-      closeAfterFailure(loaded == null ? null : loaded.decoder(), arena, batchedMatrixKernel, e);
+      closeAfterFailure(
+          loaded == null ? null : loaded.decoder(), arenaOwner, batchedMatrixKernel, e);
       throw e;
     }
   }
@@ -634,7 +644,7 @@ public final class PureJavaBackend
       closeFailure = combineCloseFailures(closeFailure, failure);
     }
     try {
-      arena.close();
+      arenaOwner.close();
     } catch (RuntimeException failure) {
       closeFailure = combineCloseFailures(closeFailure, failure);
     }
@@ -785,7 +795,7 @@ public final class PureJavaBackend
 
   private static void closeAfterFailure(
       PureJavaDecoder decoder,
-      Arena arena,
+      ModelMemoryArena arenaOwner,
       GgufBatchedMatrixKernel batchedMatrixKernel,
       Throwable failure) {
     if (decoder != null) {
@@ -801,7 +811,7 @@ public final class PureJavaBackend
       failure.addSuppressed(closeFailure);
     }
     try {
-      arena.close();
+      arenaOwner.close();
     } catch (RuntimeException closeFailure) {
       failure.addSuppressed(closeFailure);
     }

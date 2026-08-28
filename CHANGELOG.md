@@ -2,6 +2,14 @@
 
 All notable changes to models are documented here.
 
+## Unreleased
+
+### Fixed
+
+- Made mapped model and Gemma 4 expert-cache memory compatible with GraalVM Native Image while
+  retaining deterministic shared-arena cleanup on the JVM. Native executables use automatically
+  managed, cross-thread arenas so Vector API support remains available during in-process inference.
+
 ## [0.3.11] - 2026-08-27
 
 ### Added

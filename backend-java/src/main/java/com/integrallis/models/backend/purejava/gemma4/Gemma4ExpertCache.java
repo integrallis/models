@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.gemma4;
 
 import com.integrallis.models.backend.purejava.gemma4.Gemma4ExpertLoader.LoadedExpert;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4TensorLayout.ExpertWeights;
+import com.integrallis.models.backend.purejava.internal.ModelMemoryArena;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.lang.foreign.Arena;
@@ -110,7 +111,8 @@ final class Gemma4ExpertCache implements Gemma4Experts {
   private final CachePolicy policy;
   private final int numExperts;
   private final LayerState[] layers;
-  private final Arena arena = Arena.ofShared();
+  private final ModelMemoryArena arenaOwner = ModelMemoryArena.create();
+  private final Arena arena = arenaOwner.arena();
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition stateChanged = lock.newCondition();
 
@@ -442,7 +444,7 @@ final class Gemma4ExpertCache implements Gemma4Experts {
       closeFailure = e;
     }
     try {
-      arena.close();
+      arenaOwner.close();
     } catch (RuntimeException e) {
       if (closeFailure != null) {
         closeFailure.addSuppressed(e);
