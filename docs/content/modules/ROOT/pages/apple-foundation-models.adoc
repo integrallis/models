@@ -130,6 +130,11 @@ The current Apple bridge receives a complete response from
 as one event. `maxTokens` maps to Apple's maximum-response-token option; Apple
 owns the remaining sampling behavior.
 
+The current bridge does not expose Apple's guided-generation or tool-calling
+API. Registering Spring AI or LangChain4j tools with this backend is therefore
+unsupported until that native contract and its framework mapping are
+implemented and qualified.
+
 == Model Identity And Updates
 
 Apple periodically updates `SystemLanguageModel` with operating-system

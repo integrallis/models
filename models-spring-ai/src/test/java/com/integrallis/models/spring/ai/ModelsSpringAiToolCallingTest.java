@@ -17,6 +17,7 @@ package com.integrallis.models.spring.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
@@ -30,12 +31,15 @@ import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -43,6 +47,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
 import org.springframework.ai.tool.definition.ToolDefinition;
 
@@ -156,22 +162,42 @@ class ModelsSpringAiToolCallingTest {
 
   private static Prompt promptWithTools(
       List<org.springframework.ai.chat.messages.Message> messages) {
-    return new Prompt(
-        messages,
-        ToolCallingChatOptions.builder().toolCallbacks(List.of(weatherCallback())).build());
+    return new Prompt(messages, toolOptions(List.of(weatherCallback()), false));
   }
 
   private static Prompt promptWithModeTool(
       List<org.springframework.ai.chat.messages.Message> messages) {
-    return new Prompt(
-        messages, ToolCallingChatOptions.builder().toolCallbacks(List.of(modeCallback())).build());
+    return new Prompt(messages, toolOptions(List.of(modeCallback()), false));
   }
 
   private static Prompt promptWithRequiredWeatherTool(
       List<org.springframework.ai.chat.messages.Message> messages) {
-    return new Prompt(
-        messages,
-        ToolCallingChatOptions.builder().toolCallbacks(List.of(requiredWeatherCallback())).build());
+    return new Prompt(messages, toolOptions(List.of(requiredWeatherCallback()), false));
+  }
+
+  private static ToolCallingChatOptions toolOptions(
+      List<ToolCallback> callbacks, boolean internalExecution) {
+    ToolCallingChatOptions options =
+        ToolCallingChatOptions.builder().toolCallbacks(callbacks).build();
+    try {
+      ToolCallingChatOptions.class
+          .getMethod("setInternalToolExecutionEnabled", Boolean.class)
+          .invoke(options, internalExecution);
+    } catch (NoSuchMethodException ignored) {
+      // Spring AI 2.0 always delegates execution to ToolCallingAdvisor.
+    } catch (ReflectiveOperationException failure) {
+      throw new AssertionError("cannot configure Spring AI tool-execution policy", failure);
+    }
+    return options;
+  }
+
+  private static boolean hasLegacyInternalToolExecution() {
+    try {
+      ToolCallingChatOptions.class.getMethod("getInternalToolExecutionEnabled");
+      return true;
+    } catch (NoSuchMethodException ignored) {
+      return false;
+    }
   }
 
   private static List<ToolCallback> numberedCallbacks(int count) {
@@ -236,8 +262,7 @@ class ModelsSpringAiToolCallingTest {
               model, ChatTemplate.CHATML, SamplingOptions.builder().build());
       Prompt prompt =
           new Prompt(
-              List.of(new UserMessage("use tool-6")),
-              ToolCallingChatOptions.builder().toolCallbacks(numberedCallbacks(7)).build());
+              List.of(new UserMessage("use tool-6")), toolOptions(numberedCallbacks(7), false));
 
       chat.call(prompt);
       chat.call(prompt);
@@ -254,8 +279,7 @@ class ModelsSpringAiToolCallingTest {
               model, ChatTemplate.CHATML, SamplingOptions.builder().build());
       Prompt prompt =
           new Prompt(
-              List.of(new UserMessage("use tool-6")),
-              ToolCallingChatOptions.builder().toolCallbacks(numberedCallbacks(7)).build());
+              List.of(new UserMessage("use tool-6")), toolOptions(numberedCallbacks(7), false));
 
       chat.stream(prompt).collectList().block();
 
@@ -272,6 +296,163 @@ class ModelsSpringAiToolCallingTest {
       assertThatThrownBy(() -> chat.call(promptWithTools(List.of(new UserMessage("q")))))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("gemma");
+    }
+
+    @Test
+    void refusesToolsWhenTheArtifactWasNotQualifiedForToolCalling() {
+      ScriptedModel model = new ScriptedModel("ordinary text");
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model,
+              "qwen-chat-only",
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation"));
+
+      assertThatThrownBy(() -> chat.call(promptWithTools(List.of(new UserMessage("weather?")))))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("qwen-chat-only")
+          .hasMessageContaining("not qualified for tool-calling");
+      assertThat(model.lastPrompt()).isNull();
+    }
+
+    @Test
+    void acceptsToolsWhenTheArtifactWasQualifiedForToolCalling() {
+      ScriptedModel model = new ScriptedModel("ordinary text");
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model,
+              "needle-qualified",
+              ChatTemplate.NEEDLE2,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+
+      chat.call(promptWithTools(List.of(new UserMessage("weather?"))));
+
+      assertThat(model.lastPrompt()).contains("get_weather");
+    }
+  }
+
+  @Nested
+  static class ChatClientExecution {
+
+    @Test
+    void stopsARepeatingInternalToolLoop() {
+      assumeTrue(hasLegacyInternalToolExecution());
+      ScriptedModel model =
+          new ScriptedModel(
+              "<tool_call>[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Austin\"}}]</tool_call>");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "needle-qualified",
+              ChatTemplate.NEEDLE2,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      Prompt prompt =
+          new Prompt(
+              List.of(new UserMessage("weather in Austin?")),
+              toolOptions(List.of(weatherCallback()), true));
+
+      assertThatThrownBy(() -> adapter.call(prompt))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("16 consecutive turns");
+    }
+
+    @Test
+    void chatClientExecutesTheToolAndReturnsTheFollowUpAnswer() {
+      SequentialScriptedModel model =
+          new SequentialScriptedModel(
+              "<tool_call>[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Austin\"}}]</tool_call><|im_end|>",
+              "It is 88 degrees.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "needle-qualified",
+              ChatTemplate.NEEDLE2,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      ChatClient client = ChatClient.create(adapter);
+
+      String answer =
+          client.prompt().user("weather in Austin?").tools(new WeatherTools()).call().content();
+
+      assertThat(answer).isEqualTo("It is 88 degrees.");
+      assertThat(model.prompts()).hasSize(2);
+      assertThat(model.prompts().get(1)).contains("{\"tempF\":88}");
+    }
+
+    @Test
+    void streamingChatClientExecutesTheToolAndReturnsTheFollowUpAnswer() {
+      SequentialScriptedModel model =
+          new SequentialScriptedModel(
+              "<tool_call>[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Austin\"}}]</tool_call><|im_end|>",
+              "It is 88 degrees.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "needle-qualified",
+              ChatTemplate.NEEDLE2,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      ChatClient client = ChatClient.create(adapter);
+
+      String answer =
+          String.join(
+              "",
+              client.prompt().user("weather in Austin?").tools(new WeatherTools()).stream()
+                  .content()
+                  .collectList()
+                  .block());
+
+      assertThat(answer).isEqualTo("It is 88 degrees.");
+      assertThat(model.prompts()).hasSize(2);
+      assertThat(model.prompts().get(1)).contains("{\"tempF\":88}");
+    }
+  }
+
+  private static final class SequentialScriptedModel implements TextGenerationModel {
+    private final ArrayDeque<String> completions;
+    private final List<String> prompts = new ArrayList<>();
+
+    SequentialScriptedModel(String... completions) {
+      this.completions = new ArrayDeque<>(List.of(completions));
+    }
+
+    @Override
+    public String modelName() {
+      return "SequentialScriptedModel";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("scripted");
+    }
+
+    @Override
+    public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+      prompts.add(prompt.text());
+      stream.onToken(completions.removeFirst());
+      stream.onComplete();
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      prompts.add(prompt);
+      stream.onToken(completions.removeFirst());
+      stream.onComplete();
+    }
+
+    List<String> prompts() {
+      return List.copyOf(prompts);
+    }
+  }
+
+  private static final class WeatherTools {
+
+    @Tool(name = "get_weather", description = "Get the current weather for a city")
+    String getWeather(@ToolParam(description = "City name") String city) {
+      return "{\"tempF\":88}";
     }
   }
 

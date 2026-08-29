@@ -52,7 +52,8 @@ try (var runtime = ModelJars.openRuntime(MODEL)) {
         runtime.model(),
         runtime.descriptor().alias(),
         runtime.chatTemplate(),
-        defaults);
+        defaults,
+        runtime.descriptor().capabilities());
 
     String answer = model.call("Answer using only the supplied context.");
     System.out.println(answer);
@@ -74,7 +75,8 @@ var model = new ModelsSpringAiChatModel(
     runtime.descriptor().alias(),
     runtime.chatTemplate(),
     defaults,
-    observationRegistry);
+    observationRegistry,
+    runtime.descriptor().capabilities());
 ----
 
 The adapter reports `gen_ai.system=integrallis`, the Models runtime identity as
@@ -110,36 +112,54 @@ the runtime's `modelName()` for source compatibility.
 
 == Tool Calling
 
-When a `Prompt` declares Spring AI `ToolCallback` instances, the adapter renders
-their names, descriptions, and input schemas into the selected Models chat
-template. Model output is scanned back into Spring AI `AssistantMessage`
-tool calls, so Spring AI advisors and tool execution see the same
-`hasToolCalls()` and `ToolCall` surface they expect from hosted providers.
+When a `ChatClient` request declares Spring AI tools, the adapter renders their
+names, descriptions, and input schemas into the selected Models chat template.
+Model output is scanned back into Spring AI `AssistantMessage` tool calls. The
+`ChatClient` executes the callback and sends its result to the model for the
+follow-up answer, just as it does for a hosted provider.
+
+Pass the ModelJar descriptor capabilities when constructing the adapter. This
+makes an artifact that was qualified for chat, but not tool calling, fail before
+generation instead of silently attempting an unsupported workflow.
 
 [source,java]
 ----
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 
-var prompt = new Prompt(
-    List.of(new UserMessage("Switch the thermostat to cooling.")),
-    ToolCallingChatOptions.builder()
-        .toolCallbacks(List.of(setModeTool))
-        .build());
+class ThermostatTools {
+    @Tool(name = "set_mode", description = "Set the thermostat mode")
+    String setMode(@ToolParam(description = "Mode to activate") String mode) {
+        return "Thermostat mode is now " + mode;
+    }
+}
 
-ChatResponse response = model.call(prompt);
+try (var runtime = ModelJars.openRuntime(MODEL)) {
+    var model = new ModelsSpringAiChatModel(
+        runtime.model(),
+        runtime.descriptor().alias(),
+        runtime.chatTemplate(),
+        defaults,
+        runtime.descriptor().capabilities());
 
-if (response.hasToolCalls()) {
-    response.getResult().getOutput().getToolCalls()
-        .forEach(call -> System.out.println(call.name() + " " + call.arguments()));
+    String answer = ChatClient.create(model)
+        .prompt()
+        .user("Switch the thermostat to cooling.")
+        .tools(new ThermostatTools())
+        .call()
+        .content();
 }
 ----
 
-The same declaration path is used for blocking and streaming chat. Streaming
-with declared tools buffers generated text until the tool call is complete,
-because Spring AI can only act on a complete tool request.
+The same execution path is covered for blocking and streaming `ChatClient`
+requests. Streaming with declared tools buffers generated text until the tool
+call is complete, because Spring AI can only act on a complete request.
+
+Calling the lower-level `ChatModel.call(Prompt)` API returns an
+`AssistantMessage` containing the parsed tool calls; it does not execute Java
+callbacks. Use `ChatClient` when the application wants Spring AI to own the
+tool-execution loop.
 
 When the wrapped model exposes a contrastive head and more than five tools are
 declared, the adapter retrieves the five most relevant schemas before it

@@ -71,7 +71,10 @@ Implemented functionality includes:
   with LangChain4j and Spring AI schema-constrained tool decoding for
   enumerable arguments; Needle 2 additionally constrains its array protocol
   from JSON Schema and retrieves the five most relevant tools with its in-model
-  contrastive head
+  contrastive head. Spring AI `ChatClient` requests execute registered Java
+  callbacks and return the follow-up model answer on both blocking and streaming
+  paths; ModelJars callers can enforce artifact qualification by passing the
+  descriptor capabilities to the adapter
 - in-JVM text embeddings with last-token and mean pooling, tested to produce the
   same vectors as llama.cpp
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
@@ -281,7 +284,7 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 |---|---|---|
 | Plain Java | `models-runtime` | `GenerationLoop` and `TokenStream` |
 | LangChain4j | `models-langchain4j` | blocking and streaming chat models with schema-constrained tool calls |
-| Spring AI | `models-spring-ai` | observed blocking and streaming chat models with schema-constrained tool calls |
+| Spring AI | `models-spring-ai` | observed blocking and streaming chat models with qualified `ChatClient` tool execution |
 | Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel`, observations, and token-usage meters |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
