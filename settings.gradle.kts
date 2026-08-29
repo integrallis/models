@@ -35,6 +35,7 @@ include("models-embedding")
 // --- Testing & benchmarks ---
 include("models-test")
 include("models-bench")
+include("models-accelerator-bench")
 include("models-rag-bench")
 include("docs")
 

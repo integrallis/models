@@ -38,7 +38,7 @@ allprojects {
 }
 
 // Library subprojects (excludes executable benchmark applications)
-val benchmarkProjectNames = setOf("models-bench", "models-rag-bench")
+val benchmarkProjectNames = setOf("models-bench", "models-accelerator-bench", "models-rag-bench")
 val libraryProjects =
     subprojects.filterNot { it.name in benchmarkProjectNames || it.name == "docs" }
 val benchmarkProjects = subprojects.filter { it.name in benchmarkProjectNames }
