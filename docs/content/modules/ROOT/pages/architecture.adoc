@@ -35,6 +35,26 @@ Foundation Models framework through a bundled, integrity-checked FFM
 bridge. It does not launch an executable or communicate with a model
 server.
 
+== Memory And Device Execution
+
+GGUF, Safetensors, and CACT weights are mapped read-only into the Java
+process address space. They are not copied wholesale into the JVM heap;
+the operating system pages mapped data through its file cache. Runtime state,
+including the KV cache and reusable activation workspaces, still consumes JVM
+heap, so context length and concurrent sessions remain part of capacity
+planning.
+
+The downloadable-model backends currently execute on the CPU through Java's
+Vector API, with optional Models-owned Rust kernels on qualified bottlenecks.
+Apple Silicon's unified memory avoids physically separate CPU and GPU memory,
+but unified memory alone does not schedule work on the GPU. Models does not yet
+execute arbitrary MLX models or dispatch its downloaded-model graph to Metal,
+CUDA, or OpenCL.
+
+Apple Foundation Models is a separate OS-owned path. Apple controls that
+model's weights, memory, and acceleration; it is not an MLX backend for a
+downloaded ModelJar.
+
 image::models-0001.png[Models runtime architecture,align=center]
 
 == Why A Native Path Exists

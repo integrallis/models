@@ -9,4 +9,5 @@ dependencies {
 
     compileOnly("org.springframework.ai:spring-ai-model:$springAiVersion")
     testImplementation("org.springframework.ai:spring-ai-model:$springAiVersion")
+    testImplementation("org.springframework.ai:spring-ai-client-chat:$springAiVersion")
 }

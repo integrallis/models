@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
@@ -53,6 +54,8 @@ import org.springframework.ai.chat.observation.DefaultChatModelObservationConven
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.model.tool.ToolCallingManager;
+import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import reactor.core.publisher.Flux;
@@ -61,6 +64,7 @@ import reactor.core.scheduler.Schedulers;
 /** Spring AI {@link ChatModel} backed by the Models runtime generation loop. */
 public final class ModelsSpringAiChatModel implements ChatModel {
   private static final String PROVIDER = "integrallis";
+  private static final int MAX_INTERNAL_TOOL_TURNS = 16;
   private static final ChatModelObservationConvention DEFAULT_OBSERVATION_CONVENTION =
       new DefaultChatModelObservationConvention();
 
@@ -69,6 +73,8 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   private final String modelName;
   private final ChatTemplate template;
   private final ObservationRegistry observationRegistry;
+  private final Set<String> qualifiedCapabilities;
+  private final ToolCallingManager toolCallingManager;
   private final ToolSpecSelector toolSelector;
   private ChatModelObservationConvention observationConvention = DEFAULT_OBSERVATION_CONVENTION;
 
@@ -111,7 +117,23 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       String modelName,
       ChatTemplate template,
       SamplingOptions defaults) {
-    this(model, modelName, template, defaults, ObservationRegistry.NOOP);
+    this(model, modelName, template, defaults, ObservationRegistry.NOOP, null);
+  }
+
+  /**
+   * Creates an adapter with an authoritative set of artifact capabilities.
+   *
+   * <p>When tools are supplied, the adapter rejects the call unless {@code qualifiedCapabilities}
+   * contains {@code tool-calling}. ModelJars callers should pass the capabilities from the selected
+   * descriptor so a chat-only artifact cannot silently attempt an unqualified tool workflow.
+   */
+  public ModelsSpringAiChatModel(
+      TextGenerationModel model,
+      String modelName,
+      ChatTemplate template,
+      SamplingOptions defaults,
+      Set<String> qualifiedCapabilities) {
+    this(model, modelName, template, defaults, ObservationRegistry.NOOP, qualifiedCapabilities);
   }
 
   public ModelsSpringAiChatModel(
@@ -119,7 +141,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       ChatTemplate template,
       SamplingOptions defaults,
       ObservationRegistry observationRegistry) {
-    this(model, null, template, defaults, observationRegistry, true);
+    this(model, null, template, defaults, observationRegistry, true, null);
   }
 
   public ModelsSpringAiChatModel(
@@ -128,7 +150,18 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       ChatTemplate template,
       SamplingOptions defaults,
       ObservationRegistry observationRegistry) {
-    this(model, modelName, template, defaults, observationRegistry, false);
+    this(model, modelName, template, defaults, observationRegistry, false, null);
+  }
+
+  /** Creates an observed adapter with an authoritative set of artifact capabilities. */
+  public ModelsSpringAiChatModel(
+      TextGenerationModel model,
+      String modelName,
+      ChatTemplate template,
+      SamplingOptions defaults,
+      ObservationRegistry observationRegistry,
+      Set<String> qualifiedCapabilities) {
+    this(model, modelName, template, defaults, observationRegistry, false, qualifiedCapabilities);
   }
 
   private ModelsSpringAiChatModel(
@@ -137,12 +170,17 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       ChatTemplate template,
       SamplingOptions defaults,
       ObservationRegistry observationRegistry,
-      boolean useRuntimeModelName) {
+      boolean useRuntimeModelName,
+      Set<String> qualifiedCapabilities) {
     this.model = Objects.requireNonNull(model, "model");
     this.modelName = useRuntimeModelName ? null : requireModelName(modelName);
     this.template = Objects.requireNonNull(template, "template");
     this.defaults = Objects.requireNonNull(defaults, "defaults");
     this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry");
+    this.qualifiedCapabilities =
+        qualifiedCapabilities == null ? null : Set.copyOf(qualifiedCapabilities);
+    this.toolCallingManager =
+        ToolCallingManager.builder().observationRegistry(observationRegistry).build();
     this.toolSelector =
         model instanceof AuxiliaryTextGenerationModel auxiliary
                 && auxiliary.supportsContrastiveEncoding()
@@ -164,16 +202,40 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private ChatResponse callObserved(Prompt prompt, ChatModelObservationContext context) {
-    List<ToolSpec> tools = selectedTools(prompt, declaredTools(prompt));
+    Prompt current = prompt;
+    for (int toolTurn = 0; toolTurn <= MAX_INTERNAL_TOOL_TURNS; toolTurn++) {
+      ChatResponse response = callOnce(current);
+      if (!response.hasToolCalls() || !internalToolExecutionEnabled(current.getOptions())) {
+        context.setResponse(response);
+        return response;
+      }
+      ToolExecutionResult toolResult = toolCallingManager.executeToolCalls(current, response);
+      if (toolResult.returnDirect()) {
+        ChatResponse direct =
+            new ChatResponse(
+                ToolExecutionResult.buildGenerations(toolResult), response.getMetadata());
+        context.setResponse(direct);
+        return direct;
+      }
+      if (toolTurn == MAX_INTERNAL_TOOL_TURNS) {
+        throw new IllegalStateException(
+            "tool-calling exceeded " + MAX_INTERNAL_TOOL_TURNS + " consecutive turns");
+      }
+      current = new Prompt(toolResult.conversationHistory(), current.getOptions());
+    }
+    throw new IllegalStateException("unreachable tool-calling state");
+  }
+
+  private ChatResponse callOnce(Prompt prompt) {
+    List<ToolSpec> declaredTools = declaredTools(prompt);
+    requireQualifiedToolCalling(declaredTools);
+    List<ToolSpec> tools = selectedTools(prompt, declaredTools);
     ModelPrompt rendered = render(prompt, tools);
     SamplingOptions requested = options(prompt);
     GenerationOutput generated = generate(rendered, requested, tools);
-    ChatResponse response =
-        tools.isEmpty()
-            ? response(generated.text(), generated.usage())
-            : toolAwareResponse(generated.text(), generated.usage());
-    context.setResponse(response);
-    return response;
+    return tools.isEmpty()
+        ? response(generated.text(), generated.usage())
+        : toolAwareResponse(generated.text(), generated.usage());
   }
 
   @Override
@@ -199,7 +261,40 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private Flux<ChatResponse> streamObserved(Prompt prompt) {
-    List<ToolSpec> tools = selectedTools(prompt, declaredTools(prompt));
+    List<ToolSpec> declaredTools = declaredTools(prompt);
+    requireQualifiedToolCalling(declaredTools);
+    List<ToolSpec> tools = selectedTools(prompt, declaredTools);
+    Flux<ChatResponse> response = streamOnce(prompt, tools);
+    if (tools.isEmpty() || !internalToolExecutionEnabled(prompt.getOptions())) {
+      return response;
+    }
+    return response.single().flatMapMany(result -> continueToolStream(prompt, result, 0));
+  }
+
+  private Flux<ChatResponse> continueToolStream(
+      Prompt prompt, ChatResponse response, int toolTurn) {
+    if (!response.hasToolCalls()) {
+      return Flux.just(response);
+    }
+    ToolExecutionResult toolResult = toolCallingManager.executeToolCalls(prompt, response);
+    if (toolResult.returnDirect()) {
+      return Flux.just(
+          new ChatResponse(
+              ToolExecutionResult.buildGenerations(toolResult), response.getMetadata()));
+    }
+    if (toolTurn == MAX_INTERNAL_TOOL_TURNS) {
+      return Flux.error(
+          new IllegalStateException(
+              "tool-calling exceeded " + MAX_INTERNAL_TOOL_TURNS + " consecutive turns"));
+    }
+    Prompt next = new Prompt(toolResult.conversationHistory(), prompt.getOptions());
+    List<ToolSpec> tools = selectedTools(next, declaredTools(next));
+    return streamOnce(next, tools)
+        .single()
+        .flatMapMany(result -> continueToolStream(next, result, toolTurn + 1));
+  }
+
+  private Flux<ChatResponse> streamOnce(Prompt prompt, List<ToolSpec> tools) {
     ModelPrompt rendered = render(prompt, tools);
     SamplingOptions requested = options(prompt);
     return Flux.<ChatResponse>create(
@@ -253,7 +348,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   public ChatOptions getOptions() {
-    return ChatOptions.builder()
+    return ToolCallingChatOptions.builder()
         .model(resolvedModelName())
         .temperature((double) defaults.temperature())
         .topP((double) defaults.topP())
@@ -360,11 +455,42 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     return List.copyOf(tools);
   }
 
+  private static boolean internalToolExecutionEnabled(ChatOptions options) {
+    if (!(options instanceof ToolCallingChatOptions toolOptions)) {
+      return false;
+    }
+    try {
+      Object enabled =
+          ToolCallingChatOptions.class
+              .getMethod("getInternalToolExecutionEnabled")
+              .invoke(toolOptions);
+      return enabled == null || Boolean.TRUE.equals(enabled);
+    } catch (NoSuchMethodException ignored) {
+      // Spring AI 2.0 removed provider-owned execution; ToolCallingAdvisor owns the loop.
+      return false;
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("cannot read Spring AI tool-execution policy", failure);
+    }
+  }
+
   private List<ToolSpec> selectedTools(Prompt prompt, List<ToolSpec> tools) {
     if (toolSelector == null || tools.size() <= ToolSpecSelector.DEFAULT_TOOL_LIMIT) {
       return tools;
     }
     return toolSelector.select(latestUserText(prompt), tools);
+  }
+
+  private void requireQualifiedToolCalling(List<ToolSpec> tools) {
+    if (tools.isEmpty()
+        || qualifiedCapabilities == null
+        || qualifiedCapabilities.contains("tool-calling")) {
+      return;
+    }
+    throw new IllegalStateException(
+        "Model "
+            + resolvedModelName()
+            + " is not qualified for tool-calling; qualified capabilities are "
+            + qualifiedCapabilities);
   }
 
   private static String latestUserText(Prompt prompt) {
