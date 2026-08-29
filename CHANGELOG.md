@@ -2,6 +2,21 @@
 
 All notable changes to models are documented here.
 
+## [0.3.14] - 2026-08-28
+
+### Fixed
+
+- Preserved Spring AI tool declarations by advertising `ToolCallingChatOptions`, and executed the
+  callback/follow-up loop on both blocking and streaming `ChatClient` paths across Spring AI 1.1
+  and 2.0.
+- Added artifact-capability validation so ModelJars callers receive a clear error when attempting
+  tool calling with a model that was not qualified for it.
+
+### Documentation
+
+- Documented Spring AI tool execution, downloadable-model memory and device behavior, and the
+  current Apple Foundation Models tool-calling limitation.
+
 ## [0.3.13] - 2026-08-28
 
 ### Added
