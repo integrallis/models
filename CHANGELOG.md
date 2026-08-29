@@ -2,6 +2,14 @@
 
 All notable changes to models are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Exposed runtime-owned generation measurements through `InferencePipeline` and
+  `RuntimeTextGenerationModel`, including tokenization, prompt preparation, prefill, time to first
+  token, decode, total duration, token usage, prompt-cache reuse, and decode throughput.
+
 ## [0.3.12] - 2026-08-28
 
 ### Fixed

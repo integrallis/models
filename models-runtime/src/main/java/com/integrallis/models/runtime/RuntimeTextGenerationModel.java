@@ -51,6 +51,11 @@ public final class RuntimeTextGenerationModel
     return backend.tokenizer();
   }
 
+  /** Returns phase timings and usage for the most recently completed generation. */
+  public GenerationMetrics lastGenerationMetrics() {
+    return generationLoop.lastGenerationMetrics();
+  }
+
   @Override
   public String generate(String prompt, SamplingOptions options) {
     return generationLoop.generate(prompt, options);

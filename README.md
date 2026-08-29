@@ -201,7 +201,10 @@ use the lower-level `PureJavaBackend.load(Path)` and
 [Using Models guide](https://integrallis.github.io/models/docs/models/current/using-models.html).
 Wrap either backend in `InferencePipeline` for ownership-safe access to the
 tokenizer, model metadata, active context window, structured prefill,
-forward-pass logits, reset, checkpoint, and rewind.
+forward-pass logits, reset, checkpoint, rewind, and measurements for the most
+recent generation. `pipeline.lastGenerationMetrics()` reports tokenization,
+prompt preparation, prefill, time to first token, decode and total duration,
+along with token counts, prompt-cache reuse, and decode throughput.
 
 Needle 2 CACT artifacts use the same public prompt and parsing APIs. The
 `ChatTemplate.NEEDLE2` renderer emits the model's raw tool-schema envelope and

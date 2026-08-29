@@ -120,7 +120,21 @@ ModelPrompt prompt = ChatTemplate.CHATML.render(
     List.of(ChatMessage.user("Name one JVM language.")));
 
 String answer = pipeline.generate(prompt, options);
+
+GenerationMetrics metrics = pipeline.lastGenerationMetrics();
+System.out.printf(
+    "TTFT %d ms; decode %.1f tokens/s%n",
+    metrics.timeToFirstToken().orElseThrow().toMillis(),
+    metrics.decodeTokensPerSecond());
 ----
+
+The snapshot belongs to the runtime, so it measures the work inside the
+generation call rather than time spent loading the model or rendering the
+prompt. It separates tokenization, prompt preparation, prefill, and decode;
+also includes total duration, exact prompt and completion token counts, and
+the prompt-prefix cache result. `timeToFirstToken()` is empty when generation
+produces no token. Check `available()` before reading a newly opened pipeline
+and `successful()` when diagnosing a failed request.
 
 == Use Auxiliary Heads
 

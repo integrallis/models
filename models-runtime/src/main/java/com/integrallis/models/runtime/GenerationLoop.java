@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.LongSupplier;
 
 /**
  * Autoregressive generation loop that drives an inference backend to generate text.
@@ -40,18 +42,28 @@ public final class GenerationLoop {
 
   private final InferenceBackend backend;
   private final SpeculativeGenerationOptions speculativeOptions;
+  private final LongSupplier nanoTime;
   private volatile SpeculativeGenerationMetrics lastSpeculativeMetrics =
       SpeculativeGenerationMetrics.inactive();
   private volatile PromptCacheMetrics lastPromptCacheMetrics = PromptCacheMetrics.unavailable();
+  private volatile GenerationMetrics lastGenerationMetrics = GenerationMetrics.unavailable();
   private int[] cachedPromptTokens;
 
   public GenerationLoop(InferenceBackend backend) {
-    this(backend, SpeculativeGenerationOptions.disabled());
+    this(backend, SpeculativeGenerationOptions.disabled(), System::nanoTime);
   }
 
   public GenerationLoop(InferenceBackend backend, SpeculativeGenerationOptions speculativeOptions) {
+    this(backend, speculativeOptions, System::nanoTime);
+  }
+
+  GenerationLoop(
+      InferenceBackend backend,
+      SpeculativeGenerationOptions speculativeOptions,
+      LongSupplier nanoTime) {
     this.backend = Objects.requireNonNull(backend, "backend");
     this.speculativeOptions = Objects.requireNonNull(speculativeOptions, "speculativeOptions");
+    this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
   }
 
   /** Returns the measurements captured by the most recently completed request. */
@@ -62,6 +74,11 @@ public final class GenerationLoop {
   /** Returns prompt-prefix cache measurements for the most recently completed request. */
   public PromptCacheMetrics lastPromptCacheMetrics() {
     return lastPromptCacheMetrics;
+  }
+
+  /** Returns phase timings and token usage for the most recently completed request. */
+  public GenerationMetrics lastGenerationMetrics() {
+    return lastGenerationMetrics;
   }
 
   /**
@@ -144,12 +161,19 @@ public final class GenerationLoop {
     Objects.requireNonNull(constraint, "constraint");
 
     synchronized (backend) {
+      long requestStarted = nanoTime.getAsLong();
+      long phaseStarted = requestStarted;
       Tokenizer tokenizer = backend.tokenizer();
       int[] promptTokens = tokenizer.encode(prompt);
+      long phaseCompleted = nanoTime.getAsLong();
+      long tokenizationNanos = elapsed(phaseStarted, phaseCompleted);
       if (promptTokens.length == 0) {
         throw new IllegalArgumentException("prompt produced no tokens");
       }
+      phaseStarted = phaseCompleted;
       PromptPrefill promptPrefill = preparePrompt(promptTokens);
+      phaseCompleted = nanoTime.getAsLong();
+      long promptPreparationNanos = elapsed(phaseStarted, phaseCompleted);
 
       Sampler sampler = new Sampler(options);
       StopSequenceEmitter emitter = new StopSequenceEmitter(stream, options.stopSequences());
@@ -160,10 +184,19 @@ public final class GenerationLoop {
               && backend instanceof SpeculativeInferenceBackend;
       MutableSpeculativeMetrics speculativeMetrics =
           new MutableSpeculativeMetrics(speculativeActive, speculativeOptions.maximumDraftTokens());
+      MutableGenerationMetrics generationMetrics =
+          new MutableGenerationMetrics(
+              requestStarted, tokenizationNanos, promptPreparationNanos, nanoTime);
+      boolean successful = false;
 
       try {
-        float[] logits =
-            backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
+        long prefillStarted = nanoTime.getAsLong();
+        float[] logits;
+        try {
+          logits = backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
+        } finally {
+          generationMetrics.prefillNanos = elapsed(prefillStarted, nanoTime.getAsLong());
+        }
         for (int token : promptTokens) {
           allTokens.add(token);
         }
@@ -179,7 +212,8 @@ public final class GenerationLoop {
               logits,
               position,
               options.maxTokens(),
-              speculativeMetrics);
+              speculativeMetrics,
+              generationMetrics);
         } else {
           generateSequentially(
               tokenizer,
@@ -189,12 +223,14 @@ public final class GenerationLoop {
               logits,
               position,
               options.maxTokens(),
-              constraint);
+              constraint,
+              generationMetrics);
         }
 
         emitter.finish();
         cachedPromptTokens =
             backend instanceof RewindableInferenceBackend ? promptTokens.clone() : null;
+        successful = true;
         stream.onComplete(
             new GenerationUsage(promptTokens.length, allTokens.size() - promptTokens.length));
       } catch (Exception e) {
@@ -203,6 +239,13 @@ public final class GenerationLoop {
       } finally {
         lastSpeculativeMetrics = speculativeMetrics.snapshot();
         lastPromptCacheMetrics = promptPrefill.metrics();
+        lastGenerationMetrics =
+            generationMetrics.snapshot(
+                successful,
+                new GenerationUsage(
+                    promptTokens.length, Math.max(0, allTokens.size() - promptTokens.length)),
+                promptPrefill.metrics(),
+                nanoTime.getAsLong());
       }
     }
   }
@@ -255,7 +298,8 @@ public final class GenerationLoop {
       float[] initialLogits,
       int initialPosition,
       int maxTokens,
-      TokenConstraint constraint) {
+      TokenConstraint constraint,
+      MutableGenerationMetrics metrics) {
     float[] logits = initialLogits;
     int position = initialPosition;
     for (int generated = 0; generated < maxTokens; generated++) {
@@ -263,7 +307,7 @@ public final class GenerationLoop {
       if (tokenizer.isEndOfGeneration(nextToken)) {
         return;
       }
-      if (emit(tokenizer, emitter, allTokens, nextToken)) {
+      if (emit(tokenizer, emitter, allTokens, nextToken, metrics)) {
         return;
       }
       constraint.accept(nextToken);
@@ -287,7 +331,8 @@ public final class GenerationLoop {
       float[] initialLogits,
       int initialPosition,
       int maxTokens,
-      MutableSpeculativeMetrics metrics) {
+      MutableSpeculativeMetrics metrics,
+      MutableGenerationMetrics generationMetrics) {
     NgramDraftStrategy strategy = new NgramDraftStrategy(speculativeOptions);
     float[] logits = initialLogits;
     LogitBatch carriedLogits = null;
@@ -323,7 +368,7 @@ public final class GenerationLoop {
         metrics.draftSearchNanos += System.nanoTime() - searchStart;
       }
 
-      if (emit(tokenizer, emitter, allTokens, nextToken)) {
+      if (emit(tokenizer, emitter, allTokens, nextToken, generationMetrics)) {
         return;
       }
       generated++;
@@ -375,7 +420,7 @@ public final class GenerationLoop {
           carriedToken = targetToken;
           break;
         }
-        reachedStopSequence = emit(tokenizer, emitter, allTokens, targetToken);
+        reachedStopSequence = emit(tokenizer, emitter, allTokens, targetToken, generationMetrics);
         accepted++;
         generated++;
         if (reachedStopSequence) {
@@ -406,7 +451,12 @@ public final class GenerationLoop {
   }
 
   private static boolean emit(
-      Tokenizer tokenizer, StopSequenceEmitter emitter, List<Integer> allTokens, int token) {
+      Tokenizer tokenizer,
+      StopSequenceEmitter emitter,
+      List<Integer> allTokens,
+      int token,
+      MutableGenerationMetrics metrics) {
+    metrics.tokenGenerated();
     boolean stopped = emitter.emit(tokenizer.decode(token));
     allTokens.add(token);
     return stopped;
@@ -414,6 +464,60 @@ public final class GenerationLoop {
 
   private record PromptPrefill(
       int startPosition, int[] tokensToEvaluate, PromptCacheMetrics metrics) {}
+
+  private static long elapsed(long started, long completed) {
+    return Math.max(0, completed - started);
+  }
+
+  private static final class MutableGenerationMetrics {
+    private final long requestStarted;
+    private final long tokenizationNanos;
+    private final long promptPreparationNanos;
+    private final LongSupplier nanoTime;
+    private long prefillNanos;
+    private long firstTokenAt = -1;
+
+    private MutableGenerationMetrics(
+        long requestStarted,
+        long tokenizationNanos,
+        long promptPreparationNanos,
+        LongSupplier nanoTime) {
+      this.requestStarted = requestStarted;
+      this.tokenizationNanos = tokenizationNanos;
+      this.promptPreparationNanos = promptPreparationNanos;
+      this.nanoTime = nanoTime;
+    }
+
+    private void tokenGenerated() {
+      if (firstTokenAt < 0) {
+        firstTokenAt = nanoTime.getAsLong();
+      }
+    }
+
+    private GenerationMetrics snapshot(
+        boolean successful,
+        GenerationUsage usage,
+        PromptCacheMetrics promptCache,
+        long completedAt) {
+      long totalNanos = elapsed(requestStarted, completedAt);
+      Optional<java.time.Duration> timeToFirstToken =
+          firstTokenAt < 0
+              ? Optional.empty()
+              : Optional.of(java.time.Duration.ofNanos(elapsed(requestStarted, firstTokenAt)));
+      long decodeNanos = firstTokenAt < 0 ? 0 : elapsed(firstTokenAt, completedAt);
+      return new GenerationMetrics(
+          true,
+          successful,
+          java.time.Duration.ofNanos(tokenizationNanos),
+          java.time.Duration.ofNanos(promptPreparationNanos),
+          java.time.Duration.ofNanos(prefillNanos),
+          timeToFirstToken,
+          java.time.Duration.ofNanos(decodeNanos),
+          java.time.Duration.ofNanos(totalNanos),
+          usage,
+          promptCache);
+    }
+  }
 
   private static final class StopSequenceEmitter {
     private final TokenStream stream;

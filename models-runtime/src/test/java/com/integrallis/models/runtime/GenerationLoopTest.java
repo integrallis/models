@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -133,6 +134,109 @@ class GenerationLoopTest {
 
   @Nested
   class BasicGeneration {
+
+    @Test
+    void reportsMeasuredGenerationPhasesFromInsideTheRuntime() {
+      AtomicLong now = new AtomicLong();
+      Tokenizer tokenizer =
+          new Tokenizer() {
+            @Override
+            public int[] encode(String text) {
+              now.addAndGet(2);
+              return new int[] {2};
+            }
+
+            @Override
+            public String decode(int[] tokens) {
+              return Arrays.stream(tokens).mapToObj(this::decode).reduce("", String::concat);
+            }
+
+            @Override
+            public String decode(int token) {
+              return switch (token) {
+                case 3 -> "a";
+                case 4 -> "b";
+                default -> "";
+              };
+            }
+
+            @Override
+            public int vocabSize() {
+              return 5;
+            }
+
+            @Override
+            public int bosToken() {
+              return 0;
+            }
+
+            @Override
+            public int eosToken() {
+              return 1;
+            }
+          };
+      InferenceBackend backend =
+          new InferenceBackend() {
+            @Override
+            public String name() {
+              return "timed";
+            }
+
+            @Override
+            public ModelMetadata metadata() {
+              return new ModelMetadata("mock", "Timed", 64, 5, 16, 1, 1, 1);
+            }
+
+            @Override
+            public Tokenizer tokenizer() {
+              return tokenizer;
+            }
+
+            @Override
+            public void reset() {
+              now.addAndGet(3);
+            }
+
+            @Override
+            public float[] prefill(int[] tokens, int startPosition) {
+              now.addAndGet(5);
+              return logitsFor(3);
+            }
+
+            @Override
+            public float[] forward(int token, int position) {
+              now.addAndGet(7);
+              return logitsFor(4);
+            }
+
+            @Override
+            public void close() {}
+
+            private float[] logitsFor(int token) {
+              float[] logits = new float[5];
+              logits[token] = 100.0f;
+              return logits;
+            }
+          };
+      GenerationLoop loop =
+          new GenerationLoop(backend, SpeculativeGenerationOptions.disabled(), now::get);
+
+      String result =
+          loop.generate("prompt", SamplingOptions.builder().temperature(0).maxTokens(2).build());
+
+      assertThat(result).isEqualTo("ab");
+      GenerationMetrics metrics = loop.lastGenerationMetrics();
+      assertThat(metrics.available()).isTrue();
+      assertThat(metrics.successful()).isTrue();
+      assertThat(metrics.tokenization().toNanos()).isEqualTo(2);
+      assertThat(metrics.promptPreparation().toNanos()).isEqualTo(3);
+      assertThat(metrics.prefill().toNanos()).isEqualTo(5);
+      assertThat(metrics.timeToFirstToken()).hasValue(java.time.Duration.ofNanos(10));
+      assertThat(metrics.decode().toNanos()).isEqualTo(7);
+      assertThat(metrics.total().toNanos()).isEqualTo(17);
+      assertThat(metrics.usage()).isEqualTo(new GenerationUsage(1, 2));
+      assertThat(metrics.decodeTokensPerSecond()).isEqualTo(1_000_000_000.0 / 7);
+    }
 
     @Test
     void usesOneBackendPrefillForThePrompt() {

@@ -33,6 +33,16 @@ import org.junit.jupiter.api.Test;
 class InferencePipelineTest {
 
   @Test
+  void exposesTheMostRecentRuntimeGenerationMetrics() {
+    try (InferencePipeline pipeline = new InferencePipeline(new StubBackend())) {
+      pipeline.generate("hello", SamplingOptions.builder().temperature(0).maxTokens(1).build());
+
+      assertThat(pipeline.lastGenerationMetrics().available()).isTrue();
+      assertThat(pipeline.lastGenerationMetrics().usage().promptTokens()).isPositive();
+    }
+  }
+
+  @Test
   void exposesTokenizerMetadataAndManagedContextOperations() {
     StubBackend backend = new StubBackend();
 

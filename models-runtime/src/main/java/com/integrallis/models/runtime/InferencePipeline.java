@@ -92,6 +92,14 @@ public final class InferencePipeline
     return tokenizer().encode(Objects.requireNonNull(prompt, "prompt"));
   }
 
+  /** Returns phase timings and usage for the most recently completed generation. */
+  public GenerationMetrics lastGenerationMetrics() {
+    synchronized (backend) {
+      requireOpen();
+      return generationLoop.lastGenerationMetrics();
+    }
+  }
+
   /** Tokenizes and prefills a structured prompt at the requested context position. */
   public float[] prefill(ModelPrompt prompt, int startPosition) {
     Objects.requireNonNull(prompt, "prompt");
