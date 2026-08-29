@@ -35,6 +35,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -383,6 +384,30 @@ class ModelsSpringAiToolCallingTest {
     }
 
     @Test
+    void defaultToolsExecutesTheUsersHyphenatedZipcodeToolAndReturnsTheFollowUpAnswer() {
+      SequentialScriptedModel model =
+          new SequentialScriptedModel(
+              "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"88252\"}}]</tool_call><|im_end|>",
+              "It is raining cats and dogs and 78 degrees in 88252.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "needle-qualified",
+              ChatTemplate.NEEDLE2,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      ZipcodeWeatherTools weatherTools = new ZipcodeWeatherTools();
+      ChatClient client = ChatClient.builder(adapter).defaultTools(weatherTools).build();
+
+      String answer = client.prompt().user("What is the weather for 88252?").call().content();
+
+      assertThat(answer).isEqualTo("It is raining cats and dogs and 78 degrees in 88252.");
+      assertThat(weatherTools.invocations).hasValue(1);
+      assertThat(model.prompts()).hasSize(2);
+      assertThat(model.prompts().get(1)).contains("88252", "Raining cats and dogs", "78");
+    }
+
+    @Test
     void streamingChatClientExecutesTheToolAndReturnsTheFollowUpAnswer() {
       SequentialScriptedModel model =
           new SequentialScriptedModel(
@@ -455,6 +480,19 @@ class ModelsSpringAiToolCallingTest {
       return "{\"tempF\":88}";
     }
   }
+
+  private static final class ZipcodeWeatherTools {
+    private final AtomicInteger invocations = new AtomicInteger();
+
+    @Tool(name = "get-weather-for-zipcode", description = "Gets weather for a given zipcode")
+    Weather getWeatherForZipcode(
+        @ToolParam(description = "The zipcode to get weather for") String zipcode) {
+      invocations.incrementAndGet();
+      return new Weather(zipcode, "Raining cats and dogs", 78);
+    }
+  }
+
+  private record Weather(String zipcode, String conditions, int temperature) {}
 
   private static final class RetrievalModel implements AuxiliaryTextGenerationModel {
     private final List<String> encoded = new ArrayList<>();
@@ -681,11 +719,94 @@ class ModelsSpringAiToolCallingTest {
       assertThat(model.lastPrompt()).contains("<tool_response>");
       assertThat(model.lastPrompt()).contains("{\"tempF\":88}");
     }
+
+    @Test
+    void returnsNeedleToolResultsDirectlyWithoutStartingAnotherToolSelectionTurn() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel();
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build());
+      ToolResponseMessage result =
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          "000000000",
+                          "get-weather-for-zipcode",
+                          "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
+                              + "\"temperature\":78}")))
+              .build();
+
+      ChatResponse response =
+          chat.call(
+              promptWithTools(List.of(new UserMessage("What is the weather for 88252?"), result)));
+
+      assertThat(response.hasToolCalls()).isFalse();
+      assertThat(response.getResult().getOutput().getText())
+          .isEqualTo(
+              "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
+                  + "\"temperature\":78}");
+      assertThat(model.constrainedCalls).isZero();
+      assertThat(model.unconstrainedCalls).isZero();
+    }
+
+    @Test
+    void doesNotReuseAnOldNeedleToolResultForANewUserTurn() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel(true);
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build());
+      ToolResponseMessage oldResult =
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          "000000000", "set_mode", "{\"mode\":\"cool\"}")))
+              .build();
+
+      ChatResponse response =
+          chat.call(
+              promptWithModeTool(
+                  List.of(
+                      new UserMessage("switch to cooling"),
+                      oldResult,
+                      new UserMessage("switch to cooling again"))));
+
+      assertThat(response.hasToolCalls()).isTrue();
+      assertThat(model.constrainedCalls).isOne();
+      assertThat(model.unconstrainedCalls).isZero();
+    }
+
+    @Test
+    void streamsTheCompletedNeedleToolResultWithoutSelectingAnotherAction() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel(true);
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build());
+      ToolResponseMessage result =
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          "000000000", "set_mode", "{\"mode\":\"cool\"}")))
+              .build();
+
+      ChatResponse response =
+          chat.stream(promptWithModeTool(List.of(new UserMessage("switch to cooling"), result)))
+              .blockLast();
+
+      assertThat(response).isNotNull();
+      assertThat(response.hasToolCalls()).isFalse();
+      assertThat(response.getResult().getOutput().getText()).isEqualTo("{\"mode\":\"cool\"}");
+      assertThat(model.constrainedCalls).isZero();
+      assertThat(model.unconstrainedCalls).isZero();
+    }
   }
 
   private static final class ConstraintRecordingModel implements ConstrainedTextGenerationModel {
     private int constrainedCalls;
     private int unconstrainedCalls;
+    private final boolean arrayWrapped;
     private final Tokenizer tokenizer =
         new Tokenizer() {
           @Override
@@ -723,6 +844,14 @@ class ModelsSpringAiToolCallingTest {
           }
         };
 
+    ConstraintRecordingModel() {
+      this(false);
+    }
+
+    ConstraintRecordingModel(boolean arrayWrapped) {
+      this.arrayWrapped = arrayWrapped;
+    }
+
     @Override
     public String modelName() {
       return "ConstraintRecordingModel";
@@ -753,7 +882,9 @@ class ModelsSpringAiToolCallingTest {
         TokenConstraint constraint) {
       constrainedCalls++;
       String output =
-          "<tool_call>{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}</tool_call>";
+          arrayWrapped
+              ? "<tool_call>[{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}]</tool_call>"
+              : "<tool_call>{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}</tool_call>";
       for (int index = 0; index < output.length(); index++) {
         int token = output.charAt(index);
         if (!constraint.allows(token)) {

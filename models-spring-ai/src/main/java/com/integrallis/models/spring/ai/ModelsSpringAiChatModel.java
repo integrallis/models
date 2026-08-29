@@ -227,6 +227,10 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private ChatResponse callOnce(Prompt prompt) {
+    Optional<String> completedToolResult = completedNeedleToolResult(prompt);
+    if (completedToolResult.isPresent()) {
+      return response(completedToolResult.orElseThrow(), null);
+    }
     List<ToolSpec> declaredTools = declaredTools(prompt);
     requireQualifiedToolCalling(declaredTools);
     List<ToolSpec> tools = selectedTools(prompt, declaredTools);
@@ -236,6 +240,30 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     return tools.isEmpty()
         ? response(generated.text(), generated.usage())
         : toolAwareResponse(generated.text(), generated.usage());
+  }
+
+  /**
+   * Needle 2 selects and structures actions; it is not a general response-synthesis model. Once
+   * Spring has executed those actions, returning their actual result completes the advisor loop
+   * instead of asking the selector to choose the same action again.
+   */
+  private Optional<String> completedNeedleToolResult(Prompt prompt) {
+    if (template != ChatTemplate.NEEDLE2 || !(model instanceof ConstrainedTextGenerationModel)) {
+      return Optional.empty();
+    }
+    List<org.springframework.ai.chat.messages.Message> messages = prompt.getInstructions();
+    if (messages.isEmpty() || !(messages.getLast() instanceof ToolResponseMessage toolResponses)) {
+      return Optional.empty();
+    }
+    List<String> results = new ArrayList<>();
+    for (ToolResponseMessage.ToolResponse result : toolResponses.getResponses()) {
+      results.add(Objects.requireNonNullElse(result.responseData(), ""));
+    }
+    if (results.isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        results.size() == 1 ? results.getFirst() : "[" + String.join(",", results) + "]");
   }
 
   @Override
@@ -295,6 +323,10 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private Flux<ChatResponse> streamOnce(Prompt prompt, List<ToolSpec> tools) {
+    Optional<String> completedToolResult = completedNeedleToolResult(prompt);
+    if (completedToolResult.isPresent()) {
+      return Flux.just(response(completedToolResult.orElseThrow(), null));
+    }
     ModelPrompt rendered = render(prompt, tools);
     SamplingOptions requested = options(prompt);
     return Flux.<ChatResponse>create(
