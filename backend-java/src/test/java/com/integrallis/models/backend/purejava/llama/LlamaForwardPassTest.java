@@ -835,7 +835,7 @@ class LlamaForwardPassTest {
 
       float[] actual = accelerated.forward(5, 0);
 
-      assertThat(actual).containsExactly(expected);
+      assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
       assertThat(singleInvocations).hasValue(LAYERS * 2);
       assertThat(dualInvocations).hasValue(LAYERS);
       assertThat(tripleInvocations).hasValue(LAYERS);
