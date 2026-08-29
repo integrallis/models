@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.accelerator;
+package com.integrallis.models.backend.tornado;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-/** Pure device-capacity policy used before constructing any accelerator execution plans. */
-final class AcceleratorEligibility {
+/** Device-vendor and capacity policy applied before constructing accelerator execution plans. */
+public final class AcceleratorEligibility {
   private static final long PLAN_OVERHEAD_BYTES = 256L * 1024L * 1024L;
   private static final long MAX_ESTIMATED_SINGLE_ALLOCATION_BYTES = 512L * 1024L * 1024L;
 
   private AcceleratorEligibility() {}
 
-  static Decision select(
+  public static Decision select(
       List<DeviceCapabilities> devices, long modelSizeBytes, boolean accelerateDecode) {
     Objects.requireNonNull(devices, "devices");
     if (modelSizeBytes <= 0) {
@@ -55,16 +55,17 @@ final class AcceleratorEligibility {
         "qualified GPU has insufficient device memory or allocation capacity", requiredBytes);
   }
 
-  record DeviceCapabilities(
+  public record DeviceCapabilities(
       String name, String backend, String type, long globalMemoryBytes, long maxAllocationBytes) {
-    DeviceCapabilities {
+    public DeviceCapabilities {
       Objects.requireNonNull(name, "name");
       Objects.requireNonNull(backend, "backend");
       Objects.requireNonNull(type, "type");
     }
   }
 
-  record Decision(boolean eligible, DeviceCapabilities device, String reason, long requiredBytes) {
+  public record Decision(
+      boolean eligible, DeviceCapabilities device, String reason, long requiredBytes) {
     private static Decision ineligible(String reason, long requiredBytes) {
       return new Decision(false, null, reason, requiredBytes);
     }

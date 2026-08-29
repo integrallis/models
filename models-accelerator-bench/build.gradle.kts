@@ -43,6 +43,7 @@ application {
 
 dependencies {
     implementation(project(":backend-java"))
+    implementation(project(":backend-tornado"))
     implementation(project(":models-runtime"))
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
     implementation("io.github.beehive-lab:tornado-api:5.2.0-jdk25")

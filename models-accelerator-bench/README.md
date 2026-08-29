@@ -1,8 +1,9 @@
 # Java accelerator experiments
 
-This private Gradle module tests accelerator ideas without placing an unproven backend in a
-published Models artifact. The kernels are Java source compiled for an accelerator by TornadoVM;
-there is no external inference server and no handwritten CUDA or Rust shim.
+This private Gradle module retains accelerator experiments, rejected candidates, and release gates.
+The qualified Q4 projection provider now lives in the optional published `backend-tornado` module.
+Its kernels are Java source compiled for an accelerator by TornadoVM; there is no external
+inference server and no handwritten CUDA or Rust shim.
 
 The first experiment targets quantized matrix projection because profiling and the existing Models
 execution seams identify it as the dominant reusable operation. It currently contains:
@@ -98,6 +99,6 @@ tornado -cp "$classpath" \
 Use ordinary `java` with the generated classpath and `--cpu-only` when collecting a Vector API
 control on a machine without a TornadoVM runtime.
 
-Results are evidence for the next design, not published performance claims. See
+Results are qualification evidence, not universal performance claims. See
 the [A16-2Q](results/vultr-a16-2q-2026-08-29.md) and
 [A40-4Q](results/vultr-a40-4q-2026-08-29.md) reports.

@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.accelerator;
 
+import com.integrallis.models.backend.tornado.Q4ProjectionKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;

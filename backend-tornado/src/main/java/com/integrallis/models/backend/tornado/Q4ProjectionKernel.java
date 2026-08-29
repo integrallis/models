@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.accelerator;
+package com.integrallis.models.backend.tornado;
 
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.types.arrays.ByteArray;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
-/** Java-authored TornadoVM experiment for production-compatible Q4_0 by Q8_0 projections. */
-final class Q4ProjectionKernel {
+/** Java-authored TornadoVM kernel for production-compatible Q4_0 by Q8_0 projections. */
+public final class Q4ProjectionKernel {
   private static final int BLOCK_VALUES = 32;
   private static final int BLOCK_BYTES = 18;
 
   private Q4ProjectionKernel() {}
 
   /** Runs one work item per batch/output-row pair over host-prepared Q8_0 activations. */
-  static void multiply(
+  public static void multiply(
       ByteArray weights,
       ByteArray activations,
       FloatArray activationScales,
@@ -63,7 +63,7 @@ final class Q4ProjectionKernel {
   }
 
   /** Computes two projections in one dispatch over one prepared activation. */
-  static void multiplyDual(
+  public static void multiplyDual(
       ByteArray firstWeights,
       int firstRows,
       ByteArray secondWeights,
@@ -125,7 +125,7 @@ final class Q4ProjectionKernel {
   }
 
   /** Computes three projections in one dispatch over one prepared activation. */
-  static void multiplyTriple(
+  public static void multiplyTriple(
       ByteArray firstWeights,
       int firstRows,
       ByteArray secondWeights,
@@ -288,7 +288,8 @@ final class Q4ProjectionKernel {
   }
 
   /** Reproduces the production Q8_0 activation preparation, including FP16 scale rounding. */
-  static void quantize(float[] input, byte[] activations, float[] scales, int batchSize, int cols) {
+  public static void quantize(
+      float[] input, byte[] activations, float[] scales, int batchSize, int cols) {
     int blocks = cols / BLOCK_VALUES;
     for (int batch = 0; batch < batchSize; batch++) {
       for (int block = 0; block < blocks; block++) {
@@ -307,7 +308,7 @@ final class Q4ProjectionKernel {
     }
   }
 
-  static void validate(
+  public static void validate(
       ByteArray weights,
       ByteArray activations,
       FloatArray activationScales,

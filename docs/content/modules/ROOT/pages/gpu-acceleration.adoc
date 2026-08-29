@@ -1,0 +1,82 @@
+= Java GPU Acceleration
+
+`backend-tornado` optionally executes Models-owned Java Q4_0 projection kernels
+on a qualified NVIDIA GPU. The model parser, tokenizer, transformer graph,
+attention, KV cache, sampling, and generation loop remain inside Models. There
+is no external inference server and no Rust or handwritten CUDA kernel in this
+path.
+
+== Qualified Scope
+
+The production selector currently admits:
+
+* GGUF Q4_0 projection work;
+* NVIDIA devices exposed by TornadoVM's PTX backend;
+* a device with enough memory for retained prefill and decode plans plus the
+  required safety margin; and
+* fixed 32-token prefill plans and separate single-token decode plans.
+
+Attention and unsupported tensors continue on the Vector API. AMD, Intel, and
+Metal devices remain CPU fallback paths until each vendor path passes a real
+hardware parity and performance gate.
+
+== Add The Optional Backend
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:backend-tornado:{models-version}")
+}
+----
+
+Install a TornadoVM distribution compatible with the application's JDK and
+with its PTX backend enabled. Follow the
+https://tornadovm.readthedocs.io/en/latest/installation.html[official TornadoVM installation guide^].
+The `backend-tornado` dependency provides the Models integration but does not
+bundle or transitively install TornadoVM's device runtime. Device discovery
+requires the TornadoVM distribution and launch configuration. Start the
+application with `tornado`, or with ordinary `java` and TornadoVM's generated
+argument file.
+
+== Open And Inspect The Backend
+
+[source,java]
+----
+var options = TornadoBackendOptions.defaults();
+
+try (var runtime = TornadoBackend.open(modelPath, backendConfiguration, options)) {
+    var backend = runtime.backend();
+    var status = runtime.status();
+
+    System.out.printf("device=%s accelerated=%s readiness=%s%n",
+        status.device(), status.accelerated(), status.readinessTime());
+    // Pass backend to GenerationLoop or the normal Models runtime pipeline.
+}
+----
+
+Defaults perform eager readiness, accelerate eligible prefill and decode
+projections, and safely load `PureJavaBackend` when acceleration is not
+available. A qualification or deployment gate can set `requireAccelerator` to
+`true`; in that mode an ineligible device or initialization failure stops the
+load instead of falling back.
+
+Readiness is intentional. TornadoVM retains compiled code with each execution
+plan, so Models constructs and compiles the fixed shapes before accepting a
+visible request. `TornadoBackendStatus` reports that cost and the selected
+device.
+
+== Measured Gates
+
+The release candidate preserved the exact greedy CPU token sequence on both
+qualified profiles using Qwen3 0.6B Q4_0:
+
+[cols="1,1,1,1",options="header"]
+|===
+|Profile |Warm prefill |Median decode |Eager readiness
+|NVIDIA A16-2Q |4.938 s (`1.93x` CPU) |73.991 ms (`1.21x` CPU) |14.278 s
+|NVIDIA A40-4Q |2.150 s (`4.40x` CPU) |65.767 ms (`1.32x` CPU) |13.554 s
+|===
+
+These are qualification measurements for the tested virtual-GPU profiles, not
+universal performance promises. Application latency depends on device shape,
+CPU allocation, prompt length, model size, and driver/runtime versions.

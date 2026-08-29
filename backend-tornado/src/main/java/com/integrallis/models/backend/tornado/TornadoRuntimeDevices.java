@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.accelerator;
+package com.integrallis.models.backend.tornado;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,11 +22,11 @@ import uk.ac.manchester.tornado.api.TornadoRuntime;
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.runtime.TornadoRuntimeProvider;
 
-/** Defensive adapter from TornadoVM's runtime inventory to the pure eligibility policy. */
-final class TornadoRuntimeDevices {
+/** Discovers accelerator devices from the active TornadoVM runtime. */
+public final class TornadoRuntimeDevices {
   private TornadoRuntimeDevices() {}
 
-  static List<AcceleratorEligibility.DeviceCapabilities> discover() {
+  public static List<AcceleratorEligibility.DeviceCapabilities> discover() {
     try {
       TornadoRuntime runtime = TornadoRuntimeProvider.getTornadoRuntime();
       List<AcceleratorEligibility.DeviceCapabilities> devices = new ArrayList<>();

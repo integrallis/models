@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.accelerator;
 
+import com.integrallis.models.backend.tornado.Q4ProjectionKernel;
 import java.util.Locale;
 import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;

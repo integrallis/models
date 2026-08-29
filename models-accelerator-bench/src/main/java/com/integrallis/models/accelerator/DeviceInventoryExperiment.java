@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.accelerator;
 
+import com.integrallis.models.backend.tornado.AcceleratorEligibility;
+import com.integrallis.models.backend.tornado.TornadoRuntimeDevices;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;

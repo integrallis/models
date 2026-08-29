@@ -19,6 +19,7 @@ import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
+import com.integrallis.models.backend.tornado.TornadoGgufBatchedMatrixKernel;
 import com.integrallis.models.runtime.GenerationLoop;
 import com.integrallis.models.runtime.GenerationMetrics;
 import com.integrallis.models.runtime.chat.ChatMessage;

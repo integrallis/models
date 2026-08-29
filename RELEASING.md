@@ -5,7 +5,7 @@ JReleaser signs and validates one Maven Central bundle, and the workflow creates
 the GitHub release.
 
 The publication allowlist contains `models-api`, `models-runtime`, `models`,
-`models-rag`, `models-semantic-order`, `backend-java`, `backend-native`,
+`models-rag`, `models-semantic-order`, `backend-java`, `backend-tornado`, `backend-native`,
 `backend-apple`, `models-langchain4j`, `models-spring-ai`,
 `models-spring-boot-starter`, `models-embedding`, and `models-router`. Benchmark
 applications, documentation tooling, and modules containing only package scaffolding are not
@@ -23,6 +23,9 @@ published.
 API numeric kernels. The release workflow builds and tests the Models-owned
 Rust kernels on every supported native platform and compiles the Apple
 Foundation Models bridge on macOS before staging the signed Maven artifacts.
+`backend-tornado` is an optional JVM artifact; its release gate additionally
+executes the public loader and exact CPU/GPU output parity on the qualified
+NVIDIA hardware profiles.
 
 The workflow uses the same Maven Central and GPG secrets as `mfcqi-java`:
 `MAVENCENTRAL_USERNAME`, `MAVENCENTRAL_PASSWORD`, `GPG_PUBLIC_KEY`,

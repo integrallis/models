@@ -51,6 +51,7 @@ val publishedModuleNames =
         "models-rag",
         "models-semantic-order",
         "backend-java",
+        "backend-tornado",
         "backend-native",
         "backend-apple",
         "models-langchain4j",

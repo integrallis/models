@@ -17,6 +17,7 @@ include("models-router")
 
 // --- Backends ---
 include("backend-java")
+include("backend-tornado")
 include("models-backend-onnx")
 include("backend-native")
 include("backend-apple")

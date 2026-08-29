@@ -34,6 +34,9 @@ tokens. Models implements that pipeline on Java 25 and uses the Vector API for
 CPU SIMD execution:
 
 - `backend-java` executes every inference kernel in Java.
+- `backend-tornado` optionally compiles the Java Q4_0 projection kernels for a
+  qualified NVIDIA GPU. It keeps the Models graph in-process and falls back to
+  the Vector API when the device or artifact is not eligible.
 - `backend-native` runs the same Java 25 and Vector API pipeline, substituting
   only selected, measured bottleneck kernels with a small Models-owned Rust
   library through Java's Foreign Function and Memory (FFM) API.
@@ -164,6 +167,11 @@ dependencies {
 }
 ```
 
+For qualified NVIDIA acceleration, add `backend-tornado` and launch with a
+matching TornadoVM PTX runtime. The default loader performs eager readiness and
+uses the Vector API when the GPU cannot safely retain the compiled plans. See
+[Java GPU acceleration](https://integrallis.github.io/models/docs/models/current/gpu-acceleration.html).
+
 Use Apple's on-device system model on a supported Apple Silicon Mac:
 
 ```kotlin
@@ -290,6 +298,7 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 | Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |
+| Java GPU acceleration | `backend-tornado` | optional Java-authored Q4_0 projections on qualified NVIDIA GPUs |
 
 These adapters are implemented and tested against the same backend contracts;
 they do not select hidden inference paths. Their framework dependencies are
@@ -307,6 +316,7 @@ RAG, Javadocs, and release testing.
 
 - [Executable Java notebooks](notebooks/README.md)
 - [Apple Foundation Models bridge](models-backend-apple/README.md)
+- [Java GPU acceleration](backend-tornado/README.md)
 - [Native kernel backend](backend-native/README.md)
 
 ## Build

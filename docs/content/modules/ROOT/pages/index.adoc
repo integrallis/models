@@ -26,6 +26,11 @@ the same Java pipeline but replaces selected, measured bottleneck kernels with
 a small Models-owned Rust library through Java's Foreign Function and Memory
 (FFM) API. It does not embed or invoke llama.cpp or Ollama.
 
+The optional `backend-tornado` module keeps that graph and its projection
+kernels in Java while TornadoVM compiles qualified Q4_0 work for an NVIDIA GPU.
+It performs an explicit readiness pass and falls back to the Vector API when
+the device, memory capacity, or artifact is not eligible.
+
 New to local model execution? Start with
 xref:concepts.adoc[Inference Concepts].
 
@@ -94,6 +99,9 @@ image::models-0001.png[Models runtime architecture,align=center]
 
 |`backend-java`
 |GGUF, supported Safetensors, and CACT model loading with Java 25 Vector API execution
+
+|`backend-tornado`
+|Optional Java-authored Q4_0 projection acceleration on qualified NVIDIA GPUs
 
 |`backend-native`
 |The Java backend with selective Rust/FFM bottleneck-kernel substitution

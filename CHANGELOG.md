@@ -2,6 +2,20 @@
 
 All notable changes to models are documented here.
 
+## Unreleased
+
+### Added
+
+- Added the optional `backend-tornado` module. It compiles Models-owned Java Q4_0 projection
+  kernels for capacity-qualified NVIDIA GPUs, prepares reusable prefill and decode plans during
+  readiness, and falls back to the Vector API when acceleration is unavailable.
+
+### Changed
+
+- Removed redundant Needle 2 vocabulary projections during prefill while preserving exact logits.
+- Completed the Spring AI Needle 2 tool-result follow-up path for blocking and streaming
+  `ChatClient` calls, including typed `@Tool` results registered through `defaultTools(...)`.
+
 ## [0.3.14] - 2026-08-28
 
 ### Fixed

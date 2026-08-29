@@ -22,13 +22,18 @@ Java owns the behavior that defines the model:
 * streaming and framework contracts
 * diagnostics and runtime-profile selection
 
-Both backends run the same Java 25 transformer pipeline with FFM memory
+The downloadable-model backends run the same Java 25 transformer pipeline with FFM memory
 segments and the incubating Vector API. `backend-java` executes
 every numeric kernel in Java. `backend-native` substitutes only selected,
 measured bottleneck kernels with a Models-owned Rust implementation
 loaded through Java's final FFM API. It does not embed or call llama.cpp
 or Ollama. The Java graph remains authoritative, so the backend boundary
 is narrow and testable.
+
+`backend-tornado` is a Java-authored device path for that same graph. TornadoVM
+compiles eligible Q4_0 projections from Java bytecode for a qualified NVIDIA
+GPU; attention and unsupported projections remain on the Vector API. No model
+server or second inference engine is involved.
 
 `backend-apple` is also in-process: Java reaches Apple's on-device
 Foundation Models framework through a bundled, integrity-checked FFM
@@ -44,12 +49,15 @@ including the KV cache and reusable activation workspaces, still consumes JVM
 heap, so context length and concurrent sessions remain part of capacity
 planning.
 
-The downloadable-model backends currently execute on the CPU through Java's
-Vector API, with optional Models-owned Rust kernels on qualified bottlenecks.
+The default downloadable-model path executes on the CPU through Java's Vector
+API, with optional Models-owned Rust kernels on qualified bottlenecks. The
+optional xref:gpu-acceleration.adoc[Java GPU backend] offloads qualified Q4_0
+projections to NVIDIA PTX after a bounded readiness pass and a device-memory
+capacity check. AMD, Intel, Apple Metal, and non-Q4_0 artifacts currently stay
+on the CPU path because they have not passed the corresponding hardware gate.
 Apple Silicon's unified memory avoids physically separate CPU and GPU memory,
 but unified memory alone does not schedule work on the GPU. Models does not yet
-execute arbitrary MLX models or dispatch its downloaded-model graph to Metal,
-CUDA, or OpenCL.
+execute arbitrary MLX models or dispatch its downloaded-model graph to Metal.
 
 Apple Foundation Models is a separate OS-owned path. Apple controls that
 model's weights, memory, and acceleration; it is not an MLX backend for a

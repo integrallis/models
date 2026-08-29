@@ -20,6 +20,9 @@ bag-of-words
 |`backend-java` |GGUF parser, tokenizers, model graph, KV cache,
 and Java kernels
 
+|`backend-tornado` |Optional Java-authored Q4_0 projection kernels compiled
+for qualified NVIDIA GPUs by TornadoVM, with eager readiness and CPU fallback
+
 |`backend-native` |Java 25 and Vector API backend with selective Rust
 kernel acceleration through FFM
 
@@ -69,6 +72,7 @@ models-api
   <- models-runtime
       <- models
   <- backend-java <- vectors-core
+      <- backend-tornado <- TornadoVM device compiler/runtime
   <- backend-native   <- Models Rust kernels through FFM
   <- backend-apple    <- Apple's Foundation Models framework through FFM
   <- models-langchain4j      <- LangChain4j
@@ -95,6 +99,7 @@ Application dependencies use:
 
 * `com.integrallis:models`
 * `com.integrallis:backend-java`
+* `com.integrallis:backend-tornado`
 * `com.integrallis:backend-native`
 * `com.integrallis:backend-apple`
 * `com.integrallis:models-langchain4j`

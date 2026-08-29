@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.accelerator;
+package com.integrallis.models.backend.tornado;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
@@ -29,7 +29,7 @@ import uk.ac.manchester.tornado.api.enums.DataTransferMode;
 import uk.ac.manchester.tornado.api.types.arrays.ByteArray;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
-/** Experimental prefill-only Q4_0 projection provider backed by Java-authored TornadoVM kernels. */
+/** Q4_0 prefill and optional decode projections backed by Java-authored TornadoVM kernels. */
 public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   private static final int MINIMUM_BATCH = 4;
   private static final int DEFAULT_EXECUTION_BATCH_SIZE = 32;
@@ -76,7 +76,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     return executionBatchSize;
   }
 
-  /** Whether this experiment creates separate single-token projection plans for decode. */
+  /** Whether this provider creates separate single-token projection plans for decode. */
   public boolean acceleratesDecode() {
     return accelerateDecode;
   }
@@ -87,9 +87,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
 
   @Override
   public String implementation() {
-    return accelerateDecode
-        ? "tornadovm-java-q4-prefill-decode-experiment"
-        : "tornadovm-java-q4-prefill-experiment";
+    return accelerateDecode ? "tornadovm-java-q4-prefill-decode" : "tornadovm-java-q4-prefill";
   }
 
   @Override
@@ -145,7 +143,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     requireOpen();
     if (!isDualEligible(firstType, firstRows, secondType, secondRows, batchSize, cols)) {
       throw new UnsupportedOperationException(
-          "dual projection is not eligible for the Tornado experiment");
+          "dual projection is not eligible for the Tornado backend");
     }
     validateProjectionStorage(firstOutput, firstWeights, input, batchSize, firstRows, cols);
     validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
@@ -218,7 +216,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     if (!isTripleEligible(
         firstType, firstRows, secondType, secondRows, thirdType, thirdRows, batchSize, cols)) {
       throw new UnsupportedOperationException(
-          "triple projection is not eligible for the Tornado experiment");
+          "triple projection is not eligible for the Tornado backend");
     }
     validateProjectionStorage(firstOutput, firstWeights, input, batchSize, firstRows, cols);
     validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
@@ -267,8 +265,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       int cols) {
     requireOpen();
     if (!isEligible(type, batchSize, rows, cols)) {
-      throw new UnsupportedOperationException(
-          "projection is not eligible for the Tornado experiment");
+      throw new UnsupportedOperationException("projection is not eligible for the Tornado backend");
     }
     validateProjectionStorage(output, weights, input, batchSize, rows, cols);
     int planBatchSize = executionBatchSizeFor(batchSize);
@@ -287,7 +284,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     return plans.size() + dualPlans.size() + triplePlans.size();
   }
 
-  /** Number of model projection calls routed through this experiment. */
+  /** Number of model projection calls routed through this provider. */
   public synchronized long calls() {
     return calls;
   }
