@@ -17,7 +17,7 @@ package com.integrallis.models.accelerator;
 
 import java.util.Arrays;
 import java.util.Locale;
-import java.util.Random;
+import java.util.SplittableRandom;
 
 /** Device correctness and latency gate for Qwen3-shaped causal grouped-query attention. */
 public final class CausalAttentionExperiment {
@@ -120,10 +120,10 @@ public final class CausalAttentionExperiment {
   }
 
   private static float[] randomFloats(int length, long seed) {
-    Random random = new Random(seed);
+    SplittableRandom random = new SplittableRandom(seed);
     float[] values = new float[length];
     for (int index = 0; index < values.length; index++) {
-      values[index] = random.nextFloat(-1.0f, 1.0f);
+      values[index] = (float) random.nextDouble(-1.0, 1.0);
     }
     return values;
   }

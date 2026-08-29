@@ -99,4 +99,5 @@ Use ordinary `java` with the generated classpath and `--cpu-only` when collectin
 control on a machine without a TornadoVM runtime.
 
 Results are evidence for the next design, not published performance claims. See
-[`results/vultr-a16-2q-2026-08-29.md`](results/vultr-a16-2q-2026-08-29.md).
+the [A16-2Q](results/vultr-a16-2q-2026-08-29.md) and
+[A40-4Q](results/vultr-a40-4q-2026-08-29.md) reports.
