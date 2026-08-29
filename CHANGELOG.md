@@ -2,13 +2,16 @@
 
 All notable changes to models are documented here.
 
-## Unreleased
+## [0.3.15] - 2026-08-29
 
 ### Added
 
 - Added the optional `backend-tornado` module. It compiles Models-owned Java Q4_0 projection
   kernels for capacity-qualified NVIDIA GPUs, prepares reusable prefill and decode plans during
   readiness, and falls back to the Vector API when acceleration is unavailable.
+- Added standard `ServiceLoader` discovery through `PureJavaBackend.loadAutomatic(...)`, allowing
+  ModelJars and direct Models applications to select an optional accelerator without coupling the
+  core Java backend to its implementation.
 
 ### Changed
 
