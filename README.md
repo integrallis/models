@@ -72,9 +72,10 @@ Implemented functionality includes:
   enumerable arguments; Needle 2 additionally constrains its array protocol
   from JSON Schema and retrieves the five most relevant tools with its in-model
   contrastive head. Spring AI `ChatClient` requests execute registered Java
-  callbacks and return the follow-up model answer on both blocking and streaming
-  paths; ModelJars callers can enforce artifact qualification by passing the
-  descriptor capabilities to the adapter
+  callbacks on both blocking and streaming paths. Generative models receive the
+  result for their follow-up answer; Needle 2 completes the action-selection
+  loop with the actual Java tool result. ModelJars callers can enforce artifact
+  qualification by passing the descriptor capabilities to the adapter
 - in-JVM text embeddings with last-token and mean pooling, tested to produce the
   same vectors as llama.cpp
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations

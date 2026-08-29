@@ -115,8 +115,10 @@ the runtime's `modelName()` for source compatibility.
 When a `ChatClient` request declares Spring AI tools, the adapter renders their
 names, descriptions, and input schemas into the selected Models chat template.
 Model output is scanned back into Spring AI `AssistantMessage` tool calls. The
-`ChatClient` executes the callback and sends its result to the model for the
-follow-up answer, just as it does for a hosted provider.
+`ChatClient` executes the registered Java callback. Generative chat models
+receive that result for a follow-up answer. Needle 2 is an action-selection
+model, so its completed call returns the actual Java tool result instead of
+asking the selector to choose the same action again.
 
 Pass the ModelJar descriptor capabilities when constructing the adapter. This
 makes an artifact that was qualified for chat, but not tool calling, fail before
@@ -127,30 +129,53 @@ generation instead of silently attempting an unsupported workflow.
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Service;
 
-class ThermostatTools {
-    @Tool(name = "set_mode", description = "Set the thermostat mode")
-    String setMode(@ToolParam(description = "Mode to activate") String mode) {
-        return "Thermostat mode is now " + mode;
+@Service
+class WeatherTools {
+    @Tool(
+        name = "get-weather-for-zipcode",
+        description = "Gets weather for a given zipcode")
+    Weather getWeatherForZipcode(
+        @ToolParam(description = "The zipcode to get weather for")
+        String zipcode) {
+        return new Weather(zipcode, "Raining cats and dogs", 78);
     }
+
+    record Weather(String zipcode, String conditions, int temperature) {}
 }
 
-try (var runtime = ModelJars.openRuntime(MODEL)) {
-    var model = new ModelsSpringAiChatModel(
-        runtime.model(),
-        runtime.descriptor().alias(),
-        runtime.chatTemplate(),
-        defaults,
-        runtime.descriptor().capabilities());
+@Bean
+ApplicationRunner weatherDemo(WeatherTools weatherTools) {
+    return args -> {
+        try (var runtime = ModelJars.openRuntime(MODEL)) {
+            var model = new ModelsSpringAiChatModel(
+                runtime.model(),
+                runtime.descriptor().alias(),
+                runtime.chatTemplate(),
+                defaults,
+                runtime.descriptor().capabilities());
 
-    String answer = ChatClient.create(model)
-        .prompt()
-        .user("Switch the thermostat to cooling.")
-        .tools(new ThermostatTools())
-        .call()
-        .content();
+            var chatClient = ChatClient.builder(model)
+                .defaultTools(weatherTools)
+                .build();
+
+            String answer = chatClient.prompt()
+                .user("What is the weather for 88252?")
+                .call()
+                .content();
+            System.out.println(answer);
+        }
+    };
 }
 ----
+
+`defaultTools(...)` and per-request `.tools(...)` use the same adapter path.
+For Needle 2, `answer` is the serialized `Weather` returned by the invoked
+method. For a qualified generative tool-calling model, it is the model's
+follow-up response after seeing that tool result.
 
 The same execution path is covered for blocking and streaming `ChatClient`
 requests. Streaming with declared tools buffers generated text until the tool
