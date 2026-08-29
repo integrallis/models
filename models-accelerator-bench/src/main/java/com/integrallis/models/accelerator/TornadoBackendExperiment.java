@@ -70,6 +70,23 @@ public final class TornadoBackendExperiment {
           runtime.status().readinessTime().toNanos() / 1_000_000_000.0,
           runtime.status().reason());
     }
+    try (PureJavaBackend backend = PureJavaBackend.loadAutomatic(model)) {
+      String actual = generate("Service-loaded accelerator", backend);
+      if (!expected.equals(actual)) {
+        throw new IllegalStateException(
+            "service-loaded accelerator changed generated text: " + expected + " != " + actual);
+      }
+      String implementation =
+          backend
+              .diagnostics()
+              .optimization("grouped-projections")
+              .orElseThrow()
+              .settings()
+              .get("implementation");
+      if (!"tornadovm-java-q4-prefill-decode".equals(implementation)) {
+        throw new IllegalStateException("automatic provider was not selected: " + implementation);
+      }
+    }
   }
 
   private static String generate(String label, PureJavaBackend backend) {

@@ -38,6 +38,13 @@ requires the TornadoVM distribution and launch configuration. Start the
 application with `tornado`, or with ordinary `java` and TornadoVM's generated
 argument file.
 
+When `backend-tornado` is on the application classpath, `PureJavaBackend.loadAutomatic(...)`
+discovers it through Java's standard `ServiceLoader`. ModelJars uses that automatic
+entry point for artifacts qualified for the Java backend, so adding the optional
+dependency and launching with TornadoVM is sufficient; application inference code
+does not change. Without the optional module or a qualified device, the same call
+loads the Vector API backend.
+
 == Open And Inspect The Backend
 
 [source,java]
@@ -51,6 +58,16 @@ try (var runtime = TornadoBackend.open(modelPath, backendConfiguration, options)
     System.out.printf("device=%s accelerated=%s readiness=%s%n",
         status.device(), status.accelerated(), status.readinessTime());
     // Pass backend to GenerationLoop or the normal Models runtime pipeline.
+}
+----
+
+Applications that do not need the detailed readiness status can use the
+service-loaded entry point directly:
+
+[source,java]
+----
+try (var backend = PureJavaBackend.loadAutomatic(modelPath, backendConfiguration)) {
+    // Use the normal Models generation pipeline.
 }
 ----
 

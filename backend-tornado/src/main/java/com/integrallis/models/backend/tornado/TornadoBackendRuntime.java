@@ -20,7 +20,7 @@ import java.util.Objects;
 
 /** Owns the automatically selected accelerated or Vector API backend. */
 public final class TornadoBackendRuntime implements AutoCloseable {
-  private final PureJavaBackend backend;
+  private PureJavaBackend backend;
   private final TornadoBackendStatus status;
 
   TornadoBackendRuntime(PureJavaBackend backend, TornadoBackendStatus status) {
@@ -30,7 +30,16 @@ public final class TornadoBackendRuntime implements AutoCloseable {
 
   /** Returns the loaded backend used by the ordinary Models generation pipeline. */
   public PureJavaBackend backend() {
+    if (backend == null) {
+      throw new IllegalStateException("backend ownership was transferred");
+    }
     return backend;
+  }
+
+  PureJavaBackend detachBackend() {
+    PureJavaBackend detached = backend();
+    backend = null;
+    return detached;
   }
 
   /** Returns the device-selection, fallback, and readiness outcome. */
@@ -40,6 +49,9 @@ public final class TornadoBackendRuntime implements AutoCloseable {
 
   @Override
   public void close() {
-    backend.close();
+    if (backend != null) {
+      backend.close();
+      backend = null;
+    }
   }
 }

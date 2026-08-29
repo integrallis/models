@@ -53,6 +53,7 @@ import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.models.backend.purejava.spi.PureJavaBackendProvider;
 import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import com.integrallis.models.backend.purejava.tokenizer.HuggingFaceTokenizer;
@@ -66,6 +67,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 
 /**
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
@@ -75,6 +79,7 @@ public final class PureJavaBackend
     implements SpeculativeInferenceBackend, BatchInferenceBackend, AuxiliaryInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
+  private static final System.Logger LOGGER = System.getLogger(PureJavaBackend.class.getName());
 
   private final ModelMemoryArena arenaOwner;
   private final Tokenizer tokenizer;
@@ -160,6 +165,48 @@ public final class PureJavaBackend
         Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
         GgufBatchedMatrixKernel.none(),
         BatchedCausalAttentionKernel.none());
+  }
+
+  /**
+   * Loads an optional in-process accelerator when one qualifies this artifact and machine, then
+   * falls back to the ordinary Java Vector API backend.
+   */
+  public static PureJavaBackend loadAutomatic(Path modelPath) {
+    return loadAutomatic(modelPath, BackendConfiguration.empty());
+  }
+
+  /**
+   * Loads an optional in-process accelerator with artifact-qualified recommendations, then falls
+   * back to the ordinary Java Vector API backend.
+   */
+  public static PureJavaBackend loadAutomatic(
+      Path modelPath, BackendConfiguration backendConfiguration) {
+    Objects.requireNonNull(modelPath, "modelPath");
+    Objects.requireNonNull(backendConfiguration, "backendConfiguration");
+    try {
+      for (PureJavaBackendProvider provider :
+          ServiceLoader.load(
+              PureJavaBackendProvider.class, PureJavaBackend.class.getClassLoader())) {
+        try {
+          Optional<PureJavaBackend> accelerated = provider.tryLoad(modelPath, backendConfiguration);
+          if (accelerated.isPresent()) {
+            return accelerated.orElseThrow();
+          }
+        } catch (LinkageError | RuntimeException failure) {
+          LOGGER.log(
+              System.Logger.Level.WARNING,
+              "Models accelerator provider {0} failed; using the next available path: {1}",
+              provider.getClass().getName(),
+              failure.getClass().getSimpleName());
+        }
+      }
+    } catch (ServiceConfigurationError failure) {
+      LOGGER.log(
+          System.Logger.Level.WARNING,
+          "Models accelerator discovery failed; using the Vector API: {0}",
+          failure.getClass().getSimpleName());
+    }
+    return load(modelPath, backendConfiguration);
   }
 
   /**

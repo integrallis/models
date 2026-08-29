@@ -8,6 +8,10 @@ The Maven artifact does not bundle or transitively install TornadoVM's device ru
 provide a compatible TornadoVM distribution and launch configuration explicitly; without it, the
 default loader uses the Java Vector API.
 
+Adding this module also registers its accelerator through Java `ServiceLoader`.
+`PureJavaBackend.loadAutomatic(...)`—and ModelJars' Java backend path—select it only when the exact
+artifact and device pass the capacity gate.
+
 The qualified production scope is deliberately narrow:
 
 - NVIDIA GPUs reached through TornadoVM's PTX backend;

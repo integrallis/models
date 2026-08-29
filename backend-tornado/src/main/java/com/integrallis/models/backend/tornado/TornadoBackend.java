@@ -17,6 +17,7 @@ package com.integrallis.models.backend.tornado;
 
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -147,7 +148,7 @@ public final class TornadoBackend {
     LOGGER.log(
         System.Logger.Level.INFO, "Models accelerator unavailable; using Vector API: {0}", reason);
     return new TornadoBackendRuntime(
-        PureJavaBackend.load(model, backendConfiguration),
+        PureJavaBackend.load(model, backendConfiguration, GgufBatchedMatrixKernel.none()),
         new TornadoBackendStatus(false, "Vector API", reason, requiredBytes, Duration.ZERO));
   }
 

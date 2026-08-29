@@ -170,6 +170,17 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void automaticLoadingFallsBackToTheVectorApiWithoutAnInstalledProvider(@TempDir Path dir)
+        throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(43));
+
+      try (PureJavaBackend backend = PureJavaBackend.loadAutomatic(modelPath)) {
+        assertThat(backend.name()).isEqualTo("pure-java");
+        assertThat(backend.forward(5, 0)).hasSize(VOCAB_SIZE);
+      }
+    }
+
+    @Test
     void loadsGemma4ThroughTheCompleteBackendContract(@TempDir Path dir) throws IOException {
       Path modelPath = buildNanoGemma4ModelFile(dir, new Random(84));
 
