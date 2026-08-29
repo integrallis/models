@@ -35,6 +35,8 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
           PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY,
+          "true",
+          PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
           "false",
           PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
           "false",
@@ -42,6 +44,9 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
           "false");
 
   private final Map<ProjectionKey, ProjectionPlan> plans = new LinkedHashMap<>();
+  private final Map<DualProjectionKey, DualProjectionPlan> dualPlans = new LinkedHashMap<>();
+  private final Map<TripleProjectionKey, TripleProjectionPlan> triplePlans = new LinkedHashMap<>();
+  private int planSequence;
   private long calls;
   private long totalNanos;
   private boolean closed;
@@ -71,6 +76,148 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   }
 
   @Override
+  public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
+    return supports(firstType) && supports(secondType);
+  }
+
+  @Override
+  public boolean isDualEligible(
+      GgufTensorType firstType,
+      int firstRows,
+      GgufTensorType secondType,
+      int secondRows,
+      int batchSize,
+      int cols) {
+    return supportsDual(firstType, secondType)
+        && eligibleCombined(batchSize, cols, firstRows, secondRows);
+  }
+
+  @Override
+  public synchronized void multiplyDual(
+      float[] firstOutput,
+      MemorySegment firstWeights,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOutput,
+      MemorySegment secondWeights,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] input,
+      int batchSize,
+      int cols) {
+    requireOpen();
+    if (!isDualEligible(firstType, firstRows, secondType, secondRows, batchSize, cols)) {
+      throw new UnsupportedOperationException(
+          "dual projection is not eligible for the Tornado experiment");
+    }
+    validateProjectionStorage(firstOutput, firstWeights, input, batchSize, firstRows, cols);
+    validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
+    DualProjectionKey key =
+        new DualProjectionKey(
+            firstWeights.address(),
+            firstWeights.byteSize(),
+            firstRows,
+            secondWeights.address(),
+            secondWeights.byteSize(),
+            secondRows,
+            batchSize,
+            cols);
+    long started = System.nanoTime();
+    DualProjectionPlan plan =
+        dualPlans.computeIfAbsent(
+            key,
+            ignored ->
+                new DualProjectionPlan(
+                    nextPlanName(),
+                    firstWeights,
+                    firstRows,
+                    secondWeights,
+                    secondRows,
+                    batchSize,
+                    cols));
+    plan.execute(input, firstOutput, secondOutput);
+    recordCall(started);
+  }
+
+  @Override
+  public boolean supportsTriple(
+      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
+    return supports(firstType) && supports(secondType) && supports(thirdType);
+  }
+
+  @Override
+  public boolean isTripleEligible(
+      GgufTensorType firstType,
+      int firstRows,
+      GgufTensorType secondType,
+      int secondRows,
+      GgufTensorType thirdType,
+      int thirdRows,
+      int batchSize,
+      int cols) {
+    return supportsTriple(firstType, secondType, thirdType)
+        && eligibleCombined(batchSize, cols, firstRows, secondRows, thirdRows);
+  }
+
+  @Override
+  public synchronized void multiplyTriple(
+      float[] firstOutput,
+      MemorySegment firstWeights,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOutput,
+      MemorySegment secondWeights,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] thirdOutput,
+      MemorySegment thirdWeights,
+      GgufTensorType thirdType,
+      int thirdRows,
+      float[] input,
+      int batchSize,
+      int cols) {
+    requireOpen();
+    if (!isTripleEligible(
+        firstType, firstRows, secondType, secondRows, thirdType, thirdRows, batchSize, cols)) {
+      throw new UnsupportedOperationException(
+          "triple projection is not eligible for the Tornado experiment");
+    }
+    validateProjectionStorage(firstOutput, firstWeights, input, batchSize, firstRows, cols);
+    validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
+    validateProjectionStorage(thirdOutput, thirdWeights, input, batchSize, thirdRows, cols);
+    TripleProjectionKey key =
+        new TripleProjectionKey(
+            firstWeights.address(),
+            firstWeights.byteSize(),
+            firstRows,
+            secondWeights.address(),
+            secondWeights.byteSize(),
+            secondRows,
+            thirdWeights.address(),
+            thirdWeights.byteSize(),
+            thirdRows,
+            batchSize,
+            cols);
+    long started = System.nanoTime();
+    TripleProjectionPlan plan =
+        triplePlans.computeIfAbsent(
+            key,
+            ignored ->
+                new TripleProjectionPlan(
+                    nextPlanName(),
+                    firstWeights,
+                    firstRows,
+                    secondWeights,
+                    secondRows,
+                    thirdWeights,
+                    thirdRows,
+                    batchSize,
+                    cols));
+    plan.execute(input, firstOutput, secondOutput, thirdOutput);
+    recordCall(started);
+  }
+
+  @Override
   public synchronized void multiply(
       float[] output,
       float[] input,
@@ -84,30 +231,20 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       throw new UnsupportedOperationException(
           "projection is not eligible for the Tornado experiment");
     }
-    Objects.requireNonNull(output, "output");
-    Objects.requireNonNull(input, "input");
-    Objects.requireNonNull(weights, "weights");
-    int expectedInput = Math.multiplyExact(batchSize, cols);
-    int expectedOutput = Math.multiplyExact(batchSize, rows);
-    if (input.length < expectedInput || output.length < expectedOutput) {
-      throw new IllegalArgumentException("input or output storage does not match projection shape");
-    }
+    validateProjectionStorage(output, weights, input, batchSize, rows, cols);
     ProjectionKey key =
         new ProjectionKey(weights.address(), weights.byteSize(), batchSize, rows, cols);
     long started = System.nanoTime();
     ProjectionPlan plan =
         plans.computeIfAbsent(
-            key,
-            ignored ->
-                new ProjectionPlan("q4-model-" + plans.size(), weights, batchSize, rows, cols));
+            key, ignored -> new ProjectionPlan(nextPlanName(), weights, batchSize, rows, cols));
     plan.execute(input, output);
-    totalNanos += System.nanoTime() - started;
-    calls++;
+    recordCall(started);
   }
 
   /** Number of distinct tensor/shape execution plans compiled or awaiting first compilation. */
   public synchronized int projectionPlanCount() {
-    return plans.size();
+    return plans.size() + dualPlans.size() + triplePlans.size();
   }
 
   /** Number of model projection calls routed through this experiment. */
@@ -137,7 +274,31 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
         }
       }
     }
+    for (DualProjectionPlan plan : dualPlans.values()) {
+      try {
+        plan.close();
+      } catch (RuntimeException exception) {
+        if (failure == null) {
+          failure = exception;
+        } else {
+          failure.addSuppressed(exception);
+        }
+      }
+    }
+    for (TripleProjectionPlan plan : triplePlans.values()) {
+      try {
+        plan.close();
+      } catch (RuntimeException exception) {
+        if (failure == null) {
+          failure = exception;
+        } else {
+          failure.addSuppressed(exception);
+        }
+      }
+    }
     plans.clear();
+    dualPlans.clear();
+    triplePlans.clear();
     closed = true;
     if (failure != null) {
       throw failure;
@@ -150,7 +311,65 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     }
   }
 
+  private static boolean eligibleCombined(int batchSize, int cols, int... rows) {
+    if (batchSize < MINIMUM_BATCH || cols <= 0) {
+      return false;
+    }
+    long combinedRows = 0;
+    for (int rowCount : rows) {
+      if (rowCount <= 0) {
+        return false;
+      }
+      combinedRows += rowCount;
+    }
+    return combinedRows * cols >= MINIMUM_MATRIX_VALUES;
+  }
+
+  private static void validateProjectionStorage(
+      float[] output, MemorySegment weights, float[] input, int batchSize, int rows, int cols) {
+    Objects.requireNonNull(output, "output");
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(weights, "weights");
+    int expectedInput = Math.multiplyExact(batchSize, cols);
+    int expectedOutput = Math.multiplyExact(batchSize, rows);
+    if (input.length < expectedInput || output.length < expectedOutput) {
+      throw new IllegalArgumentException("input or output storage does not match projection shape");
+    }
+  }
+
+  private String nextPlanName() {
+    return "q4-model-" + planSequence++;
+  }
+
+  private void recordCall(long started) {
+    totalNanos += System.nanoTime() - started;
+    calls++;
+  }
+
   private record ProjectionKey(long address, long weightBytes, int batchSize, int rows, int cols) {}
+
+  private record DualProjectionKey(
+      long firstAddress,
+      long firstWeightBytes,
+      int firstRows,
+      long secondAddress,
+      long secondWeightBytes,
+      int secondRows,
+      int batchSize,
+      int cols) {}
+
+  private record TripleProjectionKey(
+      long firstAddress,
+      long firstWeightBytes,
+      int firstRows,
+      long secondAddress,
+      long secondWeightBytes,
+      int secondRows,
+      long thirdAddress,
+      long thirdWeightBytes,
+      int thirdRows,
+      int batchSize,
+      int cols) {}
 
   private static final class ProjectionPlan implements AutoCloseable {
     private final int batchSize;
@@ -211,6 +430,245 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       } catch (Exception exception) {
         throw new IllegalStateException("could not close Tornado projection plan", exception);
       }
+    }
+  }
+
+  private static final class DualProjectionPlan implements AutoCloseable {
+    private final int batchSize;
+    private final int firstRows;
+    private final int secondRows;
+    private final int cols;
+    private final byte[] preparedActivations;
+    private final float[] preparedScales;
+    private final ByteArray deviceActivations;
+    private final FloatArray deviceScales;
+    private final FloatArray firstDeviceOutput;
+    private final FloatArray secondDeviceOutput;
+    private final TornadoExecutionPlan plan;
+
+    private DualProjectionPlan(
+        String name,
+        MemorySegment firstWeights,
+        int firstRows,
+        MemorySegment secondWeights,
+        int secondRows,
+        int batchSize,
+        int cols) {
+      this.batchSize = batchSize;
+      this.firstRows = firstRows;
+      this.secondRows = secondRows;
+      this.cols = cols;
+      int activationEntries = Math.multiplyExact(batchSize, cols);
+      this.preparedActivations = new byte[activationEntries];
+      this.preparedScales = new float[activationEntries / 32];
+      ByteArray firstDeviceWeights = ByteArray.fromSegment(firstWeights);
+      ByteArray secondDeviceWeights = ByteArray.fromSegment(secondWeights);
+      this.deviceActivations = new ByteArray(activationEntries);
+      this.deviceScales = new FloatArray(preparedScales.length);
+      this.firstDeviceOutput = new FloatArray(Math.multiplyExact(batchSize, firstRows));
+      this.secondDeviceOutput = new FloatArray(Math.multiplyExact(batchSize, secondRows));
+      Q4ProjectionKernel.validate(
+          firstDeviceWeights,
+          deviceActivations,
+          deviceScales,
+          firstDeviceOutput,
+          batchSize,
+          firstRows,
+          cols);
+      Q4ProjectionKernel.validate(
+          secondDeviceWeights,
+          deviceActivations,
+          deviceScales,
+          secondDeviceOutput,
+          batchSize,
+          secondRows,
+          cols);
+      TaskGraph graph =
+          new TaskGraph(name)
+              .transferToDevice(
+                  DataTransferMode.FIRST_EXECUTION, firstDeviceWeights, secondDeviceWeights)
+              .transferToDevice(DataTransferMode.EVERY_EXECUTION, deviceActivations, deviceScales)
+              .task(
+                  "multiply-dual",
+                  Q4ProjectionKernel::multiplyDual,
+                  firstDeviceWeights,
+                  firstRows,
+                  secondDeviceWeights,
+                  secondRows,
+                  deviceActivations,
+                  deviceScales,
+                  firstDeviceOutput,
+                  secondDeviceOutput,
+                  batchSize,
+                  cols)
+              .transferToHost(
+                  DataTransferMode.EVERY_EXECUTION, firstDeviceOutput, secondDeviceOutput);
+      this.plan = new TornadoExecutionPlan(graph.snapshot());
+    }
+
+    private void execute(float[] input, float[] firstOutput, float[] secondOutput) {
+      prepareAndStage(
+          input,
+          preparedActivations,
+          preparedScales,
+          deviceActivations,
+          deviceScales,
+          batchSize,
+          cols);
+      plan.execute();
+      copyOutput(firstDeviceOutput, firstOutput, batchSize, firstRows);
+      copyOutput(secondDeviceOutput, secondOutput, batchSize, secondRows);
+    }
+
+    @Override
+    public void close() {
+      closePlan(plan);
+    }
+  }
+
+  private static final class TripleProjectionPlan implements AutoCloseable {
+    private final int batchSize;
+    private final int firstRows;
+    private final int secondRows;
+    private final int thirdRows;
+    private final int cols;
+    private final byte[] preparedActivations;
+    private final float[] preparedScales;
+    private final ByteArray deviceActivations;
+    private final FloatArray deviceScales;
+    private final FloatArray firstDeviceOutput;
+    private final FloatArray secondDeviceOutput;
+    private final FloatArray thirdDeviceOutput;
+    private final TornadoExecutionPlan plan;
+
+    private TripleProjectionPlan(
+        String name,
+        MemorySegment firstWeights,
+        int firstRows,
+        MemorySegment secondWeights,
+        int secondRows,
+        MemorySegment thirdWeights,
+        int thirdRows,
+        int batchSize,
+        int cols) {
+      this.batchSize = batchSize;
+      this.firstRows = firstRows;
+      this.secondRows = secondRows;
+      this.thirdRows = thirdRows;
+      this.cols = cols;
+      int activationEntries = Math.multiplyExact(batchSize, cols);
+      this.preparedActivations = new byte[activationEntries];
+      this.preparedScales = new float[activationEntries / 32];
+      ByteArray firstDeviceWeights = ByteArray.fromSegment(firstWeights);
+      ByteArray secondDeviceWeights = ByteArray.fromSegment(secondWeights);
+      ByteArray thirdDeviceWeights = ByteArray.fromSegment(thirdWeights);
+      this.deviceActivations = new ByteArray(activationEntries);
+      this.deviceScales = new FloatArray(preparedScales.length);
+      this.firstDeviceOutput = new FloatArray(Math.multiplyExact(batchSize, firstRows));
+      this.secondDeviceOutput = new FloatArray(Math.multiplyExact(batchSize, secondRows));
+      this.thirdDeviceOutput = new FloatArray(Math.multiplyExact(batchSize, thirdRows));
+      Q4ProjectionKernel.validate(
+          firstDeviceWeights,
+          deviceActivations,
+          deviceScales,
+          firstDeviceOutput,
+          batchSize,
+          firstRows,
+          cols);
+      Q4ProjectionKernel.validate(
+          secondDeviceWeights,
+          deviceActivations,
+          deviceScales,
+          secondDeviceOutput,
+          batchSize,
+          secondRows,
+          cols);
+      Q4ProjectionKernel.validate(
+          thirdDeviceWeights,
+          deviceActivations,
+          deviceScales,
+          thirdDeviceOutput,
+          batchSize,
+          thirdRows,
+          cols);
+      TaskGraph graph =
+          new TaskGraph(name)
+              .transferToDevice(
+                  DataTransferMode.FIRST_EXECUTION,
+                  firstDeviceWeights,
+                  secondDeviceWeights,
+                  thirdDeviceWeights)
+              .transferToDevice(DataTransferMode.EVERY_EXECUTION, deviceActivations, deviceScales)
+              .task(
+                  "multiply-triple",
+                  Q4ProjectionKernel::multiplyTriple,
+                  firstDeviceWeights,
+                  firstRows,
+                  secondDeviceWeights,
+                  secondRows,
+                  thirdDeviceWeights,
+                  thirdRows,
+                  deviceActivations,
+                  deviceScales,
+                  firstDeviceOutput,
+                  secondDeviceOutput,
+                  thirdDeviceOutput,
+                  batchSize,
+                  cols)
+              .transferToHost(
+                  DataTransferMode.EVERY_EXECUTION,
+                  firstDeviceOutput,
+                  secondDeviceOutput,
+                  thirdDeviceOutput);
+      this.plan = new TornadoExecutionPlan(graph.snapshot());
+    }
+
+    private void execute(
+        float[] input, float[] firstOutput, float[] secondOutput, float[] thirdOutput) {
+      prepareAndStage(
+          input,
+          preparedActivations,
+          preparedScales,
+          deviceActivations,
+          deviceScales,
+          batchSize,
+          cols);
+      plan.execute();
+      copyOutput(firstDeviceOutput, firstOutput, batchSize, firstRows);
+      copyOutput(secondDeviceOutput, secondOutput, batchSize, secondRows);
+      copyOutput(thirdDeviceOutput, thirdOutput, batchSize, thirdRows);
+    }
+
+    @Override
+    public void close() {
+      closePlan(plan);
+    }
+  }
+
+  private static void prepareAndStage(
+      float[] input,
+      byte[] preparedActivations,
+      float[] preparedScales,
+      ByteArray deviceActivations,
+      FloatArray deviceScales,
+      int batchSize,
+      int cols) {
+    Q4ProjectionKernel.quantize(input, preparedActivations, preparedScales, batchSize, cols);
+    deviceActivations.getSegment().copyFrom(MemorySegment.ofArray(preparedActivations));
+    deviceScales.getSegment().copyFrom(MemorySegment.ofArray(preparedScales));
+  }
+
+  private static void copyOutput(FloatArray deviceOutput, float[] output, int batchSize, int rows) {
+    MemorySegment.ofArray(output)
+        .asSlice(0, Math.multiplyExact((long) batchSize * rows, Float.BYTES))
+        .copyFrom(deviceOutput.getSegment());
+  }
+
+  private static void closePlan(TornadoExecutionPlan plan) {
+    try {
+      plan.close();
+    } catch (Exception exception) {
+      throw new IllegalStateException("could not close Tornado projection plan", exception);
     }
   }
 }

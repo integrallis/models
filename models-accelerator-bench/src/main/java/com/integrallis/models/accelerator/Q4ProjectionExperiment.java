@@ -240,7 +240,7 @@ public final class Q4ProjectionExperiment {
     return nanos;
   }
 
-  private static float[] vectorApiProjection(
+  static float[] vectorApiProjection(
       byte[] weights, float[] input, int batchSize, int rows, int cols) {
     float[] output = new float[Math.multiplyExact(batchSize, rows)];
     VectorUtil.ggufQ4_0Q8_0BatchedMatmul(
@@ -258,7 +258,7 @@ public final class Q4ProjectionExperiment {
     return output;
   }
 
-  private static double relativeL2(float[] expected, float[] actual) {
+  static double relativeL2(float[] expected, float[] actual) {
     double squaredError = 0.0;
     double squaredReference = 0.0;
     for (int index = 0; index < expected.length; index++) {
@@ -275,7 +275,7 @@ public final class Q4ProjectionExperiment {
     return sorted[sorted.length / 2];
   }
 
-  private static byte[] randomQ4Matrix(int rows, int cols, long seed) {
+  static byte[] randomQ4Matrix(int rows, int cols, long seed) {
     SplittableRandom random = new SplittableRandom(seed);
     int blocks = Math.multiplyExact(rows, cols / BLOCK_VALUES);
     byte[] weights = new byte[Math.multiplyExact(blocks, BLOCK_BYTES)];
@@ -291,7 +291,7 @@ public final class Q4ProjectionExperiment {
     return weights;
   }
 
-  private static float[] randomFloats(int length, long seed) {
+  static float[] randomFloats(int length, long seed) {
     SplittableRandom random = new SplittableRandom(seed);
     float[] values = new float[length];
     for (int index = 0; index < length; index++) {

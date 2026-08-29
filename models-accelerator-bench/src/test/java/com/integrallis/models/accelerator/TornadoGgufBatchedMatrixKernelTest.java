@@ -31,14 +31,18 @@ class TornadoGgufBatchedMatrixKernelTest {
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 3072, 1024)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 4, 3072, 1024)).isTrue();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 4, 32, 32)).isFalse();
+      assertThat(kernel.supportsDual(GgufTensorType.Q4_0, GgufTensorType.Q4_0)).isTrue();
+      assertThat(
+              kernel.supportsTriple(GgufTensorType.Q4_0, GgufTensorType.Q4_0, GgufTensorType.Q4_0))
+          .isTrue();
     }
   }
 
   @Test
-  void recommendsTheSingleProjectionPlanThatTheExperimentImplements() {
+  void recommendsTheGroupedProjectionPlanThatTheExperimentImplements() {
     try (TornadoGgufBatchedMatrixKernel kernel = new TornadoGgufBatchedMatrixKernel()) {
       assertThat(kernel.planRecommendations())
-          .containsEntry(PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY, "false")
+          .containsEntry(PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY, "true")
           .containsEntry(PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY, "false")
           .containsEntry(PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY, "false");
     }

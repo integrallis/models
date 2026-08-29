@@ -55,6 +55,80 @@ class Q4ProjectionKernelTest {
   }
 
   @Test
+  void matchesTwoProductionProjectionsWithOnePreparedActivation() {
+    int batchSize = 3;
+    int firstRows = 11;
+    int secondRows = 7;
+    int cols = 96;
+    byte[] firstWeights = randomQ4Matrix(firstRows, cols, 41L);
+    byte[] secondWeights = randomQ4Matrix(secondRows, cols, 43L);
+    float[] input = randomFloats(batchSize * cols, 47L);
+    byte[] activations = new byte[batchSize * cols];
+    float[] scales = new float[batchSize * cols / 32];
+    Q4ProjectionKernel.quantize(input, activations, scales, batchSize, cols);
+    float[] expectedFirst = vectorApiProjection(firstWeights, input, batchSize, firstRows, cols);
+    float[] expectedSecond = vectorApiProjection(secondWeights, input, batchSize, secondRows, cols);
+    FloatArray actualFirst = new FloatArray(batchSize * firstRows);
+    FloatArray actualSecond = new FloatArray(batchSize * secondRows);
+
+    Q4ProjectionKernel.multiplyDual(
+        ByteArray.fromArray(firstWeights),
+        firstRows,
+        ByteArray.fromArray(secondWeights),
+        secondRows,
+        ByteArray.fromArray(activations),
+        FloatArray.fromArray(scales),
+        actualFirst,
+        actualSecond,
+        batchSize,
+        cols);
+
+    assertClose(actualFirst.toHeapArray(), expectedFirst);
+    assertClose(actualSecond.toHeapArray(), expectedSecond);
+  }
+
+  @Test
+  void matchesThreeProductionProjectionsWithOnePreparedActivation() {
+    int batchSize = 2;
+    int firstRows = 9;
+    int secondRows = 7;
+    int thirdRows = 5;
+    int cols = 64;
+    byte[] firstWeights = randomQ4Matrix(firstRows, cols, 53L);
+    byte[] secondWeights = randomQ4Matrix(secondRows, cols, 59L);
+    byte[] thirdWeights = randomQ4Matrix(thirdRows, cols, 61L);
+    float[] input = randomFloats(batchSize * cols, 67L);
+    byte[] activations = new byte[batchSize * cols];
+    float[] scales = new float[batchSize * cols / 32];
+    Q4ProjectionKernel.quantize(input, activations, scales, batchSize, cols);
+    float[] expectedFirst = vectorApiProjection(firstWeights, input, batchSize, firstRows, cols);
+    float[] expectedSecond = vectorApiProjection(secondWeights, input, batchSize, secondRows, cols);
+    float[] expectedThird = vectorApiProjection(thirdWeights, input, batchSize, thirdRows, cols);
+    FloatArray actualFirst = new FloatArray(batchSize * firstRows);
+    FloatArray actualSecond = new FloatArray(batchSize * secondRows);
+    FloatArray actualThird = new FloatArray(batchSize * thirdRows);
+
+    Q4ProjectionKernel.multiplyTriple(
+        ByteArray.fromArray(firstWeights),
+        firstRows,
+        ByteArray.fromArray(secondWeights),
+        secondRows,
+        ByteArray.fromArray(thirdWeights),
+        thirdRows,
+        ByteArray.fromArray(activations),
+        FloatArray.fromArray(scales),
+        actualFirst,
+        actualSecond,
+        actualThird,
+        batchSize,
+        cols);
+
+    assertClose(actualFirst.toHeapArray(), expectedFirst);
+    assertClose(actualSecond.toHeapArray(), expectedSecond);
+    assertClose(actualThird.toHeapArray(), expectedThird);
+  }
+
+  @Test
   void rejectsMismatchedActivationScaleStorage() {
     assertThatThrownBy(
             () ->
@@ -90,6 +164,13 @@ class Q4ProjectionKernelTest {
       System.arraycopy(projected, 0, output, batch * rows, rows);
     }
     return output;
+  }
+
+  private static void assertClose(float[] actual, float[] expected) {
+    assertThat(actual).hasSameSizeAs(expected);
+    for (int index = 0; index < expected.length; index++) {
+      assertThat(actual[index]).isCloseTo(expected[index], within(2.0e-5f));
+    }
   }
 
   private static byte[] randomQ4Matrix(int rows, int cols, long seed) {

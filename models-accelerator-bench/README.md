@@ -11,6 +11,8 @@ execution seams identify it as the dominant reusable operation. It currently con
   costs;
 - a production-compatible Q4_0-by-Q8_0 projection with the same activation quantization and FP16
   scale rounding as `vectors-core`;
+- dual and triple Q4_0 dispatches that share one prepared activation across gate/up and Q/K/V
+  projections;
 - an experimental `GgufBatchedMatrixKernel` that injects the Q4_0 kernel into an otherwise unchanged
   `PureJavaBackend` for prefill only; and
 - a full-model Qwen experiment that compares output and Models-owned generation metrics.
@@ -34,32 +36,41 @@ application distribution:
 ./gradlew :models-accelerator-bench:installDist
 ```
 
-Use the TornadoVM argument file with the generated runtime classpath. For example:
+Use the TornadoVM launcher with the generated runtime classpath. For example:
 
 ```shell
 lib=models-accelerator-bench/build/install/models-accelerator-bench/lib
 classpath=$(printf '%s:' "$lib"/*.jar)
 
-java @"$TORNADOVM_HOME/tornado-argfile" \
-  --add-modules=jdk.incubator.vector \
-  --enable-native-access=ALL-UNNAMED \
-  -cp "$classpath" \
+tornado -cp "$classpath" \
   com.integrallis.models.accelerator.Q4ProjectionExperiment \
   32 3072 1024 5 20
+```
+
+The grouped-projection correctness gate executes both dispatches on the selected device:
+
+```shell
+tornado -cp "$classpath" \
+  com.integrallis.models.accelerator.Q4GroupedProjectionExperiment
 ```
 
 The full-model experiment takes a local Qwen3 0.6B Q4_0 GGUF path:
 
 ```shell
-java @"$TORNADOVM_HOME/tornado-argfile" \
-  --add-modules=jdk.incubator.vector \
-  --enable-native-access=ALL-UNNAMED \
-  -cp "$classpath" \
+tornado -cp "$classpath" \
   com.integrallis.models.accelerator.QwenFullModelExperiment \
   /path/to/Qwen3-0.6B-Q4_0.gguf
 ```
 
-Add `--long-prompt` for the 250-token prefill case. Add `--cpu-only` when collecting a Vector API
+Pass application flags through TornadoVM's `--params` option. For example, the 250-token case is:
+
+```shell
+tornado -cp "$classpath" \
+  --params="/path/to/Qwen3-0.6B-Q4_0.gguf --long-prompt" \
+  com.integrallis.models.accelerator.QwenFullModelExperiment
+```
+
+Use ordinary `java` with the generated classpath and `--cpu-only` when collecting a Vector API
 control on a machine without a TornadoVM runtime.
 
 Results are evidence for the next design, not published performance claims. See
