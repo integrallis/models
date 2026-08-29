@@ -73,6 +73,20 @@ tornado -cp "$classpath" \
   com.integrallis.models.accelerator.QwenFullModelExperiment
 ```
 
+Add `--decode` with `--eager` to create separate single-token plans and run an exact eight-token
+CPU/GPU decode-parity gate. The experiment reports median and total decode time and fails if the
+greedy token sequence changes:
+
+```shell
+tornado -cp "$classpath" \
+  --params="/path/to/Qwen3-0.6B-Q4_0.gguf --eager --decode" \
+  com.integrallis.models.accelerator.QwenFullModelExperiment
+```
+
+`--attention` is retained only as a reproducible negative experiment. Its kernels pass the isolated
+numeric gate, but the full-model result on the A16-2Q is slower than the Vector API attention path;
+it is therefore not a candidate for automatic dispatch.
+
 Pass application flags through TornadoVM's `--params` option. For example, the 250-token case is:
 
 ```shell

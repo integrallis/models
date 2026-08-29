@@ -53,6 +53,19 @@ class TornadoGgufBatchedMatrixKernelTest {
   }
 
   @Test
+  void decodeAccelerationIsExplicitAndUsesItsOwnSingleTokenShape() {
+    try (TornadoGgufBatchedMatrixKernel kernel = new TornadoGgufBatchedMatrixKernel(32, true)) {
+      assertThat(kernel.acceleratesDecode()).isTrue();
+      assertThat(kernel.executionBatchSizeFor(1)).isEqualTo(1);
+      assertThat(kernel.executionBatchSizeFor(4)).isEqualTo(32);
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 3072, 1024)).isTrue();
+      assertThat(
+              kernel.isDualEligible(GgufTensorType.Q4_0, 1024, GgufTensorType.Q4_0, 1024, 1, 1024))
+          .isTrue();
+    }
+  }
+
+  @Test
   void rejectsAnExecutionBatchBelowTheGpuThreshold() {
     assertThatThrownBy(() -> new TornadoGgufBatchedMatrixKernel(3))
         .isInstanceOf(IllegalArgumentException.class)

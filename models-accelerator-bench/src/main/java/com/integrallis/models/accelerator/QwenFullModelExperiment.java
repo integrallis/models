@@ -18,6 +18,7 @@ package com.integrallis.models.accelerator;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.runtime.GenerationLoop;
 import com.integrallis.models.runtime.GenerationMetrics;
 import com.integrallis.models.runtime.chat.ChatMessage;
@@ -47,21 +48,26 @@ public final class QwenFullModelExperiment {
 
   public static void main(String[] args) {
     if (args.length < 1
-        || args.length > 4
+        || args.length > 6
         || Arrays.stream(args, 1, args.length)
             .anyMatch(
                 argument ->
                     !"--cpu-only".equals(argument)
                         && !"--long-prompt".equals(argument)
-                        && !"--eager".equals(argument))) {
+                        && !"--eager".equals(argument)
+                        && !"--attention".equals(argument)
+                        && !"--decode".equals(argument))) {
       throw new IllegalArgumentException(
-          "usage: QwenFullModelExperiment <model.gguf> [--cpu-only] [--long-prompt] [--eager]");
+          "usage: QwenFullModelExperiment <model.gguf> [--cpu-only] [--long-prompt] [--eager] [--attention] [--decode]");
     }
     boolean cpuOnly = Arrays.asList(args).contains("--cpu-only");
     boolean longPrompt = Arrays.asList(args).contains("--long-prompt");
     boolean eager = Arrays.asList(args).contains("--eager");
-    if (cpuOnly && eager) {
-      throw new IllegalArgumentException("--eager applies only to the Tornado GPU experiment");
+    boolean attention = Arrays.asList(args).contains("--attention");
+    boolean decode = Arrays.asList(args).contains("--decode");
+    if (cpuOnly && (eager || attention || decode)) {
+      throw new IllegalArgumentException(
+          "--eager, --attention, and --decode apply only to the Tornado GPU experiment");
     }
     ModelPrompt prompt = longPrompt ? longPrompt() : SHORT_PROMPT;
     Path model = Path.of(args[0]).toAbsolutePath().normalize();
@@ -70,27 +76,55 @@ public final class QwenFullModelExperiment {
     }
     System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "512");
 
+    DecodeProbe cpuDecode = null;
     try (PureJavaBackend backend = PureJavaBackend.load(model)) {
       run("Vector API cold", backend, prompt);
       run("Vector API warm", backend, prompt);
+      if (decode) {
+        cpuDecode = runDecodeProbe("Vector API", backend, prompt, 8);
+      }
     }
     if (cpuOnly) {
       return;
     }
 
-    TornadoGgufBatchedMatrixKernel kernel = new TornadoGgufBatchedMatrixKernel();
-    try (PureJavaBackend backend = PureJavaBackend.load(model, kernel)) {
+    TornadoGgufBatchedMatrixKernel kernel = new TornadoGgufBatchedMatrixKernel(32, decode);
+    BatchedCausalAttentionKernel attentionKernel =
+        attention ? new TornadoBatchedCausalAttentionKernel() : BatchedCausalAttentionKernel.none();
+    try (PureJavaBackend backend = PureJavaBackend.load(model, kernel, attentionKernel)) {
       if (eager) {
-        prepare(backend, kernel, prompt);
+        prepare(
+            backend,
+            kernel,
+            attention ? (TornadoBatchedCausalAttentionKernel) attentionKernel : null,
+            prompt);
       }
       run(eager ? "Tornado first visible" : "Tornado cold", backend, prompt);
       run("Tornado warm", backend, prompt);
+      if (decode) {
+        DecodeProbe gpuDecode = runDecodeProbe("Tornado", backend, prompt, 8);
+        if (!Arrays.equals(cpuDecode.tokens(), gpuDecode.tokens())) {
+          throw new IllegalStateException(
+              "accelerated decode changed the greedy token sequence: "
+                  + Arrays.toString(cpuDecode.tokens())
+                  + " != "
+                  + Arrays.toString(gpuDecode.tokens()));
+        }
+      }
       System.out.printf(
           Locale.ROOT,
           "accelerated calls=%d plans=%d cumulative=%.3f s%n",
           kernel.calls(),
           kernel.projectionPlanCount(),
           kernel.totalMillis() / 1_000.0);
+      if (attentionKernel instanceof TornadoBatchedCausalAttentionKernel tornadoAttention) {
+        System.out.printf(
+            Locale.ROOT,
+            "attention calls=%d plans=%d cumulative=%.3f s%n",
+            tornadoAttention.calls(),
+            tornadoAttention.planCount(),
+            tornadoAttention.totalMillis() / 1_000.0);
+      }
     }
   }
 
@@ -120,18 +154,66 @@ public final class QwenFullModelExperiment {
         seconds(metrics.total()));
   }
 
+  private static DecodeProbe runDecodeProbe(
+      String label, PureJavaBackend backend, ModelPrompt prompt, int steps) {
+    backend.reset();
+    int[] promptTokens = backend.tokenizer().encode(prompt);
+    float[] logits = backend.prefill(promptTokens, 0);
+    int[] generated = new int[steps];
+    long[] nanos = new long[steps];
+    for (int step = 0; step < steps; step++) {
+      int token = argmax(logits);
+      generated[step] = token;
+      long started = System.nanoTime();
+      logits = backend.forward(token, promptTokens.length + step);
+      nanos[step] = System.nanoTime() - started;
+    }
+    long total = Arrays.stream(nanos).sum();
+    long[] sorted = nanos.clone();
+    Arrays.sort(sorted);
+    System.out.printf(
+        Locale.ROOT,
+        "%s decode output=%s tokens=%d p50=%.3f ms total=%.3f ms%n",
+        label,
+        backend.tokenizer().decode(generated).replace('\n', ' '),
+        steps,
+        sorted[sorted.length / 2] / 1_000_000.0,
+        total / 1_000_000.0);
+    backend.reset();
+    return new DecodeProbe(generated);
+  }
+
+  private static int argmax(float[] values) {
+    int maximumIndex = 0;
+    for (int index = 1; index < values.length; index++) {
+      if (values[index] > values[maximumIndex]) {
+        maximumIndex = index;
+      }
+    }
+    return maximumIndex;
+  }
+
   private static void prepare(
-      PureJavaBackend backend, TornadoGgufBatchedMatrixKernel kernel, ModelPrompt prompt) {
+      PureJavaBackend backend,
+      TornadoGgufBatchedMatrixKernel kernel,
+      TornadoBatchedCausalAttentionKernel attentionKernel,
+      ModelPrompt prompt) {
     long started = System.nanoTime();
     int[] promptTokens = backend.tokenizer().encode(prompt);
-    backend.prefill(readinessTokens(promptTokens, kernel.executionBatchSize()), 0);
+    int[] readinessTokens = readinessTokens(promptTokens, kernel.executionBatchSize());
+    backend.prefill(readinessTokens, 0);
+    if (kernel.acceleratesDecode()) {
+      backend.forward(readinessTokens[0], readinessTokens.length);
+    }
     backend.reset();
     System.out.printf(
         Locale.ROOT,
-        "Tornado readiness=%.3f s plans=%d calls=%d%n",
+        "Tornado readiness=%.3f s projectionPlans=%d projectionCalls=%d attentionPlans=%d attentionCalls=%d%n",
         (System.nanoTime() - started) / 1_000_000_000.0,
         kernel.projectionPlanCount(),
-        kernel.calls());
+        kernel.calls(),
+        attentionKernel == null ? 0 : attentionKernel.planCount(),
+        attentionKernel == null ? 0 : attentionKernel.calls());
   }
 
   static int[] readinessTokens(int[] source, int executionBatchSize) {
@@ -148,4 +230,6 @@ public final class QwenFullModelExperiment {
   private static double seconds(Duration duration) {
     return duration.toNanos() / 1_000_000_000.0;
   }
+
+  private record DecodeProbe(int[] tokens) {}
 }

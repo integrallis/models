@@ -25,6 +25,7 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -90,6 +91,7 @@ public final class LlamaForwardPass {
   private final GgufQ8BlockMajorKernel q8BlockMajorKernel;
   private final boolean parallelQ8FfnPreparation;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
+  private final BatchedCausalAttentionKernel batchedAttentionKernel;
   private final QuantizedBatchedLayerPlan stagedQuantizedPlan;
   private final int prefillBatchCapacity;
 
@@ -135,7 +137,13 @@ public final class LlamaForwardPass {
 
   public LlamaForwardPass(LlamaConfig config, LlamaWeights weights, KvCache cache) {
     this(
-        config, weights, cache, null, defaultPlan(config, weights), GgufBatchedMatrixKernel.none());
+        config,
+        weights,
+        cache,
+        null,
+        defaultPlan(config, weights),
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none());
   }
 
   public LlamaForwardPass(
@@ -143,7 +151,14 @@ public final class LlamaForwardPass {
       LlamaWeights weights,
       KvCache cache,
       PureJavaExecutionPlan executionPlan) {
-    this(config, weights, cache, null, executionPlan, GgufBatchedMatrixKernel.none());
+    this(
+        config,
+        weights,
+        cache,
+        null,
+        executionPlan,
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none());
   }
 
   public LlamaForwardPass(
@@ -152,7 +167,24 @@ public final class LlamaForwardPass {
       KvCache cache,
       PureJavaExecutionPlan executionPlan,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
-    this(config, weights, cache, null, executionPlan, batchedMatrixKernel);
+    this(
+        config,
+        weights,
+        cache,
+        null,
+        executionPlan,
+        batchedMatrixKernel,
+        BatchedCausalAttentionKernel.none());
+  }
+
+  public LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      PureJavaExecutionPlan executionPlan,
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
+    this(config, weights, cache, null, executionPlan, batchedMatrixKernel, batchedAttentionKernel);
   }
 
   LlamaForwardPass(
@@ -163,7 +195,8 @@ public final class LlamaForwardPass {
         cache,
         layerObserver,
         defaultPlan(config, weights),
-        GgufBatchedMatrixKernel.none());
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none());
   }
 
   LlamaForwardPass(
@@ -172,7 +205,14 @@ public final class LlamaForwardPass {
       KvCache cache,
       LayerObserver layerObserver,
       PureJavaExecutionPlan executionPlan) {
-    this(config, weights, cache, layerObserver, executionPlan, GgufBatchedMatrixKernel.none());
+    this(
+        config,
+        weights,
+        cache,
+        layerObserver,
+        executionPlan,
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none());
   }
 
   LlamaForwardPass(
@@ -182,6 +222,24 @@ public final class LlamaForwardPass {
       LayerObserver layerObserver,
       PureJavaExecutionPlan executionPlan,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
+    this(
+        config,
+        weights,
+        cache,
+        layerObserver,
+        executionPlan,
+        batchedMatrixKernel,
+        BatchedCausalAttentionKernel.none());
+  }
+
+  LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      LayerObserver layerObserver,
+      PureJavaExecutionPlan executionPlan,
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
     this.config = config;
     this.weights = weights;
     this.cache = cache;
@@ -223,6 +281,8 @@ public final class LlamaForwardPass {
     this.q8BlockMajorKernel = executionPlan.q8BlockMajorKernel();
     this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
     this.batchedMatrixKernel = loadedMatrixKernel;
+    this.batchedAttentionKernel =
+        Objects.requireNonNull(batchedAttentionKernel, "batchedAttentionKernel");
     if (!config.usesStandardLlamaLayerSemantics()
         && (finalLayerPrefillPruning
             || finalLayerKvOnlyPrefill
@@ -1260,12 +1320,14 @@ public final class LlamaForwardPass {
           "checkpoint must be between 0 and " + nextPosition + ": " + checkpoint);
     }
     cache.discardFrom(checkpoint);
+    batchedAttentionKernel.rewind(checkpoint);
     nextPosition = checkpoint;
   }
 
   /** Clears the autoregressive key-value cache before processing a new sequence. */
   public void reset() {
     cache.clear();
+    batchedAttentionKernel.reset();
     nextPosition = 0;
   }
 
@@ -1518,6 +1580,36 @@ public final class LlamaForwardPass {
       int startPosition,
       int fromBatch,
       int toBatch) {
+    int batchSize = toBatch - fromBatch;
+    int chunkStartPosition = startPosition + fromBatch;
+    int slidingWindow = config.usesSlidingWindow(layerIndex) ? config.slidingWindow() : 0;
+    if (fromBatch == 0
+        && batchedAttentionKernel.isEligible(
+            layerIndex,
+            chunkStartPosition,
+            batchSize,
+            config.numHeads(),
+            config.numKvHeads(),
+            config.keyLength(),
+            config.valueLength(),
+            cache.maxSeqLen(),
+            slidingWindow)) {
+      batchedAttentionKernel.attend(
+          batchAttnOut,
+          batchQ,
+          batchK,
+          batchV,
+          layerIndex,
+          chunkStartPosition,
+          batchSize,
+          config.numHeads(),
+          config.numKvHeads(),
+          config.keyLength(),
+          config.valueLength(),
+          cache.maxSeqLen(),
+          slidingWindow);
+      return;
+    }
     float[] keyCache = cache.keyBuffer();
     float[] valueCache = cache.valueBuffer();
     boolean separateScores = batchAttentionScores.length != 0;

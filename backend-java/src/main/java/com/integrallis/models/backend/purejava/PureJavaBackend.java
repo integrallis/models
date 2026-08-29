@@ -51,6 +51,7 @@ import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
+import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
@@ -83,6 +84,7 @@ public final class PureJavaBackend
   private final PureJavaExecutionPlan executionPlan;
   private final BackendDiagnostics diagnostics;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
+  private final BatchedCausalAttentionKernel batchedAttentionKernel;
   private PureJavaDecoder.Session[] sessionBatch = new PureJavaDecoder.Session[0];
   private boolean closed;
 
@@ -127,7 +129,8 @@ public final class PureJavaBackend
       int contextCapacity,
       PureJavaExecutionPlan executionPlan,
       BackendDiagnostics diagnostics,
-      GgufBatchedMatrixKernel batchedMatrixKernel) {
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
     this.arenaOwner = arenaOwner;
     this.tokenizer = tokenizer;
     this.decoder = decoder;
@@ -136,6 +139,7 @@ public final class PureJavaBackend
     this.executionPlan = executionPlan;
     this.diagnostics = diagnostics;
     this.batchedMatrixKernel = batchedMatrixKernel;
+    this.batchedAttentionKernel = batchedAttentionKernel;
   }
 
   /** Loads a GGUF model file and returns a ready-to-use backend. */
@@ -144,7 +148,8 @@ public final class PureJavaBackend
         modelPath,
         ModelMemoryArena.create(),
         BackendConfiguration.empty(),
-        GgufBatchedMatrixKernel.none());
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none());
   }
 
   /** Loads a GGUF model with registry-neutral, artifact-qualified recommendations. */
@@ -153,7 +158,8 @@ public final class PureJavaBackend
         modelPath,
         ModelMemoryArena.create(),
         Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
-        GgufBatchedMatrixKernel.none());
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none());
   }
 
   /**
@@ -166,7 +172,25 @@ public final class PureJavaBackend
         modelPath,
         ModelMemoryArena.create(),
         BackendConfiguration.empty(),
-        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"));
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"),
+        BatchedCausalAttentionKernel.none());
+  }
+
+  /**
+   * Loads a GGUF model with injected batched projection and causal-attention implementations.
+   *
+   * <p>The returned backend owns and closes both kernels.
+   */
+  public static PureJavaBackend load(
+      Path modelPath,
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
+    return load(
+        modelPath,
+        ModelMemoryArena.create(),
+        BackendConfiguration.empty(),
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"),
+        Objects.requireNonNull(batchedAttentionKernel, "batchedAttentionKernel"));
   }
 
   /**
@@ -182,7 +206,8 @@ public final class PureJavaBackend
         modelPath,
         ModelMemoryArena.create(),
         Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
-        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"));
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"),
+        BatchedCausalAttentionKernel.none());
   }
 
   static PureJavaBackend load(Path modelPath, Arena arena) {
@@ -190,17 +215,20 @@ public final class PureJavaBackend
         modelPath,
         ModelMemoryArena.owning(arena),
         BackendConfiguration.empty(),
-        GgufBatchedMatrixKernel.none());
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none());
   }
 
   private static PureJavaBackend load(
       Path modelPath,
       ModelMemoryArena arenaOwner,
       BackendConfiguration backendConfiguration,
-      GgufBatchedMatrixKernel batchedMatrixKernel) {
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
     Objects.requireNonNull(arenaOwner, "arenaOwner");
     Objects.requireNonNull(backendConfiguration, "backendConfiguration");
     Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
+    Objects.requireNonNull(batchedAttentionKernel, "batchedAttentionKernel");
     LoadedDecoder loaded = null;
     try {
       Objects.requireNonNull(modelPath, "modelPath");
@@ -226,7 +254,8 @@ public final class PureJavaBackend
                 new SafetensorsTensorSource(SafetensorsBundle.open(modelPath, arena)),
                 runtime,
                 planConfiguration,
-                batchedMatrixKernel);
+                batchedMatrixKernel,
+                batchedAttentionKernel);
       } else if (CactParser.matches(modelPath)) {
         CactFile file = CactParser.parse(modelPath, arena);
         CactNeedle2Layout layout = CactNeedle2Layout.from(file);
@@ -250,7 +279,13 @@ public final class PureJavaBackend
                     backendConfiguration,
                     batchedMatrixKernel)
                 : loadLlama(
-                    modelPath, file, modelFamily, runtime, planConfiguration, batchedMatrixKernel);
+                    modelPath,
+                    file,
+                    modelFamily,
+                    runtime,
+                    planConfiguration,
+                    batchedMatrixKernel,
+                    batchedAttentionKernel);
       }
 
       BackendDiagnostics diagnostics =
@@ -265,13 +300,18 @@ public final class PureJavaBackend
           loaded.contextCapacity(),
           loaded.executionPlan(),
           diagnostics,
-          batchedMatrixKernel);
+          batchedMatrixKernel,
+          batchedAttentionKernel);
     } catch (IOException e) {
-      closeAfterFailure(null, arenaOwner, batchedMatrixKernel, e);
+      closeAfterFailure(null, arenaOwner, batchedMatrixKernel, batchedAttentionKernel, e);
       throw new UncheckedIOException("Failed to load model: " + modelPath, e);
     } catch (RuntimeException | Error e) {
       closeAfterFailure(
-          loaded == null ? null : loaded.decoder(), arenaOwner, batchedMatrixKernel, e);
+          loaded == null ? null : loaded.decoder(),
+          arenaOwner,
+          batchedMatrixKernel,
+          batchedAttentionKernel,
+          e);
       throw e;
     }
   }
@@ -318,7 +358,8 @@ public final class PureJavaBackend
       SafetensorsTensorSource tensors,
       RuntimeFingerprint runtime,
       PureJavaPlanConfiguration planConfiguration,
-      GgufBatchedMatrixKernel batchedMatrixKernel) {
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
     LlamaConfig config = huggingFaceConfig.model();
     LlamaWeights weights = LlamaWeights.fromQwen2Safetensors(tensors, huggingFaceConfig);
     String modelFamily = "qwen2";
@@ -333,7 +374,13 @@ public final class PureJavaBackend
         new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
     PureJavaDecoder decoder =
         new LlamaDecoder(
-            new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel));
+            new LlamaForwardPass(
+                config,
+                weights,
+                cache,
+                executionPlan,
+                batchedMatrixKernel,
+                batchedAttentionKernel));
     ModelMetadata metadata =
         new ModelMetadata(
             modelFamily,
@@ -353,7 +400,8 @@ public final class PureJavaBackend
       String modelFamily,
       RuntimeFingerprint runtime,
       PureJavaPlanConfiguration planConfiguration,
-      GgufBatchedMatrixKernel batchedMatrixKernel) {
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
     LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
     LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
     PureJavaExecutionPlan executionPlan =
@@ -378,7 +426,13 @@ public final class PureJavaBackend
           new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
       decoder =
           new LlamaDecoder(
-              new LlamaForwardPass(config, weights, cache, executionPlan, batchedMatrixKernel));
+              new LlamaForwardPass(
+                  config,
+                  weights,
+                  cache,
+                  executionPlan,
+                  batchedMatrixKernel,
+                  batchedAttentionKernel));
     }
     ModelMetadata metadata =
         new ModelMetadata(
@@ -644,6 +698,11 @@ public final class PureJavaBackend
       closeFailure = combineCloseFailures(closeFailure, failure);
     }
     try {
+      batchedAttentionKernel.close();
+    } catch (RuntimeException failure) {
+      closeFailure = combineCloseFailures(closeFailure, failure);
+    }
+    try {
       arenaOwner.close();
     } catch (RuntimeException failure) {
       closeFailure = combineCloseFailures(closeFailure, failure);
@@ -797,6 +856,7 @@ public final class PureJavaBackend
       PureJavaDecoder decoder,
       ModelMemoryArena arenaOwner,
       GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel,
       Throwable failure) {
     if (decoder != null) {
       try {
@@ -807,6 +867,11 @@ public final class PureJavaBackend
     }
     try {
       batchedMatrixKernel.close();
+    } catch (RuntimeException closeFailure) {
+      failure.addSuppressed(closeFailure);
+    }
+    try {
+      batchedAttentionKernel.close();
     } catch (RuntimeException closeFailure) {
       failure.addSuppressed(closeFailure);
     }

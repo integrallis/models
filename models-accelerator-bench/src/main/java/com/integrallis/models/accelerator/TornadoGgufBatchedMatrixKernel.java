@@ -49,20 +49,26 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   private final Map<DualProjectionKey, DualProjectionPlan> dualPlans = new LinkedHashMap<>();
   private final Map<TripleProjectionKey, TripleProjectionPlan> triplePlans = new LinkedHashMap<>();
   private final int executionBatchSize;
+  private final boolean accelerateDecode;
   private int planSequence;
   private long calls;
   private long totalNanos;
   private boolean closed;
 
   public TornadoGgufBatchedMatrixKernel() {
-    this(DEFAULT_EXECUTION_BATCH_SIZE);
+    this(DEFAULT_EXECUTION_BATCH_SIZE, false);
   }
 
   public TornadoGgufBatchedMatrixKernel(int executionBatchSize) {
+    this(executionBatchSize, false);
+  }
+
+  public TornadoGgufBatchedMatrixKernel(int executionBatchSize, boolean accelerateDecode) {
     if (executionBatchSize < MINIMUM_BATCH) {
       throw new IllegalArgumentException("executionBatchSize must be at least " + MINIMUM_BATCH);
     }
     this.executionBatchSize = executionBatchSize;
+    this.accelerateDecode = accelerateDecode;
   }
 
   /** Fixed device batch shape used to make compiled plans reusable across prompt lengths. */
@@ -70,9 +76,20 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     return executionBatchSize;
   }
 
+  /** Whether this experiment creates separate single-token projection plans for decode. */
+  public boolean acceleratesDecode() {
+    return accelerateDecode;
+  }
+
+  int executionBatchSizeFor(int actualBatchSize) {
+    return accelerateDecode && actualBatchSize == 1 ? 1 : executionBatchSize;
+  }
+
   @Override
   public String implementation() {
-    return "tornadovm-java-q4-prefill-experiment";
+    return accelerateDecode
+        ? "tornadovm-java-q4-prefill-decode-experiment"
+        : "tornadovm-java-q4-prefill-experiment";
   }
 
   @Override
@@ -88,7 +105,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   @Override
   public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
     return supports(type)
-        && batchSize >= MINIMUM_BATCH
+        && eligibleBatchSize(batchSize)
         && batchSize <= executionBatchSize
         && rows > 0
         && cols > 0
@@ -132,6 +149,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     }
     validateProjectionStorage(firstOutput, firstWeights, input, batchSize, firstRows, cols);
     validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
+    int planBatchSize = executionBatchSizeFor(batchSize);
     DualProjectionKey key =
         new DualProjectionKey(
             firstWeights.address(),
@@ -140,7 +158,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
             secondWeights.address(),
             secondWeights.byteSize(),
             secondRows,
-            executionBatchSize,
+            planBatchSize,
             cols);
     long started = System.nanoTime();
     DualProjectionPlan plan =
@@ -153,7 +171,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
                     firstRows,
                     secondWeights,
                     secondRows,
-                    executionBatchSize,
+                    planBatchSize,
                     cols));
     plan.execute(input, firstOutput, secondOutput, batchSize);
     recordCall(started);
@@ -205,6 +223,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     validateProjectionStorage(firstOutput, firstWeights, input, batchSize, firstRows, cols);
     validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
     validateProjectionStorage(thirdOutput, thirdWeights, input, batchSize, thirdRows, cols);
+    int planBatchSize = executionBatchSizeFor(batchSize);
     TripleProjectionKey key =
         new TripleProjectionKey(
             firstWeights.address(),
@@ -216,7 +235,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
             thirdWeights.address(),
             thirdWeights.byteSize(),
             thirdRows,
-            executionBatchSize,
+            planBatchSize,
             cols);
     long started = System.nanoTime();
     TripleProjectionPlan plan =
@@ -231,7 +250,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
                     secondRows,
                     thirdWeights,
                     thirdRows,
-                    executionBatchSize,
+                    planBatchSize,
                     cols));
     plan.execute(input, firstOutput, secondOutput, thirdOutput, batchSize);
     recordCall(started);
@@ -252,13 +271,13 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
           "projection is not eligible for the Tornado experiment");
     }
     validateProjectionStorage(output, weights, input, batchSize, rows, cols);
+    int planBatchSize = executionBatchSizeFor(batchSize);
     ProjectionKey key =
-        new ProjectionKey(weights.address(), weights.byteSize(), executionBatchSize, rows, cols);
+        new ProjectionKey(weights.address(), weights.byteSize(), planBatchSize, rows, cols);
     long started = System.nanoTime();
     ProjectionPlan plan =
         plans.computeIfAbsent(
-            key,
-            ignored -> new ProjectionPlan(nextPlanName(), weights, executionBatchSize, rows, cols));
+            key, ignored -> new ProjectionPlan(nextPlanName(), weights, planBatchSize, rows, cols));
     plan.execute(input, output, batchSize);
     recordCall(started);
   }
@@ -333,7 +352,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   }
 
   private boolean eligibleCombined(int batchSize, int cols, int... rows) {
-    if (batchSize < MINIMUM_BATCH || batchSize > executionBatchSize || cols <= 0) {
+    if (!eligibleBatchSize(batchSize) || batchSize > executionBatchSize || cols <= 0) {
       return false;
     }
     long combinedRows = 0;
@@ -344,6 +363,10 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       combinedRows += rowCount;
     }
     return combinedRows * cols >= MINIMUM_MATRIX_VALUES;
+  }
+
+  private boolean eligibleBatchSize(int batchSize) {
+    return batchSize >= MINIMUM_BATCH || (accelerateDecode && batchSize == 1);
   }
 
   private static void validateProjectionStorage(

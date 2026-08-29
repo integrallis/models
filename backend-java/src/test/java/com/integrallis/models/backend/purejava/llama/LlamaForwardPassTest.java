@@ -31,6 +31,7 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -712,6 +713,100 @@ class LlamaForwardPassTest {
       assertThat(invocations).hasValueGreaterThan(0);
       assertThat(actual).containsExactly(expected);
       assertThat(accelerated.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+    }
+
+    @Test
+    void injectedAttentionKernelPreservesPrefillAndFallsBackForDecode() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+      PureJavaExecutionPlan plan = executionPlan(config, weights, tokens.length, false);
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan);
+      float[] expected = baseline.prefill(tokens, 0).clone();
+      int nextToken = argmax(expected);
+      float[] expectedNext = baseline.forward(nextToken, tokens.length);
+      AtomicInteger invocations = new AtomicInteger();
+      AtomicInteger resets = new AtomicInteger();
+      float[][] keyCaches = new float[LAYERS][CONTEXT * config.keyDim()];
+      float[][] valueCaches = new float[LAYERS][CONTEXT * config.valueDim()];
+      BatchedCausalAttentionKernel attentionKernel =
+          new BatchedCausalAttentionKernel() {
+            @Override
+            public boolean isEligible(
+                int layer,
+                int startPosition,
+                int batchSize,
+                int numHeads,
+                int numKvHeads,
+                int keyLength,
+                int valueLength,
+                int maxSequenceLength,
+                int slidingWindow) {
+              return batchSize > 1;
+            }
+
+            @Override
+            public void attend(
+                float[] output,
+                float[] query,
+                float[] key,
+                float[] value,
+                int layer,
+                int startPosition,
+                int batchSize,
+                int numHeads,
+                int numKvHeads,
+                int keyLength,
+                int valueLength,
+                int maxSequenceLength,
+                int slidingWindow) {
+              invocations.incrementAndGet();
+              referenceBatchedAttention(
+                  output,
+                  query,
+                  key,
+                  value,
+                  keyCaches[layer],
+                  valueCaches[layer],
+                  startPosition,
+                  batchSize,
+                  numHeads,
+                  numKvHeads,
+                  keyLength,
+                  valueLength,
+                  slidingWindow);
+            }
+
+            @Override
+            public void reset() {
+              resets.incrementAndGet();
+            }
+          };
+      LlamaForwardPass accelerated =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan,
+              GgufBatchedMatrixKernel.none(),
+              attentionKernel);
+
+      float[] actual = accelerated.prefill(tokens, 0);
+
+      assertThat(invocations).hasValue(LAYERS);
+      assertThat(actual).containsExactly(expected);
+      assertThat(accelerated.forward(nextToken, tokens.length)).containsExactly(expectedNext);
+      assertThat(invocations).hasValue(LAYERS);
+      accelerated.reset();
+      assertThat(resets).hasValue(1);
     }
 
     @Test
@@ -1979,6 +2074,58 @@ class LlamaForwardPassTest {
       logits = forwardPass.forward(tokens[position], position);
     }
     return logits;
+  }
+
+  private static void referenceBatchedAttention(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] keyCache,
+      float[] valueCache,
+      int startPosition,
+      int batchSize,
+      int numHeads,
+      int numKvHeads,
+      int keyLength,
+      int valueLength,
+      int slidingWindow) {
+    int queryDim = numHeads * keyLength;
+    int keyDim = numKvHeads * keyLength;
+    int valueDim = numKvHeads * valueLength;
+    int outputDim = numHeads * valueLength;
+    for (int batch = 0; batch < batchSize; batch++) {
+      System.arraycopy(key, batch * keyDim, keyCache, (startPosition + batch) * keyDim, keyDim);
+      System.arraycopy(
+          value, batch * valueDim, valueCache, (startPosition + batch) * valueDim, valueDim);
+    }
+    int groupSize = numHeads / numKvHeads;
+    float scale = (float) (1.0 / Math.sqrt(keyLength));
+    float[] scores = new float[startPosition + batchSize];
+    for (int batch = 0; batch < batchSize; batch++) {
+      int position = startPosition + batch;
+      int firstPosition = slidingWindow > 0 ? Math.max(0, position - slidingWindow + 1) : 0;
+      int outputOffset = batch * outputDim;
+      java.util.Arrays.fill(output, outputOffset, outputOffset + outputDim, 0.0f);
+      for (int head = 0; head < numHeads; head++) {
+        int kvHead = head / groupSize;
+        int queryOffset = batch * queryDim + head * keyLength;
+        for (int cached = firstPosition; cached <= position; cached++) {
+          int keyOffset = cached * keyDim + kvHead * keyLength;
+          scores[cached] =
+              com.integrallis.vectors.core.VectorUtil.dotProduct(
+                      query, queryOffset, keyCache, keyOffset, keyLength)
+                  * scale;
+        }
+        TensorOps.softmax(scores, firstPosition, position - firstPosition + 1);
+        int headOutputOffset = outputOffset + head * valueLength;
+        for (int cached = firstPosition; cached <= position; cached++) {
+          int valueOffset = cached * valueDim + kvHead * valueLength;
+          com.integrallis.vectors.core.VectorUtil.addScaledInPlace(
+              output, headOutputOffset, valueCache, valueOffset, valueLength, scores[cached]);
+        }
+      }
+    }
   }
 
   private static void multiplyQ4(
