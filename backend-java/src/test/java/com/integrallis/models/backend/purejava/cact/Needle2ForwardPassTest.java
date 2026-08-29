@@ -73,6 +73,29 @@ class Needle2ForwardPassTest {
     }
   }
 
+  @Test
+  void advancingWithoutLogitsPreservesTheNextTokenResultWhenProvided() throws IOException {
+    String configured = System.getProperty("models.fixtures.needle2Cact", "");
+    assumeTrue(!configured.isBlank(), "set -Dmodels.fixtures.needle2Cact=<needle2.cact>");
+    Path path = Path.of(configured);
+    assumeTrue(Files.isRegularFile(path), "Needle 2 fixture is not installed");
+
+    try (Arena arena = Arena.ofConfined()) {
+      Needle2Weights weights =
+          Needle2Weights.load(CactNeedle2Layout.from(CactParser.parse(path, arena)));
+      Needle2ForwardPass optimized = new Needle2ForwardPass(weights, 8);
+      Needle2ForwardPass reference = new Needle2ForwardPass(weights, 8);
+
+      optimized.advance(2, 0);
+      float[] actual = optimized.forward(3, 1);
+      reference.forward(2, 0);
+      float[] expected = reference.forward(3, 1);
+
+      assertThat(actual).containsExactly(expected);
+      assertThat(optimized.checkpoint()).isEqualTo(2);
+    }
+  }
+
   private static int argmax(float[] values) {
     int result = 0;
     for (int index = 1; index < values.length; index++) {

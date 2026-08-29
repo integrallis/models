@@ -73,6 +73,11 @@ public final class Needle2ForwardPass {
     return forward(token, position, null, true);
   }
 
+  /** Advances the sequence state without projecting the hidden state over the vocabulary. */
+  public void advance(int token, int position) {
+    forward(token, position, null, false);
+  }
+
   /** Encodes a sequence with Needle's serialized contrastive retrieval head. */
   public float[] encodeContrastive(int[] tokens) {
     Needle2ProbeHead head =

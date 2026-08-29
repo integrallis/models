@@ -204,6 +204,9 @@ tasks.register<Test>("needle2CactCompatibilityTest") {
             "com.integrallis.models.backend.purejava.cact.Needle2ForwardPassTest.matchesPinnedNeedleJaxReferenceForBosTokenWhenProvided",
         )
         includeTestsMatching(
+            "com.integrallis.models.backend.purejava.cact.Needle2ForwardPassTest.advancingWithoutLogitsPreservesTheNextTokenResultWhenProvided",
+        )
+        includeTestsMatching(
             "com.integrallis.models.backend.purejava.Needle2BackendIntegrationTest.loadsCactThroughThePublicBackendContractWhenProvided",
         )
         includeTestsMatching(

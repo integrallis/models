@@ -181,11 +181,11 @@ final class Needle2DecoderAdapter implements PureJavaDecoder {
 
   private static float[] prefill(Needle2ForwardPass forwardPass, int[] tokens, int startPosition) {
     validatePrefill(forwardPass, tokens, startPosition);
-    float[] logits = null;
-    for (int index = 0; index < tokens.length; index++) {
-      logits = forwardPass.forward(tokens[index], startPosition + index);
+    int last = tokens.length - 1;
+    for (int index = 0; index < last; index++) {
+      forwardPass.advance(tokens[index], startPosition + index);
     }
-    return logits;
+    return forwardPass.forward(tokens[last], startPosition + last);
   }
 
   private static void validatePrefill(
