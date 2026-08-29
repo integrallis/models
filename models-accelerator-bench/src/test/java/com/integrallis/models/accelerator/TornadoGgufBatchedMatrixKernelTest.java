@@ -16,6 +16,7 @@
 package com.integrallis.models.accelerator;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
@@ -26,16 +27,48 @@ class TornadoGgufBatchedMatrixKernelTest {
   @Test
   void acceleratesQ4PrefillButLeavesDecodeAndUnsupportedFormatsOnTheJavaPath() {
     try (TornadoGgufBatchedMatrixKernel kernel = new TornadoGgufBatchedMatrixKernel()) {
+      assertThat(kernel.executionBatchSize()).isEqualTo(32);
       assertThat(kernel.supports(GgufTensorType.Q4_0)).isTrue();
       assertThat(kernel.supports(GgufTensorType.Q4_K)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 3072, 1024)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 4, 3072, 1024)).isTrue();
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 30, 3072, 1024)).isTrue();
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 32, 3072, 1024)).isTrue();
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 33, 3072, 1024)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 4, 32, 32)).isFalse();
       assertThat(kernel.supportsDual(GgufTensorType.Q4_0, GgufTensorType.Q4_0)).isTrue();
       assertThat(
               kernel.supportsTriple(GgufTensorType.Q4_0, GgufTensorType.Q4_0, GgufTensorType.Q4_0))
           .isTrue();
     }
+  }
+
+  @Test
+  void acceptsAnExplicitFixedExecutionBatch() {
+    try (TornadoGgufBatchedMatrixKernel kernel = new TornadoGgufBatchedMatrixKernel(64)) {
+      assertThat(kernel.executionBatchSize()).isEqualTo(64);
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 64, 3072, 1024)).isTrue();
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 65, 3072, 1024)).isFalse();
+    }
+  }
+
+  @Test
+  void rejectsAnExecutionBatchBelowTheGpuThreshold() {
+    assertThatThrownBy(() -> new TornadoGgufBatchedMatrixKernel(3))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("executionBatchSize");
+  }
+
+  @Test
+  void padsTheLastPromptChunkWithoutReusingStaleActivations() {
+    float[] padded = {9.0f, 9.0f, 9.0f, 9.0f, 9.0f, 9.0f, 9.0f, 9.0f};
+
+    float[] executionInput =
+        TornadoGgufBatchedMatrixKernel.prepareExecutionInput(
+            new float[] {1.0f, 2.0f, 3.0f, 4.0f}, padded, 2, 4, 2);
+
+    assertThat(executionInput).isSameAs(padded);
+    assertThat(executionInput).containsExactly(1.0f, 2.0f, 3.0f, 4.0f, 0.0f, 0.0f, 0.0f, 0.0f);
   }
 
   @Test

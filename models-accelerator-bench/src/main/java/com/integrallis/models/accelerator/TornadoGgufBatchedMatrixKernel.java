@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +32,7 @@ import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 /** Experimental prefill-only Q4_0 projection provider backed by Java-authored TornadoVM kernels. */
 public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   private static final int MINIMUM_BATCH = 4;
+  private static final int DEFAULT_EXECUTION_BATCH_SIZE = 32;
   private static final long MINIMUM_MATRIX_VALUES = 1_048_576L;
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
@@ -46,10 +48,27 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   private final Map<ProjectionKey, ProjectionPlan> plans = new LinkedHashMap<>();
   private final Map<DualProjectionKey, DualProjectionPlan> dualPlans = new LinkedHashMap<>();
   private final Map<TripleProjectionKey, TripleProjectionPlan> triplePlans = new LinkedHashMap<>();
+  private final int executionBatchSize;
   private int planSequence;
   private long calls;
   private long totalNanos;
   private boolean closed;
+
+  public TornadoGgufBatchedMatrixKernel() {
+    this(DEFAULT_EXECUTION_BATCH_SIZE);
+  }
+
+  public TornadoGgufBatchedMatrixKernel(int executionBatchSize) {
+    if (executionBatchSize < MINIMUM_BATCH) {
+      throw new IllegalArgumentException("executionBatchSize must be at least " + MINIMUM_BATCH);
+    }
+    this.executionBatchSize = executionBatchSize;
+  }
+
+  /** Fixed device batch shape used to make compiled plans reusable across prompt lengths. */
+  public int executionBatchSize() {
+    return executionBatchSize;
+  }
 
   @Override
   public String implementation() {
@@ -70,6 +89,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
     return supports(type)
         && batchSize >= MINIMUM_BATCH
+        && batchSize <= executionBatchSize
         && rows > 0
         && cols > 0
         && (long) rows * cols >= MINIMUM_MATRIX_VALUES;
@@ -120,7 +140,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
             secondWeights.address(),
             secondWeights.byteSize(),
             secondRows,
-            batchSize,
+            executionBatchSize,
             cols);
     long started = System.nanoTime();
     DualProjectionPlan plan =
@@ -133,9 +153,9 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
                     firstRows,
                     secondWeights,
                     secondRows,
-                    batchSize,
+                    executionBatchSize,
                     cols));
-    plan.execute(input, firstOutput, secondOutput);
+    plan.execute(input, firstOutput, secondOutput, batchSize);
     recordCall(started);
   }
 
@@ -196,7 +216,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
             thirdWeights.address(),
             thirdWeights.byteSize(),
             thirdRows,
-            batchSize,
+            executionBatchSize,
             cols);
     long started = System.nanoTime();
     TripleProjectionPlan plan =
@@ -211,9 +231,9 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
                     secondRows,
                     thirdWeights,
                     thirdRows,
-                    batchSize,
+                    executionBatchSize,
                     cols));
-    plan.execute(input, firstOutput, secondOutput, thirdOutput);
+    plan.execute(input, firstOutput, secondOutput, thirdOutput, batchSize);
     recordCall(started);
   }
 
@@ -233,12 +253,13 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     }
     validateProjectionStorage(output, weights, input, batchSize, rows, cols);
     ProjectionKey key =
-        new ProjectionKey(weights.address(), weights.byteSize(), batchSize, rows, cols);
+        new ProjectionKey(weights.address(), weights.byteSize(), executionBatchSize, rows, cols);
     long started = System.nanoTime();
     ProjectionPlan plan =
         plans.computeIfAbsent(
-            key, ignored -> new ProjectionPlan(nextPlanName(), weights, batchSize, rows, cols));
-    plan.execute(input, output);
+            key,
+            ignored -> new ProjectionPlan(nextPlanName(), weights, executionBatchSize, rows, cols));
+    plan.execute(input, output, batchSize);
     recordCall(started);
   }
 
@@ -311,8 +332,8 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     }
   }
 
-  private static boolean eligibleCombined(int batchSize, int cols, int... rows) {
-    if (batchSize < MINIMUM_BATCH || cols <= 0) {
+  private boolean eligibleCombined(int batchSize, int cols, int... rows) {
+    if (batchSize < MINIMUM_BATCH || batchSize > executionBatchSize || cols <= 0) {
       return false;
     }
     long combinedRows = 0;
@@ -375,6 +396,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     private final int batchSize;
     private final int rows;
     private final int cols;
+    private final float[] paddedInput;
     private final byte[] preparedActivations;
     private final float[] preparedScales;
     private final ByteArray deviceActivations;
@@ -387,6 +409,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       this.rows = rows;
       this.cols = cols;
       int activationEntries = Math.multiplyExact(batchSize, cols);
+      this.paddedInput = new float[activationEntries];
       this.preparedActivations = new byte[activationEntries];
       this.preparedScales = new float[activationEntries / 32];
       ByteArray deviceWeights = ByteArray.fromSegment(weights);
@@ -413,14 +436,15 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       this.plan = new TornadoExecutionPlan(graph.snapshot());
     }
 
-    private void execute(float[] input, float[] output) {
-      Q4ProjectionKernel.quantize(input, preparedActivations, preparedScales, batchSize, cols);
+    private void execute(float[] input, float[] output, int actualBatchSize) {
+      float[] executionInput =
+          prepareExecutionInput(input, paddedInput, actualBatchSize, batchSize, cols);
+      Q4ProjectionKernel.quantize(
+          executionInput, preparedActivations, preparedScales, batchSize, cols);
       deviceActivations.getSegment().copyFrom(MemorySegment.ofArray(preparedActivations));
       deviceScales.getSegment().copyFrom(MemorySegment.ofArray(preparedScales));
       plan.execute();
-      MemorySegment.ofArray(output)
-          .asSlice(0, Math.multiplyExact((long) batchSize * rows, Float.BYTES))
-          .copyFrom(deviceOutput.getSegment());
+      copyOutput(deviceOutput, output, actualBatchSize, rows);
     }
 
     @Override
@@ -438,6 +462,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     private final int firstRows;
     private final int secondRows;
     private final int cols;
+    private final float[] paddedInput;
     private final byte[] preparedActivations;
     private final float[] preparedScales;
     private final ByteArray deviceActivations;
@@ -459,6 +484,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       this.secondRows = secondRows;
       this.cols = cols;
       int activationEntries = Math.multiplyExact(batchSize, cols);
+      this.paddedInput = new float[activationEntries];
       this.preparedActivations = new byte[activationEntries];
       this.preparedScales = new float[activationEntries / 32];
       ByteArray firstDeviceWeights = ByteArray.fromSegment(firstWeights);
@@ -506,9 +532,12 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       this.plan = new TornadoExecutionPlan(graph.snapshot());
     }
 
-    private void execute(float[] input, float[] firstOutput, float[] secondOutput) {
+    private void execute(
+        float[] input, float[] firstOutput, float[] secondOutput, int actualBatchSize) {
+      float[] executionInput =
+          prepareExecutionInput(input, paddedInput, actualBatchSize, batchSize, cols);
       prepareAndStage(
-          input,
+          executionInput,
           preparedActivations,
           preparedScales,
           deviceActivations,
@@ -516,8 +545,8 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
           batchSize,
           cols);
       plan.execute();
-      copyOutput(firstDeviceOutput, firstOutput, batchSize, firstRows);
-      copyOutput(secondDeviceOutput, secondOutput, batchSize, secondRows);
+      copyOutput(firstDeviceOutput, firstOutput, actualBatchSize, firstRows);
+      copyOutput(secondDeviceOutput, secondOutput, actualBatchSize, secondRows);
     }
 
     @Override
@@ -532,6 +561,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     private final int secondRows;
     private final int thirdRows;
     private final int cols;
+    private final float[] paddedInput;
     private final byte[] preparedActivations;
     private final float[] preparedScales;
     private final ByteArray deviceActivations;
@@ -557,6 +587,7 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       this.thirdRows = thirdRows;
       this.cols = cols;
       int activationEntries = Math.multiplyExact(batchSize, cols);
+      this.paddedInput = new float[activationEntries];
       this.preparedActivations = new byte[activationEntries];
       this.preparedScales = new float[activationEntries / 32];
       ByteArray firstDeviceWeights = ByteArray.fromSegment(firstWeights);
@@ -624,9 +655,15 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     }
 
     private void execute(
-        float[] input, float[] firstOutput, float[] secondOutput, float[] thirdOutput) {
+        float[] input,
+        float[] firstOutput,
+        float[] secondOutput,
+        float[] thirdOutput,
+        int actualBatchSize) {
+      float[] executionInput =
+          prepareExecutionInput(input, paddedInput, actualBatchSize, batchSize, cols);
       prepareAndStage(
-          input,
+          executionInput,
           preparedActivations,
           preparedScales,
           deviceActivations,
@@ -634,9 +671,9 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
           batchSize,
           cols);
       plan.execute();
-      copyOutput(firstDeviceOutput, firstOutput, batchSize, firstRows);
-      copyOutput(secondDeviceOutput, secondOutput, batchSize, secondRows);
-      copyOutput(thirdDeviceOutput, thirdOutput, batchSize, thirdRows);
+      copyOutput(firstDeviceOutput, firstOutput, actualBatchSize, firstRows);
+      copyOutput(secondDeviceOutput, secondOutput, actualBatchSize, secondRows);
+      copyOutput(thirdDeviceOutput, thirdOutput, actualBatchSize, thirdRows);
     }
 
     @Override
@@ -658,10 +695,23 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     deviceScales.getSegment().copyFrom(MemorySegment.ofArray(preparedScales));
   }
 
+  static float[] prepareExecutionInput(
+      float[] input, float[] paddedInput, int actualBatchSize, int executionBatchSize, int cols) {
+    int actualEntries = Math.multiplyExact(actualBatchSize, cols);
+    int executionEntries = Math.multiplyExact(executionBatchSize, cols);
+    if (input.length < actualEntries || paddedInput.length != executionEntries) {
+      throw new IllegalArgumentException("input storage does not match execution batch shape");
+    }
+    System.arraycopy(input, 0, paddedInput, 0, actualEntries);
+    Arrays.fill(paddedInput, actualEntries, executionEntries, 0.0f);
+    return paddedInput;
+  }
+
   private static void copyOutput(FloatArray deviceOutput, float[] output, int batchSize, int rows) {
+    long byteSize = Math.multiplyExact((long) batchSize * rows, Float.BYTES);
     MemorySegment.ofArray(output)
-        .asSlice(0, Math.multiplyExact((long) batchSize * rows, Float.BYTES))
-        .copyFrom(deviceOutput.getSegment());
+        .asSlice(0, byteSize)
+        .copyFrom(deviceOutput.getSegment().asSlice(0, byteSize));
   }
 
   private static void closePlan(TornadoExecutionPlan plan) {

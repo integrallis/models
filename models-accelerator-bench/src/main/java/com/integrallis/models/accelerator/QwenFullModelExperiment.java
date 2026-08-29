@@ -47,15 +47,22 @@ public final class QwenFullModelExperiment {
 
   public static void main(String[] args) {
     if (args.length < 1
-        || args.length > 3
+        || args.length > 4
         || Arrays.stream(args, 1, args.length)
             .anyMatch(
-                argument -> !"--cpu-only".equals(argument) && !"--long-prompt".equals(argument))) {
+                argument ->
+                    !"--cpu-only".equals(argument)
+                        && !"--long-prompt".equals(argument)
+                        && !"--eager".equals(argument))) {
       throw new IllegalArgumentException(
-          "usage: QwenFullModelExperiment <model.gguf> [--cpu-only] [--long-prompt]");
+          "usage: QwenFullModelExperiment <model.gguf> [--cpu-only] [--long-prompt] [--eager]");
     }
     boolean cpuOnly = Arrays.asList(args).contains("--cpu-only");
     boolean longPrompt = Arrays.asList(args).contains("--long-prompt");
+    boolean eager = Arrays.asList(args).contains("--eager");
+    if (cpuOnly && eager) {
+      throw new IllegalArgumentException("--eager applies only to the Tornado GPU experiment");
+    }
     ModelPrompt prompt = longPrompt ? longPrompt() : SHORT_PROMPT;
     Path model = Path.of(args[0]).toAbsolutePath().normalize();
     if (!Files.isRegularFile(model)) {
@@ -73,7 +80,10 @@ public final class QwenFullModelExperiment {
 
     TornadoGgufBatchedMatrixKernel kernel = new TornadoGgufBatchedMatrixKernel();
     try (PureJavaBackend backend = PureJavaBackend.load(model, kernel)) {
-      run("Tornado cold", backend, prompt);
+      if (eager) {
+        prepare(backend, kernel, prompt);
+      }
+      run(eager ? "Tornado first visible" : "Tornado cold", backend, prompt);
       run("Tornado warm", backend, prompt);
       System.out.printf(
           Locale.ROOT,
@@ -108,6 +118,31 @@ public final class QwenFullModelExperiment {
         seconds(metrics.prefill()),
         seconds(metrics.timeToFirstToken().orElse(Duration.ZERO)),
         seconds(metrics.total()));
+  }
+
+  private static void prepare(
+      PureJavaBackend backend, TornadoGgufBatchedMatrixKernel kernel, ModelPrompt prompt) {
+    long started = System.nanoTime();
+    int[] promptTokens = backend.tokenizer().encode(prompt);
+    backend.prefill(readinessTokens(promptTokens, kernel.executionBatchSize()), 0);
+    backend.reset();
+    System.out.printf(
+        Locale.ROOT,
+        "Tornado readiness=%.3f s plans=%d calls=%d%n",
+        (System.nanoTime() - started) / 1_000_000_000.0,
+        kernel.projectionPlanCount(),
+        kernel.calls());
+  }
+
+  static int[] readinessTokens(int[] source, int executionBatchSize) {
+    if (source.length == 0) {
+      throw new IllegalArgumentException("readiness requires prompt tokens");
+    }
+    int[] tokens = new int[executionBatchSize];
+    for (int index = 0; index < tokens.length; index++) {
+      tokens[index] = source[index % source.length];
+    }
+    return tokens;
   }
 
   private static double seconds(Duration duration) {

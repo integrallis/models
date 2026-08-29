@@ -13,6 +13,8 @@ execution seams identify it as the dominant reusable operation. It currently con
   scale rounding as `vectors-core`;
 - dual and triple Q4_0 dispatches that share one prepared activation across gate/up and Q/K/V
   projections;
+- one fixed 32-token device shape that lets prompt chunks reuse the same compiled plans; an eager
+  readiness pass can compile those plans before the first user-visible request;
 - an experimental `GgufBatchedMatrixKernel` that injects the Q4_0 kernel into an otherwise unchanged
   `PureJavaBackend` for prefill only; and
 - a full-model Qwen experiment that compares output and Models-owned generation metrics.
@@ -60,6 +62,15 @@ The full-model experiment takes a local Qwen3 0.6B Q4_0 GGUF path:
 tornado -cp "$classpath" \
   com.integrallis.models.accelerator.QwenFullModelExperiment \
   /path/to/Qwen3-0.6B-Q4_0.gguf
+```
+
+Add `--eager` to compile the fixed-shape projection plans during an explicit readiness phase before
+measuring the first visible request:
+
+```shell
+tornado -cp "$classpath" \
+  --params="/path/to/Qwen3-0.6B-Q4_0.gguf --eager" \
+  com.integrallis.models.accelerator.QwenFullModelExperiment
 ```
 
 Pass application flags through TornadoVM's `--params` option. For example, the 250-token case is:
