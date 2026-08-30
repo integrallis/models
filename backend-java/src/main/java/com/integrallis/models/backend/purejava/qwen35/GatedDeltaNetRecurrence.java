@@ -1,0 +1,143 @@
+/*
+ * Copyright 2025-2026 Integrallis Software, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.integrallis.models.backend.purejava.qwen35;
+
+import java.util.Objects;
+
+/** Scalar float32 Gated DeltaNet recurrence used as the pure-Java compatibility baseline. */
+final class GatedDeltaNetRecurrence {
+
+  private static final float NORMALIZATION_EPSILON = 1.0e-6f;
+
+  record Result(float[] output, float[] finalState) {}
+
+  private GatedDeltaNetRecurrence() {}
+
+  /**
+   * Applies the recurrent gated delta rule.
+   *
+   * <p>Query and key are laid out as {@code [token][head][keyDimension]}; value and output as
+   * {@code [token][head][valueDimension]}; gates as {@code [token][head]}; and state as {@code
+   * [head][keyDimension][valueDimension]}. Grouped query/key heads must be expanded to the value
+   * head count before calling this compatibility kernel.
+   *
+   * <p>The input state is copied and never mutated. A {@code null} state starts a cold sequence.
+   */
+  static Result forward(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] initialState,
+      int tokenCount,
+      int headCount,
+      int keyDimension,
+      int valueDimension) {
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(key, "key");
+    Objects.requireNonNull(value, "value");
+    Objects.requireNonNull(logDecay, "logDecay");
+    Objects.requireNonNull(beta, "beta");
+    requirePositive(tokenCount, "tokenCount");
+    requirePositive(headCount, "headCount");
+    requirePositive(keyDimension, "keyDimension");
+    requirePositive(valueDimension, "valueDimension");
+
+    int tokenHeads = Math.multiplyExact(tokenCount, headCount);
+    int querySize = Math.multiplyExact(tokenHeads, keyDimension);
+    int valueSize = Math.multiplyExact(tokenHeads, valueDimension);
+    int stateSize = Math.multiplyExact(Math.multiplyExact(headCount, keyDimension), valueDimension);
+    requireLength(query, querySize, "query");
+    requireLength(key, querySize, "key");
+    requireLength(value, valueSize, "value");
+    requireLength(logDecay, tokenHeads, "logDecay");
+    requireLength(beta, tokenHeads, "beta");
+    if (initialState != null) {
+      requireLength(initialState, stateSize, "initialState");
+    }
+
+    float[] state = initialState == null ? new float[stateSize] : initialState.clone();
+    float[] output = new float[valueSize];
+    float[] normalizedQuery = new float[keyDimension];
+    float[] normalizedKey = new float[keyDimension];
+    float queryScale = (float) (1.0 / Math.sqrt(keyDimension));
+
+    for (int token = 0; token < tokenCount; token++) {
+      for (int head = 0; head < headCount; head++) {
+        int tokenHead = token * headCount + head;
+        int queryOffset = tokenHead * keyDimension;
+        normalize(query, queryOffset, normalizedQuery);
+        normalize(key, queryOffset, normalizedKey);
+        for (int column = 0; column < keyDimension; column++) {
+          normalizedQuery[column] *= queryScale;
+        }
+
+        float decay = (float) Math.exp(logDecay[tokenHead]);
+        int stateOffset = head * keyDimension * valueDimension;
+        for (int index = 0; index < keyDimension * valueDimension; index++) {
+          state[stateOffset + index] *= decay;
+        }
+
+        int valueOffset = tokenHead * valueDimension;
+        for (int column = 0; column < valueDimension; column++) {
+          float memory = 0.0f;
+          for (int row = 0; row < keyDimension; row++) {
+            memory += state[stateOffset + row * valueDimension + column] * normalizedKey[row];
+          }
+          float delta = (value[valueOffset + column] - memory) * beta[tokenHead];
+          for (int row = 0; row < keyDimension; row++) {
+            state[stateOffset + row * valueDimension + column] += normalizedKey[row] * delta;
+          }
+        }
+
+        for (int column = 0; column < valueDimension; column++) {
+          float result = 0.0f;
+          for (int row = 0; row < keyDimension; row++) {
+            result += state[stateOffset + row * valueDimension + column] * normalizedQuery[row];
+          }
+          output[valueOffset + column] = result;
+        }
+      }
+    }
+    return new Result(output, state);
+  }
+
+  private static void normalize(float[] source, int offset, float[] destination) {
+    float squaredNorm = 0.0f;
+    for (int index = 0; index < destination.length; index++) {
+      float value = source[offset + index];
+      squaredNorm += value * value;
+    }
+    float inverseNorm = (float) (1.0 / Math.sqrt(squaredNorm + NORMALIZATION_EPSILON));
+    for (int index = 0; index < destination.length; index++) {
+      destination[index] = source[offset + index] * inverseNorm;
+    }
+  }
+
+  private static void requirePositive(int value, String name) {
+    if (value <= 0) {
+      throw new IllegalArgumentException(name + " must be > 0: " + value);
+    }
+  }
+
+  private static void requireLength(float[] values, int expected, String name) {
+    if (values.length != expected) {
+      throw new IllegalArgumentException(
+          name + " length must be " + expected + ": " + values.length);
+    }
+  }
+}

@@ -135,6 +135,8 @@ val modelFixtures =
     )
 
 val needle2CactFixture = modelFixture("downloadNeedle2Cact", "needle2_cq2")
+val qwen35GgufFixture =
+    modelFixture("downloadQwen3508BQ4KMGguf", "qwen3_5_0_8b_q4_k_m")
 
 dependencies {
     api(project(":models-api"))
@@ -176,6 +178,30 @@ tasks.register<JavaExec>(needle2CactFixture.taskName) {
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("com.integrallis.models.backend.purejava.fixture.ModelFixtureInstallerCli")
     args(needle2CactFixture.id)
+}
+
+tasks.register<JavaExec>(qwen35GgufFixture.taskName) {
+    description = "Download and verify the pinned ${qwen35GgufFixture.displayName} parser fixture"
+    group = "model acquisition"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.backend.purejava.fixture.ModelFixtureInstallerCli")
+    args(qwen35GgufFixture.id)
+}
+
+tasks.register<Test>("qwen35GgufLayoutTest") {
+    description = "Verify the pinned Qwen3.5 0.8B hybrid-attention GGUF layout"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.qwen35.Qwen35GgufLayoutTest",
+        )
+    }
+    dependsOn(tasks.named(qwen35GgufFixture.taskName))
+    outputs.upToDateWhen { false }
 }
 
 tasks.register<Test>("needle2CactCompatibilityTest") {
