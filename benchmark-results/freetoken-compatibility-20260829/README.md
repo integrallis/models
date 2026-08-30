@@ -8,7 +8,7 @@ model listed here.
 
 - FreeToken: `bd372b630a028e3faa51f4ab0ef6a98c2f2de501`
 - Models audit range: `292e461e4fe90502db1072138e3f82238dab0e12` through
-  `5b283c75935c8579639db49b97492a44c0992689`
+  `db3569845c284bc48ae60374817328a57125a4c2`
 - llama.cpp oracle: `a58222229`
 - FreeToken license: Apache-2.0
 - Production inference remains in-process and Java-first. External engines are reference oracles
@@ -46,6 +46,9 @@ The dense Qwen 3.5 graph was the highest-value small-model result of this audit:
 - A pinned 4B Q4_K_M file verifies token `2614` after `The` and token `33075` after
   `The quick brown fox`, matching llama.cpp `a58222229`. The latter also exercises non-zero text
   positions through Qwen 3.5's text-equivalent MRoPE path.
+- Prefill now projects bounded prompt chunks through the existing Java GGUF batch kernels. Gated
+  DeltaNet recurrence remains token ordered, uses Vector API row operations, and retains its
+  memory, delta, normalization, output, and state workspaces in the owning session.
 
 Pinned fixtures:
 
@@ -56,17 +59,37 @@ Pinned fixtures:
 
 ## Techniques worth carrying forward
 
+### Implemented and measured
+
+The 0.8B Q4_K_M artifact ran a fixed nine-case general workload on the controlled eight-vCPU AMD
+EPYC Milan host. Every retained variant answered 9/9 cases correctly and used the in-process
+pure-Java backend. The measurements below are one-iteration qualification screens, not a claim of
+production readiness:
+
+| Variant | p95 TTFT | p50 decode | p95 end to end | Result |
+| --- | ---: | ---: | ---: | --- |
+| Sequential 0.3.16 baseline | 12,731.5 ms | 10.59 tok/s | 14,997.5 ms | Correct; `OFFLINE` |
+| Batched projections | 11,718.8 ms | 9.45 tok/s | 14,790.7 ms | Correct; retained |
+| Batched + SIMD recurrence | 9,779.3 ms | 10.50 tok/s | 12,533.1 ms | Correct; retained |
+| Batched + SIMD recurrence + Q5_K two-query tail | 9,255.7 ms | 11.05 tok/s | 11,854.6 ms | Correct; retained |
+
+The final variant lowers p95 TTFT by 27.3% from the sequential baseline, but it still exceeds the
+production policy. Qwen3.5 therefore remains outside ModelJars qualification. The Q5_K tail is a
+Vectors 0.1.15 kernel improvement: a separate three-fork JMH gate improved batch-2 execution from
+`0.556 ± 0.008 ms/op` to `0.330 ± 0.003 ms/op` with exact outputs.
+
+Two experiments were rejected rather than added to the runtime. Parallelizing recurrence heads
+improved the controlled TTFT screen by only 3.3% and introduced coordination machinery; JFR showed
+that recurrence was no longer a material hotspot. Selecting the two-query Q6_K kernel regressed
+p95 TTFT to 10,737.6 ms, so the established one-query default remains.
+
 ### Implement next
 
-1. **Batched Qwen 3.5 prefill.** FreeToken projects a complete prefill batch and runs chunked GDN;
-   Models currently advances the complete graph one token at a time. Models already has batched
-   GGUF matrix kernels, so this can remain Java-native. Acceptance requires identical logits,
-   convolution state, recurrent state, and continuation tokens before measuring throughput.
-2. **State snapshots.** FreeToken snapshots recurrent and convolution state at reusable prefix
+1. **State snapshots.** FreeToken snapshots recurrent and convolution state at reusable prefix
    boundaries. Models currently reconstructs Qwen 3.5 rewind state by replaying retained tokens.
    A bounded Java snapshot should first demonstrate lower rewind latency without changing session
    ownership or results.
-3. **Qwen MoE on the existing expert cache.** Qwen 3/3.5 routing should be a new graph path over the
+2. **Qwen MoE on the existing expert cache.** Qwen 3/3.5 routing should be a new graph path over the
    existing Java mapped-expert machinery, not an imported serving runtime.
 
 ### Experiment before adoption
@@ -81,11 +104,11 @@ Pinned fixtures:
   useful design references once Models has a qualified JVM GPU backend. They do not justify adding
   FreeToken, PyTorch, CUDA Python, or another external inference dependency.
 
-### Rejected experiment
+### Earlier rejected experiment
 
 A Vectors Q4_K paired-nibble scratch-write change was tested with correctness checks and stable
 JMH measurement. It regressed from roughly `0.403 ms/op` to `0.452 ± 0.051 ms/op`, so the change was
-fully reverted and Vectors remains unchanged.
+fully reverted.
 
 ### Retained workspace experiment
 

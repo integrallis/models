@@ -143,9 +143,13 @@ runtime limit without changing the model metadata exposed to callers.
 Dense Qwen3.5 uses the same mapped-weight and sampling infrastructure but a
 hybrid graph: periodic full-attention layers use the KV cache, while the other
 layers update bounded convolution and Gated DeltaNet recurrence state. That
-state and its activation workspaces belong to each Java session and are reused
-across decode steps. The implementation does not invoke a FreeToken, Python,
-or external inference runtime; FreeToken and llama.cpp are test references.
+path projects bounded prompt chunks through the existing GGUF batch kernels,
+then advances convolution and recurrence state in token order. Its state and
+activation workspaces belong to each Java session and are reused across prefill
+and decode. The execution planner derives batch and quantized-kernel choices
+from the tensors actually loaded rather than assuming a Llama-shaped graph.
+The implementation does not invoke a FreeToken, Python, or external inference
+runtime; FreeToken and llama.cpp are test references.
 
 == Safetensors And CACT
 

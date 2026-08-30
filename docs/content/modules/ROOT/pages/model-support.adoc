@@ -101,9 +101,11 @@ host, prompts, and greedy controls supplies the reference comparator. See the
 Qwen3.5 0.8B Q4_K_M and 4B Q4_K_M are integration-tested on the pure-Java
 hybrid full-attention/Gated DeltaNet graph. Pinned llama.cpp references verify
 the first token for both artifacts and a multi-token prefix for the 0.8B; the
-4B fixture also verifies its grouped Gated DeltaNet value-head mapping. They
-remain outside the qualified identities until controlled RAG correctness,
-latency, and resource evidence is retained.
+4B fixture also verifies its grouped Gated DeltaNet value-head mapping. The
+0.8B model produced correct answers for all nine controlled workload cases
+after batched prefill and SIMD recurrence work, but its p95 time to first token
+was 9.256 seconds and therefore failed the unchanged production gate. Neither
+artifact is included in the qualified identities.
 
 H2O Danube3 500M Q4_K_M remains integration-tested, but its corrected
 structured-prompt run retains model output for only 3 of 27 requests. That

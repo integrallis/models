@@ -69,7 +69,8 @@ Implemented functionality includes:
 - F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
 - byte-level BPE and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
-- Qwen3.5 hybrid full-attention/Gated DeltaNet decode with reusable recurrent state
+- Qwen3.5 hybrid full-attention/Gated DeltaNet execution with batched prefill and reusable
+  recurrent state
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
 - tool calling across Qwen, Hermes, Llama 3, Needle 2, Gemma 4, and MiniCPM5 formats,
   with LangChain4j and Spring AI schema-constrained tool decoding for
@@ -136,9 +137,11 @@ checked against the same pinned snapshot through Transformers. See the
 Dense, text-only Qwen3.5 GGUF execution is integration-tested in pure Java
 against pinned llama.cpp token oracles for the 0.8B Q4_K_M and 4B Q4_K_M
 artifacts. The 4B gate covers grouped Gated DeltaNet value heads. These
-artifacts remain outside the qualified list until their controlled workload
-and performance evidence is complete. Qwen3.5 MoE, vision, and MTP execution
-are not supported by this release.
+artifacts remain outside the qualified list: the 0.8B artifact answered all
+nine controlled workload cases correctly, but its measured latency still
+failed the unchanged production gate. Qwen3.5 MoE, vision, and MTP execution
+are not supported by this release. See the
+[FreeToken compatibility and optimization audit](benchmark-results/freetoken-compatibility-20260829/README.md).
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)
