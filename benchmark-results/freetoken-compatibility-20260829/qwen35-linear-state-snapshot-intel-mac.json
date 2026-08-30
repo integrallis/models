@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "diagnostic-screen",
+  "recordedAt": "2026-08-30",
+  "modelsRevision": "8db5281b2704f08d58b208cd4ec5592295234483",
+  "freeTokenRevision": "bd372b630a028e3faa51f4ab0ef6a98c2f2de501",
+  "model": {
+    "sourceId": "hf://unsloth/Qwen3.5-0.8B-GGUF",
+    "revision": "6ab461498e2023f6e3c1baea90a8f0fe38ab64d0",
+    "file": "Qwen3.5-0.8B-Q4_K_M.gguf",
+    "sizeBytes": 532517120,
+    "sha256": "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517"
+  },
+  "environment": {
+    "host": "MacBookPro16,1",
+    "cpu": "6-Core Intel Core i7 2.6 GHz",
+    "logicalProcessors": 12,
+    "memoryBytes": 34359738368,
+    "os": "macOS 26.6.1, Darwin 25.6.0 x86_64",
+    "java": "Eclipse Temurin 25.0.3+9-LTS",
+    "vectorBits": 256
+  },
+  "command": "./gradlew :backend-java:qwen35LinearStateSnapshotExperiment -Pqwen35.snapshot.prefixTokens=16 -Pqwen35.snapshot.warmups=1 -Pqwen35.snapshot.iterations=5",
+  "workload": {
+    "prefixTokens": 16,
+    "warmups": 1,
+    "iterations": 5,
+    "snapshotBytes": 20201472
+  },
+  "measurements": {
+    "replayNanos": [4832643347, 4709716635, 4791455967, 4855651746, 4855674653],
+    "restoreNanos": [2077858, 2079381, 2072007, 2440749, 2095114],
+    "medianReplayMillis": 4832.643,
+    "medianRestoreMillis": 2.079,
+    "medianSpeedup": 2324.08,
+    "continuationExact": true
+  },
+  "scope": "Same-session Gated DeltaNet convolution and recurrent state only; the retained full-attention KV prefix remains session-owned.",
+  "verdict": "Retain the bounded Java snapshot primitive and next test an explicitly budgeted cross-request prefix cache. This diagnostic screen is not model qualification evidence."
+}

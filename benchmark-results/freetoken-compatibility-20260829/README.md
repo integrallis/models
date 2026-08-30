@@ -83,16 +83,36 @@ improved the controlled TTFT screen by only 3.3% and introduced coordination mac
 that recurrence was no longer a material hotspot. Selecting the two-query Q6_K kernel regressed
 p95 TTFT to 10,737.6 ms, so the established one-query default remains.
 
+### State snapshot experiment
+
+The first snapshot gate is now implemented as an internal, same-session Java primitive. It copies
+only the Gated DeltaNet convolution and recurrent state; the full-attention KV prefix stays in its
+owning session. A restore is rejected if it targets another session or if the retained token prefix
+has changed. Focused tests prove exact continuation, copy isolation, byte accounting, and those
+ownership checks.
+
+The pinned Qwen 3.5 0.8B Q4_K_M file then ran a 16-token diagnostic screen on an Intel
+`MacBookPro16,1`, Temurin 25.0.3, with one warmup and five measurements:
+
+| Operation | Median | State bytes | Continuation |
+| --- | ---: | ---: | --- |
+| Reconstruct the prefix by executing it again | 4,832.643 ms | n/a | exact |
+| Restore the immutable Java state snapshot | 2.079 ms | 20,201,472 | exact |
+
+That is a 2,324x difference for the isolated restore operation. It is strong evidence to retain the
+primitive, not an end-to-end serving claim: this screen does not include radix lookup, eviction,
+concurrent requests, or copying a separate KV prefix. Raw samples and exact environment details are
+in `qwen35-linear-state-snapshot-intel-mac.json`.
+
 ### Implement next
 
-1. **State snapshots.** FreeToken stores the complete convolution and recurrent state at aligned
-   radix-tree prefix boundaries. A cache hit resumes only from the deepest node that still owns a
-   live snapshot, then copies that immutable snapshot into a request-owned slot before execution;
-   KV entries and state snapshots have separate eviction accounting. Models currently reconstructs
-   Qwen 3.5 rewind state by replaying retained tokens and has no cross-request GDN prefix cache. The
-   first Java experiment should compare replay with a bounded, session-owned snapshot copy, report
-   snapshot bytes and latency, and prove continuation equivalence. Cross-request reuse should come
-   only after that smaller ownership and memory gate succeeds.
+1. **Bounded cross-request prefix cache.** FreeToken stores convolution and recurrent state at
+   aligned radix-tree prefix boundaries. A cache hit resumes only from the deepest node that still
+   owns a live snapshot, then copies that immutable snapshot into a request-owned slot before
+   execution; KV entries and state snapshots have separate eviction accounting. The same-session
+   Java gate succeeded. The next experiment must add explicit byte limits, pair each linear-state
+   snapshot with the matching full-attention KV prefix, and prove eviction, concurrency, and exact
+   continuation before this becomes a runtime feature.
 2. **Qwen MoE on the existing expert cache.** Qwen 3/3.5 routing should be a new graph path over the
    existing Java mapped-expert machinery, not an imported serving runtime.
 

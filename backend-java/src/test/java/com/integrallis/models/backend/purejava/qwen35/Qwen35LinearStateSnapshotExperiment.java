@@ -71,6 +71,8 @@ public final class Qwen35LinearStateSnapshotExperiment {
             "snapshotBytes": %d,
             "warmups": %d,
             "iterations": %d,
+            "replayNanos": %s,
+            "restoreNanos": %s,
             "medianReplayMillis": %.3f,
             "medianRestoreMillis": %.3f,
             "medianSpeedup": %.2f,
@@ -82,6 +84,8 @@ public final class Qwen35LinearStateSnapshotExperiment {
           snapshot.bytes(),
           warmups,
           iterations,
+          Arrays.toString(replayNanos),
+          Arrays.toString(restoreNanos),
           nanosToMillis(medianReplay),
           nanosToMillis(medianRestore),
           (double) medianReplay / medianRestore);
