@@ -537,17 +537,9 @@ public final class PureJavaBackend
       PureJavaPlanConfiguration planConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
     Qwen35Config config = Qwen35Config.fromMetadata(file.metadata());
+    Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file);
     PureJavaExecutionPlan executionPlan =
-        ExecutionPlanner.plan(
-            runtime,
-            ModelTopology.mappedArchitecture(
-                "qwen35",
-                config.attentionQueryDim(),
-                config.attentionKeyDim(),
-                config.attentionKeyDim(),
-                config.numLayers()),
-            planConfiguration,
-            batchedMatrixKernel);
+        ExecutionPlanner.plan(runtime, graph.topology(), planConfiguration, batchedMatrixKernel);
     int contextCapacity = runtimeContextLength(config.contextLength());
     ModelMetadata metadata =
         new ModelMetadata(
@@ -560,7 +552,7 @@ public final class PureJavaBackend
             config.numHeads(),
             config.numKvHeads());
     PureJavaDecoder decoder =
-        new Qwen35DecoderAdapter(Qwen35ForwardPass.fromGgufFile(file), contextCapacity);
+        new Qwen35DecoderAdapter(graph.withExecutionPlan(executionPlan), contextCapacity);
     return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
   }
 

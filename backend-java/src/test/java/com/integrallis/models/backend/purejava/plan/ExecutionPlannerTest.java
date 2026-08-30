@@ -41,7 +41,7 @@ class ExecutionPlannerTest {
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, topology, PureJavaPlanConfiguration.defaults());
 
-    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v19");
+    assertThat(plan.diagnostics().planVersion()).isEqualTo("pure-java-v20");
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.q4Kernel()).isEqualTo(GgufQ4Kernel.WIDENED);
     assertThat(plan.q6BatchedKernel()).isEqualTo(GgufQ6BatchedKernel.ONE_QUERY_BLOCK);

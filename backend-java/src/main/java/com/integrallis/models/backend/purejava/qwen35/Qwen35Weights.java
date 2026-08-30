@@ -27,6 +27,8 @@ import java.util.Set;
 /** Mapped dense Qwen3.5 tensors, kept in their GGUF encodings. */
 final class Qwen35Weights {
 
+  private static final Thread ACCESS_PROBE = Thread.ofPlatform().unstarted(() -> {});
+
   private static final Set<GgufTensorType> MATRIX_TYPES =
       Set.of(
           GgufTensorType.F32,
@@ -196,6 +198,73 @@ final class Qwen35Weights {
 
   Layer layer(int layer) {
     return layers[layer];
+  }
+
+  boolean usesMatrixType(GgufTensorType type) {
+    if (tokenEmbeddingType == type) {
+      return true;
+    }
+    for (Layer layer : layers) {
+      if (layer.ffnGate().type() == type
+          || layer.ffnUp().type() == type
+          || layer.ffnDown().type() == type) {
+        return true;
+      }
+      if (layer.fullAttention() != null
+          && (layer.fullAttention().queryGate().type() == type
+              || layer.fullAttention().key().type() == type
+              || layer.fullAttention().value().type() == type
+              || layer.fullAttention().output().type() == type)) {
+        return true;
+      }
+      if (layer.gatedDeltaNet() != null
+          && (layer.gatedDeltaNet().queryKeyValue().type() == type
+              || layer.gatedDeltaNet().outputGate().type() == type
+              || layer.gatedDeltaNet().beta().type() == type
+              || layer.gatedDeltaNet().alpha().type() == type
+              || layer.gatedDeltaNet().output().type() == type)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  boolean hasThreadShareableProjectionWeights() {
+    if (!tokenEmbedding.isAccessibleBy(ACCESS_PROBE)) {
+      return false;
+    }
+    for (Layer layer : layers) {
+      if (!shareable(layer.ffnGate(), layer.ffnUp(), layer.ffnDown())) {
+        return false;
+      }
+      if (layer.fullAttention() != null
+          && !shareable(
+              layer.fullAttention().queryGate(),
+              layer.fullAttention().key(),
+              layer.fullAttention().value(),
+              layer.fullAttention().output())) {
+        return false;
+      }
+      if (layer.gatedDeltaNet() != null
+          && !shareable(
+              layer.gatedDeltaNet().queryKeyValue(),
+              layer.gatedDeltaNet().outputGate(),
+              layer.gatedDeltaNet().beta(),
+              layer.gatedDeltaNet().alpha(),
+              layer.gatedDeltaNet().output())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean shareable(Matrix... matrices) {
+    for (Matrix matrix : matrices) {
+      if (!matrix.data().isAccessibleBy(ACCESS_PROBE)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static Matrix matrix(GgufFile file, String name, int rows, int columns) {

@@ -44,7 +44,19 @@ public record ModelTopology(
       GgufTensorType attentionOutput,
       GgufTensorType gate,
       GgufTensorType up,
-      GgufTensorType down) {
+      GgufTensorType down,
+      List<GgufTensorType> auxiliaryProjections) {
+
+    public LayerTopology(
+        GgufTensorType query,
+        GgufTensorType key,
+        GgufTensorType value,
+        GgufTensorType attentionOutput,
+        GgufTensorType gate,
+        GgufTensorType up,
+        GgufTensorType down) {
+      this(query, key, value, attentionOutput, gate, up, down, List.of());
+    }
 
     public LayerTopology {
       Objects.requireNonNull(query, "query");
@@ -54,6 +66,7 @@ public record ModelTopology(
       Objects.requireNonNull(gate, "gate");
       Objects.requireNonNull(up, "up");
       Objects.requireNonNull(down, "down");
+      auxiliaryProjections = List.copyOf(Objects.requireNonNull(auxiliaryProjections));
     }
 
     boolean supportsBatchedPrefill() {
@@ -63,7 +76,8 @@ public record ModelTopology(
           && TensorOps.supportsBatchedMatmul(attentionOutput)
           && TensorOps.supportsBatchedMatmul(gate)
           && TensorOps.supportsBatchedMatmul(up)
-          && TensorOps.supportsBatchedMatmul(down);
+          && TensorOps.supportsBatchedMatmul(down)
+          && auxiliaryProjections.stream().allMatch(TensorOps::supportsBatchedMatmul);
     }
 
     boolean groupsGateUp() {
@@ -324,7 +338,9 @@ public record ModelTopology(
   }
 
   private boolean supportsStandardLlamaLayerSemantics() {
-    return !"gemma3".equals(architecture) && supportsLlamaProjectionRouting();
+    return !"gemma3".equals(architecture)
+        && !"qwen35".equals(architecture)
+        && supportsLlamaProjectionRouting();
   }
 
   boolean supportsBatchedAttentionKernels() {

@@ -172,6 +172,8 @@ class GatedDeltaNetRecurrenceTest {
     float[] output = new float[EXPECTED_OUTPUT.length];
     float[] normalizedQuery = new float[KEY_DIM];
     float[] normalizedKey = new float[KEY_DIM];
+    float[] memory = new float[VALUE_DIM];
+    float[] delta = new float[VALUE_DIM];
 
     GatedDeltaNetRecurrence.forwardInPlace(
         QUERY,
@@ -183,6 +185,8 @@ class GatedDeltaNetRecurrenceTest {
         output,
         normalizedQuery,
         normalizedKey,
+        memory,
+        delta,
         TOKENS,
         HEADS,
         HEADS,

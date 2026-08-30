@@ -15,9 +15,11 @@
  */
 package com.integrallis.models.backend.purejava.qwen35;
 
+import com.integrallis.vectors.core.VectorUtil;
+import java.util.Arrays;
 import java.util.Objects;
 
-/** Scalar float32 Gated DeltaNet recurrence used as the pure-Java compatibility baseline. */
+/** Float32 Gated DeltaNet recurrence with Java Vector API row operations. */
 final class GatedDeltaNetRecurrence {
 
   private static final float NORMALIZATION_EPSILON = 1.0e-6f;
@@ -62,7 +64,10 @@ final class GatedDeltaNetRecurrence {
         false,
         null,
         null,
-        null);
+        null,
+        null,
+        null,
+        false);
   }
 
   /** Applies the recurrence while expanding grouped query/key heads to value heads in place. */
@@ -93,7 +98,10 @@ final class GatedDeltaNetRecurrence {
         false,
         null,
         null,
-        null);
+        null,
+        null,
+        null,
+        false);
   }
 
   /** Applies the same recurrence while mutating and retaining a caller-owned state array. */
@@ -124,7 +132,10 @@ final class GatedDeltaNetRecurrence {
         true,
         null,
         null,
-        null);
+        null,
+        null,
+        null,
+        false);
   }
 
   /** Applies grouped query/key recurrence while retaining a caller-owned state array. */
@@ -156,7 +167,10 @@ final class GatedDeltaNetRecurrence {
         true,
         null,
         null,
-        null);
+        null,
+        null,
+        null,
+        false);
   }
 
   /** Applies grouped recurrence into caller-owned state and workspace arrays. */
@@ -170,6 +184,8 @@ final class GatedDeltaNetRecurrence {
       float[] output,
       float[] normalizedQuery,
       float[] normalizedKey,
+      float[] memory,
+      float[] delta,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
@@ -191,7 +207,50 @@ final class GatedDeltaNetRecurrence {
         true,
         Objects.requireNonNull(output, "output"),
         Objects.requireNonNull(normalizedQuery, "normalizedQuery"),
-        Objects.requireNonNull(normalizedKey, "normalizedKey"));
+        Objects.requireNonNull(normalizedKey, "normalizedKey"),
+        Objects.requireNonNull(memory, "memory"),
+        Objects.requireNonNull(delta, "delta"),
+        false);
+  }
+
+  /** Applies a token prefix from capacity-sized caller-owned batch buffers. */
+  static void forwardPrefixInPlace(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] mutableState,
+      float[] output,
+      float[] normalizedQuery,
+      float[] normalizedKey,
+      float[] memory,
+      float[] delta,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    Objects.requireNonNull(mutableState, "mutableState");
+    execute(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        mutableState,
+        tokenCount,
+        keyHeadCount,
+        valueHeadCount,
+        keyDimension,
+        valueDimension,
+        true,
+        Objects.requireNonNull(output, "output"),
+        Objects.requireNonNull(normalizedQuery, "normalizedQuery"),
+        Objects.requireNonNull(normalizedKey, "normalizedKey"),
+        Objects.requireNonNull(memory, "memory"),
+        Objects.requireNonNull(delta, "delta"),
+        true);
   }
 
   private static Result execute(
@@ -209,7 +268,10 @@ final class GatedDeltaNetRecurrence {
       boolean mutateState,
       float[] outputWorkspace,
       float[] normalizedQueryWorkspace,
-      float[] normalizedKeyWorkspace) {
+      float[] normalizedKeyWorkspace,
+      float[] memoryWorkspace,
+      float[] deltaWorkspace,
+      boolean capacitySizedBuffers) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(key, "key");
     Objects.requireNonNull(value, "value");
@@ -230,11 +292,11 @@ final class GatedDeltaNetRecurrence {
     int valueSize = Math.multiplyExact(tokenValueHeads, valueDimension);
     int stateSize =
         Math.multiplyExact(Math.multiplyExact(valueHeadCount, keyDimension), valueDimension);
-    requireLength(query, querySize, "query");
-    requireLength(key, querySize, "key");
-    requireLength(value, valueSize, "value");
-    requireLength(logDecay, tokenValueHeads, "logDecay");
-    requireLength(beta, tokenValueHeads, "beta");
+    requireLength(query, querySize, "query", capacitySizedBuffers);
+    requireLength(key, querySize, "key", capacitySizedBuffers);
+    requireLength(value, valueSize, "value", capacitySizedBuffers);
+    requireLength(logDecay, tokenValueHeads, "logDecay", capacitySizedBuffers);
+    requireLength(beta, tokenValueHeads, "beta", capacitySizedBuffers);
     if (initialState != null) {
       requireLength(initialState, stateSize, "initialState");
     }
@@ -243,9 +305,11 @@ final class GatedDeltaNetRecurrence {
         mutateState
             ? initialState
             : initialState == null ? new float[stateSize] : initialState.clone();
-    float[] output = workspace(outputWorkspace, valueSize, "output");
+    float[] output = workspace(outputWorkspace, valueSize, "output", capacitySizedBuffers);
     float[] normalizedQuery = workspace(normalizedQueryWorkspace, keyDimension, "normalizedQuery");
     float[] normalizedKey = workspace(normalizedKeyWorkspace, keyDimension, "normalizedKey");
+    float[] memory = workspace(memoryWorkspace, valueDimension, "memory");
+    float[] delta = workspace(deltaWorkspace, valueDimension, "delta");
     float queryScale = (float) (1.0 / Math.sqrt(keyDimension));
     for (int token = 0; token < tokenCount; token++) {
       for (int head = 0; head < valueHeadCount; head++) {
@@ -265,23 +329,38 @@ final class GatedDeltaNetRecurrence {
         }
 
         int valueOffset = tokenHead * valueDimension;
+        Arrays.fill(memory, 0.0f);
+        for (int row = 0; row < keyDimension; row++) {
+          VectorUtil.addScaledInPlace(
+              memory,
+              0,
+              state,
+              stateOffset + row * valueDimension,
+              valueDimension,
+              normalizedKey[row]);
+        }
         for (int column = 0; column < valueDimension; column++) {
-          float memory = 0.0f;
-          for (int row = 0; row < keyDimension; row++) {
-            memory += state[stateOffset + row * valueDimension + column] * normalizedKey[row];
-          }
-          float delta = (value[valueOffset + column] - memory) * beta[tokenHead];
-          for (int row = 0; row < keyDimension; row++) {
-            state[stateOffset + row * valueDimension + column] += normalizedKey[row] * delta;
-          }
+          delta[column] = (value[valueOffset + column] - memory[column]) * beta[tokenHead];
+        }
+        for (int row = 0; row < keyDimension; row++) {
+          VectorUtil.addScaledInPlace(
+              state,
+              stateOffset + row * valueDimension,
+              delta,
+              0,
+              valueDimension,
+              normalizedKey[row]);
         }
 
-        for (int column = 0; column < valueDimension; column++) {
-          float result = 0.0f;
-          for (int row = 0; row < keyDimension; row++) {
-            result += state[stateOffset + row * valueDimension + column] * normalizedQuery[row];
-          }
-          output[valueOffset + column] = result;
+        Arrays.fill(output, valueOffset, valueOffset + valueDimension, 0.0f);
+        for (int row = 0; row < keyDimension; row++) {
+          VectorUtil.addScaledInPlace(
+              output,
+              valueOffset,
+              state,
+              stateOffset + row * valueDimension,
+              valueDimension,
+              normalizedQuery[row]);
         }
       }
     }
@@ -313,11 +392,30 @@ final class GatedDeltaNetRecurrence {
     }
   }
 
+  private static void requireLength(
+      float[] values, int expected, String name, boolean capacitySized) {
+    if (!capacitySized) {
+      requireLength(values, expected, name);
+    } else if (values.length < expected) {
+      throw new IllegalArgumentException(
+          name + " length must be at least " + expected + ": " + values.length);
+    }
+  }
+
   private static float[] workspace(float[] values, int expected, String name) {
     if (values == null) {
       return new float[expected];
     }
     requireLength(values, expected, name);
+    return values;
+  }
+
+  private static float[] workspace(
+      float[] values, int expected, String name, boolean capacitySized) {
+    if (values == null) {
+      return new float[expected];
+    }
+    requireLength(values, expected, name, capacitySized);
     return values;
   }
 }

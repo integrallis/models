@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.qwen35;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureDescriptor;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
@@ -90,6 +91,13 @@ class Qwen35ForwardPassIntegrationTest {
     try (PureJavaBackend backend = PureJavaBackend.load(descriptor.localPath().orElseThrow())) {
       assertThat(backend.metadata().modelFamily()).isEqualTo("qwen35");
       assertThat(backend.contextCapacity()).isEqualTo(32);
+      assertThat(backend.executionPlan().prefillBatchSize()).isEqualTo(32);
+      assertThat(backend.diagnostics().optimization("batched-prefill"))
+          .hasValueSatisfying(
+              decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+      assertThat(backend.diagnostics().optimization("final-layer-prefill-pruning"))
+          .hasValueSatisfying(
+              decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
       int[] prompt = backend.tokenizer().encode("The quick brown fox");
 
       float[] logits = backend.prefill(prompt, 0);

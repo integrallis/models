@@ -73,6 +73,33 @@ class Qwen35ForwardPassTest {
   }
 
   @Test
+  void batchedPrefillMatchesSequentialExecutionAcrossChunks(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      var file = GgufParser.parse(model, arena);
+      Qwen35ForwardPass sequential = Qwen35ForwardPass.fromGgufFile(file, 1);
+      Qwen35ForwardPass batched = Qwen35ForwardPass.fromGgufFile(file, 2);
+      Qwen35ForwardPass.Session sequentialSession = sequential.openSession(6);
+      Qwen35ForwardPass.Session batchedSession = batched.openSession(6);
+
+      float[] expected = sequential.prefill(sequentialSession, new int[] {1, 2, 3, 4, 5}, 0);
+      float[] actual = batched.prefill(batchedSession, new int[] {1, 2, 3, 4, 5}, 0);
+
+      assertThat(batched.prefillBatchSize()).isEqualTo(2);
+      assertThat(actual).containsExactly(expected);
+      assertThat(batchedSession.checkpoint()).isEqualTo(5);
+      assertThat(batched.forward(batchedSession, 6, 5))
+          .containsExactly(sequential.forward(sequentialSession, 6, 5));
+
+      batched.rewind(batchedSession, 2);
+      assertThat(batched.prefill(batchedSession, new int[] {3, 4, 5, 6}, 2))
+          .containsExactly(sequential.forward(new int[] {1, 2, 3, 4, 5, 6}));
+    }
+  }
+
+  @Test
   void sessionsEnforceOwnershipPositionAndCapacity(@TempDir Path directory) throws Exception {
     Path model = writeToyModel(directory);
 
