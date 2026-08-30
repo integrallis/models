@@ -177,6 +177,13 @@ For Needle 2, `answer` is the serialized `Weather` returned by the invoked
 method. For a qualified generative tool-calling model, it is the model's
 follow-up response after seeing that tool result.
 
+GPT-OSS uses the Harmony protocol. The adapter recognizes both recipient positions
+permitted by Harmony, renders current constrained-JSON call history, addresses named
+tool results back to the assistant, and returns only the completed final-channel text.
+The exact hyphenated weather example above is covered against the pinned official
+GPT-OSS 20B checkpoint. That checkpoint demonstrates adapter compatibility but remains
+outside the ModelJars catalog until its Java prefill meets the performance gate.
+
 The same execution path is covered for blocking and streaming `ChatClient`
 requests. Streaming with declared tools buffers generated text until the tool
 call is complete, because Spring AI can only act on a complete request.

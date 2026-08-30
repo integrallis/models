@@ -95,6 +95,10 @@ adapter serializes LangChain4j's typed `JsonSchemaElement` tree to JSON Schema
 text and renders the tools into the selected Models chat template. Model output
 is scanned back into LangChain4j `ToolExecutionRequest` values, and the response
 finish reason is set to `TOOL_EXECUTION` so LangChain4j's tool loop can proceed.
+GPT-OSS Harmony calls use the same path: current constrained-JSON headers and the
+older recipient-before-channel form are both recognized, named tool results are
+rendered back into Harmony history, and private analysis is not exposed as a final
+assistant answer.
 
 [source,java]
 ----

@@ -65,14 +65,15 @@ Implemented functionality includes:
 - GGUF v2/v3 parsing with memory-mapped tensor access
 - strict, memory-mapped single-file and sharded Safetensors bundles
 - CACT parsing and the Needle 2 CQ2/CQ4 execution path
-- Llama, Qwen2, Qwen3, dense Qwen3.5, and Gemma 4 decoder architectures
-- F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
+- Llama, Qwen2, Qwen3, dense Qwen3.5, Gemma 4, GPT-OSS, and Needle 2 decoder architectures
+- F32, F16, BF16, MXFP4, CQ2/CQ4, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
 - byte-level BPE and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - Qwen3.5 hybrid full-attention/Gated DeltaNet execution with batched prefill and reusable
   recurrent state
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
-- tool calling across Qwen, Hermes, Llama 3, Needle 2, Gemma 4, and MiniCPM5 formats,
+- tool calling across Qwen, Hermes, Llama 3, GPT-OSS Harmony, Needle 2, Gemma 4, and
+  MiniCPM5 formats,
   with LangChain4j and Spring AI schema-constrained tool decoding for
   enumerable arguments; Needle 2 additionally constrains its array protocol
   from JSON Schema and retrieves the five most relevant tools with its in-model
@@ -142,6 +143,12 @@ nine controlled workload cases correctly, but its measured latency still
 failed the unchanged production gate. Qwen3.5 MoE, vision, and MTP execution
 are not supported by this release. See the
 [FreeToken compatibility and optimization audit](benchmark-results/freetoken-compatibility-20260829/README.md).
+
+The official GPT-OSS 20B Safetensors/MXFP4 checkpoint passes cross-host first-token
+equivalence, greedy generation, and the exact Spring AI Harmony weather-tool loop through the
+pure-Java backend. It is not yet a qualified ModelJar: the retained two-turn EPYC test took
+1,370.459 seconds with serial prompt rewind and prefill. See the
+[GPT-OSS evidence](benchmark-results/freetoken-compatibility-20260829/gpt-oss-20b-official-checkpoint-java.json).
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)

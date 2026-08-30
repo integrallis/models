@@ -23,9 +23,11 @@ xref:embeddings.adoc#equivalence-gating[Equivalence Gating].
 The GGUF decoder recognizes `llama`, `qwen2`, `qwen3`, `qwen35`, and `gemma4`
 metadata prefixes. Qwen3.5 support is currently limited to dense, text-only
 GGUF checkpoints; its MoE, vision, and MTP paths are not supported. The
-Hugging Face path supports strict Qwen 2/Qwen2.5 BF16
-Safetensors bundles with either one weight file or an indexed shard set. The
-CACT path supports the released Needle 2 architecture and mixed CQ2/CQ4
+Hugging Face path supports strict Qwen 2/Qwen2.5 BF16 and GPT-OSS MXFP4
+Safetensors bundles with either one weight file or an indexed shard set. GPT-OSS
+implements the official Harmony prompt and tool-call protocol, but its current
+serial prompt prefill does not pass the catalog performance gate. The CACT path
+supports the released Needle 2 architecture and mixed CQ2/CQ4
 artifact layout. `ChatTemplate.NEEDLE2` implements its official raw-schema
 prompt protocol, including optional system facts and array-wrapped parallel
 tool calls.
@@ -33,6 +35,9 @@ tool calls.
 Projection kernels support:
 
 * F32
+* BF16
+* MXFP4
+* CQ2 and CQ4
 * Q4_0
 * Q5_0
 * Q8_0
@@ -132,6 +137,7 @@ and 7B Q4_0
 * Qwen3.5 0.8B and 4B Q4_K_M dense text models
 * Qwen2.5 0.5B Instruct BF16 Safetensors
 * Needle 2 CACT
+* GPT-OSS 20B MXFP4 Safetensors
 
 The DeepSeek-Coder fixture exercises mixed
 Q4_K/Q5_0/Q8_0/Q6_K tensors and legacy linear RoPE
@@ -143,8 +149,11 @@ Pinned greedy-token references compare selected GGUF fixtures with a recorded
 llama.cpp revision. Safetensors fixtures use pinned Hugging Face Transformers
 token/logit and same-host RAG references. Needle 2 uses the checksum-pinned
 official CACT artifact and engine behavior; CI also generates and parses the
-reference weather tool call through the public template API. These are test oracles and
-benchmark comparators, not runtime dependencies.
+reference weather tool call through the public template API. GPT-OSS uses pinned
+Transformers logits and greedy-generation oracles plus a real Spring AI tool loop. These
+are test oracles and benchmark comparators, not runtime dependencies. The list includes
+compatibility fixtures as well as qualified catalog artifacts; consult the production
+ledger before treating a fixture as deployable.
 
 == Backend Qualification
 
