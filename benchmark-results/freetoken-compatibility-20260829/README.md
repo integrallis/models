@@ -8,7 +8,7 @@ model listed here.
 
 - FreeToken: `bd372b630a028e3faa51f4ab0ef6a98c2f2de501`
 - Models audit range: `292e461e4fe90502db1072138e3f82238dab0e12` through
-  `db35698ca3545b48f77b5c2e151b8afd88079ddc`
+  `b06bdf91f864fe90546c7d12d56becaf983055fa`
 - llama.cpp oracle: `a58222229`
 - FreeToken license: Apache-2.0
 - Production inference remains in-process and Java-first. External engines are reference oracles
@@ -24,7 +24,7 @@ model listed here.
 | Qwen 3.5 dense | Added in Java during this audit | Qualify 0.8B and 4B first; screen 2B and 9B with the same oracle gates |
 | Qwen 3 MoE | Not implemented | Reuse the existing Gemma 4 expert loader/cache, but add Qwen routing and graph semantics test-first |
 | Qwen 3.5 MoE | Dense hybrid graph exists; routed MLP does not | Best MoE follow-on after dense Qwen 3.5 qualification |
-| GPT-OSS | Not implemented | First validate MXFP4 decoding and attention-sink primitives independently; 20B is the smallest end-to-end candidate |
+| GPT-OSS | Safetensors MXFP4 mapping, expert math, and one routed layer implemented internally | Validate attention sinks and the decoder graph next; 20B remains the smallest end-to-end candidate |
 | Muse Glimmer | Not implemented | Defer until native NVFP4 linear execution is measured; smallest cited model is 30B |
 | MiniMax M2/M3, GLM MoE/DSA, DeepSeek V4 | Not implemented | Defer: very large MoE and sparse-attention systems are poor first catalog artifacts |
 
@@ -104,6 +104,35 @@ primitive, not an end-to-end serving claim: this screen does not include radix l
 concurrent requests, or copying a separate KV prefix. Raw samples and exact environment details are
 in `qwen35-linear-state-snapshot-intel-mac.json`.
 
+### GPT-OSS MXFP4 routed-layer experiment
+
+The first GPT-OSS slice remains Java-native and in-process. Models now maps the official
+Safetensors expert tensor layout directly into Vectors 0.1.16 `Mxfp4Matrix` views, implements
+FreeToken-compatible stable top-k routing and SwiGLU-OAI activation, and executes a complete
+single-token expert layer without expanding MXFP4 weights. A pinned byte-range fixture from the
+official `openai/gpt-oss-20b` checkpoint verifies nibble order and E8M0 scale decoding against real
+artifact bytes.
+
+The routed-layer implementation has two activation paths. The exact path keeps activations in
+F32. The W4A8 path quantizes the shared hidden vector once, reuses it for all selected gate/up
+projections, and quantizes each expert activation before its down projection. A focused synthetic
+test checks the packed exact path against an independent scalar implementation and requires the
+W4A8 output to exceed 0.9999 cosine similarity with less than 0.06 maximum absolute error.
+
+A three-fork JMH diagnostic then used GPT-OSS 20B's official dimensions—2,880 hidden,
+2,880 intermediate, and four selected experts—on the same Intel Mac environment:
+
+| Activation path | Mean routed-layer time | 99.9% error | Relative result |
+| --- | ---: | ---: | ---: |
+| F32 exact | 159.305 ms/op | ±8.170 ms | baseline |
+| Java W4A8 | 12.516 ms/op | ±1.919 ms | 12.73x faster |
+
+The weights are deterministic synthetic MXFP4 data at production geometry, so this isolates the
+expert compute path; it is not a full-model tokens-per-second result. The measurement is enough to
+retain the Java implementation and continue to attention sinks and the decoder graph without a
+Rust shim. Raw samples, the pinned revisions, and the exact command are in
+`gpt-oss-20b-mxfp4-moe-intel-mac.json`.
+
 ### Implement next
 
 1. **Bounded cross-request prefix cache.** FreeToken stores convolution and recurrent state at
@@ -121,9 +150,11 @@ in `qwen35-linear-state-snapshot-intel-mac.json`.
 - **Fused GDN projection/norm operations.** FreeToken fuses QKV/Z/B/A projection and gated RMSNorm
   for GPU launch efficiency. Java already shares activation quantization across grouped
   projections; JFR must show the remaining elementwise work matters before adding special paths.
-- **MXFP4 and NVFP4 safetensors execution.** Models parses safetensors bundles and recognizes NVFP4
-  layout, but that is not end-to-end model execution. Start with independently checked unpack,
-  scaling, and dot-product primitives before adding GPT-OSS or Muse Glimmer graphs.
+- **NVFP4 Safetensors execution.** Models parses Safetensors bundles and recognizes NVFP4 layout,
+  but that is not end-to-end model execution. Start with independently checked unpack, scaling,
+  and dot-product primitives before adding Muse Glimmer graphs. MXFP4 has passed its independent
+  mapping, math, correctness, and routed-layer performance gates; GPT-OSS still needs its remaining
+  graph and runtime work.
 - **Expert residency scheduling.** FreeToken's pinned host banks and asynchronous GPU transfers are
   useful design references once Models has a qualified JVM GPU backend. They do not justify adding
   FreeToken, PyTorch, CUDA Python, or another external inference dependency.

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "diagnostic-screen",
+  "recordedAt": "2026-08-30",
+  "modelsRevision": "b06bdf91f864fe90546c7d12d56becaf983055fa",
+  "vectorsVersion": "0.1.16",
+  "vectorsRevision": "103ad04c836aa27fb2647abc8dca7425e5adcb5b",
+  "freeTokenRevision": "bd372b630a028e3faa51f4ab0ef6a98c2f2de501",
+  "referenceCheckpoint": {
+    "sourceId": "hf://openai/gpt-oss-20b",
+    "revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "format": "safetensors",
+    "encoding": "MXFP4",
+    "sizeBytes": 13761264768
+  },
+  "correctnessGates": {
+    "officialCheckpointRange": "The loader test decodes a pinned block and E8M0 scale read from the official checkpoint without downloading or expanding the tensor.",
+    "freeTokenMath": "Focused tests pin stable top-k routing and the SwiGLU-OAI clamp equation used by FreeToken.",
+    "routedLayer": "The exact packed path matches an independent scalar reference within 2e-5; W4A8 requires cosine > 0.9999 and maximum absolute difference < 0.06."
+  },
+  "environment": {
+    "host": "MacBookPro16,1",
+    "architecture": "x86_64",
+    "logicalProcessors": 12,
+    "memoryBytes": 34359738368,
+    "os": "macOS 26.6.1, Darwin 25.6.0",
+    "java": "Eclipse Temurin 25.0.3+9-LTS",
+    "vectorBits": 256
+  },
+  "command": "./gradlew :models-bench:jmh -Pjmh.includes='.*GptOssMxfp4MoeBenchmark.*' -Pjmh.fork=3 -Pjmh.warmup=3 -Pjmh.iterations=5 -Pjmh.timeOnIteration=1s -Pjmh.resultFormat=JSON",
+  "workload": {
+    "scope": "One single-token GPT-OSS 20B routed expert layer using synthetic packed weights at official projection geometry.",
+    "hiddenSize": 2880,
+    "intermediateSize": 2880,
+    "selectedExperts": 4,
+    "weightEncoding": "MXFP4",
+    "activationPaths": ["F32", "Q8_0"]
+  },
+  "measurements": {
+    "exactF32ActivationMillis": {
+      "mean": 159.305384984127,
+      "error99_9": 8.170339052769881,
+      "rawData": [
+        [151.51993685714285, 163.39625042857142, 159.376512, 160.28044671428572, 153.2310217142857],
+        [154.42769885714284, 153.2340127142857, 162.97692828571428, 152.14589828571428, 161.33927885714286],
+        [164.00291042857143, 151.790889, 153.07470028571427, 174.84532166666668, 173.93896866666665]
+      ]
+    },
+    "w4a8SharedActivationMillis": {
+      "mean": 12.51619591164154,
+      "error99_9": 1.9192801802478168,
+      "rawData": [
+        [12.062256024096385, 11.720189505747127, 12.331293426829268, 11.833188896551723, 11.572324931034483],
+        [11.74428830232558, 18.8318405, 11.649119735632183, 11.79962711627907, 12.932584455696203],
+        [12.452115481481481, 11.877811388235294, 12.123742571428572, 12.842311625, 11.970244714285714]
+      ]
+    },
+    "meanSpeedup": 12.72794
+  },
+  "verdict": "Retain the Java W4A8 routed-layer path and continue with GPT-OSS attention-sink and decoder-graph experiments. This is not end-to-end model qualification or a ModelJars catalog claim."
+}
