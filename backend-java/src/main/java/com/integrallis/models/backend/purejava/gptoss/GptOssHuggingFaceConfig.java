@@ -94,8 +94,8 @@ public record GptOssHuggingFaceConfig(
     if (numHeads % numKvHeads != 0) {
       throw malformed("numHeads must be divisible by numKvHeads");
     }
-    Math.multiplyExact(numHeads, headDim);
-    Math.multiplyExact(numKvHeads, headDim);
+    directProduct(numHeads, headDim, "queryDimension");
+    directProduct(numKvHeads, headDim, "keyValueDimension");
     if (expertsPerToken > numExperts) {
       throw malformed("expertsPerToken must not exceed numExperts");
     }
@@ -324,6 +324,13 @@ public record GptOssHuggingFaceConfig(
   private static void directTokenId(int tokenId, int vocabSize, String name) {
     if (tokenId < -1 || tokenId >= vocabSize) {
       throw malformed(name + " must be -1 or inside the vocabulary: " + tokenId);
+    }
+  }
+
+  private static void directProduct(int left, int right, String name) {
+    long product = (long) left * right;
+    if (product > Integer.MAX_VALUE) {
+      throw malformed(name + " exceeds the Java array limit: " + product);
     }
   }
 
