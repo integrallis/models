@@ -29,6 +29,7 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
+import com.integrallis.vectors.core.VectorUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -594,23 +595,23 @@ public final class Qwen35ForwardPass {
         int kvHead = head / queriesPerKvHead;
         int queryOffset = queryBase + head * headDimension;
         int gate = queryGateBase + head * 2 * headDimension + headDimension;
-        for (int prior = 0; prior <= position; prior++) {
-          int keyOffset = prior * keyDimension + kvHead * headDimension;
-          float score = 0.0f;
-          for (int column = 0; column < headDimension; column++) {
-            score += batch.query[queryOffset + column] * session.keys[layer][keyOffset + column];
-          }
-          batch.attentionScores[prior] = score * scale;
-        }
-        TensorOps.softmax(batch.attentionScores, 0, position + 1);
-        for (int column = 0; column < headDimension; column++) {
-          float sum = 0.0f;
-          for (int prior = 0; prior <= position; prior++) {
-            int valueOffset = prior * keyDimension + kvHead * headDimension;
-            sum += batch.attentionScores[prior] * session.values[layer][valueOffset + column];
-          }
-          batch.attended[queryOffset + column] = sum * sigmoid(batch.queryGate[gate + column]);
-        }
+        attendHead(
+            batch.attended,
+            queryOffset,
+            batch.query,
+            queryOffset,
+            session.keys[layer],
+            kvHead * headDimension,
+            keyDimension,
+            session.values[layer],
+            kvHead * headDimension,
+            keyDimension,
+            batch.queryGate,
+            gate,
+            batch.attentionScores,
+            position + 1,
+            headDimension,
+            scale);
       }
     }
     projectBatched(
@@ -660,24 +661,11 @@ public final class Qwen35ForwardPass {
         batch.projectionScratch);
 
     int kernel = config.gdnConvKernel();
-    int historyLength = kernel - 1;
     float[] history = session.convolutionHistory[layer];
     for (int token = 0; token < batchSize; token++) {
       int mixedBase = token * convDimension;
-      for (int channel = 0; channel < convDimension; channel++) {
-        int historyOffset = channel * historyLength;
-        int kernelOffset = channel * kernel;
-        float convolved =
-            batch.mixed[mixedBase + channel] * weights.convolution()[kernelOffset + historyLength];
-        for (int tap = 0; tap < historyLength; tap++) {
-          convolved += history[historyOffset + tap] * weights.convolution()[kernelOffset + tap];
-        }
-        if (historyLength > 1) {
-          System.arraycopy(history, historyOffset + 1, history, historyOffset, historyLength - 1);
-        }
-        history[historyOffset + historyLength - 1] = batch.mixed[mixedBase + channel];
-        batch.mixed[mixedBase + channel] = silu(convolved);
-      }
+      VectorUtil.causalDepthwiseConv1dSilu(
+          batch.mixed, mixedBase, history, 0, weights.convolution(), 0, convDimension, kernel);
       System.arraycopy(batch.mixed, mixedBase, batch.gdnQuery, token * keyDimension, keyDimension);
       System.arraycopy(
           batch.mixed, mixedBase + keyDimension, batch.gdnKey, token * keyDimension, keyDimension);
@@ -688,15 +676,21 @@ public final class Qwen35ForwardPass {
           token * valueDimension,
           valueDimension);
       int gateBase = token * valueHeads;
-      for (int head = 0; head < valueHeads; head++) {
-        batch.beta[gateBase + head] = sigmoid(batch.beta[gateBase + head]);
-        batch.logDecay[gateBase + head] =
-            weights.decay()[head]
-                * softplus(batch.alpha[gateBase + head] + weights.timeStepBias()[head]);
-      }
+      VectorUtil.sigmoidAndScaledSoftplus(
+          batch.beta,
+          gateBase,
+          batch.alpha,
+          gateBase,
+          weights.timeStepBias(),
+          0,
+          weights.decay(),
+          0,
+          batch.logDecay,
+          gateBase,
+          valueHeads);
     }
 
-    GatedDeltaNetRecurrence.forwardPrefixInPlace(
+    applyGatedDeltaNetRecurrence(
         batch.gdnQuery,
         batch.gdnKey,
         batch.gdnValue,
@@ -725,10 +719,15 @@ public final class Qwen35ForwardPass {
             weights.outputNorm(),
             headDimension,
             config.rmsNormEpsilon());
-        for (int column = 0; column < headDimension; column++) {
-          batch.recurrent[offset + column] *= silu(batch.outputGate[offset + column]);
-        }
       }
+      TensorOps.swiGlu(
+          batch.recurrent,
+          valueBase,
+          batch.outputGate,
+          valueBase,
+          batch.recurrent,
+          valueBase,
+          valueDimension);
     }
     projectBatched(
         output,
@@ -802,25 +801,68 @@ public final class Qwen35ForwardPass {
       int queryOffset = head * headDimension;
       int destination = head * headDimension;
       int gate = head * 2 * headDimension + headDimension;
-      for (int prior = 0; prior <= position; prior++) {
-        int keyOffset = prior * key.length + kvHead * headDimension;
-        float score = 0.0f;
-        for (int column = 0; column < headDimension; column++) {
-          score += query[queryOffset + column] * keyCache[keyOffset + column];
-        }
-        scores[prior] = score * scale;
-      }
-      TensorOps.softmax(scores, 0, scores.length);
-      for (int column = 0; column < headDimension; column++) {
-        float sum = 0.0f;
-        for (int prior = 0; prior <= position; prior++) {
-          int valueOffset = prior * value.length + kvHead * headDimension;
-          sum += scores[prior] * valueCache[valueOffset + column];
-        }
-        attended[destination + column] = sum * sigmoid(queryGate[gate + column]);
-      }
+      attendHead(
+          attended,
+          destination,
+          query,
+          queryOffset,
+          keyCache,
+          kvHead * headDimension,
+          key.length,
+          valueCache,
+          kvHead * headDimension,
+          value.length,
+          queryGate,
+          gate,
+          scores,
+          position + 1,
+          headDimension,
+          scale);
     }
     project(output, attended, weights.output(), scratch);
+  }
+
+  static void attendHead(
+      float[] output,
+      int outputOffset,
+      float[] query,
+      int queryOffset,
+      float[] keyCache,
+      int firstKeyOffset,
+      int keyStride,
+      float[] valueCache,
+      int firstValueOffset,
+      int valueStride,
+      float[] gate,
+      int gateOffset,
+      float[] scores,
+      int visiblePositions,
+      int headDimension,
+      float scale) {
+    for (int position = 0; position < visiblePositions; position++) {
+      scores[position] =
+          VectorUtil.dotProduct(
+                  query,
+                  queryOffset,
+                  keyCache,
+                  firstKeyOffset + position * keyStride,
+                  headDimension)
+              * scale;
+    }
+    TensorOps.softmax(scores, 0, visiblePositions);
+    Arrays.fill(output, outputOffset, outputOffset + headDimension, 0.0f);
+    for (int position = 0; position < visiblePositions; position++) {
+      VectorUtil.addScaledInPlace(
+          output,
+          outputOffset,
+          valueCache,
+          firstValueOffset + position * valueStride,
+          headDimension,
+          scores[position]);
+    }
+    for (int column = 0; column < headDimension; column++) {
+      output[outputOffset + column] *= sigmoid(gate[gateOffset + column]);
+    }
   }
 
   private void gatedDeltaNet(
@@ -840,21 +882,9 @@ public final class Qwen35ForwardPass {
     dualProject(beta, weights.beta(), alpha, weights.alpha(), input, session.scratch);
 
     int kernel = config.gdnConvKernel();
-    int historyLength = kernel - 1;
     float[] history = session.convolutionHistory[layer];
-    for (int channel = 0; channel < convDimension; channel++) {
-      int historyOffset = channel * historyLength;
-      int kernelOffset = channel * kernel;
-      float convolved = mixed[channel] * weights.convolution()[kernelOffset + historyLength];
-      for (int tap = 0; tap < historyLength; tap++) {
-        convolved += history[historyOffset + tap] * weights.convolution()[kernelOffset + tap];
-      }
-      if (historyLength > 1) {
-        System.arraycopy(history, historyOffset + 1, history, historyOffset, historyLength - 1);
-      }
-      history[historyOffset + historyLength - 1] = mixed[channel];
-      mixed[channel] = silu(convolved);
-    }
+    VectorUtil.causalDepthwiseConv1dSilu(
+        mixed, 0, history, 0, weights.convolution(), 0, convDimension, kernel);
     float[] query = workspace.query;
     float[] key = workspace.key;
     float[] value = workspace.value;
@@ -862,13 +892,11 @@ public final class Qwen35ForwardPass {
     System.arraycopy(mixed, keyDimension, key, 0, keyDimension);
     System.arraycopy(mixed, 2 * keyDimension, value, 0, valueDimension);
     float[] logDecay = workspace.logDecay;
-    for (int head = 0; head < heads; head++) {
-      beta[head] = sigmoid(beta[head]);
-      logDecay[head] = weights.decay()[head] * softplus(alpha[head] + weights.timeStepBias()[head]);
-    }
+    VectorUtil.sigmoidAndScaledSoftplus(
+        beta, 0, alpha, 0, weights.timeStepBias(), 0, weights.decay(), 0, logDecay, 0, heads);
 
     float[] recurrent = workspace.recurrent;
-    GatedDeltaNetRecurrence.forwardInPlace(
+    applyGatedDeltaNetRecurrence(
         query,
         key,
         value,
@@ -895,11 +923,81 @@ public final class Qwen35ForwardPass {
           weights.outputNorm(),
           headDimension,
           config.rmsNormEpsilon());
-      for (int column = 0; column < headDimension; column++) {
-        recurrent[offset + column] *= silu(outputGate[offset + column]);
-      }
     }
+    TensorOps.swiGlu(recurrent, outputGate, recurrent, valueDimension);
     project(output, recurrent, weights.output(), session.scratch);
+  }
+
+  private void applyGatedDeltaNetRecurrence(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output,
+      float[] normalizedQuery,
+      float[] normalizedKey,
+      float[] memory,
+      float[] delta,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    if (batchedMatrixKernel.supportsGatedDeltaNet()) {
+      batchedMatrixKernel.gatedDeltaNet(
+          query,
+          key,
+          value,
+          logDecay,
+          beta,
+          state,
+          output,
+          tokenCount,
+          keyHeadCount,
+          valueHeadCount,
+          keyDimension,
+          valueDimension);
+      return;
+    }
+    if (tokenCount == 1) {
+      GatedDeltaNetRecurrence.forwardInPlace(
+          query,
+          key,
+          value,
+          logDecay,
+          beta,
+          state,
+          output,
+          normalizedQuery,
+          normalizedKey,
+          memory,
+          delta,
+          tokenCount,
+          keyHeadCount,
+          valueHeadCount,
+          keyDimension,
+          valueDimension);
+      return;
+    }
+    GatedDeltaNetRecurrence.forwardPrefixInPlace(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        state,
+        output,
+        normalizedQuery,
+        normalizedKey,
+        memory,
+        delta,
+        tokenCount,
+        keyHeadCount,
+        valueHeadCount,
+        keyDimension,
+        valueDimension);
   }
 
   private static final class SessionState {
@@ -1421,15 +1519,5 @@ public final class Qwen35ForwardPass {
 
   private static float silu(float value) {
     return value * sigmoid(value);
-  }
-
-  private static float softplus(float value) {
-    if (value > 20.0f) {
-      return value;
-    }
-    if (value < -20.0f) {
-      return (float) Math.exp(value);
-    }
-    return (float) Math.log1p(Math.exp(value));
   }
 }

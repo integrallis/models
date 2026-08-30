@@ -152,10 +152,13 @@ final class Qwen35Weights {
                     prefix + "ssm_alpha.weight",
                     config.gdnValueHeads(),
                     config.embeddingDim()),
-                vector(
-                    file,
-                    prefix + "ssm_conv1d.weight",
-                    config.gdnConvDim() * config.gdnConvKernel()),
+                toTapMajorConvolution(
+                    vector(
+                        file,
+                        prefix + "ssm_conv1d.weight",
+                        config.gdnConvDim() * config.gdnConvKernel()),
+                    config.gdnConvDim(),
+                    config.gdnConvKernel()),
                 vector(file, prefix + "ssm_dt.bias", config.gdnValueHeads()),
                 vector(file, prefix + "ssm_a", config.gdnValueHeads()),
                 vector(file, prefix + "ssm_norm.weight", config.gdnHeadDim()),
@@ -291,6 +294,20 @@ final class Qwen35Weights {
       throw new IllegalArgumentException(name + " must be F32, found " + tensor.type());
     }
     return GgufTensorValues.toFloatArray(tensor);
+  }
+
+  static float[] toTapMajorConvolution(float[] channelMajor, int channels, int kernelSize) {
+    Objects.requireNonNull(channelMajor, "channelMajor");
+    if (channels < 1 || kernelSize < 1 || channelMajor.length != channels * kernelSize) {
+      throw new IllegalArgumentException("invalid causal convolution weight shape");
+    }
+    float[] tapMajor = new float[channelMajor.length];
+    for (int channel = 0; channel < channels; channel++) {
+      for (int tap = 0; tap < kernelSize; tap++) {
+        tapMajor[tap * channels + channel] = channelMajor[channel * kernelSize + tap];
+      }
+    }
+    return tapMajor;
   }
 
   private static void requireShape(GgufTensorData tensor, long... expected) {

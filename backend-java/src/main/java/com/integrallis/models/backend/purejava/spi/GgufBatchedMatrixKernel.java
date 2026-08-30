@@ -32,6 +32,28 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
     return Map.of();
   }
 
+  /** Returns whether this kernel can execute the Qwen 3.5 float32 Gated DeltaNet recurrence. */
+  default boolean supportsGatedDeltaNet() {
+    return false;
+  }
+
+  /** Applies a Gated DeltaNet token prefix while retaining caller-owned recurrent state. */
+  default void gatedDeltaNet(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    throw new UnsupportedOperationException("injected kernel does not support Gated DeltaNet");
+  }
+
   /** Returns whether this implementation supports the given GGUF weight format. */
   boolean supports(GgufTensorType type);
 

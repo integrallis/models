@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.qwen35;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
@@ -48,6 +49,82 @@ class Qwen35ForwardPassTest {
   private static final int CONVOLUTION_DIMENSION = 2 * KEY_DIMENSION + VALUE_DIMENSION;
   private static final int HIDDEN_DIMENSION = 8;
   private static final int VOCABULARY_SIZE = 8;
+
+  @Test
+  void transposesChannelMajorConvolutionWeightsForVectorizedExecution() {
+    float[] channelMajor = {
+      1.0f, 2.0f, 3.0f,
+      4.0f, 5.0f, 6.0f,
+      7.0f, 8.0f, 9.0f,
+      10.0f, 11.0f, 12.0f
+    };
+
+    assertThat(Qwen35Weights.toTapMajorConvolution(channelMajor, 4, 3))
+        .containsExactly(1.0f, 4.0f, 7.0f, 10.0f, 2.0f, 5.0f, 8.0f, 11.0f, 3.0f, 6.0f, 9.0f, 12.0f);
+  }
+
+  @Test
+  void attentionHeadKernelMatchesScalarReference() {
+    int positions = 3;
+    int headDimension = 4;
+    int cacheStride = 8;
+    float scale = 0.5f;
+    float[] query = {9.0f, 0.25f, -0.5f, 0.75f, 1.0f, 8.0f};
+    float[] keys = {
+      7, 7, 7, 7, 0.1f, 0.2f, -0.3f, 0.4f,
+      6, 6, 6, 6, -0.5f, 0.6f, 0.7f, -0.8f,
+      5, 5, 5, 5, 0.9f, -1.0f, 1.1f, 1.2f
+    };
+    float[] values = {
+      4, 4, 4, 4, 0.5f, -0.25f, 0.75f, 1.0f,
+      3, 3, 3, 3, -0.4f, 0.3f, 0.2f, -0.1f,
+      2, 2, 2, 2, 1.2f, 0.8f, -0.6f, 0.4f
+    };
+    float[] gate = {6.0f, -1.0f, 0.0f, 1.0f, 2.0f, 5.0f};
+    float[] expectedScores = new float[positions];
+    for (int position = 0; position < positions; position++) {
+      float dot = 0.0f;
+      for (int column = 0; column < headDimension; column++) {
+        dot += query[1 + column] * keys[position * cacheStride + 4 + column];
+      }
+      expectedScores[position] = dot * scale;
+    }
+    TensorOps.softmax(expectedScores, 0, positions);
+    float[] expected = new float[headDimension];
+    for (int column = 0; column < headDimension; column++) {
+      float sum = 0.0f;
+      for (int position = 0; position < positions; position++) {
+        sum += expectedScores[position] * values[position * cacheStride + 4 + column];
+      }
+      float gateValue = gate[1 + column];
+      expected[column] = sum / (1.0f + (float) Math.exp(-gateValue));
+    }
+
+    float[] actual = {99.0f, Float.NaN, Float.NaN, Float.NaN, Float.NaN, 98.0f};
+    Qwen35ForwardPass.attendHead(
+        actual,
+        1,
+        query,
+        1,
+        keys,
+        4,
+        cacheStride,
+        values,
+        4,
+        cacheStride,
+        gate,
+        1,
+        new float[positions],
+        positions,
+        headDimension,
+        scale);
+
+    assertThat(actual[0]).isEqualTo(99.0f);
+    for (int column = 0; column < headDimension; column++) {
+      assertThat(actual[1 + column]).isCloseTo(expected[column], within(2.0e-6f));
+    }
+    assertThat(actual[5]).isEqualTo(98.0f);
+  }
 
   @Test
   void toyHybridGraphPreservesStateAcrossPrefillRewindAndReset(@TempDir Path directory)
@@ -110,12 +187,52 @@ class Qwen35ForwardPassTest {
     Path model = writeToyModel(directory);
 
     AtomicInteger invocations = new AtomicInteger();
+    AtomicInteger gatedDeltaNetInvocations = new AtomicInteger();
     AtomicInteger maximumBatchSize = new AtomicInteger();
     GgufBatchedMatrixKernel kernel =
         new GgufBatchedMatrixKernel() {
           @Override
           public boolean supports(GgufTensorType type) {
             return type == GgufTensorType.F32;
+          }
+
+          @Override
+          public boolean supportsGatedDeltaNet() {
+            return true;
+          }
+
+          @Override
+          public void gatedDeltaNet(
+              float[] query,
+              float[] key,
+              float[] value,
+              float[] logDecay,
+              float[] beta,
+              float[] state,
+              float[] output,
+              int tokenCount,
+              int keyHeadCount,
+              int valueHeadCount,
+              int keyDimension,
+              int valueDimension) {
+            gatedDeltaNetInvocations.incrementAndGet();
+            GatedDeltaNetRecurrence.forwardPrefixInPlace(
+                query,
+                key,
+                value,
+                logDecay,
+                beta,
+                state,
+                output,
+                new float[keyDimension],
+                new float[keyDimension],
+                new float[valueDimension],
+                new float[valueDimension],
+                tokenCount,
+                keyHeadCount,
+                valueHeadCount,
+                keyDimension,
+                valueDimension);
           }
 
           @Override
@@ -145,6 +262,7 @@ class Qwen35ForwardPassTest {
       float[] actual = accelerated.prefill(new int[] {1, 2, 3, 4}, 0);
 
       assertThat(invocations).hasValueGreaterThan(0);
+      assertThat(gatedDeltaNetInvocations).hasValueGreaterThan(0);
       assertThat(maximumBatchSize).hasValueGreaterThanOrEqualTo(1);
       assertThat(actual).containsExactly(expected);
     }

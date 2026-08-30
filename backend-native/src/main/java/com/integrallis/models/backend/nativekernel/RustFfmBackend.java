@@ -41,7 +41,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
   public static final String LOAD_WARMUP_PROPERTY = "models.native.loadWarmup";
-  public static final String PLAN_VERSION = "rust-ffm-v12";
+  public static final String PLAN_VERSION = "rust-ffm-v13";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -203,6 +203,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
     environment.put("native-kernel-threads", Integer.toString(kernel.threadCount()));
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
     environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
+    environment.put("native-gated-delta-net", Boolean.toString(kernel.gatedDeltaNetEnabled()));
     environment.put("native-load-warmup", Boolean.toString(loadWarmup));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
     optimizations.add(
@@ -241,6 +242,28 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
         nativeQuantizedDecision(
             "rust-mixed-k-grouped-matmul",
             "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization"));
+    optimizations.add(
+        new OptimizationDecision(
+            "rust-gated-delta-net",
+            kernel.supportsGatedDeltaNet()
+                ? OptimizationStatus.ENABLED
+                : kernel.gatedDeltaNetEnabled()
+                    ? OptimizationStatus.UNSUPPORTED
+                    : OptimizationStatus.DISABLED,
+            kernel.supportsGatedDeltaNet()
+                ? "Qwen 3.5 recurrence executes on one AVX2/FMA caller thread without waking matrix workers"
+                : kernel.gatedDeltaNetEnabled()
+                    ? "loaded native kernel has no Gated DeltaNet recurrence"
+                    : "disabled by " + RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+            Map.of(
+                "abi",
+                Integer.toString(NativeKernelLibrary.ABI_VERSION),
+                "boundary",
+                "panama-ffm-critical",
+                "property",
+                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+                "state",
+                "caller-owned-java-array")));
     optimizations.add(
         new OptimizationDecision(
             "rust-q5-0-grouped-matmul",

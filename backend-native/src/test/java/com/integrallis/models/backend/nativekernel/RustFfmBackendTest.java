@@ -39,7 +39,7 @@ class RustFfmBackendTest {
 
   @Test
   void versionsAutomaticNativeProfileSelection() {
-    assertThat(RustFfmBackend.PLAN_VERSION).isEqualTo("rust-ffm-v12");
+    assertThat(RustFfmBackend.PLAN_VERSION).isEqualTo("rust-ffm-v13");
   }
 
   @Test
@@ -50,6 +50,8 @@ class RustFfmBackendTest {
                 RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
                 "true",
                 RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
+                "true",
+                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
                 "true",
                 RustFfmBackend.LOAD_WARMUP_PROPERTY,
                 "true",
@@ -62,6 +64,7 @@ class RustFfmBackendTest {
 
     assertThat(settings.nativeDecode()).isTrue();
     assertThat(settings.q5_0Grouped()).isTrue();
+    assertThat(settings.gatedDeltaNet()).isTrue();
     assertThat(settings.loadWarmup()).isTrue();
     assertThat(settings.threadCount()).isEqualTo(4);
   }
@@ -75,6 +78,8 @@ class RustFfmBackendTest {
                 "true",
                 RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
                 "true",
+                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+                "true",
                 RustFfmBackend.LOAD_WARMUP_PROPERTY,
                 "true",
                 NativeKernelLibrary.THREAD_COUNT_PROPERTY,
@@ -84,6 +89,8 @@ class RustFfmBackendTest {
                 "false",
                 RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
                 "false",
+                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+                "false",
                 RustFfmBackend.LOAD_WARMUP_PROPERTY,
                 "false",
                 NativeKernelLibrary.THREAD_COUNT_PROPERTY,
@@ -92,6 +99,7 @@ class RustFfmBackendTest {
 
     assertThat(settings.nativeDecode()).isFalse();
     assertThat(settings.q5_0Grouped()).isFalse();
+    assertThat(settings.gatedDeltaNet()).isFalse();
     assertThat(settings.loadWarmup()).isFalse();
     assertThat(settings.threadCount()).isEqualTo(8);
   }
@@ -181,6 +189,7 @@ class RustFfmBackendTest {
     when(kernel.threadCount()).thenReturn(4);
     when(kernel.nativeDecodeEnabled()).thenReturn(true);
     when(kernel.q5_0GroupedEnabled()).thenReturn(true);
+    when(kernel.supportsGatedDeltaNet()).thenReturn(true);
     BackendDiagnostics javaDiagnostics =
         new BackendDiagnostics("pure-java", "java-plan", Map.of("model", "nano"), List.of());
 
@@ -203,6 +212,9 @@ class RustFfmBackendTest {
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(diagnostics.optimization("rust-q6-k-batched-matmul"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(diagnostics.optimization("rust-gated-delta-net"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
   }
