@@ -23,7 +23,6 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.GatedDeltaNe
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Layer;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
-import java.util.Arrays;
 import java.util.Objects;
 
 /** Stateful scalar/Vector-API compatibility graph for dense Qwen3.5. */
@@ -316,10 +315,11 @@ public final class Qwen35ForwardPass {
     int valueDimension = config.gdnValueDim();
     int heads = config.gdnValueHeads();
     int headDimension = config.gdnHeadDim();
-    float[] mixed = new float[convDimension];
-    float[] outputGate = new float[valueDimension];
-    float[] beta = new float[heads];
-    float[] alpha = new float[heads];
+    GatedDeltaNetScratch workspace = session.gatedDeltaNetScratch;
+    float[] mixed = workspace.mixed;
+    float[] outputGate = workspace.outputGate;
+    float[] beta = workspace.beta;
+    float[] alpha = workspace.alpha;
     project(mixed, input, weights.queryKeyValue(), session.scratch);
     project(outputGate, input, weights.outputGate(), session.scratch);
     dualProject(beta, weights.beta(), alpha, weights.alpha(), input, session.scratch);
@@ -340,30 +340,34 @@ public final class Qwen35ForwardPass {
       history[historyOffset + historyLength - 1] = mixed[channel];
       mixed[channel] = silu(convolved);
     }
-    float[] query = Arrays.copyOfRange(mixed, 0, keyDimension);
-    float[] key = Arrays.copyOfRange(mixed, keyDimension, 2 * keyDimension);
-    float[] value = Arrays.copyOfRange(mixed, 2 * keyDimension, convDimension);
-    float[] logDecay = new float[heads];
+    float[] query = workspace.query;
+    float[] key = workspace.key;
+    float[] value = workspace.value;
+    System.arraycopy(mixed, 0, query, 0, keyDimension);
+    System.arraycopy(mixed, keyDimension, key, 0, keyDimension);
+    System.arraycopy(mixed, 2 * keyDimension, value, 0, valueDimension);
+    float[] logDecay = workspace.logDecay;
     for (int head = 0; head < heads; head++) {
       beta[head] = sigmoid(beta[head]);
       logDecay[head] = weights.decay()[head] * softplus(alpha[head] + weights.timeStepBias()[head]);
     }
 
-    GatedDeltaNetRecurrence.Result recurrentResult =
-        GatedDeltaNetRecurrence.forwardInPlace(
-            query,
-            key,
-            value,
-            logDecay,
-            beta,
-            session.recurrentState[layer],
-            1,
-            config.gdnKeyHeads(),
-            heads,
-            headDimension,
-            headDimension);
-    session.recurrentState[layer] = recurrentResult.finalState();
-    float[] recurrent = recurrentResult.output();
+    float[] recurrent = workspace.recurrent;
+    GatedDeltaNetRecurrence.forwardInPlace(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        session.recurrentState[layer],
+        recurrent,
+        workspace.normalizedQuery,
+        workspace.normalizedKey,
+        1,
+        config.gdnKeyHeads(),
+        heads,
+        headDimension,
+        headDimension);
     for (int head = 0; head < heads; head++) {
       int offset = head * headDimension;
       TensorOps.rmsNorm(
@@ -387,6 +391,7 @@ public final class Qwen35ForwardPass {
     private final float[][] convolutionHistory;
     private final float[][] recurrentState;
     private final ProjectionScratch scratch;
+    private final GatedDeltaNetScratch gatedDeltaNetScratch;
 
     private SessionState(Qwen35Config config, int capacity) {
       keys = new float[config.numLayers()][];
@@ -394,6 +399,7 @@ public final class Qwen35ForwardPass {
       convolutionHistory = new float[config.numLayers()][];
       recurrentState = new float[config.numLayers()][];
       scratch = new ProjectionScratch(config);
+      gatedDeltaNetScratch = new GatedDeltaNetScratch(config);
       for (int layer = 0; layer < config.numLayers(); layer++) {
         if (config.usesFullAttention(layer)) {
           keys[layer] = new float[Math.multiplyExact(capacity, config.attentionKeyDim())];
@@ -408,6 +414,34 @@ public final class Qwen35ForwardPass {
                       config.gdnHeadDim())];
         }
       }
+    }
+  }
+
+  private static final class GatedDeltaNetScratch {
+    private final float[] mixed;
+    private final float[] outputGate;
+    private final float[] beta;
+    private final float[] alpha;
+    private final float[] query;
+    private final float[] key;
+    private final float[] value;
+    private final float[] logDecay;
+    private final float[] recurrent;
+    private final float[] normalizedQuery;
+    private final float[] normalizedKey;
+
+    private GatedDeltaNetScratch(Qwen35Config config) {
+      mixed = new float[config.gdnConvDim()];
+      outputGate = new float[config.gdnValueDim()];
+      beta = new float[config.gdnValueHeads()];
+      alpha = new float[config.gdnValueHeads()];
+      query = new float[config.gdnKeyDim()];
+      key = new float[config.gdnKeyDim()];
+      value = new float[config.gdnValueDim()];
+      logDecay = new float[config.gdnValueHeads()];
+      recurrent = new float[config.gdnValueDim()];
+      normalizedQuery = new float[config.gdnHeadDim()];
+      normalizedKey = new float[config.gdnHeadDim()];
     }
   }
 

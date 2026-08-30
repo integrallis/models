@@ -59,7 +59,10 @@ final class GatedDeltaNetRecurrence {
         headCount,
         keyDimension,
         valueDimension,
-        false);
+        false,
+        null,
+        null,
+        null);
   }
 
   /** Applies the recurrence while expanding grouped query/key heads to value heads in place. */
@@ -87,7 +90,10 @@ final class GatedDeltaNetRecurrence {
         valueHeadCount,
         keyDimension,
         valueDimension,
-        false);
+        false,
+        null,
+        null,
+        null);
   }
 
   /** Applies the same recurrence while mutating and retaining a caller-owned state array. */
@@ -115,7 +121,10 @@ final class GatedDeltaNetRecurrence {
         headCount,
         keyDimension,
         valueDimension,
-        true);
+        true,
+        null,
+        null,
+        null);
   }
 
   /** Applies grouped query/key recurrence while retaining a caller-owned state array. */
@@ -144,7 +153,45 @@ final class GatedDeltaNetRecurrence {
         valueHeadCount,
         keyDimension,
         valueDimension,
-        true);
+        true,
+        null,
+        null,
+        null);
+  }
+
+  /** Applies grouped recurrence into caller-owned state and workspace arrays. */
+  static void forwardInPlace(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] mutableState,
+      float[] output,
+      float[] normalizedQuery,
+      float[] normalizedKey,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    Objects.requireNonNull(mutableState, "mutableState");
+    execute(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        mutableState,
+        tokenCount,
+        keyHeadCount,
+        valueHeadCount,
+        keyDimension,
+        valueDimension,
+        true,
+        Objects.requireNonNull(output, "output"),
+        Objects.requireNonNull(normalizedQuery, "normalizedQuery"),
+        Objects.requireNonNull(normalizedKey, "normalizedKey"));
   }
 
   private static Result execute(
@@ -159,7 +206,10 @@ final class GatedDeltaNetRecurrence {
       int valueHeadCount,
       int keyDimension,
       int valueDimension,
-      boolean mutateState) {
+      boolean mutateState,
+      float[] outputWorkspace,
+      float[] normalizedQueryWorkspace,
+      float[] normalizedKeyWorkspace) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(key, "key");
     Objects.requireNonNull(value, "value");
@@ -193,9 +243,9 @@ final class GatedDeltaNetRecurrence {
         mutateState
             ? initialState
             : initialState == null ? new float[stateSize] : initialState.clone();
-    float[] output = new float[valueSize];
-    float[] normalizedQuery = new float[keyDimension];
-    float[] normalizedKey = new float[keyDimension];
+    float[] output = workspace(outputWorkspace, valueSize, "output");
+    float[] normalizedQuery = workspace(normalizedQueryWorkspace, keyDimension, "normalizedQuery");
+    float[] normalizedKey = workspace(normalizedKeyWorkspace, keyDimension, "normalizedKey");
     float queryScale = (float) (1.0 / Math.sqrt(keyDimension));
     for (int token = 0; token < tokenCount; token++) {
       for (int head = 0; head < valueHeadCount; head++) {
@@ -261,5 +311,13 @@ final class GatedDeltaNetRecurrence {
       throw new IllegalArgumentException(
           name + " length must be " + expected + ": " + values.length);
     }
+  }
+
+  private static float[] workspace(float[] values, int expected, String name) {
+    if (values == null) {
+      return new float[expected];
+    }
+    requireLength(values, expected, name);
+    return values;
   }
 }

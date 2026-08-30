@@ -167,6 +167,33 @@ class GatedDeltaNetRecurrenceTest {
   }
 
   @Test
+  void callerOwnedWorkspaceMatchesTheReferenceWithoutAllocatingAnOutput() {
+    float[] mutableState = INITIAL_STATE.clone();
+    float[] output = new float[EXPECTED_OUTPUT.length];
+    float[] normalizedQuery = new float[KEY_DIM];
+    float[] normalizedKey = new float[KEY_DIM];
+
+    GatedDeltaNetRecurrence.forwardInPlace(
+        QUERY,
+        KEY,
+        VALUE,
+        LOG_DECAY,
+        BETA,
+        mutableState,
+        output,
+        normalizedQuery,
+        normalizedKey,
+        TOKENS,
+        HEADS,
+        HEADS,
+        KEY_DIM,
+        VALUE_DIM);
+
+    assertThat(output).containsExactly(EXPECTED_OUTPUT, within(2.0e-6f));
+    assertThat(mutableState).containsExactly(EXPECTED_FINAL_STATE, within(2.0e-6f));
+  }
+
+  @Test
   void usesTheTiledGgufHeadOrderForGroupedQueryAndKeyHeads() {
     float[] query = {1.0f, 0.0f, 1.0f, 0.0f};
     float[] key = {1.0f, 0.0f, 0.0f, 1.0f};
