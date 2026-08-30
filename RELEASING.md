@@ -23,9 +23,10 @@ published.
 API numeric kernels. The release workflow builds and tests the Models-owned
 Rust kernels on every supported native platform and compiles the Apple
 Foundation Models bridge on macOS before staging the signed Maven artifacts.
-`backend-tornado` is an optional JVM artifact; its release gate additionally
-executes the public loader and exact CPU/GPU output parity on the qualified
-NVIDIA hardware profiles.
+`backend-tornado` is an optional JVM artifact. The hosted release workflow verifies its Java
+fallback and publication shape. Before release, run the public loader and exact CPU/GPU output
+parity gate on each qualified NVIDIA hardware profile and retain the measurements under
+`models-accelerator-bench/results/`.
 
 The workflow uses the same Maven Central and GPG secrets as `mfcqi-java`:
 `MAVENCENTRAL_USERNAME`, `MAVENCENTRAL_PASSWORD`, `GPG_PUBLIC_KEY`,
