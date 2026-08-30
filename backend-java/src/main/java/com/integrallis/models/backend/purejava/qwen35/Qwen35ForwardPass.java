@@ -29,6 +29,7 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -56,6 +57,33 @@ public final class Qwen35ForwardPass {
 
     public int checkpoint() {
       return checkpoint;
+    }
+  }
+
+  /** Immutable copy of one session's convolution and recurrent state at a retained prefix. */
+  static final class LinearStateSnapshot {
+    private final Session session;
+    private final int checkpoint;
+    private final int[] tokenPrefix;
+    private final float[][] convolutionHistory;
+    private final float[][] recurrentState;
+    private final long bytes;
+
+    private LinearStateSnapshot(Session session) {
+      this.session = session;
+      this.checkpoint = session.checkpoint;
+      this.tokenPrefix = Arrays.copyOf(session.tokenHistory, checkpoint);
+      this.convolutionHistory = copyLinearState(session.state.convolutionHistory);
+      this.recurrentState = copyLinearState(session.state.recurrentState);
+      this.bytes = linearStateBytes(convolutionHistory) + linearStateBytes(recurrentState);
+    }
+
+    int checkpoint() {
+      return checkpoint;
+    }
+
+    long bytes() {
+      return bytes;
     }
   }
 
@@ -239,6 +267,29 @@ public final class Qwen35ForwardPass {
     checked.checkpoint = 0;
   }
 
+  /** Captures the Gated DeltaNet state needed to resume this session's retained token prefix. */
+  LinearStateSnapshot captureLinearState(Session session) {
+    return new LinearStateSnapshot(requireSession(session));
+  }
+
+  /** Restores a snapshot without replaying its retained prefix. */
+  void restoreLinearState(Session session, LinearStateSnapshot snapshot) {
+    Session checked = requireSession(session);
+    Objects.requireNonNull(snapshot, "snapshot");
+    if (snapshot.session != checked) {
+      throw new IllegalArgumentException(
+          "linear state snapshot must be restored to the same session");
+    }
+    if (checked.checkpoint < snapshot.checkpoint
+        || !prefixMatches(checked.tokenHistory, snapshot.tokenPrefix)) {
+      throw new IllegalStateException(
+          "session token prefix no longer matches the linear state snapshot");
+    }
+    copyLinearState(snapshot.convolutionHistory, checked.state.convolutionHistory);
+    copyLinearState(snapshot.recurrentState, checked.state.recurrentState);
+    checked.checkpoint = snapshot.checkpoint;
+  }
+
   public Qwen35Config config() {
     return config;
   }
@@ -298,6 +349,41 @@ public final class Qwen35ForwardPass {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + session.checkpoint + ", got " + position);
     }
+  }
+
+  private static boolean prefixMatches(int[] tokens, int[] expectedPrefix) {
+    for (int index = 0; index < expectedPrefix.length; index++) {
+      if (tokens[index] != expectedPrefix[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static float[][] copyLinearState(float[][] source) {
+    float[][] copy = new float[source.length][];
+    for (int layer = 0; layer < source.length; layer++) {
+      copy[layer] = source[layer] == null ? null : source[layer].clone();
+    }
+    return copy;
+  }
+
+  private static void copyLinearState(float[][] source, float[][] destination) {
+    for (int layer = 0; layer < source.length; layer++) {
+      if (source[layer] != null) {
+        System.arraycopy(source[layer], 0, destination[layer], 0, source[layer].length);
+      }
+    }
+  }
+
+  private static long linearStateBytes(float[][] state) {
+    long bytes = 0L;
+    for (float[] layer : state) {
+      if (layer != null) {
+        bytes = Math.addExact(bytes, Math.multiplyExact((long) layer.length, Float.BYTES));
+      }
+    }
+    return bytes;
   }
 
   private float[] forwardToken(int token, int position, SessionState session) {

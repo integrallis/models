@@ -100,6 +100,51 @@ class Qwen35ForwardPassTest {
   }
 
   @Test
+  void linearStateSnapshotRestoresContinuationWithoutReplayAndReportsBytes(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(GgufParser.parse(model, arena));
+      Qwen35ForwardPass.Session session = graph.openSession(6);
+      graph.prefill(session, new int[] {1, 2}, 0);
+
+      Qwen35ForwardPass.LinearStateSnapshot snapshot = graph.captureLinearState(session);
+      float[] expected = graph.prefill(session, new int[] {3, 4}, 2);
+
+      graph.restoreLinearState(session, snapshot);
+
+      assertThat(snapshot.checkpoint()).isEqualTo(2);
+      assertThat(snapshot.bytes()).isEqualTo(256L);
+      assertThat(session.checkpoint()).isEqualTo(2);
+      assertThat(graph.prefill(session, new int[] {3, 4}, 2)).containsExactly(expected);
+    }
+  }
+
+  @Test
+  void linearStateSnapshotIsBoundToItsSessionAndRetainedPrefix(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(GgufParser.parse(model, arena));
+      Qwen35ForwardPass.Session original = graph.openSession(4);
+      graph.prefill(original, new int[] {1, 2}, 0);
+      Qwen35ForwardPass.LinearStateSnapshot snapshot = graph.captureLinearState(original);
+
+      assertThatThrownBy(() -> graph.restoreLinearState(graph.openSession(4), snapshot))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("same session");
+
+      graph.rewind(original, 1);
+      graph.forward(original, 3, 1);
+      assertThatThrownBy(() -> graph.restoreLinearState(original, snapshot))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("prefix");
+    }
+  }
+
+  @Test
   void sessionsEnforceOwnershipPositionAndCapacity(@TempDir Path directory) throws Exception {
     Path model = writeToyModel(directory);
 

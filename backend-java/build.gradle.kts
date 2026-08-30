@@ -233,6 +233,23 @@ tasks.register<Test>("qwen35GroupedGdnCompatibilityTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<JavaExec>("qwen35LinearStateSnapshotExperiment") {
+    description = "Compare Qwen3.5 prefix replay with bounded Java linear-state snapshot restore"
+    group = "verification"
+    dependsOn(tasks.named(qwen35GgufFixture.taskName))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set(
+        "com.integrallis.models.backend.purejava.qwen35.Qwen35LinearStateSnapshotExperiment",
+    )
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+    args(
+        providers.gradleProperty("qwen35.snapshot.prefixTokens").getOrElse("32"),
+        providers.gradleProperty("qwen35.snapshot.warmups").getOrElse("1"),
+        providers.gradleProperty("qwen35.snapshot.iterations").getOrElse("5"),
+    )
+    maxHeapSize = "4g"
+}
+
 tasks.register<Test>("needle2CactCompatibilityTest") {
     description = "Verify the pinned official Needle 2 .cact artifact and tokenizer"
     group = "verification"
