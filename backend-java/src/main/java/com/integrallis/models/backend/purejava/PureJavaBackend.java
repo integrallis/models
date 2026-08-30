@@ -631,7 +631,7 @@ public final class PureJavaBackend
       PureJavaPlanConfiguration planConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
     Qwen35Config config = Qwen35Config.fromMetadata(file.metadata());
-    Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file);
+    Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file, batchedMatrixKernel);
     PureJavaExecutionPlan executionPlan =
         ExecutionPlanner.plan(runtime, graph.topology(), planConfiguration, batchedMatrixKernel);
     int contextCapacity = runtimeContextLength(config.contextLength());
