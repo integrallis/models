@@ -2,6 +2,18 @@
 
 All notable changes to models are documented here.
 
+## [0.3.17] - 2026-08-29
+
+### Changed
+
+- Added execution-planned, batched prefill for dense Qwen3.5 GGUF models while preserving exact
+  session, rewind, continuation, and pinned llama.cpp token results.
+- Reworked Gated DeltaNet recurrence over contiguous Vector API row operations and kept all
+  recurrence workspaces session-owned across prefill and decode.
+- Planned Qwen3.5 from its loaded tensor topology, including auxiliary Gated DeltaNet projections,
+  rather than assuming a Llama-shaped mapped graph.
+- Updated to Vectors 0.1.15 for the exact Q5_K two-query tail optimization.
+
 ## [0.3.16] - 2026-08-29
 
 ### Added
