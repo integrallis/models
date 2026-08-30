@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.safetensors.SyntheticSafetensorsBuilder;
 import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
@@ -84,6 +85,60 @@ class GptOssForwardPassTest {
 
     assertThat(first.checkpoint()).isZero();
     assertThat(forwardPass.forward(first, 0, 0)).containsExactly(firstInitial);
+  }
+
+  @Test
+  void advancesPromptTokensWithoutLogitsAndRewindsForPrefixReuse(@TempDir Path directory)
+      throws IOException {
+    GptOssHuggingFaceConfig config = config();
+    GptOssForwardPass forwardPass =
+        new GptOssForwardPass(config, GptOssWeights.load(source(directory), config), 8);
+    GptOssForwardPass.Session session = forwardPass.openSession();
+    GptOssForwardPass.Session reference = forwardPass.openSession();
+
+    forwardPass.advance(session, 0, 0);
+    float[] continuation = forwardPass.forward(session, 1, 1);
+    forwardPass.advance(reference, 0, 0);
+    assertThat(continuation).containsExactly(forwardPass.forward(reference, 1, 1));
+
+    forwardPass.advance(session, 2, 2);
+    float[] original = forwardPass.forward(session, 3, 3);
+    forwardPass.rewind(session, 2);
+
+    assertThat(session.checkpoint()).isEqualTo(2);
+    forwardPass.advance(session, 2, 2);
+    assertThat(forwardPass.forward(session, 3, 3)).containsExactly(original);
+  }
+
+  @Test
+  void loadsACompleteGptOssDirectoryThroughThePublicBackend(@TempDir Path directory)
+      throws IOException {
+    source(directory);
+    writeConfig(directory);
+    writeTokenizer(directory);
+
+    try (PureJavaBackend backend = PureJavaBackend.load(directory)) {
+      assertThat(backend.metadata().modelFamily()).isEqualTo("gpt-oss");
+      assertThat(backend.metadata().vocabSize()).isEqualTo(VOCAB);
+      assertThat(backend.diagnostics().environment())
+          .containsEntry("artifact-format", "safetensors")
+          .containsEntry("weight-encoding", "mxfp4");
+      assertThat(backend.forward(0, 0)).containsExactly(referenceFirstToken(), within(1.0e-6f));
+
+      backend.reset();
+      float[] prefill = backend.prefill(new int[] {0, 1}, 0);
+      backend.reset();
+      backend.forward(0, 0);
+      assertThat(prefill).containsExactly(backend.forward(1, 1));
+
+      try (var first = backend.openSession();
+          var second = backend.openSession()) {
+        assertThat(backend.forward(first, 0, 0)).containsExactly(backend.forward(second, 0, 0));
+        backend.forward(first, 1, 1);
+        backend.rewind(first, 1);
+        assertThat(first.checkpoint()).isEqualTo(1);
+      }
+    }
   }
 
   private static float[] referenceFirstToken() {
@@ -250,6 +305,96 @@ class GptOssForwardPassTest {
                 bf16(expertDownBias()));
     Path artifact = Files.write(directory.resolve("model.safetensors"), builder.build());
     return new SafetensorsTensorSource(SafetensorsBundle.open(artifact, Arena.global()));
+  }
+
+  private static void writeConfig(Path directory) throws IOException {
+    Files.writeString(
+        directory.resolve("config.json"),
+        """
+        {
+          "architectures":["GptOssForCausalLM"],
+          "attention_bias":true,
+          "eos_token_id":2,
+          "head_dim":32,
+          "hidden_act":"silu",
+          "hidden_act_alpha":1.702,
+          "hidden_size":32,
+          "initial_context_length":4,
+          "intermediate_size":32,
+          "layer_types":["sliding_attention"],
+          "max_position_embeddings":8,
+          "model_type":"gpt_oss",
+          "num_attention_heads":2,
+          "num_experts_per_tok":1,
+          "num_hidden_layers":1,
+          "num_key_value_heads":1,
+          "num_local_experts":1,
+          "pad_token_id":0,
+          "quantization_config":{"quant_method":"mxfp4"},
+          "rms_norm_eps":0.00001,
+          "rope_scaling":{
+            "beta_fast":32.0,
+            "beta_slow":1.0,
+            "factor":2.0,
+            "original_max_position_embeddings":4,
+            "rope_type":"yarn",
+            "truncate":false
+          },
+          "rope_theta":10000.0,
+          "sliding_window":2,
+          "swiglu_limit":7.0,
+          "tie_word_embeddings":false,
+          "vocab_size":4
+        }
+        """);
+  }
+
+  private static void writeTokenizer(Path directory) throws IOException {
+    String pattern =
+        "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]*"
+            + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?|"
+            + "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]+"
+            + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|"
+            + "\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*|\\s*[\\r\\n]+|"
+            + "\\s+(?!\\S)|\\s+";
+    Files.writeString(
+        directory.resolve("tokenizer.json"),
+        """
+        {
+          "version":"1.0",
+          "normalizer":null,
+          "pre_tokenizer":{
+            "type":"Sequence",
+            "pretokenizers":[
+              {
+                "type":"Split",
+                "pattern":{"Regex":"%s"},
+                "behavior":"Isolated",
+                "invert":false
+              },
+              {
+                "type":"ByteLevel",
+                "add_prefix_space":false,
+                "trim_offsets":true,
+                "use_regex":false
+              }
+            ]
+          },
+          "decoder":{"type":"ByteLevel"},
+          "model":{"type":"BPE","unk_token":null,"vocab":{"a":0},"merges":[]},
+          "added_tokens":[
+            {"id":1,"content":"<|startoftext|>","special":true},
+            {"id":2,"content":"<|return|>","special":true},
+            {"id":3,"content":"<|call|>","special":true}
+          ]
+        }
+        """
+            .formatted(pattern.replace("\\", "\\\\")));
+    Files.writeString(
+        directory.resolve("tokenizer_config.json"),
+        """
+        {"bos_token":"<|startoftext|>","eos_token":"<|return|>"}
+        """);
   }
 
   private static float[] embeddingMatrix() {

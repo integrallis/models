@@ -176,6 +176,26 @@ public record GptOssHuggingFaceConfig(
     return fields.toConfig();
   }
 
+  /** Returns whether a Hugging Face configuration declares the GPT-OSS model type. */
+  public static boolean matches(Path path) throws IOException {
+    Objects.requireNonNull(path, "path");
+    try (JsonParser parser = JSON.createParser(path.toFile())) {
+      require(parser.nextToken(), JsonToken.START_OBJECT, "config root");
+      while (parser.nextToken() != JsonToken.END_OBJECT) {
+        require(parser.currentToken(), JsonToken.FIELD_NAME, "config field");
+        String name = parser.currentName();
+        JsonToken value = parser.nextToken();
+        if ("model_type".equals(name)) {
+          return "gpt_oss".equals(readString(parser, value, name));
+        }
+        parser.skipChildren();
+      }
+      return false;
+    } catch (StreamReadException malformed) {
+      throw malformed("invalid or duplicate config JSON: " + malformed.getMessage(), malformed);
+    }
+  }
+
   public int queryDimension() {
     return Math.multiplyExact(numHeads, headDim);
   }

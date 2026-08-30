@@ -43,6 +43,7 @@ class GptOssHuggingFaceConfigTest {
     // openai/gpt-oss-20b at revision 6cee5e81ee83917806bbde320786a8fb61efebee.
     assertThat(sha256(path))
         .isEqualTo("3a2a26ded679375b7928ddeca59764df7cea83220c1961035f6d6e232659e9ce");
+    assertThat(GptOssHuggingFaceConfig.matches(path)).isTrue();
     GptOssHuggingFaceConfig config = GptOssHuggingFaceConfig.parse(path);
 
     assertThat(config.architectures()).containsExactly("GptOssForCausalLM");
@@ -74,6 +75,14 @@ class GptOssHuggingFaceConfigTest {
     assertThat(config.usesSlidingAttention(1)).isFalse();
     assertThat(config.attentionStartPosition(0, 300)).isEqualTo(173);
     assertThat(config.attentionStartPosition(1, 300)).isZero();
+  }
+
+  @Test
+  void doesNotClaimAnotherHuggingFaceArchitecture(@TempDir Path directory) throws IOException {
+    Path path = directory.resolve("config.json");
+    Files.writeString(path, "{\"model_type\":\"qwen2\"}");
+
+    assertThat(GptOssHuggingFaceConfig.matches(path)).isFalse();
   }
 
   @Test

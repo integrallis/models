@@ -38,6 +38,8 @@ import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.gptoss.GptOssForwardPass;
+import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import com.integrallis.models.backend.purejava.internal.ModelMemoryArena;
 import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
@@ -289,22 +291,39 @@ public final class PureJavaBackend
       Tokenizer tokenizer;
       Arena arena = arenaOwner.arena();
       if (Files.isDirectory(modelPath)) {
-        Qwen2HuggingFaceConfig config =
-            Qwen2HuggingFaceConfig.parse(modelPath.resolve("config.json"));
-        tokenizer =
-            HuggingFaceTokenizer.fromQwen2(
-                modelPath.resolve("tokenizer.json"),
-                modelPath.resolve("tokenizer_config.json"),
-                config);
-        loaded =
-            loadHuggingFaceQwen2(
-                modelPath,
-                config,
-                new SafetensorsTensorSource(SafetensorsBundle.open(modelPath, arena)),
-                runtime,
-                planConfiguration,
-                batchedMatrixKernel,
-                batchedAttentionKernel);
+        Path configPath = modelPath.resolve("config.json");
+        if (GptOssHuggingFaceConfig.matches(configPath)) {
+          GptOssHuggingFaceConfig config = GptOssHuggingFaceConfig.parse(configPath);
+          tokenizer =
+              HuggingFaceTokenizer.fromGptOss(
+                  modelPath.resolve("tokenizer.json"),
+                  modelPath.resolve("tokenizer_config.json"),
+                  config);
+          loaded =
+              loadHuggingFaceGptOss(
+                  modelPath,
+                  config,
+                  new SafetensorsTensorSource(SafetensorsBundle.open(modelPath, arena)),
+                  runtime,
+                  planConfiguration,
+                  batchedMatrixKernel);
+        } else {
+          Qwen2HuggingFaceConfig config = Qwen2HuggingFaceConfig.parse(configPath);
+          tokenizer =
+              HuggingFaceTokenizer.fromQwen2(
+                  modelPath.resolve("tokenizer.json"),
+                  modelPath.resolve("tokenizer_config.json"),
+                  config);
+          loaded =
+              loadHuggingFaceQwen2(
+                  modelPath,
+                  config,
+                  new SafetensorsTensorSource(SafetensorsBundle.open(modelPath, arena)),
+                  runtime,
+                  planConfiguration,
+                  batchedMatrixKernel,
+                  batchedAttentionKernel);
+        }
       } else if (CactParser.matches(modelPath)) {
         CactFile file = CactParser.parse(modelPath, arena);
         CactNeedle2Layout layout = CactNeedle2Layout.from(file);
@@ -442,6 +461,41 @@ public final class PureJavaBackend
             config.contextLength(),
             config.vocabSize(),
             config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadHuggingFaceGptOss(
+      Path modelPath,
+      GptOssHuggingFaceConfig config,
+      SafetensorsTensorSource tensors,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    String modelFamily = "gpt-oss";
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                modelFamily,
+                config.queryDimension(),
+                config.keyValueDimension(),
+                config.keyValueDimension(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.maxPosition());
+    PureJavaDecoder decoder =
+        new GptOssDecoderAdapter(GptOssForwardPass.load(config, tensors, contextCapacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            modelFamily,
+            modelPath.getFileName().toString(),
+            config.maxPosition(),
+            config.vocabSize(),
+            config.hiddenSize(),
             config.numLayers(),
             config.numHeads(),
             config.numKvHeads());
@@ -882,6 +936,20 @@ public final class PureJavaBackend
 
   private static BackendDiagnostics architectureDiagnostics(
       BackendDiagnostics diagnostics, PureJavaDecoder decoder) {
+    if (decoder instanceof GptOssDecoderAdapter) {
+      Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
+      environment.put("artifact-format", "safetensors");
+      environment.put("weight-encoding", "mxfp4");
+      List<OptimizationDecision> optimizations = new ArrayList<>(diagnostics.optimizations());
+      optimizations.add(
+          new OptimizationDecision(
+              "gpt-oss-mxfp4",
+              OptimizationStatus.ENABLED,
+              "MXFP4 routed experts execute directly from the mapped artifact",
+              Map.of("implementation", "java-vector-api")));
+      return new BackendDiagnostics(
+          diagnostics.backend(), diagnostics.planVersion(), environment, optimizations);
+    }
     if (decoder instanceof Needle2DecoderAdapter needle2) {
       CactHeader header = needle2.header();
       Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());

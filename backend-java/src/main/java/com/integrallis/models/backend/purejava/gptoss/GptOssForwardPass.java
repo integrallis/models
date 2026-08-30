@@ -21,16 +21,17 @@ import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionVie
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.LayerSpec;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.tensor.TensorSource;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 import java.util.Objects;
 
 /** Complete single-token Java decoder pass over mapped GPT-OSS Safetensors weights. */
-final class GptOssForwardPass {
+public final class GptOssForwardPass {
 
   /** Mutable sequence state; sessions share immutable mapped weights and are otherwise isolated. */
-  static final class Session {
+  public static final class Session {
     private final GptOssForwardPass owner;
     private final LayeredKvCache cache;
     private final RotaryTable rope;
@@ -48,6 +49,7 @@ final class GptOssForwardPass {
     private final float[] routingWeights;
     private final float[] moeOutput;
     private final float[] logits;
+    private final int[] tokenHistory;
     private int nextPosition;
 
     private Session(GptOssForwardPass owner) {
@@ -82,10 +84,11 @@ final class GptOssForwardPass {
       routingWeights = new float[config.expertsPerToken()];
       moeOutput = new float[config.hiddenSize()];
       logits = new float[config.vocabSize()];
+      tokenHistory = new int[owner.maxSequenceLength];
     }
 
     /** Returns the next absolute sequence position accepted by this session. */
-    int checkpoint() {
+    public int checkpoint() {
       return nextPosition;
     }
   }
@@ -156,18 +159,40 @@ final class GptOssForwardPass {
     }
   }
 
+  /** Loads a complete GPT-OSS decoder graph from a mapped Safetensors source. */
+  public static GptOssForwardPass load(
+      GptOssHuggingFaceConfig config, TensorSource source, int maxSequenceLength) {
+    Objects.requireNonNull(config, "config");
+    return new GptOssForwardPass(config, GptOssWeights.load(source, config), maxSequenceLength);
+  }
+
+  /** Returns the validated checkpoint execution configuration. */
+  public GptOssHuggingFaceConfig config() {
+    return config;
+  }
+
   /** Opens an independent sequence over the same mapped model weights. */
-  Session openSession() {
+  public Session openSession() {
     return new Session(this);
   }
 
   /** Runs one sequential token and returns stable vocabulary logits. */
-  float[] forward(Session session, int token, int position) {
+  public float[] forward(Session session, int token, int position) {
     return forwardTransient(session, token, position).clone();
   }
 
   /** Runs one sequential token using session-owned logits storage. */
-  float[] forwardTransient(Session session, int token, int position) {
+  public float[] forwardTransient(Session session, int token, int position) {
+    execute(session, token, position, true);
+    return session.logits;
+  }
+
+  /** Advances a prompt token without paying for a vocabulary projection that will be discarded. */
+  public void advance(Session session, int token, int position) {
+    execute(session, token, position, false);
+  }
+
+  private void execute(Session session, int token, int position, boolean projectLogits) {
     requireSession(session);
     if (position != session.nextPosition) {
       throw new IllegalArgumentException(
@@ -182,15 +207,52 @@ final class GptOssForwardPass {
     for (int layer = 0; layer < layers.length; layer++) {
       executeLayer(session, layer, position);
     }
-    TensorOps.rmsNorm(
-        session.xNorm, session.x, outputNorm, config.hiddenSize(), config.rmsNormEps());
-    weights.output().multiply(session.xNorm, session.logits);
+    if (projectLogits) {
+      TensorOps.rmsNorm(
+          session.xNorm, session.x, outputNorm, config.hiddenSize(), config.rmsNormEps());
+      weights.output().multiply(session.xNorm, session.logits);
+    }
+    session.tokenHistory[position] = token;
     session.nextPosition++;
-    return session.logits;
+  }
+
+  /** Discards sequence state at and after {@code checkpoint}. */
+  public void rewind(Session session, int checkpoint) {
+    requireSession(session);
+    if (checkpoint < 0 || checkpoint > session.nextPosition) {
+      throw new IllegalArgumentException(
+          "checkpoint must be between 0 and " + session.nextPosition + ": " + checkpoint);
+    }
+    if (checkpoint == session.nextPosition) {
+      return;
+    }
+    if (!retainsPrefixWindow(session, checkpoint)) {
+      int[] replay = Arrays.copyOf(session.tokenHistory, checkpoint);
+      session.cache.clear();
+      session.nextPosition = 0;
+      for (int position = 0; position < replay.length; position++) {
+        advance(session, replay[position], position);
+      }
+      return;
+    }
+    session.cache.discardFrom(checkpoint);
+    session.nextPosition = checkpoint;
+  }
+
+  private boolean retainsPrefixWindow(Session session, int checkpoint) {
+    for (int layer = 0; layer < layers.length; layer++) {
+      int first = config.attentionStartPosition(layer, checkpoint);
+      for (int position = first; position < checkpoint; position++) {
+        if (!session.cache.contains(layer, position)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   /** Clears retained KV state and returns a session to position zero. */
-  void reset(Session session) {
+  public void reset(Session session) {
     requireSession(session);
     session.cache.clear();
     session.nextPosition = 0;
