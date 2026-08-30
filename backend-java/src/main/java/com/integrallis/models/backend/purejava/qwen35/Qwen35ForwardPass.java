@@ -32,7 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Stateful scalar/Vector-API compatibility graph for dense Qwen3.5. */
+/** Stateful pure-Java hybrid graph for dense Qwen3.5. */
 public final class Qwen35ForwardPass {
 
   /** Independent Qwen3.5 sequence state. */
