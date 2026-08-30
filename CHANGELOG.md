@@ -2,6 +2,22 @@
 
 All notable changes to models are documented here.
 
+## [0.3.19] - 2026-08-30
+
+### Added
+
+- Added pure-Java BERT-family embedding execution with WordPiece tokenization, learned position and
+  token-type embeddings, bidirectional attention, GELU feed-forward layers, and configurable
+  pooling.
+- Added pinned All-MiniLM-L6-v2 Q4_K_M qualification against llama.cpp, including exact-token and
+  eight-probe vector equivalence gates.
+- Added real-model Spring AI and LangChain4j embedding adapter integration coverage for MiniLM.
+
+### Documentation
+
+- Documented the BERT embedding architecture, supported metadata contract, and qualified MiniLM
+  runtime path.
+
 ## [0.3.18] - 2026-08-30
 
 ### Added
