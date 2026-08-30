@@ -17,7 +17,7 @@ package com.integrallis.models.backend.purejava.qwen35;
 
 import com.integrallis.models.backend.nativekernel.NativeKernelLibrary;
 import java.nio.file.Path;
-import java.util.Random;
+import java.util.SplittableRandom;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -83,7 +83,7 @@ public class GatedDeltaNetBenchmark {
       normalizedKey = new float[DIMENSION];
       memory = new float[DIMENSION];
       delta = new float[DIMENSION];
-      Random random = new Random(42L);
+      SplittableRandom random = new SplittableRandom(42L);
       fill(random, query, 0.25f);
       fill(random, key, 0.25f);
       fill(random, value, 0.25f);
@@ -106,7 +106,7 @@ public class GatedDeltaNetBenchmark {
       nativeLibrary.close();
     }
 
-    private static void fill(Random random, float[] values, float scale) {
+    private static void fill(SplittableRandom random, float[] values, float scale) {
       for (int index = 0; index < values.length; index++) {
         values[index] = (random.nextFloat() - 0.5f) * scale;
       }
