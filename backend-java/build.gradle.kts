@@ -199,6 +199,9 @@ tasks.register<Test>("qwen35GgufLayoutTest") {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.qwen35.Qwen35GgufLayoutTest",
         )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPassIntegrationTest",
+        )
     }
     dependsOn(tasks.named(qwen35GgufFixture.taskName))
     outputs.upToDateWhen { false }

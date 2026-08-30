@@ -50,6 +50,8 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.qwen35.Qwen35Config;
+import com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
@@ -315,24 +317,29 @@ public final class PureJavaBackend
         GgufFile file = GgufParser.parse(modelPath, arena);
         tokenizer = GgufTokenizer.fromMetadata(file.metadata());
         String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
-        loaded =
-            "gemma4".equals(modelFamily)
-                ? loadGemma4(
-                    modelPath,
-                    file,
-                    modelFamily,
-                    runtime,
-                    planConfiguration,
-                    backendConfiguration,
-                    batchedMatrixKernel)
-                : loadLlama(
-                    modelPath,
-                    file,
-                    modelFamily,
-                    runtime,
-                    planConfiguration,
-                    batchedMatrixKernel,
-                    batchedAttentionKernel);
+        if ("gemma4".equals(modelFamily)) {
+          loaded =
+              loadGemma4(
+                  modelPath,
+                  file,
+                  modelFamily,
+                  runtime,
+                  planConfiguration,
+                  backendConfiguration,
+                  batchedMatrixKernel);
+        } else if ("qwen35".equals(modelFamily)) {
+          loaded = loadQwen35(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else {
+          loaded =
+              loadLlama(
+                  modelPath,
+                  file,
+                  modelFamily,
+                  runtime,
+                  planConfiguration,
+                  batchedMatrixKernel,
+                  batchedAttentionKernel);
+        }
       }
 
       BackendDiagnostics diagnostics =
@@ -521,6 +528,40 @@ public final class PureJavaBackend
     Gemma4Decoder decoder = Gemma4Decoder.load(file, contextCapacity, batchedMatrixKernel);
     return new LoadedDecoder(
         new Gemma4DecoderAdapter(decoder), metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadQwen35(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    Qwen35Config config = Qwen35Config.fromMetadata(file.metadata());
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "qwen35",
+                config.attentionQueryDim(),
+                config.attentionKeyDim(),
+                config.attentionKeyDim(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength());
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "qwen35",
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    PureJavaDecoder decoder =
+        new Qwen35DecoderAdapter(Qwen35ForwardPass.fromGgufFile(file), contextCapacity);
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
   }
 
   @Override
