@@ -155,6 +155,8 @@ val configuredSafetensorsReferencePath =
     providers.systemProperty("models.fixtures.safetensorsReference")
 val configuredQwen25HuggingFaceDirectory =
     providers.systemProperty("models.fixtures.qwen25HuggingFaceDirectory")
+val configuredGptOssHuggingFaceDirectory =
+    providers.systemProperty("models.fixtures.gptOssHuggingFaceDirectory")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
@@ -166,6 +168,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredQwen25HuggingFaceDirectory.orNull?.let {
         systemProperty("models.fixtures.qwen25HuggingFaceDirectory", it)
+    }
+    configuredGptOssHuggingFaceDirectory.orNull?.let {
+        systemProperty("models.fixtures.gptOssHuggingFaceDirectory", it)
     }
 }
 

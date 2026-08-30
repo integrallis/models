@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,10 +27,80 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class HuggingFaceTokenizerTest {
+
+  @Test
+  void buildsGptOssHarmonyTokenizerWithItsExactPretokenizer(@TempDir Path directory)
+      throws IOException {
+    String pattern =
+        "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]*"
+            + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?|"
+            + "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]+"
+            + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|"
+            + "\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*|\\s*[\\r\\n]+|"
+            + "\\s+(?!\\S)|\\s+";
+    Path tokenizer = directory.resolve("tokenizer.json");
+    Files.writeString(
+        tokenizer,
+        """
+        {
+          "version":"1.0",
+          "normalizer":null,
+          "pre_tokenizer":{
+            "type":"Sequence",
+            "pretokenizers":[
+              {
+                "type":"Split",
+                "pattern":{"Regex":"%s"},
+                "behavior":"Isolated",
+                "invert":false
+              },
+              {
+                "type":"ByteLevel",
+                "add_prefix_space":false,
+                "trim_offsets":true,
+                "use_regex":false
+              }
+            ]
+          },
+          "decoder":{"type":"ByteLevel"},
+          "model":{
+            "type":"BPE",
+            "unk_token":null,
+            "vocab":{"a":0,"b":1,"ab":2,"Ġ":3,"Ġa":4,"Ġab":5},
+            "merges":["Ġ a","Ġa b","a b"]
+          },
+          "added_tokens":[
+            {"id":6,"content":"<|startoftext|>","special":true},
+            {"id":7,"content":"<|return|>","special":true},
+            {"id":8,"content":"<|end|>","special":true},
+            {"id":9,"content":"<|call|>","special":true}
+          ]
+        }
+        """
+            .formatted(pattern.replace("\\", "\\\\")));
+    Path tokenizerConfig = directory.resolve("tokenizer_config.json");
+    Files.writeString(
+        tokenizerConfig,
+        """
+        {"bos_token":"<|startoftext|>","eos_token":"<|return|>"}
+        """);
+
+    Tokenizer parsed =
+        HuggingFaceTokenizer.fromGptOss(tokenizer, tokenizerConfig, tinyGptOssConfig());
+
+    assertThat(parsed.encode("ab")).containsExactly(2);
+    assertThat(parsed.encode(" ab")).containsExactly(5);
+    assertThat(parsed.encodeControl("<|startoftext|>ab<|end|>")).containsExactly(6, 2, 8);
+    assertThat(parsed.encode("<|end|>")).doesNotContain(8);
+    assertThat(parsed.isEndOfGeneration(7)).isTrue();
+    assertThat(parsed.isEndOfGeneration(9)).isTrue();
+    assertThat(parsed.isEndOfGeneration(8)).isFalse();
+  }
 
   @Test
   void buildsQwen2ByteLevelBpeWithoutGivingOrdinaryTextControlPrivileges(@TempDir Path directory)
@@ -152,6 +223,85 @@ class HuggingFaceTokenizerTest {
     assertThat(parsed.tokenId("<tool_call>")).isEqualTo(151657);
     assertThat(parsed.isEndOfGeneration(151643)).isTrue();
     assertThat(parsed.isEndOfGeneration(151645)).isTrue();
+  }
+
+  @Test
+  void matchesPinnedOfficialGptOss20BTokenizer() throws Exception {
+    String configured = System.getProperty("models.fixtures.gptOssHuggingFaceDirectory");
+    assumeTrue(configured != null, "set models.fixtures.gptOssHuggingFaceDirectory");
+    Path directory = Path.of(configured).toAbsolutePath().normalize();
+    Path tokenizerJson = directory.resolve("tokenizer.json");
+    Path tokenizerConfig = directory.resolve("tokenizer_config.json");
+    assumeTrue(
+        Files.isRegularFile(tokenizerJson) && Files.isRegularFile(tokenizerConfig),
+        "GPT-OSS tokenizer fixture is incomplete");
+
+    assertThat(sha256(tokenizerJson))
+        .isEqualTo("0614fe83cadab421296e664e1f48f4261fa8fef6e03e63bb75c20f38e37d07d3");
+    assertThat(sha256(tokenizerConfig))
+        .isEqualTo("9279e942392b742d633c7adbb89ebe002c98399db8926a7af5125c726f404070");
+    Tokenizer parsed =
+        HuggingFaceTokenizer.fromGptOss(tokenizerJson, tokenizerConfig, officialGptOssConfig());
+
+    assertThat(parsed.vocabSize()).isEqualTo(201_088);
+    assertThat(parsed.encode("Hello, world!")).containsExactly(13225, 11, 2375, 0);
+    assertThat(parsed.encode("Name one JVM language."))
+        .containsExactly(864, 1001, 162108, 6439, 13);
+    assertThat(parsed.encode("Phoenix → 東京 café")).containsExactly(160441, 15155, 185244, 30469);
+    assertThat(parsed.encode("cafe\u0301")).containsExactly(66, 6903, 13430);
+    assertThat(parsed.encode("Line 1\nLine 2222\n"))
+        .containsExactly(3665, 220, 16, 198, 3665, 220, 16427, 17, 198);
+    assertThat(
+            parsed.encodeControl(
+                "<|start|>user<|message|>Name one JVM language.<|end|>"
+                    + "<|start|>assistant<|channel|>final<|message|>"))
+        .containsExactly(
+            200006, 1428, 200008, 864, 1001, 162108, 6439, 13, 200007, 200006, 173781, 200005,
+            17196, 200008);
+    assertThat(parsed.isEndOfGeneration(200002)).isTrue();
+    assertThat(parsed.isEndOfGeneration(200012)).isTrue();
+    assertThat(parsed.isEndOfGeneration(200007)).isFalse();
+  }
+
+  private static GptOssHuggingFaceConfig tinyGptOssConfig() {
+    return new GptOssHuggingFaceConfig(
+        List.of("GptOssForCausalLM"),
+        32,
+        1,
+        1,
+        1,
+        32,
+        10,
+        8,
+        4,
+        32,
+        1,
+        1,
+        0,
+        1.0e-5f,
+        10_000.0f,
+        2.0f,
+        32.0f,
+        1.0f,
+        4,
+        7.0f,
+        1.702f,
+        "silu",
+        "mxfp4",
+        true,
+        false,
+        7,
+        0,
+        List.of("full_attention"));
+  }
+
+  private static GptOssHuggingFaceConfig officialGptOssConfig() throws Exception {
+    Path config =
+        Path.of(
+            HuggingFaceTokenizerTest.class
+                .getResource("/huggingface/gpt-oss-20b-config.json")
+                .toURI());
+    return GptOssHuggingFaceConfig.parse(config);
   }
 
   private static Path writeSyntheticConfig(Path directory) throws IOException {

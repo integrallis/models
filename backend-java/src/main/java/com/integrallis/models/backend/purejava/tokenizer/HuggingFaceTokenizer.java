@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -40,6 +41,13 @@ public final class HuggingFaceTokenizer {
   private static final String QWEN2_REGEX =
       "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}|"
           + " ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+";
+  private static final String GPT_OSS_REGEX =
+      "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]*"
+          + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?|"
+          + "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]+"
+          + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|"
+          + "\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*|\\s*[\\r\\n]+|"
+          + "\\s+(?!\\S)|\\s+";
 
   private HuggingFaceTokenizer() {}
 
@@ -50,7 +58,8 @@ public final class HuggingFaceTokenizer {
     Objects.requireNonNull(tokenizerJson, "tokenizerJson");
     Objects.requireNonNull(tokenizerConfigJson, "tokenizerConfigJson");
     Objects.requireNonNull(modelConfig, "modelConfig");
-    Definition definition = readDefinition(tokenizerJson, modelConfig.model().vocabSize());
+    Definition definition =
+        readDefinition(tokenizerJson, modelConfig.model().vocabSize(), Family.QWEN2);
     Settings settings = readSettings(tokenizerConfigJson);
     int bos = resolveToken(settings.bosToken(), modelConfig.bosTokenId(), definition, "BOS");
     int eos = resolveToken(settings.eosToken(), modelConfig.eosTokenId(), definition, "EOS");
@@ -66,11 +75,40 @@ public final class HuggingFaceTokenizer {
         settings.addBosToken(),
         settings.addEosToken(),
         unknown,
-        definition.normalizeNfc());
+        definition.normalizeNfc(),
+        definition.preTokenizerName());
   }
 
-  private static Definition readDefinition(Path path, int modelVocabularySize) throws IOException {
-    DefinitionFields fields = new DefinitionFields(modelVocabularySize);
+  /** Creates the tokenizer and Harmony control vocabulary declared by a GPT-OSS checkpoint. */
+  public static Tokenizer fromGptOss(
+      Path tokenizerJson, Path tokenizerConfigJson, GptOssHuggingFaceConfig modelConfig)
+      throws IOException {
+    Objects.requireNonNull(tokenizerJson, "tokenizerJson");
+    Objects.requireNonNull(tokenizerConfigJson, "tokenizerConfigJson");
+    Objects.requireNonNull(modelConfig, "modelConfig");
+    Definition definition = readDefinition(tokenizerJson, modelConfig.vocabSize(), Family.GPT_OSS);
+    Settings settings = readSettings(tokenizerConfigJson);
+    int bos = resolveToken(settings.bosToken(), -1, definition, "BOS");
+    int eos = resolveToken(settings.eosToken(), modelConfig.eosTokenId(), definition, "EOS");
+    String unknownText =
+        definition.unknownToken() != null ? definition.unknownToken() : settings.unknownToken();
+    int unknown = unknownText == null ? 0 : resolveToken(unknownText, -1, definition, "unknown");
+    return GgufTokenizer.fromByteLevelBpe(
+        definition.vocabulary(),
+        definition.merges(),
+        definition.controlTokenIds(),
+        bos,
+        eos,
+        settings.addBosToken(),
+        settings.addEosToken(),
+        unknown,
+        definition.normalizeNfc(),
+        definition.preTokenizerName());
+  }
+
+  private static Definition readDefinition(Path path, int modelVocabularySize, Family family)
+      throws IOException {
+    DefinitionFields fields = new DefinitionFields(modelVocabularySize, family);
     try (JsonParser parser = JSON.createParser(path.toFile())) {
       require(parser.nextToken(), JsonToken.START_OBJECT, "tokenizer root");
       while (parser.nextToken() != JsonToken.END_OBJECT) {
@@ -137,7 +175,7 @@ public final class HuggingFaceTokenizer {
             fields.continuingPrefix = readNullableString(parser, value, name);
         case "dropout" -> fields.hasDropout = value != JsonToken.VALUE_NULL;
         case "end_of_word_suffix" -> fields.endSuffix = readNullableString(parser, value, name);
-        case "merges" -> fields.merges = readStringArray(parser, value, name);
+        case "merges" -> fields.merges = readMerges(parser, value);
         case "type" -> fields.modelType = readString(parser, value, name);
         case "unk_token" -> fields.unknownToken = readNullableString(parser, value, name);
         case "vocab" -> readVocabulary(parser, value, fields);
@@ -209,13 +247,7 @@ public final class HuggingFaceTokenizer {
         parser.skipChildren();
       }
     }
-    if (!"Sequence".equals(type)
-        || parts.size() != 2
-        || !parts.get(0).isQwenSplit()
-        || !parts.get(1).isByteLevel()) {
-      throw malformed("unsupported Qwen 2 pre_tokenizer pipeline");
-    }
-    fields.qwenPreTokenizer = true;
+    fields.acceptPreTokenizer(type, parts);
   }
 
   private static List<PreTokenizerPart> readPreTokenizerParts(JsonParser parser, JsonToken token)
@@ -291,15 +323,26 @@ public final class HuggingFaceTokenizer {
     return type;
   }
 
-  private static List<String> readStringArray(JsonParser parser, JsonToken token, String name)
-      throws IOException {
-    require(token, JsonToken.START_ARRAY, name);
+  private static List<String> readMerges(JsonParser parser, JsonToken token) throws IOException {
+    require(token, JsonToken.START_ARRAY, "merges");
     List<String> values = new ArrayList<>();
     Set<String> unique = new HashSet<>();
     while (parser.nextToken() != JsonToken.END_ARRAY) {
-      String value = readString(parser, parser.currentToken(), name + " entry");
+      String value;
+      if (parser.currentToken() == JsonToken.VALUE_STRING) {
+        value = parser.getText();
+      } else if (parser.currentToken() == JsonToken.START_ARRAY) {
+        require(parser.nextToken(), JsonToken.VALUE_STRING, "merge left token");
+        String left = parser.getText();
+        require(parser.nextToken(), JsonToken.VALUE_STRING, "merge right token");
+        String right = parser.getText();
+        require(parser.nextToken(), JsonToken.END_ARRAY, "merge pair");
+        value = left + " " + right;
+      } else {
+        throw malformed("merge entry must be a string or two-token array");
+      }
       if (!unique.add(value)) {
-        throw malformed(name + " contains a duplicate entry: " + value);
+        throw malformed("merges contains a duplicate entry: " + value);
       }
       values.add(value);
     }
@@ -392,7 +435,8 @@ public final class HuggingFaceTokenizer {
       List<String> merges,
       Set<Integer> controlTokenIds,
       String unknownToken,
-      boolean normalizeNfc) {
+      boolean normalizeNfc,
+      String preTokenizerName) {
 
     private Definition {
       vocabulary = vocabulary.clone();
@@ -423,20 +467,56 @@ public final class HuggingFaceTokenizer {
       boolean trimOffsets,
       boolean useRegex) {
 
-    private boolean isQwenSplit() {
+    private boolean isSplit(Family family) {
       return "Split".equals(type)
-          && QWEN2_REGEX.equals(regex)
+          && family.regex().equals(regex)
           && "Isolated".equals(behavior)
           && !invert;
     }
 
-    private boolean isByteLevel() {
-      return "ByteLevel".equals(type) && !addPrefixSpace && !trimOffsets && !useRegex;
+    private boolean isByteLevel(Family family) {
+      return "ByteLevel".equals(type)
+          && !addPrefixSpace
+          && trimOffsets == family.trimOffsets()
+          && !useRegex;
+    }
+  }
+
+  private enum Family {
+    QWEN2(QWEN2_REGEX, false, "NFC", true, "qwen2"),
+    GPT_OSS(GPT_OSS_REGEX, true, null, false, "gpt-oss");
+
+    private final String regex;
+    private final boolean trimOffsets;
+    private final String normalizerType;
+    private final boolean normalizeNfc;
+    private final String preTokenizerName;
+
+    Family(
+        String regex,
+        boolean trimOffsets,
+        String normalizerType,
+        boolean normalizeNfc,
+        String preTokenizerName) {
+      this.regex = regex;
+      this.trimOffsets = trimOffsets;
+      this.normalizerType = normalizerType;
+      this.normalizeNfc = normalizeNfc;
+      this.preTokenizerName = preTokenizerName;
+    }
+
+    private String regex() {
+      return regex;
+    }
+
+    private boolean trimOffsets() {
+      return trimOffsets;
     }
   }
 
   private static final class DefinitionFields {
     private final int modelVocabularySize;
+    private final Family family;
     private final Map<Integer, String> tokens = new HashMap<>();
     private final Set<Integer> controlTokenIds = new HashSet<>();
     private boolean byteFallback;
@@ -447,14 +527,15 @@ public final class HuggingFaceTokenizer {
     private List<String> merges;
     private String modelType;
     private String normalizerType;
-    private boolean qwenPreTokenizer;
+    private boolean supportedPreTokenizer;
     private String unknownToken;
 
-    private DefinitionFields(int modelVocabularySize) {
+    private DefinitionFields(int modelVocabularySize, Family family) {
       if (modelVocabularySize <= 0) {
         throw malformed("model vocabulary size must be positive");
       }
       this.modelVocabularySize = modelVocabularySize;
+      this.family = Objects.requireNonNull(family, "family");
     }
 
     private void addToken(int id, String text) {
@@ -474,13 +555,15 @@ public final class HuggingFaceTokenizer {
           || hasDropout
           || (continuingPrefix != null && !continuingPrefix.isEmpty())
           || (endSuffix != null && !endSuffix.isEmpty())) {
-        throw malformed("unsupported Qwen 2 BPE model options");
+        throw malformed("unsupported Hugging Face byte-level BPE model options");
       }
-      if (!"NFC".equals(normalizerType) || !"ByteLevel".equals(decoderType) || !qwenPreTokenizer) {
-        throw malformed("unsupported Qwen 2 normalization or byte-level pipeline");
+      if (!Objects.equals(family.normalizerType, normalizerType)
+          || !"ByteLevel".equals(decoderType)
+          || !supportedPreTokenizer) {
+        throw malformed("unsupported byte-level normalization or pre-tokenizer pipeline");
       }
       if (merges == null || tokens.isEmpty()) {
-        throw malformed("Qwen 2 tokenizer requires vocabulary and merges");
+        throw malformed("byte-level tokenizer requires vocabulary and merges");
       }
       int highestDeclared =
           tokens.keySet().stream().mapToInt(Integer::intValue).max().orElseThrow();
@@ -498,7 +581,24 @@ public final class HuggingFaceTokenizer {
         }
       }
       java.util.Arrays.fill(vocabulary, highestDeclared + 1, vocabulary.length, "");
-      return new Definition(vocabulary, tokenIds, merges, controlTokenIds, unknownToken, true);
+      return new Definition(
+          vocabulary,
+          tokenIds,
+          merges,
+          controlTokenIds,
+          unknownToken,
+          family.normalizeNfc,
+          family.preTokenizerName);
+    }
+
+    private void acceptPreTokenizer(String type, List<PreTokenizerPart> parts) {
+      if (!"Sequence".equals(type)
+          || parts.size() != 2
+          || !parts.get(0).isSplit(family)
+          || !parts.get(1).isByteLevel(family)) {
+        throw malformed("unsupported " + family + " pre_tokenizer pipeline");
+      }
+      supportedPreTokenizer = true;
     }
   }
 }

@@ -51,6 +51,17 @@ final class BpePreTokenizer {
               + "|\\s*[\\r\\n]+"
               + "|\\s+(?!\\S)"
               + "|\\s+");
+  private static final Pattern GPT_OSS_PATTERN =
+      Pattern.compile(
+          "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]*"
+              + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?"
+              + "|[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]+"
+              + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?"
+              + "|\\p{N}{1,3}"
+              + "| ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*"
+              + "|\\s*[\\r\\n]+"
+              + "|\\s+(?!\\S)"
+              + "|\\s+");
   private static final Pattern GPT2_PATTERN =
       Pattern.compile(
           "'s|'t|'re|'ve|'m|'ll|'d"
@@ -115,6 +126,7 @@ final class BpePreTokenizer {
   private static final BpePreTokenizer SMAUG = new BpePreTokenizer(LLAMA3_PATTERN, false);
   private static final BpePreTokenizer QWEN2 = new BpePreTokenizer(QWEN2_PATTERN, false);
   private static final BpePreTokenizer QWEN35 = new BpePreTokenizer(QWEN35_PATTERN, false);
+  private static final BpePreTokenizer GPT_OSS = new BpePreTokenizer(GPT_OSS_PATTERN, false);
   private static final BpePreTokenizer GPT2 = new BpePreTokenizer(GPT2_PATTERN, false);
   private static final BpePreTokenizer SINGLE_DIGIT_GPT2 =
       new BpePreTokenizer(SINGLE_DIGIT_GPT2_PATTERN, false);
@@ -141,6 +153,9 @@ final class BpePreTokenizer {
     }
     if ("qwen35".equals(name)) {
       return QWEN35;
+    }
+    if ("gpt-oss".equals(name)) {
+      return GPT_OSS;
     }
     if (GPT2_NAMES.contains(name)) {
       return GPT2;

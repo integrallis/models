@@ -249,6 +249,30 @@ public final class GgufTokenizer implements Tokenizer {
       boolean addEosToken,
       int unknownTokenId,
       boolean normalizeNfc) {
+    return fromByteLevelBpe(
+        vocab,
+        merges,
+        controlTokenIds,
+        bosTokenId,
+        eosTokenId,
+        addBosToken,
+        addEosToken,
+        unknownTokenId,
+        normalizeNfc,
+        "qwen2");
+  }
+
+  static GgufTokenizer fromByteLevelBpe(
+      String[] vocab,
+      List<String> merges,
+      Set<Integer> controlTokenIds,
+      int bosTokenId,
+      int eosTokenId,
+      boolean addBosToken,
+      boolean addEosToken,
+      int unknownTokenId,
+      boolean normalizeNfc,
+      String preTokenizerName) {
     Objects.requireNonNull(vocab, "vocab");
     Objects.requireNonNull(merges, "merges");
     Objects.requireNonNull(controlTokenIds, "controlTokenIds");
@@ -276,6 +300,7 @@ public final class GgufTokenizer implements Tokenizer {
         endOfGenerationTokens[token] = true;
       }
     }
+    clearMessageBoundaryEndTokens(endOfGenerationTokens, tokenToId);
     List<SpecialToken> controlTokens =
         controlTokenIds.stream()
             .map(
@@ -308,7 +333,7 @@ public final class GgufTokenizer implements Tokenizer {
         addBosToken,
         addEosToken,
         false,
-        BpePreTokenizer.forName("qwen2"),
+        BpePreTokenizer.forName(Objects.requireNonNull(preTokenizerName, "preTokenizerName")),
         unknownTokenId,
         normalizeNfc);
   }
@@ -326,16 +351,21 @@ public final class GgufTokenizer implements Tokenizer {
       }
     }
 
-    boolean harmonyOrSolar =
-        (tokenToId.containsKey("<|return|>") && tokenToId.containsKey("<|call|>"))
-            || (tokenToId.containsKey("<|calls|>") && tokenToId.containsKey("<|flush|>"));
-    if (harmonyOrSolar) {
-      clearEndOfGeneration(result, tokenToId.get("<|end|>"));
-    }
+    clearMessageBoundaryEndTokens(result, tokenToId);
     if (tokenToId.containsKey("<|tool_response>")) {
       clearEndOfGeneration(result, tokenToId.get("</s>"));
     }
     return result;
+  }
+
+  private static void clearMessageBoundaryEndTokens(
+      boolean[] endOfGenerationTokens, Map<String, Integer> tokenToId) {
+    boolean harmonyOrSolar =
+        (tokenToId.containsKey("<|return|>") && tokenToId.containsKey("<|call|>"))
+            || (tokenToId.containsKey("<|calls|>") && tokenToId.containsKey("<|flush|>"));
+    if (harmonyOrSolar) {
+      clearEndOfGeneration(endOfGenerationTokens, tokenToId.get("<|end|>"));
+    }
   }
 
   private static List<SpecialToken> buildSpecialTokens(GgufMetadata metadata, String[] vocab) {
