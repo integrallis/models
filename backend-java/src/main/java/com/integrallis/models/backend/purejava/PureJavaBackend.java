@@ -26,6 +26,8 @@ import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.purejava.bert.BertConfig;
+import com.integrallis.models.backend.purejava.bert.BertForwardPass;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.cact.CactFile;
 import com.integrallis.models.backend.purejava.cact.CactHeader;
@@ -348,6 +350,8 @@ public final class PureJavaBackend
                   batchedMatrixKernel);
         } else if ("qwen35".equals(modelFamily)) {
           loaded = loadQwen35(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("bert".equals(modelFamily)) {
+          loaded = loadBert(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else {
           loaded =
               loadLlama(
@@ -420,6 +424,42 @@ public final class PureJavaBackend
     return new LoadedDecoder(
         new Needle2DecoderAdapter(
             Needle2Weights.load(layout), contextCapacity, tokenizer.tokenId("</tools>")),
+        metadata,
+        contextCapacity,
+        executionPlan);
+  }
+
+  private static LoadedDecoder loadBert(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    BertConfig config = BertConfig.fromMetadata(file.metadata());
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "bert",
+                config.embeddingDim(),
+                config.embeddingDim(),
+                config.embeddingDim(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength());
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "bert",
+            modelPath.getFileName().toString(),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numHeads());
+    return new LoadedDecoder(
+        new EncoderDecoderAdapter(BertForwardPass.fromGgufFile(file, config)),
         metadata,
         contextCapacity,
         executionPlan);

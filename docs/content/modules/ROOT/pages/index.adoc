@@ -3,9 +3,9 @@
 
 Models is an in-process inference library for Java applications. Inference is
 the work of running a trained model to produce an answer. With Models, an
-application can load an open-weight language model and generate text without
-starting Python, calling a separate model server, or sending prompts over the
-network.
+application can load an open-weight model to generate text or create embeddings
+without starting Python, calling a separate model server, or sending prompts
+over the network.
 
 Models loads GGUF files, supported Hugging Face Safetensors directories, and
 the architecture-specific CACT artifact used by Needle 2. GGUF packages model
@@ -14,9 +14,10 @@ Safetensors checkpoints keep configuration and tokenizer files beside one or
 more mapped weight shards.
 
 Running the file efficiently requires more than parsing it. The runtime must
-map large weight tensors into memory, convert text to tokens, execute every
-transformer layer, retain the attention history in a key-value (KV) cache, and
-select and stream each new token. The most expensive steps are numeric kernels
+map large weight tensors into memory, convert text to tokens, and execute every
+transformer layer. Generative models also retain an attention history in a
+key-value (KV) cache and select and stream each new token; bidirectional
+encoders instead process and pool the complete sequence. The most expensive steps are numeric kernels
 limited by memory bandwidth and SIMD throughput. Models implements that
 complete pipeline in Java 25 and uses the Vector API to reach the CPU's SIMD
 instructions.

@@ -65,9 +65,10 @@ Implemented functionality includes:
 - GGUF v2/v3 parsing with memory-mapped tensor access
 - strict, memory-mapped single-file and sharded Safetensors bundles
 - CACT parsing and the Needle 2 CQ2/CQ4 execution path
-- Llama, Qwen2, Qwen3, dense Qwen3.5, Gemma 4, GPT-OSS, and Needle 2 decoder architectures
+- BERT/MiniLM encoders plus Llama, Qwen2, Qwen3, dense Qwen3.5, Gemma 4,
+  GPT-OSS, and Needle 2 decoder architectures
 - F32, F16, BF16, MXFP4, CQ2/CQ4, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
-- byte-level BPE and Llama SentencePiece tokenizers
+- BERT WordPiece, byte-level BPE, and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - Qwen3.5 hybrid full-attention/Gated DeltaNet execution with batched prefill and reusable
   recurrent state
@@ -82,8 +83,8 @@ Implemented functionality includes:
   result for their follow-up answer; Needle 2 completes the action-selection
   loop with the actual Java tool result. ModelJars callers can enforce artifact
   qualification by passing the descriptor capabilities to the adapter
-- in-JVM text embeddings with last-token and mean pooling, tested to produce the
-  same vectors as llama.cpp
+- in-JVM text embeddings from causal decoders and bidirectional encoders, with
+  model-declared or explicit pooling and vectors tested against llama.cpp
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
 - Apple Foundation Models on supported Apple Silicon Macs
 - framework-neutral guarded RAG

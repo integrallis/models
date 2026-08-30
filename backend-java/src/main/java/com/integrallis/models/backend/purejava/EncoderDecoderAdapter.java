@@ -16,7 +16,6 @@
 package com.integrallis.models.backend.purejava;
 
 import com.integrallis.models.api.LogitBatch;
-import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import java.util.Objects;
 
 /**
@@ -30,9 +29,9 @@ import java.util.Objects;
  */
 final class EncoderDecoderAdapter implements PureJavaDecoder {
 
-  private final EncoderForwardPass encoder;
+  private final SequenceEncoder encoder;
 
-  EncoderDecoderAdapter(EncoderForwardPass encoder) {
+  EncoderDecoderAdapter(SequenceEncoder encoder) {
     this.encoder = Objects.requireNonNull(encoder, "encoder");
   }
 

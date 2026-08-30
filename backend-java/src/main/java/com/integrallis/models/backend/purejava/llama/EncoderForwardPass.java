@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.llama;
 
+import com.integrallis.models.backend.purejava.SequenceEncoder;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
@@ -46,7 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * <p>Not thread-safe: one sequence at a time over shared scratch.
  */
-public final class EncoderForwardPass {
+public final class EncoderForwardPass implements SequenceEncoder {
 
   /** Overrides how many positions are computed at once; mainly so tests can pin it to one. */
   public static final String PARALLELISM_PROPERTY = "models.encoder.threads";
@@ -268,6 +269,7 @@ public final class EncoderForwardPass {
    * @return a newly allocated pooled embedding, not normalized
    * @throws IllegalArgumentException if the sequence is empty or longer than the trained context
    */
+  @Override
   public float[] encode(int[] tokens) {
     Objects.requireNonNull(tokens, "tokens");
     if (tokens.length == 0) {

@@ -68,6 +68,39 @@ class TensorOpsTest {
   }
 
   @Nested
+  class LayerNorm {
+
+    @Test
+    void centersScalesAndBiasesTheRow() {
+      float[] x = {1.0f, 2.0f, 3.0f};
+      float[] weight = {2.0f, 3.0f, 4.0f};
+      float[] bias = {0.5f, 1.0f, 1.5f};
+      float[] out = new float[3];
+
+      TensorOps.layerNorm(out, 0, x, 0, weight, bias, 3, 0.0f);
+
+      assertThat(out[0]).isCloseTo(-1.9494897f, within(1e-6f));
+      assertThat(out[1]).isEqualTo(1.0f);
+      assertThat(out[2]).isCloseTo(6.3989797f, within(1e-6f));
+    }
+
+    @Test
+    void supportsOffsetsAndInPlaceNormalization() {
+      float[] values = {99.0f, 1.0f, 2.0f, 3.0f, 98.0f};
+      float[] weight = {1.0f, 1.0f, 1.0f};
+      float[] bias = {0.0f, 0.0f, 0.0f};
+
+      TensorOps.layerNorm(values, 1, values, 1, weight, bias, 3, 0.0f);
+
+      assertThat(values[0]).isEqualTo(99.0f);
+      assertThat(values[1]).isCloseTo(-1.2247449f, within(1e-6f));
+      assertThat(values[2]).isZero();
+      assertThat(values[3]).isCloseTo(1.2247449f, within(1e-6f));
+      assertThat(values[4]).isEqualTo(98.0f);
+    }
+  }
+
+  @Nested
   class Matmul {
 
     @Test
@@ -1667,6 +1700,30 @@ class TensorOpsTest {
       assertThat(out[1]).isZero();
       assertThat(out[2]).isCloseTo(20.0f, within(0.01f));
       assertThat(out[3]).isEqualTo(94.0f);
+    }
+  }
+
+  @Nested
+  class Gelu {
+
+    @Test
+    void matchesLlamaCppTanhApproximation() {
+      float[] input = {-1.0f, 0.0f, 2.0f};
+      float[] out = new float[3];
+
+      TensorOps.gelu(out, 0, input, 0, input.length);
+
+      assertThat(out[0]).isCloseTo(geluReference(-1.0f), within(1e-6f));
+      assertThat(out[1]).isZero();
+      assertThat(out[2]).isCloseTo(geluReference(2.0f), within(1e-6f));
+    }
+
+    private static float geluReference(float value) {
+      return 0.5f
+          * value
+          * (1.0f
+              + (float)
+                  Math.tanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
     }
   }
 

@@ -49,6 +49,10 @@ val modelFixtures =
             "qwen3_embedding_0_6b_q8_0",
         ),
         modelFixture(
+            "downloadAllMiniLmL6V2Q4KMModel",
+            "all_minilm_l6_v2_q4_k_m",
+        ),
+        modelFixture(
             "downloadQwen38BQ4KMModel",
             "qwen3_8b_q4_k_m",
         ),
@@ -426,6 +430,25 @@ tasks.register<Test>("qwen3EmbeddingIntegrationTest") {
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "4g"
+}
+
+tasks.register<Test>("miniLmEmbeddingIntegrationTest") {
+    description = "Run the pinned All-MiniLM-L6-v2 Q4_K_M pure-Java embedding tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.BertMiniLmModelFixtureIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadAllMiniLmL6V2Q4KMModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
 }
 
 tasks.register<Test>("qwen25Math15BIntegrationTest") {

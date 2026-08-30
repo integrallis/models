@@ -58,6 +58,55 @@ public final class TensorOps {
     }
   }
 
+  /** Layer normalization with learned scale and bias over one contiguous row. */
+  public static void layerNorm(
+      float[] out,
+      int outOffset,
+      float[] x,
+      int xOffset,
+      float[] weight,
+      float[] bias,
+      int size,
+      float eps) {
+    Objects.requireNonNull(out, "out");
+    Objects.requireNonNull(x, "x");
+    Objects.requireNonNull(weight, "weight");
+    Objects.requireNonNull(bias, "bias");
+    Objects.checkFromIndexSize(outOffset, size, out.length);
+    Objects.checkFromIndexSize(xOffset, size, x.length);
+    if (weight.length != size || bias.length != size) {
+      throw new IllegalArgumentException(
+          "layer-norm scale and bias must match row size: "
+              + weight.length
+              + ", "
+              + bias.length
+              + " != "
+              + size);
+    }
+    if (size == 0) {
+      throw new IllegalArgumentException("layer-norm row must not be empty");
+    }
+    if (!(eps >= 0.0f) || !Float.isFinite(eps)) {
+      throw new IllegalArgumentException("layer-norm epsilon must be finite and >= 0: " + eps);
+    }
+
+    float sum = 0.0f;
+    for (int index = 0; index < size; index++) {
+      sum += x[xOffset + index];
+    }
+    float mean = sum / size;
+    float variance = 0.0f;
+    for (int index = 0; index < size; index++) {
+      float centered = x[xOffset + index] - mean;
+      variance += centered * centered;
+    }
+    float scale = 1.0f / (float) Math.sqrt(variance / size + eps);
+    for (int index = 0; index < size; index++) {
+      float centered = x[xOffset + index] - mean;
+      out[outOffset + index] = centered * scale * weight[index] + bias[index];
+    }
+  }
+
   /** Matrix-vector multiplication: out = weight * x where weight is [rows x cols] row-major. */
   public static void matmul(float[] out, float[] x, float[] weight, int rows, int cols) {
     VectorUtil.batchDotProduct(x, weight, rows, cols, out);
@@ -1473,6 +1522,22 @@ public final class TensorOps {
   /** GELU-gated activation using llama.cpp's tanh approximation. */
   public static void geluGlu(float[] out, float[] gate, float[] up, int size) {
     geluGlu(out, 0, gate, 0, up, 0, size);
+  }
+
+  /** GELU activation using llama.cpp's tanh approximation. */
+  public static void gelu(float[] out, int outOffset, float[] input, int inputOffset, int size) {
+    Objects.requireNonNull(out, "out");
+    Objects.requireNonNull(input, "input");
+    Objects.checkFromIndexSize(outOffset, size, out.length);
+    Objects.checkFromIndexSize(inputOffset, size, input.length);
+    for (int index = 0; index < size; index++) {
+      float value = input[inputOffset + index];
+      out[outOffset + index] =
+          0.5f
+              * value
+              * (1.0f
+                  + tableTanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
+    }
   }
 
   /** Offset-aware GELU-gated activation over flat batch buffers. */

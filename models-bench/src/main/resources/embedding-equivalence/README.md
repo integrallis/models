@@ -57,6 +57,19 @@ git rev-parse --short HEAD          # goes into oracleVersion
 L2, and `-ngl 0` keeps it on CPU so the reference does not vary with the GPU. Changing any of them
 changes what the vectors mean, so they must match the recorded `pooling` and `normalized`.
 
+For a BERT encoder, make both execution choices explicit instead:
+
+```bash
+./build/bin/llama-embedding \
+  -m /path/to/model.gguf \
+  -f models-bench/src/main/resources/embedding-equivalence/probes.txt \
+  --pooling mean --attention non-causal \
+  --embd-output-format array --embd-normalize 2 --device none -c 512
+```
+
+These settings must agree with the artifact metadata. Models reads encoder pooling from that
+metadata rather than accepting a caller override.
+
 Write the output into `reference-<model>.json` with `oracleVersion`, `probeSetSha256`
 (`sha256sum probes.txt`), and `artifactSha256` updated. Regenerate against the *unmodified*
 runtime — a reference generated to accommodate a change proves nothing.
