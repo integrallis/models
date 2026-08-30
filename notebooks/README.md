@@ -27,7 +27,7 @@ Prepare either classpath without Docker:
 ./gradlew prepareNotebookClasspath -PnotebookMode=source
 ./gradlew prepareNotebookClasspath \
   -PnotebookMode=release \
-  -PnotebookVersion=0.3.19
+  -PnotebookVersion=0.3.20
 ```
 
 Test a staged release before it reaches Maven Central:
@@ -36,7 +36,7 @@ Test a staged release before it reaches Maven Central:
 ./gradlew verifyStagedPublications
 ./gradlew prepareNotebookClasspath \
   -PnotebookMode=release \
-  -PnotebookVersion=0.3.19 \
+  -PnotebookVersion=0.3.20 \
   -PnotebookRepository=build/staging-deploy
 ```
 
@@ -55,7 +55,7 @@ and does not read the host Docker credential store. To use published artifacts:
 
 ```bash
 MODELS_NOTEBOOK_MODE=release \
-MODELS_VERSION=0.3.19 \
+MODELS_VERSION=0.3.20 \
 ./docker-compose.sh up --build
 ```
 
@@ -75,7 +75,7 @@ Release mode executes the same notebooks from the selected artifacts:
 
 ```bash
 MODELS_NOTEBOOK_MODE=release \
-MODELS_VERSION=0.3.19 \
+MODELS_VERSION=0.3.20 \
 ./docker-compose.sh run --rm --no-deps jupyter \
   bash /home/jovyan/work/models/notebooks/scripts/test-notebooks.sh
 ```

@@ -2,6 +2,27 @@
 
 All notable changes to models are documented here.
 
+## [0.3.20] - 2026-08-30
+
+### Added
+
+- Added Java Vector API kernels for SwiGLU, Qwen3.5 gate transforms, and fused causal depthwise
+  convolution with SiLU.
+- Added a Models-owned ABI 5 Gated DeltaNet recurrence kernel behind the exact-profile
+  `models.native.gatedDeltaNet` switch; model graph and session state ownership remain in Java.
+- Added JMH coverage for the fused Java kernels and the Java/native recurrence paths.
+
+### Changed
+
+- Qualified Qwen3.5 0.8B Q4_K_M and Qwen2.5 3B Instruct Q4_K_M against Ollama under the unchanged
+  production RAG policy, retaining all request-level evidence and performance profiles.
+- Updated to Vectors 0.1.18 for the fused Java/Panama inference kernels.
+
+### Documentation
+
+- Documented the native recurrence boundary, deployment switches, qualified Qwen results, and
+  exact retained evidence.
+
 ## [0.3.19] - 2026-08-30
 
 ### Added
