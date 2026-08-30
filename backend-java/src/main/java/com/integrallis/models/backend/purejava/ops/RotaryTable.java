@@ -22,6 +22,7 @@ public final class RotaryTable {
 
   private final int rotaryDim;
   private final float frequencyScale;
+  private final float attentionFactor;
   private final float[] frequencyFactors;
   private final float[] frequencies;
   private final float[] cosine;
@@ -46,11 +47,22 @@ public final class RotaryTable {
    * layouts whose remaining dimensions are effectively unrotated.
    */
   public RotaryTable(int rotaryDim, float theta, float frequencyScale, float[] frequencyFactors) {
+    this(rotaryDim, theta, frequencyScale, frequencyFactors, 1.0f, null);
+  }
+
+  private RotaryTable(
+      int rotaryDim,
+      float theta,
+      float frequencyScale,
+      float[] frequencyFactors,
+      float attentionFactor,
+      float[] preparedFrequencies) {
     if (rotaryDim <= 0 || (rotaryDim & 1) != 0) {
       throw new IllegalArgumentException("rotaryDim must be positive and even: " + rotaryDim);
     }
     finitePositive("theta", theta);
     finitePositive("frequencyScale", frequencyScale);
+    finitePositive("attentionFactor", attentionFactor);
     int pairCount = rotaryDim / 2;
     if (frequencyFactors != null) {
       if (frequencyFactors.length != pairCount) {
@@ -66,12 +78,68 @@ public final class RotaryTable {
     }
     this.rotaryDim = rotaryDim;
     this.frequencyScale = frequencyScale;
-    this.frequencies = new float[pairCount];
-    for (int pair = 0; pair < pairCount; pair++) {
-      frequencies[pair] = (float) (1.0 / Math.pow(theta, (double) (pair * 2) / rotaryDim));
+    this.attentionFactor = attentionFactor;
+    if (preparedFrequencies == null) {
+      this.frequencies = new float[pairCount];
+      for (int pair = 0; pair < pairCount; pair++) {
+        frequencies[pair] = (float) (1.0 / Math.pow(theta, (double) (pair * 2) / rotaryDim));
+      }
+    } else {
+      if (preparedFrequencies.length != pairCount) {
+        throw new IllegalArgumentException(
+            "preparedFrequencies must contain " + pairCount + " entries");
+      }
+      this.frequencies = preparedFrequencies.clone();
     }
     this.cosine = new float[pairCount];
     this.sine = new float[pairCount];
+  }
+
+  /**
+   * Creates the non-trivial YaRN frequency blend and attention magnitude used by GPT-OSS and other
+   * long-context models.
+   */
+  public static RotaryTable yarn(
+      int rotaryDim,
+      float theta,
+      float factor,
+      float betaFast,
+      float betaSlow,
+      int originalContext,
+      boolean truncateCorrectionRange) {
+    if (rotaryDim <= 0 || (rotaryDim & 1) != 0) {
+      throw new IllegalArgumentException("rotaryDim must be positive and even: " + rotaryDim);
+    }
+    finitePositive("theta", theta);
+    finitePositive("factor", factor);
+    finitePositive("betaFast", betaFast);
+    finitePositive("betaSlow", betaSlow);
+    if (originalContext <= 0) {
+      throw new IllegalArgumentException("originalContext must be positive: " + originalContext);
+    }
+
+    double denominator = 2.0 * Math.log(theta);
+    double low = rotaryDim * Math.log(originalContext / (betaFast * 2.0 * Math.PI)) / denominator;
+    double high = rotaryDim * Math.log(originalContext / (betaSlow * 2.0 * Math.PI)) / denominator;
+    if (truncateCorrectionRange) {
+      low = Math.floor(low);
+      high = Math.ceil(high);
+    }
+    low = Math.max(low, 0.0);
+    high = Math.min(high, rotaryDim - 1.0);
+    if (low == high) {
+      high += 0.001;
+    }
+
+    float[] frequencies = new float[rotaryDim / 2];
+    for (int pair = 0; pair < frequencies.length; pair++) {
+      double inverseFrequency = 1.0 / Math.pow(theta, (double) (pair * 2) / rotaryDim);
+      double ramp = Math.max(0.0, Math.min(1.0, (pair - low) / (high - low)));
+      frequencies[pair] =
+          (float) ((inverseFrequency / factor) * ramp + inverseFrequency * (1.0 - ramp));
+    }
+    float attentionFactor = factor <= 1.0f ? 1.0f : 0.1f * (float) Math.log(factor) + 1.0f;
+    return new RotaryTable(rotaryDim, theta, 1.0f, null, attentionFactor, frequencies);
   }
 
   /** Prepares factors for one absolute sequence position. */
@@ -180,8 +248,8 @@ public final class RotaryTable {
     for (int pair = 0; pair < cosine.length; pair++) {
       float divisor = frequencyFactors == null ? 1.0f : frequencyFactors[pair];
       float angle = scaledPosition * frequencies[pair] / divisor;
-      cosineDestination[destinationOffset + pair] = (float) Math.cos(angle);
-      sineDestination[destinationOffset + pair] = (float) Math.sin(angle);
+      cosineDestination[destinationOffset + pair] = attentionFactor * (float) Math.cos(angle);
+      sineDestination[destinationOffset + pair] = attentionFactor * (float) Math.sin(angle);
     }
   }
 

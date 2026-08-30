@@ -100,4 +100,41 @@ class RotaryTableTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("frequencyFactors[1]");
   }
+
+  @Test
+  void yarnMatchesPinnedFreeTokenGptOssFrequenciesAndMagnitude() {
+    RotaryTable table = RotaryTable.yarn(64, 150_000.0f, 32.0f, 32.0f, 1.0f, 4_096, false);
+    float[] head = new float[64];
+    for (int index = 0; index < head.length; index++) {
+      head[index] = index + 1.0f;
+    }
+
+    table.prepare(8_192);
+    table.apply(head, 0, true);
+
+    // FreeToken bd372b6, layers/rotary.py non-truncating YaRN branch.
+    assertThat(head[0]).isCloseTo(42.88368f, offset(0.002f));
+    assertThat(head[15]).isCloseTo(-61.43231f, offset(0.002f));
+    assertThat(head[31]).isCloseTo(42.87677f, offset(0.002f));
+    assertThat(head[32]).isCloseTo(11.72366f, offset(0.002f));
+    assertThat(head[47]).isCloseTo(-29.46214f, offset(0.002f));
+    assertThat(head[63]).isCloseTo(86.28717f, offset(0.002f));
+  }
+
+  @Test
+  void yarnAppliesItsAttentionMagnitudeAtPositionZero() {
+    RotaryTable table = RotaryTable.yarn(4, 10_000.0f, 32.0f, 32.0f, 1.0f, 4_096, false);
+    float[] head = {1.0f, 2.0f, 3.0f, 4.0f};
+
+    table.prepare(0);
+    table.apply(head, 0, true);
+
+    float attentionFactor = 0.1f * (float) Math.log(32.0f) + 1.0f;
+    assertThat(head)
+        .containsExactly(
+            new float[] {
+              attentionFactor, 2 * attentionFactor, 3 * attentionFactor, 4 * attentionFactor
+            },
+            offset(1.0e-6f));
+  }
 }
