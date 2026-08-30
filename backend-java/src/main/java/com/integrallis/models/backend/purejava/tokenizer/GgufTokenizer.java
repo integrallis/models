@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
@@ -79,6 +80,7 @@ public final class GgufTokenizer implements Tokenizer {
   private final boolean useByteLevel;
   private final boolean useSentencePiece;
   private final boolean useGemma4Bpe;
+  private final boolean useWordPiece;
   private final boolean addBosToken;
   private final boolean addEosToken;
   private final boolean addSpacePrefix;
@@ -100,6 +102,7 @@ public final class GgufTokenizer implements Tokenizer {
       boolean useByteLevel,
       boolean useSentencePiece,
       boolean useGemma4Bpe,
+      boolean useWordPiece,
       boolean addBosToken,
       boolean addEosToken,
       boolean addSpacePrefix,
@@ -117,6 +120,7 @@ public final class GgufTokenizer implements Tokenizer {
     this.useByteLevel = useByteLevel;
     this.useSentencePiece = useSentencePiece;
     this.useGemma4Bpe = useGemma4Bpe;
+    this.useWordPiece = useWordPiece;
     this.addBosToken = addBosToken;
     this.addEosToken = addEosToken;
     this.addSpacePrefix = addSpacePrefix;
@@ -209,10 +213,15 @@ public final class GgufTokenizer implements Tokenizer {
     String tokenizerModel = metadata.getString("tokenizer.ggml.model").orElse("");
     boolean useSentencePiece = "llama".equals(tokenizerModel);
     boolean useGemma4Bpe = "gemma4".equals(tokenizerModel);
+    boolean useWordPiece = "bert".equals(tokenizerModel);
     boolean useByteLevel =
-        !useSentencePiece && !useGemma4Bpe && detectByteLevel(tokenizerModel, vocab, tokenToId);
-    boolean addBosToken = metadata.getBool("tokenizer.ggml.add_bos_token").orElse(useSentencePiece);
-    boolean addEosToken = metadata.getBool("tokenizer.ggml.add_eos_token").orElse(false);
+        !useSentencePiece
+            && !useGemma4Bpe
+            && !useWordPiece
+            && detectByteLevel(tokenizerModel, vocab, tokenToId);
+    boolean addBosToken =
+        metadata.getBool("tokenizer.ggml.add_bos_token").orElse(useSentencePiece || useWordPiece);
+    boolean addEosToken = metadata.getBool("tokenizer.ggml.add_eos_token").orElse(useWordPiece);
     boolean addSpacePrefix =
         metadata.getBool("tokenizer.ggml.add_space_prefix").orElse(useSentencePiece);
     String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
@@ -231,6 +240,7 @@ public final class GgufTokenizer implements Tokenizer {
         useByteLevel,
         useSentencePiece,
         useGemma4Bpe,
+        useWordPiece,
         addBosToken,
         addEosToken,
         addSpacePrefix,
@@ -328,6 +338,7 @@ public final class GgufTokenizer implements Tokenizer {
         endOfGenerationTokens,
         controlTokens,
         true,
+        false,
         false,
         false,
         addBosToken,
@@ -493,7 +504,117 @@ public final class GgufTokenizer implements Tokenizer {
     if (useGemma4Bpe) {
       return encodeGemma4Bpe(normalized);
     }
+    if (useWordPiece) {
+      return encodeWordPiece(normalized);
+    }
     return useByteLevel ? encodeByteLevelBpe(normalized) : encodePlainBpe(normalized);
+  }
+
+  private int[] encodeWordPiece(String text) {
+    List<Integer> encoded = new ArrayList<>();
+    for (String word : wordPieceWords(text)) {
+      int before = encoded.size();
+      String candidate = "\u2581" + word;
+      int[] boundaries =
+          candidate.codePoints().map(codePoint -> Character.charCount(codePoint)).toArray();
+      int[] offsets = new int[boundaries.length + 1];
+      for (int index = 0; index < boundaries.length; index++) {
+        offsets[index + 1] = offsets[index] + boundaries[index];
+      }
+
+      for (int start = 0; start < boundaries.length; ) {
+        Integer token = null;
+        int matchedEnd = -1;
+        for (int end = boundaries.length; end > start; end--) {
+          token = tokenToId.get(candidate.substring(offsets[start], offsets[end]));
+          if (token != null) {
+            matchedEnd = end;
+            break;
+          }
+        }
+        if (matchedEnd < 0) {
+          while (encoded.size() > before) {
+            encoded.remove(encoded.size() - 1);
+          }
+          encoded.add(unknownTokenId);
+          break;
+        }
+        encoded.add(token);
+        start = matchedEnd;
+      }
+    }
+    return encoded.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  private static List<String> wordPieceWords(String text) {
+    String decomposed = Normalizer.normalize(text, Normalizer.Form.NFD).toLowerCase(Locale.ROOT);
+    List<String> words = new ArrayList<>();
+    StringBuilder word = new StringBuilder();
+    decomposed
+        .codePoints()
+        .forEach(
+            codePoint -> {
+              int type = Character.getType(codePoint);
+              if (isAccentMark(type) || codePoint == 0 || codePoint == 0xfffd || isControl(type)) {
+                return;
+              }
+              if (Character.isWhitespace(codePoint)) {
+                finishWord(words, word);
+              } else if (isWordPieceBoundary(codePoint, type)) {
+                finishWord(words, word);
+                words.add(new String(Character.toChars(codePoint)));
+              } else {
+                word.appendCodePoint(codePoint);
+              }
+            });
+    finishWord(words, word);
+    return words;
+  }
+
+  private static boolean isAccentMark(int type) {
+    return type == Character.NON_SPACING_MARK
+        || type == Character.COMBINING_SPACING_MARK
+        || type == Character.ENCLOSING_MARK;
+  }
+
+  private static boolean isControl(int type) {
+    return type == Character.CONTROL || type == Character.FORMAT;
+  }
+
+  private static boolean isWordPieceBoundary(int codePoint, int type) {
+    boolean punctuation =
+        type == Character.CONNECTOR_PUNCTUATION
+            || type == Character.DASH_PUNCTUATION
+            || type == Character.START_PUNCTUATION
+            || type == Character.END_PUNCTUATION
+            || type == Character.INITIAL_QUOTE_PUNCTUATION
+            || type == Character.FINAL_QUOTE_PUNCTUATION
+            || type == Character.OTHER_PUNCTUATION;
+    boolean asciiSymbol =
+        codePoint < 0x7f
+            && (type == Character.MATH_SYMBOL
+                || type == Character.CURRENCY_SYMBOL
+                || type == Character.MODIFIER_SYMBOL
+                || type == Character.OTHER_SYMBOL);
+    return punctuation || asciiSymbol || isChineseCharacter(codePoint);
+  }
+
+  private static boolean isChineseCharacter(int codePoint) {
+    return (codePoint >= 0x4e00 && codePoint <= 0x9fff)
+        || (codePoint >= 0x3400 && codePoint <= 0x4dbf)
+        || (codePoint >= 0x20000 && codePoint <= 0x2a6df)
+        || (codePoint >= 0x2a700 && codePoint <= 0x2b73f)
+        || (codePoint >= 0x2b740 && codePoint <= 0x2b81f)
+        || (codePoint >= 0x2b920 && codePoint <= 0x2ceaf)
+        || (codePoint >= 0xf900 && codePoint <= 0xfaff)
+        || (codePoint >= 0x2f800 && codePoint <= 0x2fa1f);
+  }
+
+  private static void finishWord(List<String> words, StringBuilder word) {
+    if (!word.isEmpty()) {
+      words.add(word.toString());
+      word.setLength(0);
+    }
   }
 
   private static void append(List<Integer> destination, int[] source) {
@@ -891,6 +1012,9 @@ public final class GgufTokenizer implements Tokenizer {
 
   @Override
   public String decode(int[] tokens) {
+    if (useWordPiece) {
+      return decodeWordPiece(tokens);
+    }
     if (useSentencePiece) {
       return decodeSentencePiece(tokens);
     }
@@ -946,6 +1070,19 @@ public final class GgufTokenizer implements Tokenizer {
       bytes[i] = byteList.get(i);
     }
     return new String(bytes, StandardCharsets.UTF_8);
+  }
+
+  private String decodeWordPiece(int[] tokens) {
+    StringBuilder decoded = new StringBuilder();
+    for (int token : tokens) {
+      if (token < 0 || token >= vocab.length || token == bosTokenId || isEndOfGeneration(token)) {
+        continue;
+      }
+      decoded.append(vocab[token].replace('\u2581', ' '));
+    }
+    return !decoded.isEmpty() && decoded.charAt(0) == ' '
+        ? decoded.substring(1)
+        : decoded.toString();
   }
 
   private String decodeSentencePiece(int[] tokens) {
@@ -1021,7 +1158,7 @@ public final class GgufTokenizer implements Tokenizer {
       return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    if (useSentencePiece || useGemma4Bpe) {
+    if (useSentencePiece || useGemma4Bpe || useWordPiece) {
       return piece.replace('\u2581', ' ');
     }
 

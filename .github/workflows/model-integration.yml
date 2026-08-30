@@ -14,6 +14,8 @@ on:
       - "models-runtime/**"
       - "backend-java/**"
       - "backend-native/**"
+      - "models-langchain4j/**"
+      - "models-spring-ai/**"
       - "rust-toolchain.toml"
   pull_request:
     branches: [main]
@@ -28,6 +30,8 @@ on:
       - "models-runtime/**"
       - "backend-java/**"
       - "backend-native/**"
+      - "models-langchain4j/**"
+      - "models-spring-ai/**"
       - "rust-toolchain.toml"
   workflow_dispatch:
 
@@ -75,6 +79,7 @@ jobs:
             ~/.jvllm/models/MiniCPM5-1B-Q4_K_M.gguf
             ~/.jvllm/models/Qwen2.5-Math-1.5B-Instruct-Q4_K_M.gguf
             ~/.jvllm/models/EuroLLM-1.7B-Instruct.Q4_K_M.gguf
+            ~/.jvllm/models/all-MiniLM-L6-v2-Q4_K_M.gguf
             ~/.jvllm/models/needle2.cact
           key: purejava-model-fixtures-v6
 
@@ -96,7 +101,18 @@ jobs:
           :backend-java:downloadQwen25Math15BQ4KMModel
           :backend-java:downloadEuroLlm17BQ4KMModel
           :backend-java:downloadQwen3Embedding06BQ80Model
+          :backend-java:downloadAllMiniLmL6V2Q4KMModel
           :backend-java:downloadNeedle2Cact
+          --no-daemon
+          --stacktrace
+
+      - name: Run MiniLM embedding framework integrations
+        working-directory: models
+        run: >
+          ./gradlew
+          :backend-java:miniLmEmbeddingIntegrationTest
+          :models-langchain4j:miniLmLangChain4jIntegrationTest
+          :models-spring-ai:miniLmSpringAiIntegrationTest
           --no-daemon
           --stacktrace
 
@@ -150,4 +166,6 @@ jobs:
           path: |
             models/backend-java/build/reports/tests/
             models/backend-native/build/reports/tests/
+            models/models-langchain4j/build/reports/tests/
+            models/models-spring-ai/build/reports/tests/
           retention-days: 30

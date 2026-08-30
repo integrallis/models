@@ -212,7 +212,7 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                 <div class="cards-grid">
                     <article class="card reveal">
                         <h3 class="card-title">Qualified GGUF runtime</h3>
-                        <p class="card-description">Llama, Qwen2, Qwen3, dense Qwen3.5, and Gemma 4 decoder families with F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths.</p>
+                        <p class="card-description">BERT/MiniLM encoders plus Llama, Qwen2, Qwen3, dense Qwen3.5, and Gemma 4 decoder families with memory-mapped quantized tensor paths.</p>
                     </article>
                     <article class="card reveal">
                         <h3 class="card-title">Framework adapters</h3>
@@ -220,7 +220,7 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                     </article>
                     <article class="card reveal">
                         <h3 class="card-title">In-JVM embeddings</h3>
-                        <p class="card-description">Text to vectors from the same GGUF artifacts, tested to match llama.cpp at 0.999 cosine or better.</p>
+                        <p class="card-description">Text to vectors from causal decoders and dedicated bidirectional encoders, tested against pinned llama.cpp references.</p>
                     </article>
                     <article class="card reveal">
                         <h3 class="card-title">Tool calling</h3>

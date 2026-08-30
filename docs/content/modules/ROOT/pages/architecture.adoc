@@ -151,6 +151,14 @@ from the tensors actually loaded rather than assuming a Llama-shaped graph.
 The implementation does not invoke a FreeToken, Python, or external inference
 runtime; FreeToken and llama.cpp are test references.
 
+Bidirectional BERT encoders use a separate whole-sequence graph. Models adds
+token, position, and token-type embeddings, applies learned-bias LayerNorm,
+executes full non-causal attention and GELU feed-forward blocks, then performs
+the mean or CLS pooling declared by the artifact. There is no KV cache or
+vocabulary projection because an encoder neither predicts nor generates a next
+token. The projection weights remain memory-mapped and use the same Java GGUF
+batch kernels as decoder models.
+
 == Safetensors And CACT
 
 For a supported Hugging Face directory, the pure-Java backend validates

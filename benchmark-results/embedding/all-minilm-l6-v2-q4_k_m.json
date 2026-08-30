@@ -1,0 +1,78 @@
+{
+  "workload": "oracle-equivalence-v1",
+  "model": "All-MiniLM-L6-v2 GGUF Q4_K_M",
+  "backend": "pure-java",
+  "artifactSha256": "2ec4cee28a27a9c973d5f5230930d6ef6e52694bd2bc71be26a9bef5b1d755e6",
+  "artifactSizeBytes": 20999104,
+  "probeSetSha256": "a25952a4cb80e57c099291dda9b44ad2b713c0688c386015a1e0000bf6fbf8b9",
+  "probes": 8,
+  "embeddingDimension": 384,
+  "pooling": "mean",
+  "normalized": true,
+  "oracleBackend": "llama.cpp",
+  "oracleVersion": "a5822222909b785f23ddc74ce3c8f85bd0e38562",
+  "minimumOracleCosine": 0.9992395369537561,
+  "meanOracleCosine": 0.9996518712967475,
+  "maxComponentDelta": 0.006381319835782051,
+  "maxNormDeviation": 4.7661210533789244e-9,
+  "minimumOracleCosineFloor": 0.999,
+  "maxNormDeviationFloor": 0.001,
+  "normalizationHeld": true,
+  "qualified": true,
+  "perProbe": [
+    {
+      "probe": "The cat sat on the mat.",
+      "cosine": 0.9997407564098679,
+      "embedMillis": 774.314634
+    },
+    {
+      "probe": "How do I reset my password?",
+      "cosine": 0.9997894757775172,
+      "embedMillis": 179.166235
+    },
+    {
+      "probe": "Quantum chromodynamics describes the strong interaction.",
+      "cosine": 0.9996879600379124,
+      "embedMillis": 39.373757
+    },
+    {
+      "probe": "a",
+      "cosine": 0.9992395369537561,
+      "embedMillis": 8.261492
+    },
+    {
+      "probe": "The quick brown fox jumps over the lazy dog near the riverbank at dawn while birds sing overhead.",
+      "cosine": 0.9996536850374259,
+      "embedMillis": 37.061009
+    },
+    {
+      "probe": "Database backups are retained for 30 days.",
+      "cosine": 0.9997147891670356,
+      "embedMillis": 21.28038
+    },
+    {
+      "probe": "def add(a, b): return a + b",
+      "cosine": 0.9996979722389043,
+      "embedMillis": 24.86579
+    },
+    {
+      "probe": "¿Dónde está la biblioteca?",
+      "cosine": 0.9996907947515595,
+      "embedMillis": 22.405476
+    }
+  ],
+  "environment": {
+    "host": "vectors-bench",
+    "osName": "Linux",
+    "osVersion": "6.8.0-124-generic",
+    "architecture": "amd64",
+    "cpuModel": "AMD EPYC-Milan Processor",
+    "processors": 8,
+    "physicalMemoryBytes": 32857444352,
+    "maxHeapBytes": 8216641536,
+    "javaVersion": "25.0.3",
+    "javaVendor": "Eclipse Adoptium",
+    "vmName": "OpenJDK 64-Bit Server VM"
+  }
+}
+

@@ -192,6 +192,82 @@ class GgufTokenizerTest {
     return new GgufMetadata(entries);
   }
 
+  private GgufMetadata createWordPieceMetadata() {
+    List<String> tokens =
+        List.of(
+            "[UNK]",
+            "[CLS]",
+            "[SEP]",
+            "▁transit",
+            "▁-",
+            "▁friendly",
+            "▁api",
+            "s",
+            "▁handle",
+            "▁naive",
+            "▁cafe",
+            "▁riders",
+            "▁.",
+            "▁una",
+            "ff",
+            "ord",
+            "able",
+            "▁re",
+            "rou",
+            "ting");
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(token -> (GgufMetadataValue) new GgufMetadataValue.StringValue(token))
+                .toList()));
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("bert"));
+    entries.put("tokenizer.ggml.unknown_token_id", new GgufMetadataValue.Uint32Value(0));
+    entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(1));
+    entries.put("tokenizer.ggml.cls_token_id", new GgufMetadataValue.Uint32Value(1));
+    entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(2));
+    entries.put("tokenizer.ggml.seperator_token_id", new GgufMetadataValue.Uint32Value(2));
+    return new GgufMetadata(entries);
+  }
+
+  @Nested
+  class WordPieceEncoding {
+
+    @Test
+    void matchesTheBertNormalizationAndBoundaryContract() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      assertThat(tokenizer.encode("Transit-friendly APIs handle naïve café riders."))
+          .containsExactly(1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 2);
+    }
+
+    @Test
+    void usesTheLongestVocabularyPiecesWithinEachWord() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      assertThat(tokenizer.encode("unaffordable rerouting"))
+          .containsExactly(1, 13, 14, 15, 16, 17, 18, 19, 2);
+    }
+
+    @Test
+    void cleansControlsAndCollapsesLargeWhitespaceRuns() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      assertThat(tokenizer.encode("trans\u0007it")).containsExactly(1, 3, 2);
+      assertThat(tokenizer.encode("transit" + " ".repeat(10_000) + "friendly"))
+          .containsExactly(1, 3, 5, 2);
+    }
+
+    @Test
+    void emitsOneUnknownTokenWhenAWordCannotBeSegmented() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      assertThat(tokenizer.encode("notinthevocabulary")).containsExactly(1, 0, 2);
+    }
+  }
+
   private GgufMetadata createSmaugByteLevelMetadata() {
     return createLlama3ByteLevelMetadata("smaug-bpe");
   }

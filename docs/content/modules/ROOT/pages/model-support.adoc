@@ -20,8 +20,11 @@ xref:embeddings.adoc#equivalence-gating[Equivalence Gating].
 
 == Supported Runtime Surface
 
-The GGUF decoder recognizes `llama`, `qwen2`, `qwen3`, `qwen35`, and `gemma4`
-metadata prefixes. Qwen3.5 support is currently limited to dense, text-only
+The GGUF runtime recognizes the `bert`, `llama`, `qwen2`, `qwen3`, `qwen35`,
+and `gemma4` metadata prefixes. The `bert` path is a dedicated bidirectional
+encoder with learned-bias LayerNorm, GELU feed-forward layers, WordPiece
+tokenization, and model-declared mean or CLS pooling. Qwen3.5 support is
+currently limited to dense, text-only
 GGUF checkpoints; its MoE, vision, and MTP paths are not supported. The
 Hugging Face path supports strict Qwen 2/Qwen2.5 BF16 and GPT-OSS MXFP4
 Safetensors bundles with either one weight file or an indexed shard set. GPT-OSS
@@ -48,8 +51,8 @@ Projection kernels support:
 * Q5_K
 * Q6_K
 
-Embedding rows additionally support F16. The tokenizer layer supports
-GPT-2-style byte-level BPE and Llama SentencePiece metadata, including
+Embedding rows additionally support F16. The tokenizer layer supports BERT
+WordPiece, GPT-2-style byte-level BPE, and Llama SentencePiece metadata, including
 Unicode, byte fallback, BOS/EOS controls, and modern and legacy linear
 RoPE scaling.
 
@@ -138,6 +141,7 @@ and 7B Q4_0
 * SQLCoder-7B-2 Q5_K_M
 * Gemma 4 26B-A4B Instruct Q4_K_M
 * Qwen3.5 0.8B and 4B Q4_K_M dense text models
+* All-MiniLM-L6-v2 Q4_K_M BERT embedding encoder
 * Qwen2.5 0.5B Instruct BF16 Safetensors
 * Needle 2 CACT
 * GPT-OSS 20B MXFP4 Safetensors
@@ -149,7 +153,10 @@ metadata, and Llama-style byte BPE. Qwen2.5-Math exercises Q6_K
 token embeddings.
 
 Pinned greedy-token references compare selected GGUF fixtures with a recorded
-llama.cpp revision. Safetensors fixtures use pinned Hugging Face Transformers
+llama.cpp revision. The MiniLM fixture pins WordPiece token IDs and runs the
+standard eight-probe gate against normalized llama.cpp embeddings from the
+identical artifact; its measured minimum cosine is 0.99924 against the 0.999
+floor. Safetensors fixtures use pinned Hugging Face Transformers
 token/logit and same-host RAG references. Needle 2 uses the checksum-pinned
 official CACT artifact and engine behavior; CI also generates and parses the
 reference weather tool call through the public template API. GPT-OSS uses pinned
