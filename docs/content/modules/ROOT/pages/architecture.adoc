@@ -16,7 +16,7 @@ Java owns the behavior that defines the model:
 * GGUF, supported Safetensors, and CACT parsing and memory mapping
 * tokenizer metadata and encoding
 * transformer topology and tensor routing
-* RoPE, grouped-query attention, and residual flow
+* RoPE, grouped-query attention, Gated DeltaNet recurrence, and residual flow
 * KV-cache allocation and growth
 * sampling and generation control
 * streaming and framework contracts
@@ -139,6 +139,13 @@ The KV cache starts with 16 positions and grows geometrically. Loading a
 model therefore does not allocate its full advertised context length.
 The `models.purejava.maxContextLength` property can impose a lower hard
 runtime limit without changing the model metadata exposed to callers.
+
+Dense Qwen3.5 uses the same mapped-weight and sampling infrastructure but a
+hybrid graph: periodic full-attention layers use the KV cache, while the other
+layers update bounded convolution and Gated DeltaNet recurrence state. That
+state and its activation workspaces belong to each Java session and are reused
+across decode steps. The implementation does not invoke a FreeToken, Python,
+or external inference runtime; FreeToken and llama.cpp are test references.
 
 == Safetensors And CACT
 

@@ -65,10 +65,11 @@ Implemented functionality includes:
 - GGUF v2/v3 parsing with memory-mapped tensor access
 - strict, memory-mapped single-file and sharded Safetensors bundles
 - CACT parsing and the Needle 2 CQ2/CQ4 execution path
-- Llama, Qwen2, Qwen3, and Gemma 4 decoder architectures
+- Llama, Qwen2, Qwen3, dense Qwen3.5, and Gemma 4 decoder architectures
 - F32, F16, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
 - byte-level BPE and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
+- Qwen3.5 hybrid full-attention/Gated DeltaNet decode with reusable recurrent state
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
 - tool calling across Qwen, Hermes, Llama 3, Needle 2, Gemma 4, and MiniCPM5 formats,
   with LangChain4j and Spring AI schema-constrained tool decoding for
@@ -131,6 +132,13 @@ Qwen2.5 0.5B Instruct BF16 is the first qualified Hugging Face Safetensors
 bundle. The pure-Java path is `USABLE` on the controlled EPYC host and is
 checked against the same pinned snapshot through Transformers. See the
 [retained Safetensors evidence](benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16/README.md).
+
+Dense, text-only Qwen3.5 GGUF execution is integration-tested in pure Java
+against pinned llama.cpp token oracles for the 0.8B Q4_K_M and 4B Q4_K_M
+artifacts. The 4B gate covers grouped Gated DeltaNet value heads. These
+artifacts remain outside the qualified list until their controlled workload
+and performance evidence is complete. Qwen3.5 MoE, vision, and MTP execution
+are not supported by this release.
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)

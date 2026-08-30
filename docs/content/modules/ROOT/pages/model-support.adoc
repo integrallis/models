@@ -20,8 +20,10 @@ xref:embeddings.adoc#equivalence-gating[Equivalence Gating].
 
 == Supported Runtime Surface
 
-The GGUF decoder recognizes `llama`, `qwen2`, `qwen3`, and `gemma4` metadata
-prefixes. The Hugging Face path supports strict Qwen 2/Qwen2.5 BF16
+The GGUF decoder recognizes `llama`, `qwen2`, `qwen3`, `qwen35`, and `gemma4`
+metadata prefixes. Qwen3.5 support is currently limited to dense, text-only
+GGUF checkpoints; its MoE, vision, and MTP paths are not supported. The
+Hugging Face path supports strict Qwen 2/Qwen2.5 BF16
 Safetensors bundles with either one weight file or an indexed shard set. The
 CACT path supports the released Needle 2 architecture and mixed CQ2/CQ4
 artifact layout. `ChatTemplate.NEEDLE2` implements its official raw-schema
@@ -96,6 +98,13 @@ host, prompts, and greedy controls supplies the reference comparator. See the
 
 == Supported But Not RAG-Qualified
 
+Qwen3.5 0.8B Q4_K_M and 4B Q4_K_M are integration-tested on the pure-Java
+hybrid full-attention/Gated DeltaNet graph. Pinned llama.cpp references verify
+the first token for both artifacts and a multi-token prefix for the 0.8B; the
+4B fixture also verifies its grouped Gated DeltaNet value-head mapping. They
+remain outside the qualified identities until controlled RAG correctness,
+latency, and resource evidence is retained.
+
 H2O Danube3 500M Q4_K_M remains integration-tested, but its corrected
 structured-prompt run retains model output for only 3 of 27 requests. That
 11.1% rate fails the 33.3% contribution floor, so it is excluded from the
@@ -117,6 +126,7 @@ and 7B Q4_0
 * DeepSeek-R1-Distill-Qwen 7B Q4_K_M
 * SQLCoder-7B-2 Q5_K_M
 * Gemma 4 26B-A4B Instruct Q4_K_M
+* Qwen3.5 0.8B and 4B Q4_K_M dense text models
 * Qwen2.5 0.5B Instruct BF16 Safetensors
 * Needle 2 CACT
 
