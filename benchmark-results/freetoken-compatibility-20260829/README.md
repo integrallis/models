@@ -8,7 +8,7 @@ model listed here.
 
 - FreeToken: `bd372b630a028e3faa51f4ab0ef6a98c2f2de501`
 - Models audit range: `292e461e4fe90502db1072138e3f82238dab0e12` through
-  `db3569845c284bc48ae60374817328a57125a4c2`
+  `db35698ca3545b48f77b5c2e151b8afd88079ddc`
 - llama.cpp oracle: `a58222229`
 - FreeToken license: Apache-2.0
 - Production inference remains in-process and Java-first. External engines are reference oracles
