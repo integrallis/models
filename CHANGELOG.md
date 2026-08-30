@@ -2,6 +2,21 @@
 
 All notable changes to models are documented here.
 
+## [0.3.16] - 2026-08-29
+
+### Added
+
+- Added pure-Java execution for dense, text-only Qwen3.5 GGUF models, including their hybrid
+  full-attention/Gated DeltaNet graph and grouped value-head layout.
+- Added pinned 0.8B and 4B Q4_K_M compatibility gates against llama.cpp token oracles and
+  FreeToken recurrence fixtures.
+
+### Changed
+
+- Reused Qwen3.5 decode state and Gated DeltaNet workspaces across tokens, reducing sampled
+  transient `float[]` allocations without changing deterministic output.
+- Documented the Qwen3.5 support boundary and the measured FreeToken compatibility audit.
+
 ## [0.3.15] - 2026-08-29
 
 ### Added
