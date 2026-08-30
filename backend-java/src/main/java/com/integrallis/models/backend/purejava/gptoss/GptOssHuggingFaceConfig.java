@@ -66,6 +66,64 @@ public record GptOssHuggingFaceConfig(
     hiddenActivation = Objects.requireNonNull(hiddenActivation, "hiddenActivation");
     quantizationMethod = Objects.requireNonNull(quantizationMethod, "quantizationMethod");
     layerTypes = List.copyOf(Objects.requireNonNull(layerTypes, "layerTypes"));
+    if (!architectures.contains("GptOssForCausalLM")) {
+      throw malformed("architectures must include GptOssForCausalLM");
+    }
+    directPositive(hiddenSize, "hiddenSize");
+    directPositive(numLayers, "numLayers");
+    directPositive(numHeads, "numHeads");
+    directPositive(numKvHeads, "numKvHeads");
+    directPositive(headDim, "headDim");
+    directPositive(vocabSize, "vocabSize");
+    directPositive(maxPosition, "maxPosition");
+    directPositive(initialContextLength, "initialContextLength");
+    directPositive(intermediateSize, "intermediateSize");
+    directPositive(numExperts, "numExperts");
+    directPositive(expertsPerToken, "expertsPerToken");
+    directPositive(ropeOriginalContext, "ropeOriginalContext");
+    directFinitePositive(rmsNormEps, "rmsNormEps");
+    directFinitePositive(ropeTheta, "ropeTheta");
+    directFinitePositive(ropeYarnFactor, "ropeYarnFactor");
+    directFinitePositive(ropeBetaFast, "ropeBetaFast");
+    directFinitePositive(ropeBetaSlow, "ropeBetaSlow");
+    directFinitePositive(swigluLimit, "swigluLimit");
+    directFinitePositive(hiddenActAlpha, "hiddenActAlpha");
+    if (hiddenSize % 32 != 0 || intermediateSize % 32 != 0) {
+      throw malformed("MXFP4 hiddenSize and intermediateSize must be multiples of 32");
+    }
+    if (numHeads % numKvHeads != 0) {
+      throw malformed("numHeads must be divisible by numKvHeads");
+    }
+    Math.multiplyExact(numHeads, headDim);
+    Math.multiplyExact(numKvHeads, headDim);
+    if (expertsPerToken > numExperts) {
+      throw malformed("expertsPerToken must not exceed numExperts");
+    }
+    if (maxPosition < initialContextLength) {
+      throw malformed("maxPosition must cover initialContextLength");
+    }
+    if (ropeOriginalContext != initialContextLength) {
+      throw malformed("ropeOriginalContext must equal initialContextLength");
+    }
+    if (!"silu".equals(hiddenActivation)) {
+      throw malformed("GPT-OSS hiddenActivation must be silu; got " + hiddenActivation);
+    }
+    if (!"mxfp4".equals(quantizationMethod)) {
+      throw malformed("GPT-OSS Java path currently requires mxfp4 quantization");
+    }
+    if (layerTypes.size() != numLayers
+        || layerTypes.stream()
+            .anyMatch(
+                type -> !"full_attention".equals(type) && !"sliding_attention".equals(type))) {
+      throw malformed("layerTypes must contain one supported attention type per layer");
+    }
+    if (layerTypes.contains("sliding_attention")) {
+      directPositive(slidingWindow, "slidingWindow");
+    } else if (slidingWindow != 0) {
+      throw malformed("slidingWindow must be zero when no layer uses sliding attention");
+    }
+    directTokenId(eosTokenId, vocabSize, "eosTokenId");
+    directTokenId(padTokenId, vocabSize, "padTokenId");
   }
 
   public static GptOssHuggingFaceConfig parse(Path path) throws IOException {
@@ -249,6 +307,24 @@ public record GptOssHuggingFaceConfig(
       throw malformed(name + " must be present, finite, and positive");
     }
     return value;
+  }
+
+  private static void directPositive(int value, String name) {
+    if (value <= 0) {
+      throw malformed(name + " must be positive: " + value);
+    }
+  }
+
+  private static void directFinitePositive(float value, String name) {
+    if (!(value > 0.0f) || !Float.isFinite(value)) {
+      throw malformed(name + " must be finite and positive: " + value);
+    }
+  }
+
+  private static void directTokenId(int tokenId, int vocabSize, String name) {
+    if (tokenId < -1 || tokenId >= vocabSize) {
+      throw malformed(name + " must be -1 or inside the vocabulary: " + tokenId);
+    }
   }
 
   private static final class Fields {

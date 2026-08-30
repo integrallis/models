@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -99,6 +100,48 @@ class GptOssHuggingFaceConfigTest {
     assertThatThrownBy(() -> GptOssHuggingFaceConfig.parse(duplicate))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("duplicate config JSON");
+  }
+
+  @Test
+  void directConstructionCannotBypassTheExecutionContract() {
+    assertThatThrownBy(() -> directConfig(31, List.of("sliding_attention")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("multiples of 32");
+    assertThatThrownBy(() -> directConfig(32, List.of("cross_attention")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("layerTypes");
+  }
+
+  private static GptOssHuggingFaceConfig directConfig(int hiddenSize, List<String> layerTypes) {
+    return new GptOssHuggingFaceConfig(
+        List.of("GptOssForCausalLM"),
+        hiddenSize,
+        1,
+        2,
+        1,
+        32,
+        32,
+        256,
+        128,
+        32,
+        1,
+        1,
+        64,
+        1.0e-5f,
+        10_000.0f,
+        2.0f,
+        32.0f,
+        1.0f,
+        128,
+        7.0f,
+        1.702f,
+        "silu",
+        "mxfp4",
+        true,
+        false,
+        2,
+        0,
+        layerTypes);
   }
 
   private static String minimalConfig(String quantization, String layerTypes) {
