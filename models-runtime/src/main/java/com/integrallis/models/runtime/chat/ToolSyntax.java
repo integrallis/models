@@ -49,6 +49,8 @@ public record ToolSyntax(
     JSON_NATIVE,
     /** A JSON object fenced by delimiters (Qwen, Hermes, SmolLM3). */
     TAG_WITH_JSON,
+    /** OpenAI Harmony: the function name is in the message recipient and the body is JSON. */
+    HARMONY,
     /** Tagged key/value arguments rather than JSON (Qwen3-Coder, Functionary). */
     TAG_WITH_TAGGED
   }
@@ -62,7 +64,9 @@ public record ToolSyntax(
     /** Llama 3.x's {@code ipython} role. */
     IPYTHON,
     /** A normal {@code user} turn with no wrapper around the serialized result (Needle 2). */
-    USER_PLAIN
+    USER_PLAIN,
+    /** A named Harmony tool author, such as {@code functions.get_weather}. */
+    HARMONY_NAMED
   }
 
   /** No trained tool-call format; tools must be refused rather than approximated. */
@@ -138,6 +142,20 @@ public record ToolSyntax(
           "",
           "");
 
+  /** GPT-OSS Harmony calls route JSON arguments to a named function on the commentary channel. */
+  public static final ToolSyntax HARMONY =
+      new ToolSyntax(
+          Mode.HARMONY,
+          "<|start|>assistant to=functions.",
+          "<|call|>",
+          "name",
+          "arguments",
+          false,
+          true,
+          ResultStyle.HARMONY_NAMED,
+          "<|start|>functions.",
+          "<|end|>");
+
   /**
    * Gemma 4. Emits {@code <|tool_call>call:name{key:value,...}<tool_call|>} — note the delimiters
    * are asymmetric, with the pipe moving from the leading to the trailing position.
@@ -194,7 +212,7 @@ public record ToolSyntax(
     if (argsField == null || argsField.isBlank()) {
       throw new IllegalArgumentException("argsField must not be blank");
     }
-    if (mode == Mode.TAG_WITH_JSON || mode == Mode.TAG_WITH_TAGGED) {
+    if (mode == Mode.TAG_WITH_JSON || mode == Mode.TAG_WITH_TAGGED || mode == Mode.HARMONY) {
       if (sectionStart.isBlank()) {
         throw new IllegalArgumentException("sectionStart is required for mode " + mode);
       }
@@ -231,6 +249,6 @@ public record ToolSyntax(
    * yet parse the family's format — not that the family lacks one.
    */
   public boolean parsable() {
-    return mode == Mode.JSON_NATIVE || mode == Mode.TAG_WITH_JSON;
+    return mode == Mode.JSON_NATIVE || mode == Mode.TAG_WITH_JSON || mode == Mode.HARMONY;
   }
 }

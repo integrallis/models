@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -261,6 +263,15 @@ class HuggingFaceTokenizerTest {
     assertThat(parsed.isEndOfGeneration(200002)).isTrue();
     assertThat(parsed.isEndOfGeneration(200012)).isTrue();
     assertThat(parsed.isEndOfGeneration(200007)).isFalse();
+    assertThat(
+            parsed.encode(
+                ChatTemplate.GPT_OSS.render(List.of(ChatMessage.user("Name one JVM language.")))))
+        .containsExactly(
+            200006, 17360, 200008, 3575, 553, 17554, 162016, 11, 261, 4410, 6439, 2359, 22203, 656,
+            7788, 17527, 558, 87447, 100594, 25, 220, 1323, 19, 12, 3218, 279, 30377, 289, 25,
+            14093, 279, 2, 13888, 18403, 25, 8450, 11, 49159, 11, 1721, 13, 21030, 2804, 413, 7360,
+            395, 1753, 3176, 13, 200007, 200006, 1428, 200008, 864, 1001, 162108, 6439, 13, 200007,
+            200006, 173781);
   }
 
   private static GptOssHuggingFaceConfig tinyGptOssConfig() {

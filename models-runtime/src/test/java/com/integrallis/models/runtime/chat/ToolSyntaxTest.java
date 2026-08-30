@@ -40,6 +40,7 @@ class ToolSyntaxTest {
       assertThat(ToolSyntax.HERMES.supportsTools()).isTrue();
       assertThat(ToolSyntax.LLAMA3.supportsTools()).isTrue();
       assertThat(ToolSyntax.NEEDLE2.supportsTools()).isTrue();
+      assertThat(ToolSyntax.HARMONY.supportsTools()).isTrue();
       assertThat(ToolSyntax.GEMMA4.supportsTools()).isTrue();
       assertThat(ToolSyntax.MINICPM5.supportsTools()).isTrue();
     }
@@ -50,6 +51,7 @@ class ToolSyntaxTest {
       assertThat(ToolSyntax.HERMES.parsable()).isTrue();
       assertThat(ToolSyntax.LLAMA3.parsable()).isTrue();
       assertThat(ToolSyntax.NEEDLE2.parsable()).isTrue();
+      assertThat(ToolSyntax.HARMONY.parsable()).isTrue();
       // Tagged arguments carry no type information, so JSON cannot be reconstructed without
       // the declared tool schemas.
       assertThat(ToolSyntax.GEMMA4.parsable()).isFalse();

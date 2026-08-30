@@ -580,7 +580,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       List<ChatMessage> messages, org.springframework.ai.chat.messages.Message message) {
     if (message instanceof ToolResponseMessage responses) {
       for (ToolResponseMessage.ToolResponse response : responses.getResponses()) {
-        messages.add(ChatMessage.tool(response.responseData()));
+        messages.add(ChatMessage.tool(response.name(), response.responseData()));
       }
       return;
     }

@@ -26,6 +26,57 @@ import org.junit.jupiter.api.Test;
 class ToolCallScannerTest {
 
   @Nested
+  static class HarmonyCalls {
+
+    @Test
+    void extractsTheRecipientAndArgumentsFromACommentaryCall() {
+      String output =
+          "<|channel|>analysis<|message|>I need the weather.<|end|>"
+              + "<|start|>assistant to=functions.get-weather-for-zipcode"
+              + "<|channel|>commentary json<|message|>{\"zipcode\":\"88252\"}<|call|>";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HARMONY);
+
+      assertThat(result.content()).isEqualTo("I need the weather.");
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get-weather-for-zipcode");
+                assertThat(call.argumentsJson()).isEqualTo("{\"zipcode\":\"88252\"}");
+              });
+    }
+
+    @Test
+    void extractsACallThatContinuesTheAssistantHeaderAlreadyInThePrompt() {
+      String output =
+          " to=functions.get-weather-for-zipcode<|channel|>commentary json"
+              + "<|message|>{\"zipcode\":\"88252\"}";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HARMONY);
+
+      assertThat(result.content()).isEmpty();
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get-weather-for-zipcode");
+                assertThat(call.argumentsJson()).isEqualTo("{\"zipcode\":\"88252\"}");
+              });
+    }
+
+    @Test
+    void extractsFinalChannelTextWithoutInventingACall() {
+      String output = "<|channel|>final<|message|>It is raining.<|end|>";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HARMONY);
+
+      assertThat(result.hasCalls()).isFalse();
+      assertThat(result.content()).isEqualTo("It is raining.");
+    }
+  }
+
+  @Nested
   static class TaggedCalls {
 
     @Test

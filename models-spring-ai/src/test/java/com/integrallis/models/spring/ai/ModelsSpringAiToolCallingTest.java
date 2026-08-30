@@ -408,6 +408,35 @@ class ModelsSpringAiToolCallingTest {
     }
 
     @Test
+    void gptOssHarmonyExecutesTheUsersToolAndReturnsOnlyTheFinalChannel() {
+      SequentialScriptedModel model =
+          new SequentialScriptedModel(
+              " to=functions.get-weather-for-zipcode<|channel|>commentary json"
+                  + "<|message|>{\"zipcode\":\"88252\"}",
+              "<|channel|>final<|message|>It is 78 degrees in 88252.<|return|>");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "gpt-oss-qualified",
+              ChatTemplate.GPT_OSS,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      ZipcodeWeatherTools weatherTools = new ZipcodeWeatherTools();
+      ChatClient client = ChatClient.builder(adapter).defaultTools(weatherTools).build();
+
+      String answer = client.prompt().user("What is the weather for 88252?").call().content();
+
+      assertThat(answer).isEqualTo("It is 78 degrees in 88252.");
+      assertThat(weatherTools.invocations).hasValue(1);
+      assertThat(model.prompts()).hasSize(2);
+      assertThat(model.prompts().get(1))
+          .contains(
+              "<|start|>functions.get-weather-for-zipcode<|channel|>commentary<|message|>",
+              "Raining cats and dogs",
+              "<|start|>assistant");
+    }
+
+    @Test
     void streamingChatClientExecutesTheToolAndReturnsTheFollowUpAnswer() {
       SequentialScriptedModel model =
           new SequentialScriptedModel(
@@ -564,6 +593,28 @@ class ModelsSpringAiToolCallingTest {
   static class Recovery {
 
     @Test
+    void recoversAGptOssHarmonyCallFromTheGeneratedHeaderContinuation() {
+      ScriptedModel model =
+          new ScriptedModel(
+              " to=functions.get_weather<|channel|>commentary json"
+                  + "<|message|>{\"city\":\"Austin\"}");
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.GPT_OSS, SamplingOptions.builder().build());
+
+      ChatResponse response = chat.call(promptWithTools(List.of(new UserMessage("weather?"))));
+
+      assertThat(response.hasToolCalls()).isTrue();
+      assertThat(response.getResult().getOutput().getToolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+              });
+    }
+
+    @Test
     void surfacesAToolCallOnTheAssistantMessage() {
       // Spring AI 2.0 keys tool execution on hasToolCalls(), not on a finish reason.
       ScriptedModel model =
@@ -697,6 +748,28 @@ class ModelsSpringAiToolCallingTest {
 
   @Nested
   static class ResultsComingBack {
+
+    @Test
+    void preservesTheToolNameForGptOssHarmonyResults() {
+      ScriptedModel model = new ScriptedModel("It is raining.");
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.GPT_OSS, SamplingOptions.builder().build());
+      ToolResponseMessage result =
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          "000000000", "get_weather", "{\"condition\":\"rain\"}")))
+              .build();
+
+      chat.call(promptWithTools(List.of(new UserMessage("weather?"), result)));
+
+      assertThat(model.lastPrompt())
+          .contains(
+              "<|start|>functions.get_weather<|channel|>commentary<|message|>"
+                  + "{\"condition\":\"rain\"}<|end|>");
+    }
 
     @Test
     void mapsToolResponsesIntoTheConversation() {

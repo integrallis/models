@@ -68,6 +68,9 @@ public final class ToolCallScanner {
       // without the declared schemas. See ToolSyntax#parsable().
       return Result.plainText(generated);
     }
+    if (syntax.mode() == ToolSyntax.Mode.HARMONY) {
+      return scanHarmony(generated, syntax);
+    }
 
     String text = stripCodeFences(generated);
     List<ToolCall> calls = new ArrayList<>();
@@ -144,6 +147,78 @@ public final class ToolCallScanner {
       return Result.plainText(generated);
     }
     return new Result(prose.toString().strip(), calls);
+  }
+
+  private static Result scanHarmony(String generated, ToolSyntax syntax) {
+    List<ToolCall> calls = new ArrayList<>();
+    int cursor = 0;
+    while (true) {
+      int fullStart = generated.indexOf(syntax.sectionStart(), cursor);
+      int continuedStart = generated.indexOf(" to=functions.", cursor);
+      int start;
+      String prefix;
+      if (fullStart >= 0 && (continuedStart < 0 || fullStart <= continuedStart)) {
+        start = fullStart;
+        prefix = syntax.sectionStart();
+      } else {
+        start = continuedStart;
+        prefix = " to=functions.";
+      }
+      if (start < 0) {
+        break;
+      }
+      int nameStart = start + prefix.length();
+      int channel = generated.indexOf("<|channel|>", nameStart);
+      int message = channel < 0 ? -1 : generated.indexOf("<|message|>", channel);
+      if (channel < 0 || message < 0) {
+        break;
+      }
+      String name = generated.substring(nameStart, channel).strip();
+      int objectStart = generated.indexOf('{', message + "<|message|>".length());
+      int objectEnd = objectStart < 0 ? -1 : matchingBrace(generated, objectStart);
+      if (!name.isEmpty() && objectEnd >= 0) {
+        calls.add(ToolCall.of(calls.size(), name, generated.substring(objectStart, objectEnd + 1)));
+        cursor = objectEnd + 1;
+      } else {
+        cursor = message + "<|message|>".length();
+      }
+    }
+
+    StringBuilder content = new StringBuilder();
+    cursor = 0;
+    while (true) {
+      int marker = generated.indexOf("<|message|>", cursor);
+      if (marker < 0) {
+        break;
+      }
+      int header = generated.lastIndexOf("<|start|>", marker);
+      int headerStart = header < 0 ? 0 : header;
+      boolean toolCall = generated.substring(headerStart, marker).contains("to=functions.");
+      int valueStart = marker + "<|message|>".length();
+      int valueEnd = nextHarmonyBoundary(generated, valueStart);
+      if (!toolCall && valueEnd > valueStart) {
+        if (!content.isEmpty()) {
+          content.append('\n');
+        }
+        content.append(generated, valueStart, valueEnd);
+      }
+      cursor = Math.max(valueEnd, valueStart + 1);
+    }
+    if (content.isEmpty() && calls.isEmpty()) {
+      return Result.plainText(generated);
+    }
+    return new Result(content.toString().strip(), calls);
+  }
+
+  private static int nextHarmonyBoundary(String text, int from) {
+    int end = text.length();
+    for (String marker : new String[] {"<|end|>", "<|call|>", "<|return|>", "<|start|>"}) {
+      int candidate = text.indexOf(marker, from);
+      if (candidate >= 0 && candidate < end) {
+        end = candidate;
+      }
+    }
+    return end;
   }
 
   /**

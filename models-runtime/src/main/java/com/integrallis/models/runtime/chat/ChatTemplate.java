@@ -36,6 +36,7 @@ public enum ChatTemplate {
   CHATML_NO_THINK("chatml-no-think", ToolSyntax.QWEN),
   ZEPHYR("zephyr", ToolSyntax.NONE),
   LLAMA3("llama3", ToolSyntax.LLAMA3),
+  GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
   NEEDLE2("needle2", ToolSyntax.NEEDLE2),
   GEMMA("gemma", ToolSyntax.NONE),
   GEMMA4("gemma4", ToolSyntax.GEMMA4),
@@ -58,6 +59,11 @@ public enum ChatTemplate {
       "You have access to the following functions. To call a function, please respond with JSON"
           + " for a function call.\n\nRespond in the format {\"name\": function name,"
           + " \"parameters\": dictionary of argument name and its value}.\n\n";
+  private static final String GPT_OSS_SYSTEM =
+      "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\n"
+          + "Knowledge cutoff: 2024-06\n\nReasoning: medium\n\n"
+          + "# Valid channels: analysis, commentary, final. Channel must be included for every"
+          + " message.";
 
   private static final String DEEPSEEK_BOS = "<｜begin▁of▁sentence｜>";
   private static final String DEEPSEEK_DEFAULT_SYSTEM =
@@ -117,6 +123,7 @@ public enum ChatTemplate {
       case CHATML_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n\n");
       case ZEPHYR -> renderZephyr(conversation);
       case LLAMA3 -> renderLlama3(conversation);
+      case GPT_OSS -> renderGptOss(conversation, List.of());
       case NEEDLE2 -> renderNeedle2(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
       case GEMMA4 -> renderGemma4(conversation);
@@ -161,6 +168,7 @@ public enum ChatTemplate {
       case CHATML_NO_THINK ->
           renderChatMlWithTools(conversation, "", "<think>\n\n</think>\n\n", declared);
       case LLAMA3 -> renderLlama3WithTools(conversation, declared);
+      case GPT_OSS -> renderGptOss(conversation, declared);
       case NEEDLE2 -> renderNeedle2(conversation, declared);
       default ->
           throw new IllegalArgumentException(
@@ -299,6 +307,75 @@ public enum ChatTemplate {
       prompt.control("<|eot_id|>");
     }
     return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
+  }
+
+  /** Renders the official GPT-OSS Harmony conversation protocol. */
+  private static ModelPrompt renderGptOss(List<ChatMessage> messages, List<ToolSpec> tools) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder().control(GPT_OSS_SYSTEM);
+    if (!tools.isEmpty()) {
+      prompt.control("\nCalls to these tools must go to the commentary channel: 'functions'.");
+    }
+    prompt.control("<|end|>");
+
+    int start = 0;
+    String instructions = "";
+    if (messages.getFirst().role() == ChatRole.SYSTEM) {
+      instructions = messages.getFirst().text();
+      start = 1;
+    }
+    if (!instructions.isEmpty() || !tools.isEmpty()) {
+      prompt.control("<|start|>developer<|message|>");
+      if (!instructions.isEmpty()) {
+        prompt.control("# Instructions\n\n").text(instructions);
+        if (!tools.isEmpty()) {
+          prompt.control("\n\n");
+        }
+      }
+      if (!tools.isEmpty()) {
+        prompt.text(HarmonyToolRenderer.render(tools));
+      }
+      prompt.control("<|end|>");
+    }
+
+    for (int index = start; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      switch (message.role()) {
+        case SYSTEM ->
+            throw new IllegalArgumentException(
+                "GPT-OSS accepts a system instruction only at the start");
+        case USER ->
+            prompt.control("<|start|>user<|message|>").text(message.text()).control("<|end|>");
+        case ASSISTANT -> {
+          if (!message.text().isEmpty()) {
+            String channel = message.hasToolCalls() ? "analysis" : "final";
+            prompt
+                .control("<|start|>assistant<|channel|>" + channel + "<|message|>")
+                .text(message.text())
+                .control("<|end|>");
+          }
+          for (ToolCall call : message.toolCalls()) {
+            prompt
+                .control("<|start|>assistant to=functions.")
+                .text(call.name())
+                .control("<|channel|>commentary json<|message|>")
+                .text(call.argumentsJson())
+                .control("<|call|>");
+          }
+        }
+        case TOOL -> {
+          if (message.name().isBlank()) {
+            throw new IllegalArgumentException("GPT-OSS Harmony requires the tool-result name");
+          }
+          prompt
+              .control("<|start|>functions.")
+              .text(message.name())
+              .control("<|channel|>commentary<|message|>")
+              .text(message.text())
+              .control("<|end|>");
+        }
+      }
+    }
+    return prompt.control("<|start|>assistant").build();
   }
 
   /** Renders the protocol used by the official Needle 2 training and inference code. */

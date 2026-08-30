@@ -133,7 +133,8 @@ final class LangChain4jChatRequestMapper {
       return com.integrallis.models.runtime.chat.ChatMessage.assistantToolCalls(text, calls);
     }
     if (message instanceof ToolExecutionResultMessage toolMessage) {
-      return com.integrallis.models.runtime.chat.ChatMessage.tool(toolMessage.text());
+      return com.integrallis.models.runtime.chat.ChatMessage.tool(
+          toolMessage.toolName(), toolMessage.text());
     }
     throw new IllegalArgumentException("Unsupported LangChain4j chat message: " + message.type());
   }

@@ -271,6 +271,30 @@ class ModelsChatModelToolCallingTest {
   static class Recovery {
 
     @Test
+    void recoversAGptOssHarmonyCallFromTheGeneratedHeaderContinuation() {
+      ScriptedModel model =
+          new ScriptedModel(
+              " to=functions.get_weather<|channel|>commentary json"
+                  + "<|message|>{\"city\":\"Austin\"}");
+      ChatRequest request =
+          ChatRequest.builder()
+              .messages(UserMessage.from("weather?"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse response = chatModel(model, ChatTemplate.GPT_OSS).chat(request);
+
+      assertThat(response.finishReason()).isEqualTo(FinishReason.TOOL_EXECUTION);
+      assertThat(response.aiMessage().toolExecutionRequests())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+              });
+    }
+
+    @Test
     void surfacesToolExecutionRequestsAndTheFinishReason() {
       // Unlike Spring AI 2.0, LangChain4j needs FinishReason.TOOL_EXECUTION set explicitly.
       ScriptedModel model =
@@ -417,6 +441,32 @@ class ModelsChatModelToolCallingTest {
 
   @Nested
   static class RoundTrip {
+
+    @Test
+    void preservesTheToolNameForGptOssHarmonyResults() {
+      ScriptedModel model = new ScriptedModel("It is raining.");
+      ChatRequest request =
+          ChatRequest.builder()
+              .messages(
+                  UserMessage.from("weather?"),
+                  AiMessage.from(
+                      ToolExecutionRequest.builder()
+                          .id("000000000")
+                          .name("get_weather")
+                          .arguments("{\"city\":\"Austin\"}")
+                          .build()),
+                  ToolExecutionResultMessage.from(
+                      "000000000", "get_weather", "{\"condition\":\"rain\"}"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      chatModel(model, ChatTemplate.GPT_OSS).chat(request);
+
+      assertThat(model.lastPrompt())
+          .contains(
+              "<|start|>functions.get_weather<|channel|>commentary<|message|>"
+                  + "{\"condition\":\"rain\"}<|end|>");
+    }
 
     @Test
     void rendersAPriorCallAndItsResultBackIntoHistory() {

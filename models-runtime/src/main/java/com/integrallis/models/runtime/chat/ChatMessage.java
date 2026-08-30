@@ -20,21 +20,29 @@ import java.util.List;
 import java.util.Objects;
 
 /** One role-aware message rendered into a model's required chat template. */
-public record ChatMessage(ChatRole role, String text, List<ToolCall> toolCalls) {
+public record ChatMessage(ChatRole role, String text, List<ToolCall> toolCalls, String name) {
 
   public ChatMessage {
     role = Objects.requireNonNull(role, "role");
     toolCalls = toolCalls == null ? List.of() : List.copyOf(toolCalls);
     text = text == null ? "" : text;
+    name = name == null ? "" : name;
     // An assistant turn may be nothing but a tool call, so blank text is valid there and
     // nowhere else.
     if (text.isBlank() && toolCalls.isEmpty()) {
       throw new IllegalArgumentException("text must not be blank");
     }
+    if (role != ChatRole.TOOL && !name.isEmpty()) {
+      throw new IllegalArgumentException("name is supported only for tool messages");
+    }
+  }
+
+  public ChatMessage(ChatRole role, String text, List<ToolCall> toolCalls) {
+    this(role, text, toolCalls, "");
   }
 
   public ChatMessage(ChatRole role, String text) {
-    this(role, text, List.of());
+    this(role, text, List.of(), "");
   }
 
   public static ChatMessage system(String text) {
@@ -51,6 +59,14 @@ public record ChatMessage(ChatRole role, String text, List<ToolCall> toolCalls) 
 
   public static ChatMessage tool(String text) {
     return new ChatMessage(ChatRole.TOOL, text);
+  }
+
+  /** A named tool result for protocols, such as Harmony, that address functions explicitly. */
+  public static ChatMessage tool(String name, String text) {
+    if (name == null || name.isBlank()) {
+      throw new IllegalArgumentException("tool name must not be blank");
+    }
+    return new ChatMessage(ChatRole.TOOL, text, List.of(), name);
   }
 
   /** An assistant turn that invokes tools, optionally alongside prose. */

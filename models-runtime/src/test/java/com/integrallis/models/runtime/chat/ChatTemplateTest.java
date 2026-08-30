@@ -93,6 +93,7 @@ class ChatTemplateTest {
                     "chatml-no-think",
                     "zephyr",
                     "llama3",
+                    "gpt-oss",
                     "needle2",
                     "gemma",
                     "gemma4",
@@ -111,6 +112,7 @@ class ChatTemplateTest {
             ChatTemplate.CHATML_NO_THINK,
             ChatTemplate.ZEPHYR,
             ChatTemplate.LLAMA3,
+            ChatTemplate.GPT_OSS,
             ChatTemplate.NEEDLE2,
             ChatTemplate.GEMMA,
             ChatTemplate.GEMMA4,
@@ -144,6 +146,12 @@ class ChatTemplateTest {
                 ChatTemplate.LLAMA3,
                 "<|start_header_id|>user<|end_header_id|>\n\n"
                     + "Prompt<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"),
+            Map.entry(
+                ChatTemplate.GPT_OSS,
+                "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\n"
+                    + "Knowledge cutoff: 2024-06\n\nReasoning: medium\n\n"
+                    + "# Valid channels: analysis, commentary, final. Channel must be included for every message."
+                    + "<|end|><|start|>user<|message|>Prompt<|end|><|start|>assistant"),
             Map.entry(
                 ChatTemplate.NEEDLE2,
                 "<|im_start|>user\n<tools>[]</tools>\n"
@@ -293,6 +301,24 @@ class ChatTemplateTest {
                 .stream()
                 .map(ChatMessage::role))
         .containsExactly(ChatRole.SYSTEM, ChatRole.USER, ChatRole.ASSISTANT, ChatRole.TOOL);
+  }
+
+  @Test
+  void retainsTheToolNameNeededByNamedResultProtocols() {
+    ChatMessage result = ChatMessage.tool("get-weather-for-zipcode", "{\"temperature\":78}");
+
+    assertThat(result.name()).isEqualTo("get-weather-for-zipcode");
+    assertThat(result.role()).isEqualTo(ChatRole.TOOL);
+  }
+
+  @Test
+  void rejectsBlankToolNamesAndNamesOnOtherRoles() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ChatMessage.tool(" ", "result"))
+        .withMessageContaining("tool name");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> new ChatMessage(ChatRole.USER, "text", List.of(), "name"))
+        .withMessageContaining("only for tool messages");
   }
 
   @Test

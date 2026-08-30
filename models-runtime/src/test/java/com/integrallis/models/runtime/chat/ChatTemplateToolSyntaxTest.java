@@ -55,6 +55,13 @@ class ChatTemplateToolSyntaxTest {
     }
 
     @Test
+    void gptOssUsesTheHarmonyProtocol() {
+      assertThat(ChatTemplate.GPT_OSS.toolSyntax()).isEqualTo(ToolSyntax.HARMONY);
+      assertThat(ChatTemplate.GPT_OSS.canParseToolCalls()).isTrue();
+      assertThat(ChatTemplate.GPT_OSS.toolSyntax().mode()).isEqualTo(ToolSyntax.Mode.HARMONY);
+    }
+
+    @Test
     void familiesWithNoToolFormatDeclareNone() {
       // Verified against each family's published chat template: Gemma 2 and Phi-3.5 have no
       // `tools` variable at all, and the DeepSeek templates expose none either.
@@ -94,7 +101,8 @@ class ChatTemplateToolSyntaxTest {
       for (ChatTemplate template : ChatTemplate.values()) {
         boolean jsonShaped =
             template.toolSyntax().mode() == ToolSyntax.Mode.JSON_NATIVE
-                || template.toolSyntax().mode() == ToolSyntax.Mode.TAG_WITH_JSON;
+                || template.toolSyntax().mode() == ToolSyntax.Mode.TAG_WITH_JSON
+                || template.toolSyntax().mode() == ToolSyntax.Mode.HARMONY;
         assertThat(template.canParseToolCalls()).as("template %s", template).isEqualTo(jsonShaped);
       }
     }
