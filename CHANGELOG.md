@@ -2,6 +2,23 @@
 
 All notable changes to models are documented here.
 
+## [0.3.18] - 2026-08-30
+
+### Added
+
+- Added Java-native loading and execution for official GPT-OSS Hugging Face checkpoints, including
+  MXFP4 routed experts, attention sinks, YaRN rotary factors, and the GPT-OSS tokenizer path.
+- Added first-class GPT-OSS Harmony tool calling with the current recipient/channel wire format and
+  verified Spring AI and LangChain4j adapter coverage.
+- Added pinned official-checkpoint generation, full-logit oracle, and isolated prefill qualification
+  gates for GPT-OSS 20B.
+
+### Changed
+
+- Updated to Vectors 0.1.17 for the measured MXFP4 projection hot-loop improvement.
+- Documented GPT-OSS as a compatibility implementation rather than a qualified catalog model until
+  its measured Java-native throughput meets the publication gate.
+
 ## [0.3.17] - 2026-08-30
 
 ### Changed
