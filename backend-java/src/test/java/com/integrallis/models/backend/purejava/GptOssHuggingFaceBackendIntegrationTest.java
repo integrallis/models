@@ -73,6 +73,46 @@ class GptOssHuggingFaceBackendIntegrationTest {
   };
 
   @Test
+  void prefillsThePinnedOfficial20BCheckpoint() {
+    Path directory = fixtureDirectory();
+    assertPinnedCheckpoint(directory);
+    String previous = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "128");
+
+    try (PureJavaBackend backend = PureJavaBackend.load(directory)) {
+      ModelPrompt rendered =
+          ChatTemplate.GPT_OSS.render(List.of(ChatMessage.user("Name one JVM language.")));
+      int[] prompt = backend.tokenizer().encode(rendered);
+      assertThat(prompt).as("official tokenizer at revision %s", REVISION).isEqualTo(PROMPT_TOKENS);
+
+      long started = System.nanoTime();
+      float[] logits = backend.prefill(prompt, 0);
+      double elapsedSeconds = (System.nanoTime() - started) / 1_000_000_000.0;
+      int[] top = topTokenIds(logits, 10);
+
+      assertThat(logits).hasSize(201_088);
+      assertThat(allFinite(logits)).isTrue();
+      assertThat(top[0]).isEqualTo(200_005);
+      assertThat(backend.tokenizer().decode(top[0])).isEqualTo("<|channel|>");
+      System.out.printf(
+          "GPT_OSS_20B_PREFILL promptTokens=%d elapsedSeconds=%.3f "
+              + "argmax=%d decoded=%s top=%s%n",
+          prompt.length,
+          elapsedSeconds,
+          top[0],
+          backend.tokenizer().decode(top[0]),
+          topLogits(logits, top));
+      compareOracleWhenConfigured(logits, top);
+    } finally {
+      if (previous == null) {
+        System.clearProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+      } else {
+        System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
+      }
+    }
+  }
+
+  @Test
   void executesThePinnedOfficial20BCheckpoint() {
     Path directory = fixtureDirectory();
     assertPinnedCheckpoint(directory);

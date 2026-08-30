@@ -75,6 +75,59 @@
     "crossHostGate": "first 46 tokens exact, terminal EOS exact, final channel exact",
     "finalText": "Java."
   },
+  "prefillLayoutExperiment": {
+    "host": "vectors-bench",
+    "date": "2026-08-30",
+    "java": "Eclipse Temurin 25.0.3",
+    "promptTokens": 61,
+    "executionOrder": [
+      "serial baseline",
+      "Vector API BF16 layer-wise batch",
+      "layer-wise repeated optimized BF16 GEMV"
+    ],
+    "serialBaseline": {
+      "prefillSecondsRuns": [
+        153.875,
+        153.791
+      ],
+      "prefillSecondsMean": 153.833,
+      "oracleRuns": [
+        {
+          "cosine": 0.998617634,
+          "rmse": 0.224286909,
+          "maxAbsoluteError": 1.244914055,
+          "top10Overlap": 10,
+          "argmaxToken": 200005
+        },
+        {
+          "cosine": 0.998146449,
+          "rmse": 0.258954861,
+          "maxAbsoluteError": 1.409607887,
+          "top10Overlap": 10,
+          "argmaxToken": 200005
+        }
+      ]
+    },
+    "vectorApiBf16Batch8": {
+      "prefillSeconds": 201.7,
+      "changeFromBaselineMeanPercent": 31.11,
+      "cosine": 0.998498352,
+      "rmse": 0.234042312,
+      "maxAbsoluteError": 1.217587709,
+      "top10Overlap": 10,
+      "argmaxToken": 200005
+    },
+    "layerWiseRepeatedBf16Gemv8": {
+      "prefillSeconds": 219.105,
+      "changeFromBaselineMeanPercent": 42.43,
+      "cosine": 0.998470251,
+      "rmse": 0.236114596,
+      "maxAbsoluteError": 1.296799183,
+      "top10Overlap": 10,
+      "argmaxToken": 200005
+    },
+    "result": "rejected: both layer-wise prefill candidates preserved correctness but were slower than the bracketing serial runs; no production batching code retained"
+  },
   "frameworkToolCalling": {
     "framework": "Spring AI 2.0.0 ChatClient",
     "host": "vectors-bench",
@@ -100,5 +153,5 @@
     "springAiToolExecutionAndFollowUp": "pass",
     "catalogPerformance": "fail: the two-turn Spring AI test required 1370.459 seconds"
   },
-  "verdict": "The official GPT-OSS 20B checkpoint executes correctly through the in-process pure-Java backend on two x86-64 CPUs. Independent logits, greedy generation, the current Harmony tool-call protocol, and the exact Spring AI weather-tool loop pass. Serial prompt rewind and prefill make the two-turn workflow too slow for ModelJars promotion; batched prefill and a repeated performance/quality qualification remain release gates."
+  "verdict": "The official GPT-OSS 20B checkpoint executes correctly through the in-process pure-Java backend on two x86-64 CPUs. Independent logits, greedy generation, the current Harmony tool-call protocol, and the exact Spring AI weather-tool loop pass. Serial prompt rewind and prefill make the two-turn workflow too slow for ModelJars promotion. Two test-first layer-wise prefill candidates preserved the oracle result but regressed the mean of bracketing controlled EPYC baselines by 31.11% and 42.43%, so neither was retained. The next performance gate must target the MXFP4 expert hot loop rather than generic BF16 prompt batching."
 }
