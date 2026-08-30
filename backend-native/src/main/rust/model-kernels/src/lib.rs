@@ -636,6 +636,8 @@ fn gated_delta_net_avx2_available() -> bool {
 
 #[inline(always)]
 fn gated_delta_net_scale(values: &mut [f32], scale: f32, vectorized: bool) {
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = vectorized;
     #[cfg(target_arch = "x86_64")]
     if vectorized {
         // SAFETY: runtime feature detection selected AVX2 and the slice bounds each unaligned load.
@@ -655,6 +657,8 @@ fn gated_delta_net_add_scaled(
     vectorized: bool,
 ) {
     debug_assert_eq!(destination.len(), source.len());
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = vectorized;
     #[cfg(target_arch = "x86_64")]
     if vectorized {
         // SAFETY: runtime feature detection selected AVX2/FMA and both slices have equal lengths.
@@ -676,6 +680,8 @@ fn gated_delta_net_delta(
 ) {
     debug_assert_eq!(destination.len(), value.len());
     debug_assert_eq!(destination.len(), memory.len());
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = vectorized;
     #[cfg(target_arch = "x86_64")]
     if vectorized {
         // SAFETY: runtime feature detection selected AVX2 and all slices have equal lengths.
