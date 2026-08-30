@@ -24,7 +24,7 @@ model listed here.
 | Qwen 3.5 dense | Added in Java during this audit | Qualify 0.8B and 4B first; screen 2B and 9B with the same oracle gates |
 | Qwen 3 MoE | Not implemented | Reuse the existing Gemma 4 expert loader/cache, but add Qwen routing and graph semantics test-first |
 | Qwen 3.5 MoE | Dense hybrid graph exists; routed MLP does not | Best MoE follow-on after dense Qwen 3.5 qualification |
-| GPT-OSS | Official 20B Safetensors/MXFP4 graph executes through the public pure-Java backend | Complete public generation, framework tool-call, quality, memory, and throughput gates before catalog promotion |
+| GPT-OSS | Official 20B Safetensors/MXFP4 graph, generation, and Spring AI tool loop execute through the public pure-Java backend | Add batched prefill, then repeat quality, memory, and throughput gates before catalog promotion |
 | Muse Glimmer | Not implemented | Defer until native NVFP4 linear execution is measured; smallest cited model is 30B |
 | MiniMax M2/M3, GLM MoE/DSA, DeepSeek V4 | Not implemented | Defer: very large MoE and sparse-attention systems are poor first catalog artifacts |
 
@@ -143,12 +143,24 @@ same `<|channel|>` token and the complete oracle top-10 set on both EPYC Milan a
 Full-vector cosine was 0.998585 and 0.997862 respectively; the hardware envelope is enforced by
 the repeatable integration gate rather than assumed from one CPU.
 
-The EPYC prefill took 80.918 seconds. The six-core Cascade Lake virtual CPU took 344.874 seconds,
-despite being sold as part of a GPU instance; the Java path correctly did not use an unrelated
-external GPU runtime. This passes checkpoint compatibility, not product performance. The next
-experiment is a profile-led bounded/batched prefill change, followed by actual public generation
-and Spring AI/LangChain4j tool execution. Complete hashes, oracle provenance, host measurements,
-and thresholds are in `gpt-oss-20b-official-checkpoint-java.json`.
+The Java runtime also completed the independent oracle's 64-token greedy continuation and exposed
+only the final-channel answer, `Java.`. A second independent Transformers oracle produced the
+current Harmony call for the exact Spring AI report: the hyphenated
+`get-weather-for-zipcode` recipient and `{"zipcode":"88252"}` arguments. The adapter now accepts
+both recipient positions allowed by Harmony, writes current constrained-JSON call history, sends
+named tool results back to `assistant`, and keeps private analysis out of a completed final answer.
+The real Spring AI `ChatClient` test invoked the Java weather method exactly once and completed a
+follow-up containing `88252` and `78`.
+
+Correctness does not make the checkpoint catalog-ready. The cold retained EPYC generation gate
+took 446.078 seconds, including 211.822 seconds of prefill. The two-turn Spring AI test took
+1,370.459 seconds. A live stack sample showed serial MXFP4 work first in shared-prefix rewind and
+then in suffix prefill. The six-core Cascade Lake virtual CPU was slower still in the earlier
+first-token screen. The next experiment is therefore layer-wise batched MXFP4 prefill plus prompt
+state reuse, followed by the same end-to-end gate and a controlled quality workload. Complete
+hashes, independent generation/tool oracles, host measurements, and thresholds are in
+`gpt-oss-20b-official-checkpoint-java.json` and
+`gpt-oss-20b-transformers-generation-oracles.json`.
 
 ### Implement next
 
@@ -170,8 +182,8 @@ and thresholds are in `gpt-oss-20b-official-checkpoint-java.json`.
 - **NVFP4 Safetensors execution.** Models parses Safetensors bundles and recognizes NVFP4 layout,
   but that is not end-to-end model execution. Start with independently checked unpack, scaling,
   and dot-product primitives before adding Muse Glimmer graphs. MXFP4 and the GPT-OSS graph have
-  passed official-checkpoint equivalence; GPT-OSS still needs generation, framework, quality,
-  memory, and throughput qualification.
+  passed official-checkpoint equivalence, generation, and a Spring AI tool loop; GPT-OSS still
+  needs batched prefill and controlled quality, memory, and throughput qualification.
 - **Expert residency scheduling.** FreeToken's pinned host banks and asynchronous GPU transfers are
   useful design references once Models has a qualified JVM GPU backend. They do not justify adding
   FreeToken, PyTorch, CUDA Python, or another external inference dependency.

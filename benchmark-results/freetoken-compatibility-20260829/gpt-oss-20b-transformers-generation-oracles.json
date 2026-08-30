@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-30",
+  "implementation": "transformers",
+  "version": "4.57.6",
+  "torchVersion": "2.6.0+cu124",
+  "checkpoint": "hf://openai/gpt-oss-20b@6cee5e81ee83917806bbde320786a8fb61efebee",
+  "configuration": "Mxfp4Config(dequantize=true), BF16, CPU, greedy",
+  "host": "Vultr vcg-a16-12c-128g-32vram",
+  "oracles": [
+    {
+      "name": "single-turn-generation",
+      "sourceOutputSha256": "d54aa0f898052ffe25e7fa6c98c4831f017e6748e499720e00b0359db8abf020",
+      "userMessage": "Name one JVM language.",
+      "promptTokens": 61,
+      "generatedTokens": [
+        200005, 35644, 200008, 976, 1825, 31064, 25, 392, 864, 1001, 162108, 6439,
+        3692, 3164, 1682, 261, 4590, 4994, 13, 30456, 6052, 25, 13114, 11, 172308,
+        11, 129636, 11, 16453, 62360, 11, 363, 72013, 627, 11, 5178, 13, 6214, 1308,
+        1001, 13, 63659, 63122, 25, 13114, 13, 2604, 172308, 13, 17291, 6052, 25,
+        13114, 13, 200007, 200006, 173781, 200005, 17196, 200008, 21220, 13, 200002
+      ],
+      "decoded": "<|channel|>analysis<|message|>The user asks: \"Name one JVM language.\" They want a single example. Could answer: Java, Kotlin, Scala, Groovy, Clojure, etc. Just name one. Probably simplest: Java. Or Kotlin. I'll answer: Java.<|end|><|start|>assistant<|channel|>final<|message|>Java.<|return|>",
+      "prefillSeconds": 4.482574167,
+      "terminalToken": 200002
+    },
+    {
+      "name": "spring-weather-tool-call",
+      "sourceOutputSha256": "647550ac3b413303ca136815e560f337fdeb1b7a2f22bfb721e4374d38f1e388",
+      "userMessage": "What is the weather for 88252?",
+      "toolName": "get-weather-for-zipcode",
+      "toolSchema": {
+        "type": "object",
+        "properties": {
+          "zipcode": {
+            "type": "string",
+            "description": "The zipcode to get weather for"
+          }
+        },
+        "required": ["zipcode"]
+      },
+      "promptTokens": 134,
+      "generatedTokens": [
+        200005, 35644, 200008, 2167, 1309, 316, 2421, 290, 1114, 717, 176344, 26116,
+        12, 160243, 483, 182987, 392, 44870, 6283, 4050, 200007, 200006, 173781, 200005,
+        12606, 815, 316, 28, 44580, 775, 176344, 26116, 12, 160243, 220, 200003, 4108,
+        200008, 10848, 160243, 7534, 44870, 6283, 18583, 200012
+      ],
+      "decoded": "<|channel|>analysis<|message|>We need to call the function get-weather-for-zipcode with zipcode \"88252\".<|end|><|start|>assistant<|channel|>commentary to=functions.get-weather-for-zipcode <|constrain|>json<|message|>{\"zipcode\":\"88252\"}<|call|>",
+      "prefillSeconds": 8.759709496,
+      "terminalToken": 200012
+    }
+  ]
+}

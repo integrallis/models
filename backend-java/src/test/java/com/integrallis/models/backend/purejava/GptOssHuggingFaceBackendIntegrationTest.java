@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.models.runtime.chat.ToolCallScanner;
+import com.integrallis.models.runtime.chat.ToolSyntax;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -63,6 +65,12 @@ class GptOssHuggingFaceBackendIntegrationTest {
     13888, 18403, 25, 8450, 11, 49159, 11, 1721, 13, 21030, 2804, 413, 7360, 395, 1753, 3176, 13,
     200007, 200006, 1428, 200008, 864, 1001, 162108, 6439, 13, 200007, 200006, 173781
   };
+  private static final int[] ORACLE_GENERATED_TOKENS = {
+    200005, 35644, 200008, 976, 1825, 31064, 25, 392, 864, 1001, 162108, 6439, 3692, 3164, 1682,
+    261, 4590, 4994, 13, 30456, 6052, 25, 13114, 11, 172308, 11, 129636, 11, 16453, 62360, 11, 363,
+    72013, 627, 11, 5178, 13, 6214, 1308, 1001, 13, 63659, 63122, 25, 13114, 13, 2604, 172308, 13,
+    17291, 6052, 25, 13114, 13, 200007, 200006, 173781, 200005, 17196, 200008, 21220, 13, 200002
+  };
 
   @Test
   void executesThePinnedOfficial20BCheckpoint() {
@@ -97,6 +105,15 @@ class GptOssHuggingFaceBackendIntegrationTest {
           backend.tokenizer().decode(top[0]),
           topLogits(logits, top));
       compareOracleWhenConfigured(logits, top);
+      int[] generated = greedyContinuation(backend, prompt.length, top[0]);
+      String decoded = backend.tokenizer().decode(generated);
+      System.out.printf(
+          "GPT_OSS_20B_GENERATION tokens=%s decoded=%s%n", Arrays.toString(generated), decoded);
+      assertThat(generated).startsWith(Arrays.copyOf(ORACLE_GENERATED_TOKENS, 46));
+      assertThat(generated[generated.length - 1]).isEqualTo(backend.tokenizer().eosToken());
+      ToolCallScanner.Result response = ToolCallScanner.scan(decoded, ToolSyntax.HARMONY);
+      assertThat(response.content()).isEqualTo("Java.");
+      assertThat(response.toolCalls()).isEmpty();
     } finally {
       if (previous == null) {
         System.clearProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
@@ -165,6 +182,20 @@ class GptOssHuggingFaceBackendIntegrationTest {
     Path directory = Path.of(configured).toAbsolutePath().normalize();
     assumeTrue(Files.isDirectory(directory), "GPT-OSS Hugging Face fixture is not installed");
     return directory;
+  }
+
+  private static int[] greedyContinuation(
+      PureJavaBackend backend, int promptTokens, int firstToken) {
+    int[] generated = new int[ORACLE_GENERATED_TOKENS.length];
+    generated[0] = firstToken;
+    int count = 1;
+    while (!backend.tokenizer().isEndOfGeneration(generated[count - 1])
+        && count < generated.length) {
+      float[] logits = backend.forward(generated[count - 1], promptTokens + count - 1);
+      generated[count] = topTokenIds(logits, 1)[0];
+      count++;
+    }
+    return Arrays.copyOf(generated, count);
   }
 
   private static void assertPinnedCheckpoint(Path directory) {
