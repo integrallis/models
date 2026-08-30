@@ -61,15 +61,15 @@ and arbitrary chat templates are not implied by this list.
 
 == Qualified Identities
 
-Committed evidence covers 29 exact artifacts representing 26 distinct
+Committed evidence covers 31 exact artifacts representing 28 distinct
 model identities. Multiple quantizations of one model count as one
 identity.
 
 [cols=",",options="header",]
 |===
 |Domain |Qualified model identities
-|General |SmolLM2 360M, SmolLM2 1.7B, SmolLM3 3B, Qwen3 1.7B, Qwen2.5
-0.5B, Qwen2.5 1.5B, Llama 3.2 1B, Llama 3.2 3B, Gemma 3 1B,
+|General |SmolLM2 360M, SmolLM2 1.7B, SmolLM3 3B, Qwen3 1.7B, Qwen3.5
+0.8B, Qwen2.5 0.5B, Qwen2.5 1.5B, Qwen2.5 3B, Llama 3.2 1B, Llama 3.2 3B, Gemma 3 1B,
 Gemma 4 26B-A4B, H2O Danube2 1.8B, DeepSeek-R1-Distill-Qwen 1.5B,
 TinyLlama 1.1B Chat
 
@@ -107,17 +107,26 @@ three correctly abstain. A pinned Transformers 4.46.3 run over the same bytes,
 host, prompts, and greedy controls supplies the reference comparator. See the
 {url-models-github}/tree/main/benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16[retained reports^].
 
-== Supported But Not RAG-Qualified
+== Newly Qualified Qwen Artifacts
 
-Qwen3.5 0.8B Q4_K_M and 4B Q4_K_M are integration-tested on the pure-Java
-hybrid full-attention/Gated DeltaNet graph. Pinned llama.cpp references verify
-the first token for both artifacts and a multi-token prefix for the 0.8B; the
-4B fixture also verifies its grouped Gated DeltaNet value-head mapping. The
-0.8B model produced correct answers for all nine controlled workload cases
-after batched prefill and SIMD recurrence work, but its p95 time to first token
-was 9.256 seconds and therefore failed the unchanged production gate. Neither
-artifact is included in the qualified identities. See the
+Qwen3.5 0.8B Q4_K_M now clears the unchanged `USABLE` gate after the Java
+Vector API convolution/gate work and the narrowly scoped Gated DeltaNet FFM
+kernel. Across 27 measured requests it answers every grounded case correctly,
+reaches 1,413.0 ms p95 TTFT, 80.61 tokens/second median decode, and 1,648.6 ms
+p95 end-to-end latency. Its decode throughput is 128.5% of Ollama and its p95
+end-to-end latency is 1.34x Ollama on the same 16-core EPYC host.
+
+Qwen2.5 3B Instruct Q4_K_M also clears the `USABLE` gate: 1,085.4 ms p95 TTFT,
+29.45 tokens/second median decode, and 2,046.7 ms p95 end-to-end latency. Its
+decode throughput is 87.8% of Ollama and its p95 end-to-end latency is 1.35x
+Ollama. All 27 grounded answers are correct and 24 retain model-written text.
+
+Qwen3.5 4B Q4_K_M remains integration-tested rather than production-qualified.
+Pinned llama.cpp references verify its first token and grouped Gated DeltaNet
+value-head mapping. See the
 {url-models-github}/tree/main/benchmark-results/freetoken-compatibility-20260829[retained compatibility and optimization audit^].
+
+== Supported But Not RAG-Qualified
 
 H2O Danube3 500M Q4_K_M remains integration-tested, but its corrected
 structured-prompt run retains model output for only 3 of 27 requests. That

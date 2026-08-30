@@ -1,10 +1,10 @@
 # Production RAG Benchmarks
 
-Last updated: 2026-08-25
+Last updated: 2026-08-30
 
 ## Result
 
-Twenty-nine exact artifacts representing 26 model identities now clear the current
+Thirty-one exact artifacts representing 28 model identities now clear the current
 absolute RAG SLOs, minimum model contribution, and same-host authoritative
 engine comparison:
 
@@ -41,6 +41,14 @@ engine comparison:
   supplies the comparator because Ollama and llama.cpp do not load this format.
 - **Qwen2.5 1.5B Q4_K_M** is `USABLE` for general guarded RAG and reaches
   108.7% of Ollama and 65.3% of llama.cpp decode throughput.
+- **Qwen2.5 3B Instruct Q4_K_M** is `USABLE` for general guarded RAG. Its
+  eight-worker Rust/FFM profile reaches 87.8% of Ollama median decode
+  throughput, with 1,085.4 ms p95 TTFT, 2,046.7 ms p95 end-to-end latency,
+  and 24 correct retained model answers across 27 trials.
+- **Qwen3.5 0.8B Q4_K_M** is `USABLE` for general guarded RAG. Java Vector API
+  convolution/gate kernels plus the profiled Gated DeltaNet FFM recurrence
+  reach 128.5% of Ollama median decode throughput, with 1,413.0 ms p95 TTFT,
+  1,648.6 ms p95 end-to-end latency, and 15 correct retained model answers.
 - **UmarTransit 1B Q4_K_M** is `USABLE` for transportation guarded RAG and
   reaches 115.2% of Ollama and 68.8% of llama.cpp decode throughput.
 - **MiniCPM5 1B Q4_K_M** is `USABLE` for coding guarded RAG and reaches 131.2%
@@ -79,7 +87,8 @@ controls, and same-host comparator evidence. Exact reports are under
 `benchmark-results/certified-20260725/rag/`, and
 `benchmark-results/certified-20260726/rag/`. Corrected Gemma 4, H2O Danube3,
 and Safetensors requalification evidence is under
-`benchmark-results/certified-20260825/rag/`.
+`benchmark-results/certified-20260825/rag/`. The Qwen2.5 3B and Qwen3.5 0.8B
+qualification records are under `benchmark-results/certified-20260830/rag/`.
 
 Quantization variants are retained as independently qualified artifacts but do
 not increase the distinct-model launch count. The generated ModelJars

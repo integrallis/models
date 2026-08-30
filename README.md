@@ -92,7 +92,7 @@ Implemented functionality includes:
 
 ## Supported Models
 
-Committed same-host evidence covers 29 exact artifacts across 26 model
+Committed same-host evidence covers 31 exact artifacts across 28 model
 identities below. Support is bound to an artifact SHA, workload, runtime
 selector, backend plan, correctness result, and latency measurements; consult
 the qualification ledger for those exact details.
@@ -103,8 +103,10 @@ the qualification ledger for those exact details.
 | SmolLM2 1.7B | General |
 | SmolLM3 3B | General |
 | Qwen3 1.7B | General |
+| Qwen3.5 0.8B | General |
 | Qwen2.5 0.5B | General |
 | Qwen2.5 1.5B | General |
+| Qwen2.5 3B | General |
 | Llama 3.2 1B | General |
 | Llama 3.2 3B | General |
 | Gemma 3 1B | General |
@@ -136,14 +138,13 @@ bundle. The pure-Java path is `USABLE` on the controlled EPYC host and is
 checked against the same pinned snapshot through Transformers. See the
 [retained Safetensors evidence](benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16/README.md).
 
-Dense, text-only Qwen3.5 GGUF execution is integration-tested in pure Java
-against pinned llama.cpp token oracles for the 0.8B Q4_K_M and 4B Q4_K_M
-artifacts. The 4B gate covers grouped Gated DeltaNet value heads. These
-artifacts remain outside the qualified list: the 0.8B artifact answered all
-nine controlled workload cases correctly, but its measured latency still
-failed the unchanged production gate. Qwen3.5 MoE, vision, and MTP execution
-are not supported by this release. See the
-[FreeToken compatibility and optimization audit](benchmark-results/freetoken-compatibility-20260829/README.md).
+Qwen3.5 0.8B Q4_K_M and Qwen2.5 3B Instruct Q4_K_M now clear the unchanged
+production RAG policy at the `USABLE` tier on the controlled 16-core EPYC host.
+The Qwen3.5 profile combines Java Vector API convolution and gate kernels with
+the narrow Models-owned Gated DeltaNet FFM kernel; its surrounding graph and
+state remain Java-owned. Qwen3.5 4B remains integration-tested but not
+production-qualified. Qwen3.5 MoE, vision, and MTP execution are not supported
+by this release. See the [production RAG ledger](RAG_BENCHMARKS.md).
 
 The official GPT-OSS 20B Safetensors/MXFP4 checkpoint passes cross-host first-token
 equivalence, greedy generation, and the exact Spring AI Harmony weather-tool loop through the
