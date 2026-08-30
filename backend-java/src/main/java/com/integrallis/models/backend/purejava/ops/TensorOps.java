@@ -1512,7 +1512,11 @@ public final class TensorOps {
       float[] up,
       int upOffset,
       int size) {
-    VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+    for (int i = 0; i < size; i++) {
+      float x = gate[gateOffset + i];
+      float silu = x / (1.0f + (float) Math.exp(-x));
+      out[outOffset + i] = silu * up[upOffset + i];
+    }
   }
 
   /** GELU-gated activation using llama.cpp's tanh approximation. */

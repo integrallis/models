@@ -446,7 +446,7 @@ public final class Qwen35ForwardPass {
           embeddingDimension,
           config.rmsNormEpsilon());
       dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
-      TensorOps.swiGlu(ffn, ffnGate, ffnUp, config.hiddenDim());
+      VectorUtil.swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
       project(projected, ffn, layer.ffnDown(), session.scratch);
       add(state, projected);
     }
@@ -502,7 +502,7 @@ public final class Qwen35ForwardPass {
           batch.projectionScratch);
       for (int index = 0; index < batchSize; index++) {
         int offset = index * config.hiddenDim();
-        TensorOps.swiGlu(
+        VectorUtil.swiGlu(
             batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
       }
       projectBatched(
@@ -720,7 +720,7 @@ public final class Qwen35ForwardPass {
             headDimension,
             config.rmsNormEpsilon());
       }
-      TensorOps.swiGlu(
+      VectorUtil.swiGlu(
           batch.recurrent,
           valueBase,
           batch.outputGate,
@@ -924,7 +924,7 @@ public final class Qwen35ForwardPass {
           headDimension,
           config.rmsNormEpsilon());
     }
-    TensorOps.swiGlu(recurrent, outputGate, recurrent, valueDimension);
+    VectorUtil.swiGlu(recurrent, 0, outputGate, 0, recurrent, 0, valueDimension);
     project(output, recurrent, weights.output(), session.scratch);
   }
 
