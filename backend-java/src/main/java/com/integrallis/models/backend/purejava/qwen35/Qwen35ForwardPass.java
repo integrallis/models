@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.FullAttentio
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.GatedDeltaNet;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Layer;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
+import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -154,15 +155,15 @@ public final class Qwen35ForwardPass {
     float[] hidden = forwardToken(token, position, session.state);
     session.tokenHistory[position] = token;
     session.checkpoint++;
-    return projectLogits ? projectLogits(hidden) : null;
+    return projectLogits ? projectLogits(hidden, session.state.scratch) : null;
   }
 
-  private float[] projectLogits(float[] hidden) {
+  private float[] projectLogits(float[] hidden, ProjectionScratch scratch) {
     float[] normalized = new float[config.embeddingDim()];
     TensorOps.rmsNorm(
         normalized, hidden, weights.outputNorm(), config.embeddingDim(), config.rmsNormEpsilon());
     float[] logits = new float[config.vocabSize()];
-    project(logits, normalized, weights.output());
+    project(logits, normalized, weights.output(), scratch);
     return logits;
   }
 
@@ -202,7 +203,8 @@ public final class Qwen35ForwardPass {
             layer.fullAttention(),
             position,
             session.keys[layerIndex],
-            session.values[layerIndex]);
+            session.values[layerIndex],
+            session.scratch);
       } else {
         gatedDeltaNet(projected, normalized, layer.gatedDeltaNet(), layerIndex, session);
       }
@@ -214,10 +216,9 @@ public final class Qwen35ForwardPass {
           layer.postAttentionNorm(),
           embeddingDimension,
           config.rmsNormEpsilon());
-      project(ffnGate, normalized, layer.ffnGate());
-      project(ffnUp, normalized, layer.ffnUp());
+      dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
       TensorOps.swiGlu(ffn, ffnGate, ffnUp, config.hiddenDim());
-      project(projected, ffn, layer.ffnDown());
+      project(projected, ffn, layer.ffnDown(), session.scratch);
       add(state, projected);
     }
 
@@ -230,7 +231,8 @@ public final class Qwen35ForwardPass {
       FullAttention weights,
       int position,
       float[] keyCache,
-      float[] valueCache) {
+      float[] valueCache,
+      ProjectionScratch scratch) {
     int headDimension = config.attentionHeadDim();
     int queryHeads = config.numHeads();
     int kvHeads = config.numKvHeads();
@@ -240,9 +242,8 @@ public final class Qwen35ForwardPass {
     float[] key = new float[config.attentionKeyDim()];
     float[] value = new float[config.attentionKeyDim()];
     float[] attended = new float[queryDimension];
-    project(queryGate, input, weights.queryGate());
-    project(key, input, weights.key());
-    project(value, input, weights.value());
+    tripleProject(
+        queryGate, weights.queryGate(), key, weights.key(), value, weights.value(), input, scratch);
 
     for (int head = 0; head < queryHeads; head++) {
       int sourceOffset = head * 2 * headDimension;
@@ -305,7 +306,7 @@ public final class Qwen35ForwardPass {
         attended[destination + column] = sum * sigmoid(queryGate[gate + column]);
       }
     }
-    project(output, attended, weights.output());
+    project(output, attended, weights.output(), scratch);
   }
 
   private void gatedDeltaNet(
@@ -319,10 +320,9 @@ public final class Qwen35ForwardPass {
     float[] outputGate = new float[valueDimension];
     float[] beta = new float[heads];
     float[] alpha = new float[heads];
-    project(mixed, input, weights.queryKeyValue());
-    project(outputGate, input, weights.outputGate());
-    project(beta, input, weights.beta());
-    project(alpha, input, weights.alpha());
+    project(mixed, input, weights.queryKeyValue(), session.scratch);
+    project(outputGate, input, weights.outputGate(), session.scratch);
+    dualProject(beta, weights.beta(), alpha, weights.alpha(), input, session.scratch);
 
     int kernel = config.gdnConvKernel();
     int historyLength = kernel - 1;
@@ -350,7 +350,7 @@ public final class Qwen35ForwardPass {
     }
 
     GatedDeltaNetRecurrence.Result recurrentResult =
-        GatedDeltaNetRecurrence.forward(
+        GatedDeltaNetRecurrence.forwardInPlace(
             query,
             key,
             value,
@@ -377,7 +377,7 @@ public final class Qwen35ForwardPass {
         recurrent[offset + column] *= silu(outputGate[offset + column]);
       }
     }
-    project(output, recurrent, weights.output());
+    project(output, recurrent, weights.output(), session.scratch);
   }
 
   private static final class SessionState {
@@ -385,12 +385,14 @@ public final class Qwen35ForwardPass {
     private final float[][] values;
     private final float[][] convolutionHistory;
     private final float[][] recurrentState;
+    private final ProjectionScratch scratch;
 
     private SessionState(Qwen35Config config, int capacity) {
       keys = new float[config.numLayers()][];
       values = new float[config.numLayers()][];
       convolutionHistory = new float[config.numLayers()][];
       recurrentState = new float[config.numLayers()][];
+      scratch = new ProjectionScratch(config);
       for (int layer = 0; layer < config.numLayers(); layer++) {
         if (config.usesFullAttention(layer)) {
           keys[layer] = new float[Math.multiplyExact(capacity, config.attentionKeyDim())];
@@ -398,14 +400,108 @@ public final class Qwen35ForwardPass {
         } else {
           convolutionHistory[layer] =
               new float[Math.multiplyExact(config.gdnConvDim(), config.gdnConvKernel() - 1)];
+          recurrentState[layer] =
+              new float
+                  [Math.multiplyExact(
+                      Math.multiplyExact(config.gdnValueHeads(), config.gdnHeadDim()),
+                      config.gdnHeadDim())];
         }
       }
     }
   }
 
-  private static void project(float[] output, float[] input, Matrix weights) {
+  private static final class ProjectionScratch {
+    private final byte[] quantizedActivation;
+    private final float[] quantizedActivationScales;
+    private final int[] quantizedActivationZeroPointCorrections;
+    private final short[] quantizedActivationSums;
+
+    private ProjectionScratch(Qwen35Config config) {
+      int maximumProjectionInput =
+          Math.max(config.hiddenDim(), Math.max(config.attentionQueryDim(), config.gdnValueDim()));
+      quantizedActivation = new byte[maximumProjectionInput];
+      quantizedActivationScales = new float[(maximumProjectionInput + 31) / 32];
+      quantizedActivationZeroPointCorrections = new int[(maximumProjectionInput + 3) / 4];
+      quantizedActivationSums = new short[(maximumProjectionInput + 15) / 16];
+    }
+  }
+
+  private void project(float[] output, float[] input, Matrix weights, ProjectionScratch scratch) {
     TensorOps.ggufMatmul(
-        output, input, weights.data(), weights.type(), weights.rows(), weights.columns());
+        output,
+        input,
+        weights.data(),
+        weights.type(),
+        weights.rows(),
+        weights.columns(),
+        scratch.quantizedActivation,
+        scratch.quantizedActivationScales,
+        scratch.quantizedActivationZeroPointCorrections,
+        scratch.quantizedActivationSums,
+        GgufQ4Kernel.WIDENED);
+  }
+
+  private void dualProject(
+      float[] firstOutput,
+      Matrix firstWeights,
+      float[] secondOutput,
+      Matrix secondWeights,
+      float[] input,
+      ProjectionScratch scratch) {
+    if (firstWeights.columns() != secondWeights.columns()) {
+      throw new IllegalArgumentException("grouped projections must share their input width");
+    }
+    TensorOps.ggufDualMatmul(
+        firstOutput,
+        firstWeights.data(),
+        firstWeights.type(),
+        firstWeights.rows(),
+        secondOutput,
+        secondWeights.data(),
+        secondWeights.type(),
+        secondWeights.rows(),
+        input,
+        firstWeights.columns(),
+        scratch.quantizedActivation,
+        scratch.quantizedActivationScales,
+        scratch.quantizedActivationZeroPointCorrections,
+        scratch.quantizedActivationSums,
+        GgufQ4Kernel.WIDENED);
+  }
+
+  private void tripleProject(
+      float[] firstOutput,
+      Matrix firstWeights,
+      float[] secondOutput,
+      Matrix secondWeights,
+      float[] thirdOutput,
+      Matrix thirdWeights,
+      float[] input,
+      ProjectionScratch scratch) {
+    if (firstWeights.columns() != secondWeights.columns()
+        || firstWeights.columns() != thirdWeights.columns()) {
+      throw new IllegalArgumentException("grouped projections must share their input width");
+    }
+    TensorOps.ggufTripleMatmul(
+        firstOutput,
+        firstWeights.data(),
+        firstWeights.type(),
+        firstWeights.rows(),
+        secondOutput,
+        secondWeights.data(),
+        secondWeights.type(),
+        secondWeights.rows(),
+        thirdOutput,
+        thirdWeights.data(),
+        thirdWeights.type(),
+        thirdWeights.rows(),
+        input,
+        firstWeights.columns(),
+        scratch.quantizedActivation,
+        scratch.quantizedActivationScales,
+        scratch.quantizedActivationZeroPointCorrections,
+        scratch.quantizedActivationSums,
+        GgufQ4Kernel.WIDENED);
   }
 
   private static void add(float[] destination, float[] source) {

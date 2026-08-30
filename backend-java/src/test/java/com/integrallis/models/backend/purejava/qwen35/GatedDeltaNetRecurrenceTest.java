@@ -150,6 +150,22 @@ class GatedDeltaNetRecurrenceTest {
     assertThat(second.finalState()).containsExactly(expected.finalState(), within(2.0e-6f));
   }
 
+  @Test
+  void inPlaceExecutionMatchesTheReferenceWithoutReplacingState() {
+    float[] initialState = {0.2f, -0.1f, 0.05f, 0.3f, -0.2f, 0.4f, 0.1f, -0.05f};
+    var expected =
+        GatedDeltaNetRecurrence.forward(
+            QUERY, KEY, VALUE, LOG_DECAY, BETA, initialState, 3, 2, 2, 2);
+    float[] mutableState = initialState.clone();
+
+    var actual =
+        GatedDeltaNetRecurrence.forwardInPlace(
+            QUERY, KEY, VALUE, LOG_DECAY, BETA, mutableState, 3, 2, 2, 2);
+
+    assertThat(actual.output()).containsExactly(expected.output());
+    assertThat(actual.finalState()).isSameAs(mutableState).containsExactly(expected.finalState());
+  }
+
   private static float[] firstTokens(float[] values, int dimension, int tokenCount) {
     return Arrays.copyOf(values, tokenCount * HEADS * dimension);
   }

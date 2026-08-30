@@ -47,6 +47,59 @@ final class GatedDeltaNetRecurrence {
       int headCount,
       int keyDimension,
       int valueDimension) {
+    return execute(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        initialState,
+        tokenCount,
+        headCount,
+        keyDimension,
+        valueDimension,
+        false);
+  }
+
+  /** Applies the same recurrence while mutating and retaining a caller-owned state array. */
+  static Result forwardInPlace(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] mutableState,
+      int tokenCount,
+      int headCount,
+      int keyDimension,
+      int valueDimension) {
+    Objects.requireNonNull(mutableState, "mutableState");
+    return execute(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        mutableState,
+        tokenCount,
+        headCount,
+        keyDimension,
+        valueDimension,
+        true);
+  }
+
+  private static Result execute(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] initialState,
+      int tokenCount,
+      int headCount,
+      int keyDimension,
+      int valueDimension,
+      boolean mutateState) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(key, "key");
     Objects.requireNonNull(value, "value");
@@ -70,7 +123,10 @@ final class GatedDeltaNetRecurrence {
       requireLength(initialState, stateSize, "initialState");
     }
 
-    float[] state = initialState == null ? new float[stateSize] : initialState.clone();
+    float[] state =
+        mutateState
+            ? initialState
+            : initialState == null ? new float[stateSize] : initialState.clone();
     float[] output = new float[valueSize];
     float[] normalizedQuery = new float[keyDimension];
     float[] normalizedKey = new float[keyDimension];
