@@ -274,8 +274,8 @@ class ModelsChatModelToolCallingTest {
     void recoversAGptOssHarmonyCallFromTheGeneratedHeaderContinuation() {
       ScriptedModel model =
           new ScriptedModel(
-              " to=functions.get_weather<|channel|>commentary json"
-                  + "<|message|>{\"city\":\"Austin\"}");
+              "<|channel|>commentary to=functions.get_weather "
+                  + "<|constrain|>json<|message|>{\"city\":\"Austin\"}<|call|>");
       ChatRequest request =
           ChatRequest.builder()
               .messages(UserMessage.from("weather?"))
@@ -464,7 +464,7 @@ class ModelsChatModelToolCallingTest {
 
       assertThat(model.lastPrompt())
           .contains(
-              "<|start|>functions.get_weather<|channel|>commentary<|message|>"
+              "<|start|>functions.get_weather to=assistant<|channel|>commentary<|message|>"
                   + "{\"condition\":\"rain\"}<|end|>");
     }
 

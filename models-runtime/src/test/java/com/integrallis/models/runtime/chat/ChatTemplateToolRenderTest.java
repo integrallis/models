@@ -392,9 +392,11 @@ class ChatTemplateToolRenderTest {
 
       assertThat(prompt.text())
           .contains(
-              "<|start|>assistant to=functions.get-weather-for-zipcode<|channel|>commentary json"
+              "<|start|>assistant<|channel|>commentary "
+                  + "to=functions.get-weather-for-zipcode <|constrain|>json"
                   + "<|message|>{\"zipcode\":\"88252\"}<|call|>"
-                  + "<|start|>functions.get-weather-for-zipcode<|channel|>commentary<|message|>"
+                  + "<|start|>functions.get-weather-for-zipcode "
+                  + "to=assistant<|channel|>commentary<|message|>"
                   + "{\"zipcode\":\"88252\",\"condition\":\"Rain\",\"temperature\":78}<|end|>"
                   + "<|start|>assistant");
     }

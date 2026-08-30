@@ -146,7 +146,7 @@ public record ToolSyntax(
   public static final ToolSyntax HARMONY =
       new ToolSyntax(
           Mode.HARMONY,
-          "<|start|>assistant to=functions.",
+          "<|start|>assistant<|channel|>commentary to=functions.",
           "<|call|>",
           "name",
           "arguments",

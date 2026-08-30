@@ -411,8 +411,8 @@ class ModelsSpringAiToolCallingTest {
     void gptOssHarmonyExecutesTheUsersToolAndReturnsOnlyTheFinalChannel() {
       SequentialScriptedModel model =
           new SequentialScriptedModel(
-              " to=functions.get-weather-for-zipcode<|channel|>commentary json"
-                  + "<|message|>{\"zipcode\":\"88252\"}",
+              "<|channel|>commentary to=functions.get-weather-for-zipcode "
+                  + "<|constrain|>json<|message|>{\"zipcode\":\"88252\"}<|call|>",
               "<|channel|>final<|message|>It is 78 degrees in 88252.<|return|>");
       ModelsSpringAiChatModel adapter =
           new ModelsSpringAiChatModel(
@@ -431,7 +431,8 @@ class ModelsSpringAiToolCallingTest {
       assertThat(model.prompts()).hasSize(2);
       assertThat(model.prompts().get(1))
           .contains(
-              "<|start|>functions.get-weather-for-zipcode<|channel|>commentary<|message|>",
+              "<|start|>functions.get-weather-for-zipcode "
+                  + "to=assistant<|channel|>commentary<|message|>",
               "Raining cats and dogs",
               "<|start|>assistant");
     }
@@ -596,8 +597,8 @@ class ModelsSpringAiToolCallingTest {
     void recoversAGptOssHarmonyCallFromTheGeneratedHeaderContinuation() {
       ScriptedModel model =
           new ScriptedModel(
-              " to=functions.get_weather<|channel|>commentary json"
-                  + "<|message|>{\"city\":\"Austin\"}");
+              "<|channel|>commentary to=functions.get_weather "
+                  + "<|constrain|>json<|message|>{\"city\":\"Austin\"}<|call|>");
       ModelsSpringAiChatModel chat =
           new ModelsSpringAiChatModel(
               model, ChatTemplate.GPT_OSS, SamplingOptions.builder().build());
@@ -767,7 +768,7 @@ class ModelsSpringAiToolCallingTest {
 
       assertThat(model.lastPrompt())
           .contains(
-              "<|start|>functions.get_weather<|channel|>commentary<|message|>"
+              "<|start|>functions.get_weather to=assistant<|channel|>commentary<|message|>"
                   + "{\"condition\":\"rain\"}<|end|>");
     }
 

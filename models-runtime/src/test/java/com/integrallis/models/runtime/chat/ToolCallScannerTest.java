@@ -29,11 +29,12 @@ class ToolCallScannerTest {
   static class HarmonyCalls {
 
     @Test
-    void extractsTheRecipientAndArgumentsFromACommentaryCall() {
+    void extractsTheOfficialHarmonyRecipientAndArgumentsFromACommentaryCall() {
       String output =
           "<|channel|>analysis<|message|>I need the weather.<|end|>"
-              + "<|start|>assistant to=functions.get-weather-for-zipcode"
-              + "<|channel|>commentary json<|message|>{\"zipcode\":\"88252\"}<|call|>";
+              + "<|start|>assistant<|channel|>commentary "
+              + "to=functions.get-weather-for-zipcode <|constrain|>json"
+              + "<|message|>{\"zipcode\":\"88252\"}<|call|>";
 
       ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HARMONY);
 
@@ -48,7 +49,30 @@ class ToolCallScannerTest {
     }
 
     @Test
-    void extractsACallThatContinuesTheAssistantHeaderAlreadyInThePrompt() {
+    void extractsTheExactOfficialCheckpointWeatherCall() {
+      String output =
+          "<|channel|>analysis<|message|>We need to call the function "
+              + "get-weather-for-zipcode with zipcode \"88252\".<|end|>"
+              + "<|start|>assistant<|channel|>commentary "
+              + "to=functions.get-weather-for-zipcode <|constrain|>json"
+              + "<|message|>{\"zipcode\":\"88252\"}<|call|>";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HARMONY);
+
+      assertThat(result.content())
+          .isEqualTo(
+              "We need to call the function get-weather-for-zipcode with zipcode \"88252\".");
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get-weather-for-zipcode");
+                assertThat(call.argumentsJson()).isEqualTo("{\"zipcode\":\"88252\"}");
+              });
+    }
+
+    @Test
+    void remainsCompatibleWithTheLegacyRecipientBeforeChannelHeader() {
       String output =
           " to=functions.get-weather-for-zipcode<|channel|>commentary json"
               + "<|message|>{\"zipcode\":\"88252\"}";
@@ -73,6 +97,18 @@ class ToolCallScannerTest {
 
       assertThat(result.hasCalls()).isFalse();
       assertThat(result.content()).isEqualTo("It is raining.");
+    }
+
+    @Test
+    void exposesFinalTextButNotPrivateAnalysisWhenTheTurnIsComplete() {
+      String output =
+          "<|channel|>analysis<|message|>The user asked for one language.<|end|>"
+              + "<|start|>assistant<|channel|>final<|message|>Java.<|return|>";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HARMONY);
+
+      assertThat(result.hasCalls()).isFalse();
+      assertThat(result.content()).isEqualTo("Java.");
     }
   }
 

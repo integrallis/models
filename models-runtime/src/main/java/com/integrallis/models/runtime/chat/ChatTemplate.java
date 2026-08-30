@@ -355,9 +355,9 @@ public enum ChatTemplate {
           }
           for (ToolCall call : message.toolCalls()) {
             prompt
-                .control("<|start|>assistant to=functions.")
+                .control("<|start|>assistant<|channel|>commentary to=functions.")
                 .text(call.name())
-                .control("<|channel|>commentary json<|message|>")
+                .control(" <|constrain|>json<|message|>")
                 .text(call.argumentsJson())
                 .control("<|call|>");
           }
@@ -369,7 +369,7 @@ public enum ChatTemplate {
           prompt
               .control("<|start|>functions.")
               .text(message.name())
-              .control("<|channel|>commentary<|message|>")
+              .control(" to=assistant<|channel|>commentary<|message|>")
               .text(message.text())
               .control("<|end|>");
         }
