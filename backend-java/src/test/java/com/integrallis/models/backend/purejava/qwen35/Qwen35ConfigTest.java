@@ -62,6 +62,20 @@ class Qwen35ConfigTest {
   }
 
   @Test
+  void acceptsTheGroupedGdnHeadLayoutUsedByDenseFourAndNineBillionParameterModels() {
+    Map<String, GgufMetadataValue> entries = entries();
+    entries.put("qwen35.ssm.time_step_rank", uint(32));
+    entries.put("qwen35.ssm.inner_size", uint(4_096));
+
+    Qwen35Config config = Qwen35Config.fromMetadata(new GgufMetadata(entries));
+
+    assertThat(config.gdnKeyHeads()).isEqualTo(16);
+    assertThat(config.gdnValueHeads()).isEqualTo(32);
+    assertThat(config.gdnKeyDim()).isEqualTo(2_048);
+    assertThat(config.gdnValueDim()).isEqualTo(4_096);
+  }
+
+  @Test
   void rejectsAnArchitectureThatOnlyLooksSimilar() {
     Map<String, GgufMetadataValue> entries = entries();
     entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));

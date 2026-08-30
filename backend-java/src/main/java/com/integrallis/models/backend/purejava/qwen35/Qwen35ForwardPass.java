@@ -358,6 +358,7 @@ public final class Qwen35ForwardPass {
             beta,
             session.recurrentState[layer],
             1,
+            config.gdnKeyHeads(),
             heads,
             headDimension,
             headDimension);

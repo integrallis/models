@@ -31,8 +31,8 @@ final class GatedDeltaNetRecurrence {
    *
    * <p>Query and key are laid out as {@code [token][head][keyDimension]}; value and output as
    * {@code [token][head][valueDimension]}; gates as {@code [token][head]}; and state as {@code
-   * [head][keyDimension][valueDimension]}. Grouped query/key heads must be expanded to the value
-   * head count before calling this compatibility kernel.
+   * [head][keyDimension][valueDimension]}. When there are fewer key heads, value-head tensors use
+   * the tiled order emitted by the GGUF Qwen3.5 conversion ({@code K0,K1,...,K0,K1,...}).
    *
    * <p>The input state is copied and never mutated. A {@code null} state starts a cold sequence.
    */
@@ -56,6 +56,35 @@ final class GatedDeltaNetRecurrence {
         initialState,
         tokenCount,
         headCount,
+        headCount,
+        keyDimension,
+        valueDimension,
+        false);
+  }
+
+  /** Applies the recurrence while expanding grouped query/key heads to value heads in place. */
+  static Result forward(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] initialState,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    return execute(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        initialState,
+        tokenCount,
+        keyHeadCount,
+        valueHeadCount,
         keyDimension,
         valueDimension,
         false);
@@ -83,6 +112,36 @@ final class GatedDeltaNetRecurrence {
         mutableState,
         tokenCount,
         headCount,
+        headCount,
+        keyDimension,
+        valueDimension,
+        true);
+  }
+
+  /** Applies grouped query/key recurrence while retaining a caller-owned state array. */
+  static Result forwardInPlace(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] mutableState,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    Objects.requireNonNull(mutableState, "mutableState");
+    return execute(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        mutableState,
+        tokenCount,
+        keyHeadCount,
+        valueHeadCount,
         keyDimension,
         valueDimension,
         true);
@@ -96,7 +155,8 @@ final class GatedDeltaNetRecurrence {
       float[] beta,
       float[] initialState,
       int tokenCount,
-      int headCount,
+      int keyHeadCount,
+      int valueHeadCount,
       int keyDimension,
       int valueDimension,
       boolean mutateState) {
@@ -106,19 +166,25 @@ final class GatedDeltaNetRecurrence {
     Objects.requireNonNull(logDecay, "logDecay");
     Objects.requireNonNull(beta, "beta");
     requirePositive(tokenCount, "tokenCount");
-    requirePositive(headCount, "headCount");
+    requirePositive(keyHeadCount, "keyHeadCount");
+    requirePositive(valueHeadCount, "valueHeadCount");
     requirePositive(keyDimension, "keyDimension");
     requirePositive(valueDimension, "valueDimension");
+    if (valueHeadCount % keyHeadCount != 0) {
+      throw new IllegalArgumentException("valueHeadCount must be divisible by keyHeadCount");
+    }
 
-    int tokenHeads = Math.multiplyExact(tokenCount, headCount);
-    int querySize = Math.multiplyExact(tokenHeads, keyDimension);
-    int valueSize = Math.multiplyExact(tokenHeads, valueDimension);
-    int stateSize = Math.multiplyExact(Math.multiplyExact(headCount, keyDimension), valueDimension);
+    int tokenKeyHeads = Math.multiplyExact(tokenCount, keyHeadCount);
+    int tokenValueHeads = Math.multiplyExact(tokenCount, valueHeadCount);
+    int querySize = Math.multiplyExact(tokenKeyHeads, keyDimension);
+    int valueSize = Math.multiplyExact(tokenValueHeads, valueDimension);
+    int stateSize =
+        Math.multiplyExact(Math.multiplyExact(valueHeadCount, keyDimension), valueDimension);
     requireLength(query, querySize, "query");
     requireLength(key, querySize, "key");
     requireLength(value, valueSize, "value");
-    requireLength(logDecay, tokenHeads, "logDecay");
-    requireLength(beta, tokenHeads, "beta");
+    requireLength(logDecay, tokenValueHeads, "logDecay");
+    requireLength(beta, tokenValueHeads, "beta");
     if (initialState != null) {
       requireLength(initialState, stateSize, "initialState");
     }
@@ -131,11 +197,11 @@ final class GatedDeltaNetRecurrence {
     float[] normalizedQuery = new float[keyDimension];
     float[] normalizedKey = new float[keyDimension];
     float queryScale = (float) (1.0 / Math.sqrt(keyDimension));
-
     for (int token = 0; token < tokenCount; token++) {
-      for (int head = 0; head < headCount; head++) {
-        int tokenHead = token * headCount + head;
-        int queryOffset = tokenHead * keyDimension;
+      for (int head = 0; head < valueHeadCount; head++) {
+        int tokenHead = token * valueHeadCount + head;
+        int keyHead = head % keyHeadCount;
+        int queryOffset = (token * keyHeadCount + keyHead) * keyDimension;
         normalize(query, queryOffset, normalizedQuery);
         normalize(key, queryOffset, normalizedKey);
         for (int column = 0; column < keyDimension; column++) {

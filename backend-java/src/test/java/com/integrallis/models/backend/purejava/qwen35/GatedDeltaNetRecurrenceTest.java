@@ -166,6 +166,25 @@ class GatedDeltaNetRecurrenceTest {
     assertThat(actual.finalState()).isSameAs(mutableState).containsExactly(expected.finalState());
   }
 
+  @Test
+  void usesTheTiledGgufHeadOrderForGroupedQueryAndKeyHeads() {
+    float[] query = {1.0f, 0.0f, 1.0f, 0.0f};
+    float[] key = {1.0f, 0.0f, 0.0f, 1.0f};
+    float[] value = {1.0f, 2.0f, 3.0f, 4.0f};
+    float[] logDecay = {0.0f, 0.0f, 0.0f, 0.0f};
+    float[] beta = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    var actual =
+        GatedDeltaNetRecurrence.forward(query, key, value, logDecay, beta, null, 1, 2, 4, 2, 1);
+
+    assertThat(actual.output())
+        .containsExactly(new float[] {0.70710605f, 0.0f, 2.121318f, 0.0f}, within(2.0e-6f));
+    assertThat(actual.finalState())
+        .containsExactly(
+            new float[] {0.9999995f, 0.0f, 0.0f, 1.999999f, 2.9999986f, 0.0f, 0.0f, 3.999998f},
+            within(2.0e-6f));
+  }
+
   private static float[] firstTokens(float[] values, int dimension, int tokenCount) {
     return Arrays.copyOf(values, tokenCount * HEADS * dimension);
   }

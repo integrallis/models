@@ -35,7 +35,7 @@ class Qwen35GgufLayoutTest {
       ModelFixtureRequirement.of("hf://unsloth/Qwen3.5-0.8B-GGUF")
           .version("[3.5.0,3.6.0)")
           .variant("q4_k_m")
-          .backend("parser")
+          .backend("pure-java")
           .capability("chat");
 
   @Test
