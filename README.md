@@ -147,7 +147,9 @@ are not supported by this release. See the
 The official GPT-OSS 20B Safetensors/MXFP4 checkpoint passes cross-host first-token
 equivalence, greedy generation, and the exact Spring AI Harmony weather-tool loop through the
 pure-Java backend. It is not yet a qualified ModelJar: the retained two-turn EPYC test took
-1,370.459 seconds with serial prompt rewind and prefill. See the
+1,370.459 seconds with serial prompt rewind and prefill. Two layer-wise prefill candidates
+preserved the oracle result but regressed an isolated EPYC baseline by 31% and 42%, so neither was
+retained; optimization is now focused on the measured MXFP4 expert hot loop. See the
 [GPT-OSS evidence](benchmark-results/freetoken-compatibility-20260829/gpt-oss-20b-official-checkpoint-java.json).
 
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)

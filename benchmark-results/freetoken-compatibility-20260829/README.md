@@ -24,7 +24,7 @@ model listed here.
 | Qwen 3.5 dense | Added in Java during this audit | Qualify 0.8B and 4B first; screen 2B and 9B with the same oracle gates |
 | Qwen 3 MoE | Not implemented | Reuse the existing Gemma 4 expert loader/cache, but add Qwen routing and graph semantics test-first |
 | Qwen 3.5 MoE | Dense hybrid graph exists; routed MLP does not | Best MoE follow-on after dense Qwen 3.5 qualification |
-| GPT-OSS | Official 20B Safetensors/MXFP4 graph, generation, and Spring AI tool loop execute through the public pure-Java backend | Add batched prefill, then repeat quality, memory, and throughput gates before catalog promotion |
+| GPT-OSS | Official 20B Safetensors/MXFP4 graph, generation, and Spring AI tool loop execute through the public pure-Java backend | Optimize the MXFP4 expert hot loop, then repeat quality, memory, and throughput gates before catalog promotion |
 | Muse Glimmer | Not implemented | Defer until native NVFP4 linear execution is measured; smallest cited model is 30B |
 | MiniMax M2/M3, GLM MoE/DSA, DeepSeek V4 | Not implemented | Defer: very large MoE and sparse-attention systems are poor first catalog artifacts |
 
@@ -156,8 +156,11 @@ Correctness does not make the checkpoint catalog-ready. The cold retained EPYC g
 took 446.078 seconds, including 211.822 seconds of prefill. The two-turn Spring AI test took
 1,370.459 seconds. A live stack sample showed serial MXFP4 work first in shared-prefix rewind and
 then in suffix prefill. The six-core Cascade Lake virtual CPU was slower still in the earlier
-first-token screen. The next experiment is therefore layer-wise batched MXFP4 prefill plus prompt
-state reuse, followed by the same end-to-end gate and a controlled quality workload. Complete
+first-token screen. A test-first layer-wise prompt-prefill experiment then preserved strict
+synthetic parity and passed every oracle check, but the Vector API BF16 batch and layer-wise
+repeated-GEMV variants took 201.700 and 219.105 seconds. Bracketing serial runs took 153.875 and
+153.791 seconds on the same EPYC host. Both production candidates were removed. The next
+performance experiment must target the measured MXFP4 expert hot loop. Complete
 hashes, independent generation/tool oracles, host measurements, and thresholds are in
 `gpt-oss-20b-official-checkpoint-java.json` and
 `gpt-oss-20b-transformers-generation-oracles.json`.
@@ -182,8 +185,9 @@ hashes, independent generation/tool oracles, host measurements, and thresholds a
 - **NVFP4 Safetensors execution.** Models parses Safetensors bundles and recognizes NVFP4 layout,
   but that is not end-to-end model execution. Start with independently checked unpack, scaling,
   and dot-product primitives before adding Muse Glimmer graphs. MXFP4 and the GPT-OSS graph have
-  passed official-checkpoint equivalence, generation, and a Spring AI tool loop; GPT-OSS still
-  needs batched prefill and controlled quality, memory, and throughput qualification.
+  passed official-checkpoint equivalence, generation, and a Spring AI tool loop. Two layer-wise
+  prefill layouts were slower than serial execution, so GPT-OSS instead needs MXFP4 expert-kernel
+  work and controlled quality, memory, and throughput qualification.
 - **Expert residency scheduling.** FreeToken's pinned host banks and asynchronous GPU transfers are
   useful design references once Models has a qualified JVM GPU backend. They do not justify adding
   FreeToken, PyTorch, CUDA Python, or another external inference dependency.

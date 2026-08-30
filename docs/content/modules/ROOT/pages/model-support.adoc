@@ -26,7 +26,10 @@ GGUF checkpoints; its MoE, vision, and MTP paths are not supported. The
 Hugging Face path supports strict Qwen 2/Qwen2.5 BF16 and GPT-OSS MXFP4
 Safetensors bundles with either one weight file or an indexed shard set. GPT-OSS
 implements the official Harmony prompt and tool-call protocol, but its current
-serial prompt prefill does not pass the catalog performance gate. The CACT path
+serial prompt prefill does not pass the catalog performance gate. Two
+layer-wise prefill candidates preserved the independent oracle result but were
+31% and 42% slower than the controlled serial baseline, so neither is shipped;
+the next performance gate targets the measured MXFP4 expert hot loop. The CACT path
 supports the released Needle 2 architecture and mixed CQ2/CQ4
 artifact layout. `ChatTemplate.NEEDLE2` implements its official raw-schema
 prompt protocol, including optional system facts and array-wrapped parallel
