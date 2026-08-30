@@ -24,7 +24,7 @@ model listed here.
 | Qwen 3.5 dense | Added in Java during this audit | Qualify 0.8B and 4B first; screen 2B and 9B with the same oracle gates |
 | Qwen 3 MoE | Not implemented | Reuse the existing Gemma 4 expert loader/cache, but add Qwen routing and graph semantics test-first |
 | Qwen 3.5 MoE | Dense hybrid graph exists; routed MLP does not | Best MoE follow-on after dense Qwen 3.5 qualification |
-| GPT-OSS | Safetensors MXFP4 mapping, expert math, and one routed layer implemented internally | Validate attention sinks and the decoder graph next; 20B remains the smallest end-to-end candidate |
+| GPT-OSS | Official 20B Safetensors/MXFP4 graph executes through the public pure-Java backend | Complete public generation, framework tool-call, quality, memory, and throughput gates before catalog promotion |
 | Muse Glimmer | Not implemented | Defer until native NVFP4 linear execution is measured; smallest cited model is 30B |
 | MiniMax M2/M3, GLM MoE/DSA, DeepSeek V4 | Not implemented | Defer: very large MoE and sparse-attention systems are poor first catalog artifacts |
 
@@ -133,6 +133,23 @@ retain the Java implementation and continue to attention sinks and the decoder g
 Rust shim. Raw samples, the pinned revisions, and the exact command are in
 `gpt-oss-20b-mxfp4-moe-intel-mac.json`.
 
+### GPT-OSS official checkpoint compatibility
+
+The complete pure-Java decoder now maps and executes the official, three-shard
+`openai/gpt-oss-20b` checkpoint at immutable revision
+`6cee5e81ee83917806bbde320786a8fb61efebee`. An independent Transformers 4.57.6 run
+produced all 201,088 first-token logits for the exact 61-token Harmony prompt. Java selected the
+same `<|channel|>` token and the complete oracle top-10 set on both EPYC Milan and Cascade Lake.
+Full-vector cosine was 0.998585 and 0.997862 respectively; the hardware envelope is enforced by
+the repeatable integration gate rather than assumed from one CPU.
+
+The EPYC prefill took 80.918 seconds. The six-core Cascade Lake virtual CPU took 344.874 seconds,
+despite being sold as part of a GPU instance; the Java path correctly did not use an unrelated
+external GPU runtime. This passes checkpoint compatibility, not product performance. The next
+experiment is a profile-led bounded/batched prefill change, followed by actual public generation
+and Spring AI/LangChain4j tool execution. Complete hashes, oracle provenance, host measurements,
+and thresholds are in `gpt-oss-20b-official-checkpoint-java.json`.
+
 ### Implement next
 
 1. **Bounded cross-request prefix cache.** FreeToken stores convolution and recurrent state at
@@ -152,9 +169,9 @@ Rust shim. Raw samples, the pinned revisions, and the exact command are in
   projections; JFR must show the remaining elementwise work matters before adding special paths.
 - **NVFP4 Safetensors execution.** Models parses Safetensors bundles and recognizes NVFP4 layout,
   but that is not end-to-end model execution. Start with independently checked unpack, scaling,
-  and dot-product primitives before adding Muse Glimmer graphs. MXFP4 has passed its independent
-  mapping, math, correctness, and routed-layer performance gates; GPT-OSS still needs its remaining
-  graph and runtime work.
+  and dot-product primitives before adding Muse Glimmer graphs. MXFP4 and the GPT-OSS graph have
+  passed official-checkpoint equivalence; GPT-OSS still needs generation, framework, quality,
+  memory, and throughput qualification.
 - **Expert residency scheduling.** FreeToken's pinned host banks and asynchronous GPU transfers are
   useful design references once Models has a qualified JVM GPU backend. They do not justify adding
   FreeToken, PyTorch, CUDA Python, or another external inference dependency.

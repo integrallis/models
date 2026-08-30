@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "official-checkpoint-compatibility",
+  "recordedAt": "2026-08-30",
+  "modelsGraphRevision": "7ef1a4d8af863f8658e2cd1c9b02ab5d68c1f7cf",
+  "vectorsVersion": "0.1.16",
+  "checkpoint": {
+    "sourceId": "hf://openai/gpt-oss-20b",
+    "revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "format": "safetensors",
+    "encoding": "MXFP4",
+    "files": {
+      "config.json": "3a2a26ded679375b7928ddeca59764df7cea83220c1961035f6d6e232659e9ce",
+      "tokenizer.json": "0614fe83cadab421296e664e1f48f4261fa8fef6e03e63bb75c20f38e37d07d3",
+      "tokenizer_config.json": "9279e942392b742d633c7adbb89ebe002c98399db8926a7af5125c726f404070",
+      "model.safetensors.index.json": "0e085b977c4c9942f85938828e8c989ed7d5cdabf852e4da6a67c116cd502cd1",
+      "model-00000-of-00002.safetensors": "16d0f997dcfc4462089d536bffe51b4bcea2f872f5c430be09ef8ed392312427",
+      "model-00001-of-00002.safetensors": "4fbe328ab445455d6f58dc73852b85873bd626986310abd91cd4d2ce3245eaea",
+      "model-00002-of-00002.safetensors": "a18106b209e9ab35c3406db4f6f12a927364a058b21e9d1373d682e20674b303"
+    }
+  },
+  "oracle": {
+    "implementation": "transformers",
+    "version": "4.57.6",
+    "torchVersion": "2.6.0+cu124",
+    "configuration": "Mxfp4Config(dequantize=true), BF16, CPU",
+    "logitsSha256": "bc730be62f405fcd9e9ca737c511f4ac0187e461ce2dfae3d13f03a8a31240a7",
+    "argmaxToken": 200005,
+    "argmaxText": "<|channel|>"
+  },
+  "workload": {
+    "chatTemplate": "gpt-oss",
+    "userMessage": "Name one JVM language.",
+    "promptTokens": 61,
+    "vocabularySize": 201088,
+    "comparison": "all first-token logits"
+  },
+  "measurements": [
+    {
+      "host": "vectors-bench",
+      "cpu": "8-vCPU AMD EPYC Milan",
+      "memoryGiB": 30,
+      "java": "Eclipse Temurin 25.0.3",
+      "vectorBits": 256,
+      "prefillSeconds": 80.918,
+      "cosine": 0.998585305,
+      "rmse": 0.227149892,
+      "maxAbsoluteError": 1.232457638,
+      "top10Overlap": 10,
+      "argmaxToken": 200005
+    },
+    {
+      "host": "Vultr vcg-a16-12c-128g-32vram",
+      "cpu": "6-core/12-thread Intel Cascade Lake virtual CPU",
+      "memoryGiB": 125,
+      "java": "Eclipse Temurin 25.0.4.1",
+      "vectorBits": 256,
+      "prefillSeconds": 344.874,
+      "cosine": 0.997861871,
+      "rmse": 0.279028002,
+      "maxAbsoluteError": 1.537218571,
+      "top10Overlap": 10,
+      "argmaxToken": 200005
+    }
+  ],
+  "gate": {
+    "checkpointHashes": "pass",
+    "exactPromptTokens": "pass",
+    "finiteLogits": "pass",
+    "oracleArgmax": "pass",
+    "oracleTop10Set": "pass on both hosts",
+    "fullLogitTolerance": "pass on both hosts"
+  },
+  "verdict": "The official GPT-OSS 20B checkpoint executes correctly through the in-process pure-Java backend on two x86-64 CPUs. Public generation, framework tool calls, quality, memory, and throughput remain release gates; this evidence alone does not qualify a ModelJars catalog artifact."
+}

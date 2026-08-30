@@ -157,6 +157,8 @@ val configuredQwen25HuggingFaceDirectory =
     providers.systemProperty("models.fixtures.qwen25HuggingFaceDirectory")
 val configuredGptOssHuggingFaceDirectory =
     providers.systemProperty("models.fixtures.gptOssHuggingFaceDirectory")
+val configuredGptOssOracleLogits =
+    providers.systemProperty("models.fixtures.gptOssOracleLogits")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
@@ -171,6 +173,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredGptOssHuggingFaceDirectory.orNull?.let {
         systemProperty("models.fixtures.gptOssHuggingFaceDirectory", it)
+    }
+    configuredGptOssOracleLogits.orNull?.let {
+        systemProperty("models.fixtures.gptOssOracleLogits", it)
     }
 }
 
@@ -358,6 +363,24 @@ tasks.register<Test>("qwen25HuggingFaceIntegrationTest") {
             "com.integrallis.models.backend.purejava.Qwen2HuggingFaceBackendIntegrationTest",
         )
     }
+    maxHeapSize = "4g"
+}
+
+tasks.register<Test>("gptOssHuggingFaceIntegrationTest") {
+    description = "Run the pinned GPT-OSS 20B MXFP4 Safetensors compatibility test"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.GptOssHuggingFaceBackendIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
     maxHeapSize = "4g"
 }
 
