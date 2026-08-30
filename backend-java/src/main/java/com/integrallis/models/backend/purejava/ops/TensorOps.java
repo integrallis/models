@@ -1282,6 +1282,48 @@ public final class TensorOps {
     }
   }
 
+  /**
+   * In-place stable softmax for attention scores with one learned sink logit whose value vector is
+   * zero. The returned scores therefore sum to at most one; the remaining probability belongs to
+   * the sink and contributes no value to the attention output.
+   */
+  public static void softmaxWithZeroValueSink(
+      float[] scores, int offset, int size, float sinkLogit) {
+    Objects.requireNonNull(scores, "scores");
+    if (size <= 0) {
+      throw new IllegalArgumentException("size must be positive: " + size);
+    }
+    Objects.checkFromIndexSize(offset, size, scores.length);
+    if (!Float.isFinite(sinkLogit)) {
+      throw new IllegalArgumentException("sink logit must be finite: " + sinkLogit);
+    }
+
+    float maximum = sinkLogit;
+    for (int index = 0; index < size; index++) {
+      float score = scores[offset + index];
+      if (Float.isNaN(score)) {
+        throw new IllegalArgumentException(
+            "attention score contains NaN at index " + (offset + index));
+      }
+      if (score == Float.POSITIVE_INFINITY) {
+        throw new IllegalArgumentException(
+            "attention score contains positive infinity at index " + (offset + index));
+      }
+      maximum = Math.max(maximum, score);
+    }
+
+    float denominator = (float) Math.exp(sinkLogit - maximum);
+    for (int index = 0; index < size; index++) {
+      float probability = (float) Math.exp(scores[offset + index] - maximum);
+      scores[offset + index] = probability;
+      denominator += probability;
+    }
+    float inverseDenominator = 1.0f / denominator;
+    for (int index = 0; index < size; index++) {
+      scores[offset + index] *= inverseDenominator;
+    }
+  }
+
   /** In-place rotary position embedding on q and k vectors. */
   public static void rope(float[] q, float[] k, int position, int headDim, float ropeTheta) {
     rope(q, 0, k, 0, position, headDim, ropeTheta);

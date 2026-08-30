@@ -1461,6 +1461,30 @@ class TensorOpsTest {
     }
 
     @Test
+    void zeroValueSinkMatchesFreeTokenOnlineSoftmaxInitialization() {
+      float[] scores = {99.0f, 1.25f, -0.75f, 0.5f, 99.0f};
+
+      TensorOps.softmaxWithZeroValueSink(scores, 1, 3, 0.2f);
+
+      assertThat(scores[0]).isEqualTo(99.0f);
+      assertThat(scores[4]).isEqualTo(99.0f);
+      assertThat(scores)
+          .containsSequence(new float[] {0.51081926f, 0.06913187f, 0.24129394f}, within(1.0e-6f));
+      assertThat(scores[1] + scores[2] + scores[3])
+          .as("the missing probability belongs to the learned zero-value sink")
+          .isCloseTo(0.8212451f, within(1.0e-6f));
+    }
+
+    @Test
+    void zeroValueSinkHandlesACompletelyMaskedKeyRange() {
+      float[] scores = {Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
+
+      TensorOps.softmaxWithZeroValueSink(scores, 0, scores.length, -0.5f);
+
+      assertThat(scores).containsOnly(0.0f);
+    }
+
+    @Test
     void rejectsEmptyAndNegativeSizes() {
       float[] x = {1.0f};
 
@@ -1489,6 +1513,10 @@ class TensorOpsTest {
       assertThatThrownBy(() -> TensorOps.softmax(new float[] {1.0f, Float.POSITIVE_INFINITY}, 0, 2))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("positive infinity");
+      assertThatThrownBy(
+              () -> TensorOps.softmaxWithZeroValueSink(new float[] {1.0f}, 0, 1, Float.NaN))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("sink");
     }
   }
 
