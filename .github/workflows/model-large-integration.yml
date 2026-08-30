@@ -38,7 +38,10 @@ jobs:
   pure-java-large-model:
     name: ${{ matrix.name }} pure-Java slow test
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # Large GGUF fixtures compete for the finite Actions cache and may be evicted. A cold
+    # Hugging Face transfer can exceed two hours; let it finish so the test can run and the
+    # fixture can be saved for subsequent jobs.
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
