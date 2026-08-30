@@ -34,7 +34,7 @@ final class GptOssMxfp4ExpertWeights {
     private final Mxfp4Matrix down;
     private final float[] downBias;
 
-    private Expert(Mxfp4Matrix gateUp, float[] gateUpBias, Mxfp4Matrix down, float[] downBias) {
+    Expert(Mxfp4Matrix gateUp, float[] gateUpBias, Mxfp4Matrix down, float[] downBias) {
       this.gateUp = Objects.requireNonNull(gateUp, "gateUp");
       this.gateUpBias = Objects.requireNonNull(gateUpBias, "gateUpBias");
       this.down = Objects.requireNonNull(down, "down");
@@ -61,7 +61,18 @@ final class GptOssMxfp4ExpertWeights {
   private final Expert[] experts;
 
   private GptOssMxfp4ExpertWeights(Expert[] experts) {
-    this.experts = experts;
+    this.experts = experts.clone();
+  }
+
+  static GptOssMxfp4ExpertWeights of(Expert... experts) {
+    Objects.requireNonNull(experts, "experts");
+    if (experts.length == 0) {
+      throw new IllegalArgumentException("experts must not be empty");
+    }
+    for (int index = 0; index < experts.length; index++) {
+      Objects.requireNonNull(experts[index], "experts[" + index + "]");
+    }
+    return new GptOssMxfp4ExpertWeights(experts);
   }
 
   static GptOssMxfp4ExpertWeights load(
