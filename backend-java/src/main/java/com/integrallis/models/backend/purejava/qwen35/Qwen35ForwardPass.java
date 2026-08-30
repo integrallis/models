@@ -26,6 +26,7 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.FullAttentio
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.GatedDeltaNet;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Layer;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import java.util.ArrayList;
@@ -93,13 +94,15 @@ public final class Qwen35ForwardPass {
   private final int prefillBatchSize;
   private final GgufQ4Kernel q4Kernel;
   private final GgufQ6BatchedKernel q6BatchedKernel;
+  private final GgufBatchedMatrixKernel batchedMatrixKernel;
 
   private Qwen35ForwardPass(
       Qwen35Config config,
       Qwen35Weights weights,
       int prefillBatchSize,
       GgufQ4Kernel q4Kernel,
-      GgufQ6BatchedKernel q6BatchedKernel) {
+      GgufQ6BatchedKernel q6BatchedKernel,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
     this.config = config;
     this.weights = weights;
     this.rotary = new RotaryTable(config.ropeDimension(), config.ropeTheta(), 1.0f);
@@ -109,13 +112,27 @@ public final class Qwen35ForwardPass {
     this.prefillBatchSize = Math.min(prefillBatchSize, config.contextLength());
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.q6BatchedKernel = Objects.requireNonNull(q6BatchedKernel, "q6BatchedKernel");
+    this.batchedMatrixKernel = Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
   }
 
   public static Qwen35ForwardPass fromGgufFile(GgufFile file) {
-    return fromGgufFile(file, PureJavaPlanConfiguration.DEFAULT_PREFILL_BATCH_SIZE);
+    return fromGgufFile(
+        file, PureJavaPlanConfiguration.DEFAULT_PREFILL_BATCH_SIZE, GgufBatchedMatrixKernel.none());
   }
 
   static Qwen35ForwardPass fromGgufFile(GgufFile file, int prefillBatchSize) {
+    return fromGgufFile(file, prefillBatchSize, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Loads a graph that routes eligible projections through the injected matrix kernel. */
+  public static Qwen35ForwardPass fromGgufFile(
+      GgufFile file, GgufBatchedMatrixKernel batchedMatrixKernel) {
+    return fromGgufFile(
+        file, PureJavaPlanConfiguration.DEFAULT_PREFILL_BATCH_SIZE, batchedMatrixKernel);
+  }
+
+  static Qwen35ForwardPass fromGgufFile(
+      GgufFile file, int prefillBatchSize, GgufBatchedMatrixKernel batchedMatrixKernel) {
     Objects.requireNonNull(file, "file");
     Qwen35Config config = Qwen35Config.fromMetadata(file.metadata());
     return new Qwen35ForwardPass(
@@ -123,19 +140,26 @@ public final class Qwen35ForwardPass {
         Qwen35Weights.fromGgufFile(file, config),
         prefillBatchSize,
         GgufQ4Kernel.WIDENED,
-        GgufQ6BatchedKernel.ONE_QUERY_BLOCK);
+        GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
+        batchedMatrixKernel);
   }
 
   /** Returns a graph sharing the same mapped weights with the requested prefill batch size. */
   public Qwen35ForwardPass withPrefillBatchSize(int batchSize) {
-    return new Qwen35ForwardPass(config, weights, batchSize, q4Kernel, q6BatchedKernel);
+    return new Qwen35ForwardPass(
+        config, weights, batchSize, q4Kernel, q6BatchedKernel, batchedMatrixKernel);
   }
 
   /** Returns a graph sharing the same weights and honoring the selected execution plan. */
   public Qwen35ForwardPass withExecutionPlan(PureJavaExecutionPlan plan) {
     Objects.requireNonNull(plan, "plan");
     return new Qwen35ForwardPass(
-        config, weights, plan.prefillBatchSize(), plan.q4Kernel(), plan.q6BatchedKernel());
+        config,
+        weights,
+        plan.prefillBatchSize(),
+        plan.q4Kernel(),
+        plan.q6BatchedKernel(),
+        batchedMatrixKernel);
   }
 
   /** Returns the projection topology loaded from this graph's actual GGUF tensors. */
@@ -1049,6 +1073,11 @@ public final class Qwen35ForwardPass {
   }
 
   private void project(float[] output, float[] input, Matrix weights, ProjectionScratch scratch) {
+    if (batchedMatrixKernel.isEligible(weights.type(), 1, weights.rows(), weights.columns())) {
+      batchedMatrixKernel.multiply(
+          output, input, weights.data(), weights.type(), 1, weights.rows(), weights.columns());
+      return;
+    }
     TensorOps.ggufMatmul(
         output,
         input,
@@ -1072,6 +1101,27 @@ public final class Qwen35ForwardPass {
       ProjectionScratch scratch) {
     if (firstWeights.columns() != secondWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");
+    }
+    if (batchedMatrixKernel.isDualEligible(
+        firstWeights.type(),
+        firstWeights.rows(),
+        secondWeights.type(),
+        secondWeights.rows(),
+        1,
+        firstWeights.columns())) {
+      batchedMatrixKernel.multiplyDual(
+          firstOutput,
+          firstWeights.data(),
+          firstWeights.type(),
+          firstWeights.rows(),
+          secondOutput,
+          secondWeights.data(),
+          secondWeights.type(),
+          secondWeights.rows(),
+          input,
+          1,
+          firstWeights.columns());
+      return;
     }
     TensorOps.ggufDualMatmul(
         firstOutput,
@@ -1104,6 +1154,33 @@ public final class Qwen35ForwardPass {
         || firstWeights.columns() != thirdWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");
     }
+    if (batchedMatrixKernel.isTripleEligible(
+        firstWeights.type(),
+        firstWeights.rows(),
+        secondWeights.type(),
+        secondWeights.rows(),
+        thirdWeights.type(),
+        thirdWeights.rows(),
+        1,
+        firstWeights.columns())) {
+      batchedMatrixKernel.multiplyTriple(
+          firstOutput,
+          firstWeights.data(),
+          firstWeights.type(),
+          firstWeights.rows(),
+          secondOutput,
+          secondWeights.data(),
+          secondWeights.type(),
+          secondWeights.rows(),
+          thirdOutput,
+          thirdWeights.data(),
+          thirdWeights.type(),
+          thirdWeights.rows(),
+          input,
+          1,
+          firstWeights.columns());
+      return;
+    }
     TensorOps.ggufTripleMatmul(
         firstOutput,
         firstWeights.data(),
@@ -1133,6 +1210,18 @@ public final class Qwen35ForwardPass {
       int batchSize,
       ProjectionScratch scalarScratch,
       BatchProjectionScratch batchScratch) {
+    if (batchedMatrixKernel.isEligible(
+        weights.type(), batchSize, weights.rows(), weights.columns())) {
+      batchedMatrixKernel.multiply(
+          output,
+          input,
+          weights.data(),
+          weights.type(),
+          batchSize,
+          weights.rows(),
+          weights.columns());
+      return;
+    }
     if (!TensorOps.supportsBatchedMatmul(weights.type())) {
       float[] rowInput = new float[weights.columns()];
       float[] rowOutput = new float[weights.rows()];
@@ -1171,6 +1260,27 @@ public final class Qwen35ForwardPass {
       BatchProjectionScratch batchScratch) {
     if (firstWeights.columns() != secondWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");
+    }
+    if (batchedMatrixKernel.isDualEligible(
+        firstWeights.type(),
+        firstWeights.rows(),
+        secondWeights.type(),
+        secondWeights.rows(),
+        batchSize,
+        firstWeights.columns())) {
+      batchedMatrixKernel.multiplyDual(
+          firstOutput,
+          firstWeights.data(),
+          firstWeights.type(),
+          firstWeights.rows(),
+          secondOutput,
+          secondWeights.data(),
+          secondWeights.type(),
+          secondWeights.rows(),
+          input,
+          batchSize,
+          firstWeights.columns());
+      return;
     }
     if (!TensorOps.supportsBatchedMatmul(firstWeights.type())
         || !TensorOps.supportsBatchedMatmul(secondWeights.type())) {
@@ -1213,6 +1323,33 @@ public final class Qwen35ForwardPass {
     if (firstWeights.columns() != secondWeights.columns()
         || firstWeights.columns() != thirdWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");
+    }
+    if (batchedMatrixKernel.isTripleEligible(
+        firstWeights.type(),
+        firstWeights.rows(),
+        secondWeights.type(),
+        secondWeights.rows(),
+        thirdWeights.type(),
+        thirdWeights.rows(),
+        batchSize,
+        firstWeights.columns())) {
+      batchedMatrixKernel.multiplyTriple(
+          firstOutput,
+          firstWeights.data(),
+          firstWeights.type(),
+          firstWeights.rows(),
+          secondOutput,
+          secondWeights.data(),
+          secondWeights.type(),
+          secondWeights.rows(),
+          thirdOutput,
+          thirdWeights.data(),
+          thirdWeights.type(),
+          thirdWeights.rows(),
+          input,
+          batchSize,
+          firstWeights.columns());
+      return;
     }
     if (!TensorOps.supportsBatchedMatmul(firstWeights.type())
         || !TensorOps.supportsBatchedMatmul(secondWeights.type())

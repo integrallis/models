@@ -18,15 +18,21 @@ package com.integrallis.models.backend.purejava.qwen35;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
+import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -96,6 +102,51 @@ class Qwen35ForwardPassTest {
       batched.rewind(batchedSession, 2);
       assertThat(batched.prefill(batchedSession, new int[] {3, 4, 5, 6}, 2))
           .containsExactly(sequential.forward(new int[] {1, 2, 3, 4, 5, 6}));
+    }
+  }
+
+  @Test
+  void injectedKernelExecutesEligibleQwen35Projections(@TempDir Path directory) throws Exception {
+    Path model = writeToyModel(directory);
+
+    AtomicInteger invocations = new AtomicInteger();
+    AtomicInteger maximumBatchSize = new AtomicInteger();
+    GgufBatchedMatrixKernel kernel =
+        new GgufBatchedMatrixKernel() {
+          @Override
+          public boolean supports(GgufTensorType type) {
+            return type == GgufTensorType.F32;
+          }
+
+          @Override
+          public void multiply(
+              float[] output,
+              float[] input,
+              MemorySegment weights,
+              GgufTensorType type,
+              int batchSize,
+              int rows,
+              int cols) {
+            invocations.incrementAndGet();
+            maximumBatchSize.accumulateAndGet(batchSize, Math::max);
+            float[] rowInput = new float[cols];
+            float[] rowOutput = new float[rows];
+            for (int batch = 0; batch < batchSize; batch++) {
+              System.arraycopy(input, batch * cols, rowInput, 0, cols);
+              TensorOps.ggufMatmul(rowOutput, rowInput, weights, type, rows, cols);
+              System.arraycopy(rowOutput, 0, output, batch * rows, rows);
+            }
+          }
+        };
+
+    try (PureJavaBackend baseline = PureJavaBackend.load(model);
+        PureJavaBackend accelerated = PureJavaBackend.load(model, kernel)) {
+      float[] expected = baseline.prefill(new int[] {1, 2, 3, 4}, 0);
+      float[] actual = accelerated.prefill(new int[] {1, 2, 3, 4}, 0);
+
+      assertThat(invocations).hasValueGreaterThan(0);
+      assertThat(maximumBatchSize).hasValueGreaterThanOrEqualTo(1);
+      assertThat(actual).containsExactly(expected);
     }
   }
 
@@ -186,6 +237,7 @@ class Qwen35ForwardPassTest {
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
             .addString("general.architecture", "qwen35")
+            .addString("general.name", "Toy Qwen 3.5")
             .addUint32("qwen35.embedding_length", DIMENSION)
             .addUint32("qwen35.block_count", 2)
             .addUint32("qwen35.attention.head_count", 2)
@@ -203,6 +255,12 @@ class Qwen35ForwardPassTest {
             .addUint32("qwen35.ssm.time_step_rank", VALUE_HEADS)
             .addUint32("qwen35.ssm.inner_size", VALUE_DIMENSION)
             .addUint32("qwen35.full_attention_interval", 2)
+            .addStringArray(
+                "tokenizer.ggml.tokens", List.of("<s>", "</s>", "a", "b", "c", "d", "e", "f"))
+            .addFloat32Array(
+                "tokenizer.ggml.scores", List.of(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f))
+            .addUint32("tokenizer.ggml.bos_token_id", 0)
+            .addUint32("tokenizer.ggml.eos_token_id", 1)
             .addTensor(
                 "token_embd.weight",
                 GgufTensorType.F32,
