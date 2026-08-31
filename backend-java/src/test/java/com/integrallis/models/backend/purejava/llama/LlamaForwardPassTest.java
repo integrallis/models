@@ -482,7 +482,7 @@ class LlamaForwardPassTest {
                   config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
       float[] actual = batched.prefill(tokens, 0);
 
-      assertThat(actual).containsExactly(expected);
+      assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
       assertThat(batched.forward(17, tokens.length)).hasSize(VOCAB_SIZE);
     }
 
@@ -1965,7 +1965,8 @@ class LlamaForwardPassTest {
       float[] actualReplacement = actual.forward(23, checkpoint + 1);
 
       assertThat(checkpoint).isEqualTo(prefix.length);
-      assertThat(actualReplacement).containsExactly(expectedReplacement);
+      assertThat(actualReplacement)
+          .containsExactly(expectedReplacement, within(SIMD_REDUCTION_TOLERANCE));
     }
 
     @Test
