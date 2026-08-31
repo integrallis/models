@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Versioned FFM access to Models-owned native inference kernels. */
 @SuppressWarnings("restricted")
 public final class NativeKernelLibrary implements AutoCloseable {
-  public static final int ABI_VERSION = 4;
+  public static final int ABI_VERSION = 5;
   public static final String THREAD_COUNT_PROPERTY = "models.native.kernels.threads";
 
   private static final int STATUS_OK = 0;
@@ -92,6 +92,29 @@ public final class NativeKernelLibrary implements AutoCloseable {
           ValueLayout.ADDRESS,
           ValueLayout.JAVA_LONG,
           ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
 
   private final Arena libraryArena;
   private final long capabilities;
@@ -100,6 +123,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle quantizedBatchedHandle;
   private final MethodHandle quantizedGroupedBatchedHandle;
   private final MethodHandle quantizedIndependentBatchedHandle;
+  private final MethodHandle gatedDeltaNetHandle;
   private final int threadCount;
   private boolean closed;
 
@@ -111,6 +135,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle quantizedBatchedHandle,
       MethodHandle quantizedGroupedBatchedHandle,
       MethodHandle quantizedIndependentBatchedHandle,
+      MethodHandle gatedDeltaNetHandle,
       int threadCount) {
     this.libraryArena = libraryArena;
     this.capabilities = capabilities;
@@ -119,6 +144,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.quantizedBatchedHandle = quantizedBatchedHandle;
     this.quantizedGroupedBatchedHandle = quantizedGroupedBatchedHandle;
     this.quantizedIndependentBatchedHandle = quantizedIndependentBatchedHandle;
+    this.gatedDeltaNetHandle = gatedDeltaNetHandle;
     this.threadCount = threadCount;
   }
 
@@ -171,6 +197,11 @@ public final class NativeKernelLibrary implements AutoCloseable {
               lookup,
               "jmodels_quantized_f32_independent_batched_matmul_with_context",
               QUANTIZED_INDEPENDENT_BATCHED_WITH_CONTEXT_DESCRIPTOR);
+      MethodHandle gatedDeltaNet =
+          downcallCritical(
+              lookup,
+              "jmodels_gated_delta_net_f32_with_context",
+              GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR);
       MemorySegment context = invokeAddress(contextCreate, threadCount, "create worker context");
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
@@ -183,6 +214,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
           quantizedBatched,
           quantizedGroupedBatched,
           quantizedIndependentBatched,
+          gatedDeltaNet,
           threadCount);
     } catch (RuntimeException | LinkageError failure) {
       arena.close();
@@ -203,6 +235,91 @@ public final class NativeKernelLibrary implements AutoCloseable {
   public boolean supports(NativeKernelCapability capability) {
     Objects.requireNonNull(capability, "capability");
     return (capabilities & capability.mask()) != 0;
+  }
+
+  /** Applies the Qwen 3.5 float32 Gated DeltaNet recurrence in caller-owned arrays. */
+  public void gatedDeltaNetF32(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(key, "key");
+    Objects.requireNonNull(value, "value");
+    Objects.requireNonNull(logDecay, "logDecay");
+    Objects.requireNonNull(beta, "beta");
+    Objects.requireNonNull(state, "state");
+    Objects.requireNonNull(output, "output");
+    requirePositive(tokenCount, "tokenCount");
+    requirePositive(keyHeadCount, "keyHeadCount");
+    requirePositive(valueHeadCount, "valueHeadCount");
+    requirePositive(keyDimension, "keyDimension");
+    requirePositive(valueDimension, "valueDimension");
+    if (valueHeadCount % keyHeadCount != 0) {
+      throw new IllegalArgumentException("valueHeadCount must be divisible by keyHeadCount");
+    }
+    if (keyDimension > 256 || valueDimension > 256) {
+      throw new IllegalArgumentException("Gated DeltaNet dimensions must not exceed 256");
+    }
+    int requiredQuery =
+        Math.multiplyExact(Math.multiplyExact(tokenCount, keyHeadCount), keyDimension);
+    int requiredValue =
+        Math.multiplyExact(Math.multiplyExact(tokenCount, valueHeadCount), valueDimension);
+    int requiredGates = Math.multiplyExact(tokenCount, valueHeadCount);
+    int requiredState =
+        Math.multiplyExact(Math.multiplyExact(valueHeadCount, keyDimension), valueDimension);
+    requireCapacity(query, requiredQuery, "query");
+    requireCapacity(key, requiredQuery, "key");
+    requireCapacity(value, requiredValue, "value");
+    requireCapacity(logDecay, requiredGates, "logDecay");
+    requireCapacity(beta, requiredGates, "beta");
+    requireCapacity(state, requiredState, "state");
+    requireCapacity(output, requiredValue, "output");
+    if (!supports(NativeKernelCapability.GATED_DELTA_NET_F32)) {
+      throw new UnsupportedOperationException("loaded native library has no Gated DeltaNet kernel");
+    }
+
+    try {
+      int status =
+          (int)
+              gatedDeltaNetHandle.invokeExact(
+                  context,
+                  MemorySegment.ofArray(query),
+                  (long) query.length,
+                  MemorySegment.ofArray(key),
+                  (long) key.length,
+                  MemorySegment.ofArray(value),
+                  (long) value.length,
+                  MemorySegment.ofArray(logDecay),
+                  (long) logDecay.length,
+                  MemorySegment.ofArray(beta),
+                  (long) beta.length,
+                  MemorySegment.ofArray(state),
+                  (long) state.length,
+                  MemorySegment.ofArray(output),
+                  (long) output.length,
+                  tokenCount,
+                  keyHeadCount,
+                  valueHeadCount,
+                  keyDimension,
+                  valueDimension);
+      if (status != STATUS_OK) {
+        throw new IllegalStateException(
+            "native Gated DeltaNet kernel failed: " + statusName(status));
+      }
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("Gated DeltaNet recurrence", failure);
+    }
   }
 
   /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q4_0 projection. */
@@ -720,6 +837,29 @@ public final class NativeKernelLibrary implements AutoCloseable {
             .orElseThrow(
                 () -> new IllegalArgumentException("missing native kernel symbol: " + symbolName));
     return LINKER.downcallHandle(symbol, descriptor);
+  }
+
+  private static MethodHandle downcallCritical(
+      SymbolLookup lookup, String symbolName, FunctionDescriptor descriptor) {
+    MemorySegment symbol =
+        lookup
+            .find(symbolName)
+            .orElseThrow(
+                () -> new IllegalArgumentException("missing native kernel symbol: " + symbolName));
+    return LINKER.downcallHandle(symbol, descriptor, Linker.Option.critical(true));
+  }
+
+  private static void requirePositive(int value, String name) {
+    if (value < 1) {
+      throw new IllegalArgumentException(name + " must be positive: " + value);
+    }
+  }
+
+  private static void requireCapacity(float[] values, int required, String name) {
+    if (values.length < required) {
+      throw new IllegalArgumentException(
+          name + " requires " + required + " elements but has " + values.length);
+    }
   }
 
   private static int invokeInt(MethodHandle handle, String operation) {

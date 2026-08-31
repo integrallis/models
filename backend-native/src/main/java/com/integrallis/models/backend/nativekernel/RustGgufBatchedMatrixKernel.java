@@ -29,6 +29,7 @@ import java.util.Objects;
 public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   public static final String NATIVE_DECODE_PROPERTY = "models.native.quantizedDecode";
   public static final String Q5_0_GROUPED_PROPERTY = "models.native.q5_0.grouped";
+  public static final String GATED_DELTA_NET_PROPERTY = "models.native.gatedDeltaNet";
   private static final int MAX_GROUPED_MATRICES = 16;
 
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
@@ -45,6 +46,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private final NativeKernelLibrary library;
   private final boolean nativeDecode;
   private final boolean q5_0Grouped;
+  private final boolean gatedDeltaNet;
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
@@ -60,10 +62,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private boolean closed;
 
   private RustGgufBatchedMatrixKernel(
-      NativeKernelLibrary library, boolean nativeDecode, boolean q5_0Grouped) {
+      NativeKernelLibrary library,
+      boolean nativeDecode,
+      boolean q5_0Grouped,
+      boolean gatedDeltaNet) {
     this.library = Objects.requireNonNull(library, "library");
     this.nativeDecode = nativeDecode;
     this.q5_0Grouped = q5_0Grouped;
+    this.gatedDeltaNet = gatedDeltaNet;
   }
 
   /** Opens a Rust kernel provider from an explicit platform library. */
@@ -76,7 +82,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return new RustGgufBatchedMatrixKernel(
         NativeKernelLibrary.open(libraryPath, settings.threadCount()),
         settings.nativeDecode(),
-        settings.q5_0Grouped());
+        settings.q5_0Grouped(),
+        settings.gatedDeltaNet());
   }
 
   static RustGgufBatchedMatrixKernel open(Path libraryPath, boolean nativeDecode) {
@@ -86,11 +93,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   static RustGgufBatchedMatrixKernel open(
       Path libraryPath, boolean nativeDecode, boolean q5_0Grouped) {
     return new RustGgufBatchedMatrixKernel(
-        NativeKernelLibrary.open(libraryPath), nativeDecode, q5_0Grouped);
+        NativeKernelLibrary.open(libraryPath), nativeDecode, q5_0Grouped, false);
   }
 
   @Override
   public String implementation() {
+    if (library.supports(NativeKernelCapability.GATED_DELTA_NET_F32)) {
+      return "rust-ffm-quantized-v13";
+    }
     if (library.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)) {
       return "rust-ffm-quantized-v12";
     }
@@ -107,12 +117,51 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return PLAN_RECOMMENDATIONS;
   }
 
+  @Override
+  public boolean supportsGatedDeltaNet() {
+    return gatedDeltaNet && library.supports(NativeKernelCapability.GATED_DELTA_NET_F32);
+  }
+
+  @Override
+  public synchronized void gatedDeltaNet(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output,
+      int tokenCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    requireOpen();
+    library.gatedDeltaNetF32(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        state,
+        output,
+        tokenCount,
+        keyHeadCount,
+        valueHeadCount,
+        keyDimension,
+        valueDimension);
+  }
+
   boolean nativeDecodeEnabled() {
     return nativeDecode;
   }
 
   boolean q5_0GroupedEnabled() {
     return q5_0Grouped;
+  }
+
+  boolean gatedDeltaNetEnabled() {
+    return gatedDeltaNet;
   }
 
   int threadCount() {

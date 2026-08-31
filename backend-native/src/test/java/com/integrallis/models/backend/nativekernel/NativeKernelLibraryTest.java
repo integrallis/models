@@ -61,7 +61,66 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_BATCH_VECTOR_ACCUMULATION)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.MANY_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.GATED_DELTA_NET_F32)).isTrue();
     }
+  }
+
+  @Test
+  void gatedDeltaNetMatchesThePinnedFreeTokenRecurrence() {
+    float[] query = {
+      0.5f, -1.0f, 1.5f, 0.25f,
+      -0.75f, 0.5f, 0.1f, -0.4f,
+      1.25f, 0.75f, -0.3f, 0.9f
+    };
+    float[] key = {
+      0.2f, 0.8f, -0.6f, 0.9f,
+      1.0f, -0.5f, 0.7f, 0.2f,
+      -0.4f, 0.3f, 0.25f, -0.75f
+    };
+    float[] value = {
+      0.3f, -0.7f, 1.1f, 0.4f,
+      -0.2f, 0.9f, 0.5f, -1.2f,
+      0.8f, 0.1f, -0.6f, 0.7f
+    };
+    float[] logDecay = {-0.1f, -0.3f, -0.5f, -0.2f, -0.05f, -0.7f};
+    float[] beta = {0.7f, 0.2f, 0.4f, 0.9f, 1.0f, 0.6f};
+    float[] state = {0.1f, -0.2f, 0.3f, 0.4f, -0.5f, 0.2f, 0.1f, -0.3f};
+    float[] output = new float[value.length];
+
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
+      kernels.gatedDeltaNetF32(query, key, value, logDecay, beta, state, output, 3, 2, 2, 2, 2);
+    }
+
+    assertThat(output)
+        .containsExactly(
+            new float[] {
+              -0.148594886f,
+              0.0923976079f,
+              -0.29807961f,
+              0.0387914963f,
+              0.0826374739f,
+              -0.232684523f,
+              -0.201746792f,
+              0.0990339369f,
+              -0.115048051f,
+              -0.159083426f,
+              0.29010731f,
+              -0.305043638f
+            },
+            within(2.0e-6f));
+    assertThat(state)
+        .containsExactly(
+            new float[] {
+              -0.549856126f,
+              -0.20131427f,
+              0.600189984f,
+              -0.101754844f,
+              0.0727154538f,
+              -0.372453094f,
+              0.456705213f,
+              -0.578883469f
+            },
+            within(2.0e-6f));
   }
 
   @Test
@@ -117,7 +176,7 @@ class NativeKernelLibraryTest {
 
         assertThat(actual).containsExactly(expected);
       }
-      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v12");
+      assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v13");
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
@@ -151,13 +210,24 @@ class NativeKernelLibraryTest {
 
   @Test
   void profiledSettingsConfigureDecodeGroupingAndWorkerCountTogether() {
-    NativeKernelSettings settings = new NativeKernelSettings(true, true, false, 4);
+    NativeKernelSettings settings = new NativeKernelSettings(true, true, true, false, 4);
 
     try (RustGgufBatchedMatrixKernel kernel =
         RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
       assertThat(kernel.nativeDecodeEnabled()).isTrue();
       assertThat(kernel.q5_0GroupedEnabled()).isTrue();
+      assertThat(kernel.supportsGatedDeltaNet()).isTrue();
       assertThat(kernel.threadCount()).isEqualTo(4);
+    }
+  }
+
+  @Test
+  void unqualifiedGatedDeltaNetKernelRemainsDisabled() {
+    NativeKernelSettings settings = new NativeKernelSettings(true, true, false, false, 4);
+
+    try (RustGgufBatchedMatrixKernel kernel =
+        RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
+      assertThat(kernel.supportsGatedDeltaNet()).isFalse();
     }
   }
 

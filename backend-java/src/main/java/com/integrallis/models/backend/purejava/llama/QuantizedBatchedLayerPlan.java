@@ -48,6 +48,7 @@ final class QuantizedBatchedLayerPlan {
   private final int attentionOutputDim;
   private final int hiddenDim;
   private final float rmsNormEps;
+  private final boolean vectorizedSwiGlu;
   private final GgufQ4Kernel q4Kernel;
   private final boolean blockMajorQ8Activations;
   private final GgufQ8BlockMajorKernel q8BlockMajorKernel;
@@ -82,6 +83,7 @@ final class QuantizedBatchedLayerPlan {
       int attentionOutputDim,
       int hiddenDim,
       float rmsNormEps,
+      boolean vectorizedSwiGlu,
       GgufQ4Kernel q4Kernel,
       boolean blockMajorQ8Activations,
       GgufQ8BlockMajorKernel q8BlockMajorKernel,
@@ -111,6 +113,7 @@ final class QuantizedBatchedLayerPlan {
     this.attentionOutputDim = attentionOutputDim;
     this.hiddenDim = hiddenDim;
     this.rmsNormEps = rmsNormEps;
+    this.vectorizedSwiGlu = vectorizedSwiGlu;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.blockMajorQ8Activations = blockMajorQ8Activations;
     this.q8BlockMajorKernel = Objects.requireNonNull(q8BlockMajorKernel, "q8BlockMajorKernel");
@@ -382,7 +385,11 @@ final class QuantizedBatchedLayerPlan {
     int length = toRow - fromRow;
     for (int batch = 0; batch < activeBatchSize; batch++) {
       int rowOffset = batch * hiddenDim + fromRow;
-      TensorOps.swiGlu(activated, rowOffset, gate, rowOffset, up, rowOffset, length);
+      if (vectorizedSwiGlu) {
+        VectorUtil.swiGlu(activated, rowOffset, gate, rowOffset, up, rowOffset, length);
+      } else {
+        TensorOps.swiGlu(activated, rowOffset, gate, rowOffset, up, rowOffset, length);
+      }
     }
     quantizeBlockRange(
         outputActivation,

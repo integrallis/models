@@ -108,6 +108,16 @@ activations in parallel
 
 |`models.purejava.maxContextLength` |Impose a lower hard sequence-length
 limit
+
+|`models.native.quantizedDecode` |Use eligible Models-owned native
+quantized projection kernels during single-token decode
+
+|`models.native.gatedDeltaNet` |Use the Models-owned FFM recurrence
+kernel for an exact profiled Qwen3.5 artifact; all surrounding graph and
+state ownership remain in Java
+
+|`models.native.kernels.threads` |Set the bounded native worker-context
+size used by qualified projection and recurrence profiles
 |===
 
 Automatic selection remains restricted to exact measured profiles.

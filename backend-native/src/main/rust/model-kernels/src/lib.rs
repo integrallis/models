@@ -10,6 +10,9 @@ use std::thread::{self, JoinHandle};
 #[cfg(test)]
 use std::cell::Cell;
 
+#[cfg(test)]
+static GATED_DELTA_NET_PARALLEL_PARTITIONS: AtomicUsize = AtomicUsize::new(0);
+
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
@@ -55,7 +58,7 @@ fn record_q6_k_single_horizontal_reduction() {
     Q6_K_SINGLE_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
 }
 
-const ABI_VERSION: u32 = 4;
+const ABI_VERSION: u32 = 5;
 const CAPABILITY_Q4_0_F32_BATCHED_MATMUL: u64 = 1;
 const CAPABILITY_Q4_0_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 1;
 const CAPABILITY_PERSISTENT_WORKER_CONTEXT: u64 = 1 << 2;
@@ -74,6 +77,7 @@ const CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE: u64 = 1 << 14;
 const CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION: u64 = 1 << 15;
 const CAPABILITY_MANY_GROUPED_BATCHED_MATMUL: u64 = 1 << 16;
 const CAPABILITY_INDEPENDENT_BATCHED_MATMUL: u64 = 1 << 17;
+const CAPABILITY_GATED_DELTA_NET_F32: u64 = 1 << 18;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -95,6 +99,7 @@ const WORKER_SPIN_ITERS: usize = 4_000;
 const COMPLETION_SPIN_ITERS: usize = 4_000;
 const MAX_GROUPED_MATRICES: usize = 16;
 const STACK_BATCH_CAPACITY: usize = 128;
+const MAX_GATED_DELTA_NET_DIMENSION: usize = 256;
 
 macro_rules! batch_scratch {
     ($name:ident, $batch_size:expr, $initial:expr, $element:ty) => {
@@ -237,8 +242,17 @@ struct WorkerShared {
 
 struct WorkerState {
     shutdown: bool,
-    job: Option<ParallelJob>,
+    job: Option<WorkerJob>,
     failed: bool,
+}
+
+#[derive(Clone, Copy)]
+// The matrix job was already stored inline before Gated DeltaNet joined this pool. Boxing it would
+// add an allocation to every projection dispatch, so retain the bounded inline representation.
+#[allow(clippy::large_enum_variant)]
+enum WorkerJob {
+    Matrix(ParallelJob),
+    GatedDeltaNet(GatedDeltaNetJob),
 }
 
 #[derive(Clone, Copy)]
@@ -263,6 +277,22 @@ struct ParallelJob {
     matrices: [Option<MatrixJob>; MAX_GROUPED_MATRICES],
     matrix_count: usize,
     output_elements: usize,
+}
+
+#[derive(Clone, Copy)]
+struct GatedDeltaNetJob {
+    query: usize,
+    key: usize,
+    value: usize,
+    log_decay: usize,
+    beta: usize,
+    state: usize,
+    output: usize,
+    token_count: usize,
+    key_head_count: usize,
+    value_head_count: usize,
+    key_dimension: usize,
+    value_dimension: usize,
 }
 
 impl WorkerPool {
@@ -296,11 +326,11 @@ impl WorkerPool {
         Ok(pool)
     }
 
-    fn execute(&self, job: ParallelJob) -> bool {
+    fn execute_matrix(&self, job: ParallelJob) -> bool {
         if self.workers.is_empty() || job.output_elements < PARALLEL_OUTPUT_THRESHOLD {
             return catch_unwind(AssertUnwindSafe(|| {
-                // SAFETY: the caller owns all job buffers for this synchronous execution.
-                unsafe { execute_job_partition(job, 0, 1) }
+                // SAFETY: the caller owns all matrix buffers for this synchronous execution.
+                unsafe { execute_matrix_job_partition(job, 0, 1) }
             }))
             .is_ok();
         }
@@ -308,7 +338,7 @@ impl WorkerPool {
         let _execution = lock(&self.execution);
         {
             let mut state = lock(&self.shared.state);
-            state.job = Some(job);
+            state.job = Some(WorkerJob::Matrix(job));
             state.failed = false;
             self.shared
                 .remaining
@@ -319,11 +349,47 @@ impl WorkerPool {
         }
 
         let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
-            // SAFETY: worker zero receives a range disjoint from every persistent worker.
-            unsafe { execute_job_partition(job, 0, self.total_threads) }
+            // SAFETY: worker zero receives matrix rows disjoint from every persistent worker.
+            unsafe { execute_matrix_job_partition(job, 0, self.total_threads) }
         }))
         .is_ok();
 
+        self.await_workers(caller_succeeded)
+    }
+
+    fn execute_gated_delta_net(&self, job: GatedDeltaNetJob) -> bool {
+        if self.workers.is_empty() || job.token_count == 1 {
+            return catch_unwind(AssertUnwindSafe(|| {
+                // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
+                // Decode remains caller-only so it does not wake matrix workers once per layer.
+                unsafe { execute_gated_delta_net_partition(job, 0, 1) }
+            }))
+            .is_ok();
+        }
+
+        let _execution = lock(&self.execution);
+        {
+            let mut state = lock(&self.shared.state);
+            state.job = Some(WorkerJob::GatedDeltaNet(job));
+            state.failed = false;
+            self.shared
+                .remaining
+                .0
+                .store(self.workers.len(), Ordering::Relaxed);
+            self.shared.generation.0.fetch_add(1, Ordering::Release);
+            self.shared.work_available.notify_all();
+        }
+
+        let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
+            // SAFETY: each worker owns disjoint recurrent heads and output rows.
+            unsafe { execute_gated_delta_net_partition(job, 0, self.total_threads) }
+        }))
+        .is_ok();
+
+        self.await_workers(caller_succeeded)
+    }
+
+    fn await_workers(&self, caller_succeeded: bool) -> bool {
         let completed = poll_completion(&self.shared.remaining.0, COMPLETION_SPIN_ITERS);
         let mut state = lock(&self.shared.state);
         while !completed && self.shared.remaining.0.load(Ordering::Acquire) != 0 {
@@ -370,9 +436,14 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
             state.job
         };
         let succeeded = match job {
-            Some(job) => catch_unwind(AssertUnwindSafe(|| {
+            Some(WorkerJob::Matrix(job)) => catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: every worker receives a distinct output range and read-only shared inputs.
-                unsafe { execute_job_partition(job, worker_index, total_threads) }
+                unsafe { execute_matrix_job_partition(job, worker_index, total_threads) }
+            }))
+            .is_ok(),
+            Some(WorkerJob::GatedDeltaNet(job)) => catch_unwind(AssertUnwindSafe(|| {
+                // SAFETY: every worker receives disjoint recurrent heads and output rows.
+                unsafe { execute_gated_delta_net_partition(job, worker_index, total_threads) }
             }))
             .is_ok(),
             None => false,
@@ -414,7 +485,11 @@ fn poll_completion(remaining: &AtomicUsize, iterations: usize) -> bool {
     false
 }
 
-unsafe fn execute_job_partition(job: ParallelJob, worker_index: usize, total_threads: usize) {
+unsafe fn execute_matrix_job_partition(
+    job: ParallelJob,
+    worker_index: usize,
+    total_threads: usize,
+) {
     for matrix in job.matrices[..job.matrix_count].iter().flatten() {
         let quantized = unsafe {
             slice::from_raw_parts(matrix.quantized as *const i8, matrix.quantized_elements)
@@ -451,6 +526,250 @@ unsafe fn execute_job_partition(job: ParallelJob, worker_index: usize, total_thr
                 matrix.kernel,
             );
         }
+    }
+}
+
+unsafe fn execute_gated_delta_net_partition(
+    job: GatedDeltaNetJob,
+    worker_index: usize,
+    total_threads: usize,
+) {
+    let query_elements = job.token_count * job.key_head_count * job.key_dimension;
+    let value_elements = job.token_count * job.value_head_count * job.value_dimension;
+    let gate_elements = job.token_count * job.value_head_count;
+    let state_elements = job.value_head_count * job.key_dimension * job.value_dimension;
+    // SAFETY: the exported entry point validates every buffer length before publishing the job.
+    let query = unsafe { slice::from_raw_parts(job.query as *const f32, query_elements) };
+    let key = unsafe { slice::from_raw_parts(job.key as *const f32, query_elements) };
+    let value = unsafe { slice::from_raw_parts(job.value as *const f32, value_elements) };
+    let log_decay = unsafe { slice::from_raw_parts(job.log_decay as *const f32, gate_elements) };
+    let beta = unsafe { slice::from_raw_parts(job.beta as *const f32, gate_elements) };
+    let state = unsafe { slice::from_raw_parts_mut(job.state as *mut f32, state_elements) };
+    let output = unsafe { slice::from_raw_parts_mut(job.output as *mut f32, value_elements) };
+    let start_head = job.value_head_count * worker_index / total_threads;
+    let end_head = job.value_head_count * (worker_index + 1) / total_threads;
+    #[cfg(test)]
+    if total_threads > 1 && start_head < end_head {
+        GATED_DELTA_NET_PARALLEL_PARTITIONS.fetch_add(1, Ordering::Relaxed);
+    }
+    let query_scale = 1.0_f32 / (job.key_dimension as f32).sqrt();
+    let mut normalized_query = [0.0_f32; MAX_GATED_DELTA_NET_DIMENSION];
+    let mut normalized_key = [0.0_f32; MAX_GATED_DELTA_NET_DIMENSION];
+    let mut memory = [0.0_f32; MAX_GATED_DELTA_NET_DIMENSION];
+    let mut delta = [0.0_f32; MAX_GATED_DELTA_NET_DIMENSION];
+    let vectorized = gated_delta_net_avx2_available();
+
+    for head in start_head..end_head {
+        let key_head = head % job.key_head_count;
+        let state_offset = head * job.key_dimension * job.value_dimension;
+        for token in 0..job.token_count {
+            let token_head = token * job.value_head_count + head;
+            let query_offset = (token * job.key_head_count + key_head) * job.key_dimension;
+            normalize_gated_delta_net(
+                &query[query_offset..query_offset + job.key_dimension],
+                &mut normalized_query[..job.key_dimension],
+            );
+            normalize_gated_delta_net(
+                &key[query_offset..query_offset + job.key_dimension],
+                &mut normalized_key[..job.key_dimension],
+            );
+            for query_value in &mut normalized_query[..job.key_dimension] {
+                *query_value *= query_scale;
+            }
+
+            let decay = log_decay[token_head].exp();
+            let head_state =
+                &mut state[state_offset..state_offset + job.key_dimension * job.value_dimension];
+            gated_delta_net_scale(head_state, decay, vectorized);
+
+            memory[..job.value_dimension].fill(0.0);
+            for (row, &key_value) in normalized_key[..job.key_dimension].iter().enumerate() {
+                let row_offset = row * job.value_dimension;
+                gated_delta_net_add_scaled(
+                    &mut memory[..job.value_dimension],
+                    &head_state[row_offset..row_offset + job.value_dimension],
+                    key_value,
+                    vectorized,
+                );
+            }
+            let value_offset = token_head * job.value_dimension;
+            gated_delta_net_delta(
+                &mut delta[..job.value_dimension],
+                &value[value_offset..value_offset + job.value_dimension],
+                &memory[..job.value_dimension],
+                beta[token_head],
+                vectorized,
+            );
+            for (row, &key_value) in normalized_key[..job.key_dimension].iter().enumerate() {
+                let row_offset = row * job.value_dimension;
+                gated_delta_net_add_scaled(
+                    &mut head_state[row_offset..row_offset + job.value_dimension],
+                    &delta[..job.value_dimension],
+                    key_value,
+                    vectorized,
+                );
+            }
+
+            output[value_offset..value_offset + job.value_dimension].fill(0.0);
+            for (row, &query_value) in normalized_query[..job.key_dimension].iter().enumerate() {
+                let row_offset = row * job.value_dimension;
+                gated_delta_net_add_scaled(
+                    &mut output[value_offset..value_offset + job.value_dimension],
+                    &head_state[row_offset..row_offset + job.value_dimension],
+                    query_value,
+                    vectorized,
+                );
+            }
+        }
+    }
+}
+
+#[inline(always)]
+fn gated_delta_net_avx2_available() -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    false
+}
+
+#[inline(always)]
+fn gated_delta_net_scale(values: &mut [f32], scale: f32, vectorized: bool) {
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = vectorized;
+    #[cfg(target_arch = "x86_64")]
+    if vectorized {
+        // SAFETY: runtime feature detection selected AVX2 and the slice bounds each unaligned load.
+        unsafe { gated_delta_net_scale_avx2(values, scale) };
+        return;
+    }
+    for value in values {
+        *value *= scale;
+    }
+}
+
+#[inline(always)]
+fn gated_delta_net_add_scaled(
+    destination: &mut [f32],
+    source: &[f32],
+    scale: f32,
+    vectorized: bool,
+) {
+    debug_assert_eq!(destination.len(), source.len());
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = vectorized;
+    #[cfg(target_arch = "x86_64")]
+    if vectorized {
+        // SAFETY: runtime feature detection selected AVX2/FMA and both slices have equal lengths.
+        unsafe { gated_delta_net_add_scaled_avx2(destination, source, scale) };
+        return;
+    }
+    for (output, &value) in destination.iter_mut().zip(source) {
+        *output = value.mul_add(scale, *output);
+    }
+}
+
+#[inline(always)]
+fn gated_delta_net_delta(
+    destination: &mut [f32],
+    value: &[f32],
+    memory: &[f32],
+    beta: f32,
+    vectorized: bool,
+) {
+    debug_assert_eq!(destination.len(), value.len());
+    debug_assert_eq!(destination.len(), memory.len());
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = vectorized;
+    #[cfg(target_arch = "x86_64")]
+    if vectorized {
+        // SAFETY: runtime feature detection selected AVX2 and all slices have equal lengths.
+        unsafe { gated_delta_net_delta_avx2(destination, value, memory, beta) };
+        return;
+    }
+    for ((output, &value), &memory) in destination.iter_mut().zip(value).zip(memory) {
+        *output = (value - memory) * beta;
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn gated_delta_net_scale_avx2(values: &mut [f32], scale: f32) {
+    let scale_lanes = _mm256_set1_ps(scale);
+    let vector_end = values.len() / 8 * 8;
+    for index in (0..vector_end).step_by(8) {
+        // SAFETY: index is within vector_end, which reserves eight complete f32 lanes.
+        let lanes = unsafe { _mm256_loadu_ps(values.as_ptr().add(index)) };
+        // SAFETY: the destination covers the same eight validated lanes.
+        unsafe {
+            _mm256_storeu_ps(
+                values.as_mut_ptr().add(index),
+                _mm256_mul_ps(lanes, scale_lanes),
+            )
+        };
+    }
+    for value in &mut values[vector_end..] {
+        *value *= scale;
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn gated_delta_net_add_scaled_avx2(destination: &mut [f32], source: &[f32], scale: f32) {
+    let scale_lanes = _mm256_set1_ps(scale);
+    let vector_end = destination.len() / 8 * 8;
+    for index in (0..vector_end).step_by(8) {
+        // SAFETY: equal slice lengths and vector_end reserve eight complete lanes in both slices.
+        let output_lanes = unsafe { _mm256_loadu_ps(destination.as_ptr().add(index)) };
+        let source_lanes = unsafe { _mm256_loadu_ps(source.as_ptr().add(index)) };
+        let result = _mm256_fmadd_ps(source_lanes, scale_lanes, output_lanes);
+        // SAFETY: the destination covers the same eight validated lanes.
+        unsafe { _mm256_storeu_ps(destination.as_mut_ptr().add(index), result) };
+    }
+    for (output, &value) in destination[vector_end..]
+        .iter_mut()
+        .zip(&source[vector_end..])
+    {
+        *output = value.mul_add(scale, *output);
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn gated_delta_net_delta_avx2(
+    destination: &mut [f32],
+    value: &[f32],
+    memory: &[f32],
+    beta: f32,
+) {
+    let beta_lanes = _mm256_set1_ps(beta);
+    let vector_end = destination.len() / 8 * 8;
+    for index in (0..vector_end).step_by(8) {
+        // SAFETY: equal slice lengths and vector_end reserve eight complete lanes in every slice.
+        let value_lanes = unsafe { _mm256_loadu_ps(value.as_ptr().add(index)) };
+        let memory_lanes = unsafe { _mm256_loadu_ps(memory.as_ptr().add(index)) };
+        let result = _mm256_mul_ps(_mm256_sub_ps(value_lanes, memory_lanes), beta_lanes);
+        // SAFETY: the destination covers the same eight validated lanes.
+        unsafe { _mm256_storeu_ps(destination.as_mut_ptr().add(index), result) };
+    }
+    for ((output, &value), &memory) in destination[vector_end..]
+        .iter_mut()
+        .zip(&value[vector_end..])
+        .zip(&memory[vector_end..])
+    {
+        *output = (value - memory) * beta;
+    }
+}
+
+fn normalize_gated_delta_net(source: &[f32], destination: &mut [f32]) {
+    let mut squared_norm = 0.0_f32;
+    for &value in source {
+        squared_norm += value * value;
+    }
+    let inverse_norm = 1.0_f32 / (squared_norm + 1.0e-6_f32).sqrt();
+    for (output, &value) in destination.iter_mut().zip(source) {
+        *output = value * inverse_norm;
     }
 }
 
@@ -491,6 +810,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
         | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
         | CAPABILITY_INDEPENDENT_BATCHED_MATMUL
+        | CAPABILITY_GATED_DELTA_NET_F32
 }
 
 #[unsafe(no_mangle)]
@@ -529,6 +849,116 @@ pub unsafe extern "C" fn jmodels_kernels_context_destroy(context: *mut KernelCon
     })) {
         Ok(()) => STATUS_OK,
         Err(_) => STATUS_PANIC,
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+///
+/// `context` must be live. Every data pointer must remain valid for its advertised length for the
+/// synchronous call. State and output must be writable and must not alias any read-only input.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn jmodels_gated_delta_net_f32_with_context(
+    context: *const KernelContext,
+    query: *const f32,
+    query_elements: u64,
+    key: *const f32,
+    key_elements: u64,
+    value: *const f32,
+    value_elements: u64,
+    log_decay: *const f32,
+    log_decay_elements: u64,
+    beta: *const f32,
+    beta_elements: u64,
+    state: *mut f32,
+    state_elements: u64,
+    output: *mut f32,
+    output_elements: u64,
+    token_count: u32,
+    key_head_count: u32,
+    value_head_count: u32,
+    key_dimension: u32,
+    value_dimension: u32,
+) -> i32 {
+    if context.is_null()
+        || query.is_null()
+        || key.is_null()
+        || value.is_null()
+        || log_decay.is_null()
+        || beta.is_null()
+        || state.is_null()
+        || output.is_null()
+    {
+        return STATUS_NULL_POINTER;
+    }
+    let token_count = token_count as usize;
+    let key_head_count = key_head_count as usize;
+    let value_head_count = value_head_count as usize;
+    let key_dimension = key_dimension as usize;
+    let value_dimension = value_dimension as usize;
+    if token_count == 0
+        || key_head_count == 0
+        || value_head_count == 0
+        || key_dimension == 0
+        || value_dimension == 0
+        || key_dimension > MAX_GATED_DELTA_NET_DIMENSION
+        || value_dimension > MAX_GATED_DELTA_NET_DIMENSION
+        || !value_head_count.is_multiple_of(key_head_count)
+    {
+        return STATUS_INVALID_SHAPE;
+    }
+    let Some(required_query) = token_count
+        .checked_mul(key_head_count)
+        .and_then(|elements| elements.checked_mul(key_dimension))
+    else {
+        return STATUS_INVALID_SHAPE;
+    };
+    let Some(required_value) = token_count
+        .checked_mul(value_head_count)
+        .and_then(|elements| elements.checked_mul(value_dimension))
+    else {
+        return STATUS_INVALID_SHAPE;
+    };
+    let Some(required_gates) = token_count.checked_mul(value_head_count) else {
+        return STATUS_INVALID_SHAPE;
+    };
+    let Some(required_state) = value_head_count
+        .checked_mul(key_dimension)
+        .and_then(|elements| elements.checked_mul(value_dimension))
+    else {
+        return STATUS_INVALID_SHAPE;
+    };
+    if query_elements < required_query as u64
+        || key_elements < required_query as u64
+        || value_elements < required_value as u64
+        || log_decay_elements < required_gates as u64
+        || beta_elements < required_gates as u64
+        || state_elements < required_state as u64
+        || output_elements < required_value as u64
+    {
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+
+    match catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: Java pins every validated array for the duration of this synchronous call.
+        let context = unsafe { &*context };
+        context.workers.execute_gated_delta_net(GatedDeltaNetJob {
+            query: query as usize,
+            key: key as usize,
+            value: value as usize,
+            log_decay: log_decay as usize,
+            beta: beta as usize,
+            state: state as usize,
+            output: output as usize,
+            token_count,
+            key_head_count,
+            value_head_count,
+            key_dimension,
+            value_dimension,
+        })
+    })) {
+        Ok(true) => STATUS_OK,
+        Ok(false) | Err(_) => STATUS_PANIC,
     }
 }
 
@@ -1470,7 +1900,7 @@ fn compute_independent_with_scratch(
         sum_offset += sum_elements;
         output_offset += matrix_output_elements;
     }
-    context.workers.execute(ParallelJob {
+    context.workers.execute_matrix(ParallelJob {
         matrices,
         matrix_count: formats.len(),
         output_elements: output.len(),
@@ -1527,7 +1957,7 @@ fn compute_grouped_with_scratch(
             });
             output_offset += matrix_output_elements;
         }
-        return context.workers.execute(ParallelJob {
+        return context.workers.execute_matrix(ParallelJob {
             matrices,
             matrix_count: formats.len(),
             output_elements: output.len(),
@@ -1593,7 +2023,7 @@ fn compute_outputs(
             batch_size,
             cols,
         });
-        return context.workers.execute(ParallelJob {
+        return context.workers.execute_matrix(ParallelJob {
             matrices,
             matrix_count: 1,
             output_elements: output.len(),
@@ -4151,7 +4581,7 @@ mod tests {
 
     #[test]
     fn exports_stable_abi_and_capabilities() {
-        assert_eq!(jmodels_kernels_abi_version(), 4);
+        assert_eq!(jmodels_kernels_abi_version(), 5);
         assert_eq!(
             jmodels_kernels_capabilities(),
             CAPABILITY_Q4_0_F32_BATCHED_MATMUL
@@ -4172,6 +4602,96 @@ mod tests {
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_INDEPENDENT_BATCHED_MATMUL
+                | CAPABILITY_GATED_DELTA_NET_F32
+        );
+    }
+
+    #[test]
+    fn gated_delta_net_matches_pinned_freetoken_recurrence() {
+        GATED_DELTA_NET_PARALLEL_PARTITIONS.store(0, Ordering::Relaxed);
+        let context = jmodels_kernels_context_create(2);
+        assert!(!context.is_null());
+        let query = [
+            0.5, -1.0, 1.5, 0.25, -0.75, 0.5, 0.1, -0.4, 1.25, 0.75, -0.3, 0.9,
+        ];
+        let key = [
+            0.2, 0.8, -0.6, 0.9, 1.0, -0.5, 0.7, 0.2, -0.4, 0.3, 0.25, -0.75,
+        ];
+        let value = [
+            0.3, -0.7, 1.1, 0.4, -0.2, 0.9, 0.5, -1.2, 0.8, 0.1, -0.6, 0.7,
+        ];
+        let log_decay = [-0.1, -0.3, -0.5, -0.2, -0.05, -0.7];
+        let beta = [0.7, 0.2, 0.4, 0.9, 1.0, 0.6];
+        let mut state = [0.1, -0.2, 0.3, 0.4, -0.5, 0.2, 0.1, -0.3];
+        let mut output = [0.0_f32; 12];
+
+        // SAFETY: the context and all fixture arrays remain live and non-aliasing for the call.
+        assert_eq!(
+            unsafe {
+                jmodels_gated_delta_net_f32_with_context(
+                    context,
+                    query.as_ptr(),
+                    query.len() as u64,
+                    key.as_ptr(),
+                    key.len() as u64,
+                    value.as_ptr(),
+                    value.len() as u64,
+                    log_decay.as_ptr(),
+                    log_decay.len() as u64,
+                    beta.as_ptr(),
+                    beta.len() as u64,
+                    state.as_mut_ptr(),
+                    state.len() as u64,
+                    output.as_mut_ptr(),
+                    output.len() as u64,
+                    3,
+                    2,
+                    2,
+                    2,
+                    2,
+                )
+            },
+            STATUS_OK
+        );
+
+        let expected_output = [
+            -0.148_594_89,
+            0.092_397_61,
+            -0.298_079_6,
+            0.038_791_496,
+            0.082_637_474,
+            -0.232_684_52,
+            -0.201_746_79,
+            0.099_033_94,
+            -0.115_048_05,
+            -0.159_083_43,
+            0.290_107_3,
+            -0.305_043_64,
+        ];
+        let expected_state = [
+            -0.549_856_1,
+            -0.20131427,
+            0.600_19,
+            -0.101754844,
+            0.072_715_454,
+            -0.372_453_1,
+            0.456_705_2,
+            -0.578_883_47,
+        ];
+        for (actual, expected) in output.into_iter().zip(expected_output) {
+            assert!((actual - expected).abs() <= 2.0e-6);
+        }
+        for (actual, expected) in state.into_iter().zip(expected_state) {
+            assert!((actual - expected).abs() <= 2.0e-6);
+        }
+        assert!(
+            GATED_DELTA_NET_PARALLEL_PARTITIONS.load(Ordering::Relaxed) >= 2,
+            "multi-token Gated DeltaNet prefill must use persistent worker partitions"
+        );
+        // SAFETY: the test consumes the unique context pointer exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
         );
     }
 

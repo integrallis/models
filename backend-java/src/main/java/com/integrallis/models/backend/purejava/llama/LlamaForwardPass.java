@@ -375,6 +375,7 @@ public final class LlamaForwardPass {
                 config.attentionOutputDim(),
                 hiddenDim,
                 config.rmsNormEps(),
+                usesVectorizedSwiGlu(),
                 q4Kernel,
                 blockMajorQ8Activations,
                 q8BlockMajorKernel,
@@ -1826,9 +1827,16 @@ public final class LlamaForwardPass {
       int size) {
     if (config.usesGeluFfn()) {
       TensorOps.geluGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+    } else if (usesVectorizedSwiGlu()) {
+      VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else {
       TensorOps.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     }
+  }
+
+  private boolean usesVectorizedSwiGlu() {
+    return config.architecture() == DecoderArchitecture.QWEN2
+        || config.architecture() == DecoderArchitecture.QWEN3;
   }
 
   private static void scaleActive(float[] values, int offset, int length, float scale) {

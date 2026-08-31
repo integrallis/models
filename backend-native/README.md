@@ -8,12 +8,13 @@ the transformer graph, KV-cache ownership, sampling, and generation remain in Ja
 The native boundary is a versioned C ABI implemented by the Models-owned
 `jmodels-kernels` Rust crate.
 
-ABI 2 supports Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K batched projections and
-grouped dispatch. Mixed Q4_K/Q5_K/Q6_K groups share one Q8_K activation
-quantization. Its x86-64 path uses format-specialized AVX2/FMA integer dots,
-vectorized Q8_0 activation preparation, batched weight reuse, reusable activation
-scratch, and an explicitly owned persistent worker context. Scalar kernels
-remain available as cross-platform conformance fallbacks.
+ABI 5 supports Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K batched projections,
+grouped dispatch, and the bounded float32 Gated DeltaNet recurrence used by
+Qwen3.5. Mixed Q4_K/Q5_K/Q6_K groups share one Q8_K activation quantization.
+Its x86-64 path uses format-specialized AVX2/FMA integer dots, vectorized Q8_0
+activation preparation, batched weight reuse, reusable activation scratch, and
+an explicitly owned persistent worker context. Scalar kernels remain available
+as cross-platform conformance fallbacks.
 
 ## Build and test
 
@@ -37,7 +38,7 @@ Gradle builds the host library with Cargo under
 
 When the matching platform artifact is present on the runtime classpath,
 `RustFfmBackend` verifies its ABI/platform metadata and SHA-256, extracts it to
-`~/.models/native-kernels/abi-2/<platform>/<sha256>/`, and opens it through Java
+`~/.models/native-kernels/abi-5/<platform>/<sha256>/`, and opens it through Java
 25 FFM:
 
 ```java
@@ -63,6 +64,13 @@ java \
 
 `models.native.kernels.threads` controls the worker-context size and defaults to
 the JVM-reported processor count.
+
+`models.native.quantizedDecode=true` allows eligible single-token quantized
+projections to use the native kernels. `models.native.gatedDeltaNet=true` moves
+only Qwen3.5's measured recurrence bottleneck through the same FFM boundary;
+the graph, convolution, attention, state ownership, tokenizer, and generation
+loop remain in Java. Both switches default to `false` unless an exact qualified
+ModelJar profile recommends them.
 
 Q5_0 grouped projection dispatch is not enabled by default. On the controlled
 Qwen2.5-0.5B x86-64 profile, fused grouping recovered worker-barrier overhead but
