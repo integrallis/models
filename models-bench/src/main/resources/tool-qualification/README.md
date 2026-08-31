@@ -5,12 +5,12 @@ playground. The tool declarations and queries in `needle2-playground-v1.json` ar
 from the exact upstream revision recorded in that file. Expected calls are local assertions layered
 on top of the unchanged upstream inputs.
 
-The `needle2-tool-conformance-v1` policy requires:
+The `needle2-tool-conformance-v2` policy requires:
 
 - a parseable `<tool_call>[...]</tool_call>` response for every case;
 - the exact ordered tool selection for every case;
 - schema-valid arguments containing no undeclared fields for every case;
-- at least 90% accuracy over the expected argument values; and
+- exact agreement for every expected argument value; and
 - a correct empty-array refusal for the off-topic case.
 
 Run the gate only against the pinned artifact bytes:

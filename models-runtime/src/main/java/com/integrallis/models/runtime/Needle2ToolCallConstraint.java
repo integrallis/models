@@ -32,10 +32,12 @@ final class Needle2ToolCallConstraint implements TokenConstraint {
 
   private static final String TOOL_START = "<tool_call>";
   private static final String TOOL_END = "</tool_call>";
+  private static final List<String> PAYLOAD_CONTROL_MARKERS =
+      List.of(TOOL_START, "<|im_start|>", "<|im_end|>", "<tools>", "</tools>");
   private static final int MAX_OBJECT_ALTERNATIVES = 4096;
   private static final Pattern JSON_PATTERN =
       Pattern.compile(
-          "\\\"(?:[^\\\"\\\\\\x00-\\x1f]|\\\\[\\\"\\\\/bfnrt]|\\\\u[0-9a-fA-F]{4})*\\\"");
+          "\\\"(?:[^\\\"\\\\{}\\[\\]\\x00-\\x1f]|\\\\[\\\"\\\\/bfnrt]|\\\\u[0-9a-fA-F]{4})*\\\"");
   private static final String JSON_STRING = JSON_PATTERN.pattern();
   private static final String JSON_INTEGER = "-?(?:0|[1-9][0-9]*)";
   private static final String JSON_NUMBER = JSON_INTEGER + "(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?";
@@ -111,15 +113,30 @@ final class Needle2ToolCallConstraint implements TokenConstraint {
   }
 
   private boolean validPrefix(CharSequence candidate) {
+    String text = candidate.toString();
     int marker = payloadOffset;
     if (marker < 0) {
-      marker = candidate.toString().indexOf(TOOL_START);
+      marker = text.indexOf(TOOL_START);
       if (marker < 0) {
         return true;
       }
       marker += TOOL_START.length();
     }
-    Matcher matcher = payloadPattern.matcher(candidate.subSequence(marker, candidate.length()));
+    String payload = text.substring(marker);
+    for (String controlMarker : PAYLOAD_CONTROL_MARKERS) {
+      if (payload.contains(controlMarker)) {
+        return false;
+      }
+    }
+    int terminal = payload.indexOf(TOOL_END);
+    if (terminal >= 0) {
+      if (terminal != payload.lastIndexOf(TOOL_END)
+          || terminal + TOOL_END.length() != payload.length()) {
+        return false;
+      }
+      return payloadPattern.matcher(payload).matches();
+    }
+    Matcher matcher = payloadPattern.matcher(payload);
     return matcher.matches() || matcher.hitEnd();
   }
 

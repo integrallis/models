@@ -18,6 +18,12 @@ dependencies {
 val configuredGptOssHuggingFaceDirectory =
     providers.systemProperty("models.fixtures.gptOssHuggingFaceDirectory")
 val fixtureDirectory = providers.systemProperty("models.fixtures.directory")
+val needle2Fixture =
+    providers.systemProperty("models.fixtures.needle2Cact").orElse(
+        providers.provider {
+            Path.of(System.getProperty("user.home"), ".jvllm", "models", "needle2.cact").toString()
+        },
+    )
 val miniLmFixture =
     Path.of(
         fixtureDirectory.orNull
@@ -29,7 +35,27 @@ tasks.withType<Test>().configureEach {
     configuredGptOssHuggingFaceDirectory.orNull?.let {
         systemProperty("models.fixtures.gptOssHuggingFaceDirectory", it)
     }
+    systemProperty("models.fixtures.needle2Cact", needle2Fixture.get())
     systemProperty("models.fixtures.miniLm", miniLmFixture)
+}
+
+tasks.register<Test>("needle2SpringAiIntegrationTest") {
+    description = "Reproduce Spring AI tool calling against the pinned official Needle 2 artifact"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.spring.ai.Needle2SpringAiToolCallingIntegrationTest",
+        )
+    }
+    dependsOn(project(":backend-java").tasks.named("downloadNeedle2Cact"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
 }
 
 tasks.register<Test>("miniLmSpringAiIntegrationTest") {

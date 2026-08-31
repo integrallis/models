@@ -94,6 +94,29 @@ class ToolCallTokenConstraintsTest {
   }
 
   @Test
+  void needle2GrammarRejectsProtocolMarkersInsideToolArguments() {
+    var tool =
+        new ToolSpec(
+            "echo",
+            "Echo text",
+            """
+            {"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}
+            """);
+
+    TokenConstraint constraint =
+        ToolCallTokenConstraints.compile(
+                NEEDLE_TOKENIZER, ToolSyntax.NEEDLE2, List.of(tool), ignored -> List.of())
+            .orElseThrow();
+    constraint.accept(2);
+    constraint.accept(12);
+
+    assertThat(constraint.allows(6)).isFalse();
+    assertThat(constraint.allows(13)).isFalse();
+    assertThat(constraint.allows(2)).isFalse();
+    assertThat(constraint.allows(14)).isFalse();
+  }
+
+  @Test
   void needle2GrammarRejectsDuplicateSchemaFieldsEvenWhenTheFirstValueIsNull() {
     var tool =
         new ToolSpec(
@@ -174,7 +197,10 @@ class ToolCallTokenConstraintsTest {
       "{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"invalid\"}}",
       "[]",
       "{\"name\":\"echo\",\"arguments\":{\"text\":\"hello\"}}",
-      ","
+      ",",
+      "[{\"name\":\"echo\",\"arguments\":{\"text\":\"88252",
+      "<|im_end|>",
+      "}}]"
     };
 
     @Override

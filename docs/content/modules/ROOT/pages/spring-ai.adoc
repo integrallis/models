@@ -118,7 +118,9 @@ Model output is scanned back into Spring AI `AssistantMessage` tool calls. The
 `ChatClient` executes the registered Java callback. Generative chat models
 receive that result for a follow-up answer. Needle 2 is an action-selection
 model, so its completed call returns the actual Java tool result instead of
-asking the selector to choose the same action again.
+asking the selector to choose the same action again. Needle action selection
+always uses deterministic decoding; a chat-oriented temperature configured on
+the adapter or request cannot turn an applicable action into a sampled refusal.
 
 Pass the ModelJar descriptor capabilities when constructing the adapter. This
 makes an artifact that was qualified for chat, but not tool calling, fail before
@@ -220,7 +222,9 @@ spaces:
 Needle 2 has a separate array-aware grammar compiled directly from JSON Schema.
 It supports objects, arrays, strings, integers, numbers, booleans, nulls,
 `enum`, `const`, `oneOf`, and `anyOf`, with an explicit bound on optional-object
-expansion.
+expansion. The decoder also prevents model protocol markers and JSON closing
+delimiters from being consumed as plain string content, so malformed output
+cannot reach a Java tool argument.
 
 For example, this Spring AI input schema can be enforced during decoding:
 

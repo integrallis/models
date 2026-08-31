@@ -33,12 +33,12 @@ import java.util.Objects;
 /** Evaluates Needle 2 output against the versioned upstream playground conformance suite. */
 final class Needle2ToolQualification {
   static final String SUITE_RESOURCE = "tool-qualification/needle2-playground-v1.json";
-  static final String POLICY_VERSION = "needle2-tool-conformance-v1";
+  static final String POLICY_VERSION = "needle2-tool-conformance-v2";
   static final double MINIMUM_STRUCTURED_OUTPUT_RATE = 1.0;
   static final double MINIMUM_TOOL_SELECTION_EXACT_RATE = 1.0;
   static final double MINIMUM_SCHEMA_VALIDITY_RATE = 1.0;
   static final double MINIMUM_DECLARED_ARGUMENTS_ONLY_RATE = 1.0;
-  static final double MINIMUM_EXPECTED_ARGUMENT_ACCURACY = 0.90;
+  static final double MINIMUM_EXPECTED_ARGUMENT_ACCURACY = 1.0;
   static final double MINIMUM_REFUSAL_ACCURACY = 1.0;
 
   private static final String SECTION_START = "<tool_call>";

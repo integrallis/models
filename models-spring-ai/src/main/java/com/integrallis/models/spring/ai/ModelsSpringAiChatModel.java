@@ -235,7 +235,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     requireQualifiedToolCalling(declaredTools);
     List<ToolSpec> tools = selectedTools(prompt, declaredTools);
     ModelPrompt rendered = render(prompt, tools);
-    SamplingOptions requested = options(prompt);
+    SamplingOptions requested = options(prompt, tools);
     GenerationOutput generated = generate(rendered, requested, tools);
     return tools.isEmpty()
         ? response(generated.text(), generated.usage())
@@ -328,7 +328,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       return Flux.just(response(completedToolResult.orElseThrow(), null));
     }
     ModelPrompt rendered = render(prompt, tools);
-    SamplingOptions requested = options(prompt);
+    SamplingOptions requested = options(prompt, tools);
     return Flux.<ChatResponse>create(
         sink -> {
           // A tool call only means anything once it is complete, so when tools are in play the
@@ -430,7 +430,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     return builder.build();
   }
 
-  private SamplingOptions options(Prompt prompt) {
+  private SamplingOptions options(Prompt prompt, List<ToolSpec> tools) {
     SamplingOptions.Builder builder =
         SamplingOptions.builder()
             .temperature(defaults.temperature())
@@ -460,6 +460,11 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       if (requested.getStopSequences() != null) {
         builder.stopSequences(requested.getStopSequences());
       }
+    }
+    // Needle is an action selector, and its qualification contract is deterministic. Sampling can
+    // turn an applicable action into a refusal even while the output remains schema-valid.
+    if (template == ChatTemplate.NEEDLE2 && !tools.isEmpty()) {
+      builder.temperature(0.0f);
     }
     return builder.build();
   }

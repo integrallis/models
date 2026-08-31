@@ -127,7 +127,14 @@ class Needle2ToolQualificationTest {
     assertThat(summary.declaredArgumentsOnlyRate()).isEqualTo(1.0);
     assertThat(summary.expectedArgumentAccuracy()).isEqualTo(0.9);
     assertThat(summary.refusalAccuracy()).isEqualTo(1.0);
-    assertThat(summary.qualified()).isTrue();
+    assertThat(summary.qualified()).isFalse();
+
+    assertThat(
+            Needle2ToolQualification.summarize(
+                    List.of(
+                        result("perfect", true, true, true, true, 10, 10, false, true), refusal))
+                .qualified())
+        .isTrue();
 
     assertThat(
             Needle2ToolQualification.summarize(

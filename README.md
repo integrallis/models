@@ -81,7 +81,8 @@ Implemented functionality includes:
   contrastive head. Spring AI `ChatClient` requests execute registered Java
   callbacks on both blocking and streaming paths. Generative models receive the
   result for their follow-up answer; Needle 2 completes the action-selection
-  loop with the actual Java tool result. ModelJars callers can enforce artifact
+  loop with the actual Java tool result and uses deterministic, schema-constrained
+  decoding for those selections. ModelJars callers can enforce artifact
   qualification by passing the descriptor capabilities to the adapter
 - in-JVM text embeddings from causal decoders and bidirectional encoders, with
   model-declared or explicit pooling and vectors tested against llama.cpp
