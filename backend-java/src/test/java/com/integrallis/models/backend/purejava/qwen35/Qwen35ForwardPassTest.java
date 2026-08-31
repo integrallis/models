@@ -41,6 +41,8 @@ import org.junit.jupiter.api.io.TempDir;
 @Tag("unit")
 class Qwen35ForwardPassTest {
 
+  private static final float SIMD_REDUCTION_TOLERANCE = 2.0e-7f;
+
   private static final int DIMENSION = 8;
   private static final int HEAD_DIMENSION = 4;
   private static final int VALUE_HEADS = 2;
@@ -144,7 +146,7 @@ class Qwen35ForwardPassTest {
       assertThat(session.checkpoint()).isEqualTo(2);
 
       float[] complete = graph.forward(new int[] {1, 2});
-      assertThat(second).containsExactly(complete);
+      assertThat(second).containsExactly(complete, within(SIMD_REDUCTION_TOLERANCE));
 
       graph.rewind(session, 1);
       assertThat(graph.forward(session, 2, 1)).containsExactly(second);
