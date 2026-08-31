@@ -19,3 +19,9 @@ model-written text.
 
 `models-rust-ffm.json` and `ollama.json` retain every measured request. Their
 SHA-256 values are bound by `qualification.json`.
+
+The separate library-default smoke used the released Models `4934a6c1` code,
+left native quantized decode disabled, and passed all 9 workload cases with no
+generation failures. Its immutable report is
+`default-correctness/models-rust-ffm.json` (SHA-256
+`803f6cb0b90365897f32731225b66024a407b35126e588e807b87b40cdc4c4fc`).
