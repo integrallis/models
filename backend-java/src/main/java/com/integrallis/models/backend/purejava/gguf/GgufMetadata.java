@@ -129,4 +129,25 @@ public record GgufMetadata(Map<String, GgufMetadataValue> entries) {
             a ->
                 a.elements().stream().map(e -> ((GgufMetadataValue.BoolValue) e).value()).toList());
   }
+
+  /** Returns an int8 or uint8 array as raw bytes. */
+  public Optional<byte[]> getByteArray(String key) {
+    return get(key)
+        .filter(v -> v instanceof GgufMetadataValue.ArrayValue)
+        .map(v -> (GgufMetadataValue.ArrayValue) v)
+        .filter(
+            a -> a.elementType() == GgufValueType.INT8 || a.elementType() == GgufValueType.UINT8)
+        .map(
+            a -> {
+              byte[] bytes = new byte[a.elements().size()];
+              for (int index = 0; index < bytes.length; index++) {
+                GgufMetadataValue element = a.elements().get(index);
+                bytes[index] =
+                    element instanceof GgufMetadataValue.Int8Value signed
+                        ? signed.value()
+                        : (byte) ((GgufMetadataValue.Uint8Value) element).value();
+              }
+              return bytes;
+            });
+  }
 }

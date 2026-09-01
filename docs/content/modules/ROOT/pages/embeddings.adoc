@@ -72,8 +72,8 @@ position has seen the whole input.
 input.
 
 Dedicated encoders own their pooling choice. Do not call `pooling(...)` for a
-BERT/MiniLM GGUF; Models reads `bert.pooling_type` and rejects an override that
-would silently change the trained representation.
+BERT/MiniLM or Granite embedding GGUF; Models reads `bert.pooling_type` and
+rejects an override that would silently change the trained representation.
 
 Mean pooling on a last-token model returns vectors that agree with the correct
 ones at 0.66 cosine. Take the pooling the model card specifies.
@@ -136,8 +136,10 @@ in seconds: the reference vectors are committed, so the gate needs no local
 llama.cpp build.
 
 Probe sets cover single tokens, long input, non-Latin script, code, rare tokens,
-and ordinary prose. Dedicated encoders additionally pin WordPiece token IDs and
-the complete pooled vector. The gate takes the worst probe.
+and ordinary prose. Dedicated encoders additionally pin their tokenizer output
+and the complete pooled vector. This covers WordPiece for MiniLM and
+T5/SentencePiece unigram tokenization for Granite, including accented Latin and
+Japanese input. The gate takes the worst probe.
 
 Two floors, both placed against measurements:
 
@@ -152,6 +154,10 @@ Two floors, both placed against measurements:
 | MiniLM BERT encoder against the reference
 | 0.99924
 | 4.8e-09
+
+| Granite multilingual BERT encoder against the reference
+| 0.999746
+| < 1e-6
 
 | Mean pooling instead of last-token
 | 0.66156

@@ -53,6 +53,10 @@ val modelFixtures =
             "all_minilm_l6_v2_q4_k_m",
         ),
         modelFixture(
+            "downloadGraniteEmbedding107MMultilingualQ4KMModel",
+            "granite_embedding_107m_multilingual_q4_k_m",
+        ),
+        modelFixture(
             "downloadQwen38BQ4KMModel",
             "qwen3_8b_q4_k_m",
         ),
@@ -446,6 +450,25 @@ tasks.register<Test>("miniLmEmbeddingIntegrationTest") {
         )
     }
     dependsOn(tasks.named("downloadAllMiniLmL6V2Q4KMModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
+}
+
+tasks.register<Test>("graniteEmbeddingIntegrationTest") {
+    description = "Run the pinned Granite Embedding 107M Multilingual Q4_K_M pure-Java tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.GraniteEmbeddingModelFixtureIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadGraniteEmbedding107MMultilingualQ4KMModel"))
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "2g"

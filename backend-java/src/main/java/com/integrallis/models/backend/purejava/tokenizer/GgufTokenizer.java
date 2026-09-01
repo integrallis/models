@@ -81,6 +81,7 @@ public final class GgufTokenizer implements Tokenizer {
   private final boolean useSentencePiece;
   private final boolean useGemma4Bpe;
   private final boolean useWordPiece;
+  private final UnigramTokenizer unigramTokenizer;
   private final boolean addBosToken;
   private final boolean addEosToken;
   private final boolean addSpacePrefix;
@@ -103,6 +104,7 @@ public final class GgufTokenizer implements Tokenizer {
       boolean useSentencePiece,
       boolean useGemma4Bpe,
       boolean useWordPiece,
+      UnigramTokenizer unigramTokenizer,
       boolean addBosToken,
       boolean addEosToken,
       boolean addSpacePrefix,
@@ -121,6 +123,7 @@ public final class GgufTokenizer implements Tokenizer {
     this.useSentencePiece = useSentencePiece;
     this.useGemma4Bpe = useGemma4Bpe;
     this.useWordPiece = useWordPiece;
+    this.unigramTokenizer = unigramTokenizer;
     this.addBosToken = addBosToken;
     this.addEosToken = addEosToken;
     this.addSpacePrefix = addSpacePrefix;
@@ -214,19 +217,33 @@ public final class GgufTokenizer implements Tokenizer {
     boolean useSentencePiece = "llama".equals(tokenizerModel);
     boolean useGemma4Bpe = "gemma4".equals(tokenizerModel);
     boolean useWordPiece = "bert".equals(tokenizerModel);
+    boolean useUnigram = "t5".equals(tokenizerModel);
     boolean useByteLevel =
         !useSentencePiece
             && !useGemma4Bpe
             && !useWordPiece
+            && !useUnigram
             && detectByteLevel(tokenizerModel, vocab, tokenToId);
     boolean addBosToken =
         metadata.getBool("tokenizer.ggml.add_bos_token").orElse(useSentencePiece || useWordPiece);
-    boolean addEosToken = metadata.getBool("tokenizer.ggml.add_eos_token").orElse(useWordPiece);
+    boolean addEosToken =
+        metadata.getBool("tokenizer.ggml.add_eos_token").orElse(useWordPiece || useUnigram);
     boolean addSpacePrefix =
         metadata.getBool("tokenizer.ggml.add_space_prefix").orElse(useSentencePiece);
+    int unknownTokenId = metadata.getUint32("tokenizer.ggml.unknown_token_id").orElse(0);
+    UnigramTokenizer unigramTokenizer =
+        useUnigram
+            ? new UnigramTokenizer(
+                vocab,
+                scores,
+                metadata.getInt32Array("tokenizer.ggml.token_type").orElse(List.of()),
+                metadata.getByteArray("tokenizer.ggml.precompiled_charsmap").orElse(new byte[0]),
+                addSpacePrefix,
+                metadata.getBool("tokenizer.ggml.remove_extra_whitespaces").orElse(false),
+                unknownTokenId)
+            : null;
     String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
     BpePreTokenizer bpePreTokenizer = BpePreTokenizer.forName(preTokenizer);
-    int unknownTokenId = metadata.getUint32("tokenizer.ggml.unknown_token_id").orElse(0);
 
     return new GgufTokenizer(
         vocab,
@@ -241,6 +258,7 @@ public final class GgufTokenizer implements Tokenizer {
         useSentencePiece,
         useGemma4Bpe,
         useWordPiece,
+        unigramTokenizer,
         addBosToken,
         addEosToken,
         addSpacePrefix,
@@ -341,6 +359,7 @@ public final class GgufTokenizer implements Tokenizer {
         false,
         false,
         false,
+        null,
         addBosToken,
         addEosToken,
         false,
@@ -506,6 +525,9 @@ public final class GgufTokenizer implements Tokenizer {
     }
     if (useWordPiece) {
       return encodeWordPiece(normalized);
+    }
+    if (unigramTokenizer != null) {
+      return unigramTokenizer.encode(normalized);
     }
     return useByteLevel ? encodeByteLevelBpe(normalized) : encodePlainBpe(normalized);
   }
@@ -1018,6 +1040,9 @@ public final class GgufTokenizer implements Tokenizer {
     if (useSentencePiece) {
       return decodeSentencePiece(tokens);
     }
+    if (unigramTokenizer != null) {
+      return decodeSentencePiece(tokens);
+    }
     if (useGemma4Bpe) {
       return decodeGemma4Bpe(tokens);
     }
@@ -1158,7 +1183,7 @@ public final class GgufTokenizer implements Tokenizer {
       return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    if (useSentencePiece || useGemma4Bpe || useWordPiece) {
+    if (useSentencePiece || useGemma4Bpe || useWordPiece || unigramTokenizer != null) {
       return piece.replace('\u2581', ' ');
     }
 

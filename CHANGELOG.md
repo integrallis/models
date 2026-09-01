@@ -2,6 +2,20 @@
 
 All notable changes to models are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added pure-Java T5/SentencePiece unigram tokenization for GGUF artifacts.
+- Qualified Granite Embedding 107M Multilingual Q4_K_M on the existing bidirectional BERT encoder,
+  with pinned English, accented Latin, and Japanese tokenization plus a 0.999746 minimum
+  llama.cpp embedding cosine.
+
+### Documentation
+
+- Documented Granite multilingual embeddings, unigram tokenization, pooling, and equivalence
+  evidence.
+
 ## [0.3.21] - 2026-08-31
 
 ### Fixed
