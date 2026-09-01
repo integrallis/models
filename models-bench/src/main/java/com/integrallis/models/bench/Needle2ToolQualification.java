@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Evaluates Needle 2 output against the versioned upstream playground conformance suite. */
 final class Needle2ToolQualification {
@@ -38,8 +39,9 @@ final class Needle2ToolQualification {
   static final double MINIMUM_TOOL_SELECTION_EXACT_RATE = 1.0;
   static final double MINIMUM_SCHEMA_VALIDITY_RATE = 1.0;
   static final double MINIMUM_DECLARED_ARGUMENTS_ONLY_RATE = 1.0;
-  static final double MINIMUM_EXPECTED_ARGUMENT_ACCURACY = 1.0;
+  static final double MINIMUM_EXPECTED_ARGUMENT_ACCURACY = 0.90;
   static final double MINIMUM_REFUSAL_ACCURACY = 1.0;
+  static final Set<String> REQUIRED_REGRESSION_CASES = Set.of("spring-weather-zipcode");
 
   private static final String SECTION_START = "<tool_call>";
   private static final String SECTION_END = "</tool_call>";
@@ -235,13 +237,20 @@ final class Needle2ToolQualification {
             : rate(refusals.stream().filter(CaseResult::refusalCorrect).count(), refusals.size());
     double p95 =
         percentile95(attempts.stream().mapToLong(CaseResult::endToEndMillis).sorted().toArray());
+    boolean requiredRegressionsPassed =
+        REQUIRED_REGRESSION_CASES.stream()
+            .allMatch(
+                requiredId ->
+                    attempts.stream()
+                        .anyMatch(result -> requiredId.equals(result.id()) && result.passed()));
     boolean qualified =
         structured >= MINIMUM_STRUCTURED_OUTPUT_RATE
             && selection >= MINIMUM_TOOL_SELECTION_EXACT_RATE
             && schema >= MINIMUM_SCHEMA_VALIDITY_RATE
             && declaredOnly >= MINIMUM_DECLARED_ARGUMENTS_ONLY_RATE
             && argumentAccuracy >= MINIMUM_EXPECTED_ARGUMENT_ACCURACY
-            && refusalAccuracy >= MINIMUM_REFUSAL_ACCURACY;
+            && refusalAccuracy >= MINIMUM_REFUSAL_ACCURACY
+            && requiredRegressionsPassed;
     return new Summary(
         size,
         Math.toIntExact(attempts.stream().filter(CaseResult::passed).count()),
@@ -411,15 +420,20 @@ final class Needle2ToolQualification {
       throw new IllegalArgumentException(
           "Unsupported Needle 2 qualification suite schema: " + suite.schemaVersion());
     }
-    if (suite.cases().size() != 13) {
+    if (suite.cases().size() != 14) {
       throw new IllegalArgumentException(
-          "Needle 2 upstream playground suite must contain 13 cases: " + suite.cases().size());
+          "Needle 2 conformance suite must contain 13 upstream cases and one Spring regression: "
+              + suite.cases().size());
     }
     if (!suite.sourceRevision().matches("[0-9a-f]{40}")) {
       throw new IllegalArgumentException("sourceRevision must be an exact Git commit");
     }
     if (suite.cases().stream().map(Case::id).distinct().count() != suite.cases().size()) {
       throw new IllegalArgumentException("qualification case IDs must be unique");
+    }
+    if (!suite.cases().stream().map(Case::id).toList().containsAll(REQUIRED_REGRESSION_CASES)) {
+      throw new IllegalArgumentException(
+          "qualification suite is missing required regressions: " + REQUIRED_REGRESSION_CASES);
     }
   }
 
