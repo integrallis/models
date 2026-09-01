@@ -2,6 +2,23 @@
 
 All notable changes to models are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added a framework-neutral reranking API and pure-Java BERT cross-encoder execution with
+  WordPiece sentence pairs, token-type embeddings, exact-GELU feed-forward layers, and corrected
+  dense-tanh classification heads.
+- Added LangChain4j `ScoringModel` and Spring AI `DocumentPostProcessor` adapters with pinned
+  real-model integration tests.
+- Added a checksum-bound MS MARCO MiniLM L6 v2 Q4_K imatrix equivalence gate against ONNX and the
+  same artifact executed by an independent oracle.
+
+### Documentation
+
+- Documented reranking usage, framework integration, the rejected uncorrected conversion, retained
+  numerical evidence, and the missing standard scalar/vector `erf` as a measurable JVM request.
+
 ## [0.3.22] - 2026-08-31
 
 ### Added
