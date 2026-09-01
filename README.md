@@ -158,6 +158,8 @@ retained; optimization is now focused on the measured MXFP4 expert hot loop. See
 - [Model support and qualification](https://integrallis.github.io/models/docs/models/current/model-support.html)
 - [Production RAG results](RAG_BENCHMARKS.md)
 - [Controlled inference results](INFERENCE_BENCHMARKS.md)
+- [Experiment journal](benchmark-results/README.md)
+- [Experiment-backed requests for JVM-native AI](JVM_NATIVE_INFERENCE_GAP.md)
 
 ## Install
 
