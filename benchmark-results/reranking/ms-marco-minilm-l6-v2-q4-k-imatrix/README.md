@@ -89,11 +89,36 @@ Commands:
   :models-spring-ai:msMarcoRerankerSpringAiIntegrationTest
 ```
 
-The first retained run used Temurin 25.0.3+9 on macOS x86-64, a six-core 2.6 GHz Intel Core i7,
-and the 256-bit Panama Vector API provider. The three backend integration checks completed in
-4.579 seconds, including three separate model mappings and 15 score operations. This is a
-correctness and adapter smoke, not a throughput benchmark; ModelJars qualification must measure
-cold load, warm per-pair latency, batch latency, and memory before catalog promotion.
+The correctness run used Temurin 25.0.3+9 on macOS x86-64, a six-core 2.6 GHz Intel Core i7, and
+the 256-bit Panama Vector API provider. The three backend integration checks completed in 4.579
+seconds, including three separate model mappings and 15 score operations.
+
+## Performance result
+
+The [machine-readable performance report](performance-intel-mac.json) retains three fresh JVM
+processes. Each process maps the model, runs three six-document warmups, measures 30 individual
+pairs and ten six-document batches, and confirms the same score checksum and top-two order.
+
+| Measurement | Retained result | Policy ceiling |
+| --- | ---: | ---: |
+| Median cold load | 221.346 ms | 1,000 ms |
+| Maximum pair p95 across processes | 174.357 ms | 250 ms |
+| Median six-document batch p50 | 761.859 ms | — |
+| Maximum six-document batch p95 across processes | 930.176 ms | 1,200 ms |
+| Median batch throughput | 7.875 documents/s | — |
+
+Result: `PASS` for a six-document second-stage reranking envelope on this controlled 2019 Intel
+Mac. This is not a claim about arbitrary candidate-set sizes or hardware. The limits are explicit
+so ModelJars can reject a later artifact or runtime that preserves ordering but misses the usable
+latency envelope.
+
+Reproduce one fresh-process sample with:
+
+```bash
+./gradlew \
+  -Dmodels.fixtures.directory=/private/tmp/model-fixtures \
+  :backend-java:msMarcoMiniLmRerankerPerformanceExperiment
+```
 
 ## Product and JVM consequences
 

@@ -381,6 +381,23 @@ tasks.register<Test>("msMarcoMiniLmRerankerIntegrationTest") {
     maxHeapSize = "2g"
 }
 
+tasks.register<JavaExec>("msMarcoMiniLmRerankerPerformanceExperiment") {
+    description = "Measure the pinned MS MARCO MiniLM reranker's cold load and warm scoring"
+    group = "verification"
+    dependsOn(tasks.named("downloadMsMarcoMiniLmL6V2RerankerModel"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set(
+        "com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerPerformanceExperiment",
+    )
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+    args(
+        providers.gradleProperty("reranker.performance.warmups").getOrElse("3"),
+        providers.gradleProperty("reranker.performance.pairIterations").getOrElse("30"),
+        providers.gradleProperty("reranker.performance.batchIterations").getOrElse("10"),
+    )
+    maxHeapSize = "2g"
+}
+
 tasks.register<Test>("qwen25HuggingFaceIntegrationTest") {
     description = "Run the pinned Qwen 2.5 0.5B Hugging Face Safetensors compatibility test"
     group = "verification"

@@ -13,6 +13,8 @@ All notable changes to models are documented here.
   real-model integration tests.
 - Added a checksum-bound MS MARCO MiniLM L6 v2 Q4_K imatrix equivalence gate against ONNX and the
   same artifact executed by an independent oracle.
+- Added a three-process cold-load and warm pair/batch latency experiment for the six-document
+  second-stage reranking envelope.
 
 ### Documentation
 
