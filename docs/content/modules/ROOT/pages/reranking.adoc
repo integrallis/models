@@ -1,0 +1,90 @@
+= Reranking
+:navtitle: Reranking
+
+A reranker scores each retrieved document together with the user's query. This cross-encoder pass
+is more expensive than vector similarity, but it can improve the small candidate set that reaches
+the prompt without re-embedding the corpus.
+
+Models runs BERT cross-encoders in-process with bidirectional attention, WordPiece sentence-pair
+tokenization, token-type embeddings, and the trained classifier head. The model is memory-mapped;
+no Python process, inference server, or native runtime is involved.
+
+== Plain Java
+
+`RerankingModel` is the framework-neutral API. `GgufRerankingModel` loads a corrected BERT
+cross-encoder GGUF and owns its mapping:
+
+[source,java]
+----
+import com.integrallis.models.backend.purejava.GgufRerankingModel;
+
+try (var reranker = GgufRerankingModel.load(modelPath)) {
+    var ranked = reranker.rerank(
+            "How many people live in Berlin?",
+            documents,
+            3);
+
+    ranked.forEach(result ->
+            System.out.printf("%.3f  %s%n", result.score(), result.document()));
+}
+----
+
+Every `RerankResult` retains `originalIndex`, so an application can correlate a ranked document
+with its retrieved metadata. Scores order documents for one query; do not compare raw scores from
+unrelated queries as though they were probabilities.
+
+Use a corrected conversion that retains the model's trained classification pooler. Loading fails
+with a direct explanation when the required classifier tensors are absent instead of returning
+plausible but mis-calibrated scores.
+
+== LangChain4j
+
+`ModelsScoringModel` implements LangChain4j's `ScoringModel`:
+
+[source,java]
+----
+import com.integrallis.models.langchain4j.ModelsScoringModel;
+
+try (var scoring = new ModelsScoringModel(
+        GgufRerankingModel.load(modelPath))) {
+    var scores = scoring.scoreAll(segments, query).content();
+}
+----
+
+The returned scores stay in the same order as the supplied `TextSegment` values, matching the
+LangChain4j contract.
+
+== Spring AI
+
+`ModelsSpringAiDocumentReranker` implements Spring AI's `DocumentPostProcessor`. It sorts retrieved
+documents, attaches the raw cross-encoder score, and preserves each document's ID and metadata:
+
+[source,java]
+----
+import com.integrallis.models.spring.ai.ModelsSpringAiDocumentReranker;
+
+var postProcessor = new ModelsSpringAiDocumentReranker(
+        GgufRerankingModel.load(modelPath),
+        5);
+
+List<Document> ranked = postProcessor.process(query, retrievedDocuments);
+----
+
+The second constructor argument is the maximum number of documents to keep. Close the post
+processor with the application component that owns it; closing releases the model mapping.
+
+== Qualification
+
+The pinned MS MARCO MiniLM L6 v2 Q4_K imatrix fixture exercises the full path. Its gate compares six
+raw scores with the corrected conversion's independent ONNX Runtime reference, preserves the
+expected ordering, verifies exact pair token and token-type IDs, and repeats the same checks through
+LangChain4j and Spring AI.
+
+Run only that artifact and its framework gates:
+
+[source,bash]
+----
+./gradlew :backend-java:msMarcoMiniLmRerankerIntegrationTest \
+  :models-langchain4j:msMarcoRerankerLangChain4jIntegrationTest \
+  :models-spring-ai:msMarcoRerankerSpringAiIntegrationTest
+----

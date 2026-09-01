@@ -30,7 +30,7 @@ public final class BertForwardPass implements SequenceEncoder {
   private final BertWeights weights;
   private final float[] tokenEmbedding;
   private final float[] positionEmbedding;
-  private final float[] tokenTypeEmbedding;
+  private final float[][] tokenTypeEmbeddings;
   private final double[] pooledSum;
 
   private float[] hidden = new float[0];
@@ -55,9 +55,11 @@ public final class BertForwardPass implements SequenceEncoder {
     this.weights = Objects.requireNonNull(weights, "weights");
     this.tokenEmbedding = new float[config.embeddingDim()];
     this.positionEmbedding = new float[config.embeddingDim()];
-    this.tokenTypeEmbedding = new float[config.embeddingDim()];
+    this.tokenTypeEmbeddings = new float[weights.tokenTypeCount()][config.embeddingDim()];
     this.pooledSum = new double[config.embeddingDim()];
-    weights.tokenTypeEmbedding(tokenTypeEmbedding);
+    for (int tokenType = 0; tokenType < tokenTypeEmbeddings.length; tokenType++) {
+      weights.tokenTypeEmbedding(tokenType, tokenTypeEmbeddings[tokenType]);
+    }
   }
 
   /** Loads a complete bidirectional encoder from an already parsed GGUF. */
@@ -67,9 +69,30 @@ public final class BertForwardPass implements SequenceEncoder {
 
   @Override
   public synchronized float[] encode(int[] tokens) {
+    execute(tokens, null);
+    return pool(tokens.length);
+  }
+
+  /** Encodes a sequence with one BERT segment id per token and applies the declared pooling. */
+  public synchronized float[] encode(int[] tokens, int[] tokenTypes) {
+    execute(tokens, Objects.requireNonNull(tokenTypes, "tokenTypes"));
+    return pool(tokens.length);
+  }
+
+  /** Returns the final hidden state of the leading CLS token for a cross-encoder head. */
+  public synchronized float[] encodeCls(int[] tokens, int[] tokenTypes) {
+    execute(tokens, Objects.requireNonNull(tokenTypes, "tokenTypes"));
+    return Arrays.copyOf(hidden, config.embeddingDim());
+  }
+
+  private void execute(int[] tokens, int[] tokenTypes) {
     Objects.requireNonNull(tokens, "tokens");
     if (tokens.length == 0) {
       throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (tokenTypes != null && tokenTypes.length != tokens.length) {
+      throw new IllegalArgumentException(
+          "tokenTypes length must match tokens: " + tokenTypes.length + " != " + tokens.length);
     }
     if (tokens.length > config.contextLength()) {
       throw new IllegalArgumentException(
@@ -83,12 +106,19 @@ public final class BertForwardPass implements SequenceEncoder {
     int dim = config.embeddingDim();
     ensureCapacity(sequenceLength);
     for (int position = 0; position < sequenceLength; position++) {
+      int tokenType = tokenTypes == null ? 0 : tokenTypes[position];
+      if (tokenType < 0 || tokenType >= tokenTypeEmbeddings.length) {
+        throw new IllegalArgumentException(
+            "token type " + tokenType + " is outside the model's token type table");
+      }
       weights.tokenEmbedding(tokens[position], tokenEmbedding);
       weights.positionEmbedding(position, positionEmbedding);
       int offset = position * dim;
       for (int index = 0; index < dim; index++) {
         normalized[offset + index] =
-            tokenEmbedding[index] + positionEmbedding[index] + tokenTypeEmbedding[index];
+            tokenEmbedding[index]
+                + positionEmbedding[index]
+                + tokenTypeEmbeddings[tokenType][index];
       }
       TensorOps.layerNorm(
           hidden,
@@ -104,7 +134,6 @@ public final class BertForwardPass implements SequenceEncoder {
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
       executeLayer(weights.layer(layerIndex), sequenceLength);
     }
-    return pool(sequenceLength);
   }
 
   private void executeLayer(BertWeights.Layer layer, int sequenceLength) {
@@ -132,7 +161,7 @@ public final class BertForwardPass implements SequenceEncoder {
 
     project(feedForward, normalized, sequenceLength, layer.feedForwardUp());
     addBias(feedForward, sequenceLength, config.hiddenDim(), layer.feedForwardUpBias());
-    TensorOps.gelu(feedForward, 0, feedForward, 0, sequenceLength * config.hiddenDim());
+    TensorOps.geluErf(feedForward, 0, feedForward, 0, sequenceLength * config.hiddenDim());
     project(feedForwardProjected, feedForward, sequenceLength, layer.feedForwardDown());
     addBias(feedForwardProjected, sequenceLength, dim, layer.feedForwardDownBias());
     for (int index = 0; index < batchElements; index++) {

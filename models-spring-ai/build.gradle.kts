@@ -10,8 +10,10 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
 
     compileOnly("org.springframework.ai:spring-ai-model:$springAiVersion")
+    compileOnly("org.springframework.ai:spring-ai-rag:$springAiVersion")
     testImplementation("org.springframework.ai:spring-ai-model:$springAiVersion")
     testImplementation("org.springframework.ai:spring-ai-client-chat:$springAiVersion")
+    testImplementation("org.springframework.ai:spring-ai-rag:$springAiVersion")
     testImplementation(project(":backend-java"))
 }
 
@@ -30,6 +32,12 @@ val miniLmFixture =
             ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
         "all-MiniLM-L6-v2-Q4_K_M.gguf",
     ).toString()
+val msMarcoRerankerFixture =
+    Path.of(
+        fixtureDirectory.orNull
+            ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
+        "ms-marco-MiniLM-L-6-v2-q4_k-imatrix-g7c-f7.gguf",
+    ).toString()
 
 tasks.withType<Test>().configureEach {
     configuredGptOssHuggingFaceDirectory.orNull?.let {
@@ -37,6 +45,7 @@ tasks.withType<Test>().configureEach {
     }
     systemProperty("models.fixtures.needle2Cact", needle2Fixture.get())
     systemProperty("models.fixtures.miniLm", miniLmFixture)
+    systemProperty("models.fixtures.msMarcoReranker", msMarcoRerankerFixture)
 }
 
 tasks.register<Test>("needle2SpringAiIntegrationTest") {
@@ -72,6 +81,25 @@ tasks.register<Test>("miniLmSpringAiIntegrationTest") {
         )
     }
     dependsOn(project(":backend-java").tasks.named("downloadAllMiniLmL6V2Q4KMModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
+}
+
+tasks.register<Test>("msMarcoRerankerSpringAiIntegrationTest") {
+    description = "Run Spring AI document reranking against the pinned MS MARCO MiniLM model"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.spring.ai.MsMarcoSpringAiRerankerIntegrationTest",
+        )
+    }
+    dependsOn(project(":backend-java").tasks.named("downloadMsMarcoMiniLmL6V2RerankerModel"))
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "2g"

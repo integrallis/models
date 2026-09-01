@@ -53,6 +53,10 @@ val modelFixtures =
             "all_minilm_l6_v2_q4_k_m",
         ),
         modelFixture(
+            "downloadMsMarcoMiniLmL6V2RerankerModel",
+            "ms_marco_minilm_l6_v2_q4_k_imatrix_g7c_f7",
+        ),
+        modelFixture(
             "downloadGraniteEmbedding107MMultilingualQ4KMModel",
             "granite_embedding_107m_multilingual_q4_k_m",
         ),
@@ -356,6 +360,25 @@ tasks.named<Test>("integrationTest") {
             .filterNot(ModelFixture::slow)
             .map { tasks.named(it.taskName) },
     )
+}
+
+tasks.register<Test>("msMarcoMiniLmRerankerIntegrationTest") {
+    description = "Run the pinned corrected MS MARCO MiniLM reranker equivalence tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadMsMarcoMiniLmL6V2RerankerModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
 }
 
 tasks.register<Test>("qwen25HuggingFaceIntegrationTest") {

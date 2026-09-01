@@ -86,6 +86,8 @@ Implemented functionality includes:
   qualification by passing the descriptor capabilities to the adapter
 - in-JVM text embeddings from causal decoders and bidirectional encoders, with
   model-declared or explicit pooling and vectors tested against llama.cpp
+- pure-Java cross-encoder reranking with a framework-neutral API plus
+  LangChain4j `ScoringModel` and Spring AI `DocumentPostProcessor` adapters
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
 - Apple Foundation Models on supported Apple Silicon Macs
 - framework-neutral guarded RAG
@@ -317,8 +319,8 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Integration | Module | Surface |
 |---|---|---|
 | Plain Java | `models-runtime` | `GenerationLoop` and `TokenStream` |
-| LangChain4j | `models-langchain4j` | blocking and streaming chat models with schema-constrained tool calls |
-| Spring AI | `models-spring-ai` | observed blocking and streaming chat models with qualified `ChatClient` tool execution |
+| LangChain4j | `models-langchain4j` | blocking and streaming chat, embeddings, and cross-encoder scoring |
+| Spring AI | `models-spring-ai` | observed blocking and streaming chat, embeddings, document reranking, and qualified `ChatClient` tool execution |
 | Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel`, observations, and token-usage meters |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |

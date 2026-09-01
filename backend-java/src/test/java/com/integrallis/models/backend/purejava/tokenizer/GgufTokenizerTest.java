@@ -266,6 +266,46 @@ class GgufTokenizerTest {
 
       assertThat(tokenizer.encode("notinthevocabulary")).containsExactly(1, 0, 2);
     }
+
+    @Test
+    void encodesSentencePairsWithBertBoundariesAndTokenTypes() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      GgufTokenizer.TokenizedPair pair = tokenizer.encodePair("transit api", "friendly riders", 16);
+
+      assertThat(pair.tokens()).containsExactly(1, 3, 6, 2, 5, 11, 2);
+      assertThat(pair.tokenTypes()).containsExactly(0, 0, 0, 0, 1, 1, 1);
+    }
+
+    @Test
+    void truncatesTheLongerSideFirstToFitTheContextWindow() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      GgufTokenizer.TokenizedPair pair =
+          tokenizer.encodePair("transit api friendly", "transit api", 7);
+
+      assertThat(pair.tokens()).containsExactly(1, 3, 6, 2, 3, 6, 2);
+      assertThat(pair.tokenTypes()).containsExactly(0, 0, 0, 0, 1, 1, 1);
+    }
+
+    @Test
+    void truncatesTheFirstSideWhenPairLengthsAreTied() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      GgufTokenizer.TokenizedPair pair = tokenizer.encodePair("transit api", "transit api", 6);
+
+      assertThat(pair.tokens()).containsExactly(1, 3, 2, 3, 6, 2);
+      assertThat(pair.tokenTypes()).containsExactly(0, 0, 0, 1, 1, 1);
+    }
+
+    @Test
+    void rejectsPairEncodingForNonWordPieceModels() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
+
+      assertThatThrownBy(() -> tokenizer.encodePair("first", "second", 16))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("WordPiece");
+    }
   }
 
   private GgufMetadata createSmaugByteLevelMetadata() {

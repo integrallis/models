@@ -3,7 +3,7 @@
 
 Models is an in-process inference library for Java applications. Inference is
 the work of running a trained model to produce an answer. With Models, an
-application can load an open-weight model to generate text or create embeddings
+application can load an open-weight model to generate text, create embeddings, or rerank retrieved documents
 without starting Python, calling a separate model server, or sending prompts
 over the network.
 
@@ -117,11 +117,11 @@ image::models-0001.png[Models runtime architecture,align=center]
 |Pure-Java WordTour semantic-order models
 
 |`models-langchain4j`
-|LangChain4j blocking and streaming chat adapters with schema-constrained tool calls
+|LangChain4j blocking and streaming chat, embedding, and cross-encoder scoring adapters
 
 |`models-spring-ai`
-|Spring AI blocking and streaming chat adapters with qualified `ChatClient`
-tool execution
+|Spring AI blocking and streaming chat, embedding, and document-reranking adapters with qualified
+`ChatClient` tool execution
 
 |`models-spring-boot-starter`
 |Spring Boot auto-configuration for a local Models-backed Spring AI `ChatModel`

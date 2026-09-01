@@ -165,6 +165,10 @@ token. The projection weights remain memory-mapped and use the same Java GGUF
 batch kernels as decoder models. The graph accepts both WordPiece metadata used
 by MiniLM and T5/SentencePiece unigram metadata used by Granite embedding
 models; tokenizer behavior is pinned independently from vector equivalence.
+For rerankers, Models instead constructs `[CLS] query [SEP] document [SEP]`, applies the matching
+token-type IDs, retains the CLS hidden state, and executes the artifact's trained
+dense-tanh-output classifier head. Corrected classifier tensors are required; embedding pooling is
+not substituted for the trained scoring head.
 
 == Safetensors And CACT
 
