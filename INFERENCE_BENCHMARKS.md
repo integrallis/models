@@ -1,5 +1,10 @@
 # Controlled inference benchmarks
 
+The chronological [experiment journal](benchmark-results/README.md) connects the retained kernel,
+architecture, framework, and full-model evidence. The
+[JVM-native inference brief](JVM_NATIVE_INFERENCE_GAP.md) turns that evidence into specific,
+measurable requests for JVM, JDK-distribution, compiler, and accelerator leaders.
+
 This study compares the pure-Java backend with Ollama and llama.cpp using the
 same GGUF bytes on one CPU-only host. It is an initial single-request latency
 study, not a concurrency, cost, model-quality, or production-capacity claim.
