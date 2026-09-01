@@ -68,7 +68,7 @@ Implemented functionality includes:
 - BERT/MiniLM encoders plus Llama, Qwen2, Qwen3, dense Qwen3.5, Gemma 4,
   GPT-OSS, and Needle 2 decoder architectures
 - F32, F16, BF16, MXFP4, CQ2/CQ4, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
-- BERT WordPiece, byte-level BPE, and Llama SentencePiece tokenizers
+- BERT WordPiece, T5/SentencePiece unigram, byte-level BPE, and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - Qwen3.5 hybrid full-attention/Gated DeltaNet execution with batched prefill and reusable
   recurrent state

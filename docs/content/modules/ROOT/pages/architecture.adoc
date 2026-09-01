@@ -162,7 +162,9 @@ executes full non-causal attention and GELU feed-forward blocks, then performs
 the mean or CLS pooling declared by the artifact. There is no KV cache or
 vocabulary projection because an encoder neither predicts nor generates a next
 token. The projection weights remain memory-mapped and use the same Java GGUF
-batch kernels as decoder models.
+batch kernels as decoder models. The graph accepts both WordPiece metadata used
+by MiniLM and T5/SentencePiece unigram metadata used by Granite embedding
+models; tokenizer behavior is pinned independently from vector equivalence.
 
 == Safetensors And CACT
 
