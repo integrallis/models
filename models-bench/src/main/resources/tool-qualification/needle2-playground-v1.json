@@ -173,6 +173,17 @@
       ],
       "query": "write me a short poem about the moon",
       "expectedCalls": []
+    },
+    {
+      "id": "spring-weather-zipcode",
+      "label": "Spring AI zipcode regression",
+      "tools": [
+        {"name":"get-weather-for-zipcode","description":"Gets weather for a given zipcode","parameters":{"type":"object","properties":{"zipcode":{"type":"string","description":"The zipcode to get weather for"}},"required":["zipcode"]}}
+      ],
+      "query": "What is the weather for 88252?",
+      "expectedCalls": [
+        {"name":"get-weather-for-zipcode","arguments":{"zipcode":"88252"}}
+      ]
     }
   ]
 }

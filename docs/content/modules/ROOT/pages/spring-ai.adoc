@@ -118,7 +118,9 @@ Model output is scanned back into Spring AI `AssistantMessage` tool calls. The
 `ChatClient` executes the registered Java callback. Generative chat models
 receive that result for a follow-up answer. Needle 2 is an action-selection
 model, so its completed call returns the actual Java tool result instead of
-asking the selector to choose the same action again.
+asking the selector to choose the same action again. Needle action selection
+always uses deterministic decoding; a chat-oriented temperature configured on
+the adapter or request cannot turn an applicable action into a sampled refusal.
 
 Pass the ModelJar descriptor capabilities when constructing the adapter. This
 makes an artifact that was qualified for chat, but not tool calling, fail before
@@ -175,7 +177,9 @@ ApplicationRunner weatherDemo(WeatherTools weatherTools) {
 `defaultTools(...)` and per-request `.tools(...)` use the same adapter path.
 For Needle 2, `answer` is the serialized `Weather` returned by the invoked
 method. For a qualified generative tool-calling model, it is the model's
-follow-up response after seeing that tool result.
+follow-up response after seeing that tool result. Release verification executes
+this exact prompt against the pinned CACT artifact and asserts that the Java
+method receives exactly `"88252"` before checking the serialized result.
 
 GPT-OSS uses the Harmony protocol. The adapter recognizes both recipient positions
 permitted by Harmony, renders current constrained-JSON call history, addresses named
@@ -220,7 +224,9 @@ spaces:
 Needle 2 has a separate array-aware grammar compiled directly from JSON Schema.
 It supports objects, arrays, strings, integers, numbers, booleans, nulls,
 `enum`, `const`, `oneOf`, and `anyOf`, with an explicit bound on optional-object
-expansion.
+expansion. The decoder also prevents model protocol markers and JSON closing
+delimiters from being consumed as plain string content, so malformed output
+cannot reach a Java tool argument.
 
 For example, this Spring AI input schema can be enforced during decoding:
 

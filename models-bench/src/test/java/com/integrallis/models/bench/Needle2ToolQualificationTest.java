@@ -52,7 +52,8 @@ class Needle2ToolQualificationTest {
             "repeat",
             "array",
             "flight",
-            "refuse");
+            "refuse",
+            "spring-weather-zipcode");
   }
 
   @Test
@@ -102,7 +103,10 @@ class Needle2ToolQualificationTest {
   @Test
   void recognizesThePublishedEmptyArrayAsAnIntentionalRefusal() throws Exception {
     Needle2ToolQualification.Case item =
-        Needle2ToolQualification.loadSuite(mapper).cases().getLast();
+        Needle2ToolQualification.loadSuite(mapper).cases().stream()
+            .filter(candidate -> candidate.id().equals("refuse"))
+            .findFirst()
+            .orElseThrow();
 
     Needle2ToolQualification.CaseResult result =
         Needle2ToolQualification.evaluate(mapper, item, "<tool_call>[]</tool_call><|im_end|>", 25);
@@ -117,9 +121,10 @@ class Needle2ToolQualificationTest {
   void appliesTheDeclaredConformancePolicyWithoutRounding() {
     var passing = result("a", true, true, true, true, 9, 10, false, true);
     var refusal = result("refuse", true, true, true, true, 0, 0, true, true);
+    var regression = result("spring-weather-zipcode", true, true, true, true, 0, 0, false, true);
 
     Needle2ToolQualification.Summary summary =
-        Needle2ToolQualification.summarize(List.of(passing, refusal));
+        Needle2ToolQualification.summarize(List.of(passing, refusal, regression));
 
     assertThat(summary.structuredOutputRate()).isEqualTo(1.0);
     assertThat(summary.toolSelectionExactRate()).isEqualTo(1.0);
@@ -131,7 +136,26 @@ class Needle2ToolQualificationTest {
 
     assertThat(
             Needle2ToolQualification.summarize(
-                    List.of(result("bad", true, true, true, false, 10, 10, false, false), refusal))
+                    List.of(
+                        result("perfect", true, true, true, true, 10, 10, false, true), refusal))
+                .qualified())
+        .isFalse();
+
+    assertThat(
+            Needle2ToolQualification.summarize(
+                    List.of(
+                        result("perfect", true, true, true, true, 10, 10, false, true),
+                        refusal,
+                        regression))
+                .qualified())
+        .isTrue();
+
+    assertThat(
+            Needle2ToolQualification.summarize(
+                    List.of(
+                        result("bad", true, true, true, false, 10, 10, false, false),
+                        refusal,
+                        regression))
                 .qualified())
         .isFalse();
   }

@@ -3,15 +3,19 @@
 This gate runs the pure-Java CACT backend against all 13 examples published in Needle's
 playground. The tool declarations and queries in `needle2-playground-v1.json` are copied verbatim
 from the exact upstream revision recorded in that file. Expected calls are local assertions layered
-on top of the unchanged upstream inputs.
+on top of the unchanged upstream inputs. A fourteenth case reproduces the Spring AI zipcode report
+and is a mandatory exact-match regression.
 
-The `needle2-tool-conformance-v1` policy requires:
+The `needle2-tool-conformance-v2` policy requires:
 
 - a parseable `<tool_call>[...]</tool_call>` response for every case;
 - the exact ordered tool selection for every case;
 - schema-valid arguments containing no undeclared fields for every case;
-- at least 90% accuracy over the expected argument values; and
+- at least 90% agreement across the upstream expected argument values;
 - a correct empty-array refusal for the off-topic case.
+
+The Spring AI zipcode regression must independently pass every check, including the exact
+`"88252"` argument. Aggregate quality cannot compensate for that regression failing.
 
 Run the gate only against the pinned artifact bytes:
 

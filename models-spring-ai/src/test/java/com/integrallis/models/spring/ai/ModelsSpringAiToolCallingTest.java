@@ -687,6 +687,18 @@ class ModelsSpringAiToolCallingTest {
   static class ConstrainedDecoding {
 
     @Test
+    void usesDeterministicSamplingForNeedleToolSelection() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel(true);
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.NEEDLE2, SamplingOptions.builder().temperature(0.8f).build());
+
+      chat.call(promptWithModeTool(List.of(new UserMessage("switch to cooling"))));
+
+      assertThat(model.lastOptions.temperature()).isZero();
+    }
+
+    @Test
     void passesASchemaConstraintToConstrainedModelsWhenToolsAreDeclared() {
       ConstraintRecordingModel model = new ConstraintRecordingModel();
       ModelsSpringAiChatModel chat =
@@ -880,6 +892,7 @@ class ModelsSpringAiToolCallingTest {
   private static final class ConstraintRecordingModel implements ConstrainedTextGenerationModel {
     private int constrainedCalls;
     private int unconstrainedCalls;
+    private SamplingOptions lastOptions;
     private final boolean arrayWrapped;
     private final Tokenizer tokenizer =
         new Tokenizer() {
@@ -955,6 +968,7 @@ class ModelsSpringAiToolCallingTest {
         TokenStream stream,
         TokenConstraint constraint) {
       constrainedCalls++;
+      lastOptions = options;
       String output =
           arrayWrapped
               ? "<tool_call>[{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}]</tool_call>"

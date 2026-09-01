@@ -2,6 +2,25 @@
 
 All notable changes to models are documented here.
 
+## [0.3.21] - 2026-08-31
+
+### Fixed
+
+- Prevented Needle 2 protocol markers and JSON closing delimiters from being consumed inside
+  generated string arguments.
+- Made Needle 2 Spring AI action selection deterministic and verified the reported hyphenated
+  weather tool end to end with the exact `88252` argument and serialized Java result.
+
+### Changed
+
+- Added the Spring AI zipcode case as a mandatory CACT qualification regression and versioned the
+  policy so earlier evidence cannot qualify the corrected runtime.
+
+### Documentation
+
+- Documented deterministic Needle action selection and the exact real-model Spring AI release
+  gate.
+
 ## [0.3.20] - 2026-08-30
 
 ### Added
