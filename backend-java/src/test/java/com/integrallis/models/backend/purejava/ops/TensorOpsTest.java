@@ -1718,6 +1718,18 @@ class TensorOpsTest {
       assertThat(out[2]).isCloseTo(geluReference(2.0f), within(1e-6f));
     }
 
+    @Test
+    void matchesTheErfExactBertActivation() {
+      float[] input = {-1.0f, 0.0f, 2.0f};
+      float[] out = new float[3];
+
+      TensorOps.geluErf(out, 0, input, 0, input.length);
+
+      assertThat(out[0]).isCloseTo(-0.15865526f, within(2.0e-7f));
+      assertThat(out[1]).isZero();
+      assertThat(out[2]).isCloseTo(1.9544997f, within(2.0e-7f));
+    }
+
     private static float geluReference(float value) {
       return 0.5f
           * value

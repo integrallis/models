@@ -1540,6 +1540,38 @@ public final class TensorOps {
     }
   }
 
+  /** GELU activation using the erf formulation used by BERT's reference implementation. */
+  public static void geluErf(float[] out, int outOffset, float[] input, int inputOffset, int size) {
+    Objects.requireNonNull(out, "out");
+    Objects.requireNonNull(input, "input");
+    Objects.checkFromIndexSize(outOffset, size, out.length);
+    Objects.checkFromIndexSize(inputOffset, size, input.length);
+    for (int index = 0; index < size; index++) {
+      float value = input[inputOffset + index];
+      out[outOffset + index] = (float) (0.5 * value * (1.0 + erf(value * 0.7071067811865476)));
+    }
+  }
+
+  /** High-accuracy error-function approximation; maximum error is about 1.2e-7. */
+  private static double erf(double value) {
+    if (value == 0.0) {
+      return value;
+    }
+    double absolute = Math.abs(value);
+    double t = 1.0 / (1.0 + 0.5 * absolute);
+    double polynomial = 0.17087277;
+    polynomial = -0.82215223 + t * polynomial;
+    polynomial = 1.48851587 + t * polynomial;
+    polynomial = -1.13520398 + t * polynomial;
+    polynomial = 0.27886807 + t * polynomial;
+    polynomial = -0.18628806 + t * polynomial;
+    polynomial = 0.09678418 + t * polynomial;
+    polynomial = 0.37409196 + t * polynomial;
+    polynomial = 1.00002368 + t * polynomial;
+    double tail = t * Math.exp(-absolute * absolute - 1.26551223 + t * polynomial);
+    return value > 0.0 ? 1.0 - tail : tail - 1.0;
+  }
+
   /** Offset-aware GELU-gated activation over flat batch buffers. */
   public static void geluGlu(
       float[] out,

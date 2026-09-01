@@ -354,6 +354,13 @@ backend dimension are attached to each observation and response. Concurrent
 framework calls are serialized around the backend because the local encoder
 reuses mutable scratch state between sequences.
 
+== Document Reranking
+
+`ModelsSpringAiDocumentReranker` implements Spring AI's `DocumentPostProcessor` over an in-process
+cross-encoder. It preserves document identity and metadata, attaches the model's score, and can keep
+only the highest-ranked documents. See xref:reranking.adoc[Reranking] for the complete example and
+qualification gate.
+
 For auto-configuration, named-bean behavior, and combined Models/Vectors setup,
 continue with xref:spring-boot.adoc[Spring Boot]. For validation after
 retrieval, see xref:rag.adoc[RAG Validation].

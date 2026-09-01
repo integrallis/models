@@ -37,6 +37,28 @@ import java.util.Set;
  */
 public final class GgufTokenizer implements Tokenizer {
 
+  /** BERT sentence-pair tokens and their matching segment ids. Arrays are caller-owned. */
+  public record TokenizedPair(int[] tokens, int[] tokenTypes) {
+
+    public TokenizedPair {
+      tokens = Objects.requireNonNull(tokens, "tokens").clone();
+      tokenTypes = Objects.requireNonNull(tokenTypes, "tokenTypes").clone();
+      if (tokens.length != tokenTypes.length) {
+        throw new IllegalArgumentException("tokens and tokenTypes must have the same length");
+      }
+    }
+
+    @Override
+    public int[] tokens() {
+      return tokens.clone();
+    }
+
+    @Override
+    public int[] tokenTypes() {
+      return tokenTypes.clone();
+    }
+  }
+
   private static final Set<String> END_OF_GENERATION_TOKEN_TEXTS =
       Set.of(
           "<|eot_id|>",
@@ -204,8 +226,17 @@ public final class GgufTokenizer implements Tokenizer {
               }
             });
 
-    int bosTokenId = metadata.getUint32("tokenizer.ggml.bos_token_id").orElse(1);
-    int eosTokenId = metadata.getUint32("tokenizer.ggml.eos_token_id").orElse(2);
+    int bosTokenId =
+        metadata
+            .getUint32("tokenizer.ggml.bos_token_id")
+            .orElse(metadata.getUint32("tokenizer.ggml.cls_token_id").orElse(1));
+    int eosTokenId =
+        metadata
+            .getUint32("tokenizer.ggml.eos_token_id")
+            .orElse(
+                metadata
+                    .getUint32("tokenizer.ggml.seperator_token_id")
+                    .orElse(metadata.getUint32("tokenizer.ggml.separator_token_id").orElse(2)));
     boolean[] endOfGenerationTokens =
         buildEndOfGenerationTokens(metadata, vocab, tokenToId, eosTokenId);
     List<SpecialToken> specialTokens = buildSpecialTokens(metadata, vocab);
@@ -475,6 +506,60 @@ public final class GgufTokenizer implements Tokenizer {
     }
     flushOrdinaryText(encoded, ordinaryText);
     return addConfiguredBoundaryTokens(encoded.stream().mapToInt(Integer::intValue).toArray());
+  }
+
+  /**
+   * Encodes a BERT cross-encoder pair as {@code [CLS] first [SEP] second [SEP]}.
+   *
+   * <p>When the pair exceeds {@code maxTokens}, tokens are removed from the longer side first. This
+   * is the longest-first truncation used by the model's reference tokenizer. Segment id {@code 0}
+   * covers the first sentence and its separator; id {@code 1} covers the second sentence and its
+   * separator.
+   */
+  public TokenizedPair encodePair(String first, String second, int maxTokens) {
+    Objects.requireNonNull(first, "first");
+    Objects.requireNonNull(second, "second");
+    if (!useWordPiece) {
+      throw new IllegalStateException(
+          "sentence-pair encoding currently requires a WordPiece model");
+    }
+    if (maxTokens < 3) {
+      throw new IllegalArgumentException(
+          "maxTokens must leave room for [CLS] and two [SEP] tokens");
+    }
+
+    List<Integer> firstTokens = mutableTokens(encodeWordPiece(first));
+    List<Integer> secondTokens = mutableTokens(encodeWordPiece(second));
+    int contentBudget = maxTokens - 3;
+    while (firstTokens.size() + secondTokens.size() > contentBudget) {
+      List<Integer> longer = firstTokens.size() >= secondTokens.size() ? firstTokens : secondTokens;
+      longer.remove(longer.size() - 1);
+    }
+
+    int length = firstTokens.size() + secondTokens.size() + 3;
+    int[] tokens = new int[length];
+    int[] tokenTypes = new int[length];
+    int position = 0;
+    tokens[position++] = bosTokenId;
+    for (int token : firstTokens) {
+      tokens[position++] = token;
+    }
+    tokens[position++] = eosTokenId;
+    for (int token : secondTokens) {
+      tokens[position] = token;
+      tokenTypes[position++] = 1;
+    }
+    tokens[position] = eosTokenId;
+    tokenTypes[position] = 1;
+    return new TokenizedPair(tokens, tokenTypes);
+  }
+
+  private static List<Integer> mutableTokens(int[] tokens) {
+    List<Integer> result = new ArrayList<>(tokens.length);
+    for (int token : tokens) {
+      result.add(token);
+    }
+    return result;
   }
 
   private void appendTrustedControl(

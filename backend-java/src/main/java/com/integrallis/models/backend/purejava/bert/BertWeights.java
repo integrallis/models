@@ -151,8 +151,12 @@ final class BertWeights {
     row(positionEmbeddings, position, output);
   }
 
-  void tokenTypeEmbedding(float[] output) {
-    row(tokenTypeEmbeddings, 0, output);
+  int tokenTypeCount() {
+    return tokenTypeEmbeddings.rows();
+  }
+
+  void tokenTypeEmbedding(int tokenType, float[] output) {
+    row(tokenTypeEmbeddings, tokenType, output);
   }
 
   /** Largest Q4_0 output width, used to size the kernel's lane scratch once per sequence. */

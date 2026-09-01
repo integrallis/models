@@ -2,13 +2,36 @@
 
 Status: working research brief, 2026-09-01.
 
-This document is the evidence base for an open request to JVM, JDK-distribution, compiler, and Java
-accelerator leaders. It separates demonstrated gaps from hypotheses and gives every request a
-retained reproducer and measurable acceptance criterion. It is not a claim that Java cannot run the
-supported models. The opposite is already established: the
+This document is the evidence base for a future public set of requests to JVM, JDK-distribution,
+compiler, and Java accelerator leaders. The eventual article or paper should be derived from this
+evidence; this file is not the article itself. It separates demonstrated gaps from hypotheses and
+gives every request a retained reproducer and measurable acceptance criterion. It is not a claim
+that Java cannot run the supported models. The opposite is already established: the
 pure-Java backend parses the artifacts, tokenizes prompts, executes every supported graph, owns
 model state, samples tokens, and integrates with Spring AI and LangChain4j. The optional Rust code
 exists to improve a narrow performance envelope for selected CPU profiles.
+
+## Evidence contract for the eventual requests
+
+An observation enters the public request only when the retained notes answer all of these
+questions:
+
+1. **What was run?** Pin the model bytes, source revision, workload, JVM flags, operating system,
+   processor or accelerator, and JDK distribution—not only the Java feature version.
+2. **What was observed?** Preserve correctness output, warm and cold performance, allocation or
+   transfer behavior, and rejected results when they disprove an attractive explanation.
+3. **Where is the boundary?** Identify whether the constraint belongs to a Java API, HotSpot C2,
+   Graal, FFM, a JDK distribution, an accelerator launcher/compiler, or hardware-specific lowering.
+4. **What is Java doing today?** Record the portable Java implementation and any narrow native
+   workaround. External inference engines may supply oracle or benchmark evidence, never the
+   production implementation.
+5. **What is being requested?** Ask for a concrete API, compiler behavior, distribution facility,
+   diagnostic, or conformance lane rather than a general demand for more performance.
+6. **How would leadership know it is fixed?** Link a reproducible kernel test and an end-to-end model
+   gate with numerical or token equivalence plus an explicit performance policy.
+
+This makes the requests useful to OpenJDK, GraalVM, JDK-distribution, and accelerator leaders: each
+one is independently reproducible, attributable to the right layer, and closable by experiment.
 
 ## The current native boundary
 
@@ -51,6 +74,7 @@ artifact, hardware, and oracle details in the linked reports.
 | Mapped-memory code generation changes across JDK releases and quantization formats. | The [Java 25/26 gate](https://github.com/integrallis/vectors/blob/main/vectors-bench/jmh-results/mapped-kquant-jdk25-jdk26.md) found format-specific gains, regressions, and a Java 25 Q4_K kernel faster than Java 26 on the same host. | Stable optimization of long-offset mapped `MemorySegment` access inside vector loops, with generated-code diagnostics suitable for regression testing. |
 | Java-authored GPU execution still needs a specialized launcher and pays large compilation/readiness costs. | The [A16 report](models-accelerator-bench/results/vultr-a16-2q-2026-08-29.md) required the TornadoVM launcher, retained 223 plans, and spent about 14 seconds in eager readiness. Maven dependencies alone could not discover the device drivers. | Standard device discovery from an ordinary Java launch, persistent ahead-of-time device code caches, explicit device-memory lifetime, and asynchronous transfer/event APIs. |
 | Device compiler coverage is not yet portable across common inference graphs. | The isolated A16 integer reduction needed graph reshaping; attention passed its numeric test but more than doubled full-model prefill, and only the NVIDIA PTX envelope passed. | Cross-vendor lowering and profiling for packed integer reduction, reductions/softmax, and bounded dynamic shapes, with failures visible before a full model is deployed. |
+| Exact BERT-family activation math lacks a standard scalar or vector operation. | The corrected MS MARCO MiniLM cross-encoder requires the erf-based GELU used by its reference graph. The tested Java 25 `Math`, `StrictMath`, and Vector API expose no `erf`, so Models carries a scalar approximation and cannot express the operation directly to the vector compiler. | Standard, correctly specified scalar and vector special functions beginning with `erf`, with accuracy and lowering contracts appropriate for neural-network inference. |
 
 These are measured gaps in the tested runtimes, not permanent language limitations. The same
 reports also show cases where Java wins or where a proposed native/vector formulation should be
@@ -189,6 +213,24 @@ qualification lane across current HotSpot, GraalVM, and accelerator-enabled dist
 for the existing kernel and model gates, without capturing secrets. A distribution claim should be
 accepted only when the corresponding output-equivalence and performance policy passes on that
 runtime.
+
+### JVM-AI-9: exact special functions for model activations
+
+**Audience:** Java SE math API, Vector API, HotSpot C2, Graal, and JDK distribution teams.
+
+**Observed result:** the corrected MS MARCO MiniLM L6 cross-encoder uses the erf-based BERT GELU.
+On the tested Java 25 distribution, `Math`, `StrictMath`, and `VectorOperators` expose exponential
+and hyperbolic-tangent operations but no `erf`. The pure-Java graph therefore carries its own scalar
+approximation; using the common tanh GELU changes the reference computation.
+
+**Request:** add a specified scalar `erf` and a corresponding Vector API unary operation with
+documented accuracy, exceptional-value behavior, and portable lowering. Treat the vector form as a
+model primitive rather than requiring every inference library to maintain an approximation loop.
+
+**Acceptance gate:** the pinned MiniLM pair tokenizer and six-document cross-encoder test must keep
+the same top-two order, remain within 0.15 logits of the ONNX reference and 0.05 of the quantized
+oracle, and improve the measured scoring loop without introducing a platform-specific native
+boundary.
 
 ## Distribution-specific evidence today
 
