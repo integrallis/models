@@ -63,11 +63,18 @@ class Needle2SpringAiToolCallingIntegrationTest {
       var runtime = new RuntimeTextGenerationModel(backend);
       var adapter =
           new ModelsSpringAiChatModel(
-              runtime,
-              "needle2",
-              ChatTemplate.NEEDLE2,
-              SamplingOptions.builder().maxTokens(128).build(),
-              Set.of("chat", "text-generation", "tool-calling"));
+                  runtime,
+                  "needle2",
+                  ChatTemplate.NEEDLE2,
+                  SamplingOptions.builder().maxTokens(128).build(),
+                  Set.of("chat", "text-generation", "tool-calling"))
+              .withToolResultRenderer(
+                  "get-weather-for-zipcode",
+                  Weather.class,
+                  weather ->
+                      "The weather in %s is %s with a temperature of %d°F."
+                          .formatted(
+                              weather.zipcode(), weather.conditions(), weather.temperature()));
       WeatherTools weatherTools = new WeatherTools();
       ChatClient client = ChatClient.builder(adapter).defaultTools(weatherTools).build();
 
@@ -76,9 +83,11 @@ class Needle2SpringAiToolCallingIntegrationTest {
       assertThat(weatherTools.invocations).as("model answer: %s", answer).hasValue(1);
       assertThat(weatherTools.lastZipcode).hasValue("88252");
       assertThat(answer)
-          .isEqualTo(
-              "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
-                  + "\"temperature\":78}");
+          .isEqualTo("The weather in 88252 is Raining cats and dogs with a temperature of 78°F.");
+
+      String noAction = client.prompt().user("Hello").call().content();
+      assertThat(noAction).isEqualTo("No applicable tool is available.");
+      assertThat(noAction).doesNotContain("<think>", "<tool_call>", "<|im_end|>");
     }
   }
 }

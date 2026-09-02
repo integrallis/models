@@ -811,7 +811,8 @@ class ModelsSpringAiToolCallingTest {
       ConstraintRecordingModel model = new ConstraintRecordingModel();
       ModelsSpringAiChatModel chat =
           new ModelsSpringAiChatModel(
-              model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build());
+                  model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build())
+              .withRawToolResults();
       ToolResponseMessage result =
           ToolResponseMessage.builder()
               .responses(
@@ -834,6 +835,79 @@ class ModelsSpringAiToolCallingTest {
                   + "\"temperature\":78}");
       assertThat(model.constrainedCalls).isZero();
       assertThat(model.unconstrainedCalls).isZero();
+    }
+
+    @Test
+    void rendersANeedleToolResultThroughARegisteredJavaType() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel();
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+                  model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build())
+              .withToolResultRenderer(
+                  "get-weather-for-zipcode",
+                  Weather.class,
+                  weather ->
+                      "The weather in %s is %s with a temperature of %d°F."
+                          .formatted(
+                              weather.zipcode(), weather.conditions(), weather.temperature()));
+      ToolResponseMessage result =
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          "000000000",
+                          "get-weather-for-zipcode",
+                          "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
+                              + "\"temperature\":78}")))
+              .build();
+
+      ChatResponse response =
+          chat.call(
+              promptWithTools(List.of(new UserMessage("What is the weather for 88252?"), result)));
+
+      assertThat(response.getResult().getOutput().getText())
+          .isEqualTo("The weather in 88252 is Raining cats and dogs with a temperature of 78°F.");
+      assertThat(model.constrainedCalls).isZero();
+      assertThat(model.unconstrainedCalls).isZero();
+    }
+
+    @Test
+    void requiresANeedleToolResultPolicyInsteadOfMistakingJsonForAChatAnswer() {
+      ConstraintRecordingModel model = new ConstraintRecordingModel();
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build());
+      ToolResponseMessage result =
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          "000000000", "get_weather", "{\"tempF\":88}")))
+              .build();
+
+      assertThatThrownBy(
+              () -> chat.call(promptWithTools(List.of(new UserMessage("weather?"), result))))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("withToolResultRenderer")
+          .hasMessageContaining("withRawToolResults");
+    }
+
+    @Test
+    void hidesNeedleReasoningAndEmptyToolProtocolForANoActionTurn() {
+      String refusal =
+          "<think>No weather tool applies.</think>\n" + "<tool_call>[]</tool_call><|im_end|>";
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+                  new ScriptedModel(refusal),
+                  ChatTemplate.NEEDLE2,
+                  SamplingOptions.builder().build())
+              .withNoApplicableToolResponse("I can only help with the available tools.");
+
+      ChatResponse response = chat.call(promptWithTools(List.of(new UserMessage("Hello"))));
+
+      assertThat(response.hasToolCalls()).isFalse();
+      assertThat(response.getResult().getOutput().getText())
+          .isEqualTo("I can only help with the available tools.");
     }
 
     @Test
@@ -868,7 +942,8 @@ class ModelsSpringAiToolCallingTest {
       ConstraintRecordingModel model = new ConstraintRecordingModel(true);
       ModelsSpringAiChatModel chat =
           new ModelsSpringAiChatModel(
-              model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build());
+                  model, ChatTemplate.NEEDLE2, SamplingOptions.builder().build())
+              .withRawToolResults();
       ToolResponseMessage result =
           ToolResponseMessage.builder()
               .responses(
@@ -887,6 +962,8 @@ class ModelsSpringAiToolCallingTest {
       assertThat(model.constrainedCalls).isZero();
       assertThat(model.unconstrainedCalls).isZero();
     }
+
+    private record Weather(String zipcode, String conditions, int temperature) {}
   }
 
   private static final class ConstraintRecordingModel implements ConstrainedTextGenerationModel {

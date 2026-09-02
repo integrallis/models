@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.spring.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
@@ -35,10 +37,13 @@ import com.integrallis.models.runtime.chat.ToolSpecSelector;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -64,7 +69,10 @@ import reactor.core.scheduler.Schedulers;
 /** Spring AI {@link ChatModel} backed by the Models runtime generation loop. */
 public final class ModelsSpringAiChatModel implements ChatModel {
   private static final String PROVIDER = "integrallis";
+  private static final String DEFAULT_NO_APPLICABLE_TOOL_RESPONSE =
+      "No applicable tool is available.";
   private static final int MAX_INTERNAL_TOOL_TURNS = 16;
+  private static final ObjectMapper JSON = new ObjectMapper();
   private static final ChatModelObservationConvention DEFAULT_OBSERVATION_CONVENTION =
       new DefaultChatModelObservationConvention();
 
@@ -76,6 +84,10 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   private final Set<String> qualifiedCapabilities;
   private final ToolCallingManager toolCallingManager;
   private final ToolSpecSelector toolSelector;
+  private final Map<String, TypedToolResultRenderer<?>> toolResultRenderers =
+      new ConcurrentHashMap<>();
+  private volatile boolean rawToolResults;
+  private volatile String noApplicableToolResponse = DEFAULT_NO_APPLICABLE_TOOL_RESPONSE;
   private ChatModelObservationConvention observationConvention = DEFAULT_OBSERVATION_CONVENTION;
 
   public ModelsSpringAiChatModel(InferenceBackend backend) {
@@ -257,13 +269,33 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     }
     List<String> results = new ArrayList<>();
     for (ToolResponseMessage.ToolResponse result : toolResponses.getResponses()) {
-      results.add(Objects.requireNonNullElse(result.responseData(), ""));
+      results.add(renderToolResult(result));
     }
     if (results.isEmpty()) {
       return Optional.empty();
     }
+    if (results.size() == 1) {
+      return Optional.of(results.getFirst());
+    }
     return Optional.of(
-        results.size() == 1 ? results.getFirst() : "[" + String.join(",", results) + "]");
+        rawToolResults ? "[" + String.join(",", results) + "]" : String.join("\n", results));
+  }
+
+  private String renderToolResult(ToolResponseMessage.ToolResponse result) {
+    String serialized = Objects.requireNonNullElse(result.responseData(), "");
+    TypedToolResultRenderer<?> renderer = toolResultRenderers.get(result.name());
+    if (renderer != null) {
+      return renderer.render(serialized);
+    }
+    if (rawToolResults) {
+      return serialized;
+    }
+    throw new IllegalStateException(
+        "Needle 2 selected tool '"
+            + result.name()
+            + "', but it cannot synthesize a conversational answer from the tool result. "
+            + "Configure withToolResultRenderer(...) or explicitly opt into serialized results "
+            + "withRawToolResults().");
   }
 
   @Override
@@ -393,6 +425,46 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   public void setObservationConvention(ChatModelObservationConvention observationConvention) {
     this.observationConvention =
         Objects.requireNonNull(observationConvention, "observationConvention");
+  }
+
+  /**
+   * Renders a completed Needle tool result as user-facing assistant text.
+   *
+   * <p>Spring AI serializes Java tool return values before adding them to conversation history.
+   * This adapter deserializes the matching result to {@code resultType} and invokes {@code
+   * renderer}; application code does not need to handle the intermediate JSON string. Configure
+   * every tool that may be selected before sharing this adapter between requests.
+   */
+  public <T> ModelsSpringAiChatModel withToolResultRenderer(
+      String toolName, Class<T> resultType, Function<? super T, String> renderer) {
+    toolResultRenderers.put(
+        requireToolName(toolName),
+        new TypedToolResultRenderer<>(
+            Objects.requireNonNull(resultType, "resultType"),
+            Objects.requireNonNull(renderer, "renderer")));
+    return this;
+  }
+
+  /**
+   * Returns Needle tool results in Spring AI's serialized form.
+   *
+   * <p>This is an explicit machine-to-machine mode. Without this option or a registered typed
+   * renderer, the adapter rejects a completed Needle result rather than presenting JSON as a
+   * conversational answer.
+   */
+  public ModelsSpringAiChatModel withRawToolResults() {
+    rawToolResults = true;
+    return this;
+  }
+
+  /** Configures the user-facing response when Needle selects no applicable action. */
+  public ModelsSpringAiChatModel withNoApplicableToolResponse(String response) {
+    Objects.requireNonNull(response, "response");
+    if (response.isBlank()) {
+      throw new IllegalArgumentException("no-applicable-tool response must not be blank");
+    }
+    noApplicableToolResponse = response.strip();
+    return this;
   }
 
   private ChatModelObservationContext observationContext(Prompt prompt) {
@@ -647,6 +719,9 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   private ChatResponse toolAwareResponse(String output, GenerationUsage usage) {
     ToolCallScanner.Result scan = ToolCallScanner.scan(output, template.toolSyntax());
     if (!scan.hasCalls()) {
+      if (template == ChatTemplate.NEEDLE2 && isEmptyNeedleToolSelection(output)) {
+        return response(noApplicableToolResponse, usage);
+      }
       return response(scan.content(), usage);
     }
     List<AssistantMessage.ToolCall> calls = new ArrayList<>(scan.toolCalls().size());
@@ -677,6 +752,40 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       throw new IllegalArgumentException("modelName must not be blank");
     }
     return modelName.strip();
+  }
+
+  private static String requireToolName(String toolName) {
+    Objects.requireNonNull(toolName, "toolName");
+    if (toolName.isBlank()) {
+      throw new IllegalArgumentException("toolName must not be blank");
+    }
+    return toolName.strip();
+  }
+
+  private static boolean isEmptyNeedleToolSelection(String output) {
+    String sectionStart = ChatTemplate.NEEDLE2.toolSyntax().sectionStart();
+    String sectionEnd = ChatTemplate.NEEDLE2.toolSyntax().sectionEnd();
+    int start = output.indexOf(sectionStart);
+    if (start < 0) {
+      return false;
+    }
+    int payloadStart = start + sectionStart.length();
+    int end = output.indexOf(sectionEnd, payloadStart);
+    return end >= payloadStart && output.substring(payloadStart, end).strip().equals("[]");
+  }
+
+  private record TypedToolResultRenderer<T>(
+      Class<T> resultType, Function<? super T, String> renderer) {
+
+    private String render(String serialized) {
+      try {
+        T result = JSON.readValue(serialized, resultType);
+        return Objects.requireNonNull(renderer.apply(result), "tool result renderer returned null");
+      } catch (JsonProcessingException failure) {
+        throw new IllegalArgumentException(
+            "cannot deserialize tool result as " + resultType.getName(), failure);
+      }
+    }
   }
 
   private record GenerationOutput(String text, GenerationUsage usage) {}

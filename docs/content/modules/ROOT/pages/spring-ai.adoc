@@ -117,10 +117,12 @@ names, descriptions, and input schemas into the selected Models chat template.
 Model output is scanned back into Spring AI `AssistantMessage` tool calls. The
 `ChatClient` executes the registered Java callback. Generative chat models
 receive that result for a follow-up answer. Needle 2 is an action-selection
-model, so its completed call returns the actual Java tool result instead of
-asking the selector to choose the same action again. Needle action selection
-always uses deterministic decoding; a chat-oriented temperature configured on
-the adapter or request cannot turn an applicable action into a sampled refusal.
+model, so it cannot write a conversational answer after the tool runs. Register
+a typed result renderer for each Needle tool. The adapter converts Spring AI's
+serialized callback result back to that Java type and invokes the renderer,
+without exposing JSON parsing to application code. Needle action selection always
+uses deterministic decoding; a chat-oriented temperature configured on the
+adapter or request cannot turn an applicable action into a sampled refusal.
 
 Pass the ModelJar descriptor capabilities when constructing the adapter. This
 makes an artifact that was qualified for chat, but not tool calling, fail before
@@ -135,6 +137,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
+record Weather(String zipcode, String conditions, int temperature) {}
+
 @Service
 class WeatherTools {
     @Tool(
@@ -146,7 +150,6 @@ class WeatherTools {
         return new Weather(zipcode, "Raining cats and dogs", 78);
     }
 
-    record Weather(String zipcode, String conditions, int temperature) {}
 }
 
 @Bean
@@ -158,7 +161,15 @@ ApplicationRunner weatherDemo(WeatherTools weatherTools) {
                 runtime.descriptor().alias(),
                 runtime.chatTemplate(),
                 defaults,
-                runtime.descriptor().capabilities());
+                runtime.descriptor().capabilities())
+                .withToolResultRenderer(
+                    "get-weather-for-zipcode",
+                    Weather.class,
+                    weather -> "The weather in %s is %s with a temperature of %d°F."
+                        .formatted(
+                            weather.zipcode(),
+                            weather.conditions(),
+                            weather.temperature()));
 
             var chatClient = ChatClient.builder(model)
                 .defaultTools(weatherTools)
@@ -175,11 +186,18 @@ ApplicationRunner weatherDemo(WeatherTools weatherTools) {
 ----
 
 `defaultTools(...)` and per-request `.tools(...)` use the same adapter path.
-For Needle 2, `answer` is the serialized `Weather` returned by the invoked
-method. For a qualified generative tool-calling model, it is the model's
-follow-up response after seeing that tool result. Release verification executes
-this exact prompt against the pinned CACT artifact and asserts that the Java
-method receives exactly `"88252"` before checking the serialized result.
+For Needle 2, `answer` is the text returned by the registered typed renderer.
+For a qualified generative tool-calling model, it is the model's follow-up
+response after seeing the tool result. Release verification executes this exact
+prompt against the pinned CACT artifact, asserts that the Java method receives
+exactly `"88252"`, and verifies the rendered sentence. When no tool applies,
+Needle's private reasoning and protocol are removed and the adapter returns
+`No applicable tool is available.`; customize that text with
+`withNoApplicableToolResponse(...)`. Machine-to-machine callers that really want
+Spring's serialized callback value can opt in with `withRawToolResults()`.
+Do not use `ChatClient.call().entity(...)` to recover a Needle callback result:
+that API adds structured-output instructions to the original model request. A
+typed tool-result renderer runs only after Spring has invoked the selected tool.
 
 GPT-OSS uses the Harmony protocol. The adapter recognizes both recipient positions
 permitted by Harmony, renders current constrained-JSON call history, addresses named

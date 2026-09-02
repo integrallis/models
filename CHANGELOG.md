@@ -2,6 +2,24 @@
 
 All notable changes to models are documented here.
 
+## Unreleased
+
+### Added
+
+- Added typed, fluent Spring AI tool-result renderers for Needle 2. Spring's serialized callback
+  result is converted back to the registered Java type inside the adapter before application code
+  renders the assistant response; raw serialized results now require an explicit opt-in.
+
+### Fixed
+
+- Prevented Needle 2's private reasoning, empty tool array, and end-of-turn markers from leaking
+  into `ChatClient.content()` when no declared tool applies.
+
+### Documentation
+
+- Updated the Spring AI tool example to return a human-facing weather answer from a typed Java
+  result and documented explicit raw-result and no-applicable-tool behavior.
+
 ## [0.3.23] - 2026-09-01
 
 ### Added
