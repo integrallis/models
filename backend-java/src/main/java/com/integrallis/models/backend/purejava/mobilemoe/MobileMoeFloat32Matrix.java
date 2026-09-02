@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.mobilemoe;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.Objects;
 
 /** Zero-copy little-endian F32 row-major matrix used by MobileMoE routers. */
@@ -62,6 +63,27 @@ final class MobileMoeFloat32Matrix {
         sum += data.get(LE_FLOAT, offset + (long) column * Float.BYTES) * input[column];
       }
       output[row] = sum;
+    }
+  }
+
+  void multiplyBatch(float[] input, int batchSize, float[] output) {
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(output, "output");
+    int inputEntries = Math.multiplyExact(batchSize, columns);
+    int outputEntries = Math.multiplyExact(batchSize, rows);
+    if (input.length < inputEntries || output.length < outputEntries) {
+      throw new IllegalArgumentException(
+          "input/output lengths must cover " + inputEntries + "/" + outputEntries);
+    }
+    Arrays.fill(output, 0, outputEntries, 0.0f);
+    for (int row = 0; row < rows; row++) {
+      long offset = (long) row * columns * Float.BYTES;
+      for (int column = 0; column < columns; column++) {
+        float weight = data.get(LE_FLOAT, offset + (long) column * Float.BYTES);
+        for (int batch = 0; batch < batchSize; batch++) {
+          output[batch * rows + row] += weight * input[batch * columns + column];
+        }
+      }
     }
   }
 }

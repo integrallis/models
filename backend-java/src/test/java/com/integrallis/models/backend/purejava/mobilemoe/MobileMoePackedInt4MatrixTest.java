@@ -77,6 +77,35 @@ class MobileMoePackedInt4MatrixTest {
         .hasMessageContaining("scale");
   }
 
+  @Test
+  void batchesIndependentActivationRowsWithoutChangingTheirResults() {
+    int rows = 2;
+    int columns = 32;
+    byte[] packed = new byte[rows * columns / 2];
+    for (int logical = 0; logical < rows * columns; logical += 2) {
+      packed[logical / 2] = pack((logical % 16) - 8, ((logical + 1) % 16) - 8);
+    }
+    MobileMoePackedInt4Matrix matrix =
+        MobileMoePackedInt4Matrix.of(
+            MemorySegment.ofArray(packed), fp16(0.5f, 0.25f), rows, columns, columns);
+    float[] input = new float[3 * columns];
+    for (int index = 0; index < input.length; index++) {
+      input[index] = (index - 17) * 0.03125f;
+    }
+    float[] actual = new float[3 * rows];
+
+    matrix.multiplyBatch(input, 3, actual);
+
+    for (int batch = 0; batch < 3; batch++) {
+      float[] row = new float[columns];
+      System.arraycopy(input, batch * columns, row, 0, columns);
+      float[] expected = new float[rows];
+      matrix.multiply(row, expected);
+      assertThat(actual[batch * rows]).isCloseTo(expected[0], within(1.0e-6f));
+      assertThat(actual[batch * rows + 1]).isCloseTo(expected[1], within(1.0e-6f));
+    }
+  }
+
   private static byte pack(int even, int odd) {
     return (byte) ((even & 0x0f) | ((odd & 0x0f) << 4));
   }

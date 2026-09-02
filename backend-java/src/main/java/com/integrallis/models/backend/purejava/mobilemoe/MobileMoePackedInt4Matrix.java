@@ -107,6 +107,21 @@ final class MobileMoePackedInt4Matrix {
     VectorUtil.packedInt4GroupMatVec(input, packed, scales, rows, columns, groupSize, output);
   }
 
+  void multiplyBatch(float[] input, int batchSize, float[] output) {
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(output, "output");
+    if (input.length < Math.multiplyExact(batchSize, columns)) {
+      throw new IllegalArgumentException(
+          "input length must cover batchSize * columns; got " + input.length);
+    }
+    if (output.length < Math.multiplyExact(batchSize, rows)) {
+      throw new IllegalArgumentException(
+          "output length must cover batchSize * rows; got " + output.length);
+    }
+    VectorUtil.packedInt4GroupMatVecBatch(
+        input, batchSize, packed, scales, rows, columns, groupSize, output);
+  }
+
   private int quantized(int row, int column) {
     int bits = packedByte(row, column);
     return signedNibble((column & 1) == 0 ? bits & 0x0f : bits >>> 4);

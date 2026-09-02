@@ -60,6 +60,34 @@ class MobileMoePackedInt4RightMatrixTest {
     assertThat(actual).containsExactly(expected, within(1.0e-6f));
   }
 
+  @Test
+  void batchesIndependentExpertActivationRowsWithoutChangingTheirResults() {
+    int inputs = 3;
+    int outputs = 32;
+    byte[] packed = new byte[inputs * outputs / 2];
+    for (int logical = 0; logical < inputs * outputs; logical += 2) {
+      packed[logical / 2] =
+          (byte) (((logical % 16) - 8 & 0x0f) | ((((logical + 1) % 16) - 8 & 0x0f) << 4));
+    }
+    MobileMoePackedInt4RightMatrix matrix =
+        MobileMoePackedInt4RightMatrix.of(
+            MemorySegment.ofArray(packed), fp16(0.25f, 0.5f, 0.75f), inputs, outputs, 32);
+    float[] input = {0.5f, -1.25f, 0.75f, -0.25f, 0.125f, 1.5f};
+    float[] actual = new float[2 * outputs];
+
+    matrix.multiplyBatch(input, 2, actual);
+
+    for (int batch = 0; batch < 2; batch++) {
+      float[] row = new float[inputs];
+      System.arraycopy(input, batch * inputs, row, 0, inputs);
+      float[] expected = new float[outputs];
+      matrix.multiply(row, expected);
+      for (int output = 0; output < outputs; output++) {
+        assertThat(actual[batch * outputs + output]).isCloseTo(expected[output], within(1.0e-6f));
+      }
+    }
+  }
+
   private static MemorySegment fp16(float... values) {
     ByteBuffer buffer =
         ByteBuffer.allocate(values.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);

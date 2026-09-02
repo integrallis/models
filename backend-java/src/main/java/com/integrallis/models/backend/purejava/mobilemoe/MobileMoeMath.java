@@ -23,14 +23,21 @@ final class MobileMoeMath {
   private MobileMoeMath() {}
 
   static void normalizeHeads(float[] values, int headDimension, float epsilon) {
+    normalizeHeads(values, 0, values.length, headDimension, epsilon);
+  }
+
+  static void normalizeHeads(
+      float[] values, int valueOffset, int length, int headDimension, float epsilon) {
     Objects.requireNonNull(values, "values");
-    if (headDimension <= 0 || values.length % headDimension != 0) {
+    Objects.checkFromIndexSize(valueOffset, length, values.length);
+    if (headDimension <= 0 || length % headDimension != 0) {
       throw new IllegalArgumentException("headDimension must divide the value buffer");
     }
     if (!(epsilon > 0.0f) || !Float.isFinite(epsilon)) {
       throw new IllegalArgumentException("epsilon must be finite and positive");
     }
-    for (int offset = 0; offset < values.length; offset += headDimension) {
+    int end = valueOffset + length;
+    for (int offset = valueOffset; offset < end; offset += headDimension) {
       double sumSquares = 0.0;
       for (int index = 0; index < headDimension; index++) {
         float value = values[offset + index];

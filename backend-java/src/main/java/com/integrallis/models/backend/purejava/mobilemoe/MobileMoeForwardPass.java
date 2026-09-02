@@ -29,6 +29,8 @@ import java.util.Objects;
 /** Complete single-token Java decoder pass over mapped MobileMoE QAT Safetensors weights. */
 public final class MobileMoeForwardPass {
 
+  private static final int DEFAULT_PREFILL_BATCH_SIZE = 64;
+
   /** Mutable sequence state; sessions share immutable mapped weights and are otherwise isolated. */
   public static final class Session {
     private final MobileMoeForwardPass owner;
@@ -101,9 +103,64 @@ public final class MobileMoeForwardPass {
     }
   }
 
+  private static final class BatchState {
+    private final int capacity;
+    private final float[] hidden;
+    private final float[] normalized;
+    private final float[] query;
+    private final float[] key;
+    private final float[] value;
+    private final float[] attention;
+    private final float[] projectedAttention;
+    private final float[] routerLogits;
+    private final int[] selectedExperts;
+    private final float[] routeWeights;
+    private final float[] routedOutput;
+    private final float[] sharedGate;
+    private final float[] sharedUp;
+    private final float[] sharedActivated;
+    private final float[] sharedOutput;
+    private final float[] expertInput;
+    private final float[] expertGateUp;
+    private final float[] expertActivated;
+    private final float[] expertOutput;
+    private final int[] expertTokens;
+    private final int[] expertRoutes;
+
+    private BatchState(MobileMoeHuggingFaceConfig config, int capacity) {
+      this.capacity = capacity;
+      hidden = batchBuffer(capacity, config.hiddenSize());
+      normalized = batchBuffer(capacity, config.hiddenSize());
+      query = batchBuffer(capacity, config.queryDimension());
+      key = batchBuffer(capacity, config.keyValueDimension());
+      value = batchBuffer(capacity, config.keyValueDimension());
+      attention = batchBuffer(capacity, config.queryDimension());
+      projectedAttention = batchBuffer(capacity, config.hiddenSize());
+      routerLogits = batchBuffer(capacity, config.numExperts());
+      selectedExperts = new int[Math.multiplyExact(capacity, config.expertsPerToken())];
+      routeWeights = batchBuffer(capacity, config.expertsPerToken());
+      routedOutput = batchBuffer(capacity, config.hiddenSize());
+      sharedGate = batchBuffer(capacity, config.sharedIntermediateSize());
+      sharedUp = batchBuffer(capacity, config.sharedIntermediateSize());
+      sharedActivated = batchBuffer(capacity, config.sharedIntermediateSize());
+      sharedOutput = batchBuffer(capacity, config.hiddenSize());
+      expertInput = batchBuffer(capacity, config.hiddenSize());
+      expertGateUp = batchBuffer(capacity, Math.multiplyExact(2, config.intermediateSize()));
+      expertActivated = batchBuffer(capacity, config.intermediateSize());
+      expertOutput = batchBuffer(capacity, config.hiddenSize());
+      expertTokens = new int[capacity];
+      expertRoutes = new int[capacity];
+    }
+
+    private static float[] batchBuffer(int capacity, int width) {
+      return new float[Math.multiplyExact(capacity, width)];
+    }
+  }
+
   private final MobileMoeHuggingFaceConfig config;
   private final MobileMoeWeights weights;
   private final int maxSequenceLength;
+  private final int prefillBatchSize;
 
   private MobileMoeForwardPass(
       MobileMoeHuggingFaceConfig config, MobileMoeWeights weights, int maxSequenceLength) {
@@ -117,6 +174,13 @@ public final class MobileMoeForwardPass {
               + maxSequenceLength);
     }
     this.maxSequenceLength = maxSequenceLength;
+    int requestedBatchSize =
+        Integer.getInteger("models.mobilemoe.prefillBatchSize", DEFAULT_PREFILL_BATCH_SIZE);
+    if (requestedBatchSize <= 0) {
+      throw new IllegalArgumentException(
+          "models.mobilemoe.prefillBatchSize must be positive: " + requestedBatchSize);
+    }
+    prefillBatchSize = Math.min(requestedBatchSize, maxSequenceLength);
   }
 
   /** Loads the complete MobileMoE QAT graph from a mapped Safetensors source. */
@@ -153,6 +217,40 @@ public final class MobileMoeForwardPass {
     execute(session, token, position, false);
   }
 
+  /**
+   * Prefills consecutive prompt tokens in weight-reusing batches and returns final-token logits.
+   */
+  public float[] prefill(Session session, int[] tokens, int startPosition) {
+    requireSession(session);
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (startPosition != session.nextPosition) {
+      throw new IllegalArgumentException(
+          "position must be sequential: expected "
+              + session.nextPosition
+              + ", got "
+              + startPosition);
+    }
+    if ((long) startPosition + tokens.length > maxSequenceLength) {
+      throw new IllegalArgumentException("prefill exceeds the configured context");
+    }
+
+    BatchState batch = new BatchState(config, Math.min(prefillBatchSize, tokens.length));
+    for (int tokenOffset = 0; tokenOffset < tokens.length; ) {
+      int batchSize = Math.min(batch.capacity, tokens.length - tokenOffset);
+      int batchStart = startPosition + tokenOffset;
+      executeBatch(session, batch, tokens, tokenOffset, batchStart, batchSize);
+      for (int index = 0; index < batchSize; index++) {
+        session.tokenHistory[batchStart + index] = tokens[tokenOffset + index];
+      }
+      session.nextPosition += batchSize;
+      tokenOffset += batchSize;
+    }
+    return session.logits.clone();
+  }
+
   /** Discards sequence state at and after {@code checkpoint}. */
   public void rewind(Session session, int checkpoint) {
     requireSession(session);
@@ -169,6 +267,119 @@ public final class MobileMoeForwardPass {
     requireSession(session);
     session.cache.clear();
     session.nextPosition = 0;
+  }
+
+  private void executeBatch(
+      Session session,
+      BatchState batch,
+      int[] tokens,
+      int tokenOffset,
+      int startPosition,
+      int batchSize) {
+    int hiddenSize = config.hiddenSize();
+    for (int index = 0; index < batchSize; index++) {
+      embedToken(tokens[tokenOffset + index], batch.hidden, index * hiddenSize);
+    }
+    session.rope.prepareBatch(startPosition, batchSize);
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      executeLayerBatch(session, batch, layer, startPosition, batchSize);
+    }
+    int finalOffset = (batchSize - 1) * hiddenSize;
+    TensorOps.rmsNorm(
+        session.normalized,
+        0,
+        batch.hidden,
+        finalOffset,
+        weights.outputNorm(),
+        hiddenSize,
+        config.rmsNormEpsilon());
+    weights.embedding().multiply(session.normalized, session.logits);
+  }
+
+  private void executeLayerBatch(
+      Session session, BatchState batch, int layerIndex, int startPosition, int batchSize) {
+    MobileMoeWeights.Layer layer = weights.layer(layerIndex);
+    int hiddenSize = config.hiddenSize();
+    int queryDimension = config.queryDimension();
+    int keyValueDimension = config.keyValueDimension();
+    float[] attentionNorm = layer.attentionNorm();
+    for (int index = 0; index < batchSize; index++) {
+      int hiddenOffset = index * hiddenSize;
+      TensorOps.rmsNorm(
+          batch.normalized,
+          hiddenOffset,
+          batch.hidden,
+          hiddenOffset,
+          attentionNorm,
+          hiddenSize,
+          config.rmsNormEpsilon());
+    }
+    layer.query().multiplyBatch(batch.normalized, batchSize, batch.query);
+    layer.key().multiplyBatch(batch.normalized, batchSize, batch.key);
+    layer.value().multiplyBatch(batch.normalized, batchSize, batch.value);
+    if (config.usesRope(layerIndex)) {
+      for (int index = 0; index < batchSize; index++) {
+        int queryOffset = index * queryDimension;
+        int keyOffset = index * keyValueDimension;
+        for (int head = 0; head < config.numHeads(); head++) {
+          session.rope.applyBatch(
+              batch.query, queryOffset + head * config.headDimension(), index, false);
+        }
+        for (int head = 0; head < config.numKvHeads(); head++) {
+          session.rope.applyBatch(
+              batch.key, keyOffset + head * config.headDimension(), index, false);
+        }
+        MobileMoeMath.normalizeHeads(
+            batch.query,
+            queryOffset,
+            queryDimension,
+            config.headDimension(),
+            config.rmsNormEpsilon());
+        MobileMoeMath.normalizeHeads(
+            batch.key,
+            keyOffset,
+            keyValueDimension,
+            config.headDimension(),
+            config.rmsNormEpsilon());
+      }
+    }
+    for (int index = 0; index < batchSize; index++) {
+      session.cache.store(
+          layerIndex,
+          startPosition + index,
+          batch.key,
+          index * keyValueDimension,
+          batch.value,
+          index * keyValueDimension);
+    }
+    for (int index = 0; index < batchSize; index++) {
+      computeAttention(
+          session,
+          layerIndex,
+          startPosition + index,
+          batch.query,
+          index * queryDimension,
+          batch.attention,
+          index * queryDimension);
+    }
+    layer.output().multiplyBatch(batch.attention, batchSize, batch.projectedAttention);
+    addBatch(batch.hidden, batch.projectedAttention, batchSize, hiddenSize);
+
+    float[] postAttentionNorm = layer.postAttentionNorm();
+    for (int index = 0; index < batchSize; index++) {
+      int hiddenOffset = index * hiddenSize;
+      TensorOps.rmsNorm(
+          batch.normalized,
+          hiddenOffset,
+          batch.hidden,
+          hiddenOffset,
+          postAttentionNorm,
+          hiddenSize,
+          config.rmsNormEpsilon());
+    }
+    executeFeedForwardBatch(session, batch, layer, batchSize);
+    addBatch(batch.hidden, batch.routedOutput, batchSize, hiddenSize);
+    addBatch(batch.hidden, batch.sharedOutput, batchSize, hiddenSize);
   }
 
   private void execute(Session session, int token, int position, boolean projectLogits) {
@@ -236,7 +447,19 @@ public final class MobileMoeForwardPass {
   }
 
   private void computeAttention(Session session, int layer, int position) {
-    Arrays.fill(session.attention, 0.0f);
+    computeAttention(session, layer, position, session.query, 0, session.attention, 0);
+  }
+
+  private void computeAttention(
+      Session session,
+      int layer,
+      int position,
+      float[] query,
+      int queryBaseOffset,
+      float[] attention,
+      int attentionBaseOffset) {
+    Arrays.fill(
+        attention, attentionBaseOffset, attentionBaseOffset + config.queryDimension(), 0.0f);
     AttentionView view = session.cache.attentionView(layer, 0, position + 1);
     float[] cachedKeys = session.cache.keyBuffer(layer);
     float[] cachedValues = session.cache.valueBuffer(layer);
@@ -244,7 +467,7 @@ public final class MobileMoeForwardPass {
     float scale = (float) (1.0 / Math.sqrt(config.headDimension()));
     for (int head = 0; head < config.numHeads(); head++) {
       int keyValueHead = head / headsPerKeyValue;
-      int queryOffset = head * config.headDimension();
+      int queryOffset = queryBaseOffset + head * config.headDimension();
       int score = 0;
       for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
         AttentionSpan span = view.span(spanIndex);
@@ -253,7 +476,7 @@ public final class MobileMoeForwardPass {
           session.attentionScores[score++] =
               scale
                   * VectorUtil.dotProduct(
-                      session.query,
+                      query,
                       queryOffset,
                       cachedKeys,
                       keyOffset + row * config.keyValueDimension(),
@@ -262,7 +485,7 @@ public final class MobileMoeForwardPass {
       }
       TensorOps.softmax(session.attentionScores, 0, view.positionCount());
       int probability = 0;
-      int outputOffset = head * config.headDimension();
+      int outputOffset = attentionBaseOffset + head * config.headDimension();
       for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
         AttentionSpan span = view.span(spanIndex);
         int valueOffset = span.valueOffset() + keyValueHead * config.headDimension();
@@ -270,8 +493,7 @@ public final class MobileMoeForwardPass {
           float weight = session.attentionScores[probability++];
           int rowOffset = valueOffset + row * config.keyValueDimension();
           for (int dimension = 0; dimension < config.headDimension(); dimension++) {
-            session.attention[outputOffset + dimension] +=
-                weight * cachedValues[rowOffset + dimension];
+            attention[outputOffset + dimension] += weight * cachedValues[rowOffset + dimension];
           }
         }
       }
@@ -305,13 +527,97 @@ public final class MobileMoeForwardPass {
     shared.down().multiply(session.sharedActivated, session.sharedOutput);
   }
 
+  private void executeFeedForwardBatch(
+      Session session, BatchState batch, MobileMoeWeights.Layer layer, int batchSize) {
+    int hiddenSize = config.hiddenSize();
+    int expertHidden = config.intermediateSize();
+    int gateUpWidth = Math.multiplyExact(2, expertHidden);
+    int topK = config.expertsPerToken();
+    layer.router().multiplyBatch(batch.normalized, batchSize, batch.routerLogits);
+    float[] expertBias = layer.expertBias();
+    for (int token = 0; token < batchSize; token++) {
+      System.arraycopy(
+          batch.routerLogits,
+          token * config.numExperts(),
+          session.routerLogits,
+          0,
+          config.numExperts());
+      MobileMoeRouting.select(
+          session.routerLogits,
+          expertBias,
+          topK,
+          config.routeScale(),
+          session.selectedExperts,
+          session.routeWeights);
+      System.arraycopy(session.selectedExperts, 0, batch.selectedExperts, token * topK, topK);
+      System.arraycopy(session.routeWeights, 0, batch.routeWeights, token * topK, topK);
+    }
+
+    Arrays.fill(batch.routedOutput, 0, batchSize * hiddenSize, 0.0f);
+    for (int expertIndex = 0; expertIndex < config.numExperts(); expertIndex++) {
+      int assignmentCount = 0;
+      for (int token = 0; token < batchSize; token++) {
+        for (int route = 0; route < topK; route++) {
+          if (batch.selectedExperts[token * topK + route] == expertIndex) {
+            batch.expertTokens[assignmentCount] = token;
+            batch.expertRoutes[assignmentCount] = route;
+            System.arraycopy(
+                batch.normalized,
+                token * hiddenSize,
+                batch.expertInput,
+                assignmentCount * hiddenSize,
+                hiddenSize);
+            assignmentCount++;
+          }
+        }
+      }
+      if (assignmentCount == 0) {
+        continue;
+      }
+      MobileMoeExperts.Expert expert = layer.experts().expert(expertIndex);
+      expert.gateUp().multiplyBatch(batch.expertInput, assignmentCount, batch.expertGateUp);
+      swigluBatch(
+          batch.expertGateUp, batch.expertActivated, assignmentCount, expertHidden, gateUpWidth);
+      expert.down().multiplyBatch(batch.expertActivated, assignmentCount, batch.expertOutput);
+      for (int assignment = 0; assignment < assignmentCount; assignment++) {
+        int token = batch.expertTokens[assignment];
+        int route = batch.expertRoutes[assignment];
+        addScaled(
+            batch.routedOutput,
+            token * hiddenSize,
+            batch.expertOutput,
+            assignment * hiddenSize,
+            hiddenSize,
+            batch.routeWeights[token * topK + route]);
+      }
+    }
+
+    MobileMoeWeights.SharedExpert shared = layer.sharedExpert();
+    shared.gate().multiplyBatch(batch.normalized, batchSize, batch.sharedGate);
+    shared.up().multiplyBatch(batch.normalized, batchSize, batch.sharedUp);
+    int sharedWidth = config.sharedIntermediateSize();
+    for (int token = 0; token < batchSize; token++) {
+      int offset = token * sharedWidth;
+      for (int index = 0; index < sharedWidth; index++) {
+        batch.sharedActivated[offset + index] =
+            silu(batch.sharedGate[offset + index]) * batch.sharedUp[offset + index];
+      }
+    }
+    shared.down().multiplyBatch(batch.sharedActivated, batchSize, batch.sharedOutput);
+  }
+
   private void embedToken(int token, float[] destination) {
+    embedToken(token, destination, 0);
+  }
+
+  private void embedToken(int token, float[] destination, int destinationOffset) {
     if (token < 0 || token >= config.vocabSize()) {
       throw new IllegalArgumentException("token is outside the vocabulary: " + token);
     }
     MobileMoePackedInt4Matrix embedding = weights.embedding();
-    for (int index = 0; index < destination.length; index++) {
-      destination[index] = embedding.value(token, index);
+    Objects.checkFromIndexSize(destinationOffset, config.hiddenSize(), destination.length);
+    for (int index = 0; index < config.hiddenSize(); index++) {
+      destination[destinationOffset + index] = embedding.value(token, index);
     }
   }
 
@@ -329,6 +635,18 @@ public final class MobileMoeForwardPass {
     }
   }
 
+  private static void swigluBatch(
+      float[] gateUp, float[] output, int batchSize, int width, int gateUpWidth) {
+    for (int batch = 0; batch < batchSize; batch++) {
+      int gateOffset = batch * gateUpWidth;
+      int outputOffset = batch * width;
+      for (int index = 0; index < width; index++) {
+        output[outputOffset + index] =
+            silu(gateUp[gateOffset + index]) * gateUp[gateOffset + width + index];
+      }
+    }
+  }
+
   private static float silu(float value) {
     return value * MobileMoeRouting.sigmoid(value);
   }
@@ -339,9 +657,28 @@ public final class MobileMoeForwardPass {
     }
   }
 
+  private static void addBatch(float[] destination, float[] update, int batchSize, int rowWidth) {
+    int entries = Math.multiplyExact(batchSize, rowWidth);
+    for (int index = 0; index < entries; index++) {
+      destination[index] += update[index];
+    }
+  }
+
   private static void addScaled(float[] destination, float[] update, float scale) {
     for (int index = 0; index < destination.length; index++) {
       destination[index] += scale * update[index];
+    }
+  }
+
+  private static void addScaled(
+      float[] destination,
+      int destinationOffset,
+      float[] update,
+      int updateOffset,
+      int length,
+      float scale) {
+    for (int index = 0; index < length; index++) {
+      destination[destinationOffset + index] += scale * update[updateOffset + index];
     }
   }
 }

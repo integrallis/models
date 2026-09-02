@@ -146,11 +146,7 @@ final class MobileMoeDecoderAdapter implements PureJavaDecoder {
 
   private float[] prefill(MobileMoeForwardPass.Session session, int[] tokens, int startPosition) {
     validate(session, tokens, startPosition);
-    int last = tokens.length - 1;
-    for (int index = 0; index < last; index++) {
-      forwardPass.advance(session, tokens[index], startPosition + index);
-    }
-    return forwardPass.forward(session, tokens[last], startPosition + last);
+    return forwardPass.prefill(session, tokens, startPosition);
   }
 
   private static void validate(

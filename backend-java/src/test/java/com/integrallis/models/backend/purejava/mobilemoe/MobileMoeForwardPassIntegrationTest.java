@@ -88,6 +88,34 @@ class MobileMoeForwardPassIntegrationTest {
     }
   }
 
+  @Test
+  void batchedPrefillMatchesSequentialExecutionAndLeavesEquivalentKvState() throws Exception {
+    Path directory = fixtureDirectory();
+    assumeTrue(Files.isRegularFile(directory.resolve("model.safetensors")));
+    MobileMoeHuggingFaceConfig config =
+        MobileMoeHuggingFaceConfig.parse(directory.resolve("config.json"));
+    try (Arena arena = Arena.ofConfined()) {
+      MobileMoeForwardPass graph =
+          MobileMoeForwardPass.load(
+              config, new SafetensorsTensorSource(SafetensorsBundle.open(directory, arena)), 16);
+      MobileMoeForwardPass.Session sequential = graph.openSession();
+      MobileMoeForwardPass.Session batched = graph.openSession();
+
+      graph.advance(sequential, 128000, 0);
+      float[] expected = graph.forward(sequential, 9906, 1);
+      float[] actual = graph.prefill(batched, new int[] {128000, 9906}, 0);
+
+      assertEquals(argmax(expected), argmax(actual));
+      assertTrue(cosine(expected, actual) > 0.9997);
+      assertEquals(2, batched.checkpoint());
+
+      float[] expectedNext = graph.forward(sequential, 11, 2);
+      float[] actualNext = graph.forward(batched, 11, 2);
+      assertEquals(argmax(expectedNext), argmax(actualNext));
+      assertTrue(cosine(expectedNext, actualNext) > 0.9997);
+    }
+  }
+
   private static boolean allFinite(float[] values) {
     for (float value : values) {
       if (!Float.isFinite(value)) {

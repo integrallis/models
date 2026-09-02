@@ -75,4 +75,19 @@ final class MobileMoePackedInt4RightMatrix {
     VectorUtil.packedInt4GroupRightMatVec(
         input, packed, scales, inputs, outputs, groupSize, output);
   }
+
+  void multiplyBatch(float[] input, int batchSize, float[] output) {
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(output, "output");
+    if (input.length < Math.multiplyExact(batchSize, inputs)) {
+      throw new IllegalArgumentException(
+          "input length must cover batchSize * inputs; got " + input.length);
+    }
+    if (output.length < Math.multiplyExact(batchSize, outputs)) {
+      throw new IllegalArgumentException(
+          "output length must cover batchSize * outputs; got " + output.length);
+    }
+    VectorUtil.packedInt4GroupRightMatVecBatch(
+        input, batchSize, packed, scales, inputs, outputs, groupSize, output);
+  }
 }
