@@ -122,6 +122,12 @@ final class MobileMoePackedInt4Matrix {
         input, batchSize, packed, scales, rows, columns, groupSize, output);
   }
 
+  void multiplyBatchPreparedInt8(
+      byte[] quantizedInput, float[] inputScales, int batchSize, float[] output) {
+    VectorUtil.packedInt4GroupMatVecBatchPreparedInt8(
+        quantizedInput, inputScales, batchSize, packed, scales, rows, columns, groupSize, output);
+  }
+
   private int quantized(int row, int column) {
     int bits = packedByte(row, column);
     return signedNibble((column & 1) == 0 ? bits & 0x0f : bits >>> 4);

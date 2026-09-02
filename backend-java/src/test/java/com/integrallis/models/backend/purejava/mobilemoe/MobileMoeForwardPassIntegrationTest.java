@@ -112,7 +112,9 @@ class MobileMoeForwardPassIntegrationTest {
       float[] expectedNext = graph.forward(sequential, 11, 2);
       float[] actualNext = graph.forward(batched, 11, 2);
       assertEquals(argmax(expectedNext), argmax(actualNext));
-      assertTrue(cosine(expectedNext, actualNext) > 0.9997);
+      assertTrue(
+          cosine(expectedNext, actualNext) > 0.9997,
+          () -> "post-prefill cosine=" + cosine(expectedNext, actualNext));
     }
   }
 

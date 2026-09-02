@@ -126,6 +126,8 @@ public final class MobileMoeForwardPass {
     private final float[] expertOutput;
     private final int[] expertTokens;
     private final int[] expertRoutes;
+    private final byte[] quantizedActivation;
+    private final float[] quantizedActivationScales;
 
     private BatchState(MobileMoeHuggingFaceConfig config, int capacity) {
       this.capacity = capacity;
@@ -150,6 +152,13 @@ public final class MobileMoeForwardPass {
       expertOutput = batchBuffer(capacity, config.hiddenSize());
       expertTokens = new int[capacity];
       expertRoutes = new int[capacity];
+      int maximumProjectionInput =
+          Math.max(
+              config.sharedIntermediateSize(),
+              Math.max(config.hiddenSize(), config.queryDimension()));
+      quantizedActivation = new byte[Math.multiplyExact(capacity, maximumProjectionInput)];
+      quantizedActivationScales =
+          new float[Math.multiplyExact(capacity, (maximumProjectionInput + 31) / 32)];
     }
 
     private static float[] batchBuffer(int capacity, int width) {
@@ -161,6 +170,9 @@ public final class MobileMoeForwardPass {
   private final MobileMoeWeights weights;
   private final int maxSequenceLength;
   private final int prefillBatchSize;
+  private final boolean prefillInt8Qkv;
+  private final boolean prefillInt8AttentionOutput;
+  private final boolean prefillInt8Shared;
 
   private MobileMoeForwardPass(
       MobileMoeHuggingFaceConfig config, MobileMoeWeights weights, int maxSequenceLength) {
@@ -181,6 +193,13 @@ public final class MobileMoeForwardPass {
           "models.mobilemoe.prefillBatchSize must be positive: " + requestedBatchSize);
     }
     prefillBatchSize = Math.min(requestedBatchSize, maxSequenceLength);
+    prefillInt8Qkv =
+        Boolean.parseBoolean(System.getProperty("models.mobilemoe.prefillInt8Qkv", "false"));
+    prefillInt8AttentionOutput =
+        Boolean.parseBoolean(
+            System.getProperty("models.mobilemoe.prefillInt8AttentionOutput", "true"));
+    prefillInt8Shared =
+        Boolean.parseBoolean(System.getProperty("models.mobilemoe.prefillInt8Shared", "true"));
   }
 
   /** Loads the complete MobileMoE QAT graph from a mapped Safetensors source. */
@@ -314,9 +333,25 @@ public final class MobileMoeForwardPass {
           hiddenSize,
           config.rmsNormEpsilon());
     }
-    layer.query().multiplyBatch(batch.normalized, batchSize, batch.query);
-    layer.key().multiplyBatch(batch.normalized, batchSize, batch.key);
-    layer.value().multiplyBatch(batch.normalized, batchSize, batch.value);
+    if (prefillInt8Qkv) {
+      quantizeBatch(batch, batch.normalized, batchSize, hiddenSize);
+      layer
+          .query()
+          .multiplyBatchPreparedInt8(
+              batch.quantizedActivation, batch.quantizedActivationScales, batchSize, batch.query);
+      layer
+          .key()
+          .multiplyBatchPreparedInt8(
+              batch.quantizedActivation, batch.quantizedActivationScales, batchSize, batch.key);
+      layer
+          .value()
+          .multiplyBatchPreparedInt8(
+              batch.quantizedActivation, batch.quantizedActivationScales, batchSize, batch.value);
+    } else {
+      layer.query().multiplyBatch(batch.normalized, batchSize, batch.query);
+      layer.key().multiplyBatch(batch.normalized, batchSize, batch.key);
+      layer.value().multiplyBatch(batch.normalized, batchSize, batch.value);
+    }
     if (config.usesRope(layerIndex)) {
       for (int index = 0; index < batchSize; index++) {
         int queryOffset = index * queryDimension;
@@ -362,7 +397,18 @@ public final class MobileMoeForwardPass {
           batch.attention,
           index * queryDimension);
     }
-    layer.output().multiplyBatch(batch.attention, batchSize, batch.projectedAttention);
+    if (prefillInt8AttentionOutput) {
+      quantizeBatch(batch, batch.attention, batchSize, queryDimension);
+      layer
+          .output()
+          .multiplyBatchPreparedInt8(
+              batch.quantizedActivation,
+              batch.quantizedActivationScales,
+              batchSize,
+              batch.projectedAttention);
+    } else {
+      layer.output().multiplyBatch(batch.attention, batchSize, batch.projectedAttention);
+    }
     addBatch(batch.hidden, batch.projectedAttention, batchSize, hiddenSize);
 
     float[] postAttentionNorm = layer.postAttentionNorm();
@@ -593,8 +639,26 @@ public final class MobileMoeForwardPass {
     }
 
     MobileMoeWeights.SharedExpert shared = layer.sharedExpert();
-    shared.gate().multiplyBatch(batch.normalized, batchSize, batch.sharedGate);
-    shared.up().multiplyBatch(batch.normalized, batchSize, batch.sharedUp);
+    if (prefillInt8Shared) {
+      quantizeBatch(batch, batch.normalized, batchSize, hiddenSize);
+      shared
+          .gate()
+          .multiplyBatchPreparedInt8(
+              batch.quantizedActivation,
+              batch.quantizedActivationScales,
+              batchSize,
+              batch.sharedGate);
+      shared
+          .up()
+          .multiplyBatchPreparedInt8(
+              batch.quantizedActivation,
+              batch.quantizedActivationScales,
+              batchSize,
+              batch.sharedUp);
+    } else {
+      shared.gate().multiplyBatch(batch.normalized, batchSize, batch.sharedGate);
+      shared.up().multiplyBatch(batch.normalized, batchSize, batch.sharedUp);
+    }
     int sharedWidth = config.sharedIntermediateSize();
     for (int token = 0; token < batchSize; token++) {
       int offset = token * sharedWidth;
@@ -603,7 +667,23 @@ public final class MobileMoeForwardPass {
             silu(batch.sharedGate[offset + index]) * batch.sharedUp[offset + index];
       }
     }
-    shared.down().multiplyBatch(batch.sharedActivated, batchSize, batch.sharedOutput);
+    if (prefillInt8Shared) {
+      quantizeBatch(batch, batch.sharedActivated, batchSize, sharedWidth);
+      shared
+          .down()
+          .multiplyBatchPreparedInt8(
+              batch.quantizedActivation,
+              batch.quantizedActivationScales,
+              batchSize,
+              batch.sharedOutput);
+    } else {
+      shared.down().multiplyBatch(batch.sharedActivated, batchSize, batch.sharedOutput);
+    }
+  }
+
+  private static void quantizeBatch(BatchState batch, float[] input, int batchSize, int columns) {
+    VectorUtil.quantizeSignedInt8GroupsForPackedInt4(
+        input, batchSize, columns, 32, batch.quantizedActivation, batch.quantizedActivationScales);
   }
 
   private void embedToken(int token, float[] destination) {
