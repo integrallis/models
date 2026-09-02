@@ -15,38 +15,26 @@
  */
 package com.integrallis.models.backend.purejava.mobilemoe;
 
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.nio.ByteOrder;
-import java.util.Arrays;
 import java.util.Objects;
 
 /** MobileMoE expert tensor stored as {@code [input, packed-output]} with output-group scales. */
 final class MobileMoePackedInt4RightMatrix {
-
-  private static final ValueLayout.OfShort LE_SHORT =
-      ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   private final MemorySegment packed;
   private final MemorySegment scales;
   private final int inputs;
   private final int outputs;
   private final int groupSize;
-  private final int groupsPerInput;
 
   private MobileMoePackedInt4RightMatrix(
-      MemorySegment packed,
-      MemorySegment scales,
-      int inputs,
-      int outputs,
-      int groupSize,
-      int groupsPerInput) {
+      MemorySegment packed, MemorySegment scales, int inputs, int outputs, int groupSize) {
     this.packed = packed.asReadOnly();
     this.scales = scales.asReadOnly();
     this.inputs = inputs;
     this.outputs = outputs;
     this.groupSize = groupSize;
-    this.groupsPerInput = groupsPerInput;
   }
 
   static MobileMoePackedInt4RightMatrix of(
@@ -74,7 +62,7 @@ final class MobileMoePackedInt4RightMatrix {
       throw new IllegalArgumentException(
           "scale buffer requires " + expectedScales + " bytes; got " + scales.byteSize());
     }
-    return new MobileMoePackedInt4RightMatrix(packed, scales, inputs, outputs, groupSize, groups);
+    return new MobileMoePackedInt4RightMatrix(packed, scales, inputs, outputs, groupSize);
   }
 
   void multiply(float[] input, float[] output) {
@@ -84,33 +72,7 @@ final class MobileMoePackedInt4RightMatrix {
       throw new IllegalArgumentException(
           "input/output lengths must equal " + inputs + "/" + outputs);
     }
-    Arrays.fill(output, 0.0f);
-    for (int inputIndex = 0; inputIndex < inputs; inputIndex++) {
-      float activation = input[inputIndex];
-      for (int group = 0; group < groupsPerInput; group++) {
-        float multiplier = activation * scale(inputIndex, group);
-        int start = group * groupSize;
-        int end = start + groupSize;
-        for (int outputIndex = start; outputIndex < end; outputIndex += 2) {
-          int bits = packedByte(inputIndex, outputIndex);
-          output[outputIndex] += multiplier * signedNibble(bits & 0x0f);
-          output[outputIndex + 1] += multiplier * signedNibble(bits >>> 4);
-        }
-      }
-    }
-  }
-
-  private int packedByte(int input, int evenOutput) {
-    long index = ((long) input * outputs + evenOutput) / 2L;
-    return Byte.toUnsignedInt(packed.get(ValueLayout.JAVA_BYTE, index));
-  }
-
-  private float scale(int input, int group) {
-    long index = (long) input * groupsPerInput + group;
-    return Float.float16ToFloat(scales.get(LE_SHORT, index * Short.BYTES));
-  }
-
-  private static int signedNibble(int nibble) {
-    return nibble > 7 ? nibble - 16 : nibble;
+    VectorUtil.packedInt4GroupRightMatVec(
+        input, packed, scales, inputs, outputs, groupSize, output);
   }
 }

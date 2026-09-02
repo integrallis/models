@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.mobilemoe;
 
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
@@ -103,21 +104,7 @@ final class MobileMoePackedInt4Matrix {
       throw new IllegalArgumentException(
           "output length must equal matrix rows " + rows + "; got " + output.length);
     }
-    for (int row = 0; row < rows; row++) {
-      float sum = 0.0f;
-      for (int group = 0; group < groupsPerRow; group++) {
-        float scale = scale(row, group);
-        int start = group * groupSize;
-        int end = start + groupSize;
-        for (int column = start; column < end; column += 2) {
-          int bits = packedByte(row, column);
-          int even = signedNibble(bits & 0x0f);
-          int odd = signedNibble(bits >>> 4);
-          sum += scale * (even * input[column] + odd * input[column + 1]);
-        }
-      }
-      output[row] = sum;
-    }
+    VectorUtil.packedInt4GroupMatVec(input, packed, scales, rows, columns, groupSize, output);
   }
 
   private int quantized(int row, int column) {
