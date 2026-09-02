@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.mobilemoe;
 
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SegmentAllocator;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.util.Objects;
@@ -33,6 +34,7 @@ final class MobileMoePackedInt4Matrix {
   private final int columns;
   private final int groupSize;
   private final int groupsPerRow;
+  private final MobileMoeQ8RightMatrix runtimeQ8;
 
   private MobileMoePackedInt4Matrix(
       MemorySegment packed,
@@ -40,13 +42,15 @@ final class MobileMoePackedInt4Matrix {
       int rows,
       int columns,
       int groupSize,
-      int groupsPerRow) {
+      int groupsPerRow,
+      MobileMoeQ8RightMatrix runtimeQ8) {
     this.packed = packed.asReadOnly();
     this.scales = scales.asReadOnly();
     this.rows = rows;
     this.columns = columns;
     this.groupSize = groupSize;
     this.groupsPerRow = groupsPerRow;
+    this.runtimeQ8 = runtimeQ8;
   }
 
   static MobileMoePackedInt4Matrix of(
@@ -75,7 +79,8 @@ final class MobileMoePackedInt4Matrix {
       throw new IllegalArgumentException(
           "scale buffer requires " + expectedScales + " bytes; got " + scales.byteSize());
     }
-    return new MobileMoePackedInt4Matrix(packed, scales, rows, columns, groupSize, groupsPerRow);
+    return new MobileMoePackedInt4Matrix(
+        packed, scales, rows, columns, groupSize, groupsPerRow, null);
   }
 
   int rows() {
@@ -126,6 +131,114 @@ final class MobileMoePackedInt4Matrix {
       byte[] quantizedInput, float[] inputScales, int batchSize, float[] output) {
     VectorUtil.packedInt4GroupMatVecBatchPreparedInt8(
         quantizedInput, inputScales, batchSize, packed, scales, rows, columns, groupSize, output);
+  }
+
+  MobileMoePackedInt4Matrix prepareQ8(SegmentAllocator allocator) {
+    return new MobileMoePackedInt4Matrix(
+        packed, scales, rows, columns, groupSize, groupsPerRow, materializeQ8(allocator));
+  }
+
+  boolean usesRuntimeQ8() {
+    return runtimeQ8 != null;
+  }
+
+  void multiplyRuntime(
+      float[] input, float[] output, byte[] quantizedActivation, float[] activationScales) {
+    if (runtimeQ8 == null) {
+      multiply(input, output);
+    } else {
+      runtimeQ8.multiply(input, output, quantizedActivation, activationScales);
+    }
+  }
+
+  void multiplyBatchRuntime(
+      float[] input,
+      int batchSize,
+      float[] output,
+      byte[] quantizedActivation,
+      float[] activationScales) {
+    if (runtimeQ8 == null) {
+      multiplyBatch(input, batchSize, output);
+    } else {
+      runtimeQ8.multiplyBatch(input, batchSize, output, quantizedActivation, activationScales);
+    }
+  }
+
+  static void multiplyDualRuntime(
+      float[] input,
+      int batchSize,
+      MobileMoePackedInt4Matrix first,
+      float[] firstOutput,
+      MobileMoePackedInt4Matrix second,
+      float[] secondOutput,
+      byte[] quantizedActivation,
+      float[] activationScales) {
+    requireRuntimeQ8(first);
+    requireRuntimeQ8(second);
+    MobileMoeQ8RightMatrix.multiplyDualBatch(
+        input,
+        batchSize,
+        first.runtimeQ8,
+        firstOutput,
+        second.runtimeQ8,
+        secondOutput,
+        quantizedActivation,
+        activationScales);
+  }
+
+  static void multiplyTripleRuntime(
+      float[] input,
+      int batchSize,
+      MobileMoePackedInt4Matrix first,
+      float[] firstOutput,
+      MobileMoePackedInt4Matrix second,
+      float[] secondOutput,
+      MobileMoePackedInt4Matrix third,
+      float[] thirdOutput,
+      byte[] quantizedActivation,
+      float[] activationScales) {
+    requireRuntimeQ8(first);
+    requireRuntimeQ8(second);
+    requireRuntimeQ8(third);
+    MobileMoeQ8RightMatrix.multiplyTripleBatch(
+        input,
+        batchSize,
+        first.runtimeQ8,
+        firstOutput,
+        second.runtimeQ8,
+        secondOutput,
+        third.runtimeQ8,
+        thirdOutput,
+        quantizedActivation,
+        activationScales);
+  }
+
+  private static void requireRuntimeQ8(MobileMoePackedInt4Matrix matrix) {
+    Objects.requireNonNull(matrix, "matrix");
+    if (matrix.runtimeQ8 == null) {
+      throw new IllegalStateException("matrix does not have a prepared Q8 runtime layout");
+    }
+  }
+
+  MobileMoeQ8RightMatrix materializeQ8(SegmentAllocator allocator) {
+    Objects.requireNonNull(allocator, "allocator");
+    int blocksPerRow = columns / 32;
+    long byteCount = Math.multiplyExact(Math.multiplyExact((long) rows, blocksPerRow), 34L);
+    MemorySegment q8 = allocator.allocate(byteCount, 1);
+    long offset = 0L;
+    for (int row = 0; row < rows; row++) {
+      for (int columnBlock = 0; columnBlock < blocksPerRow; columnBlock++) {
+        float scale = scale(row, columnBlock) / 16.0f;
+        q8.set(LE_SHORT, offset, Float.floatToFloat16(scale));
+        offset += Short.BYTES;
+        int columnOffset = columnBlock * 32;
+        for (int index = 0; index < 32; index++) {
+          q8.set(
+              ValueLayout.JAVA_BYTE, offset++, (byte) (quantized(row, columnOffset + index) * 16));
+        }
+      }
+    }
+    return new MobileMoeQ8RightMatrix(q8, columns, rows);
   }
 
   private int quantized(int row, int column) {

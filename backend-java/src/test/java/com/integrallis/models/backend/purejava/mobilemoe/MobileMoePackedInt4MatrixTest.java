@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -104,6 +105,38 @@ class MobileMoePackedInt4MatrixTest {
       assertThat(actual[batch * rows]).isCloseTo(expected[0], within(1.0e-6f));
       assertThat(actual[batch * rows + 1]).isCloseTo(expected[1], within(1.0e-6f));
     }
+  }
+
+  @Test
+  void requantizesRowsToQ8ForFastRuntimeMultiplication() {
+    int rows = 32;
+    int columns = 32;
+    byte[] packed = new byte[rows * columns / 2];
+    for (int logical = 0; logical < rows * columns; logical += 2) {
+      packed[logical / 2] = pack((logical * 7 % 16) - 8, ((logical + 1) * 7 % 16) - 8);
+    }
+    float[] scaleValues = new float[rows];
+    for (int row = 0; row < rows; row++) {
+      scaleValues[row] = 0.01f + row * 0.0025f;
+    }
+    MobileMoePackedInt4Matrix packedMatrix =
+        MobileMoePackedInt4Matrix.of(
+            MemorySegment.ofArray(packed), fp16(scaleValues), rows, columns, 32);
+    float[] activations = new float[2 * columns];
+    for (int index = 0; index < activations.length; index++) {
+      activations[index] = (index % 9 - 4) * 0.125f;
+    }
+    float[] expected = new float[2 * rows];
+    packedMatrix.multiplyBatch(activations, 2, expected);
+
+    float[] actual = new float[2 * rows];
+    try (Arena arena = Arena.ofConfined()) {
+      MobileMoeQ8RightMatrix runtimeMatrix = packedMatrix.materializeQ8(arena);
+      runtimeMatrix.multiplyBatch(
+          activations, 2, actual, new byte[2 * columns], new float[2 * columns / 32]);
+    }
+
+    assertThat(actual).containsExactly(expected, within(0.02f));
   }
 
   private static byte pack(int even, int odd) {

@@ -23,15 +23,16 @@ import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tensor.TensorSource;
 import com.integrallis.vectors.core.VectorUtil;
+import java.lang.foreign.SegmentAllocator;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Complete single-token Java decoder pass over mapped MobileMoE QAT Safetensors weights. */
+/** Complete Java decoder pass over MobileMoE QAT Safetensors weights. */
 public final class MobileMoeForwardPass {
 
-  private static final int DEFAULT_PREFILL_BATCH_SIZE = 64;
+  private static final int DEFAULT_PREFILL_BATCH_SIZE = 256;
 
-  /** Mutable sequence state; sessions share immutable mapped weights and are otherwise isolated. */
+  /** Mutable sequence state; sessions share immutable weights and are otherwise isolated. */
   public static final class Session {
     private final MobileMoeForwardPass owner;
     private final LayeredKvCache cache;
@@ -56,6 +57,8 @@ public final class MobileMoeForwardPass {
     private final float[] sharedActivated;
     private final float[] sharedOutput;
     private final float[] logits;
+    private final byte[] quantizedActivation;
+    private final float[] quantizedActivationScales;
     private final int[] tokenHistory;
     private int nextPosition;
 
@@ -94,6 +97,12 @@ public final class MobileMoeForwardPass {
       sharedActivated = new float[config.sharedIntermediateSize()];
       sharedOutput = new float[config.hiddenSize()];
       logits = new float[config.vocabSize()];
+      int maximumProjectionInput =
+          Math.max(
+              config.sharedIntermediateSize(),
+              Math.max(config.hiddenSize(), config.queryDimension()));
+      quantizedActivation = new byte[maximumProjectionInput];
+      quantizedActivationScales = new float[(maximumProjectionInput + 31) / 32];
       tokenHistory = new int[owner.maxSequenceLength];
     }
 
@@ -204,10 +213,13 @@ public final class MobileMoeForwardPass {
 
   /** Loads the complete MobileMoE QAT graph from a mapped Safetensors source. */
   public static MobileMoeForwardPass load(
-      MobileMoeHuggingFaceConfig config, TensorSource source, int maxSequenceLength) {
+      MobileMoeHuggingFaceConfig config,
+      TensorSource source,
+      int maxSequenceLength,
+      SegmentAllocator allocator) {
     Objects.requireNonNull(config, "config");
     return new MobileMoeForwardPass(
-        config, MobileMoeWeights.load(source, config), maxSequenceLength);
+        config, MobileMoeWeights.load(source, config, allocator), maxSequenceLength);
   }
 
   /** Returns the validated checkpoint execution configuration. */
@@ -215,7 +227,17 @@ public final class MobileMoeForwardPass {
     return config;
   }
 
-  /** Opens an independent sequence over the same mapped model weights. */
+  /** Returns the maximum number of prompt tokens processed in one retained-weight batch. */
+  public int prefillBatchSize() {
+    return prefillBatchSize;
+  }
+
+  /** Returns the prepared runtime weight layout selected for matrix execution. */
+  public String runtimeWeightLayout() {
+    return weights.runtimeLayout();
+  }
+
+  /** Opens an independent sequence over the same model weights. */
   public Session openSession() {
     return new Session(this);
   }
@@ -312,7 +334,13 @@ public final class MobileMoeForwardPass {
         weights.outputNorm(),
         hiddenSize,
         config.rmsNormEpsilon());
-    weights.embedding().multiply(session.normalized, session.logits);
+    weights
+        .embedding()
+        .multiplyRuntime(
+            session.normalized,
+            session.logits,
+            session.quantizedActivation,
+            session.quantizedActivationScales);
   }
 
   private void executeLayerBatch(
@@ -333,7 +361,19 @@ public final class MobileMoeForwardPass {
           hiddenSize,
           config.rmsNormEpsilon());
     }
-    if (prefillInt8Qkv) {
+    if (layer.query().usesRuntimeQ8()) {
+      MobileMoePackedInt4Matrix.multiplyTripleRuntime(
+          batch.normalized,
+          batchSize,
+          layer.query(),
+          batch.query,
+          layer.key(),
+          batch.key,
+          layer.value(),
+          batch.value,
+          batch.quantizedActivation,
+          batch.quantizedActivationScales);
+    } else if (prefillInt8Qkv) {
       quantizeBatch(batch, batch.normalized, batchSize, hiddenSize);
       layer
           .query()
@@ -397,7 +437,16 @@ public final class MobileMoeForwardPass {
           batch.attention,
           index * queryDimension);
     }
-    if (prefillInt8AttentionOutput) {
+    if (layer.output().usesRuntimeQ8()) {
+      layer
+          .output()
+          .multiplyBatchRuntime(
+              batch.attention,
+              batchSize,
+              batch.projectedAttention,
+              batch.quantizedActivation,
+              batch.quantizedActivationScales);
+    } else if (prefillInt8AttentionOutput) {
       quantizeBatch(batch, batch.attention, batchSize, queryDimension);
       layer
           .output()
@@ -449,7 +498,13 @@ public final class MobileMoeForwardPass {
           weights.outputNorm(),
           config.hiddenSize(),
           config.rmsNormEpsilon());
-      weights.embedding().multiply(session.normalized, session.logits);
+      weights
+          .embedding()
+          .multiplyRuntime(
+              session.normalized,
+              session.logits,
+              session.quantizedActivation,
+              session.quantizedActivationScales);
     }
     session.tokenHistory[position] = token;
     session.nextPosition++;
@@ -463,9 +518,23 @@ public final class MobileMoeForwardPass {
         layer.attentionNorm(),
         config.hiddenSize(),
         config.rmsNormEpsilon());
-    layer.query().multiply(session.normalized, session.query);
-    layer.key().multiply(session.normalized, session.key);
-    layer.value().multiply(session.normalized, session.value);
+    if (layer.query().usesRuntimeQ8()) {
+      MobileMoePackedInt4Matrix.multiplyTripleRuntime(
+          session.normalized,
+          1,
+          layer.query(),
+          session.query,
+          layer.key(),
+          session.key,
+          layer.value(),
+          session.value,
+          session.quantizedActivation,
+          session.quantizedActivationScales);
+    } else {
+      layer.query().multiply(session.normalized, session.query);
+      layer.key().multiply(session.normalized, session.key);
+      layer.value().multiply(session.normalized, session.value);
+    }
     if (config.usesRope(layerIndex)) {
       for (int head = 0; head < config.numHeads(); head++) {
         session.rope.apply(session.query, head * config.headDimension(), false);
@@ -478,7 +547,13 @@ public final class MobileMoeForwardPass {
     }
     session.cache.store(layerIndex, position, session.key, session.value);
     computeAttention(session, layerIndex, position);
-    layer.output().multiply(session.attention, session.projectedAttention);
+    layer
+        .output()
+        .multiplyRuntime(
+            session.attention,
+            session.projectedAttention,
+            session.quantizedActivation,
+            session.quantizedActivationScales);
     add(session.hidden, session.projectedAttention);
 
     TensorOps.rmsNorm(
@@ -558,19 +633,49 @@ public final class MobileMoeForwardPass {
     Arrays.fill(session.routedOutput, 0.0f);
     for (int route = 0; route < session.selectedExperts.length; route++) {
       MobileMoeExperts.Expert expert = layer.experts().expert(session.selectedExperts[route]);
-      expert.gateUp().multiply(session.normalized, session.gateUp);
+      expert
+          .gateUp()
+          .multiply(
+              session.normalized,
+              session.gateUp,
+              session.quantizedActivation,
+              session.quantizedActivationScales);
       swiglu(session.gateUp, session.activated);
-      expert.down().multiply(session.activated, session.expertOutput);
+      expert
+          .down()
+          .multiply(
+              session.activated,
+              session.expertOutput,
+              session.quantizedActivation,
+              session.quantizedActivationScales);
       addScaled(session.routedOutput, session.expertOutput, session.routeWeights[route]);
     }
 
     MobileMoeWeights.SharedExpert shared = layer.sharedExpert();
-    shared.gate().multiply(session.normalized, session.sharedGate);
-    shared.up().multiply(session.normalized, session.sharedUp);
+    if (shared.gate().usesRuntimeQ8()) {
+      MobileMoePackedInt4Matrix.multiplyDualRuntime(
+          session.normalized,
+          1,
+          shared.gate(),
+          session.sharedGate,
+          shared.up(),
+          session.sharedUp,
+          session.quantizedActivation,
+          session.quantizedActivationScales);
+    } else {
+      shared.gate().multiply(session.normalized, session.sharedGate);
+      shared.up().multiply(session.normalized, session.sharedUp);
+    }
     for (int index = 0; index < session.sharedActivated.length; index++) {
       session.sharedActivated[index] = silu(session.sharedGate[index]) * session.sharedUp[index];
     }
-    shared.down().multiply(session.sharedActivated, session.sharedOutput);
+    shared
+        .down()
+        .multiplyRuntime(
+            session.sharedActivated,
+            session.sharedOutput,
+            session.quantizedActivation,
+            session.quantizedActivationScales);
   }
 
   private void executeFeedForwardBatch(
@@ -621,10 +726,24 @@ public final class MobileMoeForwardPass {
         continue;
       }
       MobileMoeExperts.Expert expert = layer.experts().expert(expertIndex);
-      expert.gateUp().multiplyBatch(batch.expertInput, assignmentCount, batch.expertGateUp);
+      expert
+          .gateUp()
+          .multiplyBatch(
+              batch.expertInput,
+              assignmentCount,
+              batch.expertGateUp,
+              batch.quantizedActivation,
+              batch.quantizedActivationScales);
       swigluBatch(
           batch.expertGateUp, batch.expertActivated, assignmentCount, expertHidden, gateUpWidth);
-      expert.down().multiplyBatch(batch.expertActivated, assignmentCount, batch.expertOutput);
+      expert
+          .down()
+          .multiplyBatch(
+              batch.expertActivated,
+              assignmentCount,
+              batch.expertOutput,
+              batch.quantizedActivation,
+              batch.quantizedActivationScales);
       for (int assignment = 0; assignment < assignmentCount; assignment++) {
         int token = batch.expertTokens[assignment];
         int route = batch.expertRoutes[assignment];
@@ -639,7 +758,17 @@ public final class MobileMoeForwardPass {
     }
 
     MobileMoeWeights.SharedExpert shared = layer.sharedExpert();
-    if (prefillInt8Shared) {
+    if (shared.gate().usesRuntimeQ8()) {
+      MobileMoePackedInt4Matrix.multiplyDualRuntime(
+          batch.normalized,
+          batchSize,
+          shared.gate(),
+          batch.sharedGate,
+          shared.up(),
+          batch.sharedUp,
+          batch.quantizedActivation,
+          batch.quantizedActivationScales);
+    } else if (prefillInt8Shared) {
       quantizeBatch(batch, batch.normalized, batchSize, hiddenSize);
       shared
           .gate()
@@ -667,7 +796,16 @@ public final class MobileMoeForwardPass {
             silu(batch.sharedGate[offset + index]) * batch.sharedUp[offset + index];
       }
     }
-    if (prefillInt8Shared) {
+    if (shared.down().usesRuntimeQ8()) {
+      shared
+          .down()
+          .multiplyBatchRuntime(
+              batch.sharedActivated,
+              batchSize,
+              batch.sharedOutput,
+              batch.quantizedActivation,
+              batch.quantizedActivationScales);
+    } else if (prefillInt8Shared) {
       quantizeBatch(batch, batch.sharedActivated, batchSize, sharedWidth);
       shared
           .down()

@@ -21,10 +21,13 @@ import com.integrallis.models.backend.purejava.tensor.TensorSource;
 import com.integrallis.models.backend.purejava.tensor.TensorStorage;
 import com.integrallis.models.backend.purejava.tensor.TensorView;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SegmentAllocator;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Complete zero-copy MobileMoE QAT weights over a mapped Safetensors source. */
+/**
+ * Complete MobileMoE QAT weights backed by a mapped Safetensors source and optional runtime layout.
+ */
 final class MobileMoeWeights {
 
   record SharedExpert(
@@ -81,17 +84,24 @@ final class MobileMoeWeights {
   private final MobileMoePackedInt4Matrix embedding;
   private final float[] outputNorm;
   private final Layer[] layers;
+  private final MobileMoeRightMatrix.Layout runtimeLayout;
 
   private MobileMoeWeights(
-      MobileMoePackedInt4Matrix embedding, float[] outputNorm, Layer[] layers) {
+      MobileMoePackedInt4Matrix embedding,
+      float[] outputNorm,
+      Layer[] layers,
+      MobileMoeRightMatrix.Layout runtimeLayout) {
     this.embedding = Objects.requireNonNull(embedding, "embedding");
     this.outputNorm = Objects.requireNonNull(outputNorm, "outputNorm").clone();
     this.layers = Objects.requireNonNull(layers, "layers").clone();
+    this.runtimeLayout = Objects.requireNonNull(runtimeLayout, "runtimeLayout");
   }
 
-  static MobileMoeWeights load(TensorSource source, MobileMoeHuggingFaceConfig config) {
+  static MobileMoeWeights load(
+      TensorSource source, MobileMoeHuggingFaceConfig config, SegmentAllocator allocator) {
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(config, "config");
+    Objects.requireNonNull(allocator, "allocator");
     if (!"safetensors".equals(source.format())) {
       throw new IllegalArgumentException("MobileMoE weights require Safetensors");
     }
@@ -103,8 +113,16 @@ final class MobileMoeWeights {
                     new IllegalArgumentException(
                         "MobileMoE Java path currently requires the packed QAT checkpoint"))
             .groupSize();
+    MobileMoeRightMatrix.Layout runtimeLayout = MobileMoeRightMatrix.Layout.configured();
     MobileMoePackedInt4Matrix embedding =
-        linear(source, "model.embed_tokens", config.vocabSize(), config.hiddenSize(), groupSize);
+        linear(
+            source,
+            "model.embed_tokens",
+            config.vocabSize(),
+            config.hiddenSize(),
+            groupSize,
+            runtimeLayout,
+            allocator);
     Layer[] layers = new Layer[config.numLayers()];
     for (int layer = 0; layer < layers.length; layer++) {
       String prefix = "model.layers." + layer + ".";
@@ -118,52 +136,70 @@ final class MobileMoeWeights {
                   attention + "q_proj",
                   config.queryDimension(),
                   config.hiddenSize(),
-                  groupSize),
+                  groupSize,
+                  runtimeLayout,
+                  allocator),
               linear(
                   source,
                   attention + "k_proj",
                   config.keyValueDimension(),
                   config.hiddenSize(),
-                  groupSize),
+                  groupSize,
+                  runtimeLayout,
+                  allocator),
               linear(
                   source,
                   attention + "v_proj",
                   config.keyValueDimension(),
                   config.hiddenSize(),
-                  groupSize),
+                  groupSize,
+                  runtimeLayout,
+                  allocator),
               linear(
                   source,
                   attention + "o_proj",
                   config.hiddenSize(),
                   config.queryDimension(),
-                  groupSize),
+                  groupSize,
+                  runtimeLayout,
+                  allocator),
               bf16Vector(source, prefix + "post_attention_layernorm.weight", config.hiddenSize()),
               f32Matrix(
                   source, feedForward + "router.weight", config.numExperts(), config.hiddenSize()),
               bf16Vector(source, feedForward + "expert_bias", config.numExperts()),
-              experts(source, feedForward + "experts.", config, groupSize),
+              experts(
+                  source, feedForward + "experts.", config, groupSize, runtimeLayout, allocator),
               new SharedExpert(
                   linear(
                       source,
                       feedForward + "shared_expert.gate_proj",
                       config.sharedIntermediateSize(),
                       config.hiddenSize(),
-                      groupSize),
+                      groupSize,
+                      runtimeLayout,
+                      allocator),
                   linear(
                       source,
                       feedForward + "shared_expert.up_proj",
                       config.sharedIntermediateSize(),
                       config.hiddenSize(),
-                      groupSize),
+                      groupSize,
+                      runtimeLayout,
+                      allocator),
                   linear(
                       source,
                       feedForward + "shared_expert.down_proj",
                       config.hiddenSize(),
                       config.sharedIntermediateSize(),
-                      groupSize)));
+                      groupSize,
+                      runtimeLayout,
+                      allocator)));
     }
     return new MobileMoeWeights(
-        embedding, bf16Vector(source, "model.norm.weight", config.hiddenSize()), layers);
+        embedding,
+        bf16Vector(source, "model.norm.weight", config.hiddenSize()),
+        layers,
+        runtimeLayout);
   }
 
   MobileMoePackedInt4Matrix embedding() {
@@ -181,8 +217,18 @@ final class MobileMoeWeights {
     return layers[index];
   }
 
+  String runtimeLayout() {
+    return runtimeLayout.propertyValue();
+  }
+
   private static MobileMoePackedInt4Matrix linear(
-      TensorSource source, String base, int rows, int columns, int groupSize) {
+      TensorSource source,
+      String base,
+      int rows,
+      int columns,
+      int groupSize,
+      MobileMoeRightMatrix.Layout runtimeLayout,
+      SegmentAllocator allocator) {
     TensorView packed = require(source, base + ".qweight", "U8", 1, 1, rows, columns / 2L);
     TensorView scales =
         require(
@@ -193,7 +239,9 @@ final class MobileMoeWeights {
             Short.BYTES,
             rows,
             columns / (long) groupSize);
-    return MobileMoePackedInt4Matrix.of(packed.data(), scales.data(), rows, columns, groupSize);
+    MobileMoePackedInt4Matrix matrix =
+        MobileMoePackedInt4Matrix.of(packed.data(), scales.data(), rows, columns, groupSize);
+    return runtimeLayout == MobileMoeRightMatrix.Layout.Q8 ? matrix.prepareQ8(allocator) : matrix;
   }
 
   private static MobileMoeFloat32Matrix f32Matrix(
@@ -203,7 +251,12 @@ final class MobileMoeWeights {
   }
 
   private static MobileMoeExperts experts(
-      TensorSource source, String prefix, MobileMoeHuggingFaceConfig config, int groupSize) {
+      TensorSource source,
+      String prefix,
+      MobileMoeHuggingFaceConfig config,
+      int groupSize,
+      MobileMoeRightMatrix.Layout runtimeLayout,
+      SegmentAllocator allocator) {
     int count = config.numExperts();
     int hidden = config.hiddenSize();
     int expertHidden = config.intermediateSize();
@@ -244,18 +297,24 @@ final class MobileMoeWeights {
     for (int expert = 0; expert < count; expert++) {
       experts[expert] =
           new MobileMoeExperts.Expert(
-              MobileMoePackedInt4RightMatrix.of(
-                  slice(gateUp, expert, gateBytes),
-                  slice(gateUpScale, expert, gateScaleBytes),
-                  hidden,
-                  gateUpOutput,
-                  groupSize),
-              MobileMoePackedInt4RightMatrix.of(
-                  slice(down, expert, downBytes),
-                  slice(downScale, expert, downScaleBytes),
-                  expertHidden,
-                  hidden,
-                  groupSize));
+              MobileMoeRightMatrix.prepare(
+                  MobileMoePackedInt4RightMatrix.of(
+                      slice(gateUp, expert, gateBytes),
+                      slice(gateUpScale, expert, gateScaleBytes),
+                      hidden,
+                      gateUpOutput,
+                      groupSize),
+                  runtimeLayout,
+                  allocator),
+              MobileMoeRightMatrix.prepare(
+                  MobileMoePackedInt4RightMatrix.of(
+                      slice(down, expert, downBytes),
+                      slice(downScale, expert, downScaleBytes),
+                      expertHidden,
+                      hidden,
+                      groupSize),
+                  runtimeLayout,
+                  allocator));
     }
     return new MobileMoeExperts(experts);
   }

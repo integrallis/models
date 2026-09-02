@@ -39,6 +39,14 @@ final class MobileMoeDecoderAdapter implements PureJavaDecoder {
     defaultSession = new MobileMoeSession();
   }
 
+  int prefillBatchSize() {
+    return forwardPass.prefillBatchSize();
+  }
+
+  String runtimeWeightLayout() {
+    return forwardPass.runtimeWeightLayout();
+  }
+
   @Override
   public int maxBatchSize() {
     return 1;

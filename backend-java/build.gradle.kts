@@ -437,6 +437,31 @@ tasks.register<Test>("gptOssHuggingFaceIntegrationTest") {
     maxHeapSize = "4g"
 }
 
+tasks.register<Test>("mobileMoeHuggingFaceIntegrationTest") {
+    description = "Run the gated Meta MobileMoE-S QAT Safetensors compatibility tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.MobileMoeHuggingFaceBackendIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.mobilemoe.MobileMoeForwardPassIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.mobilemoe.MobileMoeQatLayoutIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.mobilemoe.MobileMoeTokenizerIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
 tasks.register<Test>("qwen306BQ40IntegrationTest") {
     description = "Run the pinned Qwen3 0.6B Q4_0 pure-Java integration tests"
     group = "verification"

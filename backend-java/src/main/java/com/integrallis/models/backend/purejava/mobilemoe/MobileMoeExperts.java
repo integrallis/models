@@ -17,10 +17,10 @@ package com.integrallis.models.backend.purejava.mobilemoe;
 
 import java.util.Objects;
 
-/** Zero-copy packed routed-expert projections for one MobileMoE layer. */
+/** Routed-expert projections for one MobileMoE layer. */
 final class MobileMoeExperts {
 
-  record Expert(MobileMoePackedInt4RightMatrix gateUp, MobileMoePackedInt4RightMatrix down) {
+  record Expert(MobileMoeRightMatrix gateUp, MobileMoeRightMatrix down) {
     Expert {
       Objects.requireNonNull(gateUp, "gateUp");
       Objects.requireNonNull(down, "down");

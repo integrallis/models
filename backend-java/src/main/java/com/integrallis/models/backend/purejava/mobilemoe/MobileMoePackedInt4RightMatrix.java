@@ -17,10 +17,16 @@ package com.integrallis.models.backend.purejava.mobilemoe;
 
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SegmentAllocator;
+import java.lang.foreign.ValueLayout;
+import java.nio.ByteOrder;
 import java.util.Objects;
 
 /** MobileMoE expert tensor stored as {@code [input, packed-output]} with output-group scales. */
 final class MobileMoePackedInt4RightMatrix {
+
+  private static final ValueLayout.OfShort LE_SHORT =
+      ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   private final MemorySegment packed;
   private final MemorySegment scales;
@@ -89,5 +95,50 @@ final class MobileMoePackedInt4RightMatrix {
     }
     VectorUtil.packedInt4GroupRightMatVecBatch(
         input, batchSize, packed, scales, inputs, outputs, groupSize, output);
+  }
+
+  MobileMoeQ8RightMatrix materializeQ8(SegmentAllocator allocator) {
+    Objects.requireNonNull(allocator, "allocator");
+    int blocksPerRow = inputs / 32;
+    long byteCount = Math.multiplyExact(Math.multiplyExact((long) outputs, blocksPerRow), 34L);
+    MemorySegment q8 = allocator.allocate(byteCount, 1);
+    long offset = 0L;
+    float[] block = new float[32];
+    for (int output = 0; output < outputs; output++) {
+      for (int inputBlock = 0; inputBlock < blocksPerRow; inputBlock++) {
+        float maximum = 0.0f;
+        for (int index = 0; index < block.length; index++) {
+          float value = value(inputBlock * block.length + index, output);
+          block[index] = value;
+          maximum = Math.max(maximum, Math.abs(value));
+        }
+        float scale = maximum / 127.0f;
+        q8.set(LE_SHORT, offset, Float.floatToFloat16(scale));
+        offset += Short.BYTES;
+        float inverse = maximum == 0.0f ? 0.0f : 127.0f / maximum;
+        for (float value : block) {
+          int quantized = Math.clamp(ggmlNearestInt(value * inverse), -127, 127);
+          q8.set(ValueLayout.JAVA_BYTE, offset++, (byte) quantized);
+        }
+      }
+    }
+    return new MobileMoeQ8RightMatrix(q8, inputs, outputs);
+  }
+
+  private float value(int input, int output) {
+    int packedValue =
+        Byte.toUnsignedInt(
+            packed.get(ValueLayout.JAVA_BYTE, ((long) input * outputs + output) / 2L));
+    int nibble = (output & 1) == 0 ? packedValue & 0x0f : packedValue >>> 4;
+    int quantized = nibble < 8 ? nibble : nibble - 16;
+    int groupsPerInput = outputs / groupSize;
+    long scaleIndex = (long) input * groupsPerInput + output / groupSize;
+    float scale = Float.float16ToFloat(scales.get(LE_SHORT, scaleIndex * Short.BYTES));
+    return quantized * scale;
+  }
+
+  private static int ggmlNearestInt(float value) {
+    int bits = Float.floatToRawIntBits(value + 12_582_912.0f);
+    return (bits & 0x007f_ffff) - 0x0040_0000;
   }
 }

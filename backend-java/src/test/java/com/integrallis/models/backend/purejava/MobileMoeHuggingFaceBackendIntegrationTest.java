@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** Real-checkpoint load gate for the Java-native MobileMoE packed-INT4 path. */
+/** Real-checkpoint load gate for the Java-native MobileMoE QAT path. */
 @Tag("integration")
 class MobileMoeHuggingFaceBackendIntegrationTest {
 
@@ -45,7 +45,22 @@ class MobileMoeHuggingFaceBackendIntegrationTest {
       assertThat(argmax(logits)).isEqualTo(11);
       assertThat(backend.diagnostics().environment())
           .containsEntry("artifact-format", "safetensors")
-          .containsEntry("weight-encoding", "packed-int4-g32");
+          .containsEntry("weight-encoding", "packed-int4-g32")
+          .containsEntry("runtime-weight-layout", "q8")
+          .containsEntry("architecture-prefill-batch-size", "16");
+      assertThat(backend.diagnostics().optimizations())
+          .anySatisfy(
+              decision -> {
+                assertThat(decision.id()).isEqualTo("mobilemoe-runtime-weight-layout");
+                assertThat(decision.status().name()).isEqualTo("ENABLED");
+                assertThat(decision.settings()).containsEntry("runtime-layout", "q8");
+              })
+          .anySatisfy(
+              decision -> {
+                assertThat(decision.id()).isEqualTo("batched-prefill");
+                assertThat(decision.status().name()).isEqualTo("ENABLED");
+                assertThat(decision.settings()).containsEntry("batch-size", "16");
+              });
     } finally {
       if (previous == null) {
         System.clearProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);

@@ -98,7 +98,7 @@ class MobileMoeQatLayoutIntegrationTest {
           new SafetensorsTensorSource(
               SafetensorsBundle.open(directory.resolve("model.safetensors"), arena));
 
-      MobileMoeWeights weights = MobileMoeWeights.load(source, config);
+      MobileMoeWeights weights = MobileMoeWeights.load(source, config, arena);
 
       float[] expected = {
         0.0222625732f,

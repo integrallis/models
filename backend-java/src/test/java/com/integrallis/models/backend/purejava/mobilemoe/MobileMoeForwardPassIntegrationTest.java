@@ -40,7 +40,10 @@ class MobileMoeForwardPassIntegrationTest {
     try (Arena arena = Arena.ofConfined()) {
       MobileMoeForwardPass graph =
           MobileMoeForwardPass.load(
-              config, new SafetensorsTensorSource(SafetensorsBundle.open(directory, arena)), 16);
+              config,
+              new SafetensorsTensorSource(SafetensorsBundle.open(directory, arena)),
+              16,
+              arena);
       MobileMoeForwardPass.Session first = graph.openSession();
       MobileMoeForwardPass.Session second = graph.openSession();
 
@@ -72,7 +75,10 @@ class MobileMoeForwardPassIntegrationTest {
     try (Arena arena = Arena.ofConfined()) {
       MobileMoeForwardPass graph =
           MobileMoeForwardPass.load(
-              config, new SafetensorsTensorSource(SafetensorsBundle.open(directory, arena)), 16);
+              config,
+              new SafetensorsTensorSource(SafetensorsBundle.open(directory, arena)),
+              16,
+              arena);
       MobileMoeForwardPass.Session session = graph.openSession();
       float[] bos = graph.forward(session, 128000, 0);
       float[] expectedBos = readFloats(bosOracle);
@@ -97,7 +103,10 @@ class MobileMoeForwardPassIntegrationTest {
     try (Arena arena = Arena.ofConfined()) {
       MobileMoeForwardPass graph =
           MobileMoeForwardPass.load(
-              config, new SafetensorsTensorSource(SafetensorsBundle.open(directory, arena)), 16);
+              config,
+              new SafetensorsTensorSource(SafetensorsBundle.open(directory, arena)),
+              16,
+              arena);
       MobileMoeForwardPass.Session sequential = graph.openSession();
       MobileMoeForwardPass.Session batched = graph.openSession();
 
