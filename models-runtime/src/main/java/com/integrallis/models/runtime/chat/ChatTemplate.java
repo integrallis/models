@@ -36,6 +36,7 @@ public enum ChatTemplate {
   CHATML_NO_THINK("chatml-no-think", ToolSyntax.QWEN),
   ZEPHYR("zephyr", ToolSyntax.NONE),
   LLAMA3("llama3", ToolSyntax.LLAMA3),
+  MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
   GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
   NEEDLE2("needle2", ToolSyntax.NEEDLE2),
   GEMMA("gemma", ToolSyntax.NONE),
@@ -123,6 +124,7 @@ public enum ChatTemplate {
       case CHATML_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n\n");
       case ZEPHYR -> renderZephyr(conversation);
       case LLAMA3 -> renderLlama3(conversation);
+      case MOBILE_MOE -> renderMobileMoe(conversation);
       case GPT_OSS -> renderGptOss(conversation, List.of());
       case NEEDLE2 -> renderNeedle2(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
@@ -540,6 +542,18 @@ public enum ChatTemplate {
           .control("<|eot_id|>");
     }
     return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
+  }
+
+  /** Renders Meta's MobileMoE header protocol, which is distinct from the Llama 3 protocol. */
+  private static ModelPrompt renderMobileMoe(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    for (ChatMessage message : messages) {
+      prompt
+          .control("<|header_start|>" + message.role().templateName() + "<|header_end|>\n\n")
+          .text(message.text())
+          .control("<|eot|>");
+    }
+    return prompt.control("<|header_start|>assistant<|header_end|>\n\n").build();
   }
 
   private static ModelPrompt renderGemma(List<ChatMessage> messages) {

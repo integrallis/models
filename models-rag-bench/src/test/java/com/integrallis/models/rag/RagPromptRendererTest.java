@@ -205,6 +205,24 @@ class RagPromptRendererTest {
   }
 
   @Test
+  void mobileMoeProfileUsesItsOfficialHeaderAndEndOfTurnTokens() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.MOBILE_MOE);
+
+    assertThat(prompt)
+        .startsWith("<|header_start|>system<|header_end|>\n\nYou answer questions")
+        .contains("<|eot|><|header_start|>user<|header_end|>\n\nCONTEXT\n[source-1] Policy")
+        .endsWith("ANSWER\n<|eot|><|header_start|>assistant<|header_end|>\n\n")
+        .doesNotContain("<|begin_of_text|>")
+        .doesNotContain("<|start_header_id|>");
+  }
+
+  @Test
   void gemmaProfileMergesSystemInstructionsIntoTheUserTurn() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 

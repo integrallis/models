@@ -49,6 +49,8 @@ import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeForwardPass;
+import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
@@ -294,7 +296,22 @@ public final class PureJavaBackend
       Arena arena = arenaOwner.arena();
       if (Files.isDirectory(modelPath)) {
         Path configPath = modelPath.resolve("config.json");
-        if (GptOssHuggingFaceConfig.matches(configPath)) {
+        if (MobileMoeHuggingFaceConfig.matches(configPath)) {
+          MobileMoeHuggingFaceConfig config = MobileMoeHuggingFaceConfig.parse(configPath);
+          tokenizer =
+              HuggingFaceTokenizer.fromMobileMoe(
+                  modelPath.resolve("tokenizer.json"),
+                  modelPath.resolve("tokenizer_config.json"),
+                  config);
+          loaded =
+              loadHuggingFaceMobileMoe(
+                  modelPath,
+                  config,
+                  new SafetensorsTensorSource(SafetensorsBundle.open(modelPath, arena)),
+                  runtime,
+                  planConfiguration,
+                  batchedMatrixKernel);
+        } else if (GptOssHuggingFaceConfig.matches(configPath)) {
           GptOssHuggingFaceConfig config = GptOssHuggingFaceConfig.parse(configPath);
           tokenizer =
               HuggingFaceTokenizer.fromGptOss(
@@ -534,6 +551,41 @@ public final class PureJavaBackend
             modelFamily,
             modelPath.getFileName().toString(),
             config.maxPosition(),
+            config.vocabSize(),
+            config.hiddenSize(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadHuggingFaceMobileMoe(
+      Path modelPath,
+      MobileMoeHuggingFaceConfig config,
+      SafetensorsTensorSource tensors,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    String modelFamily = "mobilemoe";
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                modelFamily,
+                config.queryDimension(),
+                config.keyValueDimension(),
+                config.keyValueDimension(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength());
+    PureJavaDecoder decoder =
+        new MobileMoeDecoderAdapter(MobileMoeForwardPass.load(config, tensors, contextCapacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            modelFamily,
+            modelPath.getFileName().toString(),
+            config.contextLength(),
             config.vocabSize(),
             config.hiddenSize(),
             config.numLayers(),
@@ -976,6 +1028,20 @@ public final class PureJavaBackend
 
   private static BackendDiagnostics architectureDiagnostics(
       BackendDiagnostics diagnostics, PureJavaDecoder decoder) {
+    if (decoder instanceof MobileMoeDecoderAdapter) {
+      Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
+      environment.put("artifact-format", "safetensors");
+      environment.put("weight-encoding", "packed-int4-g32");
+      List<OptimizationDecision> optimizations = new ArrayList<>(diagnostics.optimizations());
+      optimizations.add(
+          new OptimizationDecision(
+              "mobilemoe-packed-int4",
+              OptimizationStatus.ENABLED,
+              "packed group-32 INT4 weights execute directly from the mapped artifact",
+              Map.of("implementation", "pure-java-ffm")));
+      return new BackendDiagnostics(
+          diagnostics.backend(), diagnostics.planVersion(), environment, optimizations);
+    }
     if (decoder instanceof GptOssDecoderAdapter) {
       Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
       environment.put("artifact-format", "safetensors");

@@ -27,6 +27,7 @@ public enum RagPromptTemplate {
   CHATML_NO_THINK("chatml-no-think"),
   ZEPHYR("zephyr"),
   LLAMA3("llama3"),
+  MOBILE_MOE("mobilemoe"),
   GEMMA("gemma"),
   GEMMA4("gemma4"),
   PHI3("phi3"),
@@ -89,6 +90,12 @@ public enum RagPromptTemplate {
               .control("<|start_header_id|>user<|end_header_id|>\n\n")
               .text(prompt.strip())
               .control("<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
+              .build();
+      case MOBILE_MOE ->
+          result
+              .control("<|header_start|>user<|header_end|>\n\n")
+              .text(prompt)
+              .control("<|eot|><|header_start|>assistant<|header_end|>\n\n")
               .build();
       case GEMMA ->
           result
@@ -170,6 +177,14 @@ public enum RagPromptTemplate {
               .text(userPrompt.strip())
               .control("<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
               .build();
+      case MOBILE_MOE ->
+          result
+              .control("<|header_start|>system<|header_end|>\n\n")
+              .text(systemPrompt)
+              .control("<|eot|><|header_start|>user<|header_end|>\n\n")
+              .text(userPrompt)
+              .control("<|eot|><|header_start|>assistant<|header_end|>\n\n")
+              .build();
       case GEMMA ->
           result
               .control("<start_of_turn>user\n")
@@ -234,7 +249,7 @@ public enum RagPromptTemplate {
     }
     throw new IllegalArgumentException(
         "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
-            + "chatml-no-think, zephyr, llama3, gemma, gemma4, phi3, deepseek, h2o, h2o-direct, "
-            + "minicpm5-no-think");
+            + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, phi3, deepseek, h2o, "
+            + "h2o-direct, minicpm5-no-think");
   }
 }
