@@ -142,6 +142,54 @@ public final class RotaryTable {
     return new RotaryTable(rotaryDim, theta, 1.0f, null, attentionFactor, frequencies);
   }
 
+  /**
+   * Creates the Llama 3 wavelength-scaled frequencies used by MobileMoE and compatible models.
+   *
+   * <p>High frequencies remain unchanged, low frequencies are divided by {@code factor}, and the
+   * band between them is interpolated continuously. A checkpoint may intentionally set equal low
+   * and high factors; in that case the exact boundary remains unscaled, matching Meta's reference
+   * implementation.
+   */
+  public static RotaryTable llama3(
+      int rotaryDim,
+      float theta,
+      float factor,
+      int originalContext,
+      float lowFrequencyFactor,
+      float highFrequencyFactor) {
+    if (rotaryDim <= 0 || (rotaryDim & 1) != 0) {
+      throw new IllegalArgumentException("rotaryDim must be positive and even: " + rotaryDim);
+    }
+    finitePositive("theta", theta);
+    finitePositive("factor", factor);
+    finitePositive("lowFrequencyFactor", lowFrequencyFactor);
+    finitePositive("highFrequencyFactor", highFrequencyFactor);
+    if (originalContext <= 0) {
+      throw new IllegalArgumentException("originalContext must be positive: " + originalContext);
+    }
+
+    double lowWavelength = (double) originalContext / lowFrequencyFactor;
+    double highWavelength = (double) originalContext / highFrequencyFactor;
+    float[] frequencies = new float[rotaryDim / 2];
+    for (int pair = 0; pair < frequencies.length; pair++) {
+      double frequency = 1.0 / Math.pow(theta, (double) (pair * 2) / rotaryDim);
+      double wavelength = 2.0 * Math.PI / frequency;
+      if (wavelength < highWavelength) {
+        frequencies[pair] = (float) frequency;
+      } else if (wavelength > lowWavelength) {
+        frequencies[pair] = (float) (frequency / factor);
+      } else if (highFrequencyFactor != lowFrequencyFactor) {
+        double smooth =
+            (originalContext / wavelength - lowFrequencyFactor)
+                / (highFrequencyFactor - lowFrequencyFactor);
+        frequencies[pair] = (float) ((1.0 - smooth) * frequency / factor + smooth * frequency);
+      } else {
+        frequencies[pair] = (float) frequency;
+      }
+    }
+    return new RotaryTable(rotaryDim, theta, 1.0f, null, 1.0f, frequencies);
+  }
+
   /** Prepares factors for one absolute sequence position. */
   public void prepare(int position) {
     if (position < 0) {

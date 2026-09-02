@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
+import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeHuggingFaceConfig;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -48,6 +49,9 @@ public final class HuggingFaceTokenizer {
           + "[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?|"
           + "\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*|\\s*[\\r\\n]+|"
           + "\\s+(?!\\S)|\\s+";
+  private static final String LLAMA3_REGEX =
+      "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}|"
+          + " ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+";
 
   private HuggingFaceTokenizer() {}
 
@@ -90,6 +94,34 @@ public final class HuggingFaceTokenizer {
     Settings settings = readSettings(tokenizerConfigJson);
     int bos = resolveToken(settings.bosToken(), -1, definition, "BOS");
     int eos = resolveToken(settings.eosToken(), modelConfig.eosTokenId(), definition, "EOS");
+    String unknownText =
+        definition.unknownToken() != null ? definition.unknownToken() : settings.unknownToken();
+    int unknown = unknownText == null ? 0 : resolveToken(unknownText, -1, definition, "unknown");
+    return GgufTokenizer.fromByteLevelBpe(
+        definition.vocabulary(),
+        definition.merges(),
+        definition.controlTokenIds(),
+        bos,
+        eos,
+        settings.addBosToken(),
+        settings.addEosToken(),
+        unknown,
+        definition.normalizeNfc(),
+        definition.preTokenizerName());
+  }
+
+  /** Creates the Llama-3 byte-level tokenizer declared beside a MobileMoE checkpoint. */
+  public static Tokenizer fromMobileMoe(
+      Path tokenizerJson, Path tokenizerConfigJson, MobileMoeHuggingFaceConfig modelConfig)
+      throws IOException {
+    Objects.requireNonNull(tokenizerJson, "tokenizerJson");
+    Objects.requireNonNull(tokenizerConfigJson, "tokenizerConfigJson");
+    Objects.requireNonNull(modelConfig, "modelConfig");
+    Definition definition =
+        readDefinition(tokenizerJson, modelConfig.vocabSize(), Family.MOBILE_MOE);
+    Settings settings = readSettings(tokenizerConfigJson);
+    int bos = resolveToken(settings.bosToken(), -1, definition, "BOS");
+    int eos = resolveToken(settings.eosToken(), -1, definition, "EOS");
     String unknownText =
         definition.unknownToken() != null ? definition.unknownToken() : settings.unknownToken();
     int unknown = unknownText == null ? 0 : resolveToken(unknownText, -1, definition, "unknown");
@@ -484,7 +516,8 @@ public final class HuggingFaceTokenizer {
 
   private enum Family {
     QWEN2(QWEN2_REGEX, false, "NFC", true, "qwen2"),
-    GPT_OSS(GPT_OSS_REGEX, true, null, false, "gpt-oss");
+    GPT_OSS(GPT_OSS_REGEX, true, null, false, "gpt-oss"),
+    MOBILE_MOE(LLAMA3_REGEX, true, null, false, "llama3");
 
     private final String regex;
     private final boolean trimOffsets;
@@ -544,7 +577,7 @@ public final class HuggingFaceTokenizer {
             "token id " + id + " is outside model vocabulary size " + modelVocabularySize);
       }
       String previous = tokens.putIfAbsent(id, text);
-      if (previous != null) {
+      if (previous != null && !previous.equals(text)) {
         throw malformed("token id " + id + " is assigned to both " + previous + " and " + text);
       }
     }

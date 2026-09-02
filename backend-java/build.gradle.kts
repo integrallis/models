@@ -171,6 +171,8 @@ val configuredGptOssHuggingFaceDirectory =
     providers.systemProperty("models.fixtures.gptOssHuggingFaceDirectory")
 val configuredGptOssOracleLogits =
     providers.systemProperty("models.fixtures.gptOssOracleLogits")
+val configuredMobileMoeQatDirectory =
+    providers.systemProperty("models.fixtures.mobileMoeQatDirectory")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
@@ -188,6 +190,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredGptOssOracleLogits.orNull?.let {
         systemProperty("models.fixtures.gptOssOracleLogits", it)
+    }
+    configuredMobileMoeQatDirectory.orNull?.let {
+        systemProperty("models.fixtures.mobileMoeQatDirectory", it)
     }
 }
 
