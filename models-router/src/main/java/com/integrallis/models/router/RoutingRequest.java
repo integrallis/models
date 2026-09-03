@@ -24,7 +24,7 @@ import java.util.Optional;
  * @param query the user's text
  * @param estimatedTokens prompt size used to exclude models whose context cannot hold it
  * @param taskTypeOverride skips classification when the caller already knows the task
- * @param sessionId pins a session to its first choice, preserving provider prompt caches
+ * @param sessionId enables bounded conversation affinity and model-specific cache accounting
  */
 public record RoutingRequest(
     String query, int estimatedTokens, String taskTypeOverride, String sessionId) {
@@ -99,7 +99,7 @@ public record RoutingRequest(
     }
 
     /**
-     * Pins a conversation to its first choice.
+     * Associates the request with a conversation for bounded affinity and continuity decisions.
      *
      * @param value session identifier
      * @return this builder

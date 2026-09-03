@@ -13,6 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.router;
 
-/** Spring AI adapters for Models inference and routed local/hosted chat fleets. */
-package com.integrallis.models.spring.ai;
+import java.util.Objects;
+
+/** A routing candidate paired with the application-supplied client that invokes it. */
+public record RoutedModel<T>(ModelCandidate candidate, T client) {
+  public RoutedModel {
+    Objects.requireNonNull(candidate, "candidate");
+    Objects.requireNonNull(client, "client");
+  }
+}

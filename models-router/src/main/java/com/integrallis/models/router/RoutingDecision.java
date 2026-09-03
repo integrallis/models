@@ -30,7 +30,7 @@ import java.util.Objects;
  * @param fallbacks remaining eligible models, best first
  * @param taskType how the query was classified, null when unknown
  * @param score the winner's overall score in [0, 1]
- * @param scoreBreakdown weighted contribution of each dimension to the winner's score
+ * @param scoreBreakdown named score components and any continuity rule that affected selection
  */
 public record RoutingDecision(
     ModelCandidate selected,

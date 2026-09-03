@@ -13,6 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.router;
 
-/** Spring AI adapters for Models inference and routed local/hosted chat fleets. */
-package com.integrallis.models.spring.ai;
+import java.util.List;
+
+/** Raised after every eligible model in a fleet fails. */
+public final class RoutingExecutionException extends RuntimeException {
+  private static final long serialVersionUID = 1L;
+
+  private final transient List<RoutingAttempt> attempts;
+
+  RoutingExecutionException(List<RoutingAttempt> attempts, Throwable cause) {
+    super("all " + attempts.size() + " routed model attempts failed", cause);
+    this.attempts = List.copyOf(attempts);
+  }
+
+  public List<RoutingAttempt> attempts() {
+    return attempts;
+  }
+}

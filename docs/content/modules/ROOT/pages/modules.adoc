@@ -17,6 +17,9 @@ diagnostics, and backend configuration
 |`models-semantic-order` |Pure-Java WordTour lookup and blurred
 bag-of-words
 
+|`models-router` |Adaptive, explainable model selection and provider-neutral
+execution across local and hosted clients
+
 |`backend-java` |GGUF parser, tokenizers, model graph, KV cache,
 and Java kernels
 
@@ -75,8 +78,9 @@ models-api
       <- backend-tornado <- TornadoVM device compiler/runtime
   <- backend-native   <- Models Rust kernels through FFM
   <- backend-apple    <- Apple's Foundation Models framework through FFM
-  <- models-langchain4j      <- LangChain4j
-  <- models-spring-ai        <- Spring AI
+  <- models-router    <- vectors-db
+      <- models-langchain4j  <- LangChain4j
+      <- models-spring-ai    <- Spring AI
       <- models-spring-boot-starter
   <- models-embedding        <- Vectors database modules
 
@@ -102,6 +106,7 @@ Application dependencies use:
 * `com.integrallis:backend-tornado`
 * `com.integrallis:backend-native`
 * `com.integrallis:backend-apple`
+* `com.integrallis:models-router`
 * `com.integrallis:models-langchain4j`
 * `com.integrallis:models-spring-ai`
 * `com.integrallis:models-spring-boot-starter`

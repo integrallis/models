@@ -1,0 +1,142 @@
+= Model Routing
+:navtitle: Model Routing
+
+`models-router` selects and, when asked, invokes a model from a mixed fleet of
+in-process and hosted clients. The application supplies the clients it already
+uses. The router does not embed OpenAI, Anthropic, or another provider SDK.
+
+[source,kotlin,subs="attributes+"]
+----
+dependencies {
+    implementation("com.integrallis:models-router:{models-version}")
+}
+----
+
+== Bind Local And Hosted Clients
+
+`ModelFleet<T>` is provider-neutral: `T` can be a Spring AI `ChatModel`, a
+LangChain4j model, or an application interface. This Spring AI fleet combines
+a local Models adapter and an existing hosted client:
+
+[source,java]
+----
+ChatModel local = localModelsChatModel;
+ChatModel hosted = hostedSpringAiChatModel;
+
+var fleet = ModelFleet.<ChatModel>builder()
+    .model(ModelCandidate.builder("local/qwen3")
+        .local(true)
+        .costPerMillionTokens(0, 0)
+        .timeToFirstTokenMillis(180)
+        .tokensPerSecond(24)
+        .quality(Map.of("chat", 0.82))
+        .build(), local)
+    .model(ModelCandidate.builder("hosted/frontier")
+        .local(false)
+        .costPerMillionTokens(2.50, 10.00)
+        .timeToFirstTokenMillis(450)
+        .tokensPerSecond(70)
+        .quality(Map.of("chat", 0.96))
+        .build(), hosted)
+    .policy(RoutingPolicy.LOCAL_FIRST)
+    .build();
+
+ChatModel routed = new RoutedSpringAiChatModel(
+    fleet,
+    prompt -> RoutingRequest.builder(prompt.getContents())
+        .sessionId("conversation-42")
+        .build());
+
+var chatClient = ChatClient.builder(routed).build();
+----
+
+The selected delegate receives the original Spring AI `Prompt`, including its
+messages, tools, model options, and metadata. `RoutedChatModel` and
+`RoutedStreamingChatModel` provide the same boundary for LangChain4j
+`ChatRequest` instances.
+
+Blocking calls try the ranked fallbacks when a client fails. Streaming calls
+may fall back only before the first response fragment reaches the application;
+switching after that point would combine output from two models.
+
+== How A Decision Is Made
+
+Routing happens in two stages:
+
+. Hard constraints remove models that are unavailable, cooling down, too
+  small for the prompt, outside a price or latency ceiling, below a quality
+  floor, or rejected by an application `CandidateFilter`.
+. Named scorers rank the eligible models by the selected policy, task quality,
+  cost, TTFT, reliability, locality, cache affinity, residency, queue depth,
+  and any application `CandidateScorer`.
+
+Immutable catalog or application measurements are the cold-start priors. Live
+state and explicit outcomes refine those priors:
+
+[source,java]
+----
+var router = fleet.router();
+
+router.updateRuntimeState("local/qwen3", ModelRuntimeState.builder()
+    .available(true)
+    .resident(true)
+    .queueDepth(0)
+    .build());
+
+router.record(RoutingFeedback.success("local/qwen3")
+    .sessionId("conversation-42")
+    .timeToFirstTokenMillis(143)
+    .tokensPerSecond(26.4)
+    .tokenUsage(920, 780)
+    .build());
+----
+
+Feedback updates bounded exponential moving averages. Repeated failures place
+a candidate in a temporary cooldown. `RoutingDecision.explain()` and
+`scoreBreakdown()` expose why a model won.
+
+== Conversation Continuity And Caches
+
+A session id creates bounded, expiring affinity; it does not permanently pin
+the first model. A challenger must clear the configured switch margin before
+the router moves an ordinary conversation. Active tool loops and explicitly
+non-portable provider state are hard-locked to the current healthy model by
+default:
+
+[source,java]
+----
+var request = RoutingRequest.builder(question)
+    .sessionId(conversationId)
+    .estimatedTokens(promptTokens)
+    .build();
+
+var continuity = RoutingContinuity.builder()
+    .activeToolLoop(waitingForToolResult)
+    .contextPortable(!providerOwnsConversationState)
+    .cachedPrefixTokens("local/qwen3", locallyReusableTokens)
+    .cachedPrefixTokens("hosted/frontier", providerReportedCachedTokens)
+    .build();
+
+RoutingDecision decision = router.route(request, continuity);
+----
+
+KV tensors are valid only for the model weights and runtime that created them,
+so the router never moves a KV cache between different models. Cached-token
+counts instead add affinity to the specific model that can reuse them. The
+Models generation loop already reuses exact prefixes for a compatible local
+model; hosted cached-token measurements can be reported through
+`RoutingFeedback`.
+
+Session state defaults to a five-minute idle timeout and 1,024 entries. Use
+`AdaptiveRoutingOptions` to tune those bounds, and call `closeSession(...)`
+when a conversation ends.
+
+== Extension Points
+
+Use a `CandidateFilter` for non-negotiable application rules such as tenant
+residency or a required capability. Use a named `CandidateScorer` for a
+preference such as region proximity. Scorers return a value from zero to one,
+and their named weighted contribution appears in the routing explanation.
+
+Keep hard rules in filters. A model that cannot satisfy a request should not
+win merely because unrelated scores compensate for it.

@@ -22,9 +22,9 @@ import java.util.Set;
 /**
  * One model the router may choose, local or hosted.
  *
- * <p>The router selects; it never calls. An application registers whatever it can actually reach —
- * ModelJars artifacts it runs in process, and whatever hosted providers it holds keys for — then
- * maps the chosen id back to its own client. That keeps provider SDKs out of this module entirely.
+ * <p>An application registers whatever it can actually reach: ModelJars artifacts it runs in
+ * process and hosted providers for which it holds credentials. {@link ModelFleet} binds these
+ * descriptors to application-owned clients without adding provider SDKs to this module.
  *
  * <p>For local artifacts the performance and quality figures can come from published ModelJars
  * qualification evidence, which is measured on a recorded host rather than advertised.

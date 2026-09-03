@@ -18,8 +18,13 @@ package com.integrallis.models.router;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -273,6 +278,250 @@ class ModelRouterTest {
 
       assertThat(withFlaky.route("hello").selected().id()).isEqualTo("deepseek/deepseek-v3");
     }
+
+    @Test
+    void excludesAModelReportedUnavailableAtRuntime() {
+      ModelRouter router = router(RoutingPolicy.CHEAPEST);
+      router.updateRuntimeState(
+          LOCAL_SMALL.id(), ModelRuntimeState.builder().available(false).build());
+
+      assertThat(router.route("hello").selected()).isNotEqualTo(LOCAL_SMALL);
+    }
+
+    @Test
+    void coolsDownARepeatedlyFailingModel() {
+      ModelRouter router = router(RoutingPolicy.CHEAPEST);
+      for (int failure = 0; failure < 3; failure++) {
+        router.record(RoutingFeedback.failure(LOCAL_SMALL.id()).build());
+      }
+
+      assertThat(router.status(LOCAL_SMALL.id()).orElseThrow().coolingDown()).isTrue();
+      assertThat(router.route("hello").selected()).isNotEqualTo(LOCAL_SMALL);
+    }
+
+    @Test
+    void foldsMeasuredPerformanceBackIntoSubsequentChoices() {
+      ModelCandidate measuredSlow =
+          ModelCandidate.builder("measured-slow")
+              .tags(Set.of("chat"))
+              .timeToFirstTokenMillis(50)
+              .tokensPerSecond(100)
+              .quality(Map.of("chat", 0.8))
+              .build();
+      ModelCandidate stable =
+          ModelCandidate.builder("stable")
+              .tags(Set.of("chat"))
+              .timeToFirstTokenMillis(200)
+              .tokensPerSecond(50)
+              .quality(Map.of("chat", 0.8))
+              .build();
+      ModelRouter measured =
+          ModelRouter.builder()
+              .candidates(List.of(measuredSlow, stable))
+              .classifier(ignored -> "chat")
+              .policy(RoutingPolicy.FASTEST)
+              .build();
+
+      measured.record(
+          RoutingFeedback.success(measuredSlow.id())
+              .timeToFirstTokenMillis(1_000)
+              .tokensPerSecond(5)
+              .build());
+
+      assertThat(measured.route("hello").selected()).isEqualTo(stable);
+    }
+  }
+
+  @Nested
+  static class RuntimeAwareScoring {
+
+    @Test
+    void prefersAnAlreadyResidentModelWhenTheStaticCandidatesTie() {
+      ModelCandidate first = tied("first");
+      ModelCandidate resident = tied("resident");
+      ModelRouter router = ModelRouter.builder().candidates(List.of(first, resident)).build();
+      router.updateRuntimeState(first.id(), ModelRuntimeState.builder().resident(false).build());
+      router.updateRuntimeState(resident.id(), ModelRuntimeState.builder().resident(true).build());
+
+      assertThat(router.route("hello").selected()).isEqualTo(resident);
+      assertThat(router.route("hello").scoreBreakdown()).containsKey("residency");
+    }
+
+    @Test
+    void routesAwayFromADeeperQueue() {
+      ModelCandidate busy = tied("busy");
+      ModelCandidate idle = tied("idle");
+      ModelRouter router = ModelRouter.builder().candidates(List.of(busy, idle)).build();
+      router.updateRuntimeState(busy.id(), ModelRuntimeState.builder().queueDepth(12).build());
+      router.updateRuntimeState(idle.id(), ModelRuntimeState.builder().queueDepth(0).build());
+
+      assertThat(router.route("hello").selected()).isEqualTo(idle);
+      assertThat(router.route("hello").scoreBreakdown()).containsKey("load");
+    }
+
+    private static ModelCandidate tied(String id) {
+      return ModelCandidate.builder(id)
+          .timeToFirstTokenMillis(100)
+          .tokensPerSecond(20)
+          .quality(Map.of("chat", 0.8))
+          .build();
+    }
+  }
+
+  @Nested
+  static class SessionContinuity {
+
+    @Test
+    void switchesWhenAChallengerIsMateriallyBetter() {
+      ModelRouter router = router(RoutingPolicy.CHEAPEST);
+      RoutingRequest request = RoutingRequest.builder("hello").sessionId("conversation").build();
+      assertThat(router.route(request).selected()).isEqualTo(LOCAL_SMALL);
+
+      RoutingDecision switched = router.route(request, RoutingPolicy.BEST_QUALITY);
+
+      assertThat(switched.selected()).isEqualTo(FRONTIER);
+    }
+
+    @Test
+    void explainsWhenTheSwitchMarginRetainsTheCurrentModel() {
+      ModelRouter router =
+          ModelRouter.builder()
+              .candidates(FLEET)
+              .policy(RoutingPolicy.CHEAPEST)
+              .adaptiveOptions(AdaptiveRoutingOptions.builder().switchMargin(1.0).build())
+              .build();
+      RoutingRequest request = RoutingRequest.builder("hello").sessionId("stable").build();
+      assertThat(router.route(request).selected()).isEqualTo(LOCAL_SMALL);
+
+      RoutingDecision retained = router.route(request, RoutingPolicy.BEST_QUALITY);
+
+      assertThat(retained.selected()).isEqualTo(LOCAL_SMALL);
+      assertThat(retained.scoreBreakdown()).containsEntry("switch-margin", 1.0);
+    }
+
+    @Test
+    void doesNotSwitchModelsInTheMiddleOfAToolLoop() {
+      ModelRouter router = router(RoutingPolicy.CHEAPEST);
+      RoutingRequest request = RoutingRequest.builder("hello").sessionId("tool-loop").build();
+      assertThat(router.route(request).selected()).isEqualTo(LOCAL_SMALL);
+
+      RoutingDecision retained =
+          router.route(
+              request,
+              RoutingPolicy.BEST_QUALITY,
+              RoutingContinuity.builder().activeToolLoop(true).build());
+
+      assertThat(retained.selected()).isEqualTo(LOCAL_SMALL);
+      assertThat(retained.scoreBreakdown()).containsEntry("continuity-lock", 1.0);
+    }
+
+    @Test
+    void doesNotSwitchProviderOwnedNonPortableContext() {
+      ModelRouter router = router(RoutingPolicy.CHEAPEST);
+      RoutingRequest request = RoutingRequest.builder("hello").sessionId("provider-state").build();
+      assertThat(router.route(request).selected()).isEqualTo(LOCAL_SMALL);
+
+      RoutingDecision retained =
+          router.route(
+              request,
+              RoutingPolicy.BEST_QUALITY,
+              RoutingContinuity.builder().contextPortable(false).build());
+
+      assertThat(retained.selected()).isEqualTo(LOCAL_SMALL);
+    }
+
+    @Test
+    void usesCachedPrefixEvidenceWithoutPretendingKvIsPortable() {
+      ModelCandidate current = RuntimeAwareScoring.tied("current");
+      ModelCandidate challenger = RuntimeAwareScoring.tied("challenger");
+      ModelRouter router = ModelRouter.builder().candidates(List.of(current, challenger)).build();
+      RoutingRequest request =
+          RoutingRequest.builder("continuation").estimatedTokens(1_000).sessionId("cached").build();
+      assertThat(router.route(request).selected()).isEqualTo(current);
+
+      RoutingDecision retained =
+          router.route(
+              request,
+              RoutingPolicy.BALANCED,
+              RoutingContinuity.builder().cachedPrefixTokens(current.id(), 900).build());
+
+      assertThat(retained.selected()).isEqualTo(current);
+      assertThat(retained.scoreBreakdown().get("cache-affinity")).isPositive();
+    }
+
+    @Test
+    void expiresIdleSessionsAndBoundsTheirCount() {
+      MutableClock clock = new MutableClock();
+      AdaptiveRoutingOptions options =
+          AdaptiveRoutingOptions.builder()
+              .sessionIdleTimeout(Duration.ofMinutes(1))
+              .maximumSessions(2)
+              .build();
+      ModelRouter router =
+          ModelRouter.builder()
+              .candidates(FLEET)
+              .policy(RoutingPolicy.CHEAPEST)
+              .adaptiveOptions(options)
+              .clock(clock)
+              .build();
+      router.route(RoutingRequest.builder("one").sessionId("one").build());
+      router.route(RoutingRequest.builder("two").sessionId("two").build());
+      router.route(RoutingRequest.builder("three").sessionId("three").build());
+      assertThat(router.activeSessionCount()).isEqualTo(2);
+
+      clock.advance(Duration.ofMinutes(2));
+      RoutingDecision afterExpiry =
+          router.route(
+              RoutingRequest.builder("one").sessionId("one").build(), RoutingPolicy.BEST_QUALITY);
+      assertThat(afterExpiry.selected()).isEqualTo(FRONTIER);
+    }
+
+    @Test
+    void canCloseASessionExplicitly() {
+      ModelRouter router = router(RoutingPolicy.CHEAPEST);
+      router.route(RoutingRequest.builder("hello").sessionId("done").build());
+
+      assertThat(router.closeSession("done")).isTrue();
+      assertThat(router.activeSessionCount()).isZero();
+    }
+  }
+
+  @Nested
+  static class Extensions {
+
+    @Test
+    void appliesApplicationFiltersBeforeScoring() {
+      ModelRouter router =
+          ModelRouter.builder()
+              .candidates(List.of(LOCAL_SMALL, HOSTED_BUDGET))
+              .policy(RoutingPolicy.CHEAPEST)
+              .filter(
+                  evaluation ->
+                      evaluation.candidate().local()
+                          ? Optional.of("tenant requires hosted audit logging")
+                          : Optional.empty())
+              .build();
+
+      assertThat(router.route("hello").selected()).isEqualTo(HOSTED_BUDGET);
+    }
+
+    @Test
+    void addsNamedApplicationScorersToTheDecisionTrace() {
+      ModelRouter router =
+          ModelRouter.builder()
+              .candidates(List.of(LOCAL_SMALL, HOSTED_BUDGET))
+              .policy(RoutingPolicy.BALANCED)
+              .scorer(
+                  "tenant-affinity",
+                  10.0,
+                  evaluation -> evaluation.candidate().equals(HOSTED_BUDGET) ? 1.0 : 0.0)
+              .build();
+
+      RoutingDecision decision = router.route("hello");
+
+      assertThat(decision.selected()).isEqualTo(HOSTED_BUDGET);
+      assertThat(decision.scoreBreakdown()).containsKey("tenant-affinity");
+    }
   }
 
   @Nested
@@ -290,6 +539,29 @@ class ModelRouterTest {
               () -> ModelRouter.builder().candidates(List.of(LOCAL_SMALL, LOCAL_SMALL)).build())
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("duplicate");
+    }
+  }
+
+  private static final class MutableClock extends Clock {
+    private Instant instant = Instant.parse("2026-09-03T00:00:00Z");
+
+    void advance(Duration duration) {
+      instant = instant.plus(duration);
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return ZoneId.of("UTC");
+    }
+
+    @Override
+    public Clock withZone(ZoneId zone) {
+      return this;
+    }
+
+    @Override
+    public Instant instant() {
+      return instant;
     }
   }
 }

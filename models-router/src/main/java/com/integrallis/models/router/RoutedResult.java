@@ -13,6 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.router;
 
-/** Spring AI adapters for Models inference and routed local/hosted chat fleets. */
-package com.integrallis.models.spring.ai;
+import java.util.List;
+import java.util.Objects;
+
+/** Successful result from a routed call, including its final model and any failed attempts. */
+public record RoutedResult<R>(R value, RoutingDecision decision, List<RoutingAttempt> attempts) {
+  public RoutedResult {
+    Objects.requireNonNull(value, "value");
+    Objects.requireNonNull(decision, "decision");
+    attempts = List.copyOf(attempts);
+  }
+}

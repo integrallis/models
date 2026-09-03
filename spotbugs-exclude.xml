@@ -45,4 +45,13 @@
             <Bug pattern="EI_EXPOSE_REP2"/>
         </Or>
     </Match>
+
+    <!-- A ModelFleet deliberately shares its mutable ModelRouter so applications and framework
+         adapters can publish live availability, load, cache, and call feedback to the same router
+         that makes decisions. Returning a defensive copy would split that operational state. -->
+    <Match>
+        <Class name="com.integrallis.models.router.ModelFleet"/>
+        <Method name="router"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
 </FindBugsFilter>
