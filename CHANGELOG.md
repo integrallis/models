@@ -2,6 +2,22 @@
 
 All notable changes to models are documented here.
 
+## [0.3.26] - 2026-09-03
+
+### Added
+
+- Added family-neutral tool-calling templates and parsing for Qwen/Hermes, SmolLM3, MiniCPM,
+  Llama, and Needle protocols, with schema-aware argument validation and control-token isolation.
+- Added a retained 14-scenario qualification harness covering tool selection, typed arguments,
+  crowded tool sets, refusal, parallel calls where supported, and tool-result continuation.
+- Added real-weight Spring AI and LangChain4j round-trip gates for Qwen3 1.7B, including typed Java
+  tool execution followed by a grounded conversational answer without a custom renderer.
+
+### Documentation
+
+- Published checksum-pinned evidence for six small tool models. Qwen3 1.7B and Needle 2 passed;
+  Qwen3 0.6B, MiniCPM5 1B, SmolLM3 3B, and Llama 3.2 3B remain unqualified.
+
 ## [0.3.25] - 2026-09-02
 
 ### Added
