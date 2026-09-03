@@ -26,6 +26,12 @@ val miniLmFixture =
             ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
         "all-MiniLM-L6-v2-Q4_K_M.gguf",
     ).toString()
+val qwen317bFixture =
+    Path.of(
+        fixtureDirectory.orNull
+            ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
+        "Qwen3-1.7B-Q8_0.gguf",
+    ).toString()
 val msMarcoRerankerFixture =
     Path.of(
         fixtureDirectory.orNull
@@ -35,7 +41,27 @@ val msMarcoRerankerFixture =
 
 tasks.withType<Test>().configureEach {
     systemProperty("models.fixtures.miniLm", miniLmFixture)
+    systemProperty("models.fixtures.qwen317b", qwen317bFixture)
     systemProperty("models.fixtures.msMarcoReranker", msMarcoRerankerFixture)
+}
+
+tasks.register<Test>("qwen3LangChain4jToolCallingIntegrationTest") {
+    description = "Run LangChain4j's tool loop against the pinned Qwen3 1.7B artifact"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.langchain4j.Qwen3LangChain4jToolCallingIntegrationTest",
+        )
+    }
+    dependsOn(project(":backend-java").tasks.named("downloadQwen317BQ80Model"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
 }
 
 tasks.register<Test>("miniLmLangChain4jIntegrationTest") {
