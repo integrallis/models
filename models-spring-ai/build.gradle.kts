@@ -26,6 +26,12 @@ val needle2Fixture =
             Path.of(System.getProperty("user.home"), ".jvllm", "models", "needle2.cact").toString()
         },
     )
+val qwen317bFixture =
+    Path.of(
+        fixtureDirectory.orNull
+            ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
+        "Qwen3-1.7B-Q8_0.gguf",
+    ).toString()
 val miniLmFixture =
     Path.of(
         fixtureDirectory.orNull
@@ -44,8 +50,28 @@ tasks.withType<Test>().configureEach {
         systemProperty("models.fixtures.gptOssHuggingFaceDirectory", it)
     }
     systemProperty("models.fixtures.needle2Cact", needle2Fixture.get())
+    systemProperty("models.fixtures.qwen317b", qwen317bFixture)
     systemProperty("models.fixtures.miniLm", miniLmFixture)
     systemProperty("models.fixtures.msMarcoReranker", msMarcoRerankerFixture)
+}
+
+tasks.register<Test>("qwen3SpringAiToolCallingIntegrationTest") {
+    description = "Run Spring AI's tool loop against the pinned Qwen3 1.7B artifact"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.spring.ai.Qwen3SpringAiToolCallingIntegrationTest",
+        )
+    }
+    dependsOn(project(":backend-java").tasks.named("downloadQwen317BQ80Model"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
 }
 
 tasks.register<Test>("needle2SpringAiIntegrationTest") {

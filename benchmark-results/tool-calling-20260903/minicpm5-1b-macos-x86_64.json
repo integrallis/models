@@ -1,0 +1,447 @@
+{
+  "schemaVersion" : 1,
+  "createdAt" : "2026-09-03T14:01:06.636206Z",
+  "policyVersion" : "small-model-tool-conformance-v1",
+  "modelsRevision" : "cff14f65b2c36530e54c2812efa4576416ed3b11",
+  "modelId" : "minicpm5_1b_q4_k_m",
+  "model" : "MiniCPM5 1B GGUF Q4_K_M",
+  "backend" : "pure-java",
+  "backendVersion" : "models@cff14f65b2c36530e54c2812efa4576416ed3b11",
+  "artifactSha256" : "81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa",
+  "artifactSizeBytes" : 688065920,
+  "suite" : {
+    "id" : "needle2-upstream-playground-v1",
+    "sha256" : "c5f0f5a8e5e1f4ffbfd04caeef31ab8abd5e672c157dad980260e793d0c5ace5",
+    "sourceRepository" : "https://github.com/cactus-compute/needle",
+    "sourceRevision" : "7bd8a635ebb977489703b3bb916c21412e8a9cdf",
+    "sourcePath" : "needle/playground/app.js"
+  },
+  "generation" : {
+    "temperature" : 0.0,
+    "maxTokens" : 256,
+    "promptTemplate" : "minicpm5-no-think"
+  },
+  "environment" : {
+    "host" : "Brians-MacBook-Pro.local",
+    "osName" : "Mac OS X",
+    "osVersion" : "26.6.2",
+    "architecture" : "x86_64",
+    "cpuModel" : "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "processors" : 12,
+    "physicalMemoryBytes" : 34359738368,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "pure-java",
+    "planVersion" : "pure-java-v20",
+    "environment" : {
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "gguf-threads" : "12",
+      "gguf-parallel" : "true",
+      "java-version" : "25.0.3",
+      "sve" : "false",
+      "q4-unsigned-pairwise-supported" : "true",
+      "vector-api" : "true",
+      "q4-short-pairwise-supported" : "true",
+      "fast-scalar-fma" : "true",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "java-feature" : "25",
+      "processors" : "12",
+      "fast-vector-fma" : "true",
+      "active-vector-bits" : "256",
+      "preferred-vector-bits" : "256",
+      "compiler" : "hotspot-c2",
+      "gguf-executor" : "persistent",
+      "vm-version" : "25.0.3+9-LTS",
+      "os" : "Mac OS X",
+      "projection-layers" : "24",
+      "model-architecture" : "llama",
+      "vm-vendor" : "Eclipse Adoptium",
+      "gguf-chunks-per-thread" : "2",
+      "cpu-model" : "unknown",
+      "architecture" : "x86_64"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "grouped",
+        "implementation" : "vector-api"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "12"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Mac OS X",
+        "architecture" : "x86_64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "x86_64",
+        "batch-size" : "32",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "stages" : "2",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "stages" : "7",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "12",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "chunks-per-thread" : "2",
+        "executor" : "persistent",
+        "threads" : "12"
+      }
+    } ]
+  },
+  "plannedAttempts" : 14,
+  "inapplicableCases" : [ ],
+  "complete" : true,
+  "summary" : {
+    "attempts" : 14,
+    "passed" : 5,
+    "structuredOutputRate" : 0.7142857142857143,
+    "toolSelectionExactRate" : 0.7142857142857143,
+    "schemaValidityRate" : 0.7142857142857143,
+    "declaredArgumentsOnlyRate" : 0.7142857142857143,
+    "expectedArgumentAccuracy" : 0.4864864864864865,
+    "refusalAccuracy" : 1.0,
+    "p95EndToEndMillis" : 97413.0,
+    "qualified" : false,
+    "verdict" : "FAIL"
+  },
+  "followUp" : {
+    "id" : "tool-result-follow-up",
+    "applicable" : true,
+    "endToEndMillis" : 21489,
+    "output" : "I will call the function to get the weather information for the zipcode 88252.\n\nThe weather for the zipcode 88252 is: Raining cats and dogs. The temperature is 78 degrees Fahrenheit.",
+    "conversational" : true,
+    "grounded" : true,
+    "repeatedToolCall" : false,
+    "passed" : true,
+    "diagnostics" : [ ]
+  },
+  "qualified" : false,
+  "verdict" : "FAIL",
+  "cases" : [ {
+    "id" : "home",
+    "endToEndMillis" : 74561,
+    "output" : "<function name=\"set_lights\"><param name=\"room\">bedroom</param><param name=\"state\">off</param><param name=\"brightness\">20</param></function>\n<function name=\"lock_door\"><param name=\"door\">front</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected set_lights.state=\"on\"", "expected lock_door.door=\"front door\"" ]
+  }, {
+    "id" : "robot",
+    "endToEndMillis" : 62805,
+    "output" : "<function name=\"move\"><param name=\"direction\">forward</param><param name=\"distance_m\">2.0</param></function>\n<function name=\"rotate\"><param name=\"direction\">left</param><param name=\"degrees\">90.0</param></function>\n<function name=\"gripper\"><param name=\"action\">close</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 5,
+    "expectedArguments" : 5,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "device",
+    "endToEndMillis" : 65857,
+    "output" : "I will change the page accent color to green, open the GitHub website, and then say hello to you. \n<function name=\"set_theme\"><param name=\"accent_color\">green</param></function>\n<function name=\"open_website\"><param name=\"url\">github.com</param></function>\n<function name=\"speak\"><param name=\"text\">Hello!</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected speak.text=\"hello\"" ]
+  }, {
+    "id" : "gallery",
+    "endToEndMillis" : 54698,
+    "output" : "<function name=\"create_album\"><param name=\"name\">Summer 2026</param></function>\n<function name=\"move_photos\"><param name=\"album\">Summer 2026</param><param name=\"filter\">last weekend</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "email",
+    "endToEndMillis" : 49615,
+    "output" : "<function name=\"send_email\"><param name=\"to\">finance@cactus.dev</param><param name=\"subject\">Expenses: Blue Bottle Coffee, $14.50, August 4th</param><param name=\"body\">Please find below the receipt for expenses: Blue Bottle Coffee, $14.50, August 4th.</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected send_email.subject=\"expenses\"" ]
+  }, {
+    "id" : "currency",
+    "endToEndMillis" : 49616,
+    "output" : "I need to convert 250 dollars to euros, so I will use the convert_currency function to perform this conversion.\n<function name=\"convert_currency\"><param name=\"amount\">250.0</param><param name=\"from_currency\">USD</param><param name=\"to_currency\">EUR</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "document",
+    "endToEndMillis" : 71250,
+    "output" : "The user provided a detailed booking confirmation email, but I don't have the ability to extract or analyze the content of the email. I should inform the user that I cannot perform this task. \n\nThe user provided a detailed booking confirmation email, but I don't have the ability to extract or analyze the content of the email. I should inform the user that I cannot perform this task.",
+    "structured" : false,
+    "selectionExact" : false,
+    "schemaValid" : false,
+    "declaredArgumentsOnly" : false,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected a tool call but none was emitted", "expected tool sequence [record_booking] but received []" ]
+  }, {
+    "id" : "sentiment",
+    "endToEndMillis" : 36850,
+    "output" : "I need to classify the sentiment of the user's message, so I will call the classify_sentiment function.\n<function name=\"classify_sentiment\"><param name=\"sentiment\">mixed</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected classify_sentiment.sentiment=\"negative\"" ]
+  }, {
+    "id" : "crowded",
+    "endToEndMillis" : 97413,
+    "output" : "<function name=\"open_blinds\"><param name=\"room\">bedroom</param><param name=\"position\">closed</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected open_blinds.position=\"half\"" ]
+  }, {
+    "id" : "repeat",
+    "endToEndMillis" : 33638,
+    "output" : "<function name=\"add_to_list\"><param name=\"item\">{}</param><param name=\"quantity\">{'milk': 2, 'eggs': 6}</param></function>",
+    "structured" : false,
+    "selectionExact" : false,
+    "schemaValid" : false,
+    "declaredArgumentsOnly" : false,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "malformed tool-call output", "expected tool sequence [add_to_list, add_to_list] but received []" ]
+  }, {
+    "id" : "array",
+    "endToEndMillis" : 36801,
+    "output" : "<function name=\"add_items\"><param name=\"items\">[{'type': 'string', 'value': 'milk'}, {'type': 'string', 'value': 'eggs'}, {'type': 'string', 'value': 'bread'}]</param></function>",
+    "structured" : false,
+    "selectionExact" : false,
+    "schemaValid" : false,
+    "declaredArgumentsOnly" : false,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "malformed arguments for tool add_items: Unexpected character (''' (code 39)): was expecting double-quote to start field name\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 12]", "expected tool sequence [add_items] but received []" ]
+  }, {
+    "id" : "flight",
+    "endToEndMillis" : 43252,
+    "output" : "<function name=\"search_flights\"><param name=\"from_city\">lagos</param><param name=\"to_city\">nairobi</param><param name=\"date\">2023-10-03</param><param name=\"direct_only\">True</param><param name=\"passengers\">2</param></function>",
+    "structured" : false,
+    "selectionExact" : false,
+    "schemaValid" : false,
+    "declaredArgumentsOnly" : false,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "malformed tool-call output", "expected tool sequence [search_flights] but received []" ]
+  }, {
+    "id" : "refuse",
+    "endToEndMillis" : 48518,
+    "output" : "The moon is bright and white,\nA silent, distant star.\nIt watches over the night,\nWith mysteries to keep.",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 0,
+    "refusalExpected" : true,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "spring-weather-zipcode",
+    "endToEndMillis" : 37816,
+    "output" : "I need to call the function to get the weather information for the zipcode 88252.\n<function name=\"get-weather-for-zipcode\"><param name=\"zipcode\">88252</param></function>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  } ]
+}

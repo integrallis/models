@@ -143,6 +143,10 @@ class ChatTemplateTest {
                 ChatTemplate.CHATML_NO_THINK,
                 "<|im_start|>user\n"
                     + "Prompt<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"),
+            Map.entry(
+                ChatTemplate.SMOLLM3_NO_THINK,
+                "<|im_start|>user\n"
+                    + "Prompt<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n"),
             Map.entry(ChatTemplate.ZEPHYR, "<|user|>\nPrompt</s>\n<|assistant|>"),
             Map.entry(
                 ChatTemplate.LLAMA3,

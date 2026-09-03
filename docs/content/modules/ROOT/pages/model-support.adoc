@@ -104,6 +104,34 @@ and correctness. Individual report directories under
 {url-models-github}/tree/main/benchmark-results[`benchmark-results/`^]
 contain the machine-readable qualification records.
 
+== Tool-Calling Qualification
+
+Tool calling is qualified separately from chat and generation. The retained
+suite checks tool selection, schema validity, typed arguments, crowded tool
+lists, refusal, parallel calls where the model protocol permits them, and the
+tool-result continuation used by Spring AI and LangChain4j.
+
+[cols=",,,,",options="header",]
+|===
+|Artifact |Selection |Schema |Arguments |Result
+|Needle 2 CQ2 Mixed |100% |100% |91.9% |Qualified as an action selector
+|Qwen3 1.7B Q8_0 |100% |100% |91.9% |Qualified with generative follow-up
+|Qwen3 0.6B Q4_0 |85.7% |78.6% |75.7% |Rejected
+|MiniCPM5 1B Q4_K_M |71.4% |71.4% |48.6% |Rejected
+|SmolLM3 3B Q4_K_M |92.9% |85.7% |86.5% |Rejected
+|Llama 3.2 3B Q4_K_M |88.9% |44.4% |66.7% |Rejected
+|===
+
+The Qwen3 1.7B gate includes complete real-weight Spring AI and LangChain4j
+round trips. Both invoke the Java weather tool with zipcode `88252` and let the
+model turn its structured result into grounded prose without a custom result
+renderer. Needle 2 deliberately ends at action selection, so its qualified
+Spring path uses a typed host-side renderer. Protocol adapters for MiniCPM5 and
+SmolLM3 are integration-tested, but the exact artifacts above do not advertise
+tool calling because they failed the broader behavioral gate. Reports and all
+per-case outputs are retained under
+{url-models-github}/tree/main/benchmark-results/tool-calling-20260903[`benchmark-results/tool-calling-20260903/`^].
+
 == Qualified Safetensors Bundle
 
 Qwen2.5 0.5B Instruct BF16 is the first qualified Safetensors bundle. Models

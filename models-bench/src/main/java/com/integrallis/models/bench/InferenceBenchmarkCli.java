@@ -106,6 +106,10 @@ public final class InferenceBenchmarkCli {
       System.exit(Needle2ToolQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "tool-qualification".equals(args[0])) {
+      System.exit(ToolCallingQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);

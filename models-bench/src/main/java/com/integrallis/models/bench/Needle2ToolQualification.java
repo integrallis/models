@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.chat.ToolCallScanner;
+import com.integrallis.models.runtime.chat.ToolSyntax;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -133,11 +135,21 @@ final class Needle2ToolQualification {
   }
 
   static CaseResult evaluate(ObjectMapper mapper, Case item, String output, long elapsedMillis) {
+    return evaluate(mapper, item, output, elapsedMillis, ToolSyntax.NEEDLE2);
+  }
+
+  static CaseResult evaluate(
+      ObjectMapper mapper, Case item, String output, long elapsedMillis, ToolSyntax syntax) {
     Objects.requireNonNull(mapper, "mapper");
     Objects.requireNonNull(item, "item");
+    Objects.requireNonNull(syntax, "syntax");
     String generated = output == null ? "" : output;
     List<String> diagnostics = new ArrayList<>();
-    ParsedOutput parsed = parseOutput(mapper, generated, diagnostics);
+    boolean refusalExpected = item.expectedCalls().isEmpty();
+    ParsedOutput parsed =
+        syntax == ToolSyntax.NEEDLE2
+            ? parseOutput(mapper, generated, diagnostics)
+            : parseOutput(mapper, item, generated, diagnostics, syntax, refusalExpected);
     Map<String, ToolDeclaration> declarations = new HashMap<>();
     for (ToolDeclaration tool : item.tools()) {
       declarations.put(tool.name(), tool);
@@ -191,7 +203,6 @@ final class Needle2ToolQualification {
       }
     }
 
-    boolean refusalExpected = item.expectedCalls().isEmpty();
     boolean refusalCorrect = !refusalExpected || (parsed.structured() && parsed.calls().isEmpty());
     boolean passed =
         parsed.structured()
@@ -303,6 +314,46 @@ final class Needle2ToolQualification {
       diagnostics.add("malformed tool JSON: " + malformed.getMessage());
       return new ParsedOutput(false, List.of());
     }
+  }
+
+  private static ParsedOutput parseOutput(
+      ObjectMapper mapper,
+      Case item,
+      String output,
+      List<String> diagnostics,
+      ToolSyntax syntax,
+      boolean noCallExpected) {
+    ToolCallScanner.Result scanned = ToolCallScanner.scan(output, syntax, item.toolSpecs(mapper));
+    if (!scanned.hasCalls()) {
+      boolean attemptedCall =
+          syntax.mode() == ToolSyntax.Mode.JSON_NATIVE
+              ? output.stripLeading().startsWith("{")
+              : !syntax.sectionStart().isEmpty() && output.contains(syntax.sectionStart());
+      if (noCallExpected && !attemptedCall) {
+        return new ParsedOutput(true, List.of());
+      }
+      diagnostics.add(
+          attemptedCall
+              ? "malformed tool-call output"
+              : "expected a tool call but none was emitted");
+      return new ParsedOutput(false, List.of());
+    }
+    List<ActualCall> calls = new ArrayList<>();
+    for (com.integrallis.models.api.ToolCall call : scanned.toolCalls()) {
+      try {
+        JsonNode arguments = mapper.readTree(call.argumentsJson());
+        if (!arguments.isObject()) {
+          diagnostics.add("tool " + call.name() + " arguments must be a JSON object");
+          return new ParsedOutput(false, List.of());
+        }
+        calls.add(new ActualCall(call.name(), (ObjectNode) arguments));
+      } catch (IOException malformed) {
+        diagnostics.add(
+            "malformed arguments for tool " + call.name() + ": " + malformed.getMessage());
+        return new ParsedOutput(false, List.of());
+      }
+    }
+    return new ParsedOutput(true, List.copyOf(calls));
   }
 
   private static boolean validAgainstSchema(

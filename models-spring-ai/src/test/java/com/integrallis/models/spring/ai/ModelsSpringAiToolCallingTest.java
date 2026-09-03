@@ -594,6 +594,27 @@ class ModelsSpringAiToolCallingTest {
   static class Recovery {
 
     @Test
+    void recoversMiniCpmTaggedArgumentsThroughTheDeclaredSpringSchema() {
+      ScriptedModel model =
+          new ScriptedModel(
+              "<function name=\"get_weather\"><param name=\"city\">Austin</param></function>");
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(
+              model, ChatTemplate.MINICPM5_NO_THINK, SamplingOptions.builder().build());
+
+      ChatResponse response = chat.call(promptWithTools(List.of(new UserMessage("weather?"))));
+
+      assertThat(response.hasToolCalls()).isTrue();
+      assertThat(response.getResult().getOutput().getToolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+              });
+    }
+
+    @Test
     void recoversAGptOssHarmonyCallFromTheGeneratedHeaderContinuation() {
       ScriptedModel model =
           new ScriptedModel(

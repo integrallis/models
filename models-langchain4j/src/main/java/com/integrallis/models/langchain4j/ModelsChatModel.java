@@ -93,11 +93,11 @@ public final class ModelsChatModel implements ChatModel {
   /**
    * Whether this model can take part in tool calling.
    *
-   * <p>Narrower than "the family has a tool format". Gemma 4 and MiniCPM5 do, but encode arguments
-   * as tagged pairs the runtime cannot yet turn into JSON without the declared schemas.
+   * <p>A trained tool format is necessary; schema-aware recovery handles both JSON and MiniCPM5's
+   * tagged arguments once a request declares its tools.
    */
   public boolean supportsTools() {
-    return template.canParseToolCalls();
+    return template.canParseToolCallsWithSchemas();
   }
 
   @Override
@@ -112,7 +112,7 @@ public final class ModelsChatModel implements ChatModel {
     // Without declared tools, output that merely resembles a call is ordinary text.
     ToolCallScanner.Result scan =
         toolsDeclared
-            ? ToolCallScanner.scan(generated.text(), template.toolSyntax())
+            ? ToolCallScanner.scan(generated.text(), template.toolSyntax(), tools)
             : ToolCallScanner.Result.plainText(generated.text());
     if (!scan.hasCalls()) {
       var response =
