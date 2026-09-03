@@ -2,6 +2,28 @@
 
 All notable changes to models are documented here.
 
+## [0.3.27] - 2026-09-03
+
+### Added
+
+- Added adaptive model routing across mixed local and hosted fleets, with hard capability filters,
+  composable scorers, live availability and queue signals, EWMA outcome feedback, failure cooldowns,
+  and bounded session affinity.
+- Added a provider-neutral `ModelFleet` execution layer. Applications supply their own local or
+  hosted clients, so the router does not introduce a provider SDK or external inference runtime.
+- Added Spring AI and LangChain4j routed chat adapters for blocking and streaming requests. Both
+  preserve the framework-native request, and streaming fallback is limited to failures before the
+  first response is emitted.
+
+### Fixed
+
+- Made the Qwen 3.5 rewind/reset regression test portable across equivalent SIMD reduction orders.
+
+### Documentation
+
+- Added a routing guide covering fleet construction, live feedback, session affinity, failover,
+  framework adapters, and why KV or prefix state is never shared across different models.
+
 ## [0.3.26] - 2026-09-03
 
 ### Added
