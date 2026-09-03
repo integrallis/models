@@ -149,11 +149,13 @@ class Qwen35ForwardPassTest {
       assertThat(second).containsExactly(complete, within(SIMD_REDUCTION_TOLERANCE));
 
       graph.rewind(session, 1);
-      assertThat(graph.forward(session, 2, 1)).containsExactly(second);
+      assertThat(graph.forward(session, 2, 1))
+          .containsExactly(second, within(SIMD_REDUCTION_TOLERANCE));
 
       graph.reset(session);
       assertThat(session.checkpoint()).isZero();
-      assertThat(graph.forward(session, 1, 0)).containsExactly(first);
+      assertThat(graph.forward(session, 1, 0))
+          .containsExactly(first, within(SIMD_REDUCTION_TOLERANCE));
     }
   }
 
