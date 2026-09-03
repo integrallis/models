@@ -4,7 +4,7 @@ Auto-configures a Models runtime as a Spring AI `ChatModel`.
 
 ```kotlin
 dependencies {
-    implementation("com.integrallis:models-spring-boot-starter:0.3.26")
+    implementation("com.integrallis:models-spring-boot-starter:0.3.27")
 }
 ```
 
