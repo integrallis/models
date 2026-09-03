@@ -49,6 +49,8 @@ import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeForwardPass;
+import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
@@ -76,6 +78,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
+import java.util.Set;
 
 /**
  * Pure Java inference backend that loads a GGUF model and runs Llama-family forward passes without
@@ -294,7 +297,23 @@ public final class PureJavaBackend
       Arena arena = arenaOwner.arena();
       if (Files.isDirectory(modelPath)) {
         Path configPath = modelPath.resolve("config.json");
-        if (GptOssHuggingFaceConfig.matches(configPath)) {
+        if (MobileMoeHuggingFaceConfig.matches(configPath)) {
+          MobileMoeHuggingFaceConfig config = MobileMoeHuggingFaceConfig.parse(configPath);
+          tokenizer =
+              HuggingFaceTokenizer.fromMobileMoe(
+                  modelPath.resolve("tokenizer.json"),
+                  modelPath.resolve("tokenizer_config.json"),
+                  config);
+          loaded =
+              loadHuggingFaceMobileMoe(
+                  modelPath,
+                  config,
+                  new SafetensorsTensorSource(SafetensorsBundle.open(modelPath, arena)),
+                  arena,
+                  runtime,
+                  planConfiguration,
+                  batchedMatrixKernel);
+        } else if (GptOssHuggingFaceConfig.matches(configPath)) {
           GptOssHuggingFaceConfig config = GptOssHuggingFaceConfig.parse(configPath);
           tokenizer =
               HuggingFaceTokenizer.fromGptOss(
@@ -534,6 +553,43 @@ public final class PureJavaBackend
             modelFamily,
             modelPath.getFileName().toString(),
             config.maxPosition(),
+            config.vocabSize(),
+            config.hiddenSize(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadHuggingFaceMobileMoe(
+      Path modelPath,
+      MobileMoeHuggingFaceConfig config,
+      SafetensorsTensorSource tensors,
+      Arena arena,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    String modelFamily = "mobilemoe";
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                modelFamily,
+                config.queryDimension(),
+                config.keyValueDimension(),
+                config.keyValueDimension(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength());
+    PureJavaDecoder decoder =
+        new MobileMoeDecoderAdapter(
+            MobileMoeForwardPass.load(config, tensors, contextCapacity, arena));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            modelFamily,
+            modelPath.getFileName().toString(),
+            config.contextLength(),
             config.vocabSize(),
             config.hiddenSize(),
             config.numLayers(),
@@ -976,6 +1032,59 @@ public final class PureJavaBackend
 
   private static BackendDiagnostics architectureDiagnostics(
       BackendDiagnostics diagnostics, PureJavaDecoder decoder) {
+    if (decoder instanceof MobileMoeDecoderAdapter mobileMoe) {
+      Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
+      environment.put("artifact-format", "safetensors");
+      environment.put("weight-encoding", "packed-int4-g32");
+      environment.put("runtime-weight-layout", mobileMoe.runtimeWeightLayout());
+      environment.put(
+          "architecture-prefill-batch-size", Integer.toString(mobileMoe.prefillBatchSize()));
+      List<OptimizationDecision> optimizations = new ArrayList<>(diagnostics.optimizations());
+      optimizations.removeIf(
+          decision ->
+              Set.of("grouped-projections", "batched-prefill", "mapped-model-weights")
+                  .contains(decision.id()));
+      optimizations.add(
+          new OptimizationDecision(
+              "mapped-model-weights",
+              OptimizationStatus.ENABLED,
+              "the source Safetensors checkpoint remains mapped while prepared runtime weights use backend-owned native memory",
+              Map.of("artifact-format", "safetensors", "storage", "memory-segment")));
+      boolean q8Runtime = "q8".equals(mobileMoe.runtimeWeightLayout());
+      optimizations.add(
+          new OptimizationDecision(
+              "mobilemoe-runtime-weight-layout",
+              q8Runtime ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+              q8Runtime
+                  ? "packed group-32 INT4 checkpoint weights are prepared once as row-major Q8_0 for Java Vector API execution"
+                  : "compact mode executes packed group-32 INT4 weights directly from the mapped checkpoint",
+              Map.of(
+                  "artifact-layout",
+                  "packed-int4-g32",
+                  "implementation",
+                  "java-vector-api",
+                  "runtime-layout",
+                  mobileMoe.runtimeWeightLayout())));
+      optimizations.add(
+          new OptimizationDecision(
+              "grouped-projections",
+              q8Runtime ? OptimizationStatus.ENABLED : OptimizationStatus.UNSUPPORTED,
+              q8Runtime
+                  ? "MobileMoE QKV and shared gate/up projections reuse one quantized activation and one row dispatch"
+                  : "the compact packed-INT4 fallback has no grouped projection kernel",
+              Map.of("qkv", "grouped", "gate-up", "grouped")));
+      int prefillBatchSize = mobileMoe.prefillBatchSize();
+      optimizations.add(
+          new OptimizationDecision(
+              "batched-prefill",
+              prefillBatchSize > 1 ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+              prefillBatchSize > 1
+                  ? "MobileMoE attention, shared FFN, router, and routed experts execute prompt batches with retained weights"
+                  : "MobileMoE prefill batching is disabled by configuration",
+              Map.of("batch-size", Integer.toString(prefillBatchSize))));
+      return new BackendDiagnostics(
+          diagnostics.backend(), diagnostics.planVersion(), environment, optimizations);
+    }
     if (decoder instanceof GptOssDecoderAdapter) {
       Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
       environment.put("artifact-format", "safetensors");

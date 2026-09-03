@@ -171,6 +171,8 @@ val configuredGptOssHuggingFaceDirectory =
     providers.systemProperty("models.fixtures.gptOssHuggingFaceDirectory")
 val configuredGptOssOracleLogits =
     providers.systemProperty("models.fixtures.gptOssOracleLogits")
+val configuredMobileMoeQatDirectory =
+    providers.systemProperty("models.fixtures.mobileMoeQatDirectory")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
@@ -188,6 +190,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredGptOssOracleLogits.orNull?.let {
         systemProperty("models.fixtures.gptOssOracleLogits", it)
+    }
+    configuredMobileMoeQatDirectory.orNull?.let {
+        systemProperty("models.fixtures.mobileMoeQatDirectory", it)
     }
 }
 
@@ -425,6 +430,31 @@ tasks.register<Test>("gptOssHuggingFaceIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.GptOssHuggingFaceBackendIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
+tasks.register<Test>("mobileMoeHuggingFaceIntegrationTest") {
+    description = "Run the gated Meta MobileMoE-S QAT Safetensors compatibility tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.MobileMoeHuggingFaceBackendIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.mobilemoe.MobileMoeForwardPassIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.mobilemoe.MobileMoeQatLayoutIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.mobilemoe.MobileMoeTokenizerIntegrationTest",
         )
     }
     outputs.upToDateWhen { false }

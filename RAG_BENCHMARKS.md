@@ -1,10 +1,10 @@
 # Production RAG Benchmarks
 
-Last updated: 2026-08-30
+Last updated: 2026-09-02
 
 ## Result
 
-Thirty-one exact artifacts representing 28 model identities now clear the current
+Thirty-two exact artifacts representing 29 model identities now clear the current
 absolute RAG SLOs, minimum model contribution, and same-host authoritative
 engine comparison:
 
@@ -79,6 +79,12 @@ engine comparison:
 - **TinyLlama 1.1B Chat Q4_0** is `USABLE` for general guarded RAG. Its
   marker-selected Rust/FFM path reaches 108.9% of Ollama and 53.5% of
   llama.cpp decode throughput, with 9 of 9 retained model answers correct.
+- **Meta MobileMoE-S QAT INT4 G32** is `PRODUCTION_READY` for general guarded RAG
+  through pure Java. Its default prepared-Q8 runtime layout answers 27 of 27
+  requests correctly, with 958.0 ms p95 TTFT and 21.83 tokens/second median
+  decode. Against the same-host official Transformers control, Java reaches
+  2.59x median decode throughput and 0.158x p95 end-to-end latency; the original
+  mapped packed-INT4 weights remain available as a lower-memory fallback.
 These are guarded, workload-specific qualifications, not claims of unrestricted
 question-answering quality. Every report preserves raw output, final grounded
 output, decision type, artifact SHA-256, corpus SHA-256, workload ID, runtime
@@ -89,6 +95,14 @@ controls, and same-host comparator evidence. Exact reports are under
 and Safetensors requalification evidence is under
 `benchmark-results/certified-20260825/rag/`. The Qwen2.5 3B and Qwen3.5 0.8B
 qualification records are under `benchmark-results/certified-20260830/rag/`.
+The gated MobileMoE qualification and its optimization history are under
+`benchmark-results/certified-20260902/rag/`.
+
+Production policy v6 allows an expensive authoritative comparator to use fewer
+measurement repetitions than the candidate, but never fewer cases. Artifact,
+host, workload, controls, and the exact distinct `(case ID, rendered prompt
+SHA-256)` set must match. MobileMoE therefore retains three candidate
+iterations and one complete nine-case Transformers iteration.
 
 Quantization variants are retained as independently qualified artifacts but do
 not increase the distinct-model launch count. The generated ModelJars
@@ -436,6 +450,7 @@ end-of-generation metadata correctly and stop before exposing control tokens.
 | DeepSeek-Coder 1.3B Q4_K_M | Current coding guarded-RAG suite | Marker-selected Rust/FFM reaches 29.95 tok/s, 91.6% of Ollama and 59.4% of llama.cpp, at 1.31x Ollama p95 end-to-end latency | `USABLE`; 9 of 27 accepted answers retain model text and all 9 are correct. The remaining answerable cases use validated extractive fallback. |
 | SmolLM3 3B Q4_K_M | Current general guarded-RAG suite | Marker-selected Rust/FFM reaches 15.93 tok/s, 91.4% of Ollama and 65.5% of llama.cpp, at 1.37x Ollama p95 end-to-end latency | `USABLE`; 12 of 27 accepted answers retain model text and all 12 are correct. The remaining answerable cases use validated extractive fallback. |
 | TinyLlama 1.1B Chat Q4_0 | Current general guarded-RAG suite | Marker-selected Rust/FFM reaches 34.26 tok/s, 108.9% of Ollama and 53.5% of llama.cpp, at 1.08x Ollama p95 end-to-end latency | `USABLE`; 9 of 27 accepted answers retain model text and all 9 are correct. The remaining answerable cases use validated extractive fallback. |
+| Meta MobileMoE-S QAT INT4 G32 | Current general guarded-RAG suite and official full-logit oracle | Pure Java with prepared Q8 execution weights reaches 21.83 tok/s median decode, 958.0 ms p95 TTFT, and 2,315.6 ms p95 end-to-end latency | `PRODUCTION_READY`; all 27 answers are correct. Official BOS and BOS+`hello` logits preserve the pinned cosine floors. Direct mapped packed INT4 is retained as the compact fallback. |
 
 Retrieval is perfect in every full run. The historical failed answerable case
 was therefore generation, not search: Qwen3 1.7B said the context did not state

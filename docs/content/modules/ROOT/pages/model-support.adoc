@@ -26,8 +26,13 @@ encoder with learned-bias LayerNorm, GELU feed-forward layers, WordPiece
 tokenization, and model-declared mean or CLS pooling. Qwen3.5 support is
 currently limited to dense, text-only
 GGUF checkpoints; its MoE, vision, and MTP paths are not supported. The
-Hugging Face path supports strict Qwen 2/Qwen2.5 BF16 and GPT-OSS MXFP4
-Safetensors bundles with either one weight file or an indexed shard set. GPT-OSS
+Hugging Face path supports strict Qwen 2/Qwen2.5 BF16, Meta MobileMoE QAT
+INT4, and GPT-OSS MXFP4 Safetensors bundles with either one weight file or an
+indexed shard set. MobileMoE executes its official 60-expert top-4 graph and
+chat template in Java. By default it prepares the mapped checkpoint's projection
+weights as row-major Q8 for Vector API execution; set
+`-Dmodels.mobilemoe.runtimeLayout=packed-int4` to trade latency for a smaller
+runtime footprint. GPT-OSS
 implements the official Harmony prompt and tool-call protocol, but its current
 serial prompt prefill does not pass the catalog performance gate. Two
 layer-wise prefill candidates preserved the independent oracle result but were
@@ -61,7 +66,7 @@ and arbitrary chat templates are not implied by this list.
 
 == Qualified Identities
 
-Committed evidence covers 32 exact artifacts representing 29 distinct
+Committed evidence covers 33 exact artifacts representing 30 distinct
 model identities. Multiple quantizations of one model count as one
 identity.
 
@@ -71,7 +76,7 @@ identity.
 |General |SmolLM2 360M, SmolLM2 1.7B, SmolLM3 3B, Qwen3 1.7B, Qwen3.5
 0.8B, Qwen2.5 0.5B, Qwen2.5 1.5B, Qwen2.5 3B, Llama 3.2 1B, Llama 3.2 3B, Gemma 3 1B,
 Gemma 4 26B-A4B, H2O Danube2 1.8B, DeepSeek-R1-Distill-Qwen 1.5B,
-TinyLlama 1.1B Chat
+TinyLlama 1.1B Chat, Meta MobileMoE-S QAT
 
 |Coding |Qwen3 0.6B, Qwen2.5-Coder 0.5B, Qwen2.5-Coder 1.5B,
 DeepSeek-Coder 1.3B, MiniCPM5 1B, Yi-Coder 1.5B
@@ -109,6 +114,15 @@ correct; 15 retain model text, nine use validated extractive fallback, and
 three correctly abstain. A pinned Transformers 4.46.3 run over the same bytes,
 host, prompts, and greedy controls supplies the reference comparator. See the
 {url-models-github}/tree/main/benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16[retained reports^].
+
+Meta MobileMoE-S QAT INT4 G32 is the first qualified mixture-of-experts
+Safetensors bundle. Its complete graph, tokenizer, prompt template, KV state,
+and kernels remain in process and pure Java. On the controlled eight-vCPU EPYC
+host it reaches `PRODUCTION_READY`: 27/27 correct requests, 958.0 ms p95 TTFT,
+21.83 tokens/second median decode, and 2,315.6 ms p95 end-to-end latency. The
+official PyTorch full-logit oracle and batched-versus-sequential KV test retain
+their original numerical floors. See the
+{url-models-github}/tree/main/benchmark-results/certified-20260902/rag/mobilemoe-s-qat-int4-g32[retained reports^].
 
 == Newly Qualified Qwen Artifacts
 
@@ -157,6 +171,7 @@ and 7B Q4_0
 * Granite Embedding 107M Multilingual Q4_K_M BERT embedding encoder
 * MS MARCO MiniLM L6 v2 corrected Q4_K imatrix BERT cross-encoder reranker
 * Qwen2.5 0.5B Instruct BF16 Safetensors
+* Meta MobileMoE-S QAT INT4 G32 Safetensors
 * Needle 2 CACT
 * GPT-OSS 20B MXFP4 Safetensors
 
@@ -189,9 +204,9 @@ another. The ModelJars profile adapter supplies recommendations only
 when the model SHA and complete selector match.
 
 Most qualified GGUF artifacts use the Models Rust/FFM backend to stay near
-local-runtime latency. Qwen3 0.6B Q4_0 and Qwen2.5 0.5B BF16 have qualified
-pure-Java paths. Newer JDKs are re-evaluated so profiles can move back to pure
-Java when they clear the same gate.
+local-runtime latency. Qwen3 0.6B Q4_0, Qwen2.5 0.5B BF16, and MobileMoE-S QAT
+INT4 G32 have qualified pure-Java paths. Newer JDKs are re-evaluated so
+profiles can move back to pure Java when they clear the same gate.
 
 == Catalog Metadata
 

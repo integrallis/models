@@ -93,6 +93,7 @@ class ChatTemplateTest {
                     "chatml-no-think",
                     "zephyr",
                     "llama3",
+                    "mobilemoe",
                     "gpt-oss",
                     "needle2",
                     "gemma",
@@ -112,6 +113,7 @@ class ChatTemplateTest {
             ChatTemplate.CHATML_NO_THINK,
             ChatTemplate.ZEPHYR,
             ChatTemplate.LLAMA3,
+            ChatTemplate.MOBILE_MOE,
             ChatTemplate.GPT_OSS,
             ChatTemplate.NEEDLE2,
             ChatTemplate.GEMMA,
@@ -146,6 +148,10 @@ class ChatTemplateTest {
                 ChatTemplate.LLAMA3,
                 "<|start_header_id|>user<|end_header_id|>\n\n"
                     + "Prompt<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"),
+            Map.entry(
+                ChatTemplate.MOBILE_MOE,
+                "<|header_start|>user<|header_end|>\n\n"
+                    + "Prompt<|eot|><|header_start|>assistant<|header_end|>\n\n"),
             Map.entry(
                 ChatTemplate.GPT_OSS,
                 "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\n"
@@ -206,6 +212,31 @@ class ChatTemplateTest {
             Tool result<end_of_turn>
             <start_of_turn>model
             """);
+  }
+
+  @Test
+  void rendersTheOfficialMobileMoeConversationWithoutDuplicatingBos() {
+    ModelPrompt prompt =
+        ChatTemplate.MOBILE_MOE.render(
+            List.of(
+                ChatMessage.system("Answer briefly."),
+                ChatMessage.user("Question"),
+                ChatMessage.assistant("Answer"),
+                ChatMessage.user("Next")));
+
+    assertThat(prompt.text())
+        .isEqualTo(
+            "<|header_start|>system<|header_end|>\n\nAnswer briefly.<|eot|>"
+                + "<|header_start|>user<|header_end|>\n\nQuestion<|eot|>"
+                + "<|header_start|>assistant<|header_end|>\n\nAnswer<|eot|>"
+                + "<|header_start|>user<|header_end|>\n\nNext<|eot|>"
+                + "<|header_start|>assistant<|header_end|>\n\n")
+        .doesNotContain("<|begin_of_text|>");
+    assertThat(
+            prompt.segments().stream()
+                .filter(segment -> segment.kind() == ModelPrompt.SegmentKind.TEXT)
+                .map(ModelPrompt.Segment::text))
+        .containsExactly("Answer briefly.", "Question", "Answer", "Next");
   }
 
   @Test

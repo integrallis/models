@@ -1,0 +1,36 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "benchmark-results/certified-20260902/rag/mobilemoe-s-qat-int4-g32/models-pure-java.json",
+    "sha256" : "2e0857a7b8def3b4d0999493f85039eac561e5fb3abd3d85eabdf56698776b85"
+  },
+  "comparators" : [ {
+    "path" : "benchmark-results/certified-20260902/rag/mobilemoe-s-qat-int4-g32/transformers.json",
+    "sha256" : "25022d669d5166c318e4acec8a4c1657c753c34f890c3ccead7a90a52254eb30"
+  } ],
+  "qualification" : {
+    "modelId" : "facebook_mobilemoe_s_qat_int4_g32",
+    "candidateBackend" : "pure-java",
+    "artifactSha256" : "1a54d8eb2adf19c296a1c129f9cd7d7395c21f5facfc6d13d2945e002d55e37d",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 9,
+    "modelAnswerRate" : 0.3333333333333333,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "transformers" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "transformers",
+      "decodeThroughputRatio" : 2.590028237605496,
+      "endToEndLatencyRatio" : 0.15821375860667322,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}

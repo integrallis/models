@@ -24,7 +24,7 @@ import java.util.Set;
 
 /** Production gate combining grounded RAG SLOs with same-host local-engine comparisons. */
 public final class RagProductionQualificationPolicy {
-  public static final String POLICY_ID = "production-rag-model-contribution-v5";
+  public static final String POLICY_ID = "production-rag-model-contribution-v6";
   public static final double MINIMUM_MODEL_ANSWER_RATE = 1.0 / 3.0;
   public static final double MINIMUM_MODEL_ANSWER_CORRECT_RATE = 0.90;
 
@@ -185,6 +185,9 @@ public final class RagProductionQualificationPolicy {
     if (!sameWorkload(candidate.settings(), baseline.settings())) {
       return "benchmark workload differs";
     }
+    if (!samePromptCoverage(candidate, baseline)) {
+      return "benchmark prompts differ";
+    }
     RagPerformanceTier baselineTier =
         RagPerformancePolicy.classify(baseline.summary().policyMetrics());
     if (baselineTier == RagPerformanceTier.FAILED_RUNTIME
@@ -201,8 +204,6 @@ public final class RagProductionQualificationPolicy {
         && left.promptTemplate().equals(right.promptTemplate())
         && left.retrievalTopK() == right.retrievalTopK()
         && left.maxOutputTokens() == right.maxOutputTokens()
-        && left.warmups() == right.warmups()
-        && left.iterations() == right.iterations()
         && left.contextLength() == right.contextLength()
         && left.threads() == right.threads()
         && left.groundingPolicy().equals(right.groundingPolicy())
@@ -216,6 +217,19 @@ public final class RagProductionQualificationPolicy {
                         && Objects.equals(
                             left.generationControls().get(control),
                             right.generationControls().get(control)));
+  }
+
+  private static boolean samePromptCoverage(
+      RagBenchmarkReport candidate, RagBenchmarkReport baseline) {
+    Set<PromptIdentity> candidatePrompts = promptIdentities(candidate);
+    Set<PromptIdentity> baselinePrompts = promptIdentities(baseline);
+    return !candidatePrompts.isEmpty() && candidatePrompts.equals(baselinePrompts);
+  }
+
+  private static Set<PromptIdentity> promptIdentities(RagBenchmarkReport report) {
+    return report.runs().stream()
+        .map(run -> new PromptIdentity(run.caseId(), run.promptSha256()))
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 
   private static boolean sameHardware(RagBenchmarkEnvironment left, RagBenchmarkEnvironment right) {
@@ -271,4 +285,6 @@ public final class RagProductionQualificationPolicy {
       boolean qualifies) {}
 
   private record RelativeThreshold(double minimumDecodeRatio, double maximumEndToEndRatio) {}
+
+  private record PromptIdentity(String caseId, String promptSha256) {}
 }

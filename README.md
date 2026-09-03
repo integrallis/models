@@ -66,7 +66,7 @@ Implemented functionality includes:
 - strict, memory-mapped single-file and sharded Safetensors bundles
 - CACT parsing and the Needle 2 CQ2/CQ4 execution path
 - BERT/MiniLM encoders plus Llama, Qwen2, Qwen3, dense Qwen3.5, Gemma 4,
-  GPT-OSS, and Needle 2 decoder architectures
+  MobileMoE, GPT-OSS, and Needle 2 decoder architectures
 - F32, F16, BF16, MXFP4, CQ2/CQ4, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
 - BERT WordPiece, T5/SentencePiece unigram, byte-level BPE, and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
@@ -96,7 +96,7 @@ Implemented functionality includes:
 
 ## Supported Models
 
-Committed same-host evidence covers 31 exact artifacts across 28 model
+Committed same-host evidence covers 32 exact artifacts across 29 model
 identities below. Support is bound to an artifact SHA, workload, runtime
 selector, backend plan, correctness result, and latency measurements; consult
 the qualification ledger for those exact details.
@@ -118,6 +118,7 @@ the qualification ledger for those exact details.
 | H2O Danube2 1.8B | General |
 | DeepSeek-R1-Distill-Qwen 1.5B | General |
 | TinyLlama 1.1B Chat | General |
+| Meta MobileMoE-S QAT | General |
 | Qwen3 0.6B | Coding |
 | Qwen2.5-Coder 0.5B | Coding |
 | Qwen2.5-Coder 1.5B | Coding |
@@ -141,6 +142,14 @@ Qwen2.5 0.5B Instruct BF16 is the first qualified Hugging Face Safetensors
 bundle. The pure-Java path is `USABLE` on the controlled EPYC host and is
 checked against the same pinned snapshot through Transformers. See the
 [retained Safetensors evidence](benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16/README.md).
+
+Meta MobileMoE-S QAT INT4 G32 executes entirely in Java from its pinned
+Safetensors bundle and reaches `PRODUCTION_READY` on the controlled EPYC host:
+27/27 correct answers, 958.0 ms p95 TTFT, 21.83 tokens/second median decode,
+and 2,315.6 ms p95 end-to-end latency. The runtime keeps the source checkpoint
+mapped and prepares Q8 execution weights in backend-owned native memory; a
+direct packed-INT4 fallback is available for lower-memory environments. See the
+[retained MobileMoE evidence](benchmark-results/certified-20260902/rag/mobilemoe-s-qat-int4-g32/README.md).
 
 Qwen3.5 0.8B Q4_K_M and Qwen2.5 3B Instruct Q4_K_M now clear the unchanged
 production RAG policy at the `USABLE` tier on the controlled 16-core EPYC host.
