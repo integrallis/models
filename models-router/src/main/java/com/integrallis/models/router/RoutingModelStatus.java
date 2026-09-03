@@ -13,6 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.router;
 
-/** Spring AI adapters for Models inference and routed local/hosted chat fleets. */
-package com.integrallis.models.spring.ai;
+/**
+ * Observable state used by the router after qualification priors and live feedback are combined.
+ */
+public record RoutingModelStatus(
+    String modelId,
+    double successRate,
+    long timeToFirstTokenMillis,
+    double tokensPerSecond,
+    int consecutiveFailures,
+    boolean coolingDown,
+    ModelRuntimeState runtimeState) {}

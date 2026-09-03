@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 
-/** LangChain4j ChatLanguageModel adapter. */
+/** LangChain4j adapters for Models inference and routed local/hosted chat fleets. */
 package com.integrallis.models.langchain4j;

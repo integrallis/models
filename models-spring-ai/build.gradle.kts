@@ -6,6 +6,7 @@ val springAiVersion = providers.gradleProperty("springAiVersion").getOrElse("2.0
 
 dependencies {
     api(project(":models-runtime"))
+    api(project(":models-router"))
 
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
 

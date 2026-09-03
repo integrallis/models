@@ -26,6 +26,17 @@ dependencies {
 }
 ----
 
+== Route Local And Hosted Models
+
+`RoutedSpringAiChatModel` binds ordinary Spring AI `ChatModel` clients to a
+provider-neutral `ModelFleet`. A fleet can contain a local
+`ModelsSpringAiChatModel`, hosted provider clients, and private gateways. The
+selected delegate receives the original `Prompt`, including its tools, options,
+and metadata. Blocking and streaming calls support ordered failover; streaming
+changes providers only before the first fragment is emitted. See
+xref:routing.adoc[Model Routing] for configuration, live feedback, and
+conversation continuity.
+
 == Blocking Chat
 
 The adapter maps Spring AI system, user, assistant, and tool messages to the

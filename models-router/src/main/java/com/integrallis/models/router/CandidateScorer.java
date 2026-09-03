@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.router;
 
-/** Spring AI adapters for Models inference and routed local/hosted chat fleets. */
-package com.integrallis.models.spring.ai;
+/** Application-defined preference score evaluated after hard constraints. */
+@FunctionalInterface
+public interface CandidateScorer {
+  /** Returns a preference in [0, 1], where one is best. */
+  double score(RoutingEvaluation evaluation);
+}

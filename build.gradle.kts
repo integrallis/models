@@ -1515,6 +1515,23 @@ tasks.register("verifyDocumentation") {
             "Documentation navigation must expose the Using Models page"
         }
 
+        val routingGuide = file("docs/content/modules/ROOT/pages/routing.adoc")
+        require(routingGuide.isFile && "xref:routing.adoc[Model Routing]" in documentationNavigation) {
+            "Documentation must provide and navigate to the Model Routing guide"
+        }
+        listOf(
+            "ModelFleet<T>",
+            "RoutedSpringAiChatModel",
+            "RoutedStreamingChatModel",
+            "RoutingFeedback.success",
+            "cachedPrefixTokens",
+            "never moves a KV cache"
+        ).forEach { requiredText ->
+            require(requiredText in routingGuide.readText()) {
+                "Model Routing guide is missing $requiredText"
+            }
+        }
+
         require(
             "xref:using-models.adoc[Using Models]" in docsIndex &&
                 "ModelJars.openRuntime(MODEL)" in docsIndex &&

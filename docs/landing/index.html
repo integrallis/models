@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Models - In-process language-model inference for Java 25</title>
-    <meta name="description" content="Models runs qualified GGUF, Safetensors, and CACT language models inside Java 25 applications with LangChain4j and Spring AI adapters, qualified tool execution, and selective Models-owned Rust kernel acceleration through FFM.">
+    <meta name="description" content="Models runs qualified GGUF, Safetensors, and CACT language models inside Java 25 applications with framework adapters, tool execution, and adaptive routing across local and hosted models.">
     <meta property="og:title" content="Models - In-process language-model inference for Java 25">
     <meta property="og:description" content="Load, run, stream, and integrate qualified GGUF, Safetensors, and CACT models inside the JVM, including LangChain4j and Spring AI tool calling.">
     <meta property="og:type" content="website">
@@ -219,6 +219,10 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                         <p class="card-description">Blocking and streaming APIs for plain Java, LangChain4j, Spring AI, and Spring Boot applications.</p>
                     </article>
                     <article class="card reveal">
+                        <h3 class="card-title">Adaptive model routing</h3>
+                        <p class="card-description">Explainable selection and safe failover across in-process and hosted clients using cost, quality, latency, live load, reliability, and conversation continuity.</p>
+                    </article>
+                    <article class="card reveal">
                         <h3 class="card-title">In-JVM embeddings</h3>
                         <p class="card-description">Text to vectors from causal decoders and dedicated bidirectional encoders, tested against pinned llama.cpp references.</p>
                     </article>
@@ -239,13 +243,13 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                         <p class="card-description">Versioned upstream revisions, checksums, capabilities, domains, runtime requirements, and measured backend recommendations.</p>
                     </article>
                     <article class="card reveal">
-                        <h3 class="card-title">Private by construction</h3>
-                        <p class="card-description">Prompts, retrieved context, model weights, and generated text remain inside the application process.</p>
+                        <h3 class="card-title">Local when required</h3>
+                        <p class="card-description">The Models runtime stays in process, and the router's privacy-strict policy excludes hosted clients when prompts must not leave the JVM.</p>
                     </article>
                 </div>
                 <div class="hero-cta reveal">
                     <a href="docs/models/current/model-support.html" class="btn btn-primary">Browse qualified models</a>
-                    <a href="docs/models/current/notebooks.html" class="btn btn-secondary">Run the notebooks</a>
+                    <a href="docs/models/current/routing.html" class="btn btn-secondary">Route local and hosted models</a>
                 </div>
             </div>
         </section>

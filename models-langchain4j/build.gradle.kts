@@ -6,6 +6,7 @@ val langchain4jVersion = providers.gradleProperty("langchain4jVersion").getOrEls
 
 dependencies {
     api(project(":models-runtime"))
+    api(project(":models-router"))
 
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
 

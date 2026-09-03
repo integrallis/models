@@ -26,6 +26,16 @@ dependencies {
 }
 ----
 
+== Route Local And Hosted Models
+
+`RoutedChatModel` and `RoutedStreamingChatModel` bind ordinary LangChain4j
+clients to a provider-neutral `ModelFleet`. A fleet can contain local Models
+adapters, hosted provider clients, and private gateways. The selected delegate
+receives the original `ChatRequest`, including its tools and options. Streaming
+failover occurs only before a partial response reaches the caller. See
+xref:routing.adoc[Model Routing] for configuration, feedback, and session
+continuity.
+
 == Blocking Chat
 
 The adapter maps LangChain4j system, user, assistant, and tool messages to the

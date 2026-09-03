@@ -13,6 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.router;
 
-/** Spring AI adapters for Models inference and routed local/hosted chat fleets. */
-package com.integrallis.models.spring.ai;
+import java.util.Optional;
+
+/** Application-defined hard eligibility rule evaluated before scoring. */
+@FunctionalInterface
+public interface CandidateFilter {
+  /** Returns a human-readable rejection reason, or empty when the candidate remains eligible. */
+  Optional<String> rejection(RoutingEvaluation evaluation);
+}

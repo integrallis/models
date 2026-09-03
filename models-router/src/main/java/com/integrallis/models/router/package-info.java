@@ -15,9 +15,10 @@
  */
 
 /**
- * Chooses which model answers a request, across in-process and hosted models.
+ * Chooses which model answers a request across in-process and hosted models.
  *
- * <p>The router selects and never calls, so applications keep their own provider clients and this
- * package depends on no provider SDK.
+ * <p>{@code ModelRouter} makes explainable decisions from constraints, qualification priors, live
+ * state, feedback, and conversation continuity. {@code ModelFleet} optionally executes those
+ * decisions against application-owned clients. The package depends on no provider SDK.
  */
 package com.integrallis.models.router;

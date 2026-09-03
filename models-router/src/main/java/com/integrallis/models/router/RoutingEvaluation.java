@@ -13,6 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.integrallis.models.router;
 
-/** Spring AI adapters for Models inference and routed local/hosted chat fleets. */
-package com.integrallis.models.spring.ai;
+import java.util.List;
+
+/** Immutable request and runtime facts supplied to application routing extensions. */
+public record RoutingEvaluation(
+    RoutingRequest request,
+    RoutingPolicy policy,
+    String taskType,
+    ModelCandidate candidate,
+    List<ModelCandidate> eligibleCandidates,
+    RoutingModelStatus status,
+    String previousModelId,
+    RoutingContinuity continuity) {
+
+  /** Defensively copies the eligible fleet. */
+  public RoutingEvaluation {
+    eligibleCandidates = List.copyOf(eligibleCandidates);
+  }
+}

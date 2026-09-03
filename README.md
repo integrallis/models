@@ -92,6 +92,9 @@ Implemented functionality includes:
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
 - Apple Foundation Models on supported Apple Silicon Macs
 - framework-neutral guarded RAG
+- adaptive, explainable routing across local and hosted application clients,
+  with bounded conversation affinity, live load and reliability feedback,
+  model-specific cache awareness, and ordered failover
 - compact WordTour semantic-order models
 
 ## Supported Models
@@ -333,6 +336,7 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Spring AI | `models-spring-ai` | observed blocking and streaming chat, embeddings, document reranking, and qualified `ChatClient` tool execution |
 | Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel`, observations, and token-usage meters |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
+| Model routing | `models-router` | adaptive selection and failover across in-process and hosted clients without a provider SDK dependency |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 | Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |
 | Java GPU acceleration | `backend-tornado` | optional Java-authored Q4_0 projections on qualified NVIDIA GPUs |
@@ -343,7 +347,9 @@ caller-owned, and CI composes them with the corresponding Vectors adapters and
 starter across the supported versions. See the guides for
 [LangChain4j](https://integrallis.github.io/models/docs/models/current/langchain4j.html),
 [Spring AI](https://integrallis.github.io/models/docs/models/current/spring-ai.html), and
-[Spring Boot](https://integrallis.github.io/models/docs/models/current/spring-boot.html).
+[Spring Boot](https://integrallis.github.io/models/docs/models/current/spring-boot.html). See
+[Model routing](https://integrallis.github.io/models/docs/models/current/routing.html) to combine
+those local clients with hosted models while preserving framework-native requests.
 
 ## Documentation
 
