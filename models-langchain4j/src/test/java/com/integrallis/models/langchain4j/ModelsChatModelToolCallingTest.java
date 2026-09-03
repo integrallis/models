@@ -271,6 +271,29 @@ class ModelsChatModelToolCallingTest {
   static class Recovery {
 
     @Test
+    void recoversMiniCpmTaggedArgumentsThroughTheDeclaredLangChain4jSchema() {
+      ScriptedModel model =
+          new ScriptedModel(
+              "<function name=\"get_weather\"><param name=\"city\">Austin</param></function>");
+      ChatRequest request =
+          ChatRequest.builder()
+              .messages(UserMessage.from("weather?"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse response = chatModel(model, ChatTemplate.MINICPM5_NO_THINK).chat(request);
+
+      assertThat(response.finishReason()).isEqualTo(FinishReason.TOOL_EXECUTION);
+      assertThat(response.aiMessage().toolExecutionRequests())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+              });
+    }
+
+    @Test
     void recoversAGptOssHarmonyCallFromTheGeneratedHeaderContinuation() {
       ScriptedModel model =
           new ScriptedModel(
@@ -526,6 +549,7 @@ class ModelsChatModelToolCallingTest {
 
       assertThat(chatModel(model, ChatTemplate.CHATML).supportsTools()).isTrue();
       assertThat(chatModel(model, ChatTemplate.LLAMA3).supportsTools()).isTrue();
+      assertThat(chatModel(model, ChatTemplate.MINICPM5_NO_THINK).supportsTools()).isTrue();
       assertThat(chatModel(model, ChatTemplate.GEMMA).supportsTools()).isFalse();
       // Gemma 4 has a real tool format, but a tagged one this runtime cannot yet decode.
       assertThat(chatModel(model, ChatTemplate.GEMMA4).supportsTools()).isFalse();

@@ -34,6 +34,7 @@ public enum ChatTemplate {
   CHATML_DIRECT("chatml-direct", ToolSyntax.QWEN),
   CHATML_ANSWER("chatml-answer", ToolSyntax.QWEN),
   CHATML_NO_THINK("chatml-no-think", ToolSyntax.QWEN),
+  SMOLLM3_NO_THINK("smollm3-no-think", ToolSyntax.SMOLLM3),
   ZEPHYR("zephyr", ToolSyntax.NONE),
   LLAMA3("llama3", ToolSyntax.LLAMA3),
   MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
@@ -60,6 +61,19 @@ public enum ChatTemplate {
       "You have access to the following functions. To call a function, please respond with JSON"
           + " for a function call.\n\nRespond in the format {\"name\": function name,"
           + " \"parameters\": dictionary of argument name and its value}.\n\n";
+  private static final String MINICPM5_TOOLS_PREAMBLE =
+      "# Tools\n\nYou are provided with function signatures within <tools></tools> XML tags:"
+          + "\n<tools>";
+  private static final String MINICPM5_TOOLS_EPILOGUE =
+      "\n</tools>\n\nTool usage guidelines:\n"
+          + "- You may call zero or more functions. If no function calls are needed, just answer"
+          + " normally and do not include any <function ... </function>.\n"
+          + "- When calling a function, return an XML object within <function ... </function>"
+          + " using:\n<function name=\"function-name\"><param name=\"param-name\">param-value"
+          + "</param></function>\n"
+          + "- param-value may be multi-line. If it contains <, & or newline characters, wrap it"
+          + " in a CDATA block: <param name=\"param-name\"><![CDATA[...multi-line value...]]>"
+          + "</param><|im_end|>\n";
   private static final String GPT_OSS_SYSTEM =
       "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\n"
           + "Knowledge cutoff: 2024-06\n\nReasoning: medium\n\n"
@@ -105,12 +119,18 @@ public enum ChatTemplate {
   /**
    * Whether this runtime can recover tool calls from this family's output.
    *
-   * <p>This is the check adapters should gate on. It is narrower than {@link #supportsTools()}:
-   * Gemma 4 and MiniCPM5 have real tool formats, but both encode arguments as tagged pairs that
-   * cannot be turned into JSON without the declared tool schemas.
+   * <p>This is the text-only check. It is narrower than {@link #supportsTools()}: Gemma 4 and
+   * MiniCPM5 have real tool formats, but both encode arguments as tagged pairs that cannot be
+   * turned into JSON without the declared tool schemas. Framework adapters should use {@link
+   * #canParseToolCallsWithSchemas()} instead.
    */
   public boolean canParseToolCalls() {
     return toolSyntax.parsable();
+  }
+
+  /** Whether adapters can recover calls once the request's declared schemas are available. */
+  public boolean canParseToolCallsWithSchemas() {
+    return toolSyntax.parsableWithSchemas();
   }
 
   /** Renders a conversation while keeping template controls separate from ordinary message text. */
@@ -122,6 +142,7 @@ public enum ChatTemplate {
       case CHATML_DIRECT -> renderChatMl(conversation, "", "The context states that ");
       case CHATML_ANSWER -> renderChatMl(conversation, "", "Answer: ");
       case CHATML_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n\n");
+      case SMOLLM3_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n");
       case ZEPHYR -> renderZephyr(conversation);
       case LLAMA3 -> renderLlama3(conversation);
       case MOBILE_MOE -> renderMobileMoe(conversation);
@@ -158,9 +179,11 @@ public enum ChatTemplate {
     if (declared.isEmpty() && !conversationCallsTools) {
       return render(messages);
     }
-    if (!canParseToolCalls()) {
+    if (!canParseToolCallsWithSchemas()) {
       throw new IllegalArgumentException(
-          "chat template " + id + " cannot express tool calls; check canParseToolCalls() first");
+          "chat template "
+              + id
+              + " cannot recover tool calls; check canParseToolCallsWithSchemas() first");
     }
     return switch (this) {
       case CHATML -> renderChatMlWithTools(conversation, "", "", declared);
@@ -169,14 +192,18 @@ public enum ChatTemplate {
       case CHATML_ANSWER -> renderChatMlWithTools(conversation, "", "Answer: ", declared);
       case CHATML_NO_THINK ->
           renderChatMlWithTools(conversation, "", "<think>\n\n</think>\n\n", declared);
+      case SMOLLM3_NO_THINK ->
+          renderChatMlWithTools(
+              conversation, "", "<think>\n\n</think>\n", declared, ToolSyntax.SMOLLM3);
       case LLAMA3 -> renderLlama3WithTools(conversation, declared);
       case GPT_OSS -> renderGptOss(conversation, declared);
       case NEEDLE2 -> renderNeedle2(conversation, declared);
+      case MINICPM5_NO_THINK -> renderMiniCpm5WithTools(conversation, declared);
       default ->
           throw new IllegalArgumentException(
               "chat template "
                   + id
-                  + " cannot express tool calls; check canParseToolCalls() first");
+                  + " cannot recover tool calls; check canParseToolCallsWithSchemas() first");
     };
   }
 
@@ -195,6 +222,15 @@ public enum ChatTemplate {
 
   private static ModelPrompt renderChatMlWithTools(
       List<ChatMessage> messages, String prefix, String assistantPrefix, List<ToolSpec> tools) {
+    return renderChatMlWithTools(messages, prefix, assistantPrefix, tools, ToolSyntax.QWEN);
+  }
+
+  private static ModelPrompt renderChatMlWithTools(
+      List<ChatMessage> messages,
+      String prefix,
+      String assistantPrefix,
+      List<ToolSpec> tools,
+      ToolSyntax syntax) {
     ModelPrompt.Builder prompt = ModelPrompt.builder().control(prefix);
 
     int start = 0;
@@ -216,6 +252,10 @@ public enum ChatTemplate {
     for (int index = start; index < messages.size(); index++) {
       ChatMessage message = messages.get(index);
       if (message.role() == ChatRole.TOOL) {
+        if (syntax.resultStyle() == ToolSyntax.ResultStyle.USER_PLAIN) {
+          prompt.control("<|im_start|>user\n").text(message.text()).control("<|im_end|>\n");
+          continue;
+        }
         boolean firstOfRun = index == start || messages.get(index - 1).role() != ChatRole.TOOL;
         boolean lastOfRun =
             index == messages.size() - 1 || messages.get(index + 1).role() != ChatRole.TOOL;
@@ -310,6 +350,192 @@ public enum ChatTemplate {
     }
     return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
   }
+
+  /** Renders the XML tool protocol from MiniCPM5's published chat template. */
+  private static ModelPrompt renderMiniCpm5WithTools(
+      List<ChatMessage> messages, List<ToolSpec> tools) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder().control("<s><|im_start|>system\n");
+    int start = 0;
+    if (messages.getFirst().role() == ChatRole.SYSTEM) {
+      prompt.text(messages.getFirst().text()).control("\n\n");
+      start = 1;
+    }
+    prompt.control(MINICPM5_TOOLS_PREAMBLE);
+    for (ToolSpec tool : tools) {
+      prompt.control("\n");
+      appendToolJson(prompt, tool);
+    }
+    prompt.control(MINICPM5_TOOLS_EPILOGUE);
+
+    for (int index = start; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      if (message.role() == ChatRole.TOOL) {
+        boolean firstOfRun = index == start || messages.get(index - 1).role() != ChatRole.TOOL;
+        boolean lastOfRun =
+            index == messages.size() - 1 || messages.get(index + 1).role() != ChatRole.TOOL;
+        if (firstOfRun) {
+          prompt.control("<|im_start|>user");
+        }
+        prompt.control("\n<tool_response>\n").text(message.text()).control("\n</tool_response>");
+        if (lastOfRun) {
+          prompt.control("<|im_end|>\n");
+        }
+        continue;
+      }
+
+      prompt.control("<|im_start|>" + message.role().templateName() + "\n");
+      if (!message.text().isEmpty()) {
+        prompt.text(message.text());
+      }
+      for (ToolCall call : message.toolCalls()) {
+        if (!message.text().isEmpty()) {
+          prompt.control("\n");
+        }
+        appendMiniCpm5Call(prompt, call);
+      }
+      prompt.control("<|im_end|>\n");
+    }
+    return prompt.control("<|im_start|>assistant\n<think>\n\n</think>\n\n").build();
+  }
+
+  private static void appendMiniCpm5Call(ModelPrompt.Builder prompt, ToolCall call) {
+    prompt.control("<function name=\"").text(call.name()).control("\">");
+    for (JsonArgument argument : parseJsonArguments(call.argumentsJson())) {
+      prompt.control("<param name=\"").text(argument.name()).control("\">");
+      String value = argument.displayValue();
+      if (value.indexOf('<') >= 0 || value.indexOf('&') >= 0 || value.indexOf('\n') >= 0) {
+        prompt.control("<![CDATA[").text(value).control("]]>");
+      } else {
+        prompt.text(value);
+      }
+      prompt.control("</param>");
+    }
+    prompt.control("</function>");
+  }
+
+  private static List<JsonArgument> parseJsonArguments(String json) {
+    String object = Objects.requireNonNull(json, "argumentsJson").strip();
+    if (object.length() < 2
+        || object.charAt(0) != '{'
+        || object.charAt(object.length() - 1) != '}') {
+      throw new IllegalArgumentException("tool arguments must be a JSON object");
+    }
+    List<JsonArgument> arguments = new java.util.ArrayList<>();
+    int cursor = 1;
+    while (true) {
+      cursor = skipJsonWhitespace(object, cursor);
+      if (cursor >= object.length() - 1) {
+        return List.copyOf(arguments);
+      }
+      ParsedJsonString name = parseJsonString(object, cursor);
+      cursor = skipJsonWhitespace(object, name.next());
+      if (cursor >= object.length() || object.charAt(cursor) != ':') {
+        throw new IllegalArgumentException("tool argument name must be followed by ':'");
+      }
+      cursor = skipJsonWhitespace(object, cursor + 1);
+      int valueStart = cursor;
+      int depth = 0;
+      boolean inString = false;
+      boolean escaped = false;
+      while (cursor < object.length() - 1) {
+        char current = object.charAt(cursor);
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+          } else if (current == '\\') {
+            escaped = true;
+          } else if (current == '"') {
+            inString = false;
+          }
+        } else if (current == '"') {
+          inString = true;
+        } else if (current == '{' || current == '[') {
+          depth++;
+        } else if (current == '}' || current == ']') {
+          if (depth == 0) {
+            break;
+          }
+          depth--;
+        } else if (current == ',' && depth == 0) {
+          break;
+        }
+        cursor++;
+      }
+      String rawValue = object.substring(valueStart, cursor).strip();
+      if (rawValue.isEmpty()) {
+        throw new IllegalArgumentException("tool argument value must not be empty");
+      }
+      String display = rawValue.charAt(0) == '"' ? parseJsonString(rawValue, 0).value() : rawValue;
+      arguments.add(new JsonArgument(name.value(), display));
+      cursor = skipJsonWhitespace(object, cursor);
+      if (cursor < object.length() - 1 && object.charAt(cursor) == ',') {
+        cursor++;
+      } else if (cursor < object.length() - 1) {
+        throw new IllegalArgumentException("tool arguments must be separated by ','");
+      }
+    }
+  }
+
+  private static ParsedJsonString parseJsonString(String json, int start) {
+    if (start >= json.length() || json.charAt(start) != '"') {
+      throw new IllegalArgumentException("expected a JSON string");
+    }
+    StringBuilder value = new StringBuilder();
+    for (int index = start + 1; index < json.length(); index++) {
+      char current = json.charAt(index);
+      if (current == '"') {
+        return new ParsedJsonString(value.toString(), index + 1);
+      } else if (current == '\\') {
+        if (++index >= json.length()) {
+          throw new IllegalArgumentException("unterminated JSON escape");
+        }
+        char escape = json.charAt(index);
+        if (escape == 'u') {
+          if (index + 4 >= json.length()) {
+            throw new IllegalArgumentException("incomplete JSON unicode escape");
+          }
+          int codeUnit = 0;
+          for (int digitIndex = 1; digitIndex <= 4; digitIndex++) {
+            int digit = Character.digit(json.charAt(index + digitIndex), 16);
+            if (digit < 0) {
+              throw new IllegalArgumentException("invalid JSON unicode escape");
+            }
+            codeUnit = (codeUnit << 4) | digit;
+          }
+          value.append((char) codeUnit);
+          index += 4;
+        } else {
+          value.append(
+              switch (escape) {
+                case '"' -> '"';
+                case '\\' -> '\\';
+                case '/' -> '/';
+                case 'b' -> '\b';
+                case 'f' -> '\f';
+                case 'n' -> '\n';
+                case 'r' -> '\r';
+                case 't' -> '\t';
+                default -> throw new IllegalArgumentException("invalid JSON escape");
+              });
+        }
+      } else {
+        value.append(current);
+      }
+    }
+    throw new IllegalArgumentException("unterminated JSON string");
+  }
+
+  private static int skipJsonWhitespace(String json, int start) {
+    int cursor = start;
+    while (cursor < json.length() && Character.isWhitespace(json.charAt(cursor))) {
+      cursor++;
+    }
+    return cursor;
+  }
+
+  private record JsonArgument(String name, String displayValue) {}
+
+  private record ParsedJsonString(String value, int next) {}
 
   /** Renders the official GPT-OSS Harmony conversation protocol. */
   private static ModelPrompt renderGptOss(List<ChatMessage> messages, List<ToolSpec> tools) {

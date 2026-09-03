@@ -58,6 +58,12 @@ class ToolSyntaxTest {
       assertThat(ToolSyntax.MINICPM5.parsable()).isFalse();
       assertThat(ToolSyntax.NONE.parsable()).isFalse();
     }
+
+    @Test
+    void declaredSchemasEnableMiniCpmButNotTheUnimplementedGemmaFormat() {
+      assertThat(ToolSyntax.MINICPM5.parsableWithSchemas()).isTrue();
+      assertThat(ToolSyntax.GEMMA4.parsableWithSchemas()).isFalse();
+    }
   }
 
   @Nested

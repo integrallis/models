@@ -24,10 +24,48 @@ import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import com.integrallis.models.runtime.chat.ToolSyntax;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class Needle2ToolQualificationTest {
+
+  @Test
+  void evaluatesQwenTaggedJsonWithoutNeedlesArrayWrapper() throws Exception {
+    Needle2ToolQualification.Case item =
+        Needle2ToolQualification.loadSuite(mapper).cases().stream()
+            .filter(candidate -> candidate.id().equals("currency"))
+            .findFirst()
+            .orElseThrow();
+
+    Needle2ToolQualification.CaseResult result =
+        Needle2ToolQualification.evaluate(
+            mapper,
+            item,
+            "<tool_call>{\"name\":\"convert_currency\",\"arguments\":{\"amount\":250,"
+                + "\"from_currency\":\"USD\",\"to_currency\":\"EUR\"}}</tool_call>",
+            42,
+            ToolSyntax.QWEN);
+
+    assertThat(result.passed()).isTrue();
+  }
+
+  @Test
+  void treatsANormalAnswerAsAValidNoToolDecisionForGeneralChatModels() throws Exception {
+    Needle2ToolQualification.Case item =
+        Needle2ToolQualification.loadSuite(mapper).cases().stream()
+            .filter(candidate -> candidate.id().equals("refuse"))
+            .findFirst()
+            .orElseThrow();
+
+    Needle2ToolQualification.CaseResult result =
+        Needle2ToolQualification.evaluate(
+            mapper, item, "The moon drifts over quiet roofs.", 10, ToolSyntax.QWEN);
+
+    assertThat(result.passed()).isTrue();
+    assertThat(result.refusalCorrect()).isTrue();
+  }
+
   private final ObjectMapper mapper = new ObjectMapper();
 
   @Test

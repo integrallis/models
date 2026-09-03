@@ -251,7 +251,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     GenerationOutput generated = generate(rendered, requested, tools);
     return tools.isEmpty()
         ? response(generated.text(), generated.usage())
-        : toolAwareResponse(generated.text(), generated.usage());
+        : toolAwareResponse(generated.text(), generated.usage(), tools);
   }
 
   /**
@@ -389,7 +389,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
 
                 private void complete(GenerationUsage usage) {
                   if (accumulated != null) {
-                    sink.next(toolAwareResponse(accumulated.toString(), usage));
+                    sink.next(toolAwareResponse(accumulated.toString(), usage, tools));
                   } else if (usage != null) {
                     sink.next(response("", usage));
                   }
@@ -716,8 +716,9 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   /** Builds a response that surfaces any recovered tool calls to Spring AI's advisor. */
-  private ChatResponse toolAwareResponse(String output, GenerationUsage usage) {
-    ToolCallScanner.Result scan = ToolCallScanner.scan(output, template.toolSyntax());
+  private ChatResponse toolAwareResponse(
+      String output, GenerationUsage usage, List<ToolSpec> tools) {
+    ToolCallScanner.Result scan = ToolCallScanner.scan(output, template.toolSyntax(), tools);
     if (!scan.hasCalls()) {
       if (template == ChatTemplate.NEEDLE2 && isEmptyNeedleToolSelection(output)) {
         return response(noApplicableToolResponse, usage);

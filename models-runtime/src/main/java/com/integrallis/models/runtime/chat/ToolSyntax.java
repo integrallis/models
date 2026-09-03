@@ -109,6 +109,23 @@ public record ToolSyntax(
           "");
 
   /**
+   * SmolLM3. Calls use Qwen's tagged JSON shape, but tool results return as plain user turns rather
+   * than inside {@code <tool_response>} delimiters.
+   */
+  public static final ToolSyntax SMOLLM3 =
+      new ToolSyntax(
+          Mode.TAG_WITH_JSON,
+          "<tool_call>",
+          "</tool_call>",
+          "name",
+          "arguments",
+          false,
+          true,
+          ResultStyle.USER_PLAIN,
+          "",
+          "");
+
+  /**
    * Llama 3.1 / 3.3. The only major family keyed on {@code parameters} rather than {@code
    * arguments}, and its template raises outright on more than one call per turn.
    */
@@ -245,10 +262,15 @@ public record ToolSyntax(
    * builds a parser per tool from {@code inputs.tools} for tagged formats, and hand-writes a
    * grammar for Gemma 4.
    *
-   * <p>Callers should refuse tools when this is false, but the reason is that the runtime cannot
-   * yet parse the family's format — not that the family lacks one.
+   * <p>Callers that only have generated text should refuse tools when this is false. Framework
+   * adapters also have the declared schemas and should use {@link #parsableWithSchemas()}.
    */
   public boolean parsable() {
     return mode == Mode.JSON_NATIVE || mode == Mode.TAG_WITH_JSON || mode == Mode.HARMONY;
+  }
+
+  /** Whether calls can be recovered when the request's declared JSON Schemas are available. */
+  public boolean parsableWithSchemas() {
+    return parsable() || this.equals(MINICPM5);
   }
 }

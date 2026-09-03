@@ -43,6 +43,13 @@ class ChatTemplateToolSyntaxTest {
     }
 
     @Test
+    void smolLm3UsesTaggedJsonCallsWithPlainUserResults() {
+      assertThat(ChatTemplate.SMOLLM3_NO_THINK.toolSyntax()).isEqualTo(ToolSyntax.SMOLLM3);
+      assertThat(ChatTemplate.SMOLLM3_NO_THINK.canParseToolCalls()).isTrue();
+      assertThat(ToolSyntax.SMOLLM3.resultStyle()).isEqualTo(ToolSyntax.ResultStyle.USER_PLAIN);
+    }
+
+    @Test
     void llama3UsesItsOwnFormat() {
       assertThat(ChatTemplate.LLAMA3.toolSyntax()).isEqualTo(ToolSyntax.LLAMA3);
     }
@@ -75,10 +82,9 @@ class ChatTemplateToolSyntaxTest {
     }
 
     @Test
-    void taggedFamiliesHaveAFormatButCannotYetBeParsed() {
-      // Gemma 4 emits <|tool_call>call:name{k:v}<tool_call|> and MiniCPM5 emits
-      // <function name="f"><param name="k">v</param></function>. Both are real formats, but
-      // tagged arguments carry no types, so producing JSON needs the declared schemas.
+    void taggedFamiliesRequireDeclaredSchemasForArgumentRecovery() {
+      // Their generated text is not self-describing, so the parameterless scanner cannot decode
+      // either format. MiniCPM5 is recovered by the schema-aware scanner used by the adapters.
       for (ChatTemplate template :
           new ChatTemplate[] {ChatTemplate.GEMMA4, ChatTemplate.MINICPM5_NO_THINK}) {
         assertThat(template.supportsTools()).as("template %s", template).isTrue();
@@ -87,6 +93,8 @@ class ChatTemplateToolSyntaxTest {
             .as("template %s", template)
             .isEqualTo(ToolSyntax.Mode.TAG_WITH_TAGGED);
       }
+      assertThat(ChatTemplate.MINICPM5_NO_THINK.canParseToolCallsWithSchemas()).isTrue();
+      assertThat(ChatTemplate.GEMMA4.canParseToolCallsWithSchemas()).isFalse();
     }
 
     @Test
