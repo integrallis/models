@@ -134,6 +134,13 @@ if (response.aiMessage().hasToolExecutionRequests()) {
 }
 ----
 
+Qwen3 1.7B Q8_0 is qualified for the complete generative tool loop. The
+real-weight release test uses `AiServices`, invokes a Java weather method with
+zipcode `88252`, passes its structured result back to the model, and checks the
+grounded natural-language answer. It does not use a host-side result renderer.
+Needle 2 is instead a compact action selector; an application using it must
+render the tool result itself after executing the request.
+
 The streaming adapter uses the same declaration and recovery path. When tools
 are declared, it buffers generated text until the tool call is complete and then
 delivers one terminal response, because LangChain4j cannot execute a partial

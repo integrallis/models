@@ -1,0 +1,447 @@
+{
+  "schemaVersion" : 1,
+  "createdAt" : "2026-09-03T14:01:34.051545984Z",
+  "policyVersion" : "small-model-tool-conformance-v1",
+  "modelsRevision" : "cff14f65b2c36530e54c2812efa4576416ed3b11",
+  "modelId" : "qwen3_1_7b_q8_0",
+  "model" : "Qwen3 1.7B GGUF Q8_0",
+  "backend" : "pure-java",
+  "backendVersion" : "models@cff14f65b2c36530e54c2812efa4576416ed3b11",
+  "artifactSha256" : "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+  "artifactSizeBytes" : 1834426016,
+  "suite" : {
+    "id" : "needle2-upstream-playground-v1",
+    "sha256" : "c5f0f5a8e5e1f4ffbfd04caeef31ab8abd5e672c157dad980260e793d0c5ace5",
+    "sourceRepository" : "https://github.com/cactus-compute/needle",
+    "sourceRevision" : "7bd8a635ebb977489703b3bb916c21412e8a9cdf",
+    "sourcePath" : "needle/playground/app.js"
+  },
+  "generation" : {
+    "temperature" : 0.0,
+    "maxTokens" : 256,
+    "promptTemplate" : "chatml-no-think"
+  },
+  "environment" : {
+    "host" : "vectors-bench",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-124-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "processors" : 8,
+    "physicalMemoryBytes" : 32857444352,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "pure-java",
+    "planVersion" : "pure-java-v20",
+    "environment" : {
+      "preferred-vector-bits" : "256",
+      "gguf-executor" : "persistent",
+      "compiler" : "hotspot-c2",
+      "fast-vector-fma" : "true",
+      "processors" : "8",
+      "java-feature" : "25",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "q4-short-pairwise-supported" : "true",
+      "vector-api" : "true",
+      "fast-scalar-fma" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "sve" : "false",
+      "java-version" : "25.0.3",
+      "gguf-threads" : "8",
+      "gguf-parallel" : "true",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "architecture" : "amd64",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "gguf-chunks-per-thread" : "2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "model-architecture" : "qwen3",
+      "projection-layers" : "28",
+      "os" : "Linux",
+      "vm-version" : "25.0.3+9-LTS",
+      "active-vector-bits" : "256"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "independent",
+        "gate-up" : "grouped",
+        "implementation" : "vector-api"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block",
+        "active-vector-bits" : "256",
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "output-rows" : "requested",
+        "formats" : "Q8_0,Q8_0,Q8_0"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "formats" : "Q8_0,Q8_0,Q8_0,Q8_0",
+        "unused-rows" : "kv-only"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedFfn",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "28"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedLayer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "28"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.blockMajorQ8Activations",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q8BlockMajorKernel selects scattered accumulation",
+      "settings" : {
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.parallelQ8FfnPreparation",
+      "settings" : {
+        "partition" : "batch-rows",
+        "staged-layers" : "28",
+        "eligible-layers" : "28",
+        "partitions" : "8"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "8"
+      }
+    } ]
+  },
+  "plannedAttempts" : 14,
+  "inapplicableCases" : [ ],
+  "complete" : true,
+  "summary" : {
+    "attempts" : 14,
+    "passed" : 12,
+    "structuredOutputRate" : 1.0,
+    "toolSelectionExactRate" : 1.0,
+    "schemaValidityRate" : 1.0,
+    "declaredArgumentsOnlyRate" : 1.0,
+    "expectedArgumentAccuracy" : 0.918918918918919,
+    "refusalAccuracy" : 1.0,
+    "p95EndToEndMillis" : 34899.0,
+    "qualified" : true,
+    "verdict" : "PASS"
+  },
+  "followUp" : {
+    "id" : "tool-result-follow-up",
+    "applicable" : true,
+    "endToEndMillis" : 6128,
+    "output" : "The weather in zipcode 88252 is currently raining cats and dogs, with a temperature of 78°F.",
+    "conversational" : true,
+    "grounded" : true,
+    "repeatedToolCall" : false,
+    "passed" : true,
+    "diagnostics" : [ ]
+  },
+  "qualified" : true,
+  "verdict" : "PASS",
+  "cases" : [ {
+    "id" : "home",
+    "endToEndMillis" : 21718,
+    "output" : "<tool_call>\n{\"name\": \"set_lights\", \"arguments\": {\"room\": \"bedroom\", \"state\": \"off\", \"brightness\": 20}}\n</tool_call>\n<tool_call>\n{\"name\": \"lock_door\", \"arguments\": {\"door\": \"front\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected set_lights.state=\"on\"", "expected lock_door.door=\"front door\"" ]
+  }, {
+    "id" : "robot",
+    "endToEndMillis" : 20004,
+    "output" : "<tool_call>\n{\"name\": \"move\", \"arguments\": {\"direction\": \"forward\", \"distance_m\": 2}}\n</tool_call>\n<tool_call>\n{\"name\": \"rotate\", \"arguments\": {\"direction\": \"left\", \"degrees\": 90}}\n</tool_call>\n<tool_call>\n{\"name\": \"gripper\", \"arguments\": {\"action\": \"close\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 5,
+    "expectedArguments" : 5,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "device",
+    "endToEndMillis" : 17207,
+    "output" : "<tool_call>\n{\"name\": \"set_theme\", \"arguments\": {\"accent_color\": \"green\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"open_website\", \"arguments\": {\"url\": \"github.com\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"speak\", \"arguments\": {\"text\": \"Hello\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "gallery",
+    "endToEndMillis" : 16833,
+    "output" : "<tool_call>\n{\"name\": \"create_album\", \"arguments\": {\"name\": \"Summer 2026\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"move_photos\", \"arguments\": {\"album\": \"Summer 2026\", \"filter\": \"last weekend\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "email",
+    "endToEndMillis" : 14022,
+    "output" : "<tool_call>\n{\"name\": \"send_email\", \"arguments\": {\"to\": \"finance@cactus.dev\", \"subject\": \"expenses: Blue Bottle Coffee, $14.50, August 4th\", \"body\": \"Receipt for Blue Bottle Coffee: $14.50. Date: August 4th.\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected send_email.subject=\"expenses\"" ]
+  }, {
+    "id" : "currency",
+    "endToEndMillis" : 10340,
+    "output" : "<tool_call>\n{\"name\": \"convert_currency\", \"arguments\": {\"amount\": 250, \"from_currency\": \"USD\", \"to_currency\": \"EUR\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "document",
+    "endToEndMillis" : 24011,
+    "output" : "<tool_call>\n{\"name\": \"record_booking\", \"arguments\": {\"hotel\": \"Harbor Light Hotel\", \"confirmation_number\": \"HL-88213\", \"guest_name\": \"Mr Okafor\", \"room_type\": \"deluxe sea-view\", \"check_in\": \"14 September 2026\", \"check_out\": \"18 September 2026\", \"total\": 642.50, \"currency\": \"euros\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "sentiment",
+    "endToEndMillis" : 8263,
+    "output" : "<tool_call>\n{\"name\": \"classify_sentiment\", \"arguments\": {\"sentiment\": \"negative\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "crowded",
+    "endToEndMillis" : 34899,
+    "output" : "<tool_call>\n{\"name\": \"open_blinds\", \"arguments\": {\"room\": \"bedroom\", \"position\": \"half\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "repeat",
+    "endToEndMillis" : 11172,
+    "output" : "<tool_call>\n{\"name\": \"add_to_list\", \"arguments\": {\"item\": \"milk\", \"quantity\": 2}}\n</tool_call>\n<tool_call>\n{\"name\": \"add_to_list\", \"arguments\": {\"item\": \"eggs\", \"quantity\": 6}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "array",
+    "endToEndMillis" : 7920,
+    "output" : "<tool_call>\n{\"name\": \"add_items\", \"arguments\": {\"items\": [\"milk\", \"eggs\", \"bread\"]}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "flight",
+    "endToEndMillis" : 12629,
+    "output" : "<tool_call>\n{\"name\": \"search_flights\", \"arguments\": {\"from_city\": \"lagos\", \"to_city\": \"nairobi\", \"date\": \"december 3rd\", \"direct_only\": true, \"passengers\": 2}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "refuse",
+    "endToEndMillis" : 19338,
+    "output" : "In the dark, the moon shines bright,  \nA silver ball in the night.  \nIt whispers secrets to the stars,  \nAnd paints the sky with gentle scars.  \n\nWith every tide, it moves along,  \nA guardian of the ocean's song.  \nFrom Earth, it watches, calm and wise,  \nA symbol of peace and time.",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 0,
+    "refusalExpected" : true,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "spring-weather-zipcode",
+    "endToEndMillis" : 8347,
+    "output" : "<tool_call>\n{\"name\": \"get-weather-for-zipcode\", \"arguments\": {\"zipcode\": \"88252\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  } ]
+}

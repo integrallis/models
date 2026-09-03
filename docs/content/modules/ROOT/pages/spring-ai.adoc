@@ -188,9 +188,13 @@ ApplicationRunner weatherDemo(WeatherTools weatherTools) {
 `defaultTools(...)` and per-request `.tools(...)` use the same adapter path.
 For Needle 2, `answer` is the text returned by the registered typed renderer.
 For a qualified generative tool-calling model, it is the model's follow-up
-response after seeing the tool result. Release verification executes this exact
-prompt against the pinned CACT artifact, asserts that the Java method receives
-exactly `"88252"`, and verifies the rendered sentence. When no tool applies,
+response after seeing the tool result; no result renderer is needed. Qwen3 1.7B
+Q8_0 is qualified for that workflow. Release verification runs the full
+`ChatClient` loop against its pinned weights, asserts that the Java method
+receives exactly `"88252"`, and checks that the model's final answer mentions
+both the rain and 78°F without exposing protocol tokens. The corresponding
+Needle test verifies the typed renderer path against the pinned CACT artifact.
+When no tool applies,
 Needle's private reasoning and protocol are removed and the adapter returns
 `No applicable tool is available.`; customize that text with
 `withNoApplicableToolResponse(...)`. Machine-to-machine callers that really want
