@@ -178,6 +178,15 @@ For a supported Hugging Face directory, the pure-Java backend validates
 mapped and execute through the Vectors BF16 batch kernel; the runtime does not
 convert the checkpoint to GGUF or load Python.
 
+The MobileMoE QAT path validates the official signed group-32 INT4 layout,
+expert topology, shared expert, QK normalization, and Llama 3 RoPE settings.
+The source Safetensors file stays mapped. The default runtime prepares its
+projection matrices as row-major Q8 in the backend-owned `Arena`, allowing the
+existing Vector API Q8-by-Q8 kernels and grouped QKV/shared projections to run
+without a native shim. Closing the backend releases those derived buffers.
+`-Dmodels.mobilemoe.runtimeLayout=packed-int4` retains only the compact mapped
+weights and executes them directly when memory capacity is the priority.
+
 The CACT path validates the container header, positional tensor inventory,
 embedded tokenizer, FP16 state, and mixed CQ2/CQ4 matrices before constructing
 the dedicated Needle 2 graph. CACT support is intentionally tied to that graph

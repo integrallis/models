@@ -2,6 +2,17 @@ import transformers_reference_server as reference
 import pytest
 
 
+def test_custom_model_code_is_opt_in_and_remains_local_only():
+    assert reference.model_loading_options(False) == {
+        "local_files_only": True,
+        "trust_remote_code": False,
+    }
+    assert reference.model_loading_options(True) == {
+        "local_files_only": True,
+        "trust_remote_code": True,
+    }
+
+
 def test_stop_sequences_are_applied_before_streaming_text():
     visible, stopped = reference.apply_stop_sequences("answer\n\nignored", ("\n\n",))
 

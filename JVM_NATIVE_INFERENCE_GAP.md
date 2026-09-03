@@ -1,6 +1,6 @@
 # Experiment-backed requests for JVM-native AI inference
 
-Status: working research brief, 2026-09-01.
+Status: working research brief, 2026-09-02.
 
 This document is the evidence base for a future public set of requests to JVM, JDK-distribution,
 compiler, and Java accelerator leaders. The eventual article or paper should be derived from this
@@ -56,6 +56,10 @@ turns shim removal into a performance qualification problem instead of an archit
 - Standard MXFP4 weights execute without expansion; the retained W4A8 kernel was 12.73x faster
   than exact packed decode for the isolated GPT-OSS routed-layer shape while preserving its stated
   numerical gate.
+- Meta MobileMoE-S QAT executes its complete 60-expert graph in pure Java. Preparing the gated
+  checkpoint's packed INT4 weights as Q8 at load time moved the controlled result from 22.58 s
+  first-token latency to a `PRODUCTION_READY` 958.0 ms p95 TTFT while retaining an official
+  full-logit oracle.
 - Java-authored TornadoVM kernels passed complete Qwen output gates on NVIDIA A16 and A40 devices.
   The A40 gate improved warm prefill 4.40x and median decode 1.32x over the same host's Vector API
   path.
@@ -75,6 +79,7 @@ artifact, hardware, and oracle details in the linked reports.
 | Java-authored GPU execution still needs a specialized launcher and pays large compilation/readiness costs. | The [A16 report](models-accelerator-bench/results/vultr-a16-2q-2026-08-29.md) required the TornadoVM launcher, retained 223 plans, and spent about 14 seconds in eager readiness. Maven dependencies alone could not discover the device drivers. | Standard device discovery from an ordinary Java launch, persistent ahead-of-time device code caches, explicit device-memory lifetime, and asynchronous transfer/event APIs. |
 | Device compiler coverage is not yet portable across common inference graphs. | The isolated A16 integer reduction needed graph reshaping; attention passed its numeric test but more than doubled full-model prefill, and only the NVIDIA PTX envelope passed. | Cross-vendor lowering and profiling for packed integer reduction, reductions/softmax, and bounded dynamic shapes, with failures visible before a full model is deployed. |
 | Exact BERT-family activation math lacks a standard scalar or vector operation. | The corrected MS MARCO MiniLM cross-encoder requires the erf-based GELU used by its reference graph. The tested Java 25 `Math`, `StrictMath`, and Vector API expose no `erf`, so Models carries a scalar approximation and cannot express the operation directly to the vector compiler. | Standard, correctly specified scalar and vector special functions beginning with `erf`, with accuracy and lowering contracts appropriate for neural-network inference. |
+| Scaled signed-INT4 execution still needs an expanded runtime layout. | The [MobileMoE experiment](benchmark-results/certified-20260902/rag/mobilemoe-s-qat-int4-g32/README.md) rejects BF16 expansion and records 2.76x-13.90x expert-kernel gains from preparing Q8. The complete Java graph qualifies, but it retains about 1.1 GiB of derived routed-expert weights to do so. | A portable scaled signed-INT4 dot product, with predictable mapped-memory lowering on x86 and AArch64, that approaches the prepared-Q8 kernel without duplicating the checkpoint. |
 
 These are measured gaps in the tested runtimes, not permanent language limitations. The same
 reports also show cases where Java wins or where a proposed native/vector formulation should be
@@ -232,11 +237,36 @@ the same top-two order, remain within 0.15 logits of the ONNX reference and 0.05
 oracle, and improve the measured scoring loop without introducing a platform-specific native
 boundary.
 
+### JVM-AI-10: scaled signed-INT4 dot products without weight expansion
+
+**Audience:** Vector API, HotSpot C2, Graal, and AArch64/x86 compiler teams.
+
+**Observed result:** MobileMoE-S QAT stores routed experts as input-major signed INT4 with one FP16
+scale per group of 32 outputs. Direct mapped execution was correct but too slow. Expanding to BF16
+was 1.57x-2.08x slower than direct INT4 and would add about 2.1 GiB, so it was rejected. Transposing
+and preparing Q8_0 weights made the isolated expert shapes 2.76x-13.90x faster and allowed the
+complete pure-Java model to qualify, but it adds about 1.1 GiB for the routed experts. The
+same-host official Transformers/PyTorch control expands those weights to BF16 and records 12,358.0
+ms p95 TTFT, 8.43 tokens/s median decode, and 4,281,786,368 bytes peak RSS. Java records 958.0 ms,
+21.83 tokens/s, and 2,554,105,856 bytes respectively, which shows that preserving a low-precision
+execution layout matters beyond file size.
+
+**Request:** provide a directly expressible or reliably recognized scaled signed-INT4 dot product
+whose packing, signed-nibble expansion, group-scale application, and accumulation lower predictably
+on x86 and AArch64. The operation must work efficiently over read-only mapped `MemorySegment`
+storage and support both ordinary row-major and the input-major expert layout used by the pinned
+checkpoint.
+
+**Acceptance gate:** the retained MobileMoE gate/up and down JMH shapes must approach the prepared
+Q8_0 results while reading the original mapped INT4 bytes, allocate no derived model-scale weight
+copy, and preserve the official BOS and BOS+hello logit cosine floors plus the 27-case production
+qualification.
+
 ## Distribution-specific evidence today
 
 | Runtime or distribution | What the retained experiments establish | Open issue |
 | --- | --- | --- |
-| Temurin/OpenJDK 25 HotSpot C2 | Portable widened and register-tiled Vector API kernels; correct mapped FFM execution; current production baseline | Missing pairwise packed-dot lowering in the tested build; some useful graphs require manual expansion and hardware-scoped dispatch. |
+| Temurin/OpenJDK 25 HotSpot C2 | Portable widened and register-tiled Vector API kernels; correct mapped FFM execution; current production baseline; complete pure-Java MobileMoE-S qualification | Missing pairwise packed-dot lowering in the tested build; some useful graphs require manual expansion or a model-scale prepared weight layout. |
 | Temurin/OpenJDK 26 HotSpot C2 | Long-offset mapped access improves selected K-quant workloads and complete MiniCPM metrics | Benefits are format-specific, and the measured Q4_K kernel remained slower than Java 25; release regressions need an inference-shaped lane. |
 | GraalVM CE 25 development build | The tested compiler fix emits x86 pairwise instructions and enables a qualified Q4_0 profile | The complete Q8 pairwise block still loses, local inlining control is fragile, and no equivalent AArch64 dot lowering was established. |
 | TornadoVM 5.2 on JDK 25 | Java-authored Q4 projection and decode kernels preserve full-model output and accelerate qualified NVIDIA A16/A40 paths | Specialized launch, cold plan compilation, graph-size constraints, and absent AMD/Intel gates limit ordinary application use. |

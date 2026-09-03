@@ -187,6 +187,34 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
+  void acceptsOnePassComparatorForAThreePassCandidate() {
+    RagBenchmarkReport candidate = report("pure-java", "sha", 100, 1_000);
+    RagBenchmarkReport transformers = report("transformers", "sha", 10, 10_000);
+    transformers = withSettings(transformers, withMeasurementCounts(transformers.settings(), 0, 1));
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(transformers));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.qualifyingComparators()).containsExactly("transformers");
+  }
+
+  @Test
+  void rejectsAComparatorThatDidNotRenderTheSamePrompts() {
+    RagBenchmarkReport candidate = report("pure-java", "sha", 100, 1_000);
+    RagBenchmarkReport transformers =
+        withFirstPromptSha(report("transformers", "sha", 10, 10_000), "different-prompt");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(transformers));
+
+    assertThat(qualification.qualified()).isFalse();
+    assertThat(qualification.exclusions())
+        .containsEntry("transformers", "benchmark prompts differ");
+  }
+
+  @Test
   void rejectsComparatorsWithDifferentStopSequences() {
     RagBenchmarkReport candidate =
         withSettings(
@@ -566,6 +594,64 @@ class RagProductionQualificationPolicyTest {
         report.summary(),
         report.performanceTier(),
         report.runs(),
+        report.failures());
+  }
+
+  private static RagBenchmarkSettings withMeasurementCounts(
+      RagBenchmarkSettings settings, int warmups, int iterations) {
+    return new RagBenchmarkSettings(
+        settings.corpusSha256(),
+        settings.workload(),
+        settings.caseIds(),
+        settings.promptTemplate(),
+        settings.retrievalTopK(),
+        settings.maxOutputTokens(),
+        warmups,
+        iterations,
+        settings.contextLength(),
+        settings.threads(),
+        settings.groundingPolicy(),
+        settings.minimumRetrievalScore(),
+        settings.generationControls());
+  }
+
+  private static RagBenchmarkReport withFirstPromptSha(
+      RagBenchmarkReport report, String promptSha256) {
+    List<RagRun> runs = new ArrayList<>(report.runs());
+    RagRun first = runs.getFirst();
+    runs.set(
+        0,
+        new RagRun(
+            first.framework(),
+            first.backend(),
+            first.model(),
+            first.caseId(),
+            first.retrieved(),
+            promptSha256,
+            first.retrievalMillis(),
+            first.frameworkOverheadMillis(),
+            first.endToEndMillis(),
+            first.generation(),
+            first.grounding(),
+            first.rawEvaluation(),
+            first.evaluation()));
+    return new RagBenchmarkReport(
+        report.schemaVersion(),
+        report.generatedAt(),
+        report.framework(),
+        report.backend(),
+        report.backendVersion(),
+        report.modelId(),
+        report.model(),
+        report.artifactSha256(),
+        report.artifactSizeBytes(),
+        report.settings(),
+        report.environment(),
+        report.backendDiagnostics(),
+        report.hostedApiPricing(),
+        report.summary(),
+        report.performanceTier(),
+        runs,
         report.failures());
   }
 }

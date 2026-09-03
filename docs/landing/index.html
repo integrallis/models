@@ -67,7 +67,7 @@
                     without Python, a separate model server, or a network request.
                 </p>
                 <p class="runtime-disclosure reveal">
-                    Models loads GGUF files and owns tokenization, the transformer
+                    Models loads GGUF, supported Safetensors, and CACT artifacts and owns tokenization, the transformer
                     graph, KV state, sampling, and streaming. Both backends use the
                     Java 25 runtime and Vector API.
                     <code>backend-java</code> executes every kernel in Java;
@@ -124,7 +124,7 @@ try (var runtime = ModelJars.openRuntime(MODEL)) {
                 <div class="section-header">
                     <span class="section-label">runtime</span>
                     <h2 class="section-title">Run models directly inside your Java application</h2>
-                    <p class="section-description">A GGUF file packages the model structure, tokenizer metadata, and trained weights. Models maps those weights, executes the transformer, maintains its attention cache, and generates tokens in process. Backend selection changes only kernels justified by exact artifact and host evidence.</p>
+                    <p class="section-description">GGUF, supported Hugging Face Safetensors bundles, and CACT package model structure, tokenizer metadata, and trained weights in different ways. Models maps those weights, executes the graph, maintains its attention state, and generates tokens in process. Backend selection changes only kernels justified by exact artifact and host evidence.</p>
                 </div>
 
                 <p class="install-label reveal"><span class="accent-tick"></span>Add ModelJars and a qualified model marker</p>

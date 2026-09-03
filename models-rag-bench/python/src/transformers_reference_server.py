@@ -58,10 +58,24 @@ def validate_greedy_controls(request: dict[str, Any]) -> None:
         )
 
 
+def model_loading_options(trust_remote_code: bool) -> dict[str, bool]:
+    """Builds the explicit, local-only Hugging Face loading policy."""
+    return {
+        "local_files_only": True,
+        "trust_remote_code": trust_remote_code,
+    }
+
+
 class TransformersReference:
     """Greedy, cache-backed generation over one pinned local model directory."""
 
-    def __init__(self, model_directory: Path, threads: int, context_length: int):
+    def __init__(
+        self,
+        model_directory: Path,
+        threads: int,
+        context_length: int,
+        trust_remote_code: bool = False,
+    ):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -73,14 +87,14 @@ class TransformersReference:
         torch.set_num_threads(threads)
         torch.set_num_interop_threads(1)
         self._torch = torch
+        loading_options = model_loading_options(trust_remote_code)
         self._tokenizer = AutoTokenizer.from_pretrained(
-            model_directory, local_files_only=True, trust_remote_code=False
+            model_directory, **loading_options
         )
         self._model = AutoModelForCausalLM.from_pretrained(
             model_directory,
-            local_files_only=True,
-            trust_remote_code=False,
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
+            **loading_options,
         ).eval()
         self._context_length = context_length
         self._eos_ids = self._resolve_eos_ids()
@@ -191,8 +205,18 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8081)
     parser.add_argument("--threads", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--context", type=int, default=2048)
+    parser.add_argument(
+        "--trust-remote-code",
+        action="store_true",
+        help="allow custom Python model code already present in the pinned local snapshot",
+    )
     args = parser.parse_args()
-    reference = TransformersReference(args.model_dir, args.threads, args.context)
+    reference = TransformersReference(
+        args.model_dir,
+        args.threads,
+        args.context,
+        trust_remote_code=args.trust_remote_code,
+    )
     server = HTTPServer((args.host, args.port), handler(reference))
     print(f"transformers reference ready on http://{args.host}:{args.port}", flush=True)
     try:

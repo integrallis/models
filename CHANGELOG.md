@@ -2,6 +2,25 @@
 
 All notable changes to models are documented here.
 
+## Unreleased
+
+### Added
+
+- Added pure-Java execution for Meta MobileMoE-S QAT Safetensors checkpoints, including the
+  official tokenizer and chat template, top-k routed and shared experts, packed signed-INT4 G32
+  weights, batched prefill, and grouped projections.
+- Added a prepared Q8 runtime layout that keeps the source checkpoint mapped while reusing the
+  existing Java Vector API Q8 kernels. The direct packed-INT4 layout remains available with
+  `-Dmodels.mobilemoe.runtimeLayout=packed-int4` for lower-memory environments.
+- Added official-checkpoint tokenizer, full-logit, KV-state, layout, public-backend, and
+  default-configuration integration gates.
+
+### Documentation
+
+- Recorded the complete MobileMoE optimization history, including the rejected BF16 expansion,
+  retained packed-INT4 and prepared-Q8 JMH measurements, immutable model identity, 27-request
+  production qualification, and the resulting scaled signed-INT4 JVM request.
+
 ## [0.3.24] - 2026-09-02
 
 ### Added

@@ -196,6 +196,11 @@ uv run --extra transformers --frozen models-transformers-reference \
   --port 8081
 ```
 
+For a pinned snapshot whose configuration declares a custom model implementation, add
+`--trust-remote-code`. The reference still uses `local_files_only=True`, so it executes only the
+reviewed Python files already present in that local snapshot. This switch is for independent test
+oracles; it does not add the external implementation to Models' product path.
+
 Then run the Java harness with `--backend transformers`, the same `--model-id`,
 the primary Safetensors file as `--artifact`, and the exact Python worker PID:
 
@@ -203,7 +208,7 @@ the primary Safetensors file as `--artifact`, and the exact Python worker PID:
 models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
   --framework plain-java \
   --backend transformers \
-  --backend-version transformers-4.46.3-torch-2.2.2 \
+  --backend-version transformers-4.57.6-torch-2.8.0 \
   --model qwen2.5-0.5b-instruct-bf16 \
   --model-id qwen2.5-0.5b-instruct-bf16 \
   --artifact /absolute/path/to/pinned-snapshot/model.safetensors \
@@ -222,6 +227,13 @@ The reference rejects sampling settings it does not implement. It is a
 correctness and artifact-format comparator, not a production serving claim;
 the Models candidate must independently clear the absolute quality and latency
 gate.
+
+An expensive comparator may use fewer warmups or measured repetitions than the
+candidate. It must still run every case and produce the exact same distinct
+`(case ID, rendered prompt SHA-256)` set. Artifact identity, host hardware,
+corpus, template, retrieval settings, context, thread count, grounding policy,
+and generation controls remain exact-match requirements. This permits one
+complete reference pass without paying to repeat identical prompt coverage.
 
 Use `--stop-sequence '\n\n'` to stop at the first paragraph. The CLI decodes
 `\n`, `\r`, `\t`, and `\\` escapes, applies the sequence during in-process

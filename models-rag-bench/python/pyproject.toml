@@ -13,9 +13,10 @@ dependencies = [
 llama = ["llama-cpp-python==0.3.34"]
 transformers = [
     "numpy<2",
-    "safetensors==0.4.5",
-    "torch==2.2.2",
-    "transformers==4.46.3",
+    "safetensors==0.7.0",
+    "torch==2.2.2 ; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "torch==2.8.0 ; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "transformers==4.57.6",
 ]
 test = ["pytest==8.4.2"]
 

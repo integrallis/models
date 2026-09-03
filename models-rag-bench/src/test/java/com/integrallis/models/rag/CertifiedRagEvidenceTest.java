@@ -124,6 +124,9 @@ class CertifiedRagEvidenceTest {
   private static final Path QWEN2_5_0_5B_BF16_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260825/rag/qwen2.5-0.5b-instruct-bf16");
+  private static final Path MOBILE_MOE_S_QAT_INT4_G32_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260902/rag/mobilemoe-s-qat-int4-g32");
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -2256,7 +2259,7 @@ class CertifiedRagEvidenceTest {
             transformers.runs().stream().map(run -> run.generation().inputTokens()).toList());
     assertThat(candidate.runs().getFirst().generation().inputTokens()).isEqualTo(175);
     assertThat(RagProductionQualificationPolicy.POLICY_ID)
-        .isEqualTo("production-rag-model-contribution-v5");
+        .isEqualTo("production-rag-model-contribution-v6");
     assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
     assertThat(qualification.qualified()).isTrue();
     assertThat(qualification.qualifyingComparators()).containsExactly("transformers");
@@ -2271,6 +2274,76 @@ class CertifiedRagEvidenceTest {
               assertThat(comparison.decodeThroughputRatio()).isBetween(4.88, 4.90);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(0.059, 0.060);
             });
+  }
+
+  @Test
+  void mobileMoeSafetensorsQualifiesAgainstAOnePassTransformersReference() throws Exception {
+    RagBenchmarkReport candidate =
+        report(MOBILE_MOE_S_QAT_INT4_G32_EVIDENCE, "models-pure-java.json");
+    RagBenchmarkReport transformers =
+        report(MOBILE_MOE_S_QAT_INT4_G32_EVIDENCE, "transformers.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(transformers));
+
+    assertThat(candidate.modelId()).isEqualTo("facebook_mobilemoe_s_qat_int4_g32");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("1a54d8eb2adf19c296a1c129f9cd7d7395c21f5facfc6d13d2945e002d55e37d");
+    assertThat(candidate.artifactSizeBytes()).isEqualTo(713_916_240L);
+    assertThat(candidate.settings().promptTemplate()).isEqualTo("mobilemoe");
+    assertThat(candidate.settings().iterations()).isEqualTo(3);
+    assertThat(transformers.settings().iterations()).isOne();
+    assertThat(transformers.settings().warmups()).isZero();
+    assertThat(candidate.environment()).isEqualTo(transformers.environment());
+    assertThat(candidate.summary().successfulAttempts()).isEqualTo(27);
+    assertThat(candidate.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PRODUCTION_READY);
+    assertThat(transformers.summary().successfulAttempts()).isEqualTo(9);
+    assertThat(transformers.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(transformers.performanceTier()).isEqualTo(RagPerformanceTier.OFFLINE);
+    assertThat(
+            candidate.runs().stream()
+                .map(run -> run.caseId() + ":" + run.promptSha256())
+                .distinct()
+                .toList())
+        .containsExactlyElementsOf(
+            transformers.runs().stream()
+                .map(run -> run.caseId() + ":" + run.promptSha256())
+                .distinct()
+                .toList());
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("transformers");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(2.59, 2.60);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.158, 0.159);
+            });
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("artifact-format", "safetensors")
+        .containsEntry("weight-encoding", "packed-int4-g32")
+        .containsEntry("runtime-weight-layout", "q8")
+        .containsEntry("architecture-prefill-batch-size", "256")
+        .containsEntry("model-architecture", "mobilemoe");
+  }
+
+  @Test
+  void mobileMoePassesTheLibraryDefaultCorrectnessGate() throws Exception {
+    RagBenchmarkReport report =
+        report(
+            MOBILE_MOE_S_QAT_INT4_G32_EVIDENCE.resolve("default-correctness"),
+            "models-pure-java.json");
+
+    assertThat(report.settings().warmups()).isZero();
+    assertThat(report.settings().iterations()).isOne();
+    assertThat(report.summary().totalAttempts()).isEqualTo(9);
+    assertThat(report.summary().successfulAttempts()).isEqualTo(9);
+    assertThat(report.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(report.summary().abstentionAccuracy()).isEqualTo(1.0);
+    assertThat(report.failures()).isEmpty();
   }
 
   @Test
