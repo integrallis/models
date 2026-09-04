@@ -10,6 +10,50 @@ The Models and Vectors starters are tested together on Spring AI 1.1.4, 1.1.8,
 and 2.0.0. They contribute separate chat and vector-store beans and do not
 replace one another.
 
+[#development-launchers]
+== Development Launchers
+
+Spring Boot's optimized development launch adds
+`-XX:TieredStopAtLevel=1`. That starts the application quickly by limiting
+HotSpot to the C1 compiler, but it also prevents the Vector API inference
+kernels from being optimized by C2. A model request can consequently appear to
+hang while it is actually executing the unoptimized kernels.
+
+Disable that startup optimization for `bootRun`:
+
+[source,groovy]
+----
+tasks.named('bootRun') {
+    optimizedLaunch = false
+    jvmArgs '--add-modules', 'jdk.incubator.vector'
+}
+----
+
+[source,kotlin]
+----
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    optimizedLaunch.set(false)
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+}
+----
+
+For the Spring Boot Maven plugin, use:
+
+[source,xml]
+----
+<configuration>
+    <optimizedLaunch>false</optimizedLaunch>
+    <jvmArguments>--add-modules jdk.incubator.vector</jvmArguments>
+</configuration>
+----
+
+In IntelliJ IDEA, open the Spring Boot run configuration, choose
+`Modify options`, and select `Disable launch optimization`.
+
+Models checks this JVM prerequisite before loading a pure-Java model. If a
+C1-only or interpreted-only launch is detected, startup fails immediately with
+the same remediation instead of beginning impractically slow inference.
+
 == Dependencies
 
 Use the Spring AI BOM or an existing Spring AI provider starter to select the

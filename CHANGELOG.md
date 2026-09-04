@@ -2,6 +2,21 @@
 
 All notable changes to models are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Detect C1-only and interpreted-only JVM launches before pure-Java model loading, avoiding an
+  apparent inference hang under Spring Boot `bootRun` and IntelliJ's default Spring Boot launch
+  optimization.
+- Added an exact Spring context regression for the `ChatClient` builder-customizer, conversation
+  memory, typed tool, and Qwen tool-result continuation path.
+
+### Documentation
+
+- Documented the Gradle, Maven, and IntelliJ settings that retain the optimizing C2 compiler for
+  in-process inference during development.
+
 ## [0.3.27] - 2026-09-03
 
 ### Added
