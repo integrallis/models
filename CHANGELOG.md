@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.28] - 2026-09-04
+
 ### Fixed
 
 - Detect C1-only and interpreted-only JVM launches before pure-Java model loading, avoiding an
