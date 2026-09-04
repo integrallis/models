@@ -1534,9 +1534,9 @@ class LlamaForwardPassTest {
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
       assertThat(batched.usesGroupedBatchedPrefill()).isFalse();
-      assertThat(actual).containsExactly(expected);
+      assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
       assertThat(batched.forward(3, tokens.length))
-          .containsExactly(sequential.forward(3, tokens.length));
+          .containsExactly(sequential.forward(3, tokens.length), within(SIMD_REDUCTION_TOLERANCE));
     }
 
     @Test
