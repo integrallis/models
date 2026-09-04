@@ -94,6 +94,18 @@ public final class SyntheticGgufBuilder {
     return this;
   }
 
+  public SyntheticGgufBuilder addUint8Array(String key, byte[] values) {
+    metadataEntries.add(
+        new MetadataEntry(key, GgufValueType.ARRAY, new Uint8ArrayData(values.clone())));
+    return this;
+  }
+
+  public SyntheticGgufBuilder addUint64Array(String key, long[] values) {
+    metadataEntries.add(
+        new MetadataEntry(key, GgufValueType.ARRAY, new Uint64ArrayData(values.clone())));
+    return this;
+  }
+
   public SyntheticGgufBuilder addTensor(
       String name, GgufTensorType type, long[] shape, byte[] data) {
     tensorEntries.add(new TensorEntry(name, type, shape, data));
@@ -183,6 +195,16 @@ public final class SyntheticGgufBuilder {
           for (Boolean value : bad.values) {
             out.write(value ? 1 : 0);
           }
+        } else if (entry.value instanceof Uint8ArrayData u8ad) {
+          writeU32(out, GgufValueType.UINT8.id());
+          writeU64(out, u8ad.values.length);
+          out.write(u8ad.values);
+        } else if (entry.value instanceof Uint64ArrayData u64ad) {
+          writeU32(out, GgufValueType.UINT64.id());
+          writeU64(out, u64ad.values.length);
+          for (long value : u64ad.values) {
+            writeU64(out, value);
+          }
         }
       }
       default -> throw new UnsupportedOperationException("Type not supported: " + entry.type);
@@ -232,4 +254,8 @@ public final class SyntheticGgufBuilder {
   private record Int32ArrayData(List<Integer> values) {}
 
   private record BoolArrayData(List<Boolean> values) {}
+
+  private record Uint8ArrayData(byte[] values) {}
+
+  private record Uint64ArrayData(long[] values) {}
 }
