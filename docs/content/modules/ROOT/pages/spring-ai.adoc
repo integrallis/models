@@ -10,6 +10,18 @@ Compatibility CI exercises Spring AI 1.1.4, 1.1.8, and 2.0.0. The application
 normally selects the Spring AI version through its Spring AI BOM; the Models
 adapter does not impose a provider or hosted model client.
 
+[IMPORTANT]
+====
+Spring Boot's development launch optimization limits HotSpot to the C1
+compiler. That is useful for fast application startup, but it prevents the
+Vector API inference kernels from reaching their optimized form. Disable launch
+optimization when running an in-process model with `bootRun`,
+`spring-boot:run`, or an IntelliJ Spring Boot run configuration. See
+xref:spring-boot.adoc#development-launchers[Development launchers] for the exact
+settings. Packaged applications started with `java -jar` do not receive this
+development-only option.
+====
+
 == Dependencies
 
 [source,kotlin,subs="attributes+"]

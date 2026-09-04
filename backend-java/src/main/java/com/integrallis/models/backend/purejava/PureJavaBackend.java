@@ -288,6 +288,7 @@ public final class PureJavaBackend
     LoadedDecoder loaded = null;
     try {
       Objects.requireNonNull(modelPath, "modelPath");
+      JvmLaunchSupport.requireOptimizingCompiler();
       RuntimeFingerprint runtime = RuntimeFingerprint.capture();
       Map<String, String> recommendations =
           recommendations(backendConfiguration, batchedMatrixKernel);
