@@ -7,7 +7,7 @@ the GitHub release.
 The publication allowlist contains `models-api`, `models-runtime`, `models`,
 `models-rag`, `models-semantic-order`, `backend-java`, `backend-tornado`, `backend-native`,
 `backend-apple`, `models-langchain4j`, `models-spring-ai`,
-`models-spring-boot-starter`, `models-embedding`, and `models-router`. Benchmark
+`models-spring-boot-starter`, `models-embedding`, `models-audio`, and `models-router`. Benchmark
 applications, documentation tooling, and modules containing only package scaffolding are not
 published.
 
