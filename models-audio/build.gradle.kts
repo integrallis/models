@@ -1,5 +1,29 @@
 // models-audio — Java-native speech and audio model runtimes
 
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
+import org.gradle.testing.jacoco.tasks.JacocoReport
+
+// The file-backed engine adapter requires a published Soprano artifact. It is covered by the
+// opt-in end-to-end/oracle suite and controlled qualification runs, not the ordinary unit-test task
+// whose execution data feeds the 80% JaCoCo gate.
+val sopranoArtifactIntegrationClasses = listOf("**/SopranoBackendEngine.class")
+
+tasks.withType<JacocoReport>().configureEach {
+    classDirectories.setFrom(
+        files(classDirectories.files.map { directory ->
+            fileTree(directory) { exclude(sopranoArtifactIntegrationClasses) }
+        }),
+    )
+}
+
+tasks.withType<JacocoCoverageVerification>().configureEach {
+    classDirectories.setFrom(
+        files(classDirectories.files.map { directory ->
+            fileTree(directory) { exclude(sopranoArtifactIntegrationClasses) }
+        }),
+    )
+}
+
 dependencies {
     api(project(":models-api"))
 
