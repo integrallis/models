@@ -77,6 +77,25 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return open(libraryPath, NativeKernelSettings.fromSystemProperties(Map.of()));
   }
 
+  /** Opens an explicit platform library with a model-specific worker recommendation. */
+  public static RustGgufBatchedMatrixKernel open(Path libraryPath, int recommendedThreads) {
+    return open(
+        libraryPath,
+        NativeKernelSettings.fromSystemProperties(
+            Map.of(
+                NativeKernelLibrary.THREAD_COUNT_PROPERTY, Integer.toString(recommendedThreads))));
+  }
+
+  /** Opens the integrity-checked native kernel distributed for the current platform. */
+  public static RustGgufBatchedMatrixKernel openBundled() {
+    return open(BundledNativeKernelLibrary.resolve());
+  }
+
+  /** Opens the bundled kernel with a model-specific worker recommendation. */
+  public static RustGgufBatchedMatrixKernel openBundled(int recommendedThreads) {
+    return open(BundledNativeKernelLibrary.resolve(), recommendedThreads);
+  }
+
   static RustGgufBatchedMatrixKernel open(Path libraryPath, NativeKernelSettings settings) {
     Objects.requireNonNull(settings, "settings");
     return new RustGgufBatchedMatrixKernel(

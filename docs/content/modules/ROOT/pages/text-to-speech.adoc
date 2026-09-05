@@ -1,0 +1,85 @@
+= Text-to-Speech
+
+Models can synthesize speech in-process without Python, a model server, or an
+external inference runtime. The first supported architecture is Soprano 1.1.
+Its tokenizer, language model, acoustic frames, and vocoder execute inside the
+JVM process from a pinned GGUF artifact.
+
+== Install
+
+[source,kotlin]
+----
+dependencies {
+    implementation("com.integrallis:models-audio:${modelsVersion}")
+}
+----
+
+`models-audio` includes the API and the Java backend. Qualified Q8 artifacts
+can use the bundled Models-owned native projection kernel; the rest of the
+pipeline remains Java-owned. The qualified BF16 artifact runs entirely in Java.
+
+== Synthesize a WAV file
+
+[source,java]
+----
+import com.integrallis.models.api.WavEncoder;
+import com.integrallis.models.audio.SopranoTextToSpeechModel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+try (var model = SopranoTextToSpeechModel.loadNative(modelPath)) {
+    var audio = model.synthesize("The JVM can speak for itself.");
+    Files.write(Path.of("speech.wav"), WavEncoder.pcm16(audio));
+}
+----
+
+`PcmAudio` contains immutable normalized floating-point samples, sample rate,
+channel count, frame count, and duration. `WavEncoder.pcm16(...)` converts it to
+a portable 16-bit PCM WAVE file.
+
+== Stream audio
+
+[source,java]
+----
+model.synthesize(text, options, new AudioStream() {
+    public void onAudio(PcmAudio chunk) { play(chunk); }
+    public void onComplete() { closePlayback(); }
+    public void onError(Throwable failure) { report(failure); }
+});
+----
+
+Soprano emits PCM as acoustic frames become decodable. This is genuine
+incremental synthesis: qualification requires the first audio chunk before the
+complete utterance is available, and the concatenated chunks must match the
+blocking waveform.
+
+== Controls and limits
+
+`SpeechSynthesisOptions` carries portable sampling, language, voice, speed, and
+reference-audio controls. Soprano 1.1 has one fixed English voice, so it accepts
+English and sampling controls but rejects voice selection, speed changes, and
+reference voice cloning instead of silently ignoring them.
+
+Long input is normalized and split at sentence and word boundaries before
+synthesis. The runtime exposes its selected backend and execution decisions
+through `diagnostics()`.
+
+== Qualification
+
+A catalog artifact is published for speech only when the exact file passes all
+of these checks:
+
+* waveform equivalence against the pinned official implementation;
+* valid 32 kHz mono PCM with non-empty audio;
+* incremental audio before completion whose concatenation matches blocking output;
+* at least three controlled timing trials;
+* p95 real-time factor no greater than 2.0 and p95 time to first audio no greater than two seconds.
+
+The ModelJar records the artifact hash, runtime revision, oracle revision,
+measurements, and evidence-report hash. A similarly named file with different
+bytes does not inherit the qualification.
+
+The controlled Soprano qualification records five streaming trials per exact
+artifact. Q8_0 reaches 1.225912 p95 RTF and 676.696 ms p95 time to first audio;
+pure-Java BF16 reaches 1.886551 p95 RTF and 1,670.465 ms p95 time to first
+audio. See the link:https://github.com/integrallis/models/tree/main/benchmark-results/audio/soprano-1.1-80m-java[retained reports^].

@@ -2575,9 +2575,9 @@ unsafe fn compute_q8_batched_row_range_avx2(
     }
 
     let blocks_per_row = cols / QK_0;
-    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
+    batch_scratch!(sums, batch_size, 0_f32, f32);
     for row in start_row..end_row {
-        sums.fill(_mm256_setzero_ps());
+        sums.fill(0.0);
         for block in 0..blocks_per_row {
             let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
             let weight_scale = f16_to_f32(u16::from_le_bytes([
@@ -2593,22 +2593,15 @@ unsafe fn compute_q8_batched_row_range_avx2(
                         quantized.as_ptr().add(input_offset),
                     )
                 };
+                let integer_sum = horizontal_sum_i32_avx2(pair_sums);
                 let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
-                sums[batch] = _mm256_fmadd_ps(
-                    _mm256_set1_ps(scale),
-                    _mm256_cvtepi32_ps(pair_sums),
-                    sums[batch],
-                );
+                sums[batch] = scale.mul_add(integer_sum as f32, sums[batch]);
             }
         }
         for (batch, &sum) in sums.iter().enumerate() {
-            #[cfg(test)]
-            Q8_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
             // SAFETY: each worker owns this row across all batch-major output planes.
             unsafe {
-                output
-                    .add(batch * rows + row)
-                    .write(horizontal_sum_f32_avx2(sum));
+                output.add(batch * rows + row).write(sum);
             }
         }
     }
@@ -3800,7 +3793,7 @@ unsafe fn dot_q8_0_q8_0_row_avx2(
     cols: usize,
 ) -> f32 {
     let blocks_per_row = cols / QK_0;
-    let mut sums = _mm256_setzero_ps();
+    let mut sum = 0_f32;
     for block in 0..blocks_per_row {
         let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
         let input_offset = batch * cols + block * QK_0;
@@ -3815,12 +3808,11 @@ unsafe fn dot_q8_0_q8_0_row_avx2(
             weights[weight_offset],
             weights[weight_offset + 1],
         ]));
+        let integer_sum = horizontal_sum_i32_avx2(pair_sums);
         let scale = weight_scale * activation_scales[batch * blocks_per_row + block];
-        sums = _mm256_fmadd_ps(_mm256_set1_ps(scale), _mm256_cvtepi32_ps(pair_sums), sums);
+        sum = scale.mul_add(integer_sum as f32, sum);
     }
-    #[cfg(test)]
-    Q8_0_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
-    horizontal_sum_f32_avx2(sums)
+    sum
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -4269,12 +4261,15 @@ unsafe fn unsigned_signed_products_avx2(unsigned: __m256i, signed: *const i8) ->
 }
 
 #[cfg(target_arch = "x86_64")]
+#[inline]
 #[target_feature(enable = "avx2")]
 fn horizontal_sum_i32_avx2(values: __m256i) -> i32 {
-    let mut lanes = [0_i32; 8];
-    // SAFETY: lanes provides one complete 256-bit destination.
-    unsafe { _mm256_storeu_si256(lanes.as_mut_ptr().cast(), values) };
-    lanes.into_iter().sum()
+    let halves = _mm_add_epi32(
+        _mm256_castsi256_si128(values),
+        _mm256_extracti128_si256::<1>(values),
+    );
+    let pairs = _mm_hadd_epi32(halves, halves);
+    _mm_cvtsi128_si32(_mm_hadd_epi32(pairs, pairs))
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -5522,7 +5517,7 @@ mod tests {
 
     #[cfg(target_arch = "x86_64")]
     #[test]
-    fn avx2_q8_0_row_reduces_simd_lanes_once() {
+    fn avx2_q8_0_row_matches_scalar_ordered_accumulation() {
         if !std::arch::is_x86_feature_detected!("avx2")
             || !std::arch::is_x86_feature_detected!("fma")
             || !std::arch::is_x86_feature_detected!("f16c")
@@ -5559,7 +5554,7 @@ mod tests {
             unsafe { dot_q8_0_q8_0_row_avx2(&weights, &quantized, &activation_scales, 0, 0, cols) };
 
         assert!((avx2 - scalar).abs() <= 1e-3);
-        Q8_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 1));
+        Q8_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 0));
         F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), BLOCKS));
 
         const BATCH_SIZE: usize = 3;
@@ -5582,9 +5577,50 @@ mod tests {
             );
         }
         for value in batched_output {
-            assert!((value - scalar).abs() <= 1e-3);
+            assert_eq!(value.to_bits(), scalar.to_bits());
         }
-        Q8_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), BATCH_SIZE));
+        Q8_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 0));
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn avx2_q8_0_quantization_matches_scalar_exactly() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+        const BATCH_SIZE: usize = 3;
+        const COLS: usize = 4 * QK_0;
+        let input: Vec<f32> = (0..BATCH_SIZE * COLS)
+            .map(|index| {
+                let signed = (index as i32 * 73 % 509) - 254;
+                signed as f32 * 0.001953125 + (index % 7) as f32 * 1.0e-7
+            })
+            .collect();
+        let mut scalar_quants = vec![0_i8; input.len()];
+        let mut avx2_quants = vec![0_i8; input.len()];
+        let mut scalar_scales = vec![0_f32; BATCH_SIZE * COLS / QK_0];
+        let mut avx2_scales = vec![0_f32; BATCH_SIZE * COLS / QK_0];
+
+        quantize_q8_0_batch_scalar(
+            &input,
+            BATCH_SIZE,
+            COLS,
+            &mut scalar_quants,
+            &mut scalar_scales,
+        );
+        // SAFETY: AVX2 was detected and all buffers cover the requested complete Q8 blocks.
+        unsafe {
+            quantize_q8_0_batch_avx2(
+                &input,
+                BATCH_SIZE,
+                COLS,
+                &mut avx2_quants,
+                &mut avx2_scales,
+            );
+        }
+
+        assert_eq!(avx2_quants, scalar_quants);
+        assert_eq!(avx2_scales, scalar_scales);
     }
 
     #[test]

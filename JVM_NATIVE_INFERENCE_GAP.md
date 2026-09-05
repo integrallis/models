@@ -60,6 +60,10 @@ turns shim removal into a performance qualification problem instead of an archit
   checkpoint's packed INT4 weights as Q8 at load time moved the controlled result from 22.58 s
   first-token latency to a `PRODUCTION_READY` 958.0 ms p95 TTFT while retaining an official
   full-logit oracle.
+- The standalone Soprano 1.1 80M artifact now executes its complete text-to-speech graph in Java:
+  Hugging Face-named GGUF loading, tokenization, acoustic-token generation, vocoder, ISTFT, and
+  32 kHz PCM output. Pure-Java BF16 clears the production streaming gate at 1.886551 p95 RTF. Q8
+  clears it at 1.225912 using only a Models-owned projection kernel through FFM.
 - Java-authored TornadoVM kernels passed complete Qwen output gates on NVIDIA A16 and A40 devices.
   The A40 gate improved warm prefill 4.40x and median decode 1.32x over the same host's Vector API
   path.
@@ -98,15 +102,23 @@ discussed, reproduced, and closed independently.
 **Observed result:** the expanded Vector API graph reached `VPMADDWD` and `VPMADDUBSW` on the tested
 Graal development build but not on HotSpot C2. The same report found no AArch64 `SDOT`/`UDOT`
 lowering. Even after successful instruction selection, the complete Q8 block remained slower than
-the established widening kernel.
+the established widening kernel. In the [Soprano end-to-end gate](benchmark-results/audio/soprano-1.1-80m-java/README.md),
+Q8 dot and accumulation frames account for roughly three quarters of sampled Java time. Output
+layout, physical QKV packing, and two-dimensional tiling made Java slower. The final Q8 profile
+clears the gate only when its projection kernel uses the Models-owned Rust/FFM implementation,
+while the same graph clears it entirely in Java from BF16 weights. This isolates the remaining shim
+to the missing efficient Java Q8 primitive rather than the TTS architecture.
 
 **Request:** provide direct or reliably recognized operations for signed-short pairwise
-multiply-add and unsigned-byte by signed-byte dot products, with documented overflow/saturation
-semantics suitable for exact quantized inference.
+multiply-add and signed-byte or unsigned-byte by signed-byte dot products with INT32 accumulation,
+with documented overflow/saturation semantics suitable for exact quantized inference. Expose a
+portable way to determine whether VNNI, SDOT, or SMMLA-class lowering is available; preferred vector
+width alone does not answer that question.
 
 **Acceptance gate:** the existing pairwise microbenchmarks must lower without internal APIs or
-global compiler flags on x86-64 and AArch64, allocate zero, and then pass the complete Q4/Q8 block
-plus full-model hash gates. The full block—not the presence of an opcode—is the success criterion.
+global compiler flags on x86-64 and AArch64, allocate zero, and then pass the complete Q4/Q8 block,
+full-model hash gates, and Soprano waveform gate. The full block and end-to-end model—not the
+presence of an opcode—are the success criteria.
 
 ### JVM-AI-2: predictable local optimization of vector helpers
 

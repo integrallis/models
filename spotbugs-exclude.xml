@@ -23,6 +23,13 @@
         <Package name="com.integrallis.models.backend.purejava"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+    <!-- SopranoBackend.Step is a per-call transfer object. LlamaForwardPass already creates stable
+         copies for it; returning those arrays without another defensive copy avoids duplicating
+         the vocabulary and acoustic-frame buffers on every generated token. -->
+    <Match>
+        <Class name="com.integrallis.models.backend.purejava.soprano.SopranoBackend$Step"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
     <!-- bytes_to_unicode mapping: byte value is known <=255 by construction (loop 0..255) -->
     <Match>
         <Class name="com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer"/>

@@ -1,7 +1,34 @@
 import java.nio.file.Path
 import java.util.Properties
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
+import org.gradle.testing.jacoco.tasks.JacocoReport
 
 // backend-java - GGUF parser, vectors-backed inference kernels, and KV cache
+
+// The standalone Soprano loader and vocoder require the published model artifact. They are covered
+// by sopranoGgufIntegrationTest plus the controlled oracle/latency qualification gate, not by the
+// ordinary unit-test task whose execution data feeds the 80% JaCoCo gate.
+val sopranoArtifactIntegrationClasses =
+    listOf(
+        "**/soprano/SopranoBackend*.class",
+        "**/soprano/SopranoVocoder*.class",
+    )
+
+tasks.withType<JacocoReport>().configureEach {
+    classDirectories.setFrom(
+        files(classDirectories.files.map { directory ->
+            fileTree(directory) { exclude(sopranoArtifactIntegrationClasses) }
+        }),
+    )
+}
+
+tasks.withType<JacocoCoverageVerification>().configureEach {
+    classDirectories.setFrom(
+        files(classDirectories.files.map { directory ->
+            fileTree(directory) { exclude(sopranoArtifactIntegrationClasses) }
+        }),
+    )
+}
 
 data class ModelFixture(
     val taskName: String,
@@ -580,6 +607,33 @@ tasks.register<Test>("euroLlm17BIntegrationTest") {
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "4g"
+}
+
+tasks.register<Test>("sopranoGgufIntegrationTest") {
+    description = "Run the configured standalone Soprano Q8 GGUF pure-Java integration tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.soprano.SopranoBackendIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.soprano.SopranoVocoderWeightsIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.soprano.SopranoTokenizerIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.soprano.SopranoReferenceEquivalenceIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
 }
 
 tasks.named<Test>("slowTest") {

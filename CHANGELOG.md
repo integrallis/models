@@ -4,6 +4,39 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.29] - 2026-09-05
+
+### Added
+
+- Added a framework-neutral text-to-speech API with immutable PCM audio, incremental audio
+  callbacks, speech controls, and PCM16 WAVE encoding.
+- Added complete in-process execution of standalone Soprano 1.1 GGUF artifacts: byte-level
+  tokenization, autoregressive acoustic generation, vocoder, inverse STFT, and 32 kHz mono output.
+- Added true streaming synthesis whose emitted chunks reproduce the blocking waveform exactly.
+
+### Changed
+
+- Prepared Hugging Face-named BF16 language-model projections as owned F32 execution matrices and
+  reused the Vectors prepared-F32 abstraction for the Soprano vocoder.
+- Added a narrowly scoped Models-owned Rust/FFM Q8 projection kernel for qualified CPU profiles;
+  model parsing, graph execution, state, sampling, vocoder, streaming, and audio remain Java-owned.
+- Batched 12 stable acoustic frames per streaming vocoder call and bounded Soprano's native worker
+  recommendation at six, while preserving explicit deployment overrides.
+
+### Fixed
+
+- Applied repetition penalties once per unique prior token, matching the reference sampler and
+  preventing duplicated history from multiplying the penalty.
+- Preserved per-block accumulation order in the native Q8 kernel so it matches the Java projection
+  and deterministic Soprano waveform.
+- Removed repeated overlapping one-token vocoder work from incremental synthesis; the final Q8 and
+  pure-Java BF16 profiles now pass the production streaming-latency policy.
+
+### Documentation
+
+- Added text-to-speech API guidance, immutable artifact and oracle evidence, controlled streaming
+  latency gates, and the measured packed-dot-product request for JVM implementors.
+
 ## [0.3.28] - 2026-09-04
 
 ### Fixed

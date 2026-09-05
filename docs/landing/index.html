@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Models - In-process language-model inference for Java 25</title>
-    <meta name="description" content="Models runs qualified GGUF, Safetensors, and CACT language models inside Java 25 applications with framework adapters, tool execution, and adaptive routing across local and hosted models.">
+    <title>Models - In-process AI model inference for Java 25</title>
+    <meta name="description" content="Models runs qualified GGUF, Safetensors, and CACT text, embedding, reranking, and speech models inside Java 25 applications.">
     <meta property="og:title" content="Models - In-process language-model inference for Java 25">
-    <meta property="og:description" content="Load, run, stream, and integrate qualified GGUF, Safetensors, and CACT models inside the JVM, including LangChain4j and Spring AI tool calling.">
+    <meta property="og:description" content="Load, run, and stream qualified text, embedding, reranking, and speech models inside the JVM.">
     <meta property="og:type" content="website">
     <script>
         (function () {
@@ -36,7 +36,7 @@
                 <a href="https://integrallis.com" class="brand-mark" aria-label="Integrallis"><img class="ilogo" src="assets/images/integrallis-logo.png" alt="Integrallis"></a>
                 <span class="sep">/</span>
                 <a href="#top" class="product">models</a>
-                <a href="https://github.com/integrallis/models/releases" class="version-pill" title="Release notes">v0.3.28</a>
+                <a href="https://github.com/integrallis/models/releases" class="version-pill" title="Release notes">v0.3.29</a>
             </div>
             <div class="nav-right">
                 <div class="nav-links">
@@ -63,7 +63,7 @@
                 <div class="hero-eyebrow reveal"><span class="dot"></span> In-process inference - Java 25</div>
                 <h1 class="hero-title reveal">Models</h1>
                 <p class="hero-subtitle reveal">
-                    Run open-weight language models inside your Java application,
+                    Run open-weight text and speech models inside your Java application,
                     without Python, a separate model server, or a network request.
                 </p>
                 <p class="runtime-disclosure reveal">
@@ -182,7 +182,7 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                     </div>
                     <div class="apple-example reveal">
                         <div class="code-title">// Add the Apple backend</div>
-                        <pre><code>implementation("com.integrallis:backend-apple:0.3.28")</code></pre>
+                        <pre><code>implementation("com.integrallis:backend-apple:0.3.29")</code></pre>
                         <div class="code-title">// Check availability, then generate locally</div>
                         <pre><code class="language-java hljs" data-lang="java">try (var client = AppleFoundationModels.create()) {
     var status = client.availability();
@@ -225,6 +225,10 @@ implementation("org.modeljars.huggingface:ggml-org.qwen3-0.6b-gguf.q4_0:3.0.0-q4
                     <article class="card reveal">
                         <h3 class="card-title">In-JVM embeddings</h3>
                         <p class="card-description">Text to vectors from causal decoders and dedicated bidirectional encoders, tested against pinned llama.cpp references.</p>
+                    </article>
+                    <article class="card reveal">
+                        <h3 class="card-title">Streaming speech</h3>
+                        <p class="card-description">Generate normalized PCM and WAV audio in process, with Soprano streaming its first playable chunk before the utterance completes.</p>
                     </article>
                     <article class="card reveal">
                         <h3 class="card-title">Tool calling</h3>

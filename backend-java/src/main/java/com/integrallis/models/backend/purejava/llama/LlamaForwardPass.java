@@ -68,6 +68,14 @@ public final class LlamaForwardPass {
     }
   }
 
+  /** Vocabulary logits and the normalized hidden state that produced them. */
+  public record StepOutput(float[] logits, float[] hiddenState) {
+    public StepOutput {
+      Objects.requireNonNull(logits, "logits");
+      Objects.requireNonNull(hiddenState, "hiddenState");
+    }
+  }
+
   private final LlamaConfig config;
   private final LlamaWeights weights;
   private final KvCache cache;
@@ -408,6 +416,26 @@ public final class LlamaForwardPass {
     return forwardInternal(token, position, Head.LOGITS);
   }
 
+  /**
+   * Runs one decode step and returns stable copies of both its logits and normalized hidden state.
+   *
+   * <p>This avoids executing the transformer twice for consumers, such as acoustic language models,
+   * that sample from the vocabulary projection and decode the corresponding hidden frame.
+   */
+  public StepOutput forwardWithHidden(int token, int position) {
+    StepOutput output = forwardWithHiddenTransient(token, position);
+    return new StepOutput(output.logits().clone(), output.hiddenState().clone());
+  }
+
+  /**
+   * Runs one decode step and returns backend-owned output buffers valid until the next forward
+   * call.
+   */
+  public StepOutput forwardWithHiddenTransient(int token, int position) {
+    float[] stepLogits = forwardInternal(token, position, Head.LOGITS);
+    return new StepOutput(stepLogits, xNorm);
+  }
+
   /** Processes prompt tokens while computing the vocabulary projection only for the final token. */
   public float[] prefill(int[] tokens, int startPosition) {
     Objects.requireNonNull(tokens, "tokens");
@@ -428,6 +456,21 @@ public final class LlamaForwardPass {
     }
     return forwardInternal(
         tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
+  }
+
+  /** Processes a prompt once and returns stable final-position logits and hidden state. */
+  public StepOutput prefillWithHidden(int[] tokens, int startPosition) {
+    StepOutput output = prefillWithHiddenTransient(tokens, startPosition);
+    return new StepOutput(output.logits().clone(), output.hiddenState().clone());
+  }
+
+  /**
+   * Processes a prompt once and returns backend-owned final-position outputs valid until the next
+   * forward call.
+   */
+  public StepOutput prefillWithHiddenTransient(int[] tokens, int startPosition) {
+    float[] promptLogits = prefill(tokens, startPosition);
+    return new StepOutput(promptLogits, xNorm);
   }
 
   /**

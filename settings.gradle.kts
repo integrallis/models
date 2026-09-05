@@ -32,6 +32,7 @@ include("models-semantic-kernel")
 
 // --- Bridges ---
 include("models-embedding")
+include("models-audio")
 
 // --- Testing & benchmarks ---
 include("models-test")

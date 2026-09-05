@@ -158,6 +158,120 @@ public final class LlamaWeights {
   }
 
   /**
+   * Loads a Qwen-family GGUF whose tensor names retain the original Hugging Face layout.
+   *
+   * <p>Audio GGUF packagers commonly preserve names such as {@code model.layers.0.self_attn}
+   * instead of rewriting them to llama.cpp's {@code blk.0} convention. The tensor storage is still
+   * ordinary mapped GGUF, including quantized matrices, so only the binding differs.
+   */
+  public static LlamaWeights fromHuggingFaceNamedGguf(GgufFile file, LlamaConfig config) {
+    Objects.requireNonNull(file, "file");
+    Objects.requireNonNull(config, "config");
+    if (config.architecture() != DecoderArchitecture.QWEN2
+        && config.architecture() != DecoderArchitecture.QWEN3) {
+      throw new IllegalArgumentException(
+          "Hugging Face named GGUF loading currently requires Qwen 2 or Qwen 3");
+    }
+
+    GgufTensorData tokenEmbed =
+        requireMatrix(file, "model.embed_tokens.weight", config.vocabSize(), config.embeddingDim());
+    GgufTensorData output;
+    boolean tiedOutput = false;
+    try {
+      output = requireMatrix(file, "lm_head.weight", config.vocabSize(), config.embeddingDim());
+    } catch (IllegalArgumentException missingOutput) {
+      if (!isMissingTensor(missingOutput)) {
+        throw missingOutput;
+      }
+      output = tokenEmbed;
+      tiedOutput = true;
+    }
+    ExecutionTensor preparedTokenEmbed = prepareHuggingFaceMatrix(tokenEmbed);
+    ExecutionTensor preparedOutput =
+        tiedOutput ? preparedTokenEmbed : prepareHuggingFaceMatrix(output);
+
+    LayerWeights[] layers = new LayerWeights[config.numLayers()];
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      String prefix = "model.layers." + layer + ".";
+      GgufTensorData wq =
+          requireMatrix(
+              file, prefix + "self_attn.q_proj.weight", config.queryDim(), config.embeddingDim());
+      GgufTensorData wk =
+          requireMatrix(
+              file, prefix + "self_attn.k_proj.weight", config.keyDim(), config.embeddingDim());
+      GgufTensorData wv =
+          requireMatrix(
+              file, prefix + "self_attn.v_proj.weight", config.valueDim(), config.embeddingDim());
+      GgufTensorData wo =
+          requireMatrix(
+              file,
+              prefix + "self_attn.o_proj.weight",
+              config.embeddingDim(),
+              config.attentionOutputDim());
+      GgufTensorData gate =
+          requireMatrix(
+              file, prefix + "mlp.gate_proj.weight", config.hiddenDim(), config.embeddingDim());
+      GgufTensorData up =
+          requireMatrix(
+              file, prefix + "mlp.up_proj.weight", config.hiddenDim(), config.embeddingDim());
+      GgufTensorData down =
+          requireMatrix(
+              file, prefix + "mlp.down_proj.weight", config.embeddingDim(), config.hiddenDim());
+      ExecutionTensor preparedWq = prepareHuggingFaceMatrix(wq);
+      ExecutionTensor preparedWk = prepareHuggingFaceMatrix(wk);
+      ExecutionTensor preparedWv = prepareHuggingFaceMatrix(wv);
+      ExecutionTensor preparedWo = prepareHuggingFaceMatrix(wo);
+      ExecutionTensor preparedGate = prepareHuggingFaceMatrix(gate);
+      ExecutionTensor preparedUp = prepareHuggingFaceMatrix(up);
+      ExecutionTensor preparedDown = prepareHuggingFaceMatrix(down);
+      layers[layer] =
+          new LayerWeights(
+              loadVector(file, prefix + "input_layernorm.weight", config.embeddingDim()),
+              preparedWq.data(),
+              preparedWq.type(),
+              loadOptionalF32Tensor(file, prefix + "self_attn.q_proj.bias", config.queryDim()),
+              loadOptionalF32Tensor(file, prefix + "self_attn.q_norm.weight", config.headDim()),
+              preparedWk.data(),
+              preparedWk.type(),
+              loadOptionalF32Tensor(file, prefix + "self_attn.k_proj.bias", config.keyDim()),
+              loadOptionalF32Tensor(file, prefix + "self_attn.k_norm.weight", config.headDim()),
+              preparedWv.data(),
+              preparedWv.type(),
+              loadOptionalF32Tensor(file, prefix + "self_attn.v_proj.bias", config.valueDim()),
+              preparedWo.data(),
+              preparedWo.type(),
+              new float[0],
+              loadVector(file, prefix + "post_attention_layernorm.weight", config.embeddingDim()),
+              preparedGate.data(),
+              preparedGate.type(),
+              preparedUp.data(),
+              preparedUp.type(),
+              preparedDown.data(),
+              preparedDown.type(),
+              new float[0]);
+    }
+
+    return new LlamaWeights(
+        preparedTokenEmbed.data(),
+        preparedTokenEmbed.type(),
+        config.embeddingDim(),
+        loadVector(file, "model.norm.weight", config.embeddingDim()),
+        preparedOutput.data(),
+        preparedOutput.type(),
+        layers);
+  }
+
+  private static ExecutionTensor prepareHuggingFaceMatrix(GgufTensorData tensor) {
+    if (tensor.type() != GgufTensorType.BF16) {
+      return new ExecutionTensor(tensor.dataSegment(), tensor.type());
+    }
+    float[] decoded = GgufTensorValues.toFloatArray(tensor);
+    return new ExecutionTensor(MemorySegment.ofArray(decoded).asReadOnly(), GgufTensorType.F32);
+  }
+
+  private record ExecutionTensor(MemorySegment data, GgufTensorType type) {}
+
+  /**
    * Loads Qwen 2 weights from Hugging Face Safetensors names without expanding BF16 matrices.
    * Vector and bias tensors are decoded once; projection, embedding, and output matrices remain
    * mapped and read-only.
@@ -310,6 +424,49 @@ public final class LlamaWeights {
       }
       throw e;
     }
+  }
+
+  private static float[] loadVector(GgufFile file, String name, int expectedLength) {
+    GgufTensorData tensor = file.getTensor(name);
+    requireShape(tensor, expectedLength);
+    return GgufTensorValues.toFloatArray(tensor);
+  }
+
+  private static GgufTensorData requireMatrix(GgufFile file, String name, int rows, int columns) {
+    GgufTensorData tensor = file.getTensor(name);
+    requireShape(tensor, columns, rows);
+    return tensor;
+  }
+
+  private static void requireShape(GgufTensorData tensor, long... expected) {
+    long[] actual = tensor.shape();
+    if (actual.length < expected.length) {
+      throw shapeMismatch(tensor.name(), expected, actual);
+    }
+    for (int index = 0; index < expected.length; index++) {
+      if (actual[index] != expected[index]) {
+        throw shapeMismatch(tensor.name(), expected, actual);
+      }
+    }
+    for (int index = expected.length; index < actual.length; index++) {
+      if (actual[index] != 1) {
+        throw shapeMismatch(tensor.name(), expected, actual);
+      }
+    }
+  }
+
+  private static IllegalArgumentException shapeMismatch(
+      String name, long[] expected, long[] actual) {
+    return new IllegalArgumentException(
+        name
+            + " shape must be "
+            + Arrays.toString(expected)
+            + " with optional singleton dimensions; got "
+            + Arrays.toString(actual));
+  }
+
+  private static boolean isMissingTensor(IllegalArgumentException failure) {
+    return failure.getMessage() != null && failure.getMessage().contains("Tensor not found");
   }
 
   private static TensorView requireBf16(TensorSource source, String name, long... expectedShape) {
