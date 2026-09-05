@@ -598,7 +598,7 @@ class LlamaForwardPassTest {
 
       float[] actual = freshPass(config, weights).prefillHiddenState(tokens, 0);
 
-      assertThat(actual).containsExactly(expected);
+      assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
     }
 
     @Test
