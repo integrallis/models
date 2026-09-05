@@ -3,7 +3,7 @@
 
 Models is an in-process inference library for Java applications. Inference is
 the work of running a trained model to produce an answer. With Models, an
-application can load an open-weight model to generate text, create embeddings, or rerank retrieved documents
+application can load an open-weight model to generate text, synthesize speech, create embeddings, or rerank retrieved documents
 without starting Python, calling a separate model server, or sending prompts
 over the network.
 
@@ -97,6 +97,9 @@ image::models-0001.png[Models runtime architecture,align=center]
 
 |`models-runtime`
 |Generation loop, prompt-prefix reuse, sampling, and streaming
+
+|`models-audio`
+|In-process text-to-speech, normalized PCM streaming, and WAV encoding
 
 |`backend-java`
 |GGUF, supported Safetensors, and CACT model loading with Java 25 Vector API execution

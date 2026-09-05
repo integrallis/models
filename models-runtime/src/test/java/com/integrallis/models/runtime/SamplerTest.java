@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 class SamplerTest {
 
   @Nested
-  static class Constraints {
+  class Constraints {
 
     @Test
     void greedySelectsBestAllowedToken() {
@@ -70,7 +70,7 @@ class SamplerTest {
   }
 
   @Nested
-  static class Greedy {
+  class Greedy {
 
     @Test
     void selectsArgmax() {
@@ -88,7 +88,7 @@ class SamplerTest {
   }
 
   @Nested
-  static class Temperature {
+  class Temperature {
 
     @Test
     void highTempFlattensDistribution() {
@@ -108,7 +108,7 @@ class SamplerTest {
   }
 
   @Nested
-  static class TopK {
+  class TopK {
 
     @Test
     void topK2KeepsOnlyTwo() {
@@ -142,7 +142,7 @@ class SamplerTest {
   }
 
   @Nested
-  static class TopP {
+  class TopP {
 
     @Test
     void topPKeepsMinimalSet() {
@@ -174,10 +174,24 @@ class SamplerTest {
 
       assertThat(sampled).containsExactly(0);
     }
+
+    @Test
+    void topPAppliesToTheRenormalizedTopKDistribution() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(1.0f).topK(2).topP(0.5f).seed(42L).build();
+      Sampler sampler = new Sampler(options);
+
+      Set<Integer> sampled = new HashSet<>();
+      for (int index = 0; index < 100; index++) {
+        sampled.add(sampler.sample(new float[] {0.0f, 0.0f, 0.0f, 0.0f}, List.of()));
+      }
+
+      assertThat(sampled).containsExactly(0);
+    }
   }
 
   @Nested
-  static class RepetitionPenalty {
+  class RepetitionPenalty {
 
     @Test
     void reducesRepeatedTokenProbability() {
@@ -198,6 +212,33 @@ class SamplerTest {
       Sampler sampler = new Sampler(options);
 
       assertThat(sampler.sample(new float[] {-1.0f, -0.75f}, List.of(1))).isZero();
+    }
+
+    @Test
+    void penalizesADuplicatedPositiveTokenOnlyOnce() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(0.0f).repetitionPenalty(2.0f).build();
+      Sampler sampler = new Sampler(options);
+
+      assertThat(sampler.sample(new float[] {8.0f, 3.0f}, List.of(0, 0))).isZero();
+    }
+
+    @Test
+    void penalizesADuplicatedNegativeTokenOnlyOnce() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(0.0f).repetitionPenalty(2.0f).build();
+      Sampler sampler = new Sampler(options);
+
+      assertThat(sampler.sample(new float[] {-1.0f, -3.0f}, List.of(0, 0))).isZero();
+    }
+
+    @Test
+    void ignoresOutOfRangeTokensWithoutChangingDuplicateHandling() {
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(0.0f).repetitionPenalty(2.0f).build();
+      Sampler sampler = new Sampler(options);
+
+      assertThat(sampler.sample(new float[] {8.0f, 3.0f}, List.of(-1, 0, 2, 0))).isZero();
     }
 
     @Test
@@ -223,7 +264,7 @@ class SamplerTest {
   }
 
   @Nested
-  static class Selection {
+  class Selection {
 
     @Test
     void topKBoundaryPrefersLowerTokenIdsAmongTies() {
@@ -267,22 +308,10 @@ class SamplerTest {
       }
     }
 
-    /** Mirrors the original stable-full-sort implementation, as an oracle for the fast path. */
+    /** Stable full-sort implementation used as an oracle for the bounded-heap fast path. */
     private static int fullSortReference(SamplingOptions options, float[] adjusted, Random rng) {
       for (int index = 0; index < adjusted.length; index++) {
         adjusted[index] /= options.temperature();
-      }
-      float max = Float.NEGATIVE_INFINITY;
-      for (float value : adjusted) {
-        if (value > max) max = value;
-      }
-      float sum = 0;
-      for (int index = 0; index < adjusted.length; index++) {
-        adjusted[index] = (float) Math.exp(adjusted[index] - max);
-        sum += adjusted[index];
-      }
-      for (int index = 0; index < adjusted.length; index++) {
-        adjusted[index] /= sum;
       }
 
       record TokenProb(int id, float prob) {}
@@ -295,10 +324,19 @@ class SamplerTest {
       int topK = Math.min(options.topK(), sorted.size());
       sorted = new ArrayList<>(sorted.subList(0, topK));
 
+      float max = sorted.getFirst().prob();
+      float topKMass = 0;
+      for (int index = 0; index < sorted.size(); index++) {
+        TokenProb candidate = sorted.get(index);
+        float probability = (float) Math.exp(candidate.prob() - max);
+        sorted.set(index, new TokenProb(candidate.id(), probability));
+        topKMass += probability;
+      }
+
       float cumulative = 0;
       int cutoff = sorted.size();
       for (int index = 0; index < sorted.size(); index++) {
-        cumulative += sorted.get(index).prob();
+        cumulative += sorted.get(index).prob() / topKMass;
         if (cumulative >= options.topP()) {
           cutoff = index + 1;
           break;
@@ -324,7 +362,7 @@ class SamplerTest {
   }
 
   @Nested
-  static class Reproducibility {
+  class Reproducibility {
 
     @Test
     void sameSeedSameSequence() {

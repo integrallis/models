@@ -44,10 +44,13 @@ public interface TextToSpeechModel extends AutoCloseable {
     Objects.requireNonNull(stream, "stream");
     try {
       stream.onAudio(synthesize(text, options));
-      stream.onComplete();
     } catch (RuntimeException | Error failure) {
       stream.onError(failure);
+      return;
     }
+    // Completion is already the terminal signal. If the consumer throws from it, propagate that
+    // failure instead of violating the callback contract by following it with onError.
+    stream.onComplete();
   }
 
   /** Releases model-owned resources. */

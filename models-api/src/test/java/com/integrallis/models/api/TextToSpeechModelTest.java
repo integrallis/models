@@ -16,6 +16,7 @@
 package com.integrallis.models.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +62,39 @@ class TextToSpeechModelTest {
         });
 
     assertThat(events).containsExactly("audio:1", "complete");
+  }
+
+  @Test
+  void callbackFailureAfterCompletionDoesNotSendASecondTerminalSignal() {
+    var model = new StubTextToSpeechModel();
+    List<String> events = new ArrayList<>();
+
+    assertThatThrownBy(
+            () ->
+                model.synthesize(
+                    "hello",
+                    SpeechSynthesisOptions.builder().build(),
+                    new AudioStream() {
+                      @Override
+                      public void onAudio(PcmAudio audio) {
+                        events.add("audio");
+                      }
+
+                      @Override
+                      public void onComplete() {
+                        events.add("complete");
+                        throw new IllegalStateException("consumer failed after completion");
+                      }
+
+                      @Override
+                      public void onError(Throwable failure) {
+                        events.add("error");
+                      }
+                    }))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("consumer failed after completion");
+
+    assertThat(events).containsExactly("audio", "complete");
   }
 
   private static final class StubTextToSpeechModel implements TextToSpeechModel {

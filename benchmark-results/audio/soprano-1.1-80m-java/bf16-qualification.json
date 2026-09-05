@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-05T15:42:26Z",
+  "workload": "soprano_streaming_tts_v1",
+  "model": "WalkingCat Soprano 1.1 80M GGUF BF16",
+  "backend": "pure-java",
+  "backendVersion": "0.3.29",
+  "artifact": {
+    "repository": "WalkingCat/Soprano-1.1-80M-GGUF",
+    "revision": "36c6f47cf91421b7f0cf3d862d28ae2e41aab3f2",
+    "sha256": "46c60cdf5b8e5a3b26bfd185c0870826c05b533979ea7c1d399a9ffb76a50a54",
+    "sizeBytes": 221809792
+  },
+  "oracle": {
+    "backend": "official Soprano PyTorch/Transformers implementation",
+    "version": "12fac06eb8fa53bad8b3941d3cb11e9c869477c4",
+    "modelSha256": "10e8c4223e14115688a1c8a1c5464ebb78826f17fb98ad459da9bce5471866ed",
+    "decoderSha256": "11245487e4588b0f4128d6b4c82035212bad42ffb26f36e059e9c7f861c1f8c4",
+    "probes": 2,
+    "languageModel": {
+      "logitsCosine": 1.0,
+      "maximumLogitDelta": 0.000004,
+      "hiddenCosine": 1.0,
+      "maximumHiddenDelta": 0.000002
+    },
+    "vocoder": {
+      "pcmCosine": 0.999331179,
+      "maximumPcmDelta": 0.004917,
+      "signalToDifferenceDb": 28.698
+    }
+  },
+  "streaming": {
+    "sampleRate": 32000,
+    "channels": 1,
+    "chunkTokens": 12,
+    "firstAudioBeforeCompletion": true,
+    "blockingPcmCosine": 1.0
+  },
+  "performance": {
+    "warmups": 1,
+    "trials": 5,
+    "p95RealTimeFactor": 1.886551,
+    "p95TimeToFirstAudioMillis": 1670.465,
+    "peakRssBytes": 1300054016,
+    "peakRssScope": "Conservative /usr/bin/time process-tree peak for the Gradle qualification invocation",
+    "measurements": [
+      {"trial": 1, "ttfaMillis": 1670.465, "totalMillis": 3742.917, "audioMillis": 1984, "realTimeFactor": 1.886551, "chunks": 4},
+      {"trial": 2, "ttfaMillis": 1652.017, "totalMillis": 3706.755, "audioMillis": 1984, "realTimeFactor": 1.868324, "chunks": 4},
+      {"trial": 3, "ttfaMillis": 1662.627, "totalMillis": 3705.983, "audioMillis": 1984, "realTimeFactor": 1.867935, "chunks": 4},
+      {"trial": 4, "ttfaMillis": 1659.422, "totalMillis": 3687.349, "audioMillis": 1984, "realTimeFactor": 1.858543, "chunks": 4},
+      {"trial": 5, "ttfaMillis": 1630.305, "totalMillis": 3653.654, "audioMillis": 1984, "realTimeFactor": 1.841560, "chunks": 4}
+    ]
+  },
+  "environment": {
+    "provider": "AWS EC2",
+    "instanceType": "c7i.4xlarge",
+    "osName": "Amazon Linux",
+    "osVersion": "6.18.44-99.149.amzn2023.x86_64",
+    "architecture": "x86_64",
+    "cpuModel": "Intel(R) Xeon(R) Platinum 8488C",
+    "processors": 16,
+    "physicalMemoryBytes": 34359738368,
+    "maxHeapBytes": 2147483648,
+    "javaVersion": "25.0.4.1",
+    "javaVendor": "Amazon.com Inc.",
+    "vmName": "OpenJDK 64-Bit Server VM"
+  },
+  "policy": {
+    "version": "speech-oracle-streaming-latency-v1",
+    "minimumPcmCosine": 0.995,
+    "minimumSignalToDifferenceDb": 20.0,
+    "maximumP95RealTimeFactor": 2.0,
+    "maximumP95TimeToFirstAudioMillis": 2000.0
+  },
+  "qualified": true
+}

@@ -42,8 +42,31 @@ class SopranoTokenizerTest {
             }
             """);
 
-    assertThat(tokenizer.encodePrompt("  HI  ")).containsExactly(3, 1, 6, 7, 2);
+    assertThat(tokenizer.encodePrompt("  HI  ")).containsExactly(3, 1, 7, 6, 7, 2);
     assertThat(tokenizer.eosToken()).isEqualTo(3);
+  }
+
+  @Test
+  void isolatesDigitsWordsPunctuationAndUnicodeCodePointsBeforeBpe() {
+    SopranoTokenizer tokenizer =
+        SopranoTokenizer.fromJson(
+            """
+            {
+              "added_tokens": [
+                {"id": 1, "content": "[TEXT]"},
+                {"id": 2, "content": "[START]"},
+                {"id": 3, "content": "[STOP]"}
+              ],
+              "model": {
+                "vocab": {"[UNK]": 0, "[TEXT]": 1, "[START]": 2, "[STOP]": 3,
+                          "a": 4, "1": 5, "2": 6, ",": 7, " ": 8, "é": 9, "a1": 10},
+                "merges": [["a", "1"]]
+              }
+            }
+            """);
+
+    assertThat(tokenizer.encodePrompt("A12,  É 😀"))
+        .containsExactly(3, 1, 4, 5, 6, 7, 8, 9, 8, 0, 2);
   }
 
   @Test

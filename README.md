@@ -87,6 +87,9 @@ Implemented functionality includes:
   qualification by passing the descriptor capabilities to the adapter
 - in-JVM text embeddings from causal decoders and bidirectional encoders, with
   model-declared or explicit pooling and vectors tested against llama.cpp
+- in-process text-to-speech with normalized PCM output, WAV encoding, and true
+  incremental audio streaming; Soprano 1.1 runs from one GGUF artifact with a
+  pure-Java graph and an optional Models-owned Q8 projection kernel through FFM
 - pure-Java cross-encoder reranking with a framework-neutral API plus
   LangChain4j `ScoringModel` and Spring AI `DocumentPostProcessor` adapters
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
@@ -257,6 +260,19 @@ forward-pass logits, reset, checkpoint, rewind, and measurements for the most
 recent generation. `pipeline.lastGenerationMetrics()` reports tokenization,
 prompt preparation, prefill, time to first token, decode and total duration,
 along with token counts, prompt-cache reuse, and decode throughput.
+
+For speech synthesis, add `com.integrallis:models-audio` and open a qualified
+Soprano artifact directly or through ModelJars:
+
+```java
+try (var speech = SopranoTextToSpeechModel.loadNative(modelPath)) {
+    var audio = speech.synthesize("The JVM can speak for itself.");
+    Files.write(Path.of("speech.wav"), WavEncoder.pcm16(audio));
+}
+```
+
+See the [Text-to-speech guide](https://integrallis.github.io/models/docs/models/current/text-to-speech.html)
+for streaming, supported controls, and the qualification contract.
 
 Needle 2 CACT artifacts use the same public prompt and parsing APIs. The
 `ChatTemplate.NEEDLE2` renderer emits the model's raw tool-schema envelope and

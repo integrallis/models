@@ -24,11 +24,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /** Soprano's lowercase byte-level BPE prompt tokenizer. */
 public final class SopranoTokenizer {
 
   private static final JsonFactory JSON = new JsonFactory();
+  private static final Pattern WHITESPACE = Pattern.compile("\\s", Pattern.UNICODE_CHARACTER_CLASS);
+  private static final Pattern WORD = Pattern.compile("\\w", Pattern.UNICODE_CHARACTER_CLASS);
 
   private final Map<String, Integer> vocabulary;
   private final List<Merge> merges;
@@ -89,10 +92,13 @@ public final class SopranoTokenizer {
     List<Integer> encoded = new ArrayList<>();
     encoded.add(stopToken);
     encoded.add(textToken);
-    for (String piece : splitWhitespace(text)) {
-      List<Integer> word = new ArrayList<>(piece.length());
-      for (int index = 0; index < piece.length(); index++) {
-        word.add(vocabulary.getOrDefault(String.valueOf(piece.charAt(index)), unknownToken));
+    for (String piece : preTokenize(text)) {
+      List<Integer> word = new ArrayList<>(piece.codePointCount(0, piece.length()));
+      for (int index = 0; index < piece.length(); ) {
+        int codePoint = piece.codePointAt(index);
+        String character = new String(Character.toChars(codePoint));
+        word.add(vocabulary.getOrDefault(character, unknownToken));
+        index += Character.charCount(codePoint);
       }
       applyMerges(word);
       encoded.addAll(word);
@@ -142,40 +148,57 @@ public final class SopranoTokenizer {
     String lower = text.toLowerCase(Locale.ROOT);
     StringBuilder result = new StringBuilder(lower.length());
     boolean previousWhitespace = false;
-    for (int index = 0; index < lower.length(); index++) {
-      char character = lower.charAt(index);
-      if (Character.isWhitespace(character)) {
-        if (!previousWhitespace && !result.isEmpty()) {
+    for (int index = 0; index < lower.length(); ) {
+      int codePoint = lower.codePointAt(index);
+      if (matches(WHITESPACE, codePoint)) {
+        if (!previousWhitespace) {
           result.append(' ');
         }
         previousWhitespace = true;
       } else {
-        result.append(character);
+        result.appendCodePoint(codePoint);
         previousWhitespace = false;
       }
+      index += Character.charCount(codePoint);
     }
     return result.toString();
   }
 
-  private static List<String> splitWhitespace(String text) {
+  private static List<String> preTokenize(String text) {
     List<String> pieces = new ArrayList<>();
-    StringBuilder word = new StringBuilder();
-    for (int index = 0; index < text.length(); index++) {
-      char character = text.charAt(index);
-      if (Character.isWhitespace(character)) {
-        if (!word.isEmpty()) {
-          pieces.add(word.toString());
-          word.setLength(0);
-        }
-        pieces.add(" ");
-      } else {
-        word.append(character);
+    int start = 0;
+    while (start < text.length()) {
+      int first = text.codePointAt(start);
+      int end = start + Character.charCount(first);
+      if (Character.isDigit(first)) {
+        pieces.add(text.substring(start, end));
+        start = end;
+        continue;
       }
-    }
-    if (!word.isEmpty()) {
-      pieces.add(word.toString());
+
+      int category = category(first);
+      while (end < text.length()) {
+        int next = text.codePointAt(end);
+        if (Character.isDigit(next) || category(next) != category) {
+          break;
+        }
+        end += Character.charCount(next);
+      }
+      pieces.add(text.substring(start, end));
+      start = end;
     }
     return pieces;
+  }
+
+  private static int category(int codePoint) {
+    if (matches(WHITESPACE, codePoint)) {
+      return 0;
+    }
+    return matches(WORD, codePoint) ? 1 : 2;
+  }
+
+  private static boolean matches(Pattern pattern, int codePoint) {
+    return pattern.matcher(new String(Character.toChars(codePoint))).matches();
   }
 
   private static void readAddedTokens(

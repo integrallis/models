@@ -44,7 +44,16 @@ class SopranoVocoderWeightsIntegrationTest {
       var weights = SopranoVocoderWeights.load(file, config);
 
       assertThat(weights.layerCount()).isEqualTo(8);
-      assertThat(weights.head().type()).isEqualTo(GgufTensorType.Q8_0);
+      assertThat(weights.head().type()).isIn(GgufTensorType.Q8_0, GgufTensorType.BF16);
+      assertThat(weights.head().preparedF32()).isNotNull();
+      for (int layer = 0; layer < weights.layerCount(); layer++) {
+        assertThat(weights.layer(layer).pointwiseUp().preparedF32()).isNotNull();
+        assertThat(weights.layer(layer).pointwiseDown().preparedF32()).isNotNull();
+      }
+      assertThat(weights.preparedExpandedBytes()).isEqualTo(119_543_808L);
+      long expectedSerializedBytes =
+          weights.head().type() == GgufTensorType.Q8_0 ? 31_753_824L : 59_771_904L;
+      assertThat(weights.preparedSerializedBytes()).isEqualTo(expectedSerializedBytes);
       assertThat(weights.window()).hasSize(2048);
 
       float[] audio =

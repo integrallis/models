@@ -20,6 +20,8 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.vectors.core.F32ExecutionMatrix;
+import com.integrallis.vectors.core.GgufQ8_0F32Matrix;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.Objects;
@@ -27,7 +29,12 @@ import java.util.Objects;
 /** Mapped projection tensors and decoded small vectors for Soprano's ConvNeXt vocoder. */
 final class SopranoVocoderWeights {
 
-  record Matrix(MemorySegment data, GgufTensorType type, int rows, int columns) {
+  record Matrix(
+      MemorySegment data,
+      GgufTensorType type,
+      int rows,
+      int columns,
+      PreparedProjection preparedF32) {
     Matrix {
       Objects.requireNonNull(data, "data");
       Objects.requireNonNull(type, "type");
@@ -35,6 +42,14 @@ final class SopranoVocoderWeights {
         throw new IllegalArgumentException("matrix dimensions must be positive");
       }
     }
+  }
+
+  interface PreparedProjection {
+    void multiplyBatch(float[] input, int batchSize, float[] output);
+
+    long serializedByteCount();
+
+    long expandedByteCount();
   }
 
   record Block(
@@ -58,6 +73,8 @@ final class SopranoVocoderWeights {
   private final Matrix head;
   private final float[] headBias;
   private final float[] window;
+  private final long preparedSerializedBytes;
+  private final long preparedExpandedBytes;
 
   private SopranoVocoderWeights(
       float[] embedding,
@@ -80,6 +97,16 @@ final class SopranoVocoderWeights {
     this.head = head;
     this.headBias = headBias;
     this.window = window;
+    long serializedBytes = preparedSerializedBytes(head);
+    long expandedBytes = preparedExpandedBytes(head);
+    for (Block layer : layers) {
+      serializedBytes += preparedSerializedBytes(layer.pointwiseUp());
+      serializedBytes += preparedSerializedBytes(layer.pointwiseDown());
+      expandedBytes += preparedExpandedBytes(layer.pointwiseUp());
+      expandedBytes += preparedExpandedBytes(layer.pointwiseDown());
+    }
+    this.preparedSerializedBytes = serializedBytes;
+    this.preparedExpandedBytes = expandedBytes;
   }
 
   static SopranoVocoderWeights load(GgufFile file, SopranoConfig config) {
@@ -162,6 +189,14 @@ final class SopranoVocoderWeights {
     return window;
   }
 
+  long preparedSerializedBytes() {
+    return preparedSerializedBytes;
+  }
+
+  long preparedExpandedBytes() {
+    return preparedExpandedBytes;
+  }
+
   private static Matrix projection(GgufFile file, String name, int rows, int columns) {
     GgufTensorData tensor = file.getTensor(name);
     requireShape(tensor, columns, rows);
@@ -169,7 +204,64 @@ final class SopranoVocoderWeights {
       throw new IllegalArgumentException(
           name + " uses unsupported batched projection type " + tensor.type());
     }
-    return new Matrix(tensor.dataSegment(), tensor.type(), rows, columns);
+    PreparedProjection preparedF32 = prepareProjection(tensor, rows, columns);
+    return new Matrix(tensor.dataSegment(), tensor.type(), rows, columns, preparedF32);
+  }
+
+  private static PreparedProjection prepareProjection(
+      GgufTensorData tensor, int rows, int columns) {
+    if (tensor.type() == GgufTensorType.Q8_0) {
+      GgufQ8_0F32Matrix matrix = GgufQ8_0F32Matrix.from(tensor.dataSegment(), rows, columns);
+      return new PreparedProjection() {
+        @Override
+        public void multiplyBatch(float[] input, int batchSize, float[] output) {
+          matrix.multiplyBatch(input, batchSize, output);
+        }
+
+        @Override
+        public long serializedByteCount() {
+          return matrix.serializedByteCount();
+        }
+
+        @Override
+        public long expandedByteCount() {
+          return matrix.expandedByteCount();
+        }
+      };
+    }
+    if (tensor.type() == GgufTensorType.BF16) {
+      F32ExecutionMatrix matrix =
+          F32ExecutionMatrix.copyOf(
+              GgufTensorValues.toFloatArray(tensor),
+              rows,
+              columns,
+              tensor.dataSegment().byteSize());
+      return new PreparedProjection() {
+        @Override
+        public void multiplyBatch(float[] input, int batchSize, float[] output) {
+          matrix.multiplyBatch(input, batchSize, output);
+        }
+
+        @Override
+        public long serializedByteCount() {
+          return matrix.serializedByteCount();
+        }
+
+        @Override
+        public long expandedByteCount() {
+          return matrix.expandedByteCount();
+        }
+      };
+    }
+    return null;
+  }
+
+  private static long preparedSerializedBytes(Matrix matrix) {
+    return matrix.preparedF32() == null ? 0L : matrix.preparedF32().serializedByteCount();
+  }
+
+  private static long preparedExpandedBytes(Matrix matrix) {
+    return matrix.preparedF32() == null ? 0L : matrix.preparedF32().expandedByteCount();
   }
 
   private static float[] vector(GgufFile file, String name, int size) {

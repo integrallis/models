@@ -114,6 +114,10 @@ final class SopranoVocoder {
       int frames,
       SopranoVocoderWeights.Matrix matrix,
       Scratch scratch) {
+    if (matrix.preparedF32() != null) {
+      matrix.preparedF32().multiplyBatch(input, frames, output);
+      return;
+    }
     TensorOps.ggufBatchedMatmul(
         output,
         input,

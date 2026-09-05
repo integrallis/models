@@ -507,6 +507,46 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void combinedHeadReturnsLogitsAndHiddenStateFromOneDecodeStep() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+
+      LlamaForwardPass logitsPass = newForwardPass(config, weights);
+      LlamaForwardPass hiddenPass = newForwardPass(config, weights);
+      LlamaForwardPass combinedPass = newForwardPass(config, weights);
+
+      float[] expectedLogits = logitsPass.forward(5, 0);
+      float[] expectedHidden = hiddenPass.hiddenState(5, 0).clone();
+      LlamaForwardPass.StepOutput actual = combinedPass.forwardWithHidden(5, 0);
+
+      assertThat(actual.logits()).containsExactly(expectedLogits);
+      assertThat(actual.hiddenState()).containsExactly(expectedHidden);
+      assertThat(combinedPass.checkpoint()).isEqualTo(1);
+    }
+
+    @Test
+    void combinedPrefillReturnsTheFinalPromptLogitsAndHiddenState() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13};
+
+      LlamaForwardPass logitsPass = newForwardPass(config, weights);
+      LlamaForwardPass hiddenPass = newForwardPass(config, weights);
+      LlamaForwardPass combinedPass = newForwardPass(config, weights);
+
+      float[] expectedLogits = logitsPass.prefill(tokens, 0);
+      float[] expectedHidden = hiddenPass.prefillHiddenState(tokens, 0).clone();
+      LlamaForwardPass.StepOutput actual = combinedPass.prefillWithHidden(tokens, 0);
+
+      assertThat(actual.logits()).containsExactly(expectedLogits, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(actual.hiddenState())
+          .containsExactly(expectedHidden, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(combinedPass.checkpoint()).isEqualTo(tokens.length);
+    }
+
+    @Test
     void hiddenStateIsDeterministicAndInputDependent() {
       GgufFile file = buildNanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
@@ -2067,6 +2107,14 @@ class LlamaForwardPassTest {
 
       assertThat(second).containsExactly(first);
     }
+  }
+
+  private static LlamaForwardPass newForwardPass(LlamaConfig config, LlamaWeights weights) {
+    return new LlamaForwardPass(
+        config,
+        weights,
+        new KvCache(
+            config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
   }
 
   private static float[] runSequence(LlamaForwardPass forwardPass, int[] tokens) {
