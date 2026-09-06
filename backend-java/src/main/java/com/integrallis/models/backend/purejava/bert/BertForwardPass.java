@@ -252,7 +252,7 @@ public final class BertForwardPass implements SequenceEncoder {
   private float[] pool(int sequenceLength) {
     int dim = config.embeddingDim();
     float[] pooled = new float[dim];
-    if (config.pooling() == BertConfig.Pooling.CLS) {
+    if (config.pooling() == BertConfig.Pooling.CLS || config.pooling() == BertConfig.Pooling.RANK) {
       System.arraycopy(hidden, 0, pooled, 0, dim);
       return pooled;
     }

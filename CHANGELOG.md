@@ -9,12 +9,18 @@ All notable changes to models are documented here.
 - Added explicit high-level text-generation sessions over batch-capable backends. Each session
   keeps an independent context, exact prompt-prefix history, and generation metrics while sharing
   one loaded model.
+- Added standard GGUF BERT rank pooling and `cls.*` / `cls.output.*` sequence-classifier tensor
+  aliases while preserving compatibility with previously corrected reranker artifacts.
+- Added checksum-bound plain Java, LangChain4j, and Spring AI gates for a corrected TinyBERT L2
+  Q8_0 artifact plus a local-artifact performance experiment.
 
 ### Documentation
 
 - Documented conversation-scoped generation sessions and corrected the composition research plan:
   KV state is isolated by model and adapter identity unless equality of the produced K/V
   activations is demonstrated.
+- Recorded the rejected incomplete TinyBERT community conversions, corrected conversion hashes,
+  Transformers equivalence, and the measured low-latency pure-Java reranking tier.
 
 ## [0.3.29] - 2026-09-05
 

@@ -22,10 +22,10 @@ profile, and quality scores. Composition becomes a *catalog entry*, not an appli
 - **Constrained decoding is public** in `models-runtime`: `ConstrainedTextGenerationModel`,
   `TokenConstraint`, `JsonSchemaConstraint`, and `ToolCallTokenConstraints`. A composite can invoke
   the capability directly; a constraint does not belong in provider-neutral `SamplingOptions`.
-- The ordinary pipeline retains one exact prompt-prefix lineage across calls. The
-  `feat/runtime-generation-sessions` branch adds one high-level `TextGenerationSession` per
-  conversation over the existing low-level `InferenceSession`, sharing loaded weights while
-  isolating KV, retained prefixes, lifecycle, and metrics.
+- The ordinary pipeline retains one exact prompt-prefix lineage across calls. The merged
+  `TextGenerationSession` API adds one high-level session per conversation over the existing
+  low-level `InferenceSession`, sharing loaded weights while isolating KV, retained prefixes,
+  lifecycle, and metrics.
 - No adapter/LoRA loading or swap API exists. Sharing a base's weights would not make adapter KV
   interchangeable: adapter-modified hidden states change later-layer K/V activations even if K/V
   projection matrices themselves are untouched.
@@ -82,7 +82,7 @@ without changing `SamplingOptions` or moving the composite into `models-runtime`
 parts; `Performance` = measured per recipe (the ladder below), never derived by guessing;
 `quality` keys per task ("chat", "tool-calling") measured per recipe.
 
-### 4.3 Explicit conversation state (implemented, pending merge)
+### 4.3 Explicit conversation state (merged, pending release)
 `InferencePipeline.openGenerationSession()` opens independent high-level generation state over one
 loaded, batch-capable backend. Each conversation owns its exact prompt prefix, KV state, metrics,
 reset, and close lifecycle. Calls remain serialized because backend scratch is shared. This is the

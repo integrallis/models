@@ -204,6 +204,8 @@ val configuredGptOssOracleLogits =
     providers.systemProperty("models.fixtures.gptOssOracleLogits")
 val configuredMobileMoeQatDirectory =
     providers.systemProperty("models.fixtures.mobileMoeQatDirectory")
+val configuredTinyBertRerankerPath =
+    providers.systemProperty("models.fixtures.tinyBertReranker")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
@@ -224,6 +226,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredMobileMoeQatDirectory.orNull?.let {
         systemProperty("models.fixtures.mobileMoeQatDirectory", it)
+    }
+    configuredTinyBertRerankerPath.orNull?.let {
+        systemProperty("models.fixtures.tinyBertReranker", it)
     }
 }
 
@@ -474,6 +479,29 @@ tasks.register<JavaExec>("msMarcoMiniLmL12RerankerPerformanceExperiment") {
     maxHeapSize = "2g"
 }
 
+tasks.register<JavaExec>("tinyBertStandardGgufPerformanceExperiment") {
+    description = "Measure a local corrected standard-GGUF TinyBERT reranker"
+    group = "verification"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set(
+        "com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerPerformanceExperiment",
+    )
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+    configuredTinyBertRerankerPath.orNull?.let {
+        systemProperty("models.reranker.performance.path", it)
+    }
+    systemProperty(
+        "models.reranker.performance.displayName",
+        "MS MARCO TinyBERT L2 v2 corrected Q8_0",
+    )
+    args(
+        providers.gradleProperty("reranker.performance.warmups").getOrElse("2"),
+        providers.gradleProperty("reranker.performance.pairIterations").getOrElse("20"),
+        providers.gradleProperty("reranker.performance.batchIterations").getOrElse("8"),
+    )
+    maxHeapSize = "1g"
+}
+
 tasks.register<Test>("qwen25HuggingFaceIntegrationTest") {
     description = "Run the pinned Qwen 2.5 0.5B Hugging Face Safetensors compatibility test"
     group = "verification"
@@ -531,6 +559,24 @@ tasks.register<Test>("mobileMoeHuggingFaceIntegrationTest") {
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "4g"
+}
+
+tasks.register<Test>("tinyBertStandardGgufIntegrationTest") {
+    description = "Run the corrected standard-GGUF TinyBERT reranker compatibility test"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.TinyBertStandardGgufIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "1g"
 }
 
 tasks.register<Test>("qwen306BQ40IntegrationTest") {

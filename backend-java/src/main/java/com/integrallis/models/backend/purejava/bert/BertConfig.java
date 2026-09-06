@@ -32,7 +32,8 @@ public record BertConfig(
   /** Sequence-reduction modes defined by GGUF's BERT pooling metadata. */
   public enum Pooling {
     MEAN(1),
-    CLS(2);
+    CLS(2),
+    RANK(4);
 
     private final int code;
 

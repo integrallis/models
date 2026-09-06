@@ -17,7 +17,11 @@ package com.integrallis.models.backend.purejava;
 
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureDescriptor;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 
@@ -40,17 +44,10 @@ public final class MsMarcoMiniLmRerankerPerformanceExperiment {
     int warmups = nonNegativeArgument(args, 0, 3, "warmups");
     int pairIterations = positiveArgument(args, 1, 30, "pair iterations");
     int batchIterations = positiveArgument(args, 2, 10, "batch iterations");
-    String fixtureId =
-        System.getProperty("models.reranker.performance.fixtureId", DEFAULT_FIXTURE_ID);
-    ModelFixtureDescriptor fixture =
-        ModelFixtureRegistry.fromClasspath().descriptors().stream()
-            .filter(candidate -> fixtureId.equals(candidate.id()))
-            .findFirst()
-            .orElseThrow(
-                () -> new IllegalArgumentException("unknown reranker fixture: " + fixtureId));
+    Artifact artifact = resolveArtifact();
 
     long loadStart = System.nanoTime();
-    try (GgufRerankingModel model = GgufRerankingModel.load(fixture.localPath().orElseThrow())) {
+    try (GgufRerankingModel model = GgufRerankingModel.load(artifact.path())) {
       long loadNanos = System.nanoTime() - loadStart;
       for (int warmup = 0; warmup < warmups; warmup++) {
         model.scoreAll(QUERY, DOCUMENTS);
@@ -107,9 +104,9 @@ public final class MsMarcoMiniLmRerankerPerformanceExperiment {
             "scoreChecksum": %.9f
           }
           """,
-          fixture.displayName(),
-          fixture.sha256().orElseThrow(),
-          fixture.sizeBytes().orElseThrow(),
+          artifact.displayName(),
+          artifact.sha256(),
+          artifact.sizeBytes(),
           System.getProperty("java.version"),
           System.getProperty("java.vendor"),
           System.getProperty("os.name"),
@@ -131,6 +128,43 @@ public final class MsMarcoMiniLmRerankerPerformanceExperiment {
           scoreChecksum);
     }
   }
+
+  private static Artifact resolveArtifact() {
+    String configuredPath = System.getProperty("models.reranker.performance.path");
+    if (configuredPath != null && !configuredPath.isBlank()) {
+      Path path = Path.of(configuredPath);
+      if (!Files.isRegularFile(path)) {
+        throw new IllegalArgumentException("reranker artifact is not a file: " + path);
+      }
+      try {
+        String displayName =
+            System.getProperty(
+                "models.reranker.performance.displayName", path.getFileName().toString());
+        String sha256 =
+            HexFormat.of()
+                .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)));
+        return new Artifact(displayName, path, sha256, Files.size(path));
+      } catch (Exception failure) {
+        throw new IllegalStateException("could not inspect reranker artifact: " + path, failure);
+      }
+    }
+
+    String fixtureId =
+        System.getProperty("models.reranker.performance.fixtureId", DEFAULT_FIXTURE_ID);
+    ModelFixtureDescriptor fixture =
+        ModelFixtureRegistry.fromClasspath().descriptors().stream()
+            .filter(candidate -> fixtureId.equals(candidate.id()))
+            .findFirst()
+            .orElseThrow(
+                () -> new IllegalArgumentException("unknown reranker fixture: " + fixtureId));
+    return new Artifact(
+        fixture.displayName(),
+        fixture.localPath().orElseThrow(),
+        fixture.sha256().orElseThrow(),
+        fixture.sizeBytes().orElseThrow());
+  }
+
+  private record Artifact(String displayName, Path path, String sha256, long sizeBytes) {}
 
   private static long percentile(long[] measurements, double percentile) {
     long[] sorted = measurements.clone();
