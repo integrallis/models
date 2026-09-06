@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.30] - 2026-09-06
+
 ### Added
 
 - Added explicit high-level text-generation sessions over batch-capable backends. Each session
