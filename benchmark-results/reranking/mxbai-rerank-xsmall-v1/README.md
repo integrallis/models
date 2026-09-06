@@ -5,6 +5,11 @@ The official, public Apache-2.0 checkpoint was pinned at
 It is a 12-layer, 384-wide DeBERTa-v2 cross-encoder with disentangled relative attention and an
 F16 Safetensors classification head.
 
+The qualified runtime bundle is exactly three files: `config.json`, `model.safetensors`, and
+`tokenizer.json`. The machine-readable report binds each file's size and SHA-256 plus a canonical
+manifest digest. `tokenizer_config.json` is not part of the bundle because the Java runtime does not
+read it.
+
 Models implements the complete graph in Java: the Hugging Face Unigram/precompiled-character-map
 tokenizer, sentence-pair boundaries, learned relative-position bucketing, content-to-position and
 position-to-content attention, ContextPooler, and scalar classifier. No Python, ONNX Runtime, or
