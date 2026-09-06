@@ -41,6 +41,8 @@ val msMarcoRerankerFixture =
     ).toString()
 val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
+val configuredMxbaiRerankerDirectory =
+    providers.systemProperty("models.fixtures.mxbaiRerankerDirectory")
 
 tasks.withType<Test>().configureEach {
     systemProperty("models.fixtures.miniLm", miniLmFixture)
@@ -48,6 +50,9 @@ tasks.withType<Test>().configureEach {
     systemProperty("models.fixtures.msMarcoReranker", msMarcoRerankerFixture)
     configuredTinyBertRerankerPath.orNull?.let {
         systemProperty("models.fixtures.tinyBertReranker", it)
+    }
+    configuredMxbaiRerankerDirectory.orNull?.let {
+        systemProperty("models.fixtures.mxbaiRerankerDirectory", it)
     }
 }
 
@@ -124,4 +129,22 @@ tasks.register<Test>("tinyBertStandardGgufLangChain4jIntegrationTest") {
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "1g"
+}
+
+tasks.register<Test>("mxbaiDebertaLangChain4jIntegrationTest") {
+    description = "Run LangChain4j scoring against the pinned mxbai DeBERTa reranker"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("model-fixture")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.langchain4j.MxbaiDebertaLangChain4jRerankerIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "3g"
 }

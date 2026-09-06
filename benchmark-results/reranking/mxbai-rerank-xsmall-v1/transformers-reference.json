@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-06",
+  "source": "mixedbread-ai/mxbai-rerank-xsmall-v1",
+  "revision": "b5c6e9da73abc3711f593f705371cdbe9e0fe422",
+  "referenceRuntime": "Hugging Face Transformers 4.38.1 with PyTorch",
+  "weights": {
+    "path": "model.safetensors",
+    "sizeBytes": 141685186,
+    "sha256": "a29bc212faf59c136ad0fd5712ecd2346e7b32c44a25b690625bc9ecebb14b8f",
+    "dtype": "F16"
+  },
+  "pairs": [
+    {
+      "query": "What is the population of Berlin?",
+      "document": "Berlin has a population of about 3.7 million people.",
+      "tokens": [1, 458, 269, 262, 1755, 265, 5842, 302, 2, 5842, 303, 266, 1755, 265, 314, 404, 260, 819, 705, 355, 260, 2],
+      "tokenTypes": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      "logit": 2.6104862689971924
+    },
+    {
+      "query": "What is the population of Berlin?",
+      "document": "The Eiffel Tower is located in Paris.",
+      "tokens": [1, 458, 269, 262, 1755, 265, 5842, 302, 2, 279, 36726, 6962, 269, 1137, 267, 3045, 260, 2],
+      "tokenTypes": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      "logit": -3.1909432411193848
+    }
+  ]
+}

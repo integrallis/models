@@ -170,6 +170,12 @@ token-type IDs, retains the CLS hidden state, and executes the artifact's traine
 dense-tanh-output classifier head. Corrected classifier tensors are required; embedding pooling is
 not substituted for the trained scoring head.
 
+DeBERTa-v2 rerankers use their own whole-sequence graph rather than being approximated as BERT.
+Models preserves the checkpoint's Unigram normalization, relative-position buckets,
+content-to-position and position-to-content attention, ContextPooler, and classifier. The pinned
+mxbai F16 weights expand once to F32 because the measured mapped-F16 projection path was slower;
+token rows then execute in parallel through the same Java Vector API dot-product kernels.
+
 == Safetensors And CACT
 
 For a supported Hugging Face directory, the pure-Java backend validates

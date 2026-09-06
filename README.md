@@ -90,7 +90,8 @@ Implemented functionality includes:
 - in-process text-to-speech with normalized PCM output, WAV encoding, and true
   incremental audio streaming; Soprano 1.1 runs from one GGUF artifact with a
   pure-Java graph and an optional Models-owned Q8 projection kernel through FFM
-- pure-Java cross-encoder reranking with a framework-neutral API plus
+- pure-Java BERT and DeBERTa-v2 cross-encoder reranking from GGUF and Safetensors, with a
+  framework-neutral API plus
   LangChain4j `ScoringModel` and Spring AI `DocumentPostProcessor` adapters
 - plain Java, LangChain4j, Spring AI, and Spring Boot integrations
 - Apple Foundation Models on supported Apple Silicon Macs
@@ -102,7 +103,7 @@ Implemented functionality includes:
 
 ## Supported Models
 
-Committed same-host evidence covers 32 exact artifacts across 29 model
+Committed same-host evidence covers 33 exact artifacts across 30 model
 identities below. Support is bound to an artifact SHA, workload, runtime
 selector, backend plan, correctness result, and latency measurements; consult
 the qualification ledger for those exact details.
@@ -138,6 +139,7 @@ the qualification ledger for those exact details.
 | Nexus Legal | Legal |
 | Nexus Finance | Finance |
 | Nexus Medical | Healthcare |
+| mxbai-rerank-xsmall-v1 | Reranking |
 
 Gemma 4 26B-A4B Instruct Q4_K_M is qualified at the usable tier through the
 Models Rust/FFM backend. See the
