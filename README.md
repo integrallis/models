@@ -261,6 +261,18 @@ recent generation. `pipeline.lastGenerationMetrics()` reports tokenization,
 prompt preparation, prefill, time to first token, decode and total duration,
 along with token counts, prompt-cache reuse, and decode throughput.
 
+Batch-capable backends can also open one `TextGenerationSession` per
+conversation. Sessions share the loaded model weights but keep independent KV
+state, exact prompt-prefix reuse, and metrics:
+
+```java
+try (var pipeline = new InferencePipeline(PureJavaBackend.load(gguf));
+     var conversation = pipeline.openGenerationSession()) {
+    String answer = conversation.generate(prompt, options);
+    var cache = conversation.lastGenerationMetrics().promptCache();
+}
+```
+
 For speech synthesis, add `com.integrallis:models-audio` and open a qualified
 Soprano artifact directly or through ModelJars:
 

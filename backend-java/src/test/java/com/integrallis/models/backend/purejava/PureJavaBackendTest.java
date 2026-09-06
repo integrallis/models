@@ -23,9 +23,11 @@ import com.integrallis.models.api.BatchInferenceBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
+import com.integrallis.models.runtime.InferencePipeline;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
@@ -270,6 +272,28 @@ class PureJavaBackendTest {
           assertThat(first.checkpoint()).isEqualTo(3);
           assertThat(second.checkpoint()).isEqualTo(4);
         }
+      }
+    }
+
+    @Test
+    void exposesIndependentHighLevelGenerationSessions(@TempDir Path dir) throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(42), GgufTensorType.Q4_0);
+      var options = SamplingOptions.builder().temperature(0).maxTokens(1).build();
+
+      try (InferencePipeline pipeline = new InferencePipeline(PureJavaBackend.load(modelPath));
+          var first = pipeline.openGenerationSession();
+          var second = pipeline.openGenerationSession()) {
+        first.generate("t5", options);
+
+        assertThat(first.contextWindow().position().orElseThrow()).isPositive();
+        assertThat(second.contextWindow().position()).hasValue(0);
+        assertThat(first.lastGenerationMetrics().available()).isTrue();
+        assertThat(second.lastGenerationMetrics().available()).isFalse();
+
+        second.generate("t7", options);
+
+        assertThat(second.contextWindow().position().orElseThrow()).isPositive();
+        assertThat(second.lastGenerationMetrics().available()).isTrue();
       }
     }
 

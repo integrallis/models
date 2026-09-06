@@ -41,6 +41,7 @@ import java.util.function.LongSupplier;
 public final class GenerationLoop {
 
   private final InferenceBackend backend;
+  private final Object executionLock;
   private final SpeculativeGenerationOptions speculativeOptions;
   private final LongSupplier nanoTime;
   private volatile SpeculativeGenerationMetrics lastSpeculativeMetrics =
@@ -61,9 +62,18 @@ public final class GenerationLoop {
       InferenceBackend backend,
       SpeculativeGenerationOptions speculativeOptions,
       LongSupplier nanoTime) {
+    this(backend, speculativeOptions, nanoTime, backend);
+  }
+
+  GenerationLoop(
+      InferenceBackend backend,
+      SpeculativeGenerationOptions speculativeOptions,
+      LongSupplier nanoTime,
+      Object executionLock) {
     this.backend = Objects.requireNonNull(backend, "backend");
     this.speculativeOptions = Objects.requireNonNull(speculativeOptions, "speculativeOptions");
     this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
+    this.executionLock = Objects.requireNonNull(executionLock, "executionLock");
   }
 
   /** Returns the measurements captured by the most recently completed request. */
@@ -160,7 +170,7 @@ public final class GenerationLoop {
     Objects.requireNonNull(stream, "stream");
     Objects.requireNonNull(constraint, "constraint");
 
-    synchronized (backend) {
+    synchronized (executionLock) {
       long requestStarted = nanoTime.getAsLong();
       long phaseStarted = requestStarted;
       Tokenizer tokenizer = backend.tokenizer();

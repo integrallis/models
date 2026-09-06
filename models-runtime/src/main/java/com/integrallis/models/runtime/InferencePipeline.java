@@ -18,8 +18,10 @@ package com.integrallis.models.runtime;
 import com.integrallis.models.api.AuxiliaryInferenceBackend;
 import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.BatchInferenceBackend;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.InferenceContextWindow;
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
@@ -27,8 +29,11 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -46,6 +51,8 @@ public final class InferencePipeline
     implements ConstrainedTextGenerationModel, AuxiliaryTextGenerationModel {
   private final InferenceBackend backend;
   private final GenerationLoop generationLoop;
+  private final Set<TextGenerationSession> generationSessions =
+      Collections.newSetFromMap(new IdentityHashMap<>());
   private final AtomicBoolean closed = new AtomicBoolean();
 
   /** Creates a pipeline that owns the supplied loaded backend. */
@@ -97,6 +104,39 @@ public final class InferencePipeline
     synchronized (backend) {
       requireOpen();
       return generationLoop.lastGenerationMetrics();
+    }
+  }
+
+  /** Returns whether this backend can hold more than one independent generation lineage. */
+  public boolean supportsGenerationSessions() {
+    synchronized (backend) {
+      requireOpen();
+      return backend instanceof BatchInferenceBackend;
+    }
+  }
+
+  /**
+   * Opens independent prompt/KV state while sharing this pipeline's loaded model weights.
+   *
+   * <p>Use one session per conversation or other cache lineage. Calls across sessions are
+   * serialized by this pipeline because the loaded backend may reuse transient inference scratch.
+   */
+  public TextGenerationSession openGenerationSession() {
+    synchronized (backend) {
+      requireOpen();
+      if (!(backend instanceof BatchInferenceBackend batchBackend)) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " does not support independent inference sessions");
+      }
+      InferenceSession state = batchBackend.openSession();
+      TextGenerationSession session =
+          new TextGenerationSession(
+              batchBackend,
+              state,
+              backend,
+              () -> generationSessions.removeIf(TextGenerationSession::isClosed));
+      generationSessions.add(session);
+      return session;
     }
   }
 
@@ -262,6 +302,10 @@ public final class InferencePipeline
   public void close() {
     synchronized (backend) {
       if (closed.compareAndSet(false, true)) {
+        for (TextGenerationSession session : Set.copyOf(generationSessions)) {
+          session.close();
+        }
+        generationSessions.clear();
         generationLoop.invalidatePromptCache();
         backend.close();
       }

@@ -17,14 +17,19 @@ package com.integrallis.models.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.AuxiliaryInferenceBackend;
 import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.InferenceSession;
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -127,6 +132,117 @@ class InferencePipelineTest {
     assertThatIllegalStateException()
         .isThrownBy(pipeline::metadata)
         .withMessageContaining("closed");
+  }
+
+  @Test
+  void isolatesPromptPrefixStateAcrossExplicitGenerationSessions() {
+    SessionBackend backend = new SessionBackend();
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    TextGenerationSession first = pipeline.openGenerationSession();
+
+    try (pipeline;
+        TextGenerationSession second = pipeline.openGenerationSession()) {
+      first.generate("ab", deterministicOptions());
+      second.generate("xy", deterministicOptions());
+      first.generate("abc", deterministicOptions());
+
+      assertThat(first.lastGenerationMetrics().promptCache().cacheReadInputTokens()).isEqualTo(2);
+      assertThat(first.lastGenerationMetrics().promptCache().cacheWriteInputTokens()).isEqualTo(1);
+      assertThat(second.lastGenerationMetrics().promptCache().cacheReadInputTokens()).isZero();
+      assertThat(backend.prefillStartPositions()).containsExactly(List.of(0, 2), List.of(0));
+
+      first.close();
+      first.close();
+      assertThatIllegalStateException()
+          .isThrownBy(() -> first.generate("abc", deterministicOptions()))
+          .withMessageContaining("closed");
+      assertThat(backend.closedSessions).isEqualTo(1);
+
+      second.generate("xyz", deterministicOptions());
+      assertThat(second.lastGenerationMetrics().promptCache().cacheReadInputTokens()).isEqualTo(2);
+      assertThat(backend.closeCount).isZero();
+    }
+
+    assertThat(backend.closedSessions).isEqualTo(2);
+    assertThat(backend.closeCount).isEqualTo(1);
+  }
+
+  @Test
+  void closesOpenGenerationSessionsWithTheOwningPipeline() {
+    SessionBackend backend = new SessionBackend();
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    TextGenerationSession session = pipeline.openGenerationSession();
+
+    pipeline.close();
+
+    assertThat(session.isClosed()).isTrue();
+    assertThat(backend.closedSessions).isEqualTo(1);
+    assertThat(backend.closeCount).isEqualTo(1);
+    assertThatIllegalStateException()
+        .isThrownBy(session::contextWindow)
+        .withMessageContaining("closed");
+  }
+
+  @Test
+  void explainsWhenTheBackendCannotOpenIndependentGenerationState() {
+    try (InferencePipeline pipeline = new InferencePipeline(new StubBackend())) {
+      assertThat(pipeline.supportsGenerationSessions()).isFalse();
+      assertThatThrownBy(pipeline::openGenerationSession)
+          .isInstanceOf(UnsupportedOperationException.class)
+          .hasMessageContaining("independent inference sessions");
+    }
+  }
+
+  @Test
+  void resetsOneGenerationSessionWithoutChangingAnother() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend);
+        TextGenerationSession first = pipeline.openGenerationSession();
+        TextGenerationSession second = pipeline.openGenerationSession()) {
+      first.generate("ab", deterministicOptions());
+      second.generate("xy", deterministicOptions());
+
+      first.resetContext();
+      first.generate("abc", deterministicOptions());
+      second.generate("xyz", deterministicOptions());
+
+      assertThat(backend.prefillStartPositions()).containsExactly(List.of(0, 0), List.of(0, 2));
+    }
+  }
+
+  @Test
+  void exposesTheCompleteHighLevelGenerationSessionContract() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend);
+        TextGenerationSession session = pipeline.openGenerationSession()) {
+      TokenStream stream =
+          new TokenStream() {
+            @Override
+            public void onToken(String token) {}
+
+            @Override
+            public void onComplete() {}
+
+            @Override
+            public void onError(Throwable failure) {
+              throw new AssertionError(failure);
+            }
+          };
+
+      assertThat(session.modelName()).isEqualTo("session-fixture");
+      assertThat(session.diagnostics().backend()).isEqualTo("session-stub");
+      assertThat(session.tokenizer().vocabSize()).isEqualTo(8);
+      assertThat(session.contextWindow().capacity()).isEqualTo(16);
+      assertThat(session.contextWindow().position()).hasValue(0);
+
+      assertThat(session.generate(ModelPrompt.text("ab"), deterministicOptions())).isEmpty();
+      session.generate("ab", deterministicOptions(), stream);
+      session.generate(ModelPrompt.text("ab"), deterministicOptions(), stream);
+      session.generate(
+          ModelPrompt.text("ab"), deterministicOptions(), stream, TokenConstraint.unrestricted());
+    }
   }
 
   private static SamplingOptions deterministicOptions() {
@@ -266,6 +382,150 @@ class InferencePipelineTest {
 
     private static float[] terminalLogits() {
       return new float[] {0.0f, 0.0f, 10.0f};
+    }
+  }
+
+  private static final class SessionBackend implements BatchInferenceBackend {
+    private final List<Session> sessions = new ArrayList<>();
+    private int closedSessions;
+    private int closeCount;
+
+    @Override
+    public String name() {
+      return "session-stub";
+    }
+
+    @Override
+    public ModelMetadata metadata() {
+      return new ModelMetadata("fixture", "session-fixture", 16, 8, 8, 1, 1, 1);
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return new Tokenizer() {
+        @Override
+        public int[] encode(String text) {
+          return text.chars().map(character -> 3 + Math.floorMod(character, 5)).toArray();
+        }
+
+        @Override
+        public String decode(int[] tokens) {
+          return "";
+        }
+
+        @Override
+        public String decode(int token) {
+          return "";
+        }
+
+        @Override
+        public int vocabSize() {
+          return 8;
+        }
+
+        @Override
+        public int bosToken() {
+          return 0;
+        }
+
+        @Override
+        public int eosToken() {
+          return 2;
+        }
+      };
+    }
+
+    @Override
+    public float[] forward(int token, int position) {
+      throw new AssertionError("default backend state must not serve an explicit session");
+    }
+
+    @Override
+    public int maxBatchSize() {
+      return 4;
+    }
+
+    @Override
+    public InferenceSession openSession() {
+      Session session = new Session();
+      sessions.add(session);
+      return session;
+    }
+
+    @Override
+    public float[] forward(InferenceSession session, int token, int position) {
+      Session state = requireSession(session);
+      state.position = position + 1;
+      return terminalLogits();
+    }
+
+    @Override
+    public float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
+      Session state = requireSession(session);
+      state.prefillStartPositions.add(startPosition);
+      state.position = startPosition + tokens.length;
+      return terminalLogits();
+    }
+
+    @Override
+    public LogitBatch forwardBatch(InferenceSession[] sessions, int[] tokens) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void rewind(InferenceSession session, int checkpoint) {
+      requireSession(session).position = checkpoint;
+    }
+
+    @Override
+    public void reset(InferenceSession session) {
+      requireSession(session).position = 0;
+    }
+
+    @Override
+    public void close() {
+      closeCount++;
+    }
+
+    List<List<Integer>> prefillStartPositions() {
+      return sessions.stream().map(session -> List.copyOf(session.prefillStartPositions)).toList();
+    }
+
+    private Session requireSession(InferenceSession session) {
+      if (!(session instanceof Session state) || state.closed) {
+        throw new IllegalStateException("session is closed or does not belong to this backend");
+      }
+      return state;
+    }
+
+    private static float[] terminalLogits() {
+      float[] logits = new float[8];
+      logits[2] = 10.0f;
+      return logits;
+    }
+
+    private final class Session implements InferenceSession {
+      private final List<Integer> prefillStartPositions = new ArrayList<>();
+      private int position;
+      private boolean closed;
+
+      @Override
+      public int checkpoint() {
+        return position;
+      }
+
+      @Override
+      public boolean isClosed() {
+        return closed;
+      }
+
+      @Override
+      public void close() {
+        if (!closed) {
+          closed = true;
+          closedSessions++;
+        }
+      }
     }
   }
 }
