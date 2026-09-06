@@ -13,9 +13,10 @@ external inference service is used at runtime.
 ## Correctness
 
 The pinned Transformers 4.38.1 oracle supplies exact token IDs, token-type IDs, and logits. The
-pure-Java logits differ by at most `0.000001669`, well inside the retained `0.001` gate, and preserve
-the expected ranking. The same real checkpoint also ranks the relevant document first through the
-LangChain4j `ScoringModel` and Spring AI `DocumentPostProcessor` adapters.
+pure-Java logits across all six documents differ by at most `0.000003100`, well inside the retained
+`0.001` gate, and reproduce the complete `[0, 2, 5, 1, 4, 3]` ranking. The same real checkpoint also
+ranks the relevant document first through the LangChain4j `ScoringModel` and Spring AI
+`DocumentPostProcessor` adapters.
 
 ## Storage and execution decision
 

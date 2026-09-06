@@ -27,13 +27,26 @@
     "backend": "pure-java"
   },
   "correctness": {
-    "transformersRelevantLogit": 2.6104862689971924,
-    "javaRelevantLogit": 2.610487937927246,
-    "relevantLogitDelta": 0.000001669,
-    "transformersIrrelevantLogit": -3.1909432411193848,
-    "javaIrrelevantLogit": -3.1909427642822266,
-    "irrelevantLogitDelta": 0.000000477,
-    "ranking": [0, 2, 5, 1, 4, 3]
+    "referenceRuntime": "Hugging Face Transformers 4.38.1 with PyTorch",
+    "maximumReferenceLogitDelta": 0.0000030994415283203125,
+    "referenceScores": [
+      2.610485553741455,
+      -3.1909432411193848,
+      1.1550936698913574,
+      -3.9371538162231445,
+      -3.6461875438690186,
+      -1.0840436220169067
+    ],
+    "javaScores": [
+      2.610487937927246,
+      -3.1909427642822266,
+      1.1550922393798828,
+      -3.937156915664673,
+      -3.6461877822875977,
+      -1.084044337272644
+    ],
+    "referenceRanking": [0, 2, 5, 1, 4, 3],
+    "javaRanking": [0, 2, 5, 1, 4, 3]
   },
   "singleThread": {
     "medianColdLoadMillis": 3068.725,
