@@ -26,6 +26,9 @@ before execution.
 
 Query: `How many people live in Berlin?`
 
+The machine-readable input is
+[`../workloads/berlin-population-six-documents-v1.json`](../workloads/berlin-population-six-documents-v1.json).
+
 | Index | Document |
 | ---: | --- |
 | 0 | Berlin has a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers. |
