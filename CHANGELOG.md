@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added explicit high-level text-generation sessions over batch-capable backends. Each session
+  keeps an independent context, exact prompt-prefix history, and generation metrics while sharing
+  one loaded model.
+
+### Documentation
+
+- Documented conversation-scoped generation sessions and corrected the composition research plan:
+  KV state is isolated by model and adapter identity unless equality of the produced K/V
+  activations is demonstrated.
+
 ## [0.3.29] - 2026-09-05
 
 ### Added

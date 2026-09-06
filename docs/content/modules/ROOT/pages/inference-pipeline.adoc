@@ -136,6 +136,50 @@ the prompt-prefix cache result. `timeToFirstToken()` is empty when generation
 produces no token. Check `available()` before reading a newly opened pipeline
 and `successful()` when diagnosing a failed request.
 
+== Keep Conversation State Separate
+
+A pipeline's ordinary `generate` methods maintain one exact prompt-prefix
+lineage. A server or memory application with several conversations must not
+send all of them through that single lineage. When the backend supports
+independent sessions, open one `TextGenerationSession` per conversation:
+
+[source,java]
+----
+try (InferencePipeline pipeline =
+        new InferencePipeline(PureJavaBackend.load(gguf));
+     TextGenerationSession alice = pipeline.openGenerationSession();
+     TextGenerationSession bob = pipeline.openGenerationSession()) {
+
+    String aliceReply = alice.generate(alicePrompt, options);
+    String bobReply = bob.generate(bobPrompt, options);
+
+    PromptCacheMetrics aliceCache =
+        alice.lastGenerationMetrics().promptCache();
+    System.out.printf("Alice reused %d prompt tokens%n",
+        aliceCache.cacheReadInputTokens());
+}
+----
+
+Each session owns its context/KV state, retained prompt tokens, and latest
+metrics. The sessions share the already-loaded model weights; they do not
+share KV entries with each other. Supply the complete rendered conversation
+on each call. An exact unchanged prefix is then retained within that
+conversation and only its suffix is evaluated.
+
+`resetContext()` clears one session without disturbing the others. Closing a
+session releases only its request state. Closing the pipeline closes every
+remaining session and then the loaded model. Calls are serialized across the
+pipeline because the backend may share transient logits and execution scratch;
+this API provides state isolation, not parallel generation. Use
+`supportsGenerationSessions()` when an application may load a backend without
+this capability. The pure-Java GGUF backend currently supports it.
+
+These boundaries matter when routing. Different models, or different adapter
+states of one base model, must keep separate KV lineages unless equality of
+the actual K/V activations has been established. Conversation affinity can
+avoid unnecessary switches, while each model-specific session reports the
+prefix tokens it reused and wrote.
+
 == Use Auxiliary Heads
 
 Architectures may carry trained heads in addition to token generation. Needle
