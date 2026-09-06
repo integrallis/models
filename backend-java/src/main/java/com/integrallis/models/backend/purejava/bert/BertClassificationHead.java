@@ -54,7 +54,7 @@ public final class BertClassificationHead {
     if (inputWidth <= 0) {
       throw new IllegalArgumentException("inputWidth must be > 0: " + inputWidth);
     }
-    GgufTensorData dense = required(file, "classifier.dense.weight");
+    GgufTensorData dense = required(file, "classifier.dense.weight", "cls.weight");
     long[] denseShape = dense.shape();
     if (denseShape.length != 2 || denseShape[0] != inputWidth) {
       throw new IllegalArgumentException(
@@ -64,7 +64,7 @@ public final class BertClassificationHead {
               + Arrays.toString(denseShape));
     }
     int hiddenWidth = Math.toIntExact(denseShape[1]);
-    GgufTensorData output = required(file, "classifier.out_proj.weight");
+    GgufTensorData output = required(file, "classifier.out_proj.weight", "cls.output.weight");
     long[] outputShape = output.shape();
     boolean scalarProjection =
         Arrays.equals(outputShape, new long[] {hiddenWidth})
@@ -78,12 +78,12 @@ public final class BertClassificationHead {
               + ", 1]: "
               + Arrays.toString(outputShape));
     }
-    float[] outputBias = vector(file, "classifier.out_proj.bias", 1);
+    float[] outputBias = vector(file, "classifier.out_proj.bias", "cls.output.bias", 1);
     return new BertClassificationHead(
         inputWidth,
         hiddenWidth,
         GgufTensorValues.toFloatArray(dense),
-        vector(file, "classifier.dense.bias", hiddenWidth),
+        vector(file, "classifier.dense.bias", "cls.bias", hiddenWidth),
         GgufTensorValues.toFloatArray(output),
         outputBias[0]);
   }
@@ -109,20 +109,27 @@ public final class BertClassificationHead {
     return score;
   }
 
-  private static GgufTensorData required(GgufFile file, String name) {
+  private static GgufTensorData required(GgufFile file, String name, String standardName) {
     try {
       return file.getTensor(name);
     } catch (IllegalArgumentException missing) {
-      throw new IllegalArgumentException(
-          "GGUF reranker is missing "
-              + name
-              + "; use a corrected conversion that retains the trained classifier pooler",
-          missing);
+      try {
+        return file.getTensor(standardName);
+      } catch (IllegalArgumentException standardMissing) {
+        standardMissing.addSuppressed(missing);
+        throw new IllegalArgumentException(
+            "GGUF reranker is missing "
+                + name
+                + " (standard name "
+                + standardName
+                + "); use a corrected conversion that retains the trained classifier pooler",
+            standardMissing);
+      }
     }
   }
 
-  private static float[] vector(GgufFile file, String name, int size) {
-    GgufTensorData tensor = required(file, name);
+  private static float[] vector(GgufFile file, String name, String standardName, int size) {
+    GgufTensorData tensor = required(file, name, standardName);
     if (!Arrays.equals(tensor.shape(), new long[] {size})) {
       throw new IllegalArgumentException(
           name + " shape must be [" + size + "]: " + Arrays.toString(tensor.shape()));

@@ -39,11 +39,16 @@ val msMarcoRerankerFixture =
             ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
         "ms-marco-MiniLM-L-6-v2-q4_k-imatrix-g7c-f7.gguf",
     ).toString()
+val configuredTinyBertRerankerPath =
+    providers.systemProperty("models.fixtures.tinyBertReranker")
 
 tasks.withType<Test>().configureEach {
     systemProperty("models.fixtures.miniLm", miniLmFixture)
     systemProperty("models.fixtures.qwen317b", qwen317bFixture)
     systemProperty("models.fixtures.msMarcoReranker", msMarcoRerankerFixture)
+    configuredTinyBertRerankerPath.orNull?.let {
+        systemProperty("models.fixtures.tinyBertReranker", it)
+    }
 }
 
 tasks.register<Test>("qwen3LangChain4jToolCallingIntegrationTest") {
@@ -101,4 +106,22 @@ tasks.register<Test>("msMarcoRerankerLangChain4jIntegrationTest") {
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "2g"
+}
+
+tasks.register<Test>("tinyBertStandardGgufLangChain4jIntegrationTest") {
+    description = "Run LangChain4j scoring against a corrected standard-GGUF TinyBERT reranker"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.langchain4j.TinyBertStandardGgufLangChain4jIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "1g"
 }

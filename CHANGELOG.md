@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added standard GGUF BERT rank pooling and `cls.*` / `cls.output.*` sequence-classifier tensor
+  aliases while preserving compatibility with previously corrected reranker artifacts.
+- Added checksum-bound plain Java, LangChain4j, and Spring AI gates for a corrected TinyBERT L2
+  Q8_0 artifact plus a local-artifact performance experiment.
+
+### Documentation
+
+- Recorded the rejected incomplete TinyBERT community conversions, corrected conversion hashes,
+  Transformers equivalence, and the measured low-latency pure-Java reranking tier.
+
 ## [0.3.29] - 2026-09-05
 
 ### Added

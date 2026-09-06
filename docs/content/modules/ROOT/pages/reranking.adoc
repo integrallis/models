@@ -33,9 +33,10 @@ Every `RerankResult` retains `originalIndex`, so an application can correlate a 
 with its retrieved metadata. Scores order documents for one query; do not compare raw scores from
 unrelated queries as though they were probabilities.
 
-Use a corrected conversion that retains the model's trained classification pooler. Loading fails
-with a direct explanation when the required classifier tensors are absent instead of returning
-plausible but mis-calibrated scores.
+Use a corrected conversion that retains the model's trained classification pooler. Models accepts
+the standard GGUF rank-pooling tensors (`cls.*` and `cls.output.*`) and the earlier corrected
+`classifier.dense.*` / `classifier.out_proj.*` convention. Loading fails with a direct explanation
+when either complete head is absent instead of returning plausible but mis-calibrated scores.
 
 == LangChain4j
 
@@ -83,6 +84,17 @@ LangChain4j and Spring AI.
 Run only that artifact and its framework gates:
 
 [source,bash]
+----
+
+For a locally converted standard-GGUF TinyBERT artifact, run the same public paths without adding
+it to the downloadable fixture registry:
+
+[source,bash]
+----
+./gradlew :backend-java:tinyBertStandardGgufIntegrationTest \
+  :models-langchain4j:tinyBertStandardGgufLangChain4jIntegrationTest \
+  :models-spring-ai:tinyBertStandardGgufSpringAiIntegrationTest \
+  -Dmodels.fixtures.tinyBertReranker=/absolute/path/to/tinybert-q8_0.gguf
 ----
 ./gradlew :backend-java:msMarcoMiniLmRerankerIntegrationTest \
   :models-langchain4j:msMarcoRerankerLangChain4jIntegrationTest \
