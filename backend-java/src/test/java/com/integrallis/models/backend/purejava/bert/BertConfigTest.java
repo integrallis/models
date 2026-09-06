@@ -66,6 +66,15 @@ class BertConfigTest {
         .hasMessageContaining("pooling");
   }
 
+  @Test
+  void acceptsTheStandardGgufRankPoolingContract() {
+    Map<String, GgufMetadataValue> entries = new HashMap<>(miniLmMetadata().entries());
+    entries.put("bert.pooling_type", new GgufMetadataValue.Uint32Value(4));
+
+    assertThat(BertConfig.fromMetadata(new GgufMetadata(entries)).pooling())
+        .isEqualTo(BertConfig.Pooling.RANK);
+  }
+
   private static GgufMetadata miniLmMetadata() {
     Map<String, GgufMetadataValue> entries = new HashMap<>();
     entries.put("general.architecture", new GgufMetadataValue.StringValue("bert"));
