@@ -23,7 +23,7 @@ import java.util.Locale;
 
 /** Focused cold-load and warm-scoring experiment for the pinned MiniLM cross-encoder. */
 public final class MsMarcoMiniLmRerankerPerformanceExperiment {
-  private static final String FIXTURE_ID = "ms_marco_minilm_l6_v2_q4_k_imatrix_g7c_f7";
+  private static final String DEFAULT_FIXTURE_ID = "ms_marco_minilm_l6_v2_q4_k_imatrix_g7c_f7";
   private static final String QUERY = "How many people live in Berlin?";
   private static final List<String> DOCUMENTS =
       List.of(
@@ -40,11 +40,14 @@ public final class MsMarcoMiniLmRerankerPerformanceExperiment {
     int warmups = nonNegativeArgument(args, 0, 3, "warmups");
     int pairIterations = positiveArgument(args, 1, 30, "pair iterations");
     int batchIterations = positiveArgument(args, 2, 10, "batch iterations");
+    String fixtureId =
+        System.getProperty("models.reranker.performance.fixtureId", DEFAULT_FIXTURE_ID);
     ModelFixtureDescriptor fixture =
         ModelFixtureRegistry.fromClasspath().descriptors().stream()
-            .filter(candidate -> FIXTURE_ID.equals(candidate.id()))
+            .filter(candidate -> fixtureId.equals(candidate.id()))
             .findFirst()
-            .orElseThrow();
+            .orElseThrow(
+                () -> new IllegalArgumentException("unknown reranker fixture: " + fixtureId));
 
     long loadStart = System.nanoTime();
     try (GgufRerankingModel model = GgufRerankingModel.load(fixture.localPath().orElseThrow())) {

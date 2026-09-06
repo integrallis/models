@@ -84,6 +84,10 @@ val modelFixtures =
             "ms_marco_minilm_l6_v2_q4_k_imatrix_g7c_f7",
         ),
         modelFixture(
+            "downloadMsMarcoMiniLmL12V2RerankerModel",
+            "ms_marco_minilm_l12_v2_q4_k_imatrix_g7c_f7",
+        ),
+        modelFixture(
             "downloadGraniteEmbedding107MMultilingualQ4KMModel",
             "granite_embedding_107m_multilingual_q4_k_m",
         ),
@@ -413,6 +417,25 @@ tasks.register<Test>("msMarcoMiniLmRerankerIntegrationTest") {
     maxHeapSize = "2g"
 }
 
+tasks.register<Test>("msMarcoMiniLmL12RerankerIntegrationTest") {
+    description = "Run the pinned corrected MS MARCO MiniLM L12 reranker equivalence tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.MsMarcoMiniLmL12RerankerIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadMsMarcoMiniLmL12V2RerankerModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
+}
+
 tasks.register<JavaExec>("msMarcoMiniLmRerankerPerformanceExperiment") {
     description = "Measure the pinned MS MARCO MiniLM reranker's cold load and warm scoring"
     group = "verification"
@@ -422,6 +445,27 @@ tasks.register<JavaExec>("msMarcoMiniLmRerankerPerformanceExperiment") {
         "com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerPerformanceExperiment",
     )
     jvmArgs("--add-modules", "jdk.incubator.vector")
+    args(
+        providers.gradleProperty("reranker.performance.warmups").getOrElse("3"),
+        providers.gradleProperty("reranker.performance.pairIterations").getOrElse("30"),
+        providers.gradleProperty("reranker.performance.batchIterations").getOrElse("10"),
+    )
+    maxHeapSize = "2g"
+}
+
+tasks.register<JavaExec>("msMarcoMiniLmL12RerankerPerformanceExperiment") {
+    description = "Measure the pinned MS MARCO MiniLM L12 reranker's cold load and warm scoring"
+    group = "verification"
+    dependsOn(tasks.named("downloadMsMarcoMiniLmL12V2RerankerModel"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set(
+        "com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerPerformanceExperiment",
+    )
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+    systemProperty(
+        "models.reranker.performance.fixtureId",
+        "ms_marco_minilm_l12_v2_q4_k_imatrix_g7c_f7",
+    )
     args(
         providers.gradleProperty("reranker.performance.warmups").getOrElse("3"),
         providers.gradleProperty("reranker.performance.pairIterations").getOrElse("30"),
