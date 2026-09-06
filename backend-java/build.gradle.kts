@@ -5,19 +5,22 @@ import org.gradle.testing.jacoco.tasks.JacocoReport
 
 // backend-java - GGUF parser, vectors-backed inference kernels, and KV cache
 
-// The standalone Soprano loader and vocoder require the published model artifact. They are covered
-// by sopranoGgufIntegrationTest plus the controlled oracle/latency qualification gate, not by the
-// ordinary unit-test task whose execution data feeds the 80% JaCoCo gate.
-val sopranoArtifactIntegrationClasses =
+// These loaders and forward passes require real model artifacts. They are covered by pinned
+// real-model integration and qualification gates, not by the ordinary unit-test task whose
+// execution data feeds the 80% JaCoCo gate.
+val modelArtifactIntegrationClasses =
     listOf(
         "**/soprano/SopranoBackend*.class",
         "**/soprano/SopranoVocoder*.class",
+        "**/SafetensorsRerankingModel*.class",
+        "**/deberta/DebertaV2*.class",
+        "**/tokenizer/DebertaV2Tokenizer*.class",
     )
 
 tasks.withType<JacocoReport>().configureEach {
     classDirectories.setFrom(
         files(classDirectories.files.map { directory ->
-            fileTree(directory) { exclude(sopranoArtifactIntegrationClasses) }
+            fileTree(directory) { exclude(modelArtifactIntegrationClasses) }
         }),
     )
 }
@@ -25,7 +28,7 @@ tasks.withType<JacocoReport>().configureEach {
 tasks.withType<JacocoCoverageVerification>().configureEach {
     classDirectories.setFrom(
         files(classDirectories.files.map { directory ->
-            fileTree(directory) { exclude(sopranoArtifactIntegrationClasses) }
+            fileTree(directory) { exclude(modelArtifactIntegrationClasses) }
         }),
     )
 }
@@ -206,6 +209,9 @@ val configuredMobileMoeQatDirectory =
     providers.systemProperty("models.fixtures.mobileMoeQatDirectory")
 val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
+val configuredMxbaiRerankerDirectory =
+    providers.systemProperty("models.fixtures.mxbaiRerankerDirectory")
+val configuredDebertaThreads = providers.systemProperty("models.deberta.threads")
 
 tasks.withType<Test>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
@@ -230,10 +236,19 @@ tasks.withType<Test>().configureEach {
     configuredTinyBertRerankerPath.orNull?.let {
         systemProperty("models.fixtures.tinyBertReranker", it)
     }
+    configuredMxbaiRerankerDirectory.orNull?.let {
+        systemProperty("models.fixtures.mxbaiRerankerDirectory", it)
+    }
+    configuredDebertaThreads.orNull?.let {
+        systemProperty("models.deberta.threads", it)
+    }
 }
 
 tasks.withType<JavaExec>().configureEach {
     fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
+    configuredDebertaThreads.orNull?.let {
+        systemProperty("models.deberta.threads", it)
+    }
 }
 
 tasks.register<JavaExec>(needle2CactFixture.taskName) {
@@ -500,6 +515,52 @@ tasks.register<JavaExec>("tinyBertStandardGgufPerformanceExperiment") {
         providers.gradleProperty("reranker.performance.batchIterations").getOrElse("8"),
     )
     maxHeapSize = "1g"
+}
+
+tasks.register<JavaExec>("mxbaiDebertaRerankerPerformanceExperiment") {
+    description = "Measure the pinned mxbai DeBERTa reranker's cold load and warm scoring"
+    group = "verification"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set(
+        "com.integrallis.models.backend.purejava.MxbaiDebertaRerankerPerformanceExperiment",
+    )
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+    configuredMxbaiRerankerDirectory.orNull?.let {
+        systemProperty("models.fixtures.mxbaiRerankerDirectory", it)
+    }
+    args(
+        providers.gradleProperty("reranker.performance.warmups").getOrElse("2"),
+        providers.gradleProperty("reranker.performance.pairIterations").getOrElse("10"),
+        providers.gradleProperty("reranker.performance.batchIterations").getOrElse("3"),
+    )
+    maxHeapSize = "3g"
+}
+
+tasks.register<Test>("mxbaiDebertaRerankerIntegrationTest") {
+    description = "Run the pinned mxbai DeBERTa reranker equivalence tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("model-fixture")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.MxbaiDebertaRerankerIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.deberta.DebertaV2ConfigIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.deberta.DebertaV2WeightsIntegrationTest",
+        )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.deberta.MxbaiDebertaTokenizerIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "3g"
 }
 
 tasks.register<Test>("qwen25HuggingFaceIntegrationTest") {

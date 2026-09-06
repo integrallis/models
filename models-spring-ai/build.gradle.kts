@@ -47,6 +47,8 @@ val msMarcoRerankerFixture =
     ).toString()
 val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
+val configuredMxbaiRerankerDirectory =
+    providers.systemProperty("models.fixtures.mxbaiRerankerDirectory")
 
 tasks.withType<Test>().configureEach {
     configuredGptOssHuggingFaceDirectory.orNull?.let {
@@ -58,6 +60,9 @@ tasks.withType<Test>().configureEach {
     systemProperty("models.fixtures.msMarcoReranker", msMarcoRerankerFixture)
     configuredTinyBertRerankerPath.orNull?.let {
         systemProperty("models.fixtures.tinyBertReranker", it)
+    }
+    configuredMxbaiRerankerDirectory.orNull?.let {
+        systemProperty("models.fixtures.mxbaiRerankerDirectory", it)
     }
 }
 
@@ -153,6 +158,24 @@ tasks.register<Test>("tinyBertStandardGgufSpringAiIntegrationTest") {
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "1g"
+}
+
+tasks.register<Test>("mxbaiDebertaSpringAiIntegrationTest") {
+    description = "Run Spring AI reranking against the pinned mxbai DeBERTa reranker"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("model-fixture")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.spring.ai.MxbaiDebertaSpringAiRerankerIntegrationTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "3g"
 }
 
 tasks.register<Test>("gptOssSpringAiIntegrationTest") {

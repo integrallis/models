@@ -5,9 +5,9 @@ A reranker scores each retrieved document together with the user's query. This c
 is more expensive than vector similarity, but it can improve the small candidate set that reaches
 the prompt without re-embedding the corpus.
 
-Models runs BERT cross-encoders in-process with bidirectional attention, WordPiece sentence-pair
-tokenization, token-type embeddings, and the trained classifier head. The model is memory-mapped;
-no Python process, inference server, or native runtime is involved.
+Models runs BERT and DeBERTa-v2 cross-encoders in-process. Each implementation preserves its own
+sentence-pair tokenizer, bidirectional attention graph, and trained classifier head. No Python
+process, inference server, or native runtime is involved.
 
 == Plain Java
 
@@ -37,6 +37,23 @@ Use a corrected conversion that retains the model's trained classification poole
 the standard GGUF rank-pooling tensors (`cls.*` and `cls.output.*`) and the earlier corrected
 `classifier.dense.*` / `classifier.out_proj.*` convention. Loading fails with a direct explanation
 when either complete head is absent instead of returning plausible but mis-calibrated scores.
+
+For a supported Hugging Face DeBERTa-v2 directory, load the pinned Safetensors checkpoint directly:
+
+[source,java]
+----
+import com.integrallis.models.backend.purejava.SafetensorsRerankingModel;
+
+try (var reranker = SafetensorsRerankingModel.load(modelDirectory)) {
+    var ranked = reranker.rerank(query, documents, 3);
+}
+----
+
+The DeBERTa path currently accepts the graph used by `mxbai-rerank-xsmall-v1`: Unigram
+tokenization, disentangled relative attention, and its sequence-classification pooler. Its F16
+weights expand once to F32 for execution because the retained direct-F16 experiment was materially
+slower for these projection shapes. Use `-Dmodels.deberta.threads=N` to cap its per-position
+parallelism.
 
 == LangChain4j
 
@@ -85,6 +102,10 @@ Run only that artifact and its framework gates:
 
 [source,bash]
 ----
+./gradlew :backend-java:msMarcoMiniLmRerankerIntegrationTest \
+  :models-langchain4j:msMarcoRerankerLangChain4jIntegrationTest \
+  :models-spring-ai:msMarcoRerankerSpringAiIntegrationTest
+----
 
 For a locally converted standard-GGUF TinyBERT artifact, run the same public paths without adding
 it to the downloadable fixture registry:
@@ -96,7 +117,15 @@ it to the downloadable fixture registry:
   :models-spring-ai:tinyBertStandardGgufSpringAiIntegrationTest \
   -Dmodels.fixtures.tinyBertReranker=/absolute/path/to/tinybert-q8_0.gguf
 ----
-./gradlew :backend-java:msMarcoMiniLmRerankerIntegrationTest \
-  :models-langchain4j:msMarcoRerankerLangChain4jIntegrationTest \
-  :models-spring-ai:msMarcoRerankerSpringAiIntegrationTest
+
+The official mxbai checkpoint and all three public paths are reproducible with:
+
+[source,bash]
+----
+scripts/download-mxbai-reranker-fixture.sh
+./gradlew \
+  :backend-java:mxbaiDebertaRerankerIntegrationTest \
+  :models-langchain4j:mxbaiDebertaLangChain4jIntegrationTest \
+  :models-spring-ai:mxbaiDebertaSpringAiIntegrationTest \
+  -Dmodels.fixtures.mxbaiRerankerDirectory="$HOME/.jvllm/models/mxbai-rerank-xsmall-v1"
 ----

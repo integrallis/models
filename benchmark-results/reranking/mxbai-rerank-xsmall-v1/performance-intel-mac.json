@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-06",
+  "workload": "berlin-population-six-documents-v1",
+  "model": "mixedbread-ai/mxbai-rerank-xsmall-v1",
+  "revision": "b5c6e9da73abc3711f593f705371cdbe9e0fe422",
+  "artifact": {
+    "sizeBytes": 141685186,
+    "sha256": "a29bc212faf59c136ad0fd5712ecd2346e7b32c44a25b690625bc9ecebb14b8f",
+    "format": "Safetensors F16"
+  },
+  "environment": {
+    "javaVersion": "25.0.3",
+    "javaVendor": "Eclipse Adoptium",
+    "osName": "Mac OS X",
+    "osVersion": "26.6.2",
+    "architecture": "x86_64",
+    "cpuModel": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "processors": 12
+  },
+  "method": {
+    "freshProcessesPerConfiguration": 3,
+    "warmupsPerProcess": 2,
+    "pairIterationsPerProcess": 10,
+    "batchIterationsPerProcess": 3,
+    "documentsPerBatch": 6,
+    "backend": "pure-java"
+  },
+  "correctness": {
+    "referenceRuntime": "Hugging Face Transformers 4.38.1 with PyTorch",
+    "maximumReferenceLogitDelta": 0.0000030994415283203125,
+    "referenceScores": [
+      2.610485553741455,
+      -3.1909432411193848,
+      1.1550936698913574,
+      -3.9371538162231445,
+      -3.6461875438690186,
+      -1.0840436220169067
+    ],
+    "javaScores": [
+      2.610487937927246,
+      -3.1909427642822266,
+      1.1550922393798828,
+      -3.937156915664673,
+      -3.6461877822875977,
+      -1.084044337272644
+    ],
+    "referenceRanking": [0, 2, 5, 1, 4, 3],
+    "javaRanking": [0, 2, 5, 1, 4, 3]
+  },
+  "singleThread": {
+    "medianColdLoadMillis": 3068.725,
+    "medianHeapIncreaseAfterLoadBytes": 366935336,
+    "medianPairP50Millis": 145.608,
+    "maximumPairP95Millis": 298.611,
+    "medianBatchP50Millis": 947.677,
+    "maximumBatchP95Millis": 1002.870,
+    "medianBatchP50DocumentsPerSecond": 6.331
+  },
+  "tenThreads": {
+    "medianColdLoadMillis": 2556.399,
+    "medianHeapIncreaseAfterLoadBytes": 367031232,
+    "medianPairP50Millis": 58.660,
+    "maximumPairP95Millis": 156.300,
+    "medianBatchP50Millis": 350.596,
+    "maximumBatchP95Millis": 560.781,
+    "medianBatchP50DocumentsPerSecond": 17.114
+  },
+  "parallelSpeedup": {
+    "pairP50": 2.482,
+    "batchP50": 2.703,
+    "documentsPerSecond": 2.703
+  }
+}

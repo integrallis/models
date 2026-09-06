@@ -40,7 +40,7 @@ permissions:
 
 jobs:
   pure-java-models:
-    name: GGUF model integration
+    name: Pure-Java model integration
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -81,7 +81,8 @@ jobs:
             ~/.jvllm/models/EuroLLM-1.7B-Instruct.Q4_K_M.gguf
             ~/.jvllm/models/all-MiniLM-L6-v2-Q4_K_M.gguf
             ~/.jvllm/models/needle2.cact
-          key: purejava-model-fixtures-v6
+            ~/.jvllm/models/mxbai-rerank-xsmall-v1
+          key: purejava-model-fixtures-v7
 
       - name: Download pure-Java model fixtures
         working-directory: models
@@ -146,6 +147,21 @@ jobs:
         run: >
           ./gradlew
           :models-rag-bench:embeddingAdaptersIntegrationTest
+          --no-daemon
+          --stacktrace
+
+      - name: Download pinned mxbai DeBERTa reranker
+        working-directory: models
+        run: scripts/download-mxbai-reranker-fixture.sh
+
+      - name: Run mxbai DeBERTa reranker qualification tests
+        working-directory: models
+        run: >
+          ./gradlew
+          :backend-java:mxbaiDebertaRerankerIntegrationTest
+          :models-langchain4j:mxbaiDebertaLangChain4jIntegrationTest
+          :models-spring-ai:mxbaiDebertaSpringAiIntegrationTest
+          -Dmodels.fixtures.mxbaiRerankerDirectory="$HOME/.jvllm/models/mxbai-rerank-xsmall-v1"
           --no-daemon
           --stacktrace
 
