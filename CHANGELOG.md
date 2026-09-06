@@ -4,6 +4,28 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.31] - 2026-09-06
+
+### Added
+
+- Added complete pure-Java DeBERTa-v2 cross-encoder inference from multi-file Safetensors
+  checkpoints, including the Hugging Face Unigram tokenizer, precompiled normalization,
+  disentangled relative attention, ContextPooler, and classification head.
+- Added real-checkpoint plain Java, LangChain4j, and Spring AI reranking gates for the pinned
+  `mixedbread-ai/mxbai-rerank-xsmall-v1` artifact.
+
+### Changed
+
+- Parallelized independent DeBERTa token rows while retaining deterministic scores and a
+  deployment override through `models.deberta.threads`.
+- Expanded immutable F16 weights once into the existing F32 execution kernels after direct mapped
+  F16 experiments showed a material throughput regression.
+
+### Documentation
+
+- Documented Safetensors reranking, artifact preparation, framework usage, the six-pair
+  Transformers oracle, and controlled cold-load and throughput evidence.
+
 ## [0.3.30] - 2026-09-06
 
 ### Added
