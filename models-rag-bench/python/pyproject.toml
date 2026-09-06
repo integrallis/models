@@ -22,6 +22,7 @@ test = ["pytest==8.4.2"]
 
 [project.scripts]
 models-rag-python = "models_rag_baseline:main"
+models-reranker-transformers-reference = "reranker_transformers_reference:main"
 models-transformers-reference = "transformers_reference_server:main"
 
 [build-system]
@@ -29,7 +30,11 @@ requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/models_rag_baseline.py", "src/transformers_reference_server.py"]
+packages = [
+    "src/models_rag_baseline.py",
+    "src/reranker_transformers_reference.py",
+    "src/transformers_reference_server.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
