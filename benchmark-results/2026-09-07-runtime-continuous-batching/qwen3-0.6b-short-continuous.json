@@ -1,0 +1,363 @@
+{
+  "schemaVersion" : 1,
+  "timestamp" : "2026-09-07T19:13:36.775578Z",
+  "mode" : "continuous",
+  "backend" : "pure-java",
+  "model" : "modeljars-cache:sha256/da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4",
+  "artifactSha256" : "da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4",
+  "artifactSizeBytes" : 428970080,
+  "contextLength" : 2048,
+  "concurrency" : 2,
+  "warmups" : 1,
+  "iterations" : 3,
+  "maxTokens" : 8,
+  "successfulRequests" : 6,
+  "failedRequests" : 0,
+  "completionTokens" : 48,
+  "elapsedNanos" : 9368690567,
+  "aggregateTokensPerSecond" : 5.123448112276628,
+  "ttftP50Millis" : 1249.683958,
+  "ttftP95Millis" : 2413.343452,
+  "totalP50Millis" : 3185.440689,
+  "totalP95Millis" : 3247.878944,
+  "outputSha256" : "229ad5fcf5a185d3e5a445022e08be60457936d4c0f9d2352307f0e55f6d68c2",
+  "scheduler" : {
+    "completedRequests" : 6,
+    "failedRequests" : 0,
+    "rejectedRequests" : 0,
+    "batchInvocations" : 21,
+    "sessionSteps" : 42,
+    "largestBatch" : 2,
+    "meanBatchSize" : 2.0
+  },
+  "gcCollections" : 0,
+  "gcPauseMillis" : 0,
+  "cpuMillis" : 85364.249,
+  "peakRssBytes" : 1284653056,
+  "currentRssBytes" : 1284653056,
+  "anonymousRssBytes" : 0,
+  "fileRssBytes" : 0,
+  "sharedMemoryRssBytes" : 0,
+  "jvmMemoryBefore" : {
+    "heapUsedBytes" : 371057024,
+    "heapCommittedBytes" : 809500672,
+    "nonHeapUsedBytes" : 28257592,
+    "nonHeapCommittedBytes" : 30801920,
+    "bufferPools" : {
+      "mapped" : {
+        "name" : "mapped",
+        "count" : 1,
+        "memoryUsedBytes" : 428970080,
+        "totalCapacityBytes" : 428970080
+      },
+      "mapped - 'non-volatile memory'" : {
+        "name" : "mapped - 'non-volatile memory'",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      },
+      "direct" : {
+        "name" : "direct",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      }
+    },
+    "nativeMemory" : {
+      "available" : false,
+      "totalReservedBytes" : 0,
+      "totalCommittedBytes" : 0,
+      "categories" : { }
+    }
+  },
+  "jvmMemoryAfter" : {
+    "heapUsedBytes" : 708454432,
+    "heapCommittedBytes" : 809500672,
+    "nonHeapUsedBytes" : 31793520,
+    "nonHeapCommittedBytes" : 34275328,
+    "bufferPools" : {
+      "mapped" : {
+        "name" : "mapped",
+        "count" : 1,
+        "memoryUsedBytes" : 428970080,
+        "totalCapacityBytes" : 428970080
+      },
+      "mapped - 'non-volatile memory'" : {
+        "name" : "mapped - 'non-volatile memory'",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      },
+      "direct" : {
+        "name" : "direct",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      }
+    },
+    "nativeMemory" : {
+      "available" : false,
+      "totalReservedBytes" : 0,
+      "totalCommittedBytes" : 0,
+      "categories" : { }
+    }
+  },
+  "environment" : {
+    "host" : "local-intel-i7-9750h",
+    "osName" : "Mac OS X",
+    "osVersion" : "26.6.2",
+    "architecture" : "x86_64",
+    "cpuModel" : "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "processors" : 12,
+    "physicalMemoryBytes" : 34359738368,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "diagnostics" : {
+    "backend" : "pure-java",
+    "planVersion" : "pure-java-v20",
+    "environment" : {
+      "gguf-executor" : "persistent",
+      "vm-version" : "25.0.3+9-LTS",
+      "os" : "Mac OS X",
+      "projection-layers" : "28",
+      "model-architecture" : "qwen3",
+      "vm-vendor" : "Eclipse Adoptium",
+      "gguf-chunks-per-thread" : "2",
+      "cpu-model" : "unknown",
+      "architecture" : "x86_64",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "gguf-parallel" : "true",
+      "gguf-threads" : "12",
+      "java-version" : "25.0.3",
+      "sve" : "false",
+      "q4-unsigned-pairwise-supported" : "true",
+      "fast-scalar-fma" : "true",
+      "vector-api" : "true",
+      "q4-short-pairwise-supported" : "true",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "java-feature" : "25",
+      "processors" : "12",
+      "fast-vector-fma" : "true",
+      "preferred-vector-bits" : "256",
+      "active-vector-bits" : "256",
+      "compiler" : "hotspot-c2"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "vector-api",
+        "gate-up" : "grouped",
+        "qkv" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "DISABLED",
+      "reason" : "the stable widened Q4 kernel was selected",
+      "settings" : {
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Mac OS X",
+        "architecture" : "x86_64"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "x86_64",
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "output-rows" : "requested",
+        "formats" : "Q4_0,Q4_0,Q4_0"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "formats" : "Q4_0,Q4_0,Q4_0,Q4_0",
+        "unused-rows" : "kv-only"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedFfn",
+      "settings" : {
+        "eligible-layers" : "28",
+        "parallel" : "true",
+        "stages" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedLayer",
+      "settings" : {
+        "eligible-layers" : "28",
+        "parallel" : "true",
+        "stages" : "7",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "staged-layers" : "28",
+        "partition" : "batch-rows",
+        "partitions" : "12"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "12",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    } ]
+  },
+  "requests" : [ {
+    "round" : 0,
+    "request" : 0,
+    "successful" : true,
+    "ttftMillis" : 2413.343452,
+    "totalMillis" : 3247.878944,
+    "promptTokens" : 26,
+    "completionTokens" : 8,
+    "outputSha256" : "7e071fd9b023ed8f18458a73613a0834f6220bd5cc50357ba3493c6040a9ea8c",
+    "output" : "00000000"
+  }, {
+    "round" : 0,
+    "request" : 1,
+    "successful" : true,
+    "ttftMillis" : 1210.299294,
+    "totalMillis" : 3247.634243,
+    "promptTokens" : 26,
+    "completionTokens" : 8,
+    "outputSha256" : "f52b1db9f12cf2c0cbd9fa0dcb982dd576d42cbd0771b1c81a99f07107d6f797",
+    "output" : " The phase measurement is a process that requires"
+  }, {
+    "round" : 1,
+    "request" : 0,
+    "successful" : true,
+    "ttftMillis" : 2072.120171,
+    "totalMillis" : 2932.407589,
+    "promptTokens" : 26,
+    "completionTokens" : 8,
+    "outputSha256" : "e129e0073b9b61293fc63ca65b7bf31f4234191f3190c87999e36ba1af156ced",
+    "output" : "0001, 0."
+  }, {
+    "round" : 1,
+    "request" : 1,
+    "successful" : true,
+    "ttftMillis" : 1003.518926,
+    "totalMillis" : 2932.217113,
+    "promptTokens" : 26,
+    "completionTokens" : 8,
+    "outputSha256" : "f19bd3950a76c14c1085eb8fe8a9840154c9c4b9a95653c94d7129cf8546a4e8",
+    "output" : " The phase measurement is done in a way"
+  }, {
+    "round" : 2,
+    "request" : 0,
+    "successful" : true,
+    "ttftMillis" : 1249.683958,
+    "totalMillis" : 3185.440689,
+    "promptTokens" : 26,
+    "completionTokens" : 8,
+    "outputSha256" : "75fee216868f9dc81af4be5c06abb98110a412a633ad0aad72b1f19f151e9236",
+    "output" : "0001 seconds, 0"
+  }, {
+    "round" : 2,
+    "request" : 1,
+    "successful" : true,
+    "ttftMillis" : 2285.326527,
+    "totalMillis" : 3185.604459,
+    "promptTokens" : 26,
+    "completionTokens" : 8,
+    "outputSha256" : "91309493cda8531fc054c57547f35227babfdd3b9760229ba297d1d70be846f1",
+    "output" : " The phase measurement is a process that is"
+  } ]
+}

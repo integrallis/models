@@ -32,14 +32,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * One explicit high-level generation lineage over a loaded model.
  *
  * <p>Each session owns independent backend state and its own exact prompt-prefix history. Multiple
- * sessions share the loaded model weights, while execution is serialized on the owning pipeline so
- * transient logits and backend scratch cannot race. Closing a session releases only its
- * request-specific state; closing the owning pipeline closes every remaining session and the model.
+ * sessions share the loaded model weights. The ordinary pipeline serializes their execution;
+ * pipelines configured with {@link ContinuousBatchingOptions} may advance compatible sessions in
+ * one physical-model call. Closing a session releases only its request-specific state; closing the
+ * owning pipeline closes every remaining session and the model.
  */
 public final class TextGenerationSession implements ConstrainedTextGenerationModel, AutoCloseable {
   private final Object executionLock;
+  private final Object operationLock = new Object();
   private final SessionBackend backend;
   private final GenerationLoop generationLoop;
+  private final ContinuousBatchingScheduler continuousBatching;
+  private final ContinuousBatchingScheduler.SessionState continuousBatchingState;
   private final Runnable closeListener;
   private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -48,28 +52,44 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
       InferenceSession session,
       Object executionLock,
       Runnable closeListener) {
+    this(backend, session, executionLock, closeListener, null);
+  }
+
+  TextGenerationSession(
+      BatchInferenceBackend backend,
+      InferenceSession session,
+      Object executionLock,
+      Runnable closeListener,
+      ContinuousBatchingScheduler continuousBatching) {
     this.executionLock = Objects.requireNonNull(executionLock, "executionLock");
     this.backend = new SessionBackend(backend, session);
     this.generationLoop =
         new GenerationLoop(
             this.backend, SpeculativeGenerationOptions.disabled(), System::nanoTime, executionLock);
     this.closeListener = Objects.requireNonNull(closeListener, "closeListener");
+    this.continuousBatching = continuousBatching;
+    this.continuousBatchingState =
+        continuousBatching == null ? null : continuousBatching.session(session);
   }
 
   /** Returns the active context capacity and next token position for this session. */
   public InferenceContextWindow contextWindow() {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      return new InferenceContextWindow(
-          backend.contextCapacity(), java.util.OptionalInt.of(backend.checkpoint()));
+      synchronized (executionLock) {
+        return new InferenceContextWindow(
+            backend.contextCapacity(), java.util.OptionalInt.of(backend.checkpoint()));
+      }
     }
   }
 
   /** Returns phase, token-usage, and prompt-cache measurements for this session's latest call. */
   public GenerationMetrics lastGenerationMetrics() {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      return generationLoop.lastGenerationMetrics();
+      return continuousBatching == null
+          ? generationLoop.lastGenerationMetrics()
+          : continuousBatchingState.lastGenerationMetrics();
     }
   }
 
@@ -80,18 +100,28 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
    * belongs only to this model and session; it cannot be transferred to another model.
    */
   public PromptPrefillMetrics prefillPrompt(ModelPrompt prompt) {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      return generationLoop.prefillPrompt(prompt);
+      if (continuousBatching != null) {
+        return continuousBatching.prefill(continuousBatchingState, prompt);
+      }
+      synchronized (executionLock) {
+        return generationLoop.prefillPrompt(prompt);
+      }
     }
   }
 
   /** Clears this session's context and exact prompt-prefix history. */
   public void resetContext() {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      generationLoop.invalidatePromptCache();
-      backend.reset();
+      synchronized (executionLock) {
+        generationLoop.invalidatePromptCache();
+        if (continuousBatchingState != null) {
+          continuousBatchingState.invalidatePromptCache();
+        }
+        backend.reset();
+      }
     }
   }
 
@@ -102,23 +132,27 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   @Override
   public String modelName() {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      return backend.metadata().modelName();
+      synchronized (executionLock) {
+        return backend.metadata().modelName();
+      }
     }
   }
 
   @Override
   public BackendDiagnostics diagnostics() {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      return backend.diagnostics();
+      synchronized (executionLock) {
+        return backend.diagnostics();
+      }
     }
   }
 
   @Override
   public Tokenizer tokenizer() {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
       return backend.tokenizer();
     }
@@ -126,54 +160,82 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   @Override
   public String generate(String prompt, SamplingOptions options) {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      return generationLoop.generate(prompt, options);
+      return continuousBatching == null
+          ? generateSequentially(
+              ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options)
+          : ConstrainedTextGenerationModel.super.generate(
+              ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")),
+              options,
+              TokenConstraint.unrestricted());
     }
   }
 
   @Override
   public String generate(ModelPrompt prompt, SamplingOptions options) {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      return generationLoop.generate(prompt, options);
+      return continuousBatching == null
+          ? generateSequentially(prompt, options)
+          : ConstrainedTextGenerationModel.super.generate(
+              prompt, options, TokenConstraint.unrestricted());
     }
   }
 
   @Override
   public void generate(String prompt, SamplingOptions options, TokenStream stream) {
-    synchronized (executionLock) {
-      requireOpen();
-      generationLoop.generate(prompt, options, stream);
-    }
+    generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options, stream);
   }
 
   @Override
   public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      generationLoop.generate(prompt, options, stream);
+      generateScheduledOrSequential(prompt, options, stream, TokenConstraint.unrestricted());
     }
   }
 
   @Override
   public void generate(
       ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
-    synchronized (executionLock) {
+    synchronized (operationLock) {
       requireOpen();
-      generationLoop.generate(prompt, options, stream, constraint);
+      generateScheduledOrSequential(prompt, options, stream, constraint);
     }
   }
 
   @Override
   public void close() {
-    synchronized (executionLock) {
-      if (closed.compareAndSet(false, true)) {
-        generationLoop.invalidatePromptCache();
-        backend.close();
-        closeListener.run();
+    synchronized (operationLock) {
+      synchronized (executionLock) {
+        if (closed.compareAndSet(false, true)) {
+          generationLoop.invalidatePromptCache();
+          if (continuousBatchingState != null) {
+            continuousBatchingState.invalidatePromptCache();
+          }
+          backend.close();
+          closeListener.run();
+        }
       }
     }
+  }
+
+  private String generateSequentially(ModelPrompt prompt, SamplingOptions options) {
+    synchronized (executionLock) {
+      return generationLoop.generate(prompt, options);
+    }
+  }
+
+  private void generateScheduledOrSequential(
+      ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+    if (continuousBatching == null) {
+      synchronized (executionLock) {
+        generationLoop.generate(prompt, options, stream, constraint);
+      }
+      return;
+    }
+    continuousBatching.generate(continuousBatchingState, prompt, options, stream, constraint);
   }
 
   private void requireOpen() {

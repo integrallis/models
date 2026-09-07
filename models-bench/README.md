@@ -506,6 +506,32 @@ The same gate isolates Q6_K query tiling on GraalVM. Three one-query processes a
 and lowers CPU 12.03%, with identical output and zero collections. Maximum observed RSS rises
 3.89%. One-query controls are in the gate's `q6-one-query-graal/` directory.
 
+## Public-runtime continuous-batching profile
+
+Measure complete concurrent requests through `InferencePipeline` and
+`TextGenerationSession`, including prompt ingestion, queueing, TTFT, decode,
+per-request output, scheduler utilization, and process memory:
+
+```shell
+./gradlew :models-bench:run --args='profile-runtime-sessions \
+  --model /absolute/path/to/model.gguf \
+  --mode continuous \
+  --context 2048 \
+  --concurrency 4 \
+  --warmups 1 \
+  --iterations 3 \
+  --max-tokens 16 \
+  --output build/reports/inference/runtime-continuous.json'
+```
+
+Run a second fresh process with `--mode serialized` and a different output
+path. Keep every other option and the model bytes identical. The schema-1
+report records external request-boundary TTFT and total latency, aggregate
+completion throughput, exact output hashes, CPU, GC, JVM/process memory,
+backend diagnostics, and mean/largest physical batch size. The retained Qwen
+and MiniCPM comparison is under
+`benchmark-results/2026-09-07-runtime-continuous-batching/`.
+
 ## Exact determinism audit
 
 Audit the raw float bits of every generated logit vector across repeated greedy inference trials:

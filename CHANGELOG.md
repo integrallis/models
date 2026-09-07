@@ -4,6 +4,22 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added opt-in continuous batching for high-level generation sessions. Concurrent requests share
+  one physical model step while retaining independent prompt-prefix and KV state, token constraints,
+  streaming callbacks, and per-request generation metrics.
+- Added bounded admission, a configurable idle batch-formation window, and scheduler-level batch
+  utilization metrics.
+- Preserved the backend prefill contract in bounded scheduling chunks and required an explicit
+  batch size, since controlled MiniCPM and Qwen profiles prove that capacity alone does not predict
+  a throughput gain.
+
+### Documentation
+
+- Documented how virtual conversations can use one continuous scheduler per physical member and
+  why batches never cross model identities.
+
 ## [0.3.32] - 2026-09-07
 
 ### Added

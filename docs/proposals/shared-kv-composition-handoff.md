@@ -7,6 +7,13 @@ KV lineages, but background prefill did not beat the best demand-catch-up total.
 API is implemented on `feat/hybrid-model-composition`; no preconfigured composite recipe is yet
 authorized by performance evidence.
 
+Concurrent-conversation follow-up: an opt-in runtime scheduler now batches compatible decode rows
+for sessions that share one physical model and interleaves bounded prompt chunks. Real
+Qwen3 and MiniCPM gates are token-exact. MiniCPM gains 62.83% aggregate throughput at four requests
+on the local Intel/Temurin 25 profile, while Qwen regresses at batch size two. This is therefore an
+explicit, model/host-qualified control; it neither copies nor translates cache state across model
+members.
+
 Origin: a user question on 2026-09-04 — *"can two small models serve the chat function, is there a
 model composition precedent, where one model deals with the prose and another deals with tool
 calling for example, while sharing context, KV cache, etc?"* Recorded as row **5o** in

@@ -15,6 +15,78 @@ The API is intended for runtimes and servers that manage several active
 generations. A normal application with one request at a time should continue
 to use `TextGenerationModel` or a framework adapter.
 
+== Let the Runtime Form Batches
+
+Most applications should not coordinate token rows themselves. Construct an
+`InferencePipeline` with `ContinuousBatchingOptions`, then open the ordinary
+generation sessions used by conversations:
+
+[source,java]
+----
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.ContinuousBatchingOptions;
+import com.integrallis.models.runtime.InferencePipeline;
+import java.util.concurrent.Executors;
+
+var batching = ContinuousBatchingOptions.builder()
+    .maximumBatchSize(4)
+    .maximumQueuedRequests(64)
+    .maximumPrefillChunkTokens(128)
+    .build();
+
+try (var backend = PureJavaBackend.load(gguf);
+     var pipeline = new InferencePipeline(backend, batching);
+     var first = pipeline.openGenerationSession();
+     var second = pipeline.openGenerationSession();
+     var callers = Executors.newVirtualThreadPerTaskExecutor()) {
+
+    var firstAnswer = callers.submit(() -> first.generate(firstPrompt, options));
+    var secondAnswer = callers.submit(() -> second.generate(secondPrompt, options));
+    System.out.println(firstAnswer.get());
+    System.out.println(secondAnswer.get());
+
+    var measured = pipeline.continuousBatchingMetrics().orElseThrow();
+    System.out.println(measured.meanBatchSize());
+}
+----
+
+The two `generate` calls must actually run concurrently to overlap. The scheduler
+admits waiting work up to `maximumBatchSize`, advances one token for every decode-ready
+session in a shared backend call, and replaces completed rows with queued work.
+Prompt ingestion uses the backend's multi-token prefill entry point, but is split
+into `maximumPrefillChunkTokens` scheduling turns. This bounds how long a newly admitted
+prompt can delay existing decodes without falling back to one-token prompt evaluation.
+
+The queue is bounded. `maximumQueuedRequests` makes overload explicit instead of
+allowing request state to grow without limit. `batchFormationDelay` optionally
+holds the first request for a short period when the scheduler was idle; it is not
+paid on every token. Treat `maximumBatchSize` as both a throughput control and a
+memory-capacity decision: independent sessions share weights but retain separate
+KV state and activations. The batch size is required explicitly: backend capacity
+proves correctness and memory bounds, not that a particular model and host become
+faster at that size.
+
+`VirtualChatModel` needs no special batching contract. Give every physical
+member a pipeline configured this way, then keep using
+`pipeline::openGenerationSession` as its session factory. Concurrent virtual
+conversations routed to the same member can batch. Requests routed to different
+members cannot: different weights, templates, and KV representations remain
+separate physical schedulers.
+
+The real-weight Qwen3 0.6B integration gate runs two identical conversations
+concurrently and requires token-exact answers, a largest observed batch of two,
+and successful per-request metrics. Performance claims still come from the
+controlled profile below, not from the correctness gate.
+
+The public-runtime profile demonstrates why the scheduler is opt-in. On this 12-logical-core
+Intel/Temurin 25 host, four MiniCPM5 requests improved aggregate throughput from 2.092 to
+3.406 tokens/s (+62.83%), reduced p50 TTFT from 10.97 to 4.46 seconds, and preserved the exact
+output hash; peak RSS rose 8.90%. Qwen3 0.6B did not benefit on the same host: two short requests
+regressed 18.02%, while a 149-token prompt with bounded chunks regressed 2.81%. Qualify the exact
+model, quantization, concurrency, JDK, and machine before enabling batching in production. The raw
+reports and reproduction command are in
+`benchmark-results/2026-09-07-runtime-continuous-batching/`.
+
 == Advance Active Requests
 
 `PureJavaBackend` implements `BatchInferenceBackend`. Open one session per
@@ -128,10 +200,10 @@ The versioned attribution, JVM comparison, rejected compiler-directive screens,
 and aggregate are under
 `benchmark-results/certified-20260801/decode/minicpm5-1b-session-memory-nmt/`.
 
-== Serving Work Still Above This API
+== Serving Work Still Above the Low-Level API
 
-This capability performs one transformer step for the supplied active set. It
-does not provide an HTTP server, request queue, fairness policy, dynamic
-admission loop, or chunked prefill scheduler. A serving layer decides which
-requests join each step, removes completed requests, and interleaves bounded
-prompt chunks with decode without blocking existing requests.
+`BatchInferenceBackend` performs one transformer step for a caller-supplied active set; it does
+not itself provide a queue or scheduling policy. The opt-in `InferencePipeline` scheduler above
+adds bounded admission, dynamic row replacement, and chunked prefill while preserving the regular
+generation-session API. It intentionally does not add an HTTP server or silently select a batch
+size for the deployment.

@@ -653,6 +653,9 @@ tasks.register<Test>("qwen306BQ40IntegrationTest") {
             "com.integrallis.models.backend.purejava.Qwen3ModelFixtureIntegrationTest.*Q40*",
         )
         includeTestsMatching(
+            "com.integrallis.models.backend.purejava.ContinuousBatchingIntegrationTest",
+        )
+        includeTestsMatching(
             "com.integrallis.models.backend.purejava.llama.Qwen3BatchedPrefillIntegrationTest",
         )
         includeTestsMatching(

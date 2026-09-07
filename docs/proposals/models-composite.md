@@ -50,6 +50,7 @@ cross-model KV translation ([closed-form within-family](https://arxiv.org/abs/26
 models-runtime/
   VirtualChatModel          semantic facade and independent physical sessions
   PromptPrefillMetrics      measured prefill-only catch-up
+  Continuous batching      one scheduler per physical model across conversations
 
 models-router/
   VirtualChatRouter         adaptive selector and runtime-feedback bridge
@@ -68,6 +69,9 @@ Key design commitments:
    stateful virtual-session API.
 5. **Budget accounting at the seam.** The virtual response exposes the physical member's prompt,
    completion, cache-read, cache-write, TTFT, and decode measurements where they are known.
+6. **Batch only compatible physical work.** Concurrent virtual conversations routed to the same
+   member may share a `forwardBatch` call. Different members retain different weights and KV
+   representations and therefore run on separate schedulers.
 
 ## 4. Required seams in existing modules (small, additive)
 
@@ -134,6 +138,23 @@ them a useful pair for a test-only calibrated transfer experiment, not a product
 The first small Java ridge screen found strong key structure but poor held-out value reconstruction
 (0.367–0.576 cosine; 0.819–0.987 relative L2), so its single-layer and raw-correlation top-two
 mappers were rejected. No cache-transfer SPI is authorized by that result.
+
+### 5.2 Concurrent-conversation scheduling, 2026-09-07
+
+The low-level `BatchInferenceBackend` already advances independent sessions in one weight pass; the
+missing runtime layer was admission and scheduling. An opt-in continuous scheduler now forms a
+bounded active batch for one physical model, retains prefill in bounded prompt chunks,
+interleaves those chunks with decode, replaces completed rows with queued requests, and preserves
+the existing high-level session contract. Each request retains its own sampler, constraint, stop
+sequences, streaming callbacks, prefix metrics, and KV lineage.
+
+A real Qwen3 0.6B Q4_0 gate passed two concurrent, token-exact conversations through the public
+`InferencePipeline` and `TextGenerationSession` APIs and observed physical batches of two. The
+end-to-end scheduler profile then produced the necessary counterexample: Qwen regressed 18.02% on
+the short workload and 2.81% with a 149-token prompt on the local Intel/Temurin 25 host. MiniCPM5
+improved aggregate throughput from 2.092 to 3.406 tokens/s (+62.83%) at four concurrent requests,
+reduced p50 TTFT 59.35%, and retained the exact output hash at an 8.90% peak-RSS cost. Continuous
+batching therefore remains explicit and model/host-qualified; callers must supply a batch size.
 
 ## 6. Why this belongs in the models project
 
