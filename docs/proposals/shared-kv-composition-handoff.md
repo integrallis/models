@@ -1,9 +1,11 @@
 # Handoff: two small models in one chat — state, switching, and composition
 
-**Status:** runtime assumptions audited against Models 0.3.29 on 2026-09-06. No composition rung has
-been measured yet. The explicit high-level generation-session prerequisite is merged on `main` at
-`aa505c2a1ea9cfc4bcbb8028c5bd9899914518be`; all performance and quality claims below remain
-hypotheses until the protocol in section 4 is run.
+**Status:** runtime assumptions audited against Models 0.3.31 and Rungs 1–2 measured downstream on
+2026-09-06. Qwen3 1.7B passed the five-turn control both unconstrained and constrained; dispatching
+tool turns to Needle2 fell to 2/5 and fired the correctness stop gate. The explicit high-level
+generation-session prerequisite is released from `aa505c2a1ea9cfc4bcbb8028c5bd9899914518be`.
+Harness, raw reports, and method corrections are in
+[Memory PR #1](https://github.com/integrallis/memory/pull/1).
 
 Origin: a user question on 2026-09-04 — *"can two small models serve the chat function, is there a
 model composition precedent, where one model deals with the prose and another deals with tool
@@ -43,9 +45,9 @@ stronger invariant over the produced activations is demonstrated. Output-head-on
 may preserve transformer KV, but its usefulness for prose/tool specialization is an experiment, not
 an assumption.
 
-Models 0.3.29 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. The
-next release adds one high-level `TextGenerationSession` per conversation over the existing
-low-level `InferenceSession`, with isolated prompt/KV lineage and metrics.
+Models 0.3.31 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
+provide one high-level `TextGenerationSession` per conversation over the existing low-level
+`InferenceSession`, with isolated prompt/KV lineage and metrics.
 
 ---
 
@@ -93,10 +95,9 @@ prefill the whole transcript on every turn if its own session is retained, but i
 other model's KV.
 *Decides:* whether role specialisation beats a single model, before paying for cache engineering.
 
-*Runtime status:* ready to measure from `main`, and ready for downstream use after the next Models
-release. `ModelFleet` already binds local or hosted application clients, and router continuity
-discourages unnecessary model switches. The session API supplies isolated local state and
-model-specific prefix metrics.
+*Runtime status:* measured for the first candidate pair. `ModelFleet` bound both local clients and
+the session API supplied isolated state and model-specific prefix metrics. The runtime mechanics
+worked, but the Qwen/Needle pair failed 2/5 on task correctness and is rejected.
 
 ### Rung 3 — shared-base adapter pair with isolated KV
 Two specialists as adapters over one loaded base. The base weights are shared, while each adapter
@@ -135,6 +136,9 @@ evidence about our regime.
 ---
 
 ## 5. The packaging half (row 5p) — relevant if any rung wins
+
+The first pair did not win, so none of the packaging below is authorized by the current evidence.
+It remains a design candidate for a future pair that clears the same correctness gate.
 
 The direction already set: a composite is **pure metadata, lighter than a model marker**, shipped as
 `org.modeljars.composite:<codename>` whose **Maven dependencies ARE its parts**, so the dependency
