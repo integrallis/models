@@ -168,6 +168,41 @@ class InferencePipelineTest {
   }
 
   @Test
+  void preparesOneGenerationSessionWithoutGeneratingOrChangingAnother() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend);
+        TextGenerationSession chat = pipeline.openGenerationSession();
+        TextGenerationSession tools = pipeline.openGenerationSession()) {
+      chat.generate("xy", deterministicOptions());
+
+      PromptPrefillMetrics prepared = tools.prefillPrompt(ModelPrompt.text("ab"));
+      tools.generate("abc", deterministicOptions());
+
+      assertThat(prepared.promptCache()).isEqualTo(new PromptCacheMetrics(true, 2, 0, 2));
+      assertThat(tools.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+      assertThat(chat.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 2, 0, 2));
+      assertThat(backend.prefillStartPositions()).containsExactly(List.of(0), List.of(0, 2));
+    }
+  }
+
+  @Test
+  void rejectsPreparingAClosedGenerationSession() {
+    SessionBackend backend = new SessionBackend();
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    TextGenerationSession session = pipeline.openGenerationSession();
+    session.close();
+
+    assertThatIllegalStateException()
+        .isThrownBy(() -> session.prefillPrompt(ModelPrompt.text("ab")))
+        .withMessageContaining("closed");
+
+    pipeline.close();
+  }
+
+  @Test
   void closesOpenGenerationSessionsWithTheOwningPipeline() {
     SessionBackend backend = new SessionBackend();
     InferencePipeline pipeline = new InferencePipeline(backend);

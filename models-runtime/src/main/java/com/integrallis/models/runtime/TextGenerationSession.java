@@ -73,6 +73,19 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     }
   }
 
+  /**
+   * Prefills this session's own prompt/KV lineage without decoding output tokens.
+   *
+   * <p>Use this to catch up an inactive routed model before a possible handoff. A prepared prefix
+   * belongs only to this model and session; it cannot be transferred to another model.
+   */
+  public PromptPrefillMetrics prefillPrompt(ModelPrompt prompt) {
+    synchronized (executionLock) {
+      requireOpen();
+      return generationLoop.prefillPrompt(prompt);
+    }
+  }
+
   /** Clears this session's context and exact prompt-prefix history. */
   public void resetContext() {
     synchronized (executionLock) {
