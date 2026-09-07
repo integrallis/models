@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /** Profiles the public generation-session API with and without continuous batching. */
 final class RuntimeBatchProfileCli {
 
-  private static final int SCHEMA_VERSION = 1;
+  private static final int SCHEMA_VERSION = 2;
   private static final Set<String> OPTIONS =
       Set.of(
           "model",
@@ -59,6 +59,7 @@ final class RuntimeBatchProfileCli {
           "warmups",
           "iterations",
           "max-tokens",
+          "batch-prefill-across-sessions",
           "mode",
           "batch-delay-ms",
           "output");
@@ -127,6 +128,7 @@ final class RuntimeBatchProfileCli {
         BenchmarkCliArguments.integer(values, "warmups", 1),
         BenchmarkCliArguments.integer(values, "iterations", 3),
         BenchmarkCliArguments.integer(values, "max-tokens", 16),
+        booleanValue(values, "batch-prefill-across-sessions", false),
         mode,
         Duration.ofMillis(BenchmarkCliArguments.integer(values, "batch-delay-ms", 1)),
         Path.of(
@@ -150,6 +152,7 @@ final class RuntimeBatchProfileCli {
     ContinuousBatchingOptions batching =
         ContinuousBatchingOptions.builder()
             .maximumBatchSize(configuration.concurrency())
+            .batchPrefillAcrossSessions(configuration.batchPrefillAcrossSessions())
             .batchFormationDelay(configuration.batchFormationDelay())
             .build();
     long processId = ProcessHandle.current().pid();
@@ -203,6 +206,7 @@ final class RuntimeBatchProfileCli {
           configuration.warmups(),
           configuration.iterations(),
           configuration.maxTokens(),
+          configuration.batchPrefillAcrossSessions(),
           successfulRequests,
           requests.size() - successfulRequests,
           completionTokens,
@@ -357,6 +361,21 @@ final class RuntimeBatchProfileCli {
         .writeValue(output.toFile(), result);
   }
 
+  private static boolean booleanValue(
+      Map<String, String> values, String name, boolean defaultValue) {
+    String value = values.get(name);
+    if (value == null) {
+      return defaultValue;
+    }
+    if ("true".equalsIgnoreCase(value)) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(value)) {
+      return false;
+    }
+    throw new IllegalArgumentException("--" + name + " must be true or false: " + value);
+  }
+
   private static void restoreProperty(String name, String previous) {
     if (previous == null) {
       System.clearProperty(name);
@@ -373,6 +392,7 @@ final class RuntimeBatchProfileCli {
       int warmups,
       int iterations,
       int maxTokens,
+      boolean batchPrefillAcrossSessions,
       Mode mode,
       Duration batchFormationDelay,
       Path output) {
@@ -393,6 +413,9 @@ final class RuntimeBatchProfileCli {
           || maxTokens <= 0
           || batchFormationDelay.isNegative()) {
         throw new IllegalArgumentException("runtime session profile options are invalid");
+      }
+      if (mode == Mode.SERIALIZED && batchPrefillAcrossSessions) {
+        throw new IllegalArgumentException("batchPrefillAcrossSessions requires continuous mode");
       }
     }
   }
@@ -430,6 +453,7 @@ final class RuntimeBatchProfileCli {
       int warmups,
       int iterations,
       int maxTokens,
+      boolean batchPrefillAcrossSessions,
       int successfulRequests,
       int failedRequests,
       int completionTokens,
