@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.33] - 2026-09-07
+
 ### Added
 
 - Added opt-in continuous batching for high-level generation sessions. Concurrent requests share
