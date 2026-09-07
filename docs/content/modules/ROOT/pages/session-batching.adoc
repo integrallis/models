@@ -115,9 +115,10 @@ tradeoffs are retained in `benchmark-results/2026-09-07-ragged-prefill/`.
 
 == Advance Active Requests
 
-`PureJavaBackend` implements `BatchInferenceBackend`. Open one session per
-request, prefill each prompt, and pass the active sessions and their current
-tokens in matching array positions:
+`PureJavaBackend` implements `BatchInferenceBackend`. `RustFfmBackend` preserves the same contract
+while its wrapped Java transformer uses qualified native matrix kernels, so choosing that backend
+does not discard session batching. Open one session per request, prefill each prompt, and pass the
+active sessions and their current tokens in matching array positions:
 
 [source,java]
 ----

@@ -24,6 +24,8 @@ import static org.mockito.Mockito.when;
 
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.OptimizationStatus;
@@ -180,6 +182,55 @@ class RustFfmBackendTest {
     verify(delegate).rewind(8);
     verify(delegate).reset();
     verify(delegate).close();
+  }
+
+  @Test
+  void exposesTheJavaTransformersIndependentSessionBatchingContract() {
+    PureJavaBackend delegate = mock(PureJavaBackend.class);
+    InferenceSession session = mock(InferenceSession.class);
+    InferenceSession[] sessions = {session};
+    int[] prompt = {3, 5};
+    int[][] prompts = {prompt};
+    int[] tokens = {7};
+    float[] forward = {1.0f};
+    float[] transientForward = {2.0f};
+    float[] prefill = {3.0f};
+    LogitBatch stablePrefill = mock(LogitBatch.class);
+    LogitBatch transientPrefill = mock(LogitBatch.class);
+    LogitBatch stableForward = mock(LogitBatch.class);
+    LogitBatch transientForwardBatch = mock(LogitBatch.class);
+    when(delegate.maxBatchSize()).thenReturn(4);
+    when(delegate.supportsRaggedPrefillBatch()).thenReturn(true);
+    when(delegate.openSession()).thenReturn(session);
+    when(delegate.forward(session, 7, 2)).thenReturn(forward);
+    when(delegate.forwardTransient(session, 11, 3)).thenReturn(transientForward);
+    when(delegate.prefill(session, prompt, 0)).thenReturn(prefill);
+    when(delegate.prefillBatch(sessions, prompts)).thenReturn(stablePrefill);
+    when(delegate.prefillBatchTransient(sessions, prompts)).thenReturn(transientPrefill);
+    when(delegate.forwardBatch(sessions, tokens)).thenReturn(stableForward);
+    when(delegate.forwardBatchTransient(sessions, tokens)).thenReturn(transientForwardBatch);
+    RustFfmBackend backend =
+        new RustFfmBackend(
+            delegate,
+            new BackendDiagnostics("rust-ffm", RustFfmBackend.PLAN_VERSION, Map.of(), List.of()));
+
+    assertThat(backend).isInstanceOf(BatchInferenceBackend.class);
+    assertThat(backend.maxBatchSize()).isEqualTo(4);
+    assertThat(backend.supportsRaggedPrefillBatch()).isTrue();
+    assertThat(backend.openSession()).isSameAs(session);
+    assertThat(backend.forward(session, 7, 2)).isSameAs(forward);
+    assertThat(backend.forwardTransient(session, 11, 3)).isSameAs(transientForward);
+    assertThat(backend.prefill(session, prompt, 0)).isSameAs(prefill);
+    assertThat(backend.prefillBatch(sessions, prompts)).isSameAs(stablePrefill);
+    assertThat(backend.prefillBatchTransient(sessions, prompts)).isSameAs(transientPrefill);
+    assertThat(backend.forwardBatch(sessions, tokens)).isSameAs(stableForward);
+    assertThat(backend.forwardBatchTransient(sessions, tokens)).isSameAs(transientForwardBatch);
+
+    backend.rewind(session, 2);
+    backend.reset(session);
+
+    verify(delegate).rewind(session, 2);
+    verify(delegate).reset(session);
   }
 
   @Test

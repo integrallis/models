@@ -17,6 +17,8 @@ package com.integrallis.models.backend.nativekernel;
 
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
@@ -37,7 +39,7 @@ import java.util.Objects;
  * GGUF backend that keeps transformer execution in Java and delegates qualified matrix kernels to
  * Models-owned Rust code through FFM.
  */
-public final class RustFfmBackend implements SpeculativeInferenceBackend {
+public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
   public static final String LOAD_WARMUP_PROPERTY = "models.native.loadWarmup";
@@ -156,6 +158,66 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend {
   @Override
   public float[] prefill(int[] tokens, int startPosition) {
     return delegate.prefill(tokens, startPosition);
+  }
+
+  @Override
+  public int maxBatchSize() {
+    return delegate.maxBatchSize();
+  }
+
+  @Override
+  public InferenceSession openSession() {
+    return delegate.openSession();
+  }
+
+  @Override
+  public float[] forward(InferenceSession session, int token, int position) {
+    return delegate.forward(session, token, position);
+  }
+
+  @Override
+  public float[] forwardTransient(InferenceSession session, int token, int position) {
+    return delegate.forwardTransient(session, token, position);
+  }
+
+  @Override
+  public float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
+    return delegate.prefill(session, tokens, startPosition);
+  }
+
+  @Override
+  public boolean supportsRaggedPrefillBatch() {
+    return delegate.supportsRaggedPrefillBatch();
+  }
+
+  @Override
+  public LogitBatch prefillBatch(InferenceSession[] sessions, int[][] tokenBatches) {
+    return delegate.prefillBatch(sessions, tokenBatches);
+  }
+
+  @Override
+  public LogitBatch prefillBatchTransient(InferenceSession[] sessions, int[][] tokenBatches) {
+    return delegate.prefillBatchTransient(sessions, tokenBatches);
+  }
+
+  @Override
+  public LogitBatch forwardBatch(InferenceSession[] sessions, int[] tokens) {
+    return delegate.forwardBatch(sessions, tokens);
+  }
+
+  @Override
+  public LogitBatch forwardBatchTransient(InferenceSession[] sessions, int[] tokens) {
+    return delegate.forwardBatchTransient(sessions, tokens);
+  }
+
+  @Override
+  public void rewind(InferenceSession session, int checkpoint) {
+    delegate.rewind(session, checkpoint);
+  }
+
+  @Override
+  public void reset(InferenceSession session) {
+    delegate.reset(session);
   }
 
   @Override
