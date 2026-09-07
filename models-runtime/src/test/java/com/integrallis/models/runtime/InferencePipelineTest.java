@@ -33,6 +33,9 @@ import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class InferencePipelineTest {
@@ -189,6 +192,188 @@ class InferencePipelineTest {
   }
 
   @Test
+  void continuouslyBatchesConcurrentGenerationSessionsWithoutSharingState() throws Exception {
+    ContinuousBatchBackend backend = new ContinuousBatchBackend();
+    ContinuousBatchingOptions batching =
+        ContinuousBatchingOptions.builder()
+            .maximumBatchSize(2)
+            .maximumQueuedRequests(4)
+            .batchFormationDelay(java.time.Duration.ofMillis(25))
+            .build();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend, batching);
+        TextGenerationSession first = pipeline.openGenerationSession();
+        TextGenerationSession second = pipeline.openGenerationSession();
+        var callers = Executors.newFixedThreadPool(2)) {
+      CountDownLatch ready = new CountDownLatch(2);
+      CountDownLatch start = new CountDownLatch(1);
+      var firstResult = callers.submit(() -> generateWhenReleased(first, "a", ready, start));
+      var secondResult = callers.submit(() -> generateWhenReleased(second, "b", ready, start));
+
+      assertThat(ready.await(1, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+
+      assertThat(firstResult.get(2, TimeUnit.SECONDS)).isEqualTo("A");
+      assertThat(secondResult.get(2, TimeUnit.SECONDS)).isEqualTo("B");
+      assertThat(backend.batchSizes).containsExactly(2);
+      assertThat(backend.sessionTokens()).containsExactly(List.of(3, 5), List.of(4, 6));
+      assertThat(pipeline.continuousBatchingMetrics().orElseThrow().completedRequests())
+          .isEqualTo(2);
+      assertThat(pipeline.continuousBatchingMetrics().orElseThrow().largestBatch()).isEqualTo(2);
+    }
+  }
+
+  @Test
+  void replacesCompletedRowsWithoutMixingConversationState() throws Exception {
+    CountDownLatch batchEntered = new CountDownLatch(1);
+    CountDownLatch releaseBatch = new CountDownLatch(1);
+    ContinuousBatchBackend backend = new ContinuousBatchBackend(batchEntered, releaseBatch);
+    ContinuousBatchingOptions batching =
+        ContinuousBatchingOptions.builder()
+            .maximumBatchSize(2)
+            .maximumQueuedRequests(2)
+            .batchFormationDelay(java.time.Duration.ofMillis(25))
+            .build();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend, batching);
+        TextGenerationSession shortRequest = pipeline.openGenerationSession();
+        TextGenerationSession longRequest = pipeline.openGenerationSession();
+        TextGenerationSession replacement = pipeline.openGenerationSession();
+        var callers = Executors.newFixedThreadPool(3)) {
+      CountDownLatch ready = new CountDownLatch(2);
+      CountDownLatch start = new CountDownLatch(1);
+      var shortResult =
+          callers.submit(
+              () -> generateWhenReleased(shortRequest, "a", oneTokenOptions(), ready, start));
+      var longResult =
+          callers.submit(
+              () -> generateWhenReleased(longRequest, "c", threeTokenOptions(), ready, start));
+
+      assertThat(ready.await(1, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      assertThat(batchEntered.await(1, TimeUnit.SECONDS)).isTrue();
+      var replacementResult = callers.submit(() -> replacement.generate("b", twoTokenOptions()));
+      awaitQueuedRequest(pipeline);
+      releaseBatch.countDown();
+
+      assertThat(shortResult.get(2, TimeUnit.SECONDS)).isEqualTo("A");
+      assertThat(longResult.get(2, TimeUnit.SECONDS)).isEqualTo("CCC");
+      assertThat(replacementResult.get(2, TimeUnit.SECONDS)).isEqualTo("B");
+      assertThat(backend.batchSizes).containsExactly(1, 2);
+      assertThat(backend.sessionTokens())
+          .containsExactly(List.of(3), List.of(7, 1, 1), List.of(4, 6));
+    }
+  }
+
+  @Test
+  void continuousBatchingPreservesPrefixReusePrefillAndTokenConstraints() {
+    ContinuousBatchBackend backend = new ContinuousBatchBackend();
+    ContinuousBatchingOptions batching =
+        ContinuousBatchingOptions.builder()
+            .maximumBatchSize(2)
+            .maximumPrefillChunkTokens(1)
+            .batchFormationDelay(java.time.Duration.ZERO)
+            .build();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend, batching);
+        TextGenerationSession session = pipeline.openGenerationSession()) {
+      PromptPrefillMetrics prefill = session.prefillPrompt(ModelPrompt.text("aa"));
+      String generated =
+          session.generate(
+              ModelPrompt.text("ab"),
+              SamplingOptions.builder().temperature(0).maxTokens(2).build(),
+              TokenSequenceConstraint.of(6));
+
+      assertThat(generated).isEqualTo("B");
+      assertThat(prefill.promptCache().cacheWriteInputTokens()).isEqualTo(2);
+      assertThat(session.lastGenerationMetrics().promptCache().cacheReadInputTokens()).isEqualTo(1);
+      assertThat(session.lastGenerationMetrics().promptCache().cacheWriteInputTokens())
+          .isEqualTo(1);
+      assertThat(backend.sessionTokens()).containsExactly(List.of(3, 4));
+      assertThat(backend.prefillChunkSizes).containsExactly(1, 1, 1);
+    }
+  }
+
+  @Test
+  void continuousBatchingRejectsWorkBeyondTheBoundedQueue() throws Exception {
+    CountDownLatch batchEntered = new CountDownLatch(1);
+    CountDownLatch releaseBatch = new CountDownLatch(1);
+    ContinuousBatchBackend backend = new ContinuousBatchBackend(batchEntered, releaseBatch);
+    ContinuousBatchingOptions batching =
+        ContinuousBatchingOptions.builder()
+            .maximumBatchSize(1)
+            .maximumQueuedRequests(1)
+            .batchFormationDelay(java.time.Duration.ZERO)
+            .build();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend, batching);
+        TextGenerationSession active = pipeline.openGenerationSession();
+        TextGenerationSession queued = pipeline.openGenerationSession();
+        TextGenerationSession rejected = pipeline.openGenerationSession();
+        var callers = Executors.newFixedThreadPool(3)) {
+      var activeResult = callers.submit(() -> active.generate("a", twoTokenOptions()));
+      assertThat(batchEntered.await(1, TimeUnit.SECONDS)).isTrue();
+      var queuedResult = callers.submit(() -> queued.generate("b", twoTokenOptions()));
+      awaitQueuedRequest(pipeline);
+
+      assertThatThrownBy(() -> rejected.generate("a", twoTokenOptions()))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("queue is full");
+      assertThat(pipeline.continuousBatchingMetrics().orElseThrow().rejectedRequests()).isOne();
+
+      releaseBatch.countDown();
+      assertThat(activeResult.get(2, TimeUnit.SECONDS)).isEqualTo("A");
+      assertThat(queuedResult.get(2, TimeUnit.SECONDS)).isEqualTo("B");
+    }
+  }
+
+  @Test
+  void validatesContinuousBatchingAgainstBackendCapacity() {
+    assertThatThrownBy(
+            () ->
+                new InferencePipeline(
+                    new StubBackend(),
+                    ContinuousBatchingOptions.builder().maximumBatchSize(2).build()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("does not support independent inference sessions");
+
+    assertThatThrownBy(
+            () ->
+                new InferencePipeline(
+                    new SessionBackend(),
+                    ContinuousBatchingOptions.builder().maximumBatchSize(5).build()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("exceeds backend capacity 4");
+  }
+
+  private static void awaitQueuedRequest(InferencePipeline pipeline) {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+    while (pipeline.continuousBatchingMetrics().orElseThrow().queuedRequests() == 0
+        && System.nanoTime() < deadline) {
+      Thread.onSpinWait();
+    }
+    assertThat(pipeline.continuousBatchingMetrics().orElseThrow().queuedRequests()).isEqualTo(1);
+  }
+
+  private static String generateWhenReleased(
+      TextGenerationSession session, String prompt, CountDownLatch ready, CountDownLatch start)
+      throws InterruptedException {
+    return generateWhenReleased(session, prompt, twoTokenOptions(), ready, start);
+  }
+
+  private static String generateWhenReleased(
+      TextGenerationSession session,
+      String prompt,
+      SamplingOptions options,
+      CountDownLatch ready,
+      CountDownLatch start)
+      throws InterruptedException {
+    ready.countDown();
+    start.await();
+    return session.generate(prompt, options);
+  }
+
+  @Test
   void rejectsPreparingAClosedGenerationSession() {
     SessionBackend backend = new SessionBackend();
     InferencePipeline pipeline = new InferencePipeline(backend);
@@ -282,6 +467,18 @@ class InferencePipelineTest {
 
   private static SamplingOptions deterministicOptions() {
     return SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
+  }
+
+  private static SamplingOptions twoTokenOptions() {
+    return SamplingOptions.builder().temperature(0.0f).maxTokens(2).build();
+  }
+
+  private static SamplingOptions oneTokenOptions() {
+    return SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
+  }
+
+  private static SamplingOptions threeTokenOptions() {
+    return SamplingOptions.builder().temperature(0.0f).maxTokens(3).build();
   }
 
   private static final class StubBackend
@@ -560,6 +757,208 @@ class InferencePipelineTest {
           closed = true;
           closedSessions++;
         }
+      }
+    }
+  }
+
+  private static final class ContinuousBatchBackend implements BatchInferenceBackend {
+    private final List<Session> sessions = new ArrayList<>();
+    private final List<Integer> batchSizes = new ArrayList<>();
+    private final List<Integer> prefillChunkSizes = new ArrayList<>();
+    private final CountDownLatch batchEntered;
+    private final CountDownLatch releaseBatch;
+
+    private ContinuousBatchBackend() {
+      this(null, null);
+    }
+
+    private ContinuousBatchBackend(CountDownLatch batchEntered, CountDownLatch releaseBatch) {
+      this.batchEntered = batchEntered;
+      this.releaseBatch = releaseBatch;
+    }
+
+    @Override
+    public String name() {
+      return "continuous-batch-stub";
+    }
+
+    @Override
+    public ModelMetadata metadata() {
+      return new ModelMetadata("fixture", "continuous-batch-fixture", 16, 8, 8, 1, 1, 1);
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return new Tokenizer() {
+        @Override
+        public int[] encode(String text) {
+          return switch (text) {
+            case "a" -> new int[] {3};
+            case "b" -> new int[] {4};
+            case "c" -> new int[] {7};
+            case "aa" -> new int[] {3, 3};
+            case "ab" -> new int[] {3, 4};
+            default -> throw new IllegalArgumentException("unexpected prompt " + text);
+          };
+        }
+
+        @Override
+        public String decode(int[] tokens) {
+          StringBuilder decoded = new StringBuilder();
+          for (int token : tokens) {
+            decoded.append(decode(token));
+          }
+          return decoded.toString();
+        }
+
+        @Override
+        public String decode(int token) {
+          return switch (token) {
+            case 5 -> "A";
+            case 6 -> "B";
+            case 1 -> "C";
+            default -> "";
+          };
+        }
+
+        @Override
+        public int vocabSize() {
+          return 8;
+        }
+
+        @Override
+        public int bosToken() {
+          return 0;
+        }
+
+        @Override
+        public int eosToken() {
+          return 2;
+        }
+      };
+    }
+
+    @Override
+    public float[] forward(int token, int position) {
+      throw new AssertionError("default backend state must not serve an explicit session");
+    }
+
+    @Override
+    public int maxBatchSize() {
+      return 2;
+    }
+
+    @Override
+    public InferenceSession openSession() {
+      Session session = new Session();
+      sessions.add(session);
+      return session;
+    }
+
+    @Override
+    public float[] forward(InferenceSession session, int token, int position) {
+      Session state = requireSession(session);
+      state.tokens.add(token);
+      state.position = position + 1;
+      return logitsAfter(token);
+    }
+
+    @Override
+    public float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
+      prefillChunkSizes.add(tokens.length);
+      return BatchInferenceBackend.super.prefill(session, tokens, startPosition);
+    }
+
+    @Override
+    public LogitBatch forwardBatch(InferenceSession[] batchSessions, int[] tokens) {
+      if (batchEntered != null) {
+        batchEntered.countDown();
+        try {
+          if (!releaseBatch.await(1, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("test did not release batch");
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException("test batch interrupted", interrupted);
+        }
+      }
+      batchSizes.add(batchSessions.length);
+      float[] logits = new float[batchSessions.length * tokenizer().vocabSize()];
+      for (int row = 0; row < batchSessions.length; row++) {
+        Session session = requireSession(batchSessions[row]);
+        session.tokens.add(tokens[row]);
+        session.position++;
+        System.arraycopy(
+            logitsAfter(tokens[row]),
+            0,
+            logits,
+            row * tokenizer().vocabSize(),
+            tokenizer().vocabSize());
+      }
+      return new LogitBatch(batchSessions.length, tokenizer().vocabSize(), logits);
+    }
+
+    @Override
+    public void rewind(InferenceSession session, int checkpoint) {
+      Session state = requireSession(session);
+      state.position = checkpoint;
+      while (state.tokens.size() > checkpoint) {
+        state.tokens.removeLast();
+      }
+    }
+
+    @Override
+    public void reset(InferenceSession session) {
+      Session state = requireSession(session);
+      state.position = 0;
+      state.tokens.clear();
+    }
+
+    @Override
+    public void close() {}
+
+    List<List<Integer>> sessionTokens() {
+      return sessions.stream().map(session -> List.copyOf(session.tokens)).toList();
+    }
+
+    private Session requireSession(InferenceSession session) {
+      if (!(session instanceof Session state) || state.closed) {
+        throw new IllegalStateException("session is closed or does not belong to this backend");
+      }
+      return state;
+    }
+
+    private static float[] logitsAfter(int token) {
+      float[] logits = new float[8];
+      logits[
+              switch (token) {
+                case 3 -> 5;
+                case 4 -> 6;
+                case 7, 1 -> 1;
+                default -> 2;
+              }] =
+          10.0f;
+      return logits;
+    }
+
+    private final class Session implements InferenceSession {
+      private final List<Integer> tokens = new ArrayList<>();
+      private int position;
+      private boolean closed;
+
+      @Override
+      public int checkpoint() {
+        return position;
+      }
+
+      @Override
+      public boolean isClosed() {
+        return closed;
+      }
+
+      @Override
+      public void close() {
+        closed = true;
       }
     }
   }

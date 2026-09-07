@@ -32,6 +32,7 @@ import com.integrallis.models.api.Tokenizer;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,6 +52,7 @@ public final class InferencePipeline
     implements ConstrainedTextGenerationModel, AuxiliaryTextGenerationModel {
   private final InferenceBackend backend;
   private final GenerationLoop generationLoop;
+  private final ContinuousBatchingScheduler continuousBatching;
   private final Set<TextGenerationSession> generationSessions =
       Collections.newSetFromMap(new IdentityHashMap<>());
   private final AtomicBoolean closed = new AtomicBoolean();
@@ -59,6 +61,25 @@ public final class InferencePipeline
   public InferencePipeline(InferenceBackend backend) {
     this.backend = Objects.requireNonNull(backend, "backend");
     generationLoop = new GenerationLoop(backend);
+    continuousBatching = null;
+  }
+
+  /**
+   * Creates a pipeline whose explicit generation sessions share an opt-in continuous scheduler.
+   *
+   * <p>The backend's default generation lineage remains available through this pipeline. Calls on
+   * that lineage and scheduled session batches serialize on the same loaded backend.
+   */
+  public InferencePipeline(InferenceBackend backend, ContinuousBatchingOptions batchingOptions) {
+    this.backend = Objects.requireNonNull(backend, "backend");
+    generationLoop = new GenerationLoop(backend);
+    if (!(backend instanceof BatchInferenceBackend batchBackend)) {
+      throw new IllegalArgumentException(
+          "Backend " + backend.name() + " does not support independent inference sessions");
+    }
+    continuousBatching =
+        new ContinuousBatchingScheduler(
+            batchBackend, backend, Objects.requireNonNull(batchingOptions, "batchingOptions"));
   }
 
   /** Returns immutable architecture metadata for the loaded model. */
@@ -123,11 +144,20 @@ public final class InferencePipeline
     }
   }
 
+  /** Returns scheduler measurements when this pipeline was created with continuous batching. */
+  public Optional<ContinuousBatchingMetrics> continuousBatchingMetrics() {
+    requireOpen();
+    return continuousBatching == null
+        ? Optional.empty()
+        : Optional.of(continuousBatching.metrics());
+  }
+
   /**
    * Opens independent prompt/KV state while sharing this pipeline's loaded model weights.
    *
-   * <p>Use one session per conversation or other cache lineage. Calls across sessions are
-   * serialized by this pipeline because the loaded backend may reuse transient inference scratch.
+   * <p>Use one session per conversation or other cache lineage. The ordinary pipeline serializes
+   * calls because the loaded backend may reuse transient inference scratch. A pipeline constructed
+   * with {@link ContinuousBatchingOptions} instead schedules concurrent session calls together.
    */
   public TextGenerationSession openGenerationSession() {
     synchronized (backend) {
@@ -142,7 +172,8 @@ public final class InferencePipeline
               batchBackend,
               state,
               backend,
-              () -> generationSessions.removeIf(TextGenerationSession::isClosed));
+              () -> generationSessions.removeIf(TextGenerationSession::isClosed),
+              continuousBatching);
       generationSessions.add(session);
       return session;
     }
@@ -308,6 +339,9 @@ public final class InferencePipeline
   /** Closes the owned backend exactly once. */
   @Override
   public void close() {
+    if (continuousBatching != null) {
+      continuousBatching.close();
+    }
     synchronized (backend) {
       if (closed.compareAndSet(false, true)) {
         for (TextGenerationSession session : Set.copyOf(generationSessions)) {
