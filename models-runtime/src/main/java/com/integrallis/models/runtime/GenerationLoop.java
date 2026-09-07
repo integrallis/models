@@ -101,6 +101,55 @@ public final class GenerationLoop {
     cachedPromptTokens = null;
   }
 
+  /**
+   * Prefills a rewindable backend without decoding output and retains the resulting prompt prefix.
+   *
+   * <p>This is intended for asynchronously catching up an inactive model-specific session before a
+   * possible routing handoff. It never makes KV state portable between different backends.
+   */
+  public PromptPrefillMetrics prefillPrompt(ModelPrompt prompt) {
+    requirePrompt(prompt);
+    synchronized (executionLock) {
+      if (!(backend instanceof RewindableInferenceBackend)) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
+      }
+      long started = nanoTime.getAsLong();
+      long phaseStarted = started;
+      int[] promptTokens = backend.tokenizer().encode(prompt);
+      long phaseCompleted = nanoTime.getAsLong();
+      long tokenizationNanos = elapsed(phaseStarted, phaseCompleted);
+      if (promptTokens.length == 0) {
+        throw new IllegalArgumentException("prompt produced no tokens");
+      }
+      phaseStarted = phaseCompleted;
+      PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
+      phaseCompleted = nanoTime.getAsLong();
+      long cachePreparationNanos = elapsed(phaseStarted, phaseCompleted);
+      long prefillStarted = phaseCompleted;
+      try {
+        backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
+        cachedPromptTokens = promptTokens.clone();
+        lastPromptCacheMetrics = promptPrefill.metrics();
+        long completed = nanoTime.getAsLong();
+        return new PromptPrefillMetrics(
+            java.time.Duration.ofNanos(tokenizationNanos),
+            java.time.Duration.ofNanos(cachePreparationNanos),
+            java.time.Duration.ofNanos(elapsed(prefillStarted, completed)),
+            java.time.Duration.ofNanos(elapsed(started, completed)),
+            promptPrefill.metrics());
+      } catch (RuntimeException | Error failure) {
+        cachedPromptTokens = null;
+        try {
+          backend.reset();
+        } catch (RuntimeException | Error resetFailure) {
+          failure.addSuppressed(resetFailure);
+        }
+        throw failure;
+      }
+    }
+  }
+
   /** Generates text from a prompt, returning the complete generated string. */
   public String generate(String prompt, SamplingOptions options) {
     return generate(ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options);
@@ -181,7 +230,7 @@ public final class GenerationLoop {
         throw new IllegalArgumentException("prompt produced no tokens");
       }
       phaseStarted = phaseCompleted;
-      PromptPrefill promptPrefill = preparePrompt(promptTokens);
+      PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
       phaseCompleted = nanoTime.getAsLong();
       long promptPreparationNanos = elapsed(phaseStarted, phaseCompleted);
 
@@ -267,7 +316,7 @@ public final class GenerationLoop {
     }
   }
 
-  private PromptPrefill preparePrompt(int[] promptTokens) {
+  private PromptPrefill preparePromptTokens(int[] promptTokens) {
     if (!(backend instanceof RewindableInferenceBackend rewindableBackend)) {
       backend.reset();
       return new PromptPrefill(

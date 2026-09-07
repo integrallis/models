@@ -6,10 +6,10 @@ dependencies {
     // build wires in whichever embedding ModelJar the index is pinned to.
     api("com.integrallis:vectors-db:${providers.gradleProperty("vectorsVersion").get()}")
 
-    // The catalog SPI only. models-api is the lowest tier in this project, and ModelJars already
-    // depends on models, so an SPI it implements has to live there rather than here — the router
-    // must not depend on ModelJars or the tiers invert.
-    api(project(":models-api"))
+    // Runtime chat types let VirtualChatRouter adapt the provider-neutral decision engine to the
+    // in-process virtual model. This still pulls no backend or ModelJars dependency, so ModelJars
+    // remains free to implement the catalog SPI without inverting the tiers.
+    api(project(":models-runtime"))
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")

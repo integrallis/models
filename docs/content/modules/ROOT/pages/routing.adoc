@@ -131,6 +131,10 @@ Session state defaults to a five-minute idle timeout and 1,024 entries. Use
 `AdaptiveRoutingOptions` to tune those bounds, and call `closeSession(...)`
 when a conversation ends.
 
+For one semantic conversation that routes directly among independently stateful local Models
+sessions, including member-specific templates, constraints, KV-prefix accounting, and optional
+background catch-up, see xref:virtual-models.adoc[Virtual Models].
+
 == Extension Points
 
 Use a `CandidateFilter` for non-negotiable application rules such as tenant

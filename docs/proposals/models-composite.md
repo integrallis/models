@@ -1,24 +1,24 @@
 # `models-composite` — a virtual model assembled from smaller ones
 
-Status: PROPOSAL (runtime assumptions re-audited 2026-09-06; no composite built).
+Status: EXPERIMENTAL (virtual runtime implemented and measured 2026-09-07; no packaged recipe).
 Origin: memory project register rows 5j/5o; the workbench chat-tier question — "what local
 configuration beats the wire?" — kept converging on composition rather than a single bigger model.
 
 ## 1. The idea in one paragraph
 
-A `CompositeModel` implements `TextGenerationModel` — same `modelName()`, `diagnostics()`,
-`generate(prompt, options, stream)` contract as any backend — but inside it is a *policy over
-parts*: a turn classifier that dispatches to a prose specialist or a tool-calling specialist, a
-token constraint applied when structure is required, and (phase 2) adapter swapping over one
-shared base with adapter-isolated KV state. Cross-adapter KV reuse is a later experiment requiring
-proof that the produced K/V activations are equal. To every consumer — Spring AI adapter, workbench,
-memory-server, and critically the **router** — it is just another model with an id, a performance
-profile, and quality scores. Composition becomes a *catalog entry*, not an application concern.
+`VirtualChatModel` owns one canonical role-aware conversation and a policy over physical parts. A
+selector dispatches each semantic turn to a chat or tool specialist, each part renders the shared
+messages with its own template, and each part retains an independent `TextGenerationSession` and
+KV lineage. `VirtualChatRouter` supplies classifier, policy, affinity, and feedback integration.
+This cannot correctly implement the raw `TextGenerationModel` contract because that contract
+receives an already-rendered prompt; re-rendering per model requires semantic messages. Packaging a
+measured recipe behind a catalog identity remains a later phase.
 
 ## 2. What the research established (read from the code, this repo, 2026-09-04)
 
 - `TextGenerationModel` is streaming-first (`generate(prompt, options, TokenStream)`) with
-  blocking wrappers — a facade a composite can implement without API changes.
+  blocking wrappers, but its rendered prompt is the wrong abstraction for members with different
+  chat templates. The virtual facade therefore owns canonical `ChatMessage` history.
 - **Constrained decoding is public** in `models-runtime`: `ConstrainedTextGenerationModel`,
   `TokenConstraint`, `JsonSchemaConstraint`, and `ToolCallTokenConstraints`. A composite can invoke
   the capability directly; a constraint does not belong in provider-neutral `SamplingOptions`.
@@ -29,6 +29,9 @@ profile, and quality scores. Composition becomes a *catalog entry*, not an appli
 - No adapter/LoRA loading or swap API exists. Sharing a base's weights would not make adapter KV
   interchangeable: adapter-modified hidden states change later-layer K/V activations even if K/V
   projection matrices themselves are untouched.
+- Raw KV remains model-specific. Activated LoRA creates one exact exception by leaving a prefix on
+  the base model before adapter invocation. Calibrated cross-model mappers are a separate,
+  approximate research path and are not implemented by the virtual runtime.
 - The catalog SPI (`ModelCatalogProvider` → `DiscoveredModel{id, local, tags, contextWindow,
   costs, sizeBytes, Performance, quality, successRate}`) is ServiceLoader-discovered, and the
   router consumes it via `CatalogDiscovery`. The router **selects, never calls** — so a composite
@@ -36,39 +39,35 @@ profile, and quality scores. Composition becomes a *catalog entry*, not an appli
 
 Literature precedent for the composition levels (read, not measured): specialist function-callers
 (Gorilla, xLAM), token-level collaboration (Co-LLM; speculative decoding as the speed variant),
-cross-attention weight composition (CALM), shared-base multi-adapter serving (S-LoRA, Punica).
+cross-attention weight composition (CALM), shared-base multi-adapter serving (S-LoRA, Punica),
+base-aligned prefix reuse ([Activated LoRA](https://arxiv.org/abs/2512.17910)), and calibrated
+cross-model KV translation ([closed-form within-family](https://arxiv.org/abs/2608.03893) and
+[universal context-reuse](https://arxiv.org/abs/2608.30963) proposals).
 
-## 3. Module shape
+## 3. Implemented shape
 
 ```
-models-composite/
-  CompositeModel            implements ConstrainedTextGenerationModel — the facade
-  TurnPolicy                SPI: classify(prompt) -> route          (default: router's task classifier)
-  CompositePart             a named part: delegate model + optional TokenConstraint + ChatTemplate
-  CompositeRecipe           declarative assembly: parts, policy, fallback order, budget
-  CompositeCatalog          implements ModelCatalogProvider — publishes recipes as DiscoveredModels
-  recipes/                  built-in recipes (see §5)
+models-runtime/
+  VirtualChatModel          semantic facade and independent physical sessions
+  PromptPrefillMetrics      measured prefill-only catch-up
+
+models-router/
+  VirtualChatRouter         adaptive selector and runtime-feedback bridge
 ```
 
 Key design commitments:
 
-1. **The facade is honest.** `modelName()` names the recipe (`composite:chat-local-v1`);
-   `diagnostics()` reports every part's backend diagnostics plus which part served the last call —
-   a composed answer must never be unattributable (the same provenance instinct as everywhere else
-   in this family).
-2. **Dispatch is a policy SPI, not an if-chain.** Default `TurnPolicy` = the router's bundled
-   task classifier (already shipped, 0.90 held-out); a recipe may override with a rule (e.g. "the
-   prompt's tail contains tool schemas ⇒ tool part").
-3. **Constraints ride the part, not the call.** A `CompositePart` binds its delegate to an
-   optional `TokenConstraint` factory (e.g. tool part + `JsonSchemaConstraint` over the declared
-   tools). Malformed structured output becomes impossible by construction on that part.
-4. **Parts are models, so parts can be composites or hosted.** A recipe may name a hosted
-   delegate for one role — composition and routing then nest naturally (a PRIVACY_STRICT policy
-   at the router level still filters the whole composite by its `local` flag, which is only true
-   if every part is local).
-5. **Budget accounting at the seam.** The composite counts tokens per part per call and exposes
-   them through diagnostics — the numbers a spend ledger (e.g. the Forge's) needs, produced where
-   they are known.
+1. **The facade is honest.** Every response names the physical member, route reason, task, switch
+   boundary, parsed tool calls, and generation metrics; a composed answer is never unattributable.
+2. **Dispatch is a policy SPI, not an if-chain.** The default `Selector` follows declared
+   capabilities; `VirtualChatRouter` adds the bundled classifier and adaptive routing policies.
+3. **Constraints ride the member.** A member may bind an optional `ConstraintFactory`, evaluated
+   with the current tools for each selected turn.
+4. **Implemented members are local sessions.** Mixed local/hosted fleets remain supported by
+   `ModelFleet` and the framework routed adapters, but hosted state has not been folded into the
+   stateful virtual-session API.
+5. **Budget accounting at the seam.** The virtual response exposes the physical member's prompt,
+   completion, cache-read, cache-write, TTFT, and decode measurements where they are known.
 
 ## 4. Required seams in existing modules (small, additive)
 
@@ -77,12 +76,12 @@ Key design commitments:
 A composite part can bind a `TokenConstraint` factory to its delegate and invoke this capability
 without changing `SamplingOptions` or moving the composite into `models-runtime`.
 
-### 4.2 Catalog entry for virtual models (none needed)
-`CompositeCatalog` is just another `ModelCatalogProvider` on the classpath. `sizeBytes` = sum of
-parts; `Performance` = measured per recipe (the ladder below), never derived by guessing;
-`quality` keys per task ("chat", "tool-calling") measured per recipe.
+### 4.2 Catalog entry for virtual models (future)
+A future `CompositeCatalog` can be another `ModelCatalogProvider` on the classpath. `sizeBytes` =
+sum of parts; `Performance` = measured per recipe (the ladder below), never derived by guessing;
+`quality` keys per task ("chat", "tool-calling") measured per recipe. No recipe is registered now.
 
-### 4.3 Explicit conversation state (merged, pending release)
+### 4.3 Explicit conversation state (released in 0.3.30)
 `InferencePipeline.openGenerationSession()` opens independent high-level generation state over one
 loaded, batch-capable backend. Each conversation owns its exact prompt prefix, KV state, metrics,
 reset, and close lifecycle. Calls remain serialized because backend scratch is shared. This is the
@@ -95,6 +94,12 @@ and duplicate KV memory. Cross-adapter KV reuse is a separate gated experiment: 
 activations must match every layer under full recomputation. Restricting adapters to Q + MLP is not
 sufficient because changed hidden states feed later K/V projections.
 
+### 4.5 Phase 3 — measured context mobility (`models-accelerator-bench` first)
+Do not add a public cache-import API first. Screen immutable artifacts for layer count, KV-head
+count, per-head key/value dimensions, RoPE, and tokenizer identity; then capture test-only
+unrotated K/V and fit a pair-specific mapping. Only a held-out quality and latency win can justify a
+runtime SPI. The current screening tool always reports `directReuseSafe=false`.
+
 ## 5. Built-in recipes and their gates (nothing ships un-measured)
 
 | recipe | parts | gate |
@@ -102,21 +107,42 @@ sufficient because changed hidden states feed later K/V projections.
 | `chat-local-constrained` | one small instruct model; tool part = same model + JSON-schema constraint | beats the same model unconstrained on tool-call correctness at equal latency (expected: deletes the malformed-call class) |
 | `chat-local-dispatch` | tool specialist (≤1B) + prose model (1.5–3B), turn dispatch | beats `chat-local-constrained` after charging separate KV and model-switch catch-up prefill, or it dies |
 | `chat-local-adapters` (phase 2) | shared base + specialist adapters with isolated KV | beats two fully loaded models on memory without losing latency or quality |
-| `chat-local-kv-compatible` (research) | specialization proven to preserve every layer's K/V activations | beats isolated adapter state on switch latency with token-equivalent handoffs |
+| `chat-local-activated-adapter` (research) | base model + adapter activated after explicit invocation tokens | reuses only the proven base-aligned prefix and beats isolated adapter catch-up with equivalent output |
+| `chat-local-kv-translated` (research) | pair-specific calibrated mapper between two matched-KV models | beats native target prefill while retaining declared held-out target quality; every translated handoff is observable |
 
 Measurement protocol: the workbench chat ladder already defined in the memory project — five canned
 memory interactions (store, search, prose), tool-call correctness, phase timings, prompt-cache
 read/write tokens, cold/warm/switch-back latency, peak RSS/native memory, and selected model for
 each turn. Run against the measured hosted round-trip. Same harness, new arms.
 
+### 5.1 Qwen dispatch screen, 2026-09-07
+
+Qwen3 0.6B Q4_0 for chat plus qualified Qwen3 1.7B Q8_0 for tools passed all five turns through the
+pure-Java backend. Independent prefix evidence behaved as designed: the first tool switch was cold
+without catch-up, and both switch-backs reused only the selected member's own cached tokens.
+
+Eager background prefill reduced the first tool switch from 57.953 s to 44.601 s at the default 12
+GGUF workers, but raised the five-turn total from 104.514 s to 107.272 s by competing with foreground
+chat. Six-worker prefill beat its matched six-worker control, but not the best no-background result.
+The semantic facade proceeds; this pair does not become a built-in recipe. Raw reports and the
+rejected after-turn scheduler are retained by the Memory composition harness.
+
+The two Qwen artifacts also passed a metadata-only calibration screen: both have 28 layers, 16
+query heads, 8 KV heads, 128-wide keys/values, the same RoPE base, and an identical tokenizer
+vocabulary. Their hidden widths differ and their KV values are not directly reusable. This makes
+them a useful pair for a test-only calibrated transfer experiment, not a product feature or recipe.
+The first small Java ridge screen found strong key structure but poor held-out value reconstruction
+(0.367–0.576 cosine; 0.819–0.987 relative L2), so its single-layer and raw-correlation top-two
+mappers were rejected. No cache-transfer SPI is authorized by that result.
+
 ## 6. Why this belongs in the models project
 
 The router made model *selection* infrastructure; this makes model *assembly* infrastructure, and
 the two compose: a recipe is a candidate, so the router can choose between "one big local model",
 "a composite of two small ones", and "the wire" on measured cost/latency/quality like any other
-choice. Downstream (memory-server chat, workbench, Forge deliberators) then consume compositions
-without knowing they are composed — which is exactly the modeljars thesis applied one level up:
-models as dependencies, now compositions as dependencies.
+choice. Downstream semantic-chat consumers can use one virtual session while retaining
+physical-model provenance in each response. A future packaged recipe would apply the ModelJars
+thesis one level up: models as dependencies, then compositions as dependencies.
 
 ## 7. Landscape (swept 2026-09-04, docs/source level; discovery search unavailable — found-no-evidence, not verified-absent)
 
@@ -148,13 +174,13 @@ cross-vocabulary TLI pairing (Qwen3-8B ← SmolLM2-135M); Mixture-of-Agents (6 p
 layers, aggregator matters — WizardLM proposes well and aggregates badly); RouteLLM's published
 routers; Plano/archgw's 4B orchestrator beside task agents.
 
-## 8. Open questions (for the build phase)
+## 8. Open questions
 
 - Streaming across dispatch: a turn routed mid-stream cannot switch parts; dispatch is
   per-generate-call (fine for chat turns; recorded limitation).
-- ChatTemplate mismatch between parts (CHATML vs others): the recipe owns per-part templates;
-  the composite's `ModelPrompt` handling must re-render per part, not share rendered text.
-- Where does tool-schema knowledge live? The constraint factory needs the tool JSON schemas at
-  call time — likely via `ModelPrompt` metadata rather than string parsing (needs an API look).
-- Router `quality` keys for composites: measured per recipe on which benchmark? (Tool-fidelity
+- Framework adapters need an explicit conversation/session ownership contract; a singleton Spring
+  or LangChain4j model cannot silently infer which concurrent caller owns retained state.
+- A packaged recipe needs a ModelJars-owned lifecycle that opens every pinned part and closes the
+  virtual session before its runtimes; the current builder deliberately receives session factories.
+- Router `quality` keys for packaged recipes: measured per recipe on which benchmark? (Tool-fidelity
   protocol for "tool-calling"; a small chat eval for "chat" — decide when the ladder runs.)

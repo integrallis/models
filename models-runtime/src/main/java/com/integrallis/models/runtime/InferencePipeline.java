@@ -107,6 +107,14 @@ public final class InferencePipeline
     }
   }
 
+  /** Prefills this pipeline's prompt/KV lineage without decoding output tokens. */
+  public PromptPrefillMetrics prefillPrompt(ModelPrompt prompt) {
+    synchronized (backend) {
+      requireOpen();
+      return generationLoop.prefillPrompt(prompt);
+    }
+  }
+
   /** Returns whether this backend can hold more than one independent generation lineage. */
   public boolean supportsGenerationSessions() {
     synchronized (backend) {

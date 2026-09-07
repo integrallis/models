@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
@@ -668,6 +669,52 @@ class GenerationLoopTest {
   class PromptCaching {
 
     @Test
+    void rejectsPrefillOnlyOnABackendThatCannotRetainThePrefix() {
+      GenerationLoop loop = new GenerationLoop(mockBackend(new int[] {1}));
+
+      assertThatThrownBy(() -> loop.prefillPrompt(ModelPrompt.text("hello")))
+          .isInstanceOf(UnsupportedOperationException.class)
+          .hasMessageContaining("cannot retain");
+    }
+
+    @Test
+    void clearsBackendAndPromptStateWhenPrefillOnlyFails() {
+      PrefixCachingBackend backend = new PrefixCachingBackend();
+      GenerationLoop loop = new GenerationLoop(backend);
+      backend.failNextPrefill = true;
+
+      assertThatThrownBy(() -> loop.prefillPrompt(ModelPrompt.text("hello world")))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("fixture prefill failure");
+
+      loop.generate(
+          "hello world", SamplingOptions.builder().temperature(0.0f).maxTokens(1).build());
+
+      assertThat(backend.prefills).containsExactly(new PrefillCall(0, new int[] {2, 3, 4}));
+      assertThat(backend.resetCalls).isEqualTo(3);
+      assertThat(loop.lastPromptCacheMetrics()).isEqualTo(new PromptCacheMetrics(true, 3, 0, 3));
+    }
+
+    @Test
+    void prefillsAnInactivePromptWithoutGeneratingAndLeavesItReusable() {
+      PrefixCachingBackend backend = new PrefixCachingBackend();
+      GenerationLoop loop = new GenerationLoop(backend);
+
+      PromptPrefillMetrics prepared = loop.prefillPrompt(ModelPrompt.text("hello world"));
+      String generated =
+          loop.generate(
+              "hello world", SamplingOptions.builder().temperature(0.0f).maxTokens(1).build());
+
+      assertThat(prepared.promptCache()).isEqualTo(new PromptCacheMetrics(true, 3, 0, 3));
+      assertThat(loop.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+      assertThat(backend.prefills)
+          .containsExactly(
+              new PrefillCall(0, new int[] {2, 3, 4}), new PrefillCall(2, new int[] {4}));
+      assertThat(generated).isEqualTo("!");
+    }
+
+    @Test
     void reusesTheLongestSharedPrefixAndPrefillsOnlyTheNewSuffix() {
       PrefixCachingBackend backend = new PrefixCachingBackend();
       GenerationLoop loop = new GenerationLoop(backend);
@@ -760,6 +807,7 @@ class GenerationLoopTest {
     private final List<Integer> rewindCheckpoints = new ArrayList<>();
     private int resetCalls;
     private int nextPosition;
+    private boolean failNextPrefill;
 
     @Override
     public String name() {
@@ -779,6 +827,10 @@ class GenerationLoopTest {
     @Override
     public float[] prefill(int[] tokens, int startPosition) {
       assertThat(startPosition).isEqualTo(nextPosition);
+      if (failNextPrefill) {
+        failNextPrefill = false;
+        throw new IllegalStateException("fixture prefill failure");
+      }
       prefills.add(new PrefillCall(startPosition, tokens));
       nextPosition += tokens.length;
       return logitsFor(5);
