@@ -98,6 +98,21 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
+  public boolean supportsRaggedPrefillBatch() {
+    return true;
+  }
+
+  @Override
+  public LogitBatch prefillBatch(Session[] sessions, int[][] tokenBatches) {
+    return forwardPass.prefillBatch(unwrapSessions(sessions), tokenBatches);
+  }
+
+  @Override
+  public LogitBatch prefillBatchTransient(Session[] sessions, int[][] tokenBatches) {
+    return forwardPass.prefillBatchTransient(unwrapSessions(sessions), tokenBatches);
+  }
+
+  @Override
   public LogitBatch forwardBatch(Session[] sessions, int[] tokens) {
     return forwardPass.forwardBatch(unwrapSessions(sessions), tokens);
   }

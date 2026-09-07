@@ -860,6 +860,27 @@ public final class PureJavaBackend
   }
 
   @Override
+  public boolean supportsRaggedPrefillBatch() {
+    return decoder.supportsRaggedPrefillBatch();
+  }
+
+  @Override
+  public LogitBatch prefillBatch(InferenceSession[] sessions, int[][] tokenBatches) {
+    if (!decoder.supportsRaggedPrefillBatch()) {
+      return BatchInferenceBackend.super.prefillBatch(sessions, tokenBatches);
+    }
+    return decoder.prefillBatch(unwrapSessions(sessions), tokenBatches);
+  }
+
+  @Override
+  public LogitBatch prefillBatchTransient(InferenceSession[] sessions, int[][] tokenBatches) {
+    if (!decoder.supportsRaggedPrefillBatch()) {
+      return BatchInferenceBackend.super.prefillBatchTransient(sessions, tokenBatches);
+    }
+    return decoder.prefillBatchTransient(unwrapSessions(sessions), tokenBatches);
+  }
+
+  @Override
   public LogitBatch forwardBatch(InferenceSession[] sessions, int[] tokens) {
     return decoder.forwardBatch(unwrapSessions(sessions), tokens);
   }

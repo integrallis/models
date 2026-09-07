@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureDescriptor;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
@@ -214,6 +215,48 @@ class MiniCpm5ModelFixtureIntegrationTest {
       }
     } finally {
       restoreSystemProperty(PREFILL_BATCH_SIZE_PROPERTY, previousBatchSize);
+      restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
+    }
+  }
+
+  @Test
+  void raggedSessionPrefillMatchesIndependentRealWeightInferenceExactly() {
+    ModelFixtureDescriptor descriptor = descriptorWithInstalledArtifact();
+    String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
+    System.setProperty(
+        PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(INTEGRATION_CONTEXT_LENGTH));
+
+    try (PureJavaBackend backend = PureJavaBackend.load(descriptor.localPath().orElseThrow());
+        InferenceSession firstControl = backend.openSession();
+        InferenceSession secondControl = backend.openSession();
+        InferenceSession firstRagged = backend.openSession();
+        InferenceSession secondRagged = backend.openSession()) {
+      int[][] prompts = {
+        backend.tokenizer().encode("Name one JVM language."),
+        backend.tokenizer().encode("Explain in one sentence why KV state belongs to one model.")
+      };
+      float[][] expected = {
+        backend.prefill(firstControl, prompts[0], 0).clone(),
+        backend.prefill(secondControl, prompts[1], 0).clone()
+      };
+
+      var actual =
+          backend.prefillBatch(new InferenceSession[] {firstRagged, secondRagged}, prompts);
+
+      assertThat(actual.copyRow(0)).containsExactly(expected[0]);
+      assertThat(actual.copyRow(1)).containsExactly(expected[1]);
+      int[] nextTokens = {argmax(expected[0]), argmax(expected[1])};
+      var expectedContinuation =
+          new float[][] {
+            backend.forward(firstControl, nextTokens[0], firstControl.checkpoint()).clone(),
+            backend.forward(secondControl, nextTokens[1], secondControl.checkpoint()).clone()
+          };
+      var actualContinuation =
+          backend.forwardBatch(new InferenceSession[] {firstRagged, secondRagged}, nextTokens);
+
+      assertThat(actualContinuation.copyRow(0)).containsExactly(expectedContinuation[0]);
+      assertThat(actualContinuation.copyRow(1)).containsExactly(expectedContinuation[1]);
+    } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
     }
   }

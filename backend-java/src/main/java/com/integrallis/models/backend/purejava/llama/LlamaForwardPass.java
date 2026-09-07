@@ -563,6 +563,64 @@ public final class LlamaForwardPass {
         session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
   }
 
+  /**
+   * Prefills different-length prompts for independent sessions and returns stable final logits for
+   * each session.
+   */
+  public LogitBatch prefillBatch(Session[] sessions, int[][] tokenBatches) {
+    return prefillBatchTransient(sessions, tokenBatches).snapshot();
+  }
+
+  /**
+   * Prefills different-length prompts for independent sessions. Returned storage may be reused by
+   * the next logits-producing call.
+   */
+  public LogitBatch prefillBatchTransient(Session[] sessions, int[][] tokenBatches) {
+    validateSessionPrefillBatch(sessions, tokenBatches);
+    int sessionCount = sessions.length;
+    int vocabSize = config.vocabSize();
+    if (sessionCount == 1) {
+      ensureSessionBatchLogits(vocabSize);
+      float[] row = prefill(sessions[0], tokenBatches[0], sessions[0].nextPosition);
+      System.arraycopy(row, 0, sessionBatchLogits, 0, vocabSize);
+      return new LogitBatch(1, vocabSize, sessionBatchLogits);
+    }
+
+    int dim = config.embeddingDim();
+    float[] finalStates = new float[Math.multiplyExact(sessionCount, dim)];
+    Session[] activeSessions = new Session[sessionCount];
+    int[] activeTokens = new int[sessionCount];
+    int[] activeIndexes = new int[sessionCount];
+    int maximumLength = 0;
+    for (int[] tokens : tokenBatches) {
+      maximumLength = Math.max(maximumLength, tokens.length);
+    }
+
+    for (int tokenIndex = 0; tokenIndex < maximumLength; tokenIndex++) {
+      int activeCount = 0;
+      for (int sessionIndex = 0; sessionIndex < sessionCount; sessionIndex++) {
+        int[] tokens = tokenBatches[sessionIndex];
+        if (tokenIndex < tokens.length) {
+          activeSessions[activeCount] = sessions[sessionIndex];
+          activeTokens[activeCount] = tokens[tokenIndex];
+          activeIndexes[activeCount] = sessionIndex;
+          activeCount++;
+        }
+      }
+      advanceIndependentSessionBatch(activeSessions, activeTokens, activeCount);
+      for (int activeIndex = 0; activeIndex < activeCount; activeIndex++) {
+        int sessionIndex = activeIndexes[activeIndex];
+        if (tokenIndex + 1 == tokenBatches[sessionIndex].length) {
+          System.arraycopy(batchX, activeIndex * dim, finalStates, sessionIndex * dim, dim);
+        }
+      }
+    }
+
+    System.arraycopy(finalStates, 0, batchX, 0, finalStates.length);
+    projectIndependentSessionLogits(sessionCount, dim, vocabSize);
+    return new LogitBatch(sessionCount, vocabSize, sessionBatchLogits);
+  }
+
   /** Runs one decode token for each independent session and returns stable logits. */
   public LogitBatch forwardBatch(Session[] sessions, int[] tokens) {
     return forwardBatchTransient(sessions, tokens).snapshot();
@@ -815,15 +873,20 @@ public final class LlamaForwardPass {
     int dim = config.embeddingDim();
     int vocabSize = config.vocabSize();
 
+    advanceIndependentSessionBatch(sessions, tokens, batchSize);
+    projectIndependentSessionLogits(batchSize, dim, vocabSize);
+    return new LogitBatch(batchSize, vocabSize, sessionBatchLogits);
+  }
+
+  private void advanceIndependentSessionBatch(Session[] sessions, int[] tokens, int batchSize) {
+    int dim = config.embeddingDim();
     prepareIndependentSessionInputs(sessions, tokens, batchSize, dim);
     for (int layer = 0; layer < config.numLayers(); layer++) {
       executeIndependentSessionLayer(sessions, batchSize, layer);
     }
-    projectIndependentSessionLogits(batchSize, dim, vocabSize);
-    for (Session session : sessions) {
-      session.nextPosition++;
+    for (int index = 0; index < batchSize; index++) {
+      sessions[index].nextPosition++;
     }
-    return new LogitBatch(batchSize, vocabSize, sessionBatchLogits);
   }
 
   private void prepareIndependentSessionInputs(
@@ -1054,6 +1117,45 @@ public final class LlamaForwardPass {
       if (session.nextPosition >= session.cache.maxSeqLen()) {
         throw new IllegalArgumentException(
             "session " + index + " has reached context length " + session.cache.maxSeqLen());
+      }
+      for (int prior = 0; prior < index; prior++) {
+        if (sessions[prior] == session) {
+          throw new IllegalArgumentException("sessions must be distinct");
+        }
+      }
+    }
+  }
+
+  private void validateSessionPrefillBatch(Session[] sessions, int[][] tokenBatches) {
+    Objects.requireNonNull(sessions, "sessions");
+    Objects.requireNonNull(tokenBatches, "tokenBatches");
+    if (sessions.length == 0) {
+      throw new IllegalArgumentException("sessions must not be empty");
+    }
+    if (tokenBatches.length != sessions.length) {
+      throw new IllegalArgumentException(
+          "tokenBatches.length must equal sessions.length: "
+              + tokenBatches.length
+              + " != "
+              + sessions.length);
+    }
+    int maxBatchSize = maxSessionBatchSize();
+    if (sessions.length > maxBatchSize) {
+      throw new IllegalArgumentException(
+          "session batch exceeds capacity " + maxBatchSize + ": " + sessions.length);
+    }
+    for (int index = 0; index < sessions.length; index++) {
+      Session session = requireSession(sessions[index]);
+      int[] tokens = Objects.requireNonNull(tokenBatches[index], "tokenBatches[" + index + "]");
+      if (tokens.length == 0) {
+        throw new IllegalArgumentException("tokenBatches[" + index + "] must not be empty");
+      }
+      if (tokens.length > session.cache.maxSeqLen() - session.nextPosition) {
+        throw new IllegalArgumentException(
+            "prompt for session "
+                + index
+                + " exceeds context length: "
+                + (session.nextPosition + (long) tokens.length));
       }
       for (int prior = 0; prior < index; prior++) {
         if (sessions[prior] == session) {

@@ -52,6 +52,69 @@ public interface BatchInferenceBackend extends InferenceBackend {
     return logits;
   }
 
+  /**
+   * Returns whether this backend combines different-length independent-session prompts in shared
+   * physical model passes rather than using the sequential compatibility implementation.
+   */
+  default boolean supportsRaggedPrefillBatch() {
+    return false;
+  }
+
+  /**
+   * Processes one different-length prompt per independent session and returns stable final logits
+   * in session order.
+   *
+   * <p>The compatibility implementation preserves independent state but evaluates sessions one at a
+   * time. Check {@link #supportsRaggedPrefillBatch()} before assuming weight-read amortization.
+   */
+  default LogitBatch prefillBatch(InferenceSession[] sessions, int[][] tokenBatches) {
+    Objects.requireNonNull(sessions, "sessions");
+    Objects.requireNonNull(tokenBatches, "tokenBatches");
+    if (sessions.length == 0) {
+      throw new IllegalArgumentException("sessions must not be empty");
+    }
+    if (tokenBatches.length != sessions.length) {
+      throw new IllegalArgumentException(
+          "tokenBatches.length must equal sessions.length: "
+              + tokenBatches.length
+              + " != "
+              + sessions.length);
+    }
+    if (sessions.length > maxBatchSize()) {
+      throw new IllegalArgumentException(
+          "session batch exceeds capacity " + maxBatchSize() + ": " + sessions.length);
+    }
+
+    int vocabularySize = metadata().vocabSize();
+    float[] batchLogits = new float[Math.multiplyExact(sessions.length, vocabularySize)];
+    for (int index = 0; index < sessions.length; index++) {
+      InferenceSession session = Objects.requireNonNull(sessions[index], "sessions[" + index + "]");
+      int[] tokens = Objects.requireNonNull(tokenBatches[index], "tokenBatches[" + index + "]");
+      if (session.isClosed()) {
+        throw new IllegalStateException("session " + index + " is closed");
+      }
+      for (int prior = 0; prior < index; prior++) {
+        if (sessions[prior] == session) {
+          throw new IllegalArgumentException("sessions must be distinct");
+        }
+      }
+      float[] logits = prefill(session, tokens, session.checkpoint());
+      if (logits.length < vocabularySize) {
+        throw new IllegalStateException(
+            "backend returned " + logits.length + " logits for vocabulary size " + vocabularySize);
+      }
+      System.arraycopy(logits, 0, batchLogits, index * vocabularySize, vocabularySize);
+    }
+    return new LogitBatch(sessions.length, vocabularySize, batchLogits);
+  }
+
+  /**
+   * Processes one prompt per session and may reuse the returned storage on the next backend call.
+   */
+  default LogitBatch prefillBatchTransient(InferenceSession[] sessions, int[][] tokenBatches) {
+    return prefillBatch(sessions, tokenBatches);
+  }
+
   /** Runs one token for every session and returns stable session-major logits. */
   LogitBatch forwardBatch(InferenceSession[] sessions, int[] tokens);
 

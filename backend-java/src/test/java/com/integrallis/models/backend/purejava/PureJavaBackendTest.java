@@ -259,10 +259,15 @@ class PureJavaBackendTest {
         assertThat(backend).isInstanceOf(BatchInferenceBackend.class);
         BatchInferenceBackend batching = backend;
         assertThat(batching.maxBatchSize()).isGreaterThanOrEqualTo(2);
+        assertThat(batching.supportsRaggedPrefillBatch()).isTrue();
         try (InferenceSession first = batching.openSession();
             InferenceSession second = batching.openSession()) {
-          batching.prefill(first, new int[] {5, 7}, 0);
-          batching.prefill(second, new int[] {11, 13, 17}, 0);
+          var promptLogits =
+              batching.prefillBatch(
+                  new InferenceSession[] {first, second}, new int[][] {{5, 7}, {11, 13, 17}});
+
+          assertThat(promptLogits.tokenCount()).isEqualTo(2);
+          assertThat(promptLogits.vocabularySize()).isEqualTo(VOCAB_SIZE);
 
           var logits =
               batching.forwardBatch(new InferenceSession[] {first, second}, new int[] {19, 23});

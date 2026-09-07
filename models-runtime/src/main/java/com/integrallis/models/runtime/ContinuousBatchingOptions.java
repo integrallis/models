@@ -23,12 +23,14 @@ public final class ContinuousBatchingOptions {
   private final int maximumBatchSize;
   private final int maximumQueuedRequests;
   private final int maximumPrefillChunkTokens;
+  private final boolean batchPrefillAcrossSessions;
   private final Duration batchFormationDelay;
 
   private ContinuousBatchingOptions(Builder builder) {
     maximumBatchSize = builder.maximumBatchSize;
     maximumQueuedRequests = builder.maximumQueuedRequests;
     maximumPrefillChunkTokens = builder.maximumPrefillChunkTokens;
+    batchPrefillAcrossSessions = builder.batchPrefillAcrossSessions;
     batchFormationDelay = builder.batchFormationDelay;
   }
 
@@ -51,6 +53,11 @@ public final class ContinuousBatchingOptions {
     return maximumPrefillChunkTokens;
   }
 
+  /** Whether compatible prompt chunks may share physical model passes across sessions. */
+  public boolean batchPrefillAcrossSessions() {
+    return batchPrefillAcrossSessions;
+  }
+
   /** Short delay used only when forming a new batch from an idle scheduler. */
   public Duration batchFormationDelay() {
     return batchFormationDelay;
@@ -60,6 +67,7 @@ public final class ContinuousBatchingOptions {
     private int maximumBatchSize;
     private int maximumQueuedRequests = 128;
     private int maximumPrefillChunkTokens = 128;
+    private boolean batchPrefillAcrossSessions;
     private Duration batchFormationDelay = Duration.ofMillis(1);
 
     private Builder() {}
@@ -88,6 +96,17 @@ public final class ContinuousBatchingOptions {
         throw new IllegalArgumentException("maximumPrefillChunkTokens must be > 0");
       }
       maximumPrefillChunkTokens = value;
+      return this;
+    }
+
+    /**
+     * Enables model-specific ragged prompt batching.
+     *
+     * <p>This remains disabled by default because a correct batched kernel is not necessarily
+     * faster for every model, batch size, JVM, and host.
+     */
+    public Builder batchPrefillAcrossSessions(boolean value) {
+      batchPrefillAcrossSessions = value;
       return this;
     }
 
