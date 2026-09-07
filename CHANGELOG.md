@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.32] - 2026-09-07
+
 ### Added
 
 - Added `VirtualChatModel`, which presents capability-specific local models as one role-aware
