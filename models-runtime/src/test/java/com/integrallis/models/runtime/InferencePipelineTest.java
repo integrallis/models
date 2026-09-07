@@ -224,6 +224,38 @@ class InferencePipelineTest {
   }
 
   @Test
+  void batchesUnequalPromptsOnlyWhenExplicitlyEnabled() throws Exception {
+    ContinuousBatchBackend backend = new ContinuousBatchBackend();
+    ContinuousBatchingOptions batching =
+        ContinuousBatchingOptions.builder()
+            .maximumBatchSize(2)
+            .maximumQueuedRequests(4)
+            .batchPrefillAcrossSessions(true)
+            .batchFormationDelay(java.time.Duration.ofMillis(25))
+            .build();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend, batching);
+        TextGenerationSession first = pipeline.openGenerationSession();
+        TextGenerationSession second = pipeline.openGenerationSession();
+        var callers = Executors.newFixedThreadPool(2)) {
+      CountDownLatch ready = new CountDownLatch(2);
+      CountDownLatch start = new CountDownLatch(1);
+      var firstResult = callers.submit(() -> generateWhenReleased(first, "aa", ready, start));
+      var secondResult = callers.submit(() -> generateWhenReleased(second, "b", ready, start));
+
+      assertThat(ready.await(1, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+
+      assertThat(firstResult.get(2, TimeUnit.SECONDS)).isEqualTo("A");
+      assertThat(secondResult.get(2, TimeUnit.SECONDS)).isEqualTo("B");
+      assertThat(backend.raggedPrefillChunkSizes).hasSize(1);
+      assertThat(backend.raggedPrefillChunkSizes.getFirst()).containsExactlyInAnyOrder(2, 1);
+      assertThat(backend.prefillChunkSizes).isEmpty();
+      assertThat(backend.sessionTokens()).containsExactly(List.of(3, 3, 5), List.of(4, 6));
+    }
+  }
+
+  @Test
   void replacesCompletedRowsWithoutMixingConversationState() throws Exception {
     CountDownLatch batchEntered = new CountDownLatch(1);
     CountDownLatch releaseBatch = new CountDownLatch(1);
@@ -344,6 +376,17 @@ class InferencePipelineTest {
                     ContinuousBatchingOptions.builder().maximumBatchSize(5).build()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("exceeds backend capacity 4");
+
+    assertThatThrownBy(
+            () ->
+                new InferencePipeline(
+                    new SessionBackend(),
+                    ContinuousBatchingOptions.builder()
+                        .maximumBatchSize(2)
+                        .batchPrefillAcrossSessions(true)
+                        .build()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("ragged prefill");
   }
 
   private static void awaitQueuedRequest(InferencePipeline pipeline) {
@@ -765,6 +808,7 @@ class InferencePipelineTest {
     private final List<Session> sessions = new ArrayList<>();
     private final List<Integer> batchSizes = new ArrayList<>();
     private final List<Integer> prefillChunkSizes = new ArrayList<>();
+    private final List<List<Integer>> raggedPrefillChunkSizes = new ArrayList<>();
     private final CountDownLatch batchEntered;
     private final CountDownLatch releaseBatch;
 
@@ -849,6 +893,11 @@ class InferencePipelineTest {
     }
 
     @Override
+    public boolean supportsRaggedPrefillBatch() {
+      return true;
+    }
+
+    @Override
     public InferenceSession openSession() {
       Session session = new Session();
       sessions.add(session);
@@ -867,6 +916,27 @@ class InferencePipelineTest {
     public float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
       prefillChunkSizes.add(tokens.length);
       return BatchInferenceBackend.super.prefill(session, tokens, startPosition);
+    }
+
+    @Override
+    public LogitBatch prefillBatch(InferenceSession[] batchSessions, int[][] tokenBatches) {
+      raggedPrefillChunkSizes.add(
+          java.util.Arrays.stream(tokenBatches).map(tokens -> tokens.length).toList());
+      float[] logits = new float[batchSessions.length * tokenizer().vocabSize()];
+      for (int row = 0; row < batchSessions.length; row++) {
+        Session session = requireSession(batchSessions[row]);
+        for (int token : tokenBatches[row]) {
+          session.tokens.add(token);
+          session.position++;
+        }
+        System.arraycopy(
+            logitsAfter(tokenBatches[row][tokenBatches[row].length - 1]),
+            0,
+            logits,
+            row * tokenizer().vocabSize(),
+            tokenizer().vocabSize());
+      }
+      return new LogitBatch(batchSessions.length, tokenizer().vocabSize(), logits);
     }
 
     @Override

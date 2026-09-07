@@ -275,6 +275,12 @@ try (var pipeline = new InferencePipeline(PureJavaBackend.load(gguf));
 }
 ```
 
+Servers can construct the pipeline with `ContinuousBatchingOptions` to batch concurrent decode
+steps. Qualified deployments can additionally opt into `batchPrefillAcrossSessions(true)` for
+unequal prompt chunks. Both choices remain explicit because the exact model, quantization, batch
+size, JVM, and host determine whether shared passes improve latency, throughput, and memory. See
+the [session batching guide](https://integrallis.github.io/models/docs/models/current/session-batching.html).
+
 For speech synthesis, add `com.integrallis:models-audio` and open a qualified
 Soprano artifact directly or through ModelJars:
 

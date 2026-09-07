@@ -56,6 +56,32 @@ class RuntimeBatchProfileCliTest {
     assertThat(continuousBackend.prefillCalls()).isEqualTo(6);
   }
 
+  @Test
+  void continuousModeCanExplicitlyBatchPromptPrefill() throws Exception {
+    Path model = Files.write(directory.resolve("fixture.gguf"), new byte[] {1, 2, 3});
+    var configuration =
+        new RuntimeBatchProfileCli.Configuration(
+            new PureJavaModelSource(model.toString(), model),
+            "profile prompt",
+            64,
+            2,
+            1,
+            2,
+            2,
+            true,
+            RuntimeBatchProfileCli.Mode.CONTINUOUS,
+            Duration.ofMillis(10),
+            directory.resolve("ragged.json"));
+    var backend = new FakeBatchBackend();
+
+    var result = RuntimeBatchProfileCli.profile(backend, configuration);
+
+    assertThat(result.successfulRequests()).isEqualTo(4);
+    assertThat(result.batchPrefillAcrossSessions()).isTrue();
+    assertThat(backend.raggedPrefillCalls()).isEqualTo(3);
+    assertThat(backend.prefillCalls()).isZero();
+  }
+
   private RuntimeBatchProfileCli.Configuration configuration(
       Path model, RuntimeBatchProfileCli.Mode mode) {
     return new RuntimeBatchProfileCli.Configuration(
@@ -66,6 +92,7 @@ class RuntimeBatchProfileCliTest {
         1,
         2,
         2,
+        false,
         mode,
         Duration.ofMillis(10),
         directory.resolve(mode.externalName() + ".json"));
@@ -76,6 +103,7 @@ class RuntimeBatchProfileCliTest {
 
     private final List<Integer> batchSizes = new ArrayList<>();
     private int prefillCalls;
+    private int raggedPrefillCalls;
 
     List<Integer> batchSizes() {
       return List.copyOf(batchSizes);
@@ -85,9 +113,18 @@ class RuntimeBatchProfileCliTest {
       return prefillCalls;
     }
 
+    int raggedPrefillCalls() {
+      return raggedPrefillCalls;
+    }
+
     @Override
     public int maxBatchSize() {
       return 4;
+    }
+
+    @Override
+    public boolean supportsRaggedPrefillBatch() {
+      return true;
     }
 
     @Override
@@ -111,6 +148,23 @@ class RuntimeBatchProfileCliTest {
       FakeSession state = checked(session);
       state.position = startPosition + tokens.length;
       return logits(tokens[tokens.length - 1]);
+    }
+
+    @Override
+    public LogitBatch prefillBatch(InferenceSession[] sessions, int[][] tokenBatches) {
+      raggedPrefillCalls++;
+      float[] values = new float[sessions.length * VOCABULARY_SIZE];
+      for (int index = 0; index < sessions.length; index++) {
+        FakeSession state = checked(sessions[index]);
+        state.position += tokenBatches[index].length;
+        System.arraycopy(
+            logits(tokenBatches[index][tokenBatches[index].length - 1]),
+            0,
+            values,
+            index * VOCABULARY_SIZE,
+            VOCABULARY_SIZE);
+      }
+      return new LogitBatch(sessions.length, VOCABULARY_SIZE, values);
     }
 
     @Override

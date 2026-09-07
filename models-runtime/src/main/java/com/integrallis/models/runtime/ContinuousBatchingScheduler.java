@@ -41,6 +41,7 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
   private final Object executionLock;
   private final int maximumBatchSize;
   private final int maximumPrefillChunkTokens;
+  private final boolean batchPrefillAcrossSessions;
   private final long batchFormationDelayNanos;
   private final ArrayBlockingQueue<Request> waiting;
   private final Thread worker;
@@ -69,6 +70,11 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
           "maximumBatchSize " + maximumBatchSize + " exceeds backend capacity " + backendMaximum);
     }
     maximumPrefillChunkTokens = options.maximumPrefillChunkTokens();
+    batchPrefillAcrossSessions = options.batchPrefillAcrossSessions();
+    if (batchPrefillAcrossSessions && !backend.supportsRaggedPrefillBatch()) {
+      throw new IllegalArgumentException(
+          "batchPrefillAcrossSessions requires a backend with physical ragged prefill support");
+    }
     batchFormationDelayNanos = options.batchFormationDelay().toNanos();
     waiting = new ArrayBlockingQueue<>(options.maximumQueuedRequests());
     worker =
@@ -275,6 +281,7 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
     int chunks = decoding ? 1 : active.size();
     int scanned = 0;
     int index = Math.floorMod(prefillCursor, active.size());
+    List<Request> selected = new ArrayList<>(Math.min(chunks, active.size()));
     while (scanned < active.size() && chunks > 0) {
       Request request = active.get(index);
       if (!request.prepared || !request.inPrompt() || request.isDone()) {
@@ -282,12 +289,59 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
         scanned++;
         continue;
       }
-      advancePrefill(request);
+      selected.add(request);
       chunks--;
       index = (index + 1) % active.size();
       scanned++;
     }
     prefillCursor = index;
+    if (batchPrefillAcrossSessions && selected.size() > 1) {
+      advancePrefillBatch(selected);
+    } else {
+      selected.forEach(this::advancePrefill);
+    }
+  }
+
+  private void advancePrefillBatch(List<Request> requests) {
+    InferenceSession[] sessions = new InferenceSession[requests.size()];
+    int[][] tokenBatches = new int[requests.size()][];
+    int[] ends = new int[requests.size()];
+    for (int row = 0; row < requests.size(); row++) {
+      Request request = requests.get(row);
+      int start = request.promptIndex;
+      int end = Math.min(request.promptTokens.length, start + maximumPrefillChunkTokens);
+      sessions[row] = request.state.session;
+      tokenBatches[row] = Arrays.copyOfRange(request.promptTokens, start, end);
+      ends[row] = end;
+    }
+
+    long started = System.nanoTime();
+    LogitBatch logits;
+    try {
+      synchronized (executionLock) {
+        logits = backend.prefillBatchTransient(sessions, tokenBatches);
+      }
+    } catch (RuntimeException | Error failure) {
+      requests.forEach(request -> fail(request, failure));
+      return;
+    }
+    long elapsedNanos = elapsed(started, System.nanoTime());
+    for (int row = 0; row < requests.size(); row++) {
+      Request request = requests.get(row);
+      try {
+        request.prefill = request.prefill.plusNanos(elapsedNanos);
+        request.promptIndex = ends[row];
+        if (!request.inPrompt()) {
+          if (request.prefillOnly) {
+            completePrefill(request);
+          } else {
+            acceptInitialLogits(request, logits, row);
+          }
+        }
+      } catch (RuntimeException | Error failure) {
+        fail(request, failure);
+      }
+    }
   }
 
   private void advancePrefill(Request request) {
@@ -371,6 +425,11 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
 
   private void acceptInitialLogits(Request request, float[] logits) {
     int next = request.sampler.sample(logits, request.allTokens, request.constraint::allows);
+    acceptToken(request, next);
+  }
+
+  private void acceptInitialLogits(Request request, LogitBatch logits, int row) {
+    int next = request.sampler.sample(logits, row, request.allTokens, request.constraint::allows);
     acceptToken(request, next);
   }
 

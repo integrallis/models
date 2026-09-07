@@ -87,6 +87,10 @@ public final class InferenceBenchmarkCli {
       RuntimeBatchProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "profile-ragged-prefill".equals(args[0])) {
+      RaggedPrefillProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "compare".equals(args[0])) {
       BenchmarkComparisonCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;

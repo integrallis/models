@@ -53,9 +53,26 @@ try (var backend = PureJavaBackend.load(gguf);
 The two `generate` calls must actually run concurrently to overlap. The scheduler
 admits waiting work up to `maximumBatchSize`, advances one token for every decode-ready
 session in a shared backend call, and replaces completed rows with queued work.
-Prompt ingestion uses the backend's multi-token prefill entry point, but is split
-into `maximumPrefillChunkTokens` scheduling turns. This bounds how long a newly admitted
-prompt can delay existing decodes without falling back to one-token prompt evaluation.
+By default, prompt ingestion uses each session's prefill entry point and is split into
+`maximumPrefillChunkTokens` scheduling turns. This bounds how long a newly admitted prompt can
+delay existing decodes.
+
+For a model and host where ragged prompt batching has passed a controlled profile, opt in explicitly:
+
+[source,java]
+----
+var batching = ContinuousBatchingOptions.builder()
+    .maximumBatchSize(4)
+    .maximumPrefillChunkTokens(128)
+    .batchPrefillAcrossSessions(true)
+    .build();
+----
+
+The scheduler then groups compatible prompt chunks from active sessions. Every session still owns
+its position and KV cache. Models rejects this option when the backend has no physical ragged
+prefill implementation; it does not silently run a sequential compatibility path. The option is
+disabled by default because correctness and advertised batch capacity do not prove a performance
+win.
 
 The queue is bounded. `maximumQueuedRequests` makes overload explicit instead of
 allowing request state to grow without limit. `batchFormationDelay` optionally
@@ -87,11 +104,21 @@ model, quantization, concurrency, JDK, and machine before enabling batching in p
 reports and reproduction command are in
 `benchmark-results/2026-09-07-runtime-continuous-batching/`.
 
+The follow-up ragged-prefill profile makes the same boundary concrete. With four unequal prompts,
+MiniCPM5 improved from 5.84 to 12.10 prompt tokens/s (+107.2%), while Qwen3 0.6B regressed from
+21.36 to 19.60 (-8.2%); both retained the exact same next-step continuation hash. In the complete
+MiniCPM runtime profile, enabling ragged prefill improved aggregate generation throughput 5.54%,
+p95 TTFT 19.85%, and p50 total request time 9.89%, but worsened p50 TTFT 61.16% because all four
+prompts finished together rather than letting the first sequential prompt begin decoding early.
+Peak RSS was also 84.52% higher in that run. These throughput, fairness, latency, and memory
+tradeoffs are retained in `benchmark-results/2026-09-07-ragged-prefill/`.
+
 == Advance Active Requests
 
-`PureJavaBackend` implements `BatchInferenceBackend`. Open one session per
-request, prefill each prompt, and pass the active sessions and their current
-tokens in matching array positions:
+`PureJavaBackend` implements `BatchInferenceBackend`. `RustFfmBackend` preserves the same contract
+while its wrapped Java transformer uses qualified native matrix kernels, so choosing that backend
+does not discard session batching. Open one session per request, prefill each prompt, and pass the
+active sessions and their current tokens in matching array positions:
 
 [source,java]
 ----
@@ -130,6 +157,23 @@ try (PureJavaBackend loaded = PureJavaBackend.load(gguf)) {
 
 The example uses greedy selection for brevity. A serving runtime can pass each
 row to `Sampler` with that request's sampling options and token history.
+
+When `backend.supportsRaggedPrefillBatch()` is true and the exact deployment has qualified it, the
+two independent prefill calls can be replaced with one call:
+
+[source,java]
+----
+var promptLogits = backend.prefillBatchTransient(
+    new InferenceSession[] {first, second},
+    new int[][] {firstPrompt, secondPrompt});
+int firstToken = promptLogits.argmax(0);
+int secondToken = promptLogits.argmax(1);
+----
+
+The current pure-Java implementation advances at most one token from each session per transformer
+pass. It therefore preserves isolation structurally. A future kernel that flattens several new
+positions from one session into the same physical pass must additionally enforce that session's
+causal attention boundary.
 
 `forwardBatchTransient` may reuse its logit storage on the next backend call.
 Consume each row before invoking the backend again, or call `snapshot()` when

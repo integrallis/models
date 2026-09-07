@@ -1772,6 +1772,54 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void raggedSessionPrefillPreservesFinalLogitsKvStateAndContinuation() {
+      GgufFile file = buildQ4KNanoModel(new Random(46));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[][] prompts = {{5, 7, 11}, {13, 17, 19, 23, 29}};
+      KvCache[] expectedCaches = new KvCache[prompts.length];
+      LlamaForwardPass[] expectedPasses = new LlamaForwardPass[prompts.length];
+      float[][] expectedLogits = new float[prompts.length][];
+      for (int index = 0; index < prompts.length; index++) {
+        expectedCaches[index] =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        expectedPasses[index] = new LlamaForwardPass(config, weights, expectedCaches[index]);
+        expectedLogits[index] = expectedPasses[index].prefill(prompts[index], 0).clone();
+      }
+
+      LlamaForwardPass ragged =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session[] sessions = {ragged.openSession(), ragged.openSession()};
+
+      LogitBatch actual = ragged.prefillBatchTransient(sessions, prompts);
+
+      assertThat(actual.tokenCount()).isEqualTo(prompts.length);
+      for (int index = 0; index < prompts.length; index++) {
+        assertThat(actual.copyRow(index))
+            .containsExactly(expectedLogits[index], within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(sessions[index].checkpoint()).isEqualTo(prompts[index].length);
+        assertThat(sessions[index].cache().keyBuffer())
+            .containsExactly(expectedCaches[index].keyBuffer());
+        assertThat(sessions[index].cache().valueBuffer())
+            .containsExactly(expectedCaches[index].valueBuffer());
+      }
+
+      int[] nextTokens = {argmax(expectedLogits[0]), argmax(expectedLogits[1])};
+      LogitBatch continued = ragged.forwardBatchTransient(sessions, nextTokens);
+      for (int index = 0; index < prompts.length; index++) {
+        assertThat(continued.copyRow(index))
+            .containsExactly(
+                expectedPasses[index].forward(nextTokens[index], prompts[index].length),
+                within(SIMD_REDUCTION_TOLERANCE));
+      }
+    }
+
+    @Test
     void fourSessionBatchExercisesRegisterTiledKQuantPathWithinFloatTolerance() {
       GgufFile file = buildQ4KNanoModel(new Random(43));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());

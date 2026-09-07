@@ -35,7 +35,19 @@ class ContinuousBatchingOptionsTest {
     assertThat(options.maximumBatchSize()).isEqualTo(4);
     assertThat(options.maximumQueuedRequests()).isEqualTo(128);
     assertThat(options.maximumPrefillChunkTokens()).isEqualTo(128);
+    assertThat(options.batchPrefillAcrossSessions()).isFalse();
     assertThat(options.batchFormationDelay()).isEqualTo(Duration.ofMillis(1));
+  }
+
+  @Test
+  void explicitlyEnablesCrossSessionPromptBatching() {
+    ContinuousBatchingOptions options =
+        ContinuousBatchingOptions.builder()
+            .maximumBatchSize(4)
+            .batchPrefillAcrossSessions(true)
+            .build();
+
+    assertThat(options.batchPrefillAcrossSessions()).isTrue();
   }
 
   @Test

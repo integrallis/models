@@ -105,6 +105,18 @@ interface PureJavaDecoder extends AutoCloseable {
 
   float[] prefill(Session session, int[] tokens, int startPosition);
 
+  default boolean supportsRaggedPrefillBatch() {
+    return false;
+  }
+
+  default LogitBatch prefillBatch(Session[] sessions, int[][] tokenBatches) {
+    throw new UnsupportedOperationException("this decoder does not batch ragged session prefill");
+  }
+
+  default LogitBatch prefillBatchTransient(Session[] sessions, int[][] tokenBatches) {
+    return prefillBatch(sessions, tokenBatches);
+  }
+
   LogitBatch forwardBatch(Session[] sessions, int[] tokens);
 
   LogitBatch forwardBatchTransient(Session[] sessions, int[] tokens);
