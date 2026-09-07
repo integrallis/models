@@ -75,7 +75,6 @@ class RuntimeBatchProfileCliTest {
     private static final int VOCABULARY_SIZE = 32;
 
     private final List<Integer> batchSizes = new ArrayList<>();
-    private int nextSession;
     private int prefillCalls;
 
     List<Integer> batchSizes() {
@@ -93,7 +92,7 @@ class RuntimeBatchProfileCliTest {
 
     @Override
     public InferenceSession openSession() {
-      return new FakeSession(nextSession++);
+      return new FakeSession();
     }
 
     @Override
@@ -103,7 +102,7 @@ class RuntimeBatchProfileCliTest {
         throw new IllegalArgumentException("non-sequential position");
       }
       state.position++;
-      return logits(token, state.id);
+      return logits(token);
     }
 
     @Override
@@ -111,7 +110,7 @@ class RuntimeBatchProfileCliTest {
       prefillCalls++;
       FakeSession state = checked(session);
       state.position = startPosition + tokens.length;
-      return logits(tokens[tokens.length - 1], state.id);
+      return logits(tokens[tokens.length - 1]);
     }
 
     @Override
@@ -193,21 +192,16 @@ class RuntimeBatchProfileCliTest {
       return (FakeSession) session;
     }
 
-    private static float[] logits(int token, int session) {
+    private static float[] logits(int token) {
       float[] values = new float[VOCABULARY_SIZE];
-      values[Math.floorMod(token + session + 1, VOCABULARY_SIZE)] = 1;
+      values[Math.floorMod(token + 1, VOCABULARY_SIZE)] = 1;
       return values;
     }
   }
 
   private static final class FakeSession implements InferenceSession {
-    private final int id;
     private int position;
     private boolean closed;
-
-    private FakeSession(int id) {
-      this.id = id;
-    }
 
     @Override
     public int checkpoint() {
