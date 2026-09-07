@@ -1,6 +1,6 @@
 # Handoff: two small models in one chat — state, switching, and composition
 
-**Status:** runtime assumptions audited against Models 0.3.31. Rungs 1–2 were measured downstream
+**Status:** runtime assumptions audited against Models 0.3.32. Rungs 1–2 were measured downstream
 on 2026-09-06; Qwen3 1.7B passed while Qwen + Needle2 fell to 2/5. A second pair and background
 catch-up were measured on 2026-09-07: Qwen3 0.6B chat + Qwen3 1.7B tools passed 5/5 with isolated
 KV lineages, but background prefill did not beat the best demand-catch-up total. The virtual-model
@@ -61,7 +61,7 @@ stronger invariant over the produced activations is demonstrated. Output-head-on
 may preserve transformer KV, but its usefulness for prose/tool specialization is an experiment, not
 an assumption.
 
-Models 0.3.31 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
+Models 0.3.32 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
 provide one high-level `TextGenerationSession` per conversation over the existing low-level
 `InferenceSession`, with isolated prompt/KV lineage and metrics.
 
