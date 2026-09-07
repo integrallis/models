@@ -4,6 +4,23 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added `VirtualChatModel`, which presents capability-specific local models as one role-aware
+  conversation while retaining a separate generation session, chat template, and exact prompt/KV
+  prefix for each physical member.
+- Added prefill-only generation-session preparation and optional background catch-up for inactive
+  virtual-model members, with cache and phase measurements.
+- Added `VirtualChatRouter`, connecting virtual conversations to the adaptive router's task
+  classifier, policies, session affinity, cache evidence, and runtime feedback.
+- Added canonical initial history when opening a virtual session, allowing system instructions and
+  prior messages to be installed without generating an artificial turn.
+
+### Documentation
+
+- Documented virtual-model construction, routing, tool turns, switch telemetry, background-prefill
+  resource tradeoffs, and the boundary between shared semantic context and model-specific KV.
+
 ## [0.3.31] - 2026-09-06
 
 ### Added

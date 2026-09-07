@@ -1,0 +1,116 @@
+= Virtual Models
+:navtitle: Virtual Models
+
+A virtual model presents several small local models as one conversation. One member can handle
+ordinary chat while another handles tool turns, without making the application translate history
+between model-specific prompt formats.
+
+The conversation shares semantic messages, not tensors. Every member receives the same role-aware
+history rendered through its own `ChatTemplate`, and every member retains its own
+`TextGenerationSession` and KV lineage. A switch can reuse only the prefix previously prepared by
+the selected member.
+
+== Compose Two Members
+
+`VirtualChatModel` belongs to `models-runtime`. This example assumes the two loaded runtimes come
+from ModelJars, but the session factories can come from any Models `InferencePipeline`:
+
+[source,java]
+----
+var virtual = VirtualChatModel.builder()
+    .member("chat", Set.of("chat"),
+        chatRuntime.chatTemplate(), chatRuntime::openGenerationSession)
+    .member("tools", Set.of("tool-use"),
+        toolRuntime.chatTemplate(), toolRuntime::openGenerationSession)
+    .build();
+
+try (var conversation = virtual.openSession(
+        "support-42", List.of(ChatMessage.system("Answer briefly.")))) {
+    var answer = conversation.generate(
+        "chat", ChatMessage.user("What can you help me with?"), List.of(), options);
+
+    var call = conversation.generate(
+        "tool-use", ChatMessage.user("Check the weather in 88252."), tools, options);
+
+    var finalAnswer = conversation.generate(
+        "tool-use",
+        ChatMessage.tool(call.toolCalls().getFirst().name(), toolResultJson),
+        tools,
+        options);
+}
+----
+
+The default selector retains the prior member when it has the requested capability, otherwise it
+chooses the first member declaring that capability. The optional constraint factory is evaluated
+for each selected turn, so a tool member can bind a schema-specific decoding constraint when its
+tool protocol supports one.
+
+`Response` identifies the physical member, routing reason, task, switch boundary, parsed tool
+calls, and the actual `GenerationMetrics`. `memberStates()` reports each member's independent
+cached-token count and any background-prefill failure.
+
+== Use The Adaptive Router
+
+`VirtualChatRouter` connects the virtual conversation to `models-router`. It can classify an
+unlabelled turn, apply normal candidate policies, retain bounded session affinity, and learn from
+the real TTFT, throughput, success, and cache-token measurements returned by each member:
+
+[source,java]
+----
+var router = ModelRouter.builder()
+    .candidates(List.of(
+        ModelCandidate.builder("chat").local(true).tags(Set.of("chat")).build(),
+        ModelCandidate.builder("tools").local(true).tags(Set.of("tool-use")).build()))
+    .policy(RoutingPolicy.LOCAL_FIRST)
+    .build();
+
+var virtual = VirtualChatModel.builder()
+    .member("chat", Set.of("chat"), chatTemplate, chatPipeline::openGenerationSession)
+    .member("tools", Set.of("tool-use"), toolTemplate, toolPipeline::openGenerationSession)
+    .selector(new VirtualChatRouter(router))
+    .build();
+----
+
+Call `conversation.generate(input, tools, options)` without a task label to use the router's task
+classifier. Supply a task label when the application already knows the capability it requires.
+Closing the conversation releases its physical sessions and router affinity.
+
+== Hide Some Switch Prefill
+
+An inactive member normally catches up only when selected. `backgroundPrefill(executor)` instead
+prepares its current semantic prefix while the active member generates:
+
+[source,java]
+----
+try (var prefillExecutor = Executors.newSingleThreadExecutor()) {
+    var virtual = VirtualChatModel.builder()
+        // members and selector omitted
+        .backgroundPrefill(prefillExecutor)
+        .build();
+}
+----
+
+The caller owns the executor because this is a resource policy, not a universally safe speedup.
+Separate models can compete for CPU cores and memory bandwidth; compare foreground latency and
+first-switch latency on the target machine before enabling it. A failed prefill is retained in the
+member state and the selected model can still perform a normal cold generation.
+
+== Cache Boundary
+
+KV entries depend on every layer's weights and preceding hidden states. They cannot be copied
+between independently trained members, even when both members use the same architecture. Virtual
+models therefore provide:
+
+* one canonical, role-aware conversation;
+* model-specific prompt rendering;
+* independently reusable prompt/KV prefixes;
+* explicit cold, same-model, first-switch, and switch-back telemetry.
+
+Shared-base adapters may reduce duplicate weight memory in a later execution strategy, but they do
+not make adapter-produced KV interchangeable without an activation-equivalence proof.
+
+Research systems can _translate_ source KV into an approximation of a target model's state using a
+pair-specific calibrated mapping. That is different from copying or sharing raw cache entries, may
+lose target-model quality, and is not performed by `VirtualChatModel`. The production API keeps
+exact member-owned state unless an application explicitly opts into a future, separately qualified
+transfer strategy.
