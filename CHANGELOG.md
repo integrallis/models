@@ -4,6 +4,26 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.34] - 2026-09-07
+
+### Added
+
+- Added opt-in ragged prompt prefill across independent generation sessions. Supported backends
+  share physical transformer passes while retaining each session's position, KV cache, final
+  logits, and continuation state.
+- Added an explicit backend capability signal and fail-fast scheduler validation, preventing an
+  unsupported backend from silently turning the requested optimization into sequential work.
+
+### Fixed
+
+- Preserved the complete independent-session batching contract through the Rust/FFM backend
+  wrapper selected by qualified ModelJars runtimes.
+
+### Documentation
+
+- Documented the model- and machine-specific qualification boundary, including exact-continuation
+  MiniCPM and Qwen counterexamples and the measured latency-versus-memory tradeoff.
+
 ## [0.3.33] - 2026-09-07
 
 ### Added
