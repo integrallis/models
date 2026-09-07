@@ -64,12 +64,24 @@ public final class VirtualChatModel {
 
   /** Opens independent KV state for every member behind one semantic conversation. */
   public Session openSession() {
-    return openSession(UUID.randomUUID().toString());
+    return openSession(UUID.randomUUID().toString(), List.of());
+  }
+
+  /** Opens a session with model-independent history, such as an initial system instruction. */
+  public Session openSession(List<ChatMessage> initialHistory) {
+    return openSession(UUID.randomUUID().toString(), initialHistory);
   }
 
   /** Opens a named session so router telemetry can retain a stable conversation identity. */
   public Session openSession(String sessionId) {
+    return openSession(sessionId, List.of());
+  }
+
+  /** Opens a named session with canonical history that has not yet triggered generation. */
+  public Session openSession(String sessionId, List<ChatMessage> initialHistory) {
     String id = requireText(sessionId, "sessionId");
+    List<ChatMessage> startingHistory =
+        List.copyOf(Objects.requireNonNull(initialHistory, "initialHistory"));
     Map<String, ActiveMember> active = new LinkedHashMap<>();
     try {
       for (Member member : members.values()) {
@@ -77,7 +89,7 @@ public final class VirtualChatModel {
             Objects.requireNonNull(member.sessionFactory().get(), "generation session");
         active.put(member.id(), new ActiveMember(member, session));
       }
-      return new Session(id, active, selector, backgroundPrefillExecutor);
+      return new Session(id, startingHistory, active, selector, backgroundPrefillExecutor);
     } catch (RuntimeException | Error failure) {
       try {
         closeMembers(active.values());
@@ -247,10 +259,12 @@ public final class VirtualChatModel {
 
     private Session(
         String sessionId,
+        List<ChatMessage> initialHistory,
         Map<String, ActiveMember> members,
         Selector selector,
         Executor backgroundPrefillExecutor) {
       this.sessionId = sessionId;
+      this.history.addAll(initialHistory);
       this.members = members;
       this.selector = selector;
       this.backgroundPrefillExecutor = backgroundPrefillExecutor;

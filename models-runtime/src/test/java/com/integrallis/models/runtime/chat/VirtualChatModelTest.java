@@ -168,6 +168,39 @@ class VirtualChatModelTest {
     }
   }
 
+  @Test
+  void opensWithCanonicalSystemHistoryWithoutGeneratingAnExtraTurn() {
+    RecordingBackend chatBackend = new RecordingBackend("chat", "READY");
+
+    try (InferencePipeline chatPipeline = new InferencePipeline(chatBackend)) {
+      VirtualChatModel model =
+          VirtualChatModel.builder()
+              .member(
+                  "chat",
+                  Set.of("chat"),
+                  ChatTemplate.CHATML_NO_THINK,
+                  chatPipeline::openGenerationSession)
+              .build();
+
+      try (VirtualChatModel.Session conversation =
+          model.openSession(
+              "system-history", List.of(ChatMessage.system("Answer in one short sentence.")))) {
+        VirtualChatModel.Response response =
+            conversation.generate("chat", ChatMessage.user("Are you ready?"), List.of(), OPTIONS);
+
+        assertThat(response.content()).isEqualTo("READY");
+        assertThat(chatBackend.prompts())
+            .singleElement()
+            .asString()
+            .contains("Answer in one short sentence.")
+            .contains("Are you ready?");
+        assertThat(conversation.history())
+            .extracting(ChatMessage::role)
+            .containsExactly(ChatRole.SYSTEM, ChatRole.USER, ChatRole.ASSISTANT);
+      }
+    }
+  }
+
   private static final class RecordingBackend implements BatchInferenceBackend {
     private static final int VOCABULARY_SIZE = 130;
     private final String name;
