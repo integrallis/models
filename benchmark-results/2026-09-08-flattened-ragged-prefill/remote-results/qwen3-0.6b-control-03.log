@@ -1,0 +1,47 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava UP-TO-DATE
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes UP-TO-DATE
+> Task :backend-java:jar UP-TO-DATE
+> Task :backend-native:compileJava UP-TO-DATE
+> Task :backend-native:processResources NO-SOURCE
+> Task :backend-native:classes UP-TO-DATE
+> Task :backend-native:jar UP-TO-DATE
+> Task :backend-native:cargoBuildRelease UP-TO-DATE
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources UP-TO-DATE
+> Task :backend-native:nativePlatformJar UP-TO-DATE
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-router:compileJava UP-TO-DATE
+> Task :models-bench:compileJava UP-TO-DATE
+> Task :models-bench:processResources UP-TO-DATE
+> Task :models-bench:classes UP-TO-DATE
+> Task :models-router:processResources UP-TO-DATE
+> Task :models-router:classes UP-TO-DATE
+> Task :models-router:jar UP-TO-DATE
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 08, 2026 12:50:39 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 08, 2026 12:50:39 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ragged prefill: mode=ragged concurrency=4 prompt-tokens=330 aggregate=46.05 tok/s hash=25d112d411cc6a79518c7289d68c6bc8910791aa7c23e2cbf5964f6efc638924
+report: /opt/modeljars-runs/flat-prefill-20260908/results/qwen3-0.6b-control-03.json
+
+BUILD SUCCESSFUL in 18s
+18 actionable tasks: 2 executed, 16 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
