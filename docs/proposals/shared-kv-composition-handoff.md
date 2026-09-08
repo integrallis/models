@@ -1,11 +1,12 @@
 # Handoff: two small models in one chat — state, switching, and composition
 
-**Status:** runtime assumptions audited against Models 0.3.34. Rungs 1–2 were measured downstream
+**Status:** runtime assumptions audited against Models 0.3.35. Rungs 1–2 were measured downstream
 on 2026-09-06; Qwen3 1.7B passed while Qwen + Needle2 fell to 2/5. A second pair and background
 catch-up were measured on 2026-09-07: Qwen3 0.6B chat + Qwen3 1.7B tools passed 5/5 with isolated
-KV lineages, but background prefill did not beat the best demand-catch-up total. The virtual-model
-API is implemented on `feat/hybrid-model-composition`; no preconfigured composite recipe is yet
-authorized by performance evidence.
+KV lineages, but background prefill did not beat the best demand-catch-up total. A clean-host,
+six-turn comparison on 2026-09-08 passed all 36 correctness turns but measured the composite at
+91.223 seconds median versus 75.672 seconds for the single-model control, a 20.55% regression. The
+virtual-model API is released, but no preconfigured composite recipe is authorized by the evidence.
 
 Concurrent-conversation follow-up: an opt-in runtime scheduler now batches compatible decode rows
 for sessions that share one physical model and interleaves bounded prompt chunks. Real
@@ -68,7 +69,7 @@ stronger invariant over the produced activations is demonstrated. Output-head-on
 may preserve transformer KV, but its usefulness for prose/tool specialization is an experiment, not
 an assumption.
 
-Models 0.3.34 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
+Models 0.3.35 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
 provide one high-level `TextGenerationSession` per conversation over the existing low-level
 `InferenceSession`, with isolated prompt/KV lineage and metrics.
 
