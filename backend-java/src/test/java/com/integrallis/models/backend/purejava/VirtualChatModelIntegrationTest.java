@@ -104,11 +104,17 @@ class VirtualChatModelIntegrationTest {
                 TOOL_OPTIONS);
         VirtualChatModel.Response answer =
             conversation.generate(
-                "chat",
+                "tool-use",
                 ChatMessage.tool(
                     "get-weather-for-zipcode",
                     "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
                         + "\"temperatureInFahrenheit\":78}"),
+                List.of(WEATHER),
+                TOOL_OPTIONS);
+        VirtualChatModel.Response followUp =
+            conversation.generate(
+                "chat",
+                ChatMessage.user("What temperature did the weather tool report?"),
                 List.of(WEATHER),
                 TOOL_OPTIONS);
 
@@ -123,11 +129,14 @@ class VirtualChatModelIntegrationTest {
                   assertThat(toolCall.name()).isEqualTo("get-weather-for-zipcode");
                   assertThat(toolCall.argumentsJson()).contains("88252");
                 });
-        assertThat(answer.memberId()).isEqualTo("chat");
-        assertThat(answer.boundary()).isEqualTo(VirtualChatModel.Boundary.SWITCH_BACK);
+        assertThat(answer.memberId()).isEqualTo("tools");
+        assertThat(answer.boundary()).isEqualTo(VirtualChatModel.Boundary.SAME_MODEL);
         assertThat(answer.content()).contains("78").containsIgnoringCase("rain");
         assertThat(answer.content()).doesNotContain("<tool_call>", "<think>");
-        assertThat(answer.metrics().promptCache().cacheReadInputTokens()).isPositive();
+        assertThat(followUp.memberId()).isEqualTo("chat");
+        assertThat(followUp.boundary()).isEqualTo(VirtualChatModel.Boundary.SWITCH_BACK);
+        assertThat(followUp.content()).contains("78");
+        assertThat(followUp.metrics().promptCache().cacheReadInputTokens()).isPositive();
       }
     }
   }

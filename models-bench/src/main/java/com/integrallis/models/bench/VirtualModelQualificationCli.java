@@ -26,6 +26,7 @@ import com.integrallis.models.runtime.GenerationMetrics;
 import com.integrallis.models.runtime.InferencePipeline;
 import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatRole;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.VirtualChatModel;
 import com.integrallis.vectors.core.VectorRuntimeCapabilities;
@@ -85,8 +86,13 @@ final class VirtualModelQualificationCli {
               "remember",
               "{\"fact\":\"I prefer aisle seats.\"}"),
           Step.prose(
-              "prose-switch-back",
+              "tool-result",
+              "tool-use",
               ChatMessage.tool("remember", "{\"stored\":true,\"memoryId\":\"mem-2048\"}"),
+              "mem-2048"),
+          Step.prose(
+              "prose-switch-back",
+              ChatMessage.user("What memory record id was assigned? Reply with only the id."),
               "mem-2048"),
           Step.tool(
               "tool-switch-back",
@@ -337,6 +343,16 @@ final class VirtualModelQualificationCli {
                 ? assessTool(
                     response.toolCalls(), step.expectedTool(), step.expectedArgumentsJson())
                 : assessProse(response.content(), step.expectedFragments(), response.toolCalls());
+        String expectedMember =
+            configuration.arm() == Arm.CONTROL || step.taskType().equals("tool-use")
+                ? "qwen-1.7b"
+                : "qwen-0.6b";
+        if (!response.memberId().equals(expectedMember)) {
+          List<String> diagnostics = new ArrayList<>(assessment.diagnostics());
+          diagnostics.add(
+              "expected member " + expectedMember + " but selected " + response.memberId());
+          assessment = new Assessment(false, diagnostics);
+        }
         turns.add(
             new TurnEvidence(
                 step.id(),
@@ -415,7 +431,7 @@ final class VirtualModelQualificationCli {
 
   private static Optional<com.integrallis.models.runtime.TokenConstraint> toolConstraint(
       com.integrallis.models.runtime.TextGenerationSession session, VirtualChatModel.Turn turn) {
-    if (!turn.taskType().equals("tool-use")) {
+    if (!turn.taskType().equals("tool-use") || turn.input().role() == ChatRole.TOOL) {
       return Optional.empty();
     }
     return ToolCallTokenConstraints.compile(
@@ -577,7 +593,11 @@ final class VirtualModelQualificationCli {
       String expectedTool,
       String expectedArgumentsJson) {
     private static Step prose(String id, ChatMessage input, String... fragments) {
-      return new Step(id, "chat", input, List.of(fragments), "", "");
+      return prose(id, "chat", input, fragments);
+    }
+
+    private static Step prose(String id, String taskType, ChatMessage input, String... fragments) {
+      return new Step(id, taskType, input, List.of(fragments), "", "");
     }
 
     private static Step tool(
