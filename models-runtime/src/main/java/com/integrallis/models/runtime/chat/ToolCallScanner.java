@@ -275,6 +275,15 @@ public final class ToolCallScanner {
       } else if (literal.startsWith("None", index)) {
         json.append("null");
         index += "None".length() - 1;
+      } else if (literalKeywordAt(literal, index, "true")) {
+        json.append("true");
+        index += "true".length() - 1;
+      } else if (literalKeywordAt(literal, index, "false")) {
+        json.append("false");
+        index += "false".length() - 1;
+      } else if (literalKeywordAt(literal, index, "null")) {
+        json.append("null");
+        index += "null".length() - 1;
       } else if (Character.isLetter(current) || current == '_') {
         return null;
       } else {
@@ -282,6 +291,18 @@ public final class ToolCallScanner {
       }
     }
     return inSingle || inDouble || escaped ? null : json.toString();
+  }
+
+  private static boolean literalKeywordAt(String literal, int index, String keyword) {
+    if (!literal.startsWith(keyword, index)) {
+      return false;
+    }
+    int end = index + keyword.length();
+    return end == literal.length()
+        || Character.isWhitespace(literal.charAt(end))
+        || literal.charAt(end) == ','
+        || literal.charAt(end) == ']'
+        || literal.charAt(end) == '}';
   }
 
   /**

@@ -314,6 +314,23 @@ class ToolCallScannerTest {
     }
 
     @Test
+    void normalizesHammerSingleQuotedObjectsWithJsonBooleansAndNulls() {
+      String output =
+          "[{'name': 'search_flights', 'arguments': {'direct_only': true,"
+              + " 'return_trip': false, 'cabin': null}}]";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call ->
+                  assertThat(call.argumentsJson())
+                      .isEqualTo(
+                          "{\"direct_only\": true, \"return_trip\": false, \"cabin\": null}"));
+    }
+
+    @Test
     void acceptsEitherArgumentKeyRegardlessOfTheDeclaredOne() {
       // Models drift between the two spellings; both frameworks tolerate it, so we do too.
       assertThat(
