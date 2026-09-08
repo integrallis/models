@@ -118,6 +118,15 @@ public final class InferenceBenchmarkCli {
       System.exit(ToolCallingQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "virtual-model-qualification".equals(args[0])) {
+      System.exit(VirtualModelQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "virtual-model-qualification-compare".equals(args[0])) {
+      System.exit(
+          VirtualModelQualificationComparisonCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);
