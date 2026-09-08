@@ -4,6 +4,29 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.35] - 2026-09-08
+
+### Added
+
+- Added the Hammer 2.1 tool protocol and a safe parser for its mixed JSON, Python-literal, and
+  tagged tool-call output. Qualification evidence is retained, but no Hammer model is promoted.
+- Added a reproducible virtual-model qualification harness that verifies conversation continuity,
+  tool selection, opaque tool-result handling, exact recall, latency, and peak memory across fresh
+  JVM processes.
+
+### Fixed
+
+- Applied GGUF YaRN scaling from the checkpoint metadata, restoring exact long-context inference
+  for architectures that declare a scaled original context length.
+- Made the Pages artifact name unique per workflow attempt so a failed documentation deployment can
+  be retried without creating an ambiguous duplicate artifact.
+
+### Qualification
+
+- Rejected the Qwen3 0.6B chat + Qwen3 1.7B tool composite after it passed all 36 correctness turns
+  but was 20.55% slower at median end-to-end latency than the single-model control on an isolated
+  8-vCPU host. The runtime APIs remain available; no preconfigured hybrid artifact is published.
+
 ## [0.3.34] - 2026-09-07
 
 ### Added
