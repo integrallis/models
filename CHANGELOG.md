@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.36] - 2026-09-08
+
 ### Changed
 
 - Flattened compatible prompt positions from independent Llama-family sessions into physical
