@@ -45,6 +45,24 @@ chooses the first member declaring that capability. The optional constraint fact
 for each selected turn, so a tool member can bind a schema-specific decoding constraint when its
 tool protocol supports one.
 
+Keep the complete tool loop on the capable member. The generated call and the immediate
+`ChatMessage.tool(...)` result both use `tool-use`; only the next ordinary user turn returns to
+`chat`. This lets the tool model synthesize the result with the call still in its own KV lineage.
+When using a constraint factory, constrain assistant call generation but leave the tool-result turn
+unconstrained so the member can produce natural language:
+
+[source,java]
+----
+(session, turn) -> turn.input().role() == ChatRole.TOOL
+    ? Optional.empty()
+    : ToolCallTokenConstraints.compile(
+        session.tokenizer(), ChatTemplate.CHATML_NO_THINK.toolSyntax(),
+        turn.tools(), alternatives)
+----
+
+`VirtualChatRouter` applies the same rule when turns are not explicitly labelled: a `TOOL` input
+marks an active tool loop, and the router hard-locks it to the previous member by default.
+
 `Response` identifies the physical member, routing reason, task, switch boundary, parsed tool
 calls, and the actual `GenerationMetrics`. `memberStates()` reports each member's independent
 cached-token count and any background-prefill failure.

@@ -5,6 +5,42 @@
 `models-bench` contains the controlled comparison harness, a decode-only JFR profiler for the
 pure-Java backend, and the embedding equivalence gate.
 
+## Virtual-model qualification gate
+
+`virtual-model-qualification` runs one isolated process arm of the Qwen chat/tool composition
+screen. The control uses Qwen3 1.7B for every turn; the hybrid routes ordinary chat to Qwen3 0.6B
+and keeps tool selection plus result synthesis on Qwen3 1.7B. Both execute the same six-turn
+conversation with exact artifact digests, deterministic options, tool arguments, an opaque tool
+result, later context recall, route boundaries, prompt-cache metrics, memory, JVM, and vector
+configuration in the report.
+
+Run at least three fresh processes per arm in a counterbalanced order:
+
+```bash
+models-bench virtual-model-qualification \
+  --arm control \
+  --chat-model /path/to/Qwen3-0.6B-Q4_0.gguf \
+  --tool-model /path/to/Qwen3-1.7B-Q8_0.gguf \
+  --models-revision "$(git rev-parse HEAD)" \
+  --run-id control-01 \
+  --report build/reports/virtual-model/control-01.json
+```
+
+After collecting both arms, apply the correctness, comparability, and median-latency gate:
+
+```bash
+models-bench virtual-model-qualification-compare \
+  --control-reports control-01.json,control-02.json,control-03.json \
+  --hybrid-reports hybrid-01.json,hybrid-02.json,hybrid-03.json \
+  --minimum-improvement 0.05 \
+  --output comparison.json
+```
+
+The comparison rejects failed turns, mismatched code/protocol/runtime settings, wrong artifacts,
+reused process IDs, non-counterbalanced ordering, or a median improvement below the declared floor.
+It is a packaging gate: a useful primitive does not become a preconfigured hybrid merely because
+one run was fast.
+
 ## Embedding equivalence gate
 
 ```bash

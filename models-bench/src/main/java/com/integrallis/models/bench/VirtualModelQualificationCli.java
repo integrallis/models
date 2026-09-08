@@ -253,7 +253,7 @@ final class VirtualModelQualificationCli {
                 control(toolPipeline),
                 List.of(
                     artifact("chat", chatSha, configuration.chatModel(), false, "qwen3"),
-                    artifact("control", toolSha, configuration.toolModel(), true, "qwen3")));
+                    artifact("tools", toolSha, configuration.toolModel(), true, "qwen3")));
       }
     } else {
       try (PureJavaBackend chatBackend = PureJavaBackend.load(configuration.chatModel());
@@ -353,7 +353,7 @@ final class VirtualModelQualificationCli {
               "expected member " + expectedMember + " but selected " + response.memberId());
           assessment = new Assessment(false, diagnostics);
         }
-        turns.add(
+        TurnEvidence evidence =
             new TurnEvidence(
                 step.id(),
                 step.taskType(),
@@ -367,7 +367,17 @@ final class VirtualModelQualificationCli {
                 Hashing.sha256(response.output()),
                 response.toolCalls(),
                 metrics(response.metrics()),
-                ProcessMemory.snapshot(ProcessHandle.current().pid())));
+                ProcessMemory.snapshot(ProcessHandle.current().pid()));
+        turns.add(evidence);
+        System.out.printf(
+            "%-20s %-10s %-12s total=%6d ms cache=%d/%d %s%n",
+            evidence.id(),
+            evidence.memberId(),
+            evidence.boundary(),
+            evidence.metrics().totalMillis(),
+            evidence.metrics().cacheReadInputTokens(),
+            evidence.metrics().cacheInputTokens(),
+            evidence.passed() ? "PASS" : "FAIL");
         if (!assessment.passed()) {
           break;
         }
