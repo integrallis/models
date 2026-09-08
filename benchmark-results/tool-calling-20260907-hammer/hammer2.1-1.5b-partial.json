@@ -1,0 +1,395 @@
+{
+  "schemaVersion" : 1,
+  "createdAt" : "2026-09-08T02:02:51.134192Z",
+  "policyVersion" : "small-model-tool-conformance-v1",
+  "modelsRevision" : "ddb822f8fba1aecd6f388fd205c859a0d0d3cb37",
+  "modelId" : "madeagents_hammer2_1_1_5b_gguf_q4_k_m",
+  "model" : "MadeAgents Hammer 2.1 1.5B GGUF Q4_K_M",
+  "backend" : "pure-java",
+  "backendVersion" : "models@ddb822f8fba1aecd6f388fd205c859a0d0d3cb37",
+  "artifactSha256" : "c3447bf9d0dbbedcff33f4f64769f3add82877790a23940d554b5099056a0110",
+  "artifactSizeBytes" : 985701312,
+  "suite" : {
+    "id" : "needle2-upstream-playground-v1",
+    "sha256" : "c5f0f5a8e5e1f4ffbfd04caeef31ab8abd5e672c157dad980260e793d0c5ace5",
+    "sourceRepository" : "https://github.com/cactus-compute/needle",
+    "sourceRevision" : "7bd8a635ebb977489703b3bb916c21412e8a9cdf",
+    "sourcePath" : "needle/playground/app.js"
+  },
+  "generation" : {
+    "temperature" : 0.0,
+    "maxTokens" : 128,
+    "promptTemplate" : "hammer"
+  },
+  "environment" : {
+    "host" : "Brians-MacBook-Pro.local",
+    "osName" : "Mac OS X",
+    "osVersion" : "26.6.2",
+    "architecture" : "x86_64",
+    "cpuModel" : "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "processors" : 12,
+    "physicalMemoryBytes" : 34359738368,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "pure-java",
+    "planVersion" : "pure-java-v20",
+    "environment" : {
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "architecture" : "x86_64",
+      "gguf-chunks-per-thread" : "2",
+      "cpu-model" : "unknown",
+      "vm-vendor" : "Eclipse Adoptium",
+      "model-architecture" : "qwen2",
+      "projection-layers" : "28",
+      "os" : "Mac OS X",
+      "vm-version" : "25.0.3+9-LTS",
+      "gguf-executor" : "persistent",
+      "preferred-vector-bits" : "256",
+      "compiler" : "hotspot-c2",
+      "active-vector-bits" : "256",
+      "fast-vector-fma" : "true",
+      "processors" : "12",
+      "java-feature" : "25",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "vector-api" : "true",
+      "fast-scalar-fma" : "true",
+      "q4-short-pairwise-supported" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "sve" : "false",
+      "java-version" : "25.0.3",
+      "gguf-parallel" : "true",
+      "gguf-threads" : "12"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "vector-api",
+        "qkv" : "grouped",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "14",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "x86_64",
+        "os" : "Mac OS X",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "batch-size" : "32",
+        "architecture" : "x86_64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "12",
+        "partition" : "batch-rows",
+        "staged-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "12",
+        "executor" : "persistent",
+        "chunks-per-thread" : "2"
+      }
+    } ]
+  },
+  "plannedAttempts" : 14,
+  "inapplicableCases" : [ ],
+  "complete" : false,
+  "summary" : {
+    "attempts" : 11,
+    "passed" : 6,
+    "structuredOutputRate" : 0.9090909090909091,
+    "toolSelectionExactRate" : 0.8181818181818182,
+    "schemaValidityRate" : 0.9090909090909091,
+    "declaredArgumentsOnlyRate" : 0.9090909090909091,
+    "expectedArgumentAccuracy" : 0.6875,
+    "refusalAccuracy" : 1.0,
+    "p95EndToEndMillis" : 226023.0,
+    "qualified" : false,
+    "verdict" : "FAIL"
+  },
+  "followUp" : null,
+  "qualified" : false,
+  "verdict" : "FAIL",
+  "cases" : [ {
+    "id" : "home",
+    "endToEndMillis" : 188404,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'set_lights', 'arguments': {'room': 'bedroom', 'state': 'off', 'brightness': 20}}, 'required': ['room', 'state', 'brightness']}, {'type': 'function', 'function': {'name': 'lock_door', 'arguments': {'door': 'front'}}, 'required': ['door']}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected set_lights.state=\"on\"", "expected lock_door.door=\"front door\"" ]
+  }, {
+    "id" : "robot",
+    "endToEndMillis" : 126297,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'move', 'arguments': {'direction': 'forward', 'distance_m': 2}}}, {'type': 'function', 'function': {'name': 'rotate', 'arguments': {'direction': 'left', 'degrees': 90}}}, {'type': 'function', 'function': {'name': 'gripper', 'arguments': {'action': 'close'}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 5,
+    "expectedArguments" : 5,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "device",
+    "endToEndMillis" : 123653,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'set_theme', 'arguments': {'accent_color': 'green'}}}, {'type': 'function', 'function': {'name': 'open_website', 'arguments': {'url': 'https://github.com'}}}, {'type': 'function', 'function': {'name': 'speak', 'arguments': {'text': 'hello'}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected open_website.url=\"github.com\"" ]
+  }, {
+    "id" : "gallery",
+    "endToEndMillis" : 109871,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'create_album', 'arguments': {'name': 'Summer 2026'}}}, {'type': 'function', 'function': {'name': 'move_photos', 'arguments': {'album': 'Summer 2026', 'filter': 'last weekend'}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "email",
+    "endToEndMillis" : 86534,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'send_email', 'arguments': {'to': 'finance@cactus.dev', 'subject': 'expenses: Blue Bottle Coffee, $14.50, August 4th', 'body': 'Please find the receipt below.'}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected send_email.subject=\"expenses\"" ]
+  }, {
+    "id" : "currency",
+    "endToEndMillis" : 80770,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'convert_currency', 'arguments': {'amount': 250, 'from_currency': 'USD', 'to_currency': 'EUR'}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "document",
+    "endToEndMillis" : 90059,
+    "output" : "```\n[]\n```",
+    "structured" : false,
+    "selectionExact" : false,
+    "schemaValid" : false,
+    "declaredArgumentsOnly" : false,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected a tool call but none was emitted", "expected tool sequence [record_booking] but received []" ]
+  }, {
+    "id" : "sentiment",
+    "endToEndMillis" : 61282,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'classify_sentiment', 'arguments': {'sentiment': 'negative'}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "crowded",
+    "endToEndMillis" : 226023,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'open_blinds', 'arguments': {'room': 'bedroom', 'position': 'half'}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "repeat",
+    "endToEndMillis" : 85339,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'add_to_list', 'arguments': {'item': 'milk', 'quantity': 2}}, 'type': 'function', 'function': {'name': 'add_to_list', 'arguments': {'item': 'eggs', 'quantity': 6}}}]\n```",
+    "structured" : true,
+    "selectionExact" : false,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected tool sequence [add_to_list, add_to_list] but received [add_to_list]" ]
+  }, {
+    "id" : "array",
+    "endToEndMillis" : 50472,
+    "output" : "```\n[{'type': 'function', 'function': {'name': 'add_items', 'arguments': {'items': ['milk', 'eggs', 'bread']}}}]\n```",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  } ]
+}
