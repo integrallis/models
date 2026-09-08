@@ -24,9 +24,11 @@ import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.runtime.InferencePipeline;
 import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatRole;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.VirtualChatModel;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -81,11 +83,13 @@ class VirtualChatModelIntegrationTest {
                   ChatTemplate.CHATML_NO_THINK,
                   toolPipeline::openGenerationSession,
                   (session, turn) ->
-                      ToolCallTokenConstraints.compile(
-                          session.tokenizer(),
-                          ChatTemplate.CHATML_NO_THINK.toolSyntax(),
-                          turn.tools(),
-                          ignored -> List.of("{\"zipcode\":\"88252\"}")))
+                      turn.input().role() == ChatRole.TOOL
+                          ? Optional.empty()
+                          : ToolCallTokenConstraints.compile(
+                              session.tokenizer(),
+                              ChatTemplate.CHATML_NO_THINK.toolSyntax(),
+                              turn.tools(),
+                              ignored -> List.of("{\"zipcode\":\"88252\"}")))
               .build();
 
       try (VirtualChatModel.Session conversation =
