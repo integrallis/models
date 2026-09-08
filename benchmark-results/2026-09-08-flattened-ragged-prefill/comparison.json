@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "controlCommit": "96ee1c20907d72f1557a1756f387d5042dca8f3a",
+  "candidateCommit": "e869ae507aeb73faf1b53891d49dbb713fa92ba9",
+  "decision": "accept",
+  "minimumRequiredImprovementPercent": 5.0,
+  "models": {
+    "minicpm5-1b-q4-k-m": {
+      "artifactSha256": "81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa",
+      "outputSha256": "3f611e510e6e661a701ae8226058512a6ef52230cf721d860913169dcf40082c",
+      "controlThroughput": [22.509915567160025, 22.511078945174418, 22.605393430449837],
+      "candidateThroughput": [23.73739295757787, 23.820050309098278, 24.084262799273002],
+      "controlMedianPromptTokensPerSecond": 22.511078945174418,
+      "candidateMedianPromptTokensPerSecond": 23.820050309098278,
+      "improvementPercent": 5.8148,
+      "controlMedianElapsedNanos": 14659448390,
+      "candidateMedianElapsedNanos": 13853875022,
+      "controlMedianPeakRssBytes": 1814974464,
+      "candidateMedianPeakRssBytes": 1774239744
+    },
+    "qwen3-0.6b-q4-0": {
+      "artifactSha256": "da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4",
+      "outputSha256": "25d112d411cc6a79518c7289d68c6bc8910791aa7c23e2cbf5964f6efc638924",
+      "controlThroughput": [45.75357559867511, 45.98259697516197, 46.04957869476979],
+      "candidateThroughput": [52.3653514710192, 52.47698488846266, 52.56633755795465],
+      "controlMedianPromptTokensPerSecond": 45.98259697516197,
+      "candidateMedianPromptTokensPerSecond": 52.47698488846266,
+      "improvementPercent": 14.1236,
+      "controlMedianElapsedNanos": 7176628153,
+      "candidateMedianElapsedNanos": 6288471045,
+      "controlMedianPeakRssBytes": 1242341376,
+      "candidateMedianPeakRssBytes": 1233125376
+    }
+  },
+  "geometricMeanImprovementPercent": 9.8907
+}

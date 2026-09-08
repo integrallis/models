@@ -113,6 +113,16 @@ prompts finished together rather than letting the first sequential prompt begin 
 Peak RSS was also 84.52% higher in that run. These throughput, fairness, latency, and memory
 tradeoffs are retained in `benchmark-results/2026-09-07-ragged-prefill/`.
 
+The next implementation flattens compatible positions from those independent prompts into each
+physical projection batch. Causal attention remains session-local: all rows write only to their
+own KV cache, and a row can read that cache only through its explicit position. On an isolated
+eight-vCPU AMD EPYC-Milan host, three counterbalanced fresh-JVM runs improved median ragged-prompt
+throughput from 22.51 to 23.82 tokens/s (+5.81%) for MiniCPM5 1B Q4_K_M and from 45.98 to 52.48
+tokens/s (+14.12%) for Qwen3 0.6B Q4_0. Every run retained its control output hash, the pinned
+MiniCPM real-weight gate matched complete KV buffers and logits exactly, and median peak RSS did
+not increase. The raw reports are in
+`benchmark-results/2026-09-08-flattened-ragged-prefill/`.
+
 == Advance Active Requests
 
 `PureJavaBackend` implements `BatchInferenceBackend`. `RustFfmBackend` preserves the same contract
@@ -170,10 +180,11 @@ int firstToken = promptLogits.argmax(0);
 int secondToken = promptLogits.argmax(1);
 ----
 
-The current pure-Java implementation advances at most one token from each session per transformer
-pass. It therefore preserves isolation structurally. A future kernel that flattens several new
-positions from one session into the same physical pass must additionally enforce that session's
-causal attention boundary.
+The pure-Java Llama-family implementation can place several new positions from one session in the
+same physical projection batch. It assigns every row an explicit session and position, stores
+projected keys and values only in that session's cache, and applies causal attention through the
+row position. A later prompt position can therefore see earlier positions from the same session
+without seeing any other session's state.
 
 `forwardBatchTransient` may reuse its logit storage on the next backend call.
 Consume each row before invoking the backend again, or call `snapshot()` when

@@ -4,6 +4,13 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Flattened compatible prompt positions from independent Llama-family sessions into physical
+  projection batches while preserving each session's causal attention boundary and KV cache.
+  Pinned MiniCPM5 and Qwen3 profiles improved median aggregate prompt throughput by 5.81% and
+  14.12%, respectively, with matching output hashes and no increase in median peak RSS.
+
 ## [0.3.35] - 2026-09-08
 
 ### Added
