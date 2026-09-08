@@ -42,6 +42,13 @@ enum ToolCallingCandidate {
       "c3447bf9d0dbbedcff33f4f64769f3add82877790a23940d554b5099056a0110",
       ChatTemplate.HAMMER,
       false),
+  HAMMER21_3B(
+      "hammer2.1-3b",
+      "madeagents_hammer2_1_3b_gguf_q4_k_m",
+      "MadeAgents Hammer 2.1 3B GGUF Q4_K_M",
+      "a42369a669dbab0be10f1e04d755e55eb103b4b1bb7b4dec8c0ce4cf6c12b98d",
+      ChatTemplate.HAMMER,
+      false),
   QWEN3_06B(
       "qwen3-0.6b",
       "qwen3_0_6b_q4_0",
