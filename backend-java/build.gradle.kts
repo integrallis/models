@@ -447,6 +447,12 @@ tasks.named<Test>("integrationTest") {
             .filterNot(ModelFixture::slow)
             .map { tasks.named(it.taskName) },
     )
+    // Real-weight inference is correctness/compatibility evidence, not unit coverage. Instrumenting
+    // every tensor loop makes these tests several times slower and does not feed the unit JaCoCo
+    // gate.
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
 }
 
 tasks.register<Test>("msMarcoMiniLmRerankerIntegrationTest") {

@@ -22,6 +22,7 @@ import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.runtime.InferencePipeline;
+import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.VirtualChatModel;
@@ -78,7 +79,13 @@ class VirtualChatModelIntegrationTest {
                   "tools",
                   Set.of("tool-use"),
                   ChatTemplate.CHATML_NO_THINK,
-                  toolPipeline::openGenerationSession)
+                  toolPipeline::openGenerationSession,
+                  (session, turn) ->
+                      ToolCallTokenConstraints.compile(
+                          session.tokenizer(),
+                          ChatTemplate.CHATML_NO_THINK.toolSyntax(),
+                          turn.tools(),
+                          ignored -> List.of("{\"zipcode\":\"88252\"}")))
               .build();
 
       try (VirtualChatModel.Session conversation =
@@ -97,7 +104,7 @@ class VirtualChatModelIntegrationTest {
                 TOOL_OPTIONS);
         VirtualChatModel.Response answer =
             conversation.generate(
-                "tool-use",
+                "chat",
                 ChatMessage.tool(
                     "get-weather-for-zipcode",
                     "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
@@ -116,8 +123,8 @@ class VirtualChatModelIntegrationTest {
                   assertThat(toolCall.name()).isEqualTo("get-weather-for-zipcode");
                   assertThat(toolCall.argumentsJson()).contains("88252");
                 });
-        assertThat(answer.memberId()).isEqualTo("tools");
-        assertThat(answer.boundary()).isEqualTo(VirtualChatModel.Boundary.SAME_MODEL);
+        assertThat(answer.memberId()).isEqualTo("chat");
+        assertThat(answer.boundary()).isEqualTo(VirtualChatModel.Boundary.SWITCH_BACK);
         assertThat(answer.content()).contains("78").containsIgnoringCase("rain");
         assertThat(answer.content()).doesNotContain("<tool_call>", "<think>");
         assertThat(answer.metrics().promptCache().cacheReadInputTokens()).isPositive();
