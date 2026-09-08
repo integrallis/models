@@ -26,7 +26,29 @@ enum ToolCallingCandidate {
       "cactus_compute_needle2_cact_cq2_mixed",
       "Cactus Compute Needle 2 CACT CQ2 Mixed",
       "b43aabfcaf1a6db6acf488076eab71d823c08697c7af4521fc1d174b60ede5ba",
-      ChatTemplate.NEEDLE2),
+      ChatTemplate.NEEDLE2,
+      false),
+  HAMMER21_05B(
+      "hammer2.1-0.5b",
+      "madeagents_hammer2_1_0_5b_gguf_q4_k_m",
+      "MadeAgents Hammer 2.1 0.5B GGUF Q4_K_M",
+      "190676fe7ac430ac6680b32c216d4eb7413002e2af0c140b8280a0f74fcc6a4d",
+      ChatTemplate.HAMMER,
+      false),
+  HAMMER21_15B(
+      "hammer2.1-1.5b",
+      "madeagents_hammer2_1_1_5b_gguf_q4_k_m",
+      "MadeAgents Hammer 2.1 1.5B GGUF Q4_K_M",
+      "c3447bf9d0dbbedcff33f4f64769f3add82877790a23940d554b5099056a0110",
+      ChatTemplate.HAMMER,
+      false),
+  HAMMER21_3B(
+      "hammer2.1-3b",
+      "madeagents_hammer2_1_3b_gguf_q4_k_m",
+      "MadeAgents Hammer 2.1 3B GGUF Q4_K_M",
+      "a42369a669dbab0be10f1e04d755e55eb103b4b1bb7b4dec8c0ce4cf6c12b98d",
+      ChatTemplate.HAMMER,
+      false),
   QWEN3_06B(
       "qwen3-0.6b",
       "qwen3_0_6b_q4_0",
@@ -63,14 +85,26 @@ enum ToolCallingCandidate {
   private final String modelName;
   private final String artifactSha256;
   private final ChatTemplate template;
+  private final boolean synthesizesToolResults;
 
   ToolCallingCandidate(
       String key, String modelId, String modelName, String artifactSha256, ChatTemplate template) {
+    this(key, modelId, modelName, artifactSha256, template, true);
+  }
+
+  ToolCallingCandidate(
+      String key,
+      String modelId,
+      String modelName,
+      String artifactSha256,
+      ChatTemplate template,
+      boolean synthesizesToolResults) {
     this.key = key;
     this.modelId = modelId;
     this.modelName = modelName;
     this.artifactSha256 = artifactSha256;
     this.template = template;
+    this.synthesizesToolResults = synthesizesToolResults;
   }
 
   String key() {
@@ -91,6 +125,10 @@ enum ToolCallingCandidate {
 
   ChatTemplate template() {
     return template;
+  }
+
+  boolean synthesizesToolResults() {
+    return synthesizesToolResults;
   }
 
   static ToolCallingCandidate parse(String value) {

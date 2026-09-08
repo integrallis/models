@@ -22,10 +22,13 @@ import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.runtime.InferencePipeline;
+import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatRole;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.VirtualChatModel;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -78,7 +81,15 @@ class VirtualChatModelIntegrationTest {
                   "tools",
                   Set.of("tool-use"),
                   ChatTemplate.CHATML_NO_THINK,
-                  toolPipeline::openGenerationSession)
+                  toolPipeline::openGenerationSession,
+                  (session, turn) ->
+                      turn.input().role() == ChatRole.TOOL
+                          ? Optional.empty()
+                          : ToolCallTokenConstraints.compile(
+                              session.tokenizer(),
+                              ChatTemplate.CHATML_NO_THINK.toolSyntax(),
+                              turn.tools(),
+                              ignored -> List.of("{\"zipcode\":\"88252\"}")))
               .build();
 
       try (VirtualChatModel.Session conversation =
@@ -104,6 +115,12 @@ class VirtualChatModelIntegrationTest {
                         + "\"temperatureInFahrenheit\":78}"),
                 List.of(WEATHER),
                 TOOL_OPTIONS);
+        VirtualChatModel.Response followUp =
+            conversation.generate(
+                "chat",
+                ChatMessage.user("What temperature did the weather tool report?"),
+                List.of(WEATHER),
+                TOOL_OPTIONS);
 
         assertThat(greeting.memberId()).isEqualTo("chat");
         assertThat(greeting.content()).containsIgnoringCase("READY");
@@ -120,7 +137,10 @@ class VirtualChatModelIntegrationTest {
         assertThat(answer.boundary()).isEqualTo(VirtualChatModel.Boundary.SAME_MODEL);
         assertThat(answer.content()).contains("78").containsIgnoringCase("rain");
         assertThat(answer.content()).doesNotContain("<tool_call>", "<think>");
-        assertThat(answer.metrics().promptCache().cacheReadInputTokens()).isPositive();
+        assertThat(followUp.memberId()).isEqualTo("chat");
+        assertThat(followUp.boundary()).isEqualTo(VirtualChatModel.Boundary.SWITCH_BACK);
+        assertThat(followUp.content()).contains("78");
+        assertThat(followUp.metrics().promptCache().cacheReadInputTokens()).isPositive();
       }
     }
   }

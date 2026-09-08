@@ -18,6 +18,7 @@ package com.integrallis.models.runtime.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.api.ToolCall;
+import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,7 @@ import org.junit.jupiter.api.Test;
 class ToolCallScannerTest {
 
   @Nested
-  static class HarmonyCalls {
+  class HarmonyCalls {
 
     @Test
     void extractsTheOfficialHarmonyRecipientAndArgumentsFromACommentaryCall() {
@@ -113,7 +114,7 @@ class ToolCallScannerTest {
   }
 
   @Nested
-  static class TaggedCalls {
+  class TaggedCalls {
 
     @Test
     void extractsASingleQwenStyleCall() {
@@ -200,7 +201,102 @@ class ToolCallScannerTest {
   }
 
   @Nested
-  static class BareJson {
+  class BareJson {
+
+    @Test
+    void extractsHammerParallelCallsFromAFencedPythonStyleArray() {
+      String output =
+          "```json\n[{'name': 'get_weather', 'arguments': {'city': 'Phoenix'}},"
+              + " {'name': 'add', 'arguments': {'a': 17, 'b': 25}}]\n```";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.content()).isEmpty();
+      assertThat(result.toolCalls())
+          .extracting(ToolCall::name)
+          .containsExactly("get_weather", "add");
+      assertThat(result.toolCalls())
+          .extracting(ToolCall::argumentsJson)
+          .containsExactly("{\"city\": \"Phoenix\"}", "{\"a\": 17, \"b\": 25}");
+    }
+
+    @Test
+    void extractsHammerCallsWhenTheModelActuallyReturnsStrictJson() {
+      String output = "[{\"name\":\"ping\",\"arguments\":{}}]";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.toolCalls()).extracting(ToolCall::name).containsExactly("ping");
+    }
+
+    @Test
+    void extractsHammerCallsFromItsObservedOpenAiFunctionWrapper() {
+      String output =
+          "[{'type':'function','function':{'name':'get_weather',"
+              + "'arguments':{'city':'Phoenix'}}}]";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.argumentsJson()).isEqualTo("{\"city\":\"Phoenix\"}");
+              });
+    }
+
+    @Test
+    void rejectsNestedHammerWrappersThatDoNotDeclareAFunction() {
+      String output =
+          "[{'type':'data','function':{'name':'get_weather'," + "'arguments':{'city':'Phoenix'}}}]";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.toolCalls()).isEmpty();
+      assertThat(result.content()).isEqualTo(output);
+    }
+
+    @Test
+    void normalizesHammerPythonBooleansNullsAndQuotedStringsWithoutEvaluation() {
+      String output =
+          "[{'name': 'remember', 'arguments': {'enabled': True, 'missing': None,"
+              + " 'label': 'Brian\\'s JVM'}}]";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call ->
+                  assertThat(call.argumentsJson())
+                      .isEqualTo(
+                          "{\"enabled\": true, \"missing\": null, \"label\": \"Brian's JVM\"}"));
+    }
+
+    @Test
+    void rejectsMalformedHammerArraySeparators() {
+      for (String output :
+          List.of(
+              "[,{'name':'ping','arguments':{}}]",
+              "[{'name':'ping','arguments':{}},]",
+              "[{'name':'ping','arguments':{}},,{'name':'pong','arguments':{}}]")) {
+        ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+        assertThat(result.toolCalls()).as(output).isEmpty();
+        assertThat(result.content()).as(output).isEqualTo(output);
+      }
+    }
+
+    @Test
+    void treatsNonLiteralHammerExpressionsAsPlainText() {
+      String output = "[{'name':'ping','arguments':__import__('os').system('echo nope')}]";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.toolCalls()).isEmpty();
+      assertThat(result.content()).isEqualTo(output);
+    }
 
     @Test
     void extractsALlamaStyleCallKeyedOnParameters() {
@@ -215,6 +311,23 @@ class ToolCallScannerTest {
                 assertThat(call.name()).isEqualTo("get_weather");
                 assertThat(call.argumentsJson()).isEqualTo("{\"city\": \"Austin\"}");
               });
+    }
+
+    @Test
+    void normalizesHammerSingleQuotedObjectsWithJsonBooleansAndNulls() {
+      String output =
+          "[{'name': 'search_flights', 'arguments': {'direct_only': true,"
+              + " 'return_trip': false, 'cabin': null}}]";
+
+      ToolCallScanner.Result result = ToolCallScanner.scan(output, ToolSyntax.HAMMER);
+
+      assertThat(result.toolCalls())
+          .singleElement()
+          .satisfies(
+              call ->
+                  assertThat(call.argumentsJson())
+                      .isEqualTo(
+                          "{\"direct_only\": true, \"return_trip\": false, \"cabin\": null}"));
     }
 
     @Test
@@ -234,7 +347,7 @@ class ToolCallScannerTest {
   }
 
   @Nested
-  static class MarkdownFences {
+  class MarkdownFences {
 
     @Test
     void stripsAFencedJsonCall() {
@@ -257,7 +370,7 @@ class ToolCallScannerTest {
   }
 
   @Nested
-  static class JsonExtents {
+  class JsonExtents {
 
     @Test
     void handlesNestedObjectsInArguments() {
@@ -299,7 +412,7 @@ class ToolCallScannerTest {
   }
 
   @Nested
-  static class Degradation {
+  class Degradation {
 
     @Test
     void returnsPlainTextWhenTheFamilyDeclaresNoToolFormat() {

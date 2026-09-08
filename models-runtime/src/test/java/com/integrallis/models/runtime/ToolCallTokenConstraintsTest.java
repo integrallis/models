@@ -61,6 +61,31 @@ class ToolCallTokenConstraintsTest {
   }
 
   @Test
+  void compilesHammerArrayGrammarFromFiniteArgumentAlternatives() {
+    var tool =
+        new ToolSpec(
+            "get_weather",
+            "Look up the weather",
+            """
+            {"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}
+            """);
+
+    TokenConstraint constraint =
+        ToolCallTokenConstraints.compile(
+                HAMMER_TOKENIZER,
+                ToolSyntax.HAMMER,
+                List.of(tool),
+                ignored -> List.of("{\"city\":\"Phoenix\"}"))
+            .orElseThrow();
+
+    constraint.accept(1);
+    constraint.accept(2);
+    constraint.accept(3);
+    assertThat(constraint.isComplete()).isTrue();
+    assertThat(constraint.allows(4)).isFalse();
+  }
+
+  @Test
   void needle2GrammarAllowsARefusalAndParallelCalls() {
     var tool =
         new ToolSpec(
@@ -183,6 +208,43 @@ class ToolCallTokenConstraintsTest {
   }
 
   private static final Tokenizer NEEDLE_TOKENIZER = new NeedleTokenizer();
+  private static final Tokenizer HAMMER_TOKENIZER = new HammerTokenizer();
+
+  private static final class HammerTokenizer implements Tokenizer {
+    private static final String[] TOKENS = {
+      "</s>", "[", "{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Phoenix\"}}", "]", "extra"
+    };
+
+    @Override
+    public int[] encode(String text) {
+      throw new AssertionError("not used");
+    }
+
+    @Override
+    public String decode(int[] tokens) {
+      throw new AssertionError("not used");
+    }
+
+    @Override
+    public String decode(int token) {
+      return TOKENS[token];
+    }
+
+    @Override
+    public int vocabSize() {
+      return TOKENS.length;
+    }
+
+    @Override
+    public int bosToken() {
+      return 0;
+    }
+
+    @Override
+    public int eosToken() {
+      return 0;
+    }
+  }
 
   private static final class NeedleTokenizer implements Tokenizer {
     private static final String[] TOKENS = {

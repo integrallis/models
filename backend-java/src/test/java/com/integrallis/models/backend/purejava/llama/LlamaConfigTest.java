@@ -129,6 +129,44 @@ class LlamaConfigTest {
     }
 
     @Test
+    void ignoresScalingFactorWhenScalingIsDisabled() {
+      Map<String, GgufMetadataValue> entries = requiredLlamaEntries();
+      entries.put("llama.rope.scaling.type", new GgufMetadataValue.StringValue("none"));
+      entries.put("llama.rope.scaling.factor", new GgufMetadataValue.Float32Value(8.0f));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.ropeFrequencyScale()).isEqualTo(1.0f);
+      assertThat(config.ropeScaling().type()).isEqualTo(LlamaConfig.RopeScalingType.LINEAR);
+      assertThat(config.ropeScaling().factor()).isEqualTo(1.0f);
+    }
+
+    @Test
+    void readsThePinnedQwenYarnRopeScalingContract() {
+      Map<String, GgufMetadataValue> entries = requiredLlamaEntries();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen2"));
+      entries.put("qwen2.embedding_length", new GgufMetadataValue.Uint32Value(896));
+      entries.put("qwen2.block_count", new GgufMetadataValue.Uint32Value(24));
+      entries.put("qwen2.attention.head_count", new GgufMetadataValue.Uint32Value(14));
+      entries.put("qwen2.attention.head_count_kv", new GgufMetadataValue.Uint32Value(2));
+      entries.put("qwen2.context_length", new GgufMetadataValue.Uint32Value(32768));
+      entries.put("qwen2.rope.freq_base", new GgufMetadataValue.Float32Value(1_000_000.0f));
+      entries.put("qwen2.rope.scaling.type", new GgufMetadataValue.StringValue("yarn"));
+      entries.put("qwen2.rope.scaling.factor", new GgufMetadataValue.Float32Value(4.0f));
+      entries.put(
+          "qwen2.rope.scaling.original_context_length", new GgufMetadataValue.Uint32Value(32768));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.ropeFrequencyScale()).isEqualTo(0.25f);
+      assertThat(config.ropeScaling().type()).isEqualTo(LlamaConfig.RopeScalingType.YARN);
+      assertThat(config.ropeScaling().factor()).isEqualTo(4.0f);
+      assertThat(config.ropeScaling().originalContext()).isEqualTo(32768);
+      assertThat(config.ropeScaling().betaFast()).isEqualTo(32.0f);
+      assertThat(config.ropeScaling().betaSlow()).isEqualTo(1.0f);
+    }
+
+    @Test
     void readsExplicitQwenHeadWidthsAndRopeLayout() {
       Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
       entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));

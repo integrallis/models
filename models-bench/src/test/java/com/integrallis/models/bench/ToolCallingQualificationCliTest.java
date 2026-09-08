@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolSyntax;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,6 +60,47 @@ class ToolCallingQualificationCliTest {
     assertThat(configuration.maxTokens()).isEqualTo(192);
     assertThat(configuration.caseId()).isEqualTo("currency");
     assertThat(configuration.modelsRevision()).isEqualTo(REVISION);
+  }
+
+  @Test
+  void parsesThePinnedHammerCandidate() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("hammer.gguf"), "fixture");
+
+    ToolCallingQualificationCli.Configuration configuration =
+        ToolCallingQualificationCli.parse(
+            new String[] {
+              "--candidate",
+              "hammer2.1-0.5b",
+              "--model",
+              artifact.toString(),
+              "--models-revision",
+              REVISION
+            });
+
+    assertThat(configuration.candidate()).isEqualTo(ToolCallingCandidate.HAMMER21_05B);
+    assertThat(configuration.candidate().template()).isEqualTo(ChatTemplate.HAMMER);
+    assertThat(configuration.candidate().synthesizesToolResults()).isFalse();
+    assertThat(ToolCallingCandidate.QWEN3_06B.synthesizesToolResults()).isTrue();
+  }
+
+  @Test
+  void parsesThePinnedHammerOnePointFiveBillionCandidate() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("hammer-1.5b.gguf"), "fixture");
+
+    ToolCallingQualificationCli.Configuration configuration =
+        ToolCallingQualificationCli.parse(
+            new String[] {
+              "--candidate",
+              "hammer2.1-1.5b",
+              "--model",
+              artifact.toString(),
+              "--models-revision",
+              REVISION
+            });
+
+    assertThat(configuration.candidate()).isEqualTo(ToolCallingCandidate.HAMMER21_15B);
+    assertThat(configuration.candidate().template()).isEqualTo(ChatTemplate.HAMMER);
+    assertThat(configuration.candidate().synthesizesToolResults()).isFalse();
   }
 
   @Test

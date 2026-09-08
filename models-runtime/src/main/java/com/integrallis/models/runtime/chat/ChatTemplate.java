@@ -40,6 +40,7 @@ public enum ChatTemplate {
   MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
   GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
   NEEDLE2("needle2", ToolSyntax.NEEDLE2),
+  HAMMER("hammer", ToolSyntax.HAMMER),
   GEMMA("gemma", ToolSyntax.NONE),
   GEMMA4("gemma4", ToolSyntax.GEMMA4),
   PHI3("phi3", ToolSyntax.NONE),
@@ -79,6 +80,29 @@ public enum ChatTemplate {
           + "Knowledge cutoff: 2024-06\n\nReasoning: medium\n\n"
           + "# Valid channels: analysis, commentary, final. Channel must be included for every"
           + " message.";
+  private static final String HAMMER_TASK_INSTRUCTION =
+      "You are a tool calling assistant. In order to complete the user's request, you need to"
+          + " select one or more appropriate tools from the following tools and fill in the"
+          + " correct values for the tool parameters. Your specific tasks are:\n"
+          + "1. Make one or more function/tool calls to meet the request based on the question.\n"
+          + "2. If none of the function can be used, point it out and refuse to answer.\n"
+          + "3. If the given question lacks the parameters required by the function, also point"
+          + " it out.\n\n"
+          + "The following are characters that may interact with you\n"
+          + "1. user: Provides query or additional information.\n"
+          + "2. tool: Returns the results of the tool calling.";
+  private static final String HAMMER_FORMAT_INSTRUCTION =
+      "The output MUST strictly adhere to the following JSON format, and NO other text MUST be"
+          + " included.\n"
+          + "The example format is as follows. Please make sure the parameter type is correct. If"
+          + " no function call is needed, please directly output an empty list '[]'\n"
+          + "```\n"
+          + "[\n"
+          + "    {\"name\": \"func_name1\", \"arguments\": {\"argument1\": \"value1\","
+          + " \"argument2\": \"value2\"}},\n"
+          + "    ... (more tool calls as required)\n"
+          + "]\n"
+          + "```";
 
   private static final String DEEPSEEK_BOS = "<｜begin▁of▁sentence｜>";
   private static final String DEEPSEEK_DEFAULT_SYSTEM =
@@ -148,6 +172,7 @@ public enum ChatTemplate {
       case MOBILE_MOE -> renderMobileMoe(conversation);
       case GPT_OSS -> renderGptOss(conversation, List.of());
       case NEEDLE2 -> renderNeedle2(conversation, List.of());
+      case HAMMER -> renderHammer(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
       case GEMMA4 -> renderGemma4(conversation);
       case PHI3 -> renderPhi3(conversation);
@@ -198,6 +223,7 @@ public enum ChatTemplate {
       case LLAMA3 -> renderLlama3WithTools(conversation, declared);
       case GPT_OSS -> renderGptOss(conversation, declared);
       case NEEDLE2 -> renderNeedle2(conversation, declared);
+      case HAMMER -> renderHammer(conversation, declared);
       case MINICPM5_NO_THINK -> renderMiniCpm5WithTools(conversation, declared);
       default ->
           throw new IllegalArgumentException(
@@ -675,6 +701,136 @@ public enum ChatTemplate {
           .control("}");
     }
     prompt.control("]</tools>");
+  }
+
+  /** Renders the exact tool-specialist envelope published with Hammer 2.1. */
+  private static ModelPrompt renderHammer(List<ChatMessage> messages, List<ToolSpec> tools) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    int start = 0;
+    String system = "You are a helpful assistant.";
+    if (messages.getFirst().role() == ChatRole.SYSTEM) {
+      system = messages.getFirst().text();
+      start = 1;
+    }
+    prompt.control("<|im_start|>system\n").text(system).control("<|im_end|>\n");
+
+    if (!tools.isEmpty()) {
+      prompt
+          .control("\n<|im_start|>user\n[BEGIN OF TASK INSTRUCTION]\n")
+          .control(HAMMER_TASK_INSTRUCTION)
+          .control("\n\n[END OF TASK INSTRUCTION]\n\n[BEGIN OF AVAILABLE_TOOLS]\n[");
+      for (int index = 0; index < tools.size(); index++) {
+        if (index > 0) {
+          prompt.control(", ");
+        }
+        appendHammerTool(prompt, tools.get(index));
+      }
+      prompt
+          .control("]\n[END OF AVAILABLE_TOOLS]\n\n\n[BEGIN OF TASK INSTRUCTION]\n")
+          .control(HAMMER_FORMAT_INSTRUCTION)
+          .control("\n\n[END OF TASK INSTRUCTION]\n\n<|im_end|>\n");
+    }
+
+    for (int index = start; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      if (message.role() == ChatRole.SYSTEM) {
+        throw new IllegalArgumentException("hammer accepts a system turn only at the start");
+      }
+      prompt.control("<|im_start|>" + message.role().templateName() + "\n");
+      if (!message.text().isEmpty()) {
+        prompt.text(message.text());
+      }
+      if (message.hasToolCalls()) {
+        prompt.control("[");
+        for (int callIndex = 0; callIndex < message.toolCalls().size(); callIndex++) {
+          if (callIndex > 0) {
+            prompt.control(", ");
+          }
+          ToolCall call = message.toolCalls().get(callIndex);
+          prompt
+              .control("{'name': '")
+              .text(escapePythonSingle(call.name()))
+              .control("', 'arguments': ")
+              .text(jsonToPythonLiteral(call.argumentsJson()))
+              .control("}");
+        }
+        prompt.control("]");
+      }
+      prompt.control("<|im_end|>\n");
+    }
+    return prompt.control("<|im_start|>assistant\n").build();
+  }
+
+  private static void appendHammerTool(ModelPrompt.Builder prompt, ToolSpec tool) {
+    prompt
+        .control("{'type': 'function', 'function': {'name': '")
+        .text(escapePythonSingle(tool.name()))
+        .control("', 'description': '")
+        .text(escapePythonSingle(tool.description()))
+        .control("', 'parameters': ")
+        .text(jsonToPythonLiteral(tool.inputSchema()))
+        .control("}}");
+  }
+
+  private static String escapePythonSingle(String value) {
+    return value
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t");
+  }
+
+  private static String jsonToPythonLiteral(String json) {
+    StringBuilder python = new StringBuilder(json.length());
+    boolean inString = false;
+    boolean escaped = false;
+    for (int index = 0; index < json.length(); index++) {
+      char current = json.charAt(index);
+      if (inString) {
+        if (escaped) {
+          if (current == '"') {
+            python.append('"');
+          } else {
+            python.append('\\').append(current);
+          }
+          escaped = false;
+        } else if (current == '\\') {
+          escaped = true;
+        } else if (current == '"') {
+          python.append('\'');
+          inString = false;
+        } else if (current == '\'') {
+          python.append("\\'");
+        } else {
+          python.append(current);
+        }
+      } else if (current == '"') {
+        python.append('\'');
+        inString = true;
+      } else if (json.startsWith("true", index)) {
+        python.append("True");
+        index += "true".length() - 1;
+      } else if (json.startsWith("false", index)) {
+        python.append("False");
+        index += "false".length() - 1;
+      } else if (json.startsWith("null", index)) {
+        python.append("None");
+        index += "null".length() - 1;
+      } else if (current == ':') {
+        python.append(": ");
+      } else if (current == ',') {
+        python.append(", ");
+      } else if (Character.isWhitespace(current)) {
+        // Python's compact container representation owns spacing outside string values.
+      } else {
+        python.append(current);
+      }
+    }
+    if (inString || escaped) {
+      throw new IllegalArgumentException("tool JSON contains an unterminated string");
+    }
+    return python.toString();
   }
 
   /**

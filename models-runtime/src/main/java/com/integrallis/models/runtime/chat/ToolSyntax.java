@@ -47,6 +47,8 @@ public record ToolSyntax(
     NONE,
     /** A bare JSON object, with no surrounding delimiter (Llama 3.x). */
     JSON_NATIVE,
+    /** One bare JSON array containing zero or more calls (Hammer). */
+    JSON_ARRAY,
     /** A JSON object fenced by delimiters (Qwen, Hermes, SmolLM3). */
     TAG_WITH_JSON,
     /** OpenAI Harmony: the function name is in the message recipient and the body is JSON. */
@@ -159,6 +161,15 @@ public record ToolSyntax(
           "",
           "");
 
+  /**
+   * Hammer 2.1. Calls are emitted as one bare array. Its official template asks for JSON but
+   * renders tool declarations with Python's {@code str()}, so the trained checkpoints also emit a
+   * narrow Python-literal spelling that the scanner normalizes without evaluating code.
+   */
+  public static final ToolSyntax HAMMER =
+      new ToolSyntax(
+          Mode.JSON_ARRAY, "", "", "name", "arguments", true, true, ResultStyle.TOOL_ROLE, "", "");
+
   /** GPT-OSS Harmony calls route JSON arguments to a named function on the commentary channel. */
   public static final ToolSyntax HARMONY =
       new ToolSyntax(
@@ -266,7 +277,10 @@ public record ToolSyntax(
    * adapters also have the declared schemas and should use {@link #parsableWithSchemas()}.
    */
   public boolean parsable() {
-    return mode == Mode.JSON_NATIVE || mode == Mode.TAG_WITH_JSON || mode == Mode.HARMONY;
+    return mode == Mode.JSON_NATIVE
+        || mode == Mode.JSON_ARRAY
+        || mode == Mode.TAG_WITH_JSON
+        || mode == Mode.HARMONY;
   }
 
   /** Whether calls can be recovered when the request's declared JSON Schemas are available. */

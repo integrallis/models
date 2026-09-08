@@ -1,5 +1,6 @@
 import java.nio.file.Path
 import java.util.Properties
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
@@ -207,6 +208,7 @@ val configuredGptOssOracleLogits =
     providers.systemProperty("models.fixtures.gptOssOracleLogits")
 val configuredMobileMoeQatDirectory =
     providers.systemProperty("models.fixtures.mobileMoeQatDirectory")
+val configuredHammer21GgufPath = providers.systemProperty("models.fixtures.hammer21Gguf")
 val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
 val configuredMxbaiRerankerDirectory =
@@ -232,6 +234,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredMobileMoeQatDirectory.orNull?.let {
         systemProperty("models.fixtures.mobileMoeQatDirectory", it)
+    }
+    configuredHammer21GgufPath.orNull?.let {
+        systemProperty("models.fixtures.hammer21Gguf", it)
     }
     configuredTinyBertRerankerPath.orNull?.let {
         systemProperty("models.fixtures.tinyBertReranker", it)
@@ -380,6 +385,32 @@ tasks.register<Test>("needle2CactCompatibilityTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("hammerYarnCompatibilityTest") {
+    description = "Verify pinned Hammer 2.1 tool output through GGUF YaRN inference"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.HammerYarnModelIntegrationTest",
+        )
+    }
+    val configuredArtifact = configuredHammer21GgufPath.orNull
+    onlyIf("-Dmodels.fixtures.hammer21Gguf points to the pinned Hammer 2.1 GGUF") {
+        configuredArtifact != null
+    }
+    configuredArtifact?.let {
+        systemProperty("models.fixtures.hammer21Gguf", it)
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
+}
+
 modelFixtures.forEach { fixture ->
     tasks.register<JavaExec>(fixture.taskName) {
         description =
@@ -416,6 +447,12 @@ tasks.named<Test>("integrationTest") {
             .filterNot(ModelFixture::slow)
             .map { tasks.named(it.taskName) },
     )
+    // Real-weight inference is correctness/compatibility evidence, not unit coverage. Instrumenting
+    // every tensor loop makes these tests several times slower and does not feed the unit JaCoCo
+    // gate.
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
 }
 
 tasks.register<Test>("msMarcoMiniLmRerankerIntegrationTest") {
