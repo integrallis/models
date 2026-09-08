@@ -32,6 +32,7 @@ import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 
@@ -133,6 +134,10 @@ public final class LlamaForwardPass {
   private final float[] batchFfnUp;
   private final float[] batchFfnOut;
   private final float[] batchFfnProjected;
+  private final Session[] batchSessions;
+  private final int[] batchTokens;
+  private final int[] batchSessionIndexes;
+  private final int[] batchPromptIndexes;
   private final int[] batchPositions;
   private final byte[] batchQuantizedActivation;
   private final float[] batchQuantizedActivationScales;
@@ -349,6 +354,10 @@ public final class LlamaForwardPass {
     this.batchFfnUp = batchBuffer(prefillBatchCapacity, hiddenDim);
     this.batchFfnOut = batchBuffer(prefillBatchCapacity, hiddenDim);
     this.batchFfnProjected = batchBuffer(prefillBatchCapacity, dim);
+    this.batchSessions = new Session[prefillBatchCapacity];
+    this.batchTokens = new int[prefillBatchCapacity];
+    this.batchSessionIndexes = new int[prefillBatchCapacity];
+    this.batchPromptIndexes = new int[prefillBatchCapacity];
     this.batchPositions = new int[prefillBatchCapacity];
     this.batchQuantizedActivation =
         new byte[Math.multiplyExact(prefillBatchCapacity, maxProjectionInput)];
@@ -585,31 +594,49 @@ public final class LlamaForwardPass {
 
     int dim = config.embeddingDim();
     float[] finalStates = new float[Math.multiplyExact(sessionCount, dim)];
-    Session[] activeSessions = new Session[sessionCount];
-    int[] activeTokens = new int[sessionCount];
-    int[] activeIndexes = new int[sessionCount];
-    int maximumLength = 0;
+    int[] consumed = new int[sessionCount];
+    int[] chunkCounts = new int[sessionCount];
+    int remaining = 0;
     for (int[] tokens : tokenBatches) {
-      maximumLength = Math.max(maximumLength, tokens.length);
+      remaining = Math.addExact(remaining, tokens.length);
     }
 
-    for (int tokenIndex = 0; tokenIndex < maximumLength; tokenIndex++) {
-      int activeCount = 0;
-      for (int sessionIndex = 0; sessionIndex < sessionCount; sessionIndex++) {
-        int[] tokens = tokenBatches[sessionIndex];
-        if (tokenIndex < tokens.length) {
-          activeSessions[activeCount] = sessions[sessionIndex];
-          activeTokens[activeCount] = tokens[tokenIndex];
-          activeIndexes[activeCount] = sessionIndex;
-          activeCount++;
+    while (remaining > 0) {
+      Arrays.fill(chunkCounts, 0);
+      int batchSize = 0;
+      boolean admitted = true;
+      while (batchSize < prefillBatchCapacity && admitted) {
+        admitted = false;
+        for (int sessionIndex = 0;
+            sessionIndex < sessionCount && batchSize < prefillBatchCapacity;
+            sessionIndex++) {
+          int promptIndex = consumed[sessionIndex];
+          if (promptIndex >= tokenBatches[sessionIndex].length) {
+            continue;
+          }
+          batchSessions[batchSize] = sessions[sessionIndex];
+          batchTokens[batchSize] = tokenBatches[sessionIndex][promptIndex];
+          batchSessionIndexes[batchSize] = sessionIndex;
+          batchPromptIndexes[batchSize] = promptIndex;
+          batchPositions[batchSize] =
+              sessions[sessionIndex].nextPosition + chunkCounts[sessionIndex];
+          consumed[sessionIndex]++;
+          chunkCounts[sessionIndex]++;
+          batchSize++;
+          remaining--;
+          admitted = true;
         }
       }
-      advanceIndependentSessionBatch(activeSessions, activeTokens, activeCount);
-      for (int activeIndex = 0; activeIndex < activeCount; activeIndex++) {
-        int sessionIndex = activeIndexes[activeIndex];
-        if (tokenIndex + 1 == tokenBatches[sessionIndex].length) {
-          System.arraycopy(batchX, activeIndex * dim, finalStates, sessionIndex * dim, dim);
+
+      advanceIndependentSessionRows(batchSessions, batchTokens, batchSize);
+      for (int row = 0; row < batchSize; row++) {
+        int sessionIndex = batchSessionIndexes[row];
+        if (batchPromptIndexes[row] + 1 == tokenBatches[sessionIndex].length) {
+          System.arraycopy(batchX, row * dim, finalStates, sessionIndex * dim, dim);
         }
+      }
+      for (int sessionIndex = 0; sessionIndex < sessionCount; sessionIndex++) {
+        sessions[sessionIndex].nextPosition += chunkCounts[sessionIndex];
       }
     }
 
@@ -878,11 +905,21 @@ public final class LlamaForwardPass {
   private void advanceIndependentSessionBatch(Session[] sessions, int[] tokens, int batchSize) {
     int dim = config.embeddingDim();
     prepareIndependentSessionInputs(sessions, tokens, batchSize, dim);
-    for (int layer = 0; layer < config.numLayers(); layer++) {
-      executeIndependentSessionLayer(sessions, batchSize, layer);
-    }
+    advanceIndependentSessionLayers(sessions, batchSize);
     for (int index = 0; index < batchSize; index++) {
       sessions[index].nextPosition++;
+    }
+  }
+
+  private void advanceIndependentSessionRows(Session[] sessions, int[] tokens, int batchSize) {
+    int dim = config.embeddingDim();
+    prepareIndependentSessionInputs(tokens, batchSize, dim);
+    advanceIndependentSessionLayers(sessions, batchSize);
+  }
+
+  private void advanceIndependentSessionLayers(Session[] sessions, int batchSize) {
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      executeIndependentSessionLayer(sessions, batchSize, layer);
     }
   }
 
@@ -891,6 +928,10 @@ public final class LlamaForwardPass {
     for (int batch = 0; batch < batchSize; batch++) {
       batchPositions[batch] = sessions[batch].nextPosition;
     }
+    prepareIndependentSessionInputs(tokens, batchSize, dim);
+  }
+
+  private void prepareIndependentSessionInputs(int[] tokens, int batchSize, int dim) {
     prepareRopePositions(batchPositions, batchSize);
 
     for (int batch = 0; batch < batchSize; batch++) {
@@ -984,7 +1025,13 @@ public final class LlamaForwardPass {
       }
 
       Session session = sessions[batch];
-      session.cache.store(layer, session.nextPosition, batchK, keyOffset, batchV, valueOffset);
+      int position = batchPositions[batch];
+      session.cache.store(layer, position, batchK, keyOffset, batchV, valueOffset);
+    }
+    for (int batch = 0; batch < batchSize; batch++) {
+      int queryOffset = batch * queryDim;
+      Session session = sessions[batch];
+      int position = batchPositions[batch];
       float[] scores = batchAttentionScores.length == 0 ? attentionScores : batchAttentionScores;
       int scoresOffset = batchAttentionScores.length == 0 ? 0 : batch * session.cache.maxSeqLen();
       groupedQueryAttention(
@@ -993,7 +1040,7 @@ public final class LlamaForwardPass {
           batchAttnOut,
           batch * attentionOutputDim,
           layer,
-          session.nextPosition,
+          position,
           session.cache,
           session.cache.keyBuffer(),
           session.cache.valueBuffer(),
@@ -1062,7 +1109,7 @@ public final class LlamaForwardPass {
       return;
     }
     for (int batch = 0; batch < batchSize; batch++) {
-      layerObserver.onLayerComplete(layer, sessions[batch].nextPosition, batchX, batch * dim, dim);
+      layerObserver.onLayerComplete(layer, batchPositions[batch], batchX, batch * dim, dim);
     }
   }
 

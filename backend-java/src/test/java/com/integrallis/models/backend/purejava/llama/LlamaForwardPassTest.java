@@ -1820,6 +1820,126 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void raggedSessionPrefillFlattensCompatiblePromptRowsIntoOneProjectionBatch() {
+      GgufFile file = buildQ4KNanoModel(new Random(47));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      AtomicInteger largestProjectionBatch = new AtomicInteger();
+      GgufBatchedMatrixKernel observer =
+          new GgufBatchedMatrixKernel() {
+            @Override
+            public boolean supports(GgufTensorType type) {
+              return false;
+            }
+
+            @Override
+            public void multiply(
+                float[] output,
+                float[] input,
+                MemorySegment weight,
+                GgufTensorType type,
+                int batchSize,
+                int rows,
+                int cols) {
+              throw new AssertionError("ineligible observation kernel must not execute");
+            }
+
+            @Override
+            public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
+              largestProjectionBatch.accumulateAndGet(batchSize, Math::max);
+              return false;
+            }
+
+            @Override
+            public boolean isDualEligible(
+                GgufTensorType firstType,
+                int firstRows,
+                GgufTensorType secondType,
+                int secondRows,
+                int batchSize,
+                int cols) {
+              largestProjectionBatch.accumulateAndGet(batchSize, Math::max);
+              return false;
+            }
+
+            @Override
+            public boolean isTripleEligible(
+                GgufTensorType firstType,
+                int firstRows,
+                GgufTensorType secondType,
+                int secondRows,
+                GgufTensorType thirdType,
+                int thirdRows,
+                int batchSize,
+                int cols) {
+              largestProjectionBatch.accumulateAndGet(batchSize, Math::max);
+              return false;
+            }
+          };
+      LlamaForwardPass pass =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              executionPlan(config, weights, 32, false),
+              observer);
+      LlamaForwardPass.Session[] sessions = {pass.openSession(), pass.openSession()};
+
+      pass.prefillBatchTransient(sessions, new int[][] {{5, 7, 11}, {13, 17, 19, 23, 29}});
+
+      assertThat(largestProjectionBatch).hasValue(8);
+    }
+
+    @Test
+    void raggedSessionPrefillChunksFlattenedRowsAcrossRetainedPrefixes() {
+      GgufFile file = buildQ4KNanoModel(new Random(48));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[][] prefixes = {{5, 7}, {11}};
+      int[][] extensions = {{13, 17, 19, 23, 29}, {31, 2, 3, 4, 6, 8}};
+      KvCache[] expectedCaches = new KvCache[extensions.length];
+      LlamaForwardPass[] expectedPasses = new LlamaForwardPass[extensions.length];
+      float[][] expectedLogits = new float[extensions.length][];
+      for (int index = 0; index < extensions.length; index++) {
+        expectedCaches[index] =
+            new KvCache(
+                config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+        expectedPasses[index] =
+            new LlamaForwardPass(
+                config, weights, expectedCaches[index], executionPlan(config, weights, 4, false));
+        expectedPasses[index].prefill(prefixes[index], 0);
+        expectedLogits[index] =
+            expectedPasses[index].prefill(extensions[index], prefixes[index].length).clone();
+      }
+
+      LlamaForwardPass flattened =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              executionPlan(config, weights, 4, false));
+      LlamaForwardPass.Session[] sessions = {flattened.openSession(), flattened.openSession()};
+      for (int index = 0; index < sessions.length; index++) {
+        flattened.prefill(sessions[index], prefixes[index], 0);
+      }
+
+      LogitBatch actual = flattened.prefillBatchTransient(sessions, extensions);
+
+      for (int index = 0; index < sessions.length; index++) {
+        assertThat(actual.copyRow(index))
+            .containsExactly(expectedLogits[index], within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(sessions[index].checkpoint())
+            .isEqualTo(prefixes[index].length + extensions[index].length);
+        assertThat(sessions[index].cache().keyBuffer())
+            .containsExactly(expectedCaches[index].keyBuffer());
+        assertThat(sessions[index].cache().valueBuffer())
+            .containsExactly(expectedCaches[index].valueBuffer());
+      }
+    }
+
+    @Test
     void fourSessionBatchExercisesRegisterTiledKQuantPathWithinFloatTolerance() {
       GgufFile file = buildQ4KNanoModel(new Random(43));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
