@@ -73,7 +73,7 @@ final class VirtualModelQualificationCli {
                   + "\"required\":[\"query\"]}"));
   private static final List<Step> STEPS =
       List.of(
-          Step.prose("cold-prose", ChatMessage.user("Reply with only READY."), "ready"),
+          Step.prose("cold-prose", ChatMessage.user("Say hello in one short sentence."), "hello"),
           Step.prose(
               "warm-prose",
               ChatMessage.user(
@@ -284,6 +284,10 @@ final class VirtualModelQualificationCli {
     }
     if (!calls.isEmpty()) {
       diagnostics.add("prose turn emitted " + calls.size() + " tool call(s)");
+    }
+    JsonNode structured = parseJsonOrNull(content);
+    if (structured != null && (structured.isObject() || structured.isArray())) {
+      diagnostics.add("prose turn emitted JSON-shaped content");
     }
     return new Assessment(diagnostics.isEmpty(), diagnostics);
   }

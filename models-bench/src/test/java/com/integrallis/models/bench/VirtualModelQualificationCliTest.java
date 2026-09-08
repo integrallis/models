@@ -112,6 +112,13 @@ class VirtualModelQualificationCliTest {
                     "The memory record is unknown.", List.of("mem-2048"), List.of())
                 .passed())
         .isFalse();
+    assertThat(
+            VirtualModelQualificationCli.assessProse(
+                    "{\"name\":\"ready\",\"arguments\":{\"status\":\"READY\"}}",
+                    List.of("ready"),
+                    List.of())
+                .passed())
+        .isFalse();
 
     var correct = ToolCall.of(0, "remember", "{\"fact\":\"I prefer aisle seats.\"}");
     var wrong = ToolCall.of(0, "remember", "{\"fact\":\"I prefer window seats.\"}");
