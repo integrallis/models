@@ -110,6 +110,7 @@ class ChatTemplateToolSyntaxTest {
         boolean jsonShaped =
             template.toolSyntax().mode() == ToolSyntax.Mode.JSON_NATIVE
                 || template.toolSyntax().mode() == ToolSyntax.Mode.TAG_WITH_JSON
+                || template.toolSyntax().mode() == ToolSyntax.Mode.JSON_ARRAY
                 || template.toolSyntax().mode() == ToolSyntax.Mode.HARMONY;
         assertThat(template.canParseToolCalls()).as("template %s", template).isEqualTo(jsonShaped);
       }

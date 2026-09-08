@@ -74,6 +74,9 @@ public final class ToolCallScanner {
     if (syntax.mode() == ToolSyntax.Mode.HARMONY) {
       return scanHarmony(generated, syntax);
     }
+    if (syntax.mode() == ToolSyntax.Mode.JSON_ARRAY) {
+      return scanBareArray(generated, syntax);
+    }
 
     String text = stripCodeFences(generated);
     List<ToolCall> calls = new ArrayList<>();
@@ -150,6 +153,135 @@ public final class ToolCallScanner {
       return Result.plainText(generated);
     }
     return new Result(prose.toString().strip(), calls);
+  }
+
+  private static Result scanBareArray(String generated, ToolSyntax syntax) {
+    String fenced = stripCodeFences(generated).strip();
+    String text = normalizeLiteralArray(fenced);
+    if (text == null || text.isEmpty() || text.charAt(0) != '[') {
+      return Result.plainText(generated);
+    }
+    int arrayEnd = matchingArray(text, 0);
+    if (arrayEnd != text.length() - 1) {
+      return Result.plainText(generated);
+    }
+
+    List<ToolCall> calls = new ArrayList<>();
+    int cursor = 1;
+    while (cursor < arrayEnd && Character.isWhitespace(text.charAt(cursor))) {
+      cursor++;
+    }
+    while (cursor < arrayEnd) {
+      if (text.charAt(cursor) != '{') {
+        return Result.plainText(generated);
+      }
+      int objectEnd = matchingBrace(text, cursor);
+      if (objectEnd < 0 || objectEnd > arrayEnd) {
+        return Result.plainText(generated);
+      }
+      ToolCall call = toCall(text.substring(cursor, objectEnd + 1), calls.size(), syntax);
+      if (call == null) {
+        return Result.plainText(generated);
+      }
+      calls.add(call);
+      cursor = objectEnd + 1;
+      while (cursor < arrayEnd && Character.isWhitespace(text.charAt(cursor))) {
+        cursor++;
+      }
+      if (cursor == arrayEnd) {
+        break;
+      }
+      if (text.charAt(cursor) != ',') {
+        return Result.plainText(generated);
+      }
+      cursor++;
+      while (cursor < arrayEnd && Character.isWhitespace(text.charAt(cursor))) {
+        cursor++;
+      }
+      if (cursor == arrayEnd) {
+        return Result.plainText(generated);
+      }
+    }
+    return new Result("", calls);
+  }
+
+  /**
+   * Converts Hammer's trained Python-literal spelling into strict JSON without evaluating it.
+   * Anything outside the JSON/Python literal subset is rejected.
+   */
+  private static String normalizeLiteralArray(String literal) {
+    StringBuilder json = new StringBuilder(literal.length());
+    boolean inSingle = false;
+    boolean inDouble = false;
+    boolean escaped = false;
+    for (int index = 0; index < literal.length(); index++) {
+      char current = literal.charAt(index);
+      if (inSingle) {
+        if (escaped) {
+          switch (current) {
+            case '\'', '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {
+              if (current == '\'') {
+                json.append('\'');
+              } else if (current == '"') {
+                json.append("\\\"");
+              } else {
+                json.append('\\').append(current);
+              }
+            }
+            default -> {
+              return null;
+            }
+          }
+          escaped = false;
+        } else if (current == '\\') {
+          escaped = true;
+        } else if (current == '\'') {
+          json.append('"');
+          inSingle = false;
+        } else if (current == '"') {
+          json.append("\\\"");
+        } else if (current < 0x20) {
+          return null;
+        } else {
+          json.append(current);
+        }
+        continue;
+      }
+      if (inDouble) {
+        json.append(current);
+        if (escaped) {
+          escaped = false;
+        } else if (current == '\\') {
+          escaped = true;
+        } else if (current == '"') {
+          inDouble = false;
+        } else if (current < 0x20) {
+          return null;
+        }
+        continue;
+      }
+      if (current == '\'') {
+        json.append('"');
+        inSingle = true;
+      } else if (current == '"') {
+        json.append(current);
+        inDouble = true;
+      } else if (literal.startsWith("True", index)) {
+        json.append("true");
+        index += "True".length() - 1;
+      } else if (literal.startsWith("False", index)) {
+        json.append("false");
+        index += "False".length() - 1;
+      } else if (literal.startsWith("None", index)) {
+        json.append("null");
+        index += "None".length() - 1;
+      } else if (Character.isLetter(current) || current == '_') {
+        return null;
+      } else {
+        json.append(current);
+      }
+    }
+    return inSingle || inDouble || escaped ? null : json.toString();
   }
 
   /**
@@ -461,6 +593,12 @@ public final class ToolCallScanner {
   private static ToolCall toCall(String object, int index, ToolSyntax syntax) {
     String name = stringField(object, syntax.nameField());
     if (name == null || name.isBlank()) {
+      if (syntax == ToolSyntax.HAMMER && "function".equals(stringField(object, "type"))) {
+        String nestedFunction = rawField(object, "function");
+        if (nestedFunction != null && nestedFunction.length() < object.length()) {
+          return toCall(nestedFunction, index, syntax);
+        }
+      }
       return null;
     }
     // Accept whichever spelling the model used: models drift between the two, and the declared

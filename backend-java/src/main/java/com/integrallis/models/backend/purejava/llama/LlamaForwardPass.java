@@ -299,12 +299,9 @@ public final class LlamaForwardPass {
       throw new IllegalArgumentException(
           "execution plan selected Llama-only layer shortcuts for " + config.architecture());
     }
-    this.globalRopeTable =
-        new RotaryTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
+    this.globalRopeTable = config.globalRotaryTable();
     this.slidingWindowRopeTable =
-        config.slidingWindow() > 0
-            ? new RotaryTable(config.keyLength(), config.slidingWindowRopeTheta(), 1.0f)
-            : globalRopeTable;
+        config.slidingWindow() > 0 ? config.slidingWindowRotaryTable() : globalRopeTable;
 
     int dim = config.embeddingDim();
     int hiddenDim = config.hiddenDim();

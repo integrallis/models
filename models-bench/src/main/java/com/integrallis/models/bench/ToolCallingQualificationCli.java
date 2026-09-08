@@ -267,7 +267,7 @@ final class ToolCallingQualificationCli {
       Needle2ToolQualification.Suite suite,
       ObjectMapper mapper,
       int maxTokens) {
-    if (candidate == ToolCallingCandidate.NEEDLE2) {
+    if (!candidate.synthesizesToolResults()) {
       return new FollowUpResult(
           "tool-result-follow-up",
           false,
@@ -278,7 +278,8 @@ final class ToolCallingQualificationCli {
           false,
           true,
           List.of(
-              "Needle 2 is a selector; its host-side typed result renderer completes the turn"));
+              candidate.modelName()
+                  + " is a tool selector; a host renderer or conversational model completes the turn"));
     }
     Needle2ToolQualification.Case weather =
         suite.cases().stream()

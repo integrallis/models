@@ -149,8 +149,7 @@ public final class EncoderForwardPass implements SequenceEncoder {
               + config.embeddingDim());
     }
 
-    this.globalRopeTable =
-        new RotaryTable(config.keyLength(), config.ropeTheta(), config.ropeFrequencyScale());
+    this.globalRopeTable = config.globalRotaryTable();
     this.slidingWindowRopeTable =
         config.slidingWindow() > 0
             ? new RotaryTable(config.keyLength(), config.slidingWindowRopeTheta(), 1.0f)

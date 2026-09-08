@@ -24,9 +24,13 @@ import org.junit.jupiter.api.Test;
 class ToolCallingCandidateTest {
 
   @Test
-  void pinsTheSixQualificationCandidatesAndTheirProtocols() {
-    assertThat(ToolCallingCandidate.values()).hasSize(6);
+  void pinsTheQualificationCandidatesAndTheirProtocols() {
+    assertThat(ToolCallingCandidate.values()).hasSize(8);
     assertThat(ToolCallingCandidate.parse("needle2").template()).isEqualTo(ChatTemplate.NEEDLE2);
+    assertThat(ToolCallingCandidate.parse("hammer2.1-0.5b").template())
+        .isEqualTo(ChatTemplate.HAMMER);
+    assertThat(ToolCallingCandidate.parse("hammer2.1-1.5b").template())
+        .isEqualTo(ChatTemplate.HAMMER);
     assertThat(ToolCallingCandidate.parse("qwen3-0.6b").template())
         .isEqualTo(ChatTemplate.CHATML_NO_THINK);
     assertThat(ToolCallingCandidate.parse("qwen3-1.7b").template())

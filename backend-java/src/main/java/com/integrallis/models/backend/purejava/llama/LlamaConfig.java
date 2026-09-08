@@ -16,6 +16,8 @@
 package com.integrallis.models.backend.purejava.llama;
 
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
+import com.integrallis.models.backend.purejava.ops.RotaryTable;
+import java.util.Objects;
 
 /** Configuration for a Llama-family model, extracted from GGUF metadata. */
 public record LlamaConfig(
@@ -35,7 +37,8 @@ public record LlamaConfig(
     float rmsNormEps,
     int slidingWindow,
     int slidingWindowPattern,
-    float finalLogitSoftcap) {
+    float finalLogitSoftcap,
+    RopeScaling ropeScaling) {
 
   public LlamaConfig {
     if (architecture == null) throw new IllegalArgumentException("architecture must not be null");
@@ -66,6 +69,95 @@ public record LlamaConfig(
     if (finalLogitSoftcap < 0.0f || !Float.isFinite(finalLogitSoftcap)) {
       throw new IllegalArgumentException(
           "finalLogitSoftcap must be finite and >= 0: " + finalLogitSoftcap);
+    }
+    ropeScaling = Objects.requireNonNull(ropeScaling, "ropeScaling");
+    // The structured scaling contract is authoritative. Canonicalizing the legacy scalar also
+    // avoids reciprocal float round-trip differences and correctly handles GGUF files that retain
+    // an unused factor while explicitly declaring scaling type "none".
+    ropeFrequencyScale = ropeScaling.frequencyScale();
+  }
+
+  /** Compatibility constructor for ordinary or linearly scaled checkpoints. */
+  public LlamaConfig(
+      DecoderArchitecture architecture,
+      int embeddingDim,
+      int numLayers,
+      int numHeads,
+      int numKvHeads,
+      int keyLength,
+      int valueLength,
+      int vocabSize,
+      int contextLength,
+      int hiddenDim,
+      float ropeTheta,
+      float ropeFrequencyScale,
+      float slidingWindowRopeTheta,
+      float rmsNormEps,
+      int slidingWindow,
+      int slidingWindowPattern,
+      float finalLogitSoftcap) {
+    this(
+        architecture,
+        embeddingDim,
+        numLayers,
+        numHeads,
+        numKvHeads,
+        keyLength,
+        valueLength,
+        vocabSize,
+        contextLength,
+        hiddenDim,
+        ropeTheta,
+        ropeFrequencyScale,
+        slidingWindowRopeTheta,
+        rmsNormEps,
+        slidingWindow,
+        slidingWindowPattern,
+        finalLogitSoftcap,
+        RopeScaling.linear(ropeFrequencyScale));
+  }
+
+  /** GGUF rotary-scaling algorithms implemented by the pure-Java graph. */
+  public enum RopeScalingType {
+    LINEAR,
+    YARN
+  }
+
+  /** Complete long-context scaling contract retained from GGUF metadata. */
+  public record RopeScaling(
+      RopeScalingType type, float factor, int originalContext, float betaFast, float betaSlow) {
+
+    public RopeScaling {
+      type = Objects.requireNonNull(type, "type");
+      if (!(factor > 0.0f) || !Float.isFinite(factor)) {
+        throw new IllegalArgumentException("RoPE scaling factor must be finite and > 0: " + factor);
+      }
+      if (type == RopeScalingType.YARN && originalContext <= 0) {
+        throw new IllegalArgumentException(
+            "YaRN originalContext must be positive: " + originalContext);
+      }
+      if (!(betaFast > 0.0f) || !Float.isFinite(betaFast)) {
+        throw new IllegalArgumentException("YaRN betaFast must be finite and > 0: " + betaFast);
+      }
+      if (!(betaSlow > 0.0f) || !Float.isFinite(betaSlow)) {
+        throw new IllegalArgumentException("YaRN betaSlow must be finite and > 0: " + betaSlow);
+      }
+    }
+
+    static RopeScaling linear(float frequencyScale) {
+      if (!(frequencyScale > 0.0f) || !Float.isFinite(frequencyScale)) {
+        throw new IllegalArgumentException(
+            "RoPE frequency scale must be finite and > 0: " + frequencyScale);
+      }
+      return new RopeScaling(RopeScalingType.LINEAR, 1.0f / frequencyScale, 0, 32.0f, 1.0f);
+    }
+
+    static RopeScaling yarn(float factor, int originalContext, float betaFast, float betaSlow) {
+      return new RopeScaling(RopeScalingType.YARN, factor, originalContext, betaFast, betaSlow);
+    }
+
+    float frequencyScale() {
+      return 1.0f / factor;
     }
   }
 
@@ -172,6 +264,26 @@ public record LlamaConfig(
     return usesSlidingWindow(layer) ? 1.0f : ropeFrequencyScale;
   }
 
+  /** Builds the global RoPE table with the checkpoint's declared scaling algorithm. */
+  RotaryTable globalRotaryTable() {
+    if (ropeScaling.type() == RopeScalingType.YARN) {
+      return RotaryTable.yarn(
+          keyLength,
+          ropeTheta,
+          ropeScaling.factor(),
+          ropeScaling.betaFast(),
+          ropeScaling.betaSlow(),
+          ropeScaling.originalContext(),
+          true);
+    }
+    return new RotaryTable(keyLength, ropeTheta, ropeFrequencyScale);
+  }
+
+  /** Builds the unscaled table used by architectures with alternating sliding-window RoPE. */
+  RotaryTable slidingWindowRotaryTable() {
+    return new RotaryTable(keyLength, slidingWindowRopeTheta, 1.0f);
+  }
+
   /**
    * First cache position visible to the selected attention layer.
    *
@@ -269,6 +381,7 @@ public record LlamaConfig(
     int hiddenDim = getArchKey(metadata, arch, "feed_forward_length").orElse(embeddingDim * 4);
     float ropeTheta = getArchFloatKey(metadata, arch, "rope.freq_base").orElse(10000.0f);
     float ropeFrequencyScale = ropeFrequencyScale(metadata, arch);
+    RopeScaling ropeScaling = ropeScaling(metadata, arch, contextLength, ropeFrequencyScale);
     float slidingWindowRopeTheta =
         getArchFloatKey(metadata, arch, "rope.freq_base_swa").orElse(10_000.0f);
     float rmsNormEps =
@@ -296,7 +409,29 @@ public record LlamaConfig(
         rmsNormEps,
         slidingWindow,
         slidingWindowPattern,
-        finalLogitSoftcap);
+        finalLogitSoftcap,
+        ropeScaling);
+  }
+
+  private static RopeScaling ropeScaling(
+      GgufMetadata metadata, String arch, int contextLength, float frequencyScale) {
+    String type =
+        metadata
+            .getString(arch + ".rope.scaling.type")
+            .or(() -> metadata.getString("llama.rope.scaling.type"))
+            .orElse("linear");
+    if ("none".equals(type) || "linear".equals(type)) {
+      return RopeScaling.linear("none".equals(type) ? 1.0f : frequencyScale);
+    }
+    if (!"yarn".equals(type)) {
+      throw new IllegalArgumentException("Unsupported RoPE scaling type: " + type);
+    }
+    float factor = 1.0f / frequencyScale;
+    int originalContext =
+        getArchKey(metadata, arch, "rope.scaling.original_context_length").orElse(contextLength);
+    float betaFast = getArchFloatKey(metadata, arch, "rope.scaling.yarn_beta_fast").orElse(32.0f);
+    float betaSlow = getArchFloatKey(metadata, arch, "rope.scaling.yarn_beta_slow").orElse(1.0f);
+    return RopeScaling.yarn(factor, originalContext, betaFast, betaSlow);
   }
 
   private static float ropeFrequencyScale(GgufMetadata metadata, String arch) {

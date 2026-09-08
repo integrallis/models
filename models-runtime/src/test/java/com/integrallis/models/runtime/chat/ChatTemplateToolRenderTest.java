@@ -53,7 +53,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class QwenSchemaInjection {
+  class QwenSchemaInjection {
 
     @Test
     void rendersTheToolPreambleAndSchemas() {
@@ -94,7 +94,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class QwenToolResults {
+  class QwenToolResults {
 
     @Test
     void coalescesConsecutiveResultsIntoOneUserTurn() {
@@ -124,7 +124,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class SmolLm3 {
+  class SmolLm3 {
 
     @Test
     void usesTaggedJsonCallsButReturnsToolResultsAsPlainUserTurns() {
@@ -145,7 +145,96 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class MiniCpm5 {
+  class Hammer {
+
+    @Test
+    void rendersTheOfficialToolTaskAndPythonStyleSchemaEnvelope() {
+      ModelPrompt prompt =
+          ChatTemplate.HAMMER.render(
+              List.of(ChatMessage.user("weather in Austin?")), List.of(WEATHER));
+
+      assertThat(prompt.text())
+          .startsWith("<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n")
+          .contains("[BEGIN OF TASK INSTRUCTION]")
+          .contains("You are a tool calling assistant.")
+          .contains("[BEGIN OF AVAILABLE_TOOLS]")
+          .contains("{'type': 'function', 'function': {'name': 'get_weather'")
+          .contains("'parameters': {'type': 'object'")
+          .contains("<|im_start|>user\nweather in Austin?<|im_end|>\n")
+          .endsWith("<|im_start|>assistant\n");
+    }
+
+    @Test
+    void matchesThePinnedOfficialHammerTokenizerTemplateExactly() {
+      ModelPrompt prompt =
+          ChatTemplate.HAMMER.render(
+              List.of(ChatMessage.user("weather in Austin?")), List.of(WEATHER));
+
+      assertThat(prompt.text())
+          .isEqualTo(
+              """
+              <|im_start|>system
+              You are a helpful assistant.<|im_end|>
+
+              <|im_start|>user
+              [BEGIN OF TASK INSTRUCTION]
+              You are a tool calling assistant. In order to complete the user's request, you need to select one or more appropriate tools from the following tools and fill in the correct values for the tool parameters. Your specific tasks are:
+              1. Make one or more function/tool calls to meet the request based on the question.
+              2. If none of the function can be used, point it out and refuse to answer.
+              3. If the given question lacks the parameters required by the function, also point it out.
+
+              The following are characters that may interact with you
+              1. user: Provides query or additional information.
+              2. tool: Returns the results of the tool calling.
+
+              [END OF TASK INSTRUCTION]
+
+              [BEGIN OF AVAILABLE_TOOLS]
+              [{'type': 'function', 'function': {'name': 'get_weather', 'description': 'Look up the forecast', 'parameters': {'type': 'object', 'properties': {'city': {'type': 'string'}}}}}]
+              [END OF AVAILABLE_TOOLS]
+
+
+              [BEGIN OF TASK INSTRUCTION]
+              The output MUST strictly adhere to the following JSON format, and NO other text MUST be included.
+              The example format is as follows. Please make sure the parameter type is correct. If no function call is needed, please directly output an empty list '[]'
+              ```
+              [
+                  {"name": "func_name1", "arguments": {"argument1": "value1", "argument2": "value2"}},
+                  ... (more tool calls as required)
+              ]
+              ```
+
+              [END OF TASK INSTRUCTION]
+
+              <|im_end|>
+              <|im_start|>user
+              weather in Austin?<|im_end|>
+              <|im_start|>assistant
+              """);
+    }
+
+    @Test
+    void usesTheCallerSystemMessageAndRendersToolResultsAsToolTurns() {
+      ModelPrompt prompt =
+          ChatTemplate.HAMMER.render(
+              List.of(
+                  ChatMessage.system("Use tools precisely."),
+                  ChatMessage.user("weather?"),
+                  ChatMessage.assistantToolCalls(
+                      "", List.of(ToolCall.of(0, "get_weather", "{\"city\":\"Austin\"}"))),
+                  ChatMessage.tool("{\"temperatureF\":88}")),
+              List.of(WEATHER));
+
+      assertThat(prompt.text())
+          .startsWith("<|im_start|>system\nUse tools precisely.<|im_end|>\n")
+          .contains(
+              "<|im_start|>assistant\n[{'name': 'get_weather', 'arguments': {'city': 'Austin'}}]<|im_end|>\n")
+          .contains("<|im_start|>tool\n{\"temperatureF\":88}<|im_end|>\n");
+    }
+  }
+
+  @Nested
+  class MiniCpm5 {
 
     @Test
     void rendersTaggedCallsAndSchemaSafeToolResultsUsingTheOfficialProtocol() {
@@ -206,7 +295,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class AssistantCalls {
+  class AssistantCalls {
 
     @Test
     void rendersAToolCallInTheFamilyFormat() {
@@ -238,7 +327,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class TrustBoundary {
+  class TrustBoundary {
 
     @Test
     void aHostileToolResultCannotForgeATurn() {
@@ -289,7 +378,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class Llama3 {
+  class Llama3 {
 
     @Test
     void placesSchemasInTheFirstUserMessage() {
@@ -330,7 +419,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class Needle2 {
+  class Needle2 {
 
     @Test
     void rendersTheReferenceToolPromptWithoutOpenAiWrappers() {
@@ -403,7 +492,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class GptOssHarmony {
+  class GptOssHarmony {
 
     @Test
     void matchesTheOfficialRendererForInstructionsAndTools() {
@@ -511,7 +600,7 @@ class ChatTemplateToolRenderTest {
   }
 
   @Nested
-  static class Refusal {
+  class Refusal {
 
     @Test
     void rejectsToolsForFamiliesThatCannotParseThem() {

@@ -66,6 +66,13 @@ renderer follows the CACT reference protocol: schemas are placed directly in
 the `<tools>` array rather than wrapped in an OpenAI function object, and
 parallel calls are emitted as one JSON array inside `<tool_call>`.
 
+For Hammer 2.1 checkpoints, use `ChatTemplate.HAMMER`. It renders the
+checkpoint's published tool-selection instructions and Python-style schema
+envelope. `ToolCallScanner` accepts the strict JSON requested by that prompt
+and the narrow Python-literal form emitted by the checkpoint; it never
+evaluates model output. Protocol support does not by itself qualify a specific
+artifact—the tool-calling qualification suite still gates catalog admission.
+
 [source,java]
 ----
 import static org.modeljars.catalog.Cactus_Compute_Needle2_Cact_Cq2_Mixed.MODEL;

@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class ToolSyntaxTest {
 
   @Nested
-  static class Capability {
+  class Capability {
 
     @Test
     void noneReportsNoToolSupport() {
@@ -43,6 +43,7 @@ class ToolSyntaxTest {
       assertThat(ToolSyntax.HARMONY.supportsTools()).isTrue();
       assertThat(ToolSyntax.GEMMA4.supportsTools()).isTrue();
       assertThat(ToolSyntax.MINICPM5.supportsTools()).isTrue();
+      assertThat(ToolSyntax.HAMMER.supportsTools()).isTrue();
     }
 
     @Test
@@ -52,6 +53,7 @@ class ToolSyntaxTest {
       assertThat(ToolSyntax.LLAMA3.parsable()).isTrue();
       assertThat(ToolSyntax.NEEDLE2.parsable()).isTrue();
       assertThat(ToolSyntax.HARMONY.parsable()).isTrue();
+      assertThat(ToolSyntax.HAMMER.parsable()).isTrue();
       // Tagged arguments carry no type information, so JSON cannot be reconstructed without
       // the declared tool schemas.
       assertThat(ToolSyntax.GEMMA4.parsable()).isFalse();
@@ -67,7 +69,7 @@ class ToolSyntaxTest {
   }
 
   @Nested
-  static class Families {
+  class Families {
 
     @Test
     void qwenTagsCallsAndFeedsResultsBackThroughAUserTurn() {
@@ -112,10 +114,20 @@ class ToolSyntaxTest {
       assertThat(syntax.parallelCalls()).isTrue();
       assertThat(syntax.resultStyle()).isEqualTo(ToolSyntax.ResultStyle.USER_PLAIN);
     }
+
+    @Test
+    void hammerEmitsOneBareArrayOfParallelCalls() {
+      ToolSyntax syntax = ToolSyntax.HAMMER;
+
+      assertThat(syntax.mode()).isEqualTo(ToolSyntax.Mode.JSON_ARRAY);
+      assertThat(syntax.arrayWrapped()).isTrue();
+      assertThat(syntax.parallelCalls()).isTrue();
+      assertThat(syntax.resultStyle()).isEqualTo(ToolSyntax.ResultStyle.TOOL_ROLE);
+    }
   }
 
   @Nested
-  static class Validation {
+  class Validation {
 
     @Test
     void taggedModesRequireDelimiters() {

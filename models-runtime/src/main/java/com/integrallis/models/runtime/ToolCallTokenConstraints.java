@@ -41,14 +41,17 @@ public final class ToolCallTokenConstraints {
     Objects.requireNonNull(tools, "tools");
     Objects.requireNonNull(argumentAlternatives, "argumentAlternatives");
     if (syntax.mode() != ToolSyntax.Mode.TAG_WITH_JSON
-        && syntax.mode() != ToolSyntax.Mode.JSON_NATIVE) {
+        && syntax.mode() != ToolSyntax.Mode.JSON_NATIVE
+        && syntax.mode() != ToolSyntax.Mode.JSON_ARRAY) {
       return Optional.empty();
     }
     if (syntax.arrayWrapped()) {
       if (syntax == ToolSyntax.NEEDLE2) {
         return Optional.of(Needle2ToolCallConstraint.compile(tokenizer, tools));
       }
-      return Optional.empty();
+      if (syntax != ToolSyntax.HAMMER) {
+        return Optional.empty();
+      }
     }
     List<String> alternatives = new ArrayList<>();
     for (ToolSpec tool : tools) {
@@ -77,9 +80,11 @@ public final class ToolCallTokenConstraints {
             + ":"
             + arguments
             + "}";
-    return syntax.mode() == ToolSyntax.Mode.TAG_WITH_JSON
-        ? syntax.sectionStart() + call + syntax.sectionEnd()
-        : call;
+    return switch (syntax.mode()) {
+      case TAG_WITH_JSON -> syntax.sectionStart() + call + syntax.sectionEnd();
+      case JSON_ARRAY -> "[" + call + "]";
+      default -> call;
+    };
   }
 
   private static String quoteJson(String value) {
