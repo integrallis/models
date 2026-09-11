@@ -4,6 +4,19 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added per-member virtual-conversation context projection, including full-history, current-turn,
+  and tool-result-to-user policies. Physical members still retain independent exact prompt/KV
+  state; the projection controls only the semantic messages rendered for that member.
+
+### Qualification
+
+- Qualified Qwen3 0.6B Q4_0 chat plus Qwen3 1.7B Q8_0 tool selection as a projected virtual model.
+  All 36 turns passed across six counterbalanced fresh JVMs on a dedicated eight-vCPU host. Median
+  end-to-end time improved from 53.166 seconds to 35.151 seconds (33.88%), while median peak RSS
+  increased from 2,404,032 KiB to 3,270,444 KiB because both models remain resident.
+
 ## [0.3.36] - 2026-09-08
 
 ### Changed

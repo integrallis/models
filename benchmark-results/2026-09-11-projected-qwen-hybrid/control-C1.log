@@ -1,0 +1,42 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 11, 2026 7:09:56 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 11, 2026 7:09:56 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+cold-prose           qwen-1.7b  COLD         total= 23607 ms cache=0/229 PASS
+warm-prose           qwen-1.7b  SAME_MODEL   total=  6114 ms cache=225/262 PASS
+first-tool-switch    qwen-1.7b  SAME_MODEL   total=  7135 ms cache=258/303 PASS
+tool-result          qwen-1.7b  SAME_MODEL   total=  8606 ms cache=299/352 PASS
+prose-switch-back    qwen-1.7b  SAME_MODEL   total=  6241 ms cache=348/400 PASS
+tool-switch-back     qwen-1.7b  SAME_MODEL   total=  5366 ms cache=396/425 PASS
+CONTROL PASS total=57119 ms load=277 ms
+  cold-prose           qwen-1.7b  COLD         total= 23607 ms cache=0/229 PASS
+  warm-prose           qwen-1.7b  SAME_MODEL   total=  6114 ms cache=225/262 PASS
+  first-tool-switch    qwen-1.7b  SAME_MODEL   total=  7135 ms cache=258/303 PASS
+  tool-result          qwen-1.7b  SAME_MODEL   total=  8606 ms cache=299/352 PASS
+  prose-switch-back    qwen-1.7b  SAME_MODEL   total=  6241 ms cache=348/400 PASS
+  tool-switch-back     qwen-1.7b  SAME_MODEL   total=  5366 ms cache=396/425 PASS
+Report: /opt/modeljars-runs/projected-qwen-hybrid/results/control-C1.json
+	Command being timed: "/opt/modeljars-runs/projected-qwen-hybrid/models/models-bench/build/install/models-bench/bin/models-bench needle-smollm-hybrid-qualification --arm control --control-model /opt/modeljars-runs/projected-qwen-hybrid/artifacts/Qwen3-1.7B-Q8_0.gguf --chat-model /opt/modeljars-runs/projected-qwen-hybrid/artifacts/Qwen3-0.6B-Q4_0.gguf --chat-profile qwen3-0.6b --tool-model /opt/modeljars-runs/projected-qwen-hybrid/artifacts/Qwen3-1.7B-Q8_0.gguf --tool-profile qwen3-1.7b --models-revision e4d130dd8c5986e6cef6d7ff5cb7d3533a5ceb6b --run-id C1 --max-tokens 64 --report /opt/modeljars-runs/projected-qwen-hybrid/results/control-C1.json"
+	User time (seconds): 336.65
+	System time (seconds): 1.58
+	Percent of CPU this job got: 555%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:00.88
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2407596
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 177629
+	Voluntary context switches: 144427
+	Involuntary context switches: 1669
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

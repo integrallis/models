@@ -1,6 +1,6 @@
 # `models-composite` — a virtual model assembled from smaller ones
 
-Status: EXPERIMENTAL (virtual runtime implemented and measured 2026-09-07; no packaged recipe).
+Status: QUALIFIED RECIPE PENDING PACKAGING (projected Qwen pair passed 2026-09-11).
 Origin: memory project register rows 5j/5o; the workbench chat-tier question — "what local
 configuration beats the wire?" — kept converging on composition rather than a single bigger model.
 
@@ -69,7 +69,11 @@ Key design commitments:
    stateful virtual-session API.
 5. **Budget accounting at the seam.** The virtual response exposes the physical member's prompt,
    completion, cache-read, cache-write, TTFT, and decode measurements where they are known.
-6. **Batch only compatible physical work.** Concurrent virtual conversations routed to the same
+6. **Project only the context a member needs.** The default remains complete canonical history.
+   A stateless specialist can receive the current turn, while a chat member can receive structured
+   tool results without another model's assistant-call protocol. Projection changes prompt input;
+   it does not make KV portable.
+7. **Batch only compatible physical work.** Concurrent virtual conversations routed to the same
    member may share a `forwardBatch` call. Different members retain different weights and KV
    representations and therefore run on separate schedulers.
 
@@ -139,7 +143,20 @@ The first small Java ridge screen found strong key structure but poor held-out v
 (0.367–0.576 cosine; 0.819–0.987 relative L2), so its single-layer and raw-correlation top-two
 mappers were rejected. No cache-transfer SPI is authorized by that result.
 
-### 5.2 Concurrent-conversation scheduling, 2026-09-07
+### 5.2 Projected Qwen dispatch qualification, 2026-09-11
+
+The earlier full-history Qwen pair was rejected because it was 20.55% slower than the single-model
+control. The retained topology changes the work, not the correctness gate: Qwen3 0.6B Q4_0 handles
+prose and translated tool results, while Qwen3 1.7B Q8_0 receives only the current tool-selection
+turn. Each member keeps its own exact session and KV lineage.
+
+Three fresh control JVMs and three fresh hybrid JVMs ran a counterbalanced six-turn protocol on an
+isolated eight-vCPU EPYC-Milan host. All 36 turns passed. The control median was 53.166 seconds and
+the hybrid median was 35.151 seconds, a 33.88% improvement. Median peak RSS increased 36.04%, from
+2,404,032 KiB to 3,270,444 KiB, because both models are resident. This authorizes a named
+latency-qualified recipe and records its memory tradeoff; it does not authorize raw KV sharing.
+
+### 5.3 Concurrent-conversation scheduling, 2026-09-07
 
 The low-level `BatchInferenceBackend` already advances independent sessions in one weight pass; the
 missing runtime layer was admission and scheduling. An opt-in continuous scheduler now forms a
