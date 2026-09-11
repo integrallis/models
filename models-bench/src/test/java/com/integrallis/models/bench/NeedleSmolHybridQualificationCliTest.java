@@ -128,4 +128,20 @@ class NeedleSmolHybridQualificationCliTest {
                 ChatMessage.user("Call remember")))
         .isEqualTo("qwen-1.7b-tools");
   }
+
+  @Test
+  void keepsSchemasVisibleToTheControlButOnlyToolTurnsInTheHybrid() {
+    assertThat(
+            NeedleSmolHybridQualificationCli.declaresTools(
+                NeedleSmolHybridQualificationCli.Arm.CONTROL, false))
+        .isTrue();
+    assertThat(
+            NeedleSmolHybridQualificationCli.declaresTools(
+                NeedleSmolHybridQualificationCli.Arm.HYBRID, true))
+        .isTrue();
+    assertThat(
+            NeedleSmolHybridQualificationCli.declaresTools(
+                NeedleSmolHybridQualificationCli.Arm.HYBRID, false))
+        .isFalse();
+  }
 }

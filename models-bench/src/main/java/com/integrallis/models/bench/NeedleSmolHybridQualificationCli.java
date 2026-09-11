@@ -405,7 +405,8 @@ final class NeedleSmolHybridQualificationCli {
             "virtual-qualification-" + configuration.runId(),
             List.of(ChatMessage.system(SYSTEM)))) {
       for (Step step : STEPS) {
-        List<ToolSpec> declaredTools = step.expectsTool() ? TOOLS : List.of();
+        List<ToolSpec> declaredTools =
+            declaresTools(configuration.arm(), step.expectsTool()) ? TOOLS : List.of();
         VirtualChatModel.Response response =
             session.generate(step.taskType(), step.input(), declaredTools, options);
         Assessment assessment =
@@ -482,6 +483,10 @@ final class NeedleSmolHybridQualificationCli {
 
   static String expectedMember(Arm arm, String taskType, ChatMessage input) {
     return expectedMember(arm, ToolProfile.NEEDLE2, taskType, input);
+  }
+
+  static boolean declaresTools(Arm arm, boolean expectsTool) {
+    return arm == Arm.CONTROL || expectsTool;
   }
 
   static String expectedMember(
