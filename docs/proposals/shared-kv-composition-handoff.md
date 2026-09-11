@@ -72,7 +72,7 @@ stronger invariant over the produced activations is demonstrated. Output-head-on
 may preserve transformer KV, but its usefulness for prose/tool specialization is an experiment, not
 an assumption.
 
-Models 0.3.36 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
+Models 0.3.37 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
 provide one high-level `TextGenerationSession` per conversation over the existing low-level
 `InferenceSession`, with isolated prompt/KV lineage and metrics.
 

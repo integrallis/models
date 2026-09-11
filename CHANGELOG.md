@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.37] - 2026-09-11
+
 ### Added
 
 - Added per-member virtual-conversation context projection, including full-history, current-turn,
