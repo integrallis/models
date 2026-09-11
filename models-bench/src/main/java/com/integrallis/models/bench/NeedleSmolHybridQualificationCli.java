@@ -67,7 +67,9 @@ final class NeedleSmolHybridQualificationCli {
           "run-id",
           "max-tokens",
           "report");
-  private static final String SYSTEM = "You are a helpful assistant. Answer directly and briefly.";
+  private static final String SYSTEM =
+      "Answer directly and briefly. Use a declared tool whenever the user asks for one. After a "
+          + "tool result, confirm the result in natural language and include every returned id.";
   private static final List<ToolSpec> TOOLS =
       List.of(
           new ToolSpec(
