@@ -6,7 +6,7 @@ fi
 
 repository=/home/jovyan/work/models
 mode=${MODELS_NOTEBOOK_MODE:-source}
-version=${MODELS_VERSION:-0.3.36}
+version=${MODELS_VERSION:-0.3.37}
 repository_url=${MODELS_NOTEBOOK_REPOSITORY:-}
 
 case "$mode" in
