@@ -49,7 +49,7 @@ final class NeedleSmolHybridQualificationCli {
       "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a";
   static final String CHAT_SHA256 =
       "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201";
-  static final String TOOL_SHA256 =
+  static final String NEEDLE_SHA256 =
       "b43aabfcaf1a6db6acf488076eab71d823c08697c7af4521fc1d174b60ede5ba";
 
   private static final int PASS = 0;
@@ -62,6 +62,7 @@ final class NeedleSmolHybridQualificationCli {
           "control-model",
           "chat-model",
           "tool-model",
+          "tool-profile",
           "models-revision",
           "run-id",
           "max-tokens",
@@ -126,11 +127,46 @@ final class NeedleSmolHybridQualificationCli {
     }
   }
 
+  enum ToolProfile {
+    NEEDLE2("needle2", NEEDLE_SHA256, "needle-2", ChatTemplate.NEEDLE2, "needle2"),
+    QWEN3_1_7B(
+        "qwen3-1.7b", CONTROL_SHA256, "qwen-1.7b-tools", ChatTemplate.CHATML_NO_THINK, "qwen3");
+
+    private final String id;
+    private final String sha256;
+    private final String memberId;
+    private final ChatTemplate template;
+    private final String architecture;
+
+    ToolProfile(
+        String id, String sha256, String memberId, ChatTemplate template, String architecture) {
+      this.id = id;
+      this.sha256 = sha256;
+      this.memberId = memberId;
+      this.template = template;
+      this.architecture = architecture;
+    }
+
+    static ToolProfile parse(String value) {
+      for (ToolProfile profile : values()) {
+        if (profile.id.equals(value)) {
+          return profile;
+        }
+      }
+      throw new IllegalArgumentException("--tool-profile must be needle2 or qwen3-1.7b: " + value);
+    }
+
+    String memberId() {
+      return memberId;
+    }
+  }
+
   record Configuration(
       Arm arm,
       Path controlModel,
       Path chatModel,
       Path toolModel,
+      ToolProfile toolProfile,
       String modelsRevision,
       String runId,
       int maxTokens,
@@ -216,6 +252,7 @@ final class NeedleSmolHybridQualificationCli {
     Path controlModel = regularFile(values, "control-model");
     Path chatModel = regularFile(values, "chat-model");
     Path toolModel = regularFile(values, "tool-model");
+    ToolProfile toolProfile = ToolProfile.parse(required(values, "tool-profile"));
     String modelsRevision = required(values, "models-revision");
     if (!modelsRevision.matches("[0-9a-f]{40}")) {
       throw new IllegalArgumentException("--models-revision must be an exact 40-character Git SHA");
@@ -235,7 +272,15 @@ final class NeedleSmolHybridQualificationCli {
                     + runId
                     + ".json"));
     return new Configuration(
-        arm, controlModel, chatModel, toolModel, modelsRevision, runId, maxTokens, report);
+        arm,
+        controlModel,
+        chatModel,
+        toolModel,
+        toolProfile,
+        modelsRevision,
+        runId,
+        maxTokens,
+        report);
   }
 
   static int run(String[] args) throws IOException {
@@ -245,7 +290,7 @@ final class NeedleSmolHybridQualificationCli {
     String toolSha = Hashing.sha256(configuration.toolModel());
     requireDigest("control", CONTROL_SHA256, controlSha);
     requireDigest("chat", CHAT_SHA256, chatSha);
-    requireDigest("tool", TOOL_SHA256, toolSha);
+    requireDigest("tool", configuration.toolProfile().sha256, toolSha);
 
     BenchmarkEnvironment environment = BenchmarkEnvironment.capture();
     JvmMemorySnapshot beforeLoad = JvmMemorySnapshot.capture();
@@ -266,7 +311,12 @@ final class NeedleSmolHybridQualificationCli {
                 List.of(
                     artifact("control", controlSha, configuration.controlModel(), true, "qwen3"),
                     artifact("chat", chatSha, configuration.chatModel(), false, "llama"),
-                    artifact("tools", toolSha, configuration.toolModel(), false, "needle2")));
+                    artifact(
+                        "tools",
+                        toolSha,
+                        configuration.toolModel(),
+                        false,
+                        configuration.toolProfile().architecture)));
       }
     } else {
       try (PureJavaBackend chatBackend = PureJavaBackend.load(configuration.chatModel());
@@ -281,11 +331,16 @@ final class NeedleSmolHybridQualificationCli {
                 beforeLoad,
                 JvmMemorySnapshot.capture(),
                 loadMillis,
-                hybrid(chatPipeline, toolPipeline),
+                hybrid(chatPipeline, toolPipeline, configuration.toolProfile()),
                 List.of(
                     artifact("control", controlSha, configuration.controlModel(), false, "qwen3"),
                     artifact("chat", chatSha, configuration.chatModel(), true, "llama"),
-                    artifact("tools", toolSha, configuration.toolModel(), true, "needle2")));
+                    artifact(
+                        "tools",
+                        toolSha,
+                        configuration.toolModel(),
+                        true,
+                        configuration.toolProfile().architecture)));
       }
     }
     write(configuration.report(), report);
@@ -358,7 +413,9 @@ final class NeedleSmolHybridQualificationCli {
                 ? assessTool(
                     response.toolCalls(), step.expectedTool(), step.expectedArgumentsJson())
                 : assessProse(response.content(), step.expectedFragments(), response.toolCalls());
-        String expectedMember = expectedMember(configuration.arm(), step.taskType(), step.input());
+        String expectedMember =
+            expectedMember(
+                configuration.arm(), configuration.toolProfile(), step.taskType(), step.input());
         if (!response.memberId().equals(expectedMember)) {
           List<String> diagnostics = new ArrayList<>(assessment.diagnostics());
           diagnostics.add(
@@ -401,7 +458,7 @@ final class NeedleSmolHybridQualificationCli {
     return new Report(
         1,
         Instant.now().toString(),
-        POLICY_VERSION,
+        POLICY_VERSION + "-" + configuration.toolProfile().id,
         PROTOCOL_SHA256,
         configuration.modelsRevision(),
         configuration.runId(),
@@ -424,11 +481,16 @@ final class NeedleSmolHybridQualificationCli {
   }
 
   static String expectedMember(Arm arm, String taskType, ChatMessage input) {
+    return expectedMember(arm, ToolProfile.NEEDLE2, taskType, input);
+  }
+
+  static String expectedMember(
+      Arm arm, ToolProfile toolProfile, String taskType, ChatMessage input) {
     if (arm == Arm.CONTROL) {
       return "qwen-1.7b";
     }
     return taskType.equals("tool-use") && input.role() != ChatRole.TOOL
-        ? "needle-2"
+        ? toolProfile.memberId
         : "smollm2-360m";
   }
 
@@ -444,7 +506,11 @@ final class NeedleSmolHybridQualificationCli {
   }
 
   private static VirtualChatModel hybrid(
-      InferencePipeline chatPipeline, InferencePipeline toolPipeline) {
+      InferencePipeline chatPipeline, InferencePipeline toolPipeline, ToolProfile toolProfile) {
+    VirtualChatModel.ConstraintFactory constraintFactory =
+        toolProfile == ToolProfile.NEEDLE2
+            ? NeedleSmolHybridQualificationCli::needleToolConstraint
+            : NeedleSmolHybridQualificationCli::qwenToolConstraint;
     return VirtualChatModel.builder()
         .member(
             "smollm2-360m",
@@ -452,11 +518,11 @@ final class NeedleSmolHybridQualificationCli {
             ChatTemplate.CHATML_NO_THINK,
             chatPipeline::openGenerationSession)
         .member(
-            "needle-2",
+            toolProfile.memberId,
             Set.of("tool-use"),
-            ChatTemplate.NEEDLE2,
+            toolProfile.template,
             toolPipeline::openGenerationSession,
-            NeedleSmolHybridQualificationCli::needleToolConstraint,
+            constraintFactory,
             VirtualChatModel.ContextProjection.currentTurn())
         .build();
   }

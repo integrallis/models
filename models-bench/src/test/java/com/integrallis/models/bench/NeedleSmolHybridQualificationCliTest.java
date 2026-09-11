@@ -46,6 +46,8 @@ class NeedleSmolHybridQualificationCliTest {
               chat.toString(),
               "--tool-model",
               tools.toString(),
+              "--tool-profile",
+              "needle2",
               "--models-revision",
               REVISION,
               "--run-id",
@@ -60,6 +62,8 @@ class NeedleSmolHybridQualificationCliTest {
     assertThat(configuration.controlModel()).isEqualTo(control);
     assertThat(configuration.chatModel()).isEqualTo(chat);
     assertThat(configuration.toolModel()).isEqualTo(tools);
+    assertThat(configuration.toolProfile())
+        .isEqualTo(NeedleSmolHybridQualificationCli.ToolProfile.NEEDLE2);
     assertThat(configuration.modelsRevision()).isEqualTo(REVISION);
     assertThat(configuration.runId()).isEqualTo("hybrid-01");
     assertThat(configuration.maxTokens()).isEqualTo(96);
@@ -80,6 +84,8 @@ class NeedleSmolHybridQualificationCliTest {
                       model.toString(),
                       "--chat-model",
                       model.toString(),
+                      "--tool-profile",
+                      "needle2",
                       "--models-revision",
                       REVISION,
                       "--run-id",
@@ -108,5 +114,18 @@ class NeedleSmolHybridQualificationCliTest {
                 "tool-use",
                 ChatMessage.user("Call remember")))
         .isEqualTo("qwen-1.7b");
+  }
+
+  @Test
+  void supportsTheQualifiedQwenToolMember() {
+    assertThat(NeedleSmolHybridQualificationCli.ToolProfile.parse("qwen3-1.7b").memberId())
+        .isEqualTo("qwen-1.7b-tools");
+    assertThat(
+            NeedleSmolHybridQualificationCli.expectedMember(
+                NeedleSmolHybridQualificationCli.Arm.HYBRID,
+                NeedleSmolHybridQualificationCli.ToolProfile.QWEN3_1_7B,
+                "tool-use",
+                ChatMessage.user("Call remember")))
+        .isEqualTo("qwen-1.7b-tools");
   }
 }
