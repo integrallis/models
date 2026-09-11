@@ -44,6 +44,8 @@ class NeedleSmolHybridQualificationCliTest {
               control.toString(),
               "--chat-model",
               chat.toString(),
+              "--chat-profile",
+              "smollm2-360m",
               "--tool-model",
               tools.toString(),
               "--tool-profile",
@@ -61,6 +63,8 @@ class NeedleSmolHybridQualificationCliTest {
     assertThat(configuration.arm()).isEqualTo(NeedleSmolHybridQualificationCli.Arm.HYBRID);
     assertThat(configuration.controlModel()).isEqualTo(control);
     assertThat(configuration.chatModel()).isEqualTo(chat);
+    assertThat(configuration.chatProfile())
+        .isEqualTo(NeedleSmolHybridQualificationCli.ChatProfile.SMOLLM2_360M);
     assertThat(configuration.toolModel()).isEqualTo(tools);
     assertThat(configuration.toolProfile())
         .isEqualTo(NeedleSmolHybridQualificationCli.ToolProfile.NEEDLE2);
@@ -84,6 +88,8 @@ class NeedleSmolHybridQualificationCliTest {
                       model.toString(),
                       "--chat-model",
                       model.toString(),
+                      "--chat-profile",
+                      "smollm2-360m",
                       "--tool-profile",
                       "needle2",
                       "--models-revision",
@@ -127,6 +133,20 @@ class NeedleSmolHybridQualificationCliTest {
                 "tool-use",
                 ChatMessage.user("Call remember")))
         .isEqualTo("qwen-1.7b-tools");
+  }
+
+  @Test
+  void supportsTheQualifiedQwenChatMember() {
+    assertThat(NeedleSmolHybridQualificationCli.ChatProfile.parse("qwen3-0.6b").memberId())
+        .isEqualTo("qwen-0.6b-chat");
+    assertThat(
+            NeedleSmolHybridQualificationCli.expectedMember(
+                NeedleSmolHybridQualificationCli.Arm.HYBRID,
+                NeedleSmolHybridQualificationCli.ChatProfile.QWEN3_0_6B,
+                NeedleSmolHybridQualificationCli.ToolProfile.QWEN3_1_7B,
+                "chat",
+                ChatMessage.user("hello")))
+        .isEqualTo("qwen-0.6b-chat");
   }
 
   @Test
