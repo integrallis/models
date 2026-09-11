@@ -516,7 +516,8 @@ final class NeedleSmolHybridQualificationCli {
             "smollm2-360m",
             Set.of("chat"),
             ChatTemplate.CHATML_NO_THINK,
-            chatPipeline::openGenerationSession)
+            chatPipeline::openGenerationSession,
+            VirtualChatModel.ContextProjection.toolResultsAsUser())
         .member(
             toolProfile.memberId,
             Set.of("tool-use"),

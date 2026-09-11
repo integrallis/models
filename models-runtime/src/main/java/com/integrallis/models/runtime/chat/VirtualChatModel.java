@@ -159,6 +159,31 @@ public final class VirtualChatModel {
     static ContextProjection currentTurn() {
       return turn -> List.of(turn.input());
     }
+
+    /**
+     * Preserves prose history while exposing tool results as ordinary user text.
+     *
+     * <p>This is useful for a chat member that can narrate structured results but was not trained
+     * on the selected tool member's call protocol.
+     */
+    static ContextProjection toolResultsAsUser() {
+      return turn -> {
+        List<ChatMessage> projected = new ArrayList<>();
+        for (ChatMessage message : turn.history()) {
+          if (message.role() == ChatRole.TOOL) {
+            projected.add(
+                ChatMessage.user("Tool " + message.name() + " returned: " + message.text()));
+          } else if (message.role() == ChatRole.ASSISTANT && !message.toolCalls().isEmpty()) {
+            if (!message.text().isBlank()) {
+              projected.add(ChatMessage.assistant(message.text()));
+            }
+          } else {
+            projected.add(message);
+          }
+        }
+        return List.copyOf(projected);
+      };
+    }
   }
 
   /** Selected member and a human-readable reason retained in response telemetry. */
@@ -486,10 +511,6 @@ public final class VirtualChatModel {
       if (visible.isEmpty()) {
         throw new IllegalStateException(
             "context projection for member " + member.id() + " produced no messages");
-      }
-      if (!visible.getLast().equals(turn.input())) {
-        throw new IllegalStateException(
-            "context projection for member " + member.id() + " must retain the current input last");
       }
       return visible;
     }
