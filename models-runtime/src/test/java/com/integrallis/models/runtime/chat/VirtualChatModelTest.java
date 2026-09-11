@@ -126,6 +126,45 @@ class VirtualChatModelTest {
   }
 
   @Test
+  void projectsOnlyTheCurrentTurnForAStatelessSpecialist() {
+    RecordingBackend chatBackend = new RecordingBackend("chat", "CHAT");
+    RecordingBackend toolBackend = new RecordingBackend("tools", "TOOL");
+
+    try (InferencePipeline chatPipeline = new InferencePipeline(chatBackend);
+        InferencePipeline toolPipeline = new InferencePipeline(toolBackend)) {
+      VirtualChatModel model =
+          VirtualChatModel.builder()
+              .member(
+                  "chat",
+                  Set.of("chat"),
+                  ChatTemplate.CHATML_NO_THINK,
+                  chatPipeline::openGenerationSession)
+              .member(
+                  "tools",
+                  Set.of("tool-use"),
+                  ChatTemplate.CHATML_NO_THINK,
+                  toolPipeline::openGenerationSession,
+                  VirtualChatModel.ContextProjection.currentTurn())
+              .build();
+
+      try (VirtualChatModel.Session conversation = model.openSession("projected-context")) {
+        conversation.generate("chat", ChatMessage.user("prior prose"), List.of(), OPTIONS);
+        conversation.generate(
+            "tool-use", ChatMessage.user("current tool request"), List.of(), OPTIONS);
+
+        assertThat(toolBackend.prompts())
+            .singleElement()
+            .asString()
+            .contains("current tool request")
+            .doesNotContain("prior prose", "CHAT");
+        assertThat(conversation.history())
+            .extracting(ChatMessage::text)
+            .containsExactly("prior prose", "CHAT", "current tool request", "TOOL");
+      }
+    }
+  }
+
+  @Test
   void backgroundPrefillWarmsOnlyTheInactiveMembersOwnPrefix() {
     RecordingBackend chatBackend = new RecordingBackend("chat", "CHAT", "chat-shadow");
     RecordingBackend toolBackend = new RecordingBackend("tools", "tool-shadow", "TOOL");

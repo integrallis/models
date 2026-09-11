@@ -456,7 +456,8 @@ final class NeedleSmolHybridQualificationCli {
             Set.of("tool-use"),
             ChatTemplate.NEEDLE2,
             toolPipeline::openGenerationSession,
-            NeedleSmolHybridQualificationCli::needleToolConstraint)
+            NeedleSmolHybridQualificationCli::needleToolConstraint,
+            VirtualChatModel.ContextProjection.currentTurn())
         .build();
   }
 
