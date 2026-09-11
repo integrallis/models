@@ -76,7 +76,8 @@ class VirtualChatModelIntegrationTest {
                   "chat",
                   Set.of("chat"),
                   ChatTemplate.CHATML_NO_THINK,
-                  chatPipeline::openGenerationSession)
+                  chatPipeline::openGenerationSession,
+                  VirtualChatModel.ContextProjection.toolResultsAsUser())
               .member(
                   "tools",
                   Set.of("tool-use"),
@@ -89,7 +90,8 @@ class VirtualChatModelIntegrationTest {
                               session.tokenizer(),
                               ChatTemplate.CHATML_NO_THINK.toolSyntax(),
                               turn.tools(),
-                              ignored -> List.of("{\"zipcode\":\"88252\"}")))
+                              ignored -> List.of("{\"zipcode\":\"88252\"}")),
+                  VirtualChatModel.ContextProjection.currentTurn())
               .build();
 
       try (VirtualChatModel.Session conversation =
@@ -108,18 +110,18 @@ class VirtualChatModelIntegrationTest {
                 TOOL_OPTIONS);
         VirtualChatModel.Response answer =
             conversation.generate(
-                "tool-use",
+                "chat",
                 ChatMessage.tool(
                     "get-weather-for-zipcode",
                     "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
                         + "\"temperatureInFahrenheit\":78}"),
-                List.of(WEATHER),
+                List.of(),
                 TOOL_OPTIONS);
         VirtualChatModel.Response followUp =
             conversation.generate(
                 "chat",
                 ChatMessage.user("What temperature did the weather tool report?"),
-                List.of(WEATHER),
+                List.of(),
                 TOOL_OPTIONS);
 
         assertThat(greeting.memberId()).isEqualTo("chat");
@@ -133,12 +135,12 @@ class VirtualChatModelIntegrationTest {
                   assertThat(toolCall.name()).isEqualTo("get-weather-for-zipcode");
                   assertThat(toolCall.argumentsJson()).contains("88252");
                 });
-        assertThat(answer.memberId()).isEqualTo("tools");
-        assertThat(answer.boundary()).isEqualTo(VirtualChatModel.Boundary.SAME_MODEL);
+        assertThat(answer.memberId()).isEqualTo("chat");
+        assertThat(answer.boundary()).isEqualTo(VirtualChatModel.Boundary.SWITCH_BACK);
         assertThat(answer.content()).contains("78").containsIgnoringCase("rain");
         assertThat(answer.content()).doesNotContain("<tool_call>", "<think>");
         assertThat(followUp.memberId()).isEqualTo("chat");
-        assertThat(followUp.boundary()).isEqualTo(VirtualChatModel.Boundary.SWITCH_BACK);
+        assertThat(followUp.boundary()).isEqualTo(VirtualChatModel.Boundary.SAME_MODEL);
         assertThat(followUp.content()).contains("78");
         assertThat(followUp.metrics().promptCache().cacheReadInputTokens()).isPositive();
       }

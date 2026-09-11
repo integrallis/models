@@ -1,0 +1,11 @@
+2026-09-11T19:16:06Z
+openjdk version "25.0.4.1" 2026-08-18 LTS
+OpenJDK Runtime Environment Temurin-25.0.4.1+1 (build 25.0.4.1+1-LTS)
+OpenJDK 64-Bit Server VM Temurin-25.0.4.1+1 (build 25.0.4.1+1-LTS, mixed mode, sharing)
+rustc 1.98.1 (48a229cea 2026-09-01)
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+5722 bash -c set -euo pipefail source /root/.cargo/env BASE=/opt/modeljars-runs/projected-qwen-hybrid { date -u +%FT%TZ; /opt/temurin-25/bin/java -version; rustc --version; cargo --version; pgrep -af "models-bench|gradle|java" || true; free -h; uptime; } > "$BASE/results/post-run.txt" 2>&1 cd "$BASE/results" find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt 
+               total        used        free      shared  buff/cache   available
+Mem:            30Gi       715Mi        24Gi       4.8Mi       6.0Gi        29Gi
+Swap:             0B          0B          0B
+ 19:16:07 up 16 min,  1 user,  load average: 1.97, 3.08, 1.65

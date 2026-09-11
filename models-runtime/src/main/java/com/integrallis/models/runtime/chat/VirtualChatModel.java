@@ -145,6 +145,47 @@ public final class VirtualChatModel {
     }
   }
 
+  /** Selects the canonical messages visible to one member for the current turn. */
+  @FunctionalInterface
+  public interface ContextProjection {
+    List<ChatMessage> project(Turn turn);
+
+    /** Makes the complete canonical conversation visible, preserving the default behavior. */
+    static ContextProjection fullHistory() {
+      return Turn::history;
+    }
+
+    /** Makes only the current input visible to a stateless specialist. */
+    static ContextProjection currentTurn() {
+      return turn -> List.of(turn.input());
+    }
+
+    /**
+     * Preserves prose history while exposing tool results as ordinary user text.
+     *
+     * <p>This is useful for a chat member that can narrate structured results but was not trained
+     * on the selected tool member's call protocol.
+     */
+    static ContextProjection toolResultsAsUser() {
+      return turn -> {
+        List<ChatMessage> projected = new ArrayList<>();
+        for (ChatMessage message : turn.history()) {
+          if (message.role() == ChatRole.TOOL) {
+            projected.add(
+                ChatMessage.user("Tool " + message.name() + " returned: " + message.text()));
+          } else if (message.role() == ChatRole.ASSISTANT && !message.toolCalls().isEmpty()) {
+            if (!message.text().isBlank()) {
+              projected.add(ChatMessage.assistant(message.text()));
+            }
+          } else {
+            projected.add(message);
+          }
+        }
+        return List.copyOf(projected);
+      };
+    }
+  }
+
   /** Selected member and a human-readable reason retained in response telemetry. */
   public record Selection(String memberId, String reason, String taskType) {
     public Selection {
@@ -301,12 +342,13 @@ public final class VirtualChatModel {
       Response response;
       try {
         awaitPrefill(selection.memberId());
-        scheduleInactivePrefills(selection.memberId(), turn.history(), declaredTools);
+        scheduleInactivePrefills(selection.memberId(), turn, declaredTools);
 
+        List<ChatMessage> visibleHistory = project(selected.member, turn);
         var prompt =
             declaredTools.isEmpty()
-                ? selected.member.template().render(turn.history())
-                : selected.member.template().render(turn.history(), declaredTools);
+                ? selected.member.template().render(visibleHistory)
+                : selected.member.template().render(visibleHistory, declaredTools);
         Optional<TokenConstraint> constraint =
             Objects.requireNonNull(
                 selected.member.constraintFactory().create(selected.session, turn),
@@ -424,7 +466,7 @@ public final class VirtualChatModel {
     }
 
     private void scheduleInactivePrefills(
-        String selectedMemberId, List<ChatMessage> promptHistory, List<ToolSpec> tools) {
+        String selectedMemberId, Turn turn, List<ToolSpec> tools) {
       if (backgroundPrefillExecutor == null) {
         return;
       }
@@ -441,10 +483,11 @@ public final class VirtualChatModel {
                     .thenRunAsync(
                         () -> {
                           try {
+                            List<ChatMessage> visibleHistory = project(active.member, turn);
                             var prompt =
                                 tools.isEmpty()
-                                    ? active.member.template().render(promptHistory)
-                                    : active.member.template().render(promptHistory, tools);
+                                    ? active.member.template().render(visibleHistory)
+                                    : active.member.template().render(visibleHistory, tools);
                             var prefill = active.session.prefillPrompt(prompt);
                             active.lastPromptCache = prefill.promptCache();
                             active.prefilled = true;
@@ -458,6 +501,18 @@ public final class VirtualChatModel {
                         backgroundPrefillExecutor);
             pendingPrefills.put(id, next);
           });
+    }
+
+    private static List<ChatMessage> project(Member member, Turn turn) {
+      List<ChatMessage> visible =
+          List.copyOf(
+              Objects.requireNonNull(
+                  member.contextProjection().project(turn), "projected context"));
+      if (visible.isEmpty()) {
+        throw new IllegalStateException(
+            "context projection for member " + member.id() + " produced no messages");
+      }
+      return visible;
     }
 
     private Boundary boundary(String selected) {
@@ -489,7 +544,23 @@ public final class VirtualChatModel {
         Set<String> capabilities,
         ChatTemplate template,
         Supplier<TextGenerationSession> sessionFactory) {
-      return member(id, capabilities, template, sessionFactory, ConstraintFactory.none());
+      return member(
+          id,
+          capabilities,
+          template,
+          sessionFactory,
+          ConstraintFactory.none(),
+          ContextProjection.fullHistory());
+    }
+
+    public Builder member(
+        String id,
+        Set<String> capabilities,
+        ChatTemplate template,
+        Supplier<TextGenerationSession> sessionFactory,
+        ContextProjection contextProjection) {
+      return member(
+          id, capabilities, template, sessionFactory, ConstraintFactory.none(), contextProjection);
     }
 
     public Builder member(
@@ -498,6 +569,22 @@ public final class VirtualChatModel {
         ChatTemplate template,
         Supplier<TextGenerationSession> sessionFactory,
         ConstraintFactory constraintFactory) {
+      return member(
+          id,
+          capabilities,
+          template,
+          sessionFactory,
+          constraintFactory,
+          ContextProjection.fullHistory());
+    }
+
+    public Builder member(
+        String id,
+        Set<String> capabilities,
+        ChatTemplate template,
+        Supplier<TextGenerationSession> sessionFactory,
+        ConstraintFactory constraintFactory,
+        ContextProjection contextProjection) {
       String memberId = requireText(id, "id");
       Member member =
           new Member(
@@ -505,7 +592,8 @@ public final class VirtualChatModel {
               Set.copyOf(Objects.requireNonNull(capabilities, "capabilities")),
               Objects.requireNonNull(template, "template"),
               Objects.requireNonNull(sessionFactory, "sessionFactory"),
-              Objects.requireNonNull(constraintFactory, "constraintFactory"));
+              Objects.requireNonNull(constraintFactory, "constraintFactory"),
+              Objects.requireNonNull(contextProjection, "contextProjection"));
       if (members.putIfAbsent(memberId, member) != null) {
         throw new IllegalArgumentException("duplicate virtual model member " + memberId);
       }
@@ -538,7 +626,8 @@ public final class VirtualChatModel {
       Set<String> capabilities,
       ChatTemplate template,
       Supplier<TextGenerationSession> sessionFactory,
-      ConstraintFactory constraintFactory) {}
+      ConstraintFactory constraintFactory,
+      ContextProjection contextProjection) {}
 
   private static final class ActiveMember {
     private final Member member;

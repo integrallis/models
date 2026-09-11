@@ -5,10 +5,11 @@ A virtual model presents several small local models as one conversation. One mem
 ordinary chat while another handles tool turns, without making the application translate history
 between model-specific prompt formats.
 
-The conversation shares semantic messages, not tensors. Every member receives the same role-aware
-history rendered through its own `ChatTemplate`, and every member retains its own
-`TextGenerationSession` and KV lineage. A switch can reuse only the prefix previously prepared by
-the selected member.
+The conversation shares semantic messages, not tensors. By default every member receives the
+complete role-aware history rendered through its own `ChatTemplate`. A member can instead declare
+an explicit context projection when its job needs less history or it cannot consume another
+member's tool protocol. Every member retains its own `TextGenerationSession` and KV lineage. A
+switch can reuse only the prefix previously prepared by the selected member.
 
 == Compose Two Members
 
@@ -66,6 +67,41 @@ marks an active tool loop, and the router hard-locks it to the previous member b
 `Response` identifies the physical member, routing reason, task, switch boundary, parsed tool
 calls, and the actual `GenerationMetrics`. `memberStates()` reports each member's independent
 cached-token count and any background-prefill failure.
+
+== Project Context Per Member
+
+Context projection is a prompt-composition policy; it never copies or translates another model's
+KV tensors. The built-in policies are:
+
+* `fullHistory()` — the default, complete canonical conversation;
+* `currentTurn()` — only the current input, for a stateless selector or tool specialist;
+* `toolResultsAsUser()` — prose history plus tool results expressed as ordinary user messages,
+  without another member's assistant tool-call syntax.
+
+The qualified Qwen chat/tool pair uses the latter two policies:
+
+[source,java]
+----
+var virtual = VirtualChatModel.builder()
+    .member("chat", Set.of("chat"), chatTemplate,
+        chatPipeline::openGenerationSession,
+        VirtualChatModel.ContextProjection.toolResultsAsUser())
+    .member("tools", Set.of("tool-use"), toolTemplate,
+        toolPipeline::openGenerationSession,
+        toolConstraintFactory,
+        VirtualChatModel.ContextProjection.currentTurn())
+    .build();
+----
+
+On an isolated eight-vCPU EPYC-Milan host, Qwen3 0.6B Q4_0 for chat and Qwen3 1.7B Q8_0 for tool
+selection passed every turn in three fresh processes. Its 35.151-second median beat the same
+six-turn workload on Qwen3 1.7B alone at 53.166 seconds, a 33.88% improvement. Peak process RSS
+rose from a 2,404,032 KiB median to 3,270,444 KiB because both weight sets remain resident. The
+recipe is therefore qualified for latency with an explicit memory tradeoff.
+
+A custom `ContextProjection` receives the complete immutable `Turn` and must return at least one
+message. Keep projection deterministic and preserve any system instruction the member requires.
+The projection is applied consistently to foreground generation and background prefill.
 
 == Use The Adaptive Router
 

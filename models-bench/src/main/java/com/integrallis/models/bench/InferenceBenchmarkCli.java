@@ -127,6 +127,10 @@ public final class InferenceBenchmarkCli {
           VirtualModelQualificationComparisonCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "needle-smollm-hybrid-qualification".equals(args[0])) {
+      System.exit(NeedleSmolHybridQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);

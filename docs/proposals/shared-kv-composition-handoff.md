@@ -1,12 +1,15 @@
 # Handoff: two small models in one chat — state, switching, and composition
 
-**Status:** runtime assumptions audited against Models 0.3.36. Rungs 1–2 were measured downstream
+**Status:** projected Qwen dispatch qualified on 2026-09-11. Rungs 1–2 were measured downstream
 on 2026-09-06; Qwen3 1.7B passed while Qwen + Needle2 fell to 2/5. A second pair and background
 catch-up were measured on 2026-09-07: Qwen3 0.6B chat + Qwen3 1.7B tools passed 5/5 with isolated
 KV lineages, but background prefill did not beat the best demand-catch-up total. A clean-host,
 six-turn comparison on 2026-09-08 passed all 36 correctness turns but measured the composite at
-91.223 seconds median versus 75.672 seconds for the single-model control, a 20.55% regression. The
-virtual-model API is released, but no preconfigured composite recipe is authorized by the evidence.
+91.223 seconds median versus 75.672 seconds for the single-model control, a 20.55% regression. A
+follow-up kept exact independent KV while projecting only task-relevant semantic context. Across
+six counterbalanced fresh JVMs, the projected Qwen pair passed all 36 turns and improved the median
+from 53.166 seconds to 35.151 seconds (33.88%). Its median peak RSS rose 36.04% because both models
+remain resident. A named latency-qualified recipe is now authorized with that memory tradeoff.
 
 Concurrent-conversation follow-up: an opt-in runtime scheduler now batches compatible decode rows
 for sessions that share one physical model and interleaves bounded prompt chunks. Real
@@ -126,6 +129,12 @@ session API supplied isolated state and model-specific prefix metrics. The Qwen/
 2/5 and is rejected. Qwen3 0.6B chat + Qwen3 1.7B tools passed 5/5: the tool member read 0/258 tokens
 on its first demand switch, while each switch-back reused only that member's retained prefix.
 
+The 2026-09-11 follow-up added explicit per-member context projection. Qwen3 0.6B receives prose
+history with tool results translated to user messages; Qwen3 1.7B receives only the current tool
+selection turn. On the isolated eight-vCPU gate this topology passed all 36 turns and was 33.88%
+faster at median than Qwen3 1.7B alone. It spends 36.04% more median peak RSS to keep both models
+resident. This is the first composition to clear both the correctness and latency gates.
+
 ### Rung 3 — independent sessions with background catch-up
 Prefill an inactive member's current semantic history while the selected member generates. The
 prepared KV remains owned by the inactive member; a later switch reuses that member's exact prefix.
@@ -197,9 +206,9 @@ evidence about our regime.
 
 ## 5. The packaging half (row 5p) — relevant if any rung wins
 
-Neither measured pair cleared both correctness and end-to-end performance gates, so none of the
-packaging below is authorized by the current evidence. It remains a design candidate for a future
-pair that clears both.
+The projected Qwen pair now clears correctness and end-to-end performance, so the packaging below
+is authorized for that exact topology and artifact pair. Other combinations still require their
+own complete gate.
 
 The direction already set: a composite is **pure metadata, lighter than a model marker**, shipped as
 `org.modeljars.composite:<codename>` whose **Maven dependencies ARE its parts**, so the dependency

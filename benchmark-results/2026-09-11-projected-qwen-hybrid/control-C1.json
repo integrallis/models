@@ -1,0 +1,368 @@
+{
+  "schemaVersion" : 1,
+  "createdAt" : "2026-09-11T19:10:54.078143550Z",
+  "policyVersion" : "needle-smollm-virtual-chat-tool-v1-qwen3-0.6b-qwen3-1.7b",
+  "protocolSha256" : "2d91e4fe54c7d6cc002789cfda8f6a7edd3abcc1263ed9d62be797944f700279",
+  "modelsRevision" : "e4d130dd8c5986e6cef6d7ff5cb7d3533a5ceb6b",
+  "runId" : "C1",
+  "arm" : "CONTROL",
+  "maxTokens" : 64,
+  "processId" : 5081,
+  "environment" : {
+    "host" : "modeljars-bench-projected-hybrid-20260911",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-138-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "processors" : 8,
+    "physicalMemoryBytes" : 32857440256,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "jvmArguments" : [ "--add-modules=jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED" ],
+  "vectorRuntime" : {
+    "providerName" : "PanamaVectorUtilSupport",
+    "vectorApi" : true,
+    "configuredMaxVectorBits" : 256,
+    "preferredVectorBits" : 256,
+    "activeVectorBits" : 256,
+    "fastVectorFma" : true,
+    "fastScalarFma" : true,
+    "sve" : false,
+    "q4ShortPairwiseSupported" : true,
+    "q4UnsignedPairwiseSupported" : true,
+    "ggufParallel" : true,
+    "ggufExecutor" : "persistent",
+    "ggufThreads" : 8,
+    "ggufChunksPerThread" : 2
+  },
+  "vectorOverrides" : { },
+  "artifacts" : [ {
+    "role" : "control",
+    "sha256" : "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+    "sizeBytes" : 1834426016,
+    "loaded" : true,
+    "architecture" : "qwen3"
+  }, {
+    "role" : "chat",
+    "sha256" : "da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4",
+    "sizeBytes" : 428970080,
+    "loaded" : false,
+    "architecture" : "qwen3"
+  }, {
+    "role" : "tools",
+    "sha256" : "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+    "sizeBytes" : 1834426016,
+    "loaded" : false,
+    "architecture" : "qwen3"
+  } ],
+  "loadMillis" : 277,
+  "memoryBeforeLoad" : {
+    "heapUsedBytes" : 13777768,
+    "heapCommittedBytes" : 520093696,
+    "nonHeapUsedBytes" : 8968848,
+    "nonHeapCommittedBytes" : 13959168,
+    "bufferPools" : {
+      "mapped" : {
+        "name" : "mapped",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      },
+      "mapped - 'non-volatile memory'" : {
+        "name" : "mapped - 'non-volatile memory'",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      },
+      "direct" : {
+        "name" : "direct",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      }
+    },
+    "nativeMemory" : {
+      "available" : false,
+      "totalReservedBytes" : 0,
+      "totalCommittedBytes" : 0,
+      "categories" : { }
+    }
+  },
+  "memoryAfterLoad" : {
+    "heapUsedBytes" : 81804136,
+    "heapCommittedBytes" : 520093696,
+    "nonHeapUsedBytes" : 19930880,
+    "nonHeapCommittedBytes" : 22937600,
+    "bufferPools" : {
+      "mapped" : {
+        "name" : "mapped",
+        "count" : 1,
+        "memoryUsedBytes" : 1834426016,
+        "totalCapacityBytes" : 1834426016
+      },
+      "mapped - 'non-volatile memory'" : {
+        "name" : "mapped - 'non-volatile memory'",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      },
+      "direct" : {
+        "name" : "direct",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      }
+    },
+    "nativeMemory" : {
+      "available" : false,
+      "totalReservedBytes" : 0,
+      "totalCommittedBytes" : 0,
+      "categories" : { }
+    }
+  },
+  "memoryAfterRun" : {
+    "heapUsedBytes" : 214154976,
+    "heapCommittedBytes" : 520093696,
+    "nonHeapUsedBytes" : 25193632,
+    "nonHeapCommittedBytes" : 27394048,
+    "bufferPools" : {
+      "mapped" : {
+        "name" : "mapped",
+        "count" : 1,
+        "memoryUsedBytes" : 1834426016,
+        "totalCapacityBytes" : 1834426016
+      },
+      "mapped - 'non-volatile memory'" : {
+        "name" : "mapped - 'non-volatile memory'",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      },
+      "direct" : {
+        "name" : "direct",
+        "count" : 0,
+        "memoryUsedBytes" : 0,
+        "totalCapacityBytes" : 0
+      }
+    },
+    "nativeMemory" : {
+      "available" : false,
+      "totalReservedBytes" : 0,
+      "totalCommittedBytes" : 0,
+      "categories" : { }
+    }
+  },
+  "totalMillis" : 57119,
+  "complete" : true,
+  "passed" : true,
+  "turns" : [ {
+    "id" : "cold-prose",
+    "taskType" : "chat",
+    "inputRole" : "user",
+    "memberId" : "qwen-1.7b",
+    "boundary" : "COLD",
+    "routeReason" : "capability=chat",
+    "passed" : true,
+    "diagnostics" : [ ],
+    "content" : "Hello! How can I assist you today?",
+    "outputSha256" : "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+    "toolCalls" : [ ],
+    "metrics" : {
+      "tokenizationMillis" : 15,
+      "promptPreparationMillis" : 0,
+      "prefillMillis" : 22398,
+      "timeToFirstTokenMillis" : 22419,
+      "decodeMillis" : 1187,
+      "totalMillis" : 23607,
+      "promptTokens" : 229,
+      "completionTokens" : 9,
+      "cacheInputTokens" : 229,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 229,
+      "decodeTokensPerSecond" : 6.7364314183671885
+    },
+    "processMemory" : {
+      "highWaterBytes" : 2289045504,
+      "residentBytes" : 2289045504,
+      "anonymousResidentBytes" : 426680320,
+      "fileResidentBytes" : 1862365184,
+      "sharedMemoryResidentBytes" : 0
+    }
+  }, {
+    "id" : "warm-prose",
+    "taskType" : "chat",
+    "inputRole" : "user",
+    "memberId" : "qwen-1.7b",
+    "boundary" : "SAME_MODEL",
+    "routeReason" : "retained capable member",
+    "passed" : true,
+    "diagnostics" : [ ],
+    "content" : "Long-term memory allows an assistant to recall and use previously learned information to perform tasks and answer questions.",
+    "outputSha256" : "d5f9f8c508241529e9d81f4fbc02aad1f6fdce81ad194c96fbef9e8916b397be",
+    "toolCalls" : [ ],
+    "metrics" : {
+      "tokenizationMillis" : 3,
+      "promptPreparationMillis" : 0,
+      "prefillMillis" : 3734,
+      "timeToFirstTokenMillis" : 3737,
+      "decodeMillis" : 2376,
+      "totalMillis" : 6114,
+      "promptTokens" : 262,
+      "completionTokens" : 20,
+      "cacheInputTokens" : 262,
+      "cacheReadInputTokens" : 225,
+      "cacheWriteInputTokens" : 37,
+      "decodeTokensPerSecond" : 7.993302941547472
+    },
+    "processMemory" : {
+      "highWaterBytes" : 2400575488,
+      "residentBytes" : 2400575488,
+      "anonymousResidentBytes" : 538210304,
+      "fileResidentBytes" : 1862365184,
+      "sharedMemoryResidentBytes" : 0
+    }
+  }, {
+    "id" : "first-tool-switch",
+    "taskType" : "tool-use",
+    "inputRole" : "user",
+    "memberId" : "qwen-1.7b",
+    "boundary" : "SAME_MODEL",
+    "routeReason" : "retained capable member",
+    "passed" : true,
+    "diagnostics" : [ ],
+    "content" : "",
+    "outputSha256" : "69951fa9243cdf796cafaffda0665df377c1cf255c5b3cd520640b0e5ac9ee5c",
+    "toolCalls" : [ {
+      "id" : "000000000",
+      "name" : "remember",
+      "argumentsJson" : "{\"fact\":\"I prefer aisle seats.\"}"
+    } ],
+    "metrics" : {
+      "tokenizationMillis" : 2,
+      "promptPreparationMillis" : 0,
+      "prefillMillis" : 4506,
+      "timeToFirstTokenMillis" : 4572,
+      "decodeMillis" : 2562,
+      "totalMillis" : 7135,
+      "promptTokens" : 303,
+      "completionTokens" : 18,
+      "cacheInputTokens" : 303,
+      "cacheReadInputTokens" : 258,
+      "cacheWriteInputTokens" : 45,
+      "decodeTokensPerSecond" : 6.6333559923051135
+    },
+    "processMemory" : {
+      "highWaterBytes" : 2461835264,
+      "residentBytes" : 2461835264,
+      "anonymousResidentBytes" : 599470080,
+      "fileResidentBytes" : 1862365184,
+      "sharedMemoryResidentBytes" : 0
+    }
+  }, {
+    "id" : "tool-result",
+    "taskType" : "chat",
+    "inputRole" : "tool",
+    "memberId" : "qwen-1.7b",
+    "boundary" : "SAME_MODEL",
+    "routeReason" : "retained capable member",
+    "passed" : true,
+    "diagnostics" : [ ],
+    "content" : "The fact \"I prefer aisle seats.\" has been successfully stored in memory with the ID \"mem-2048\".",
+    "outputSha256" : "bd2fe0dc5231f739d0e67cad21e81d31bb6e14d69bd80c950318870f4460a73b",
+    "toolCalls" : [ ],
+    "metrics" : {
+      "tokenizationMillis" : 1,
+      "promptPreparationMillis" : 0,
+      "prefillMillis" : 5501,
+      "timeToFirstTokenMillis" : 5503,
+      "decodeMillis" : 3103,
+      "totalMillis" : 8606,
+      "promptTokens" : 352,
+      "completionTokens" : 25,
+      "cacheInputTokens" : 352,
+      "cacheReadInputTokens" : 299,
+      "cacheWriteInputTokens" : 53,
+      "decodeTokensPerSecond" : 7.733782348401182
+    },
+    "processMemory" : {
+      "highWaterBytes" : 2461851648,
+      "residentBytes" : 2461851648,
+      "anonymousResidentBytes" : 599486464,
+      "fileResidentBytes" : 1862365184,
+      "sharedMemoryResidentBytes" : 0
+    }
+  }, {
+    "id" : "prose-switch-back",
+    "taskType" : "chat",
+    "inputRole" : "user",
+    "memberId" : "qwen-1.7b",
+    "boundary" : "SAME_MODEL",
+    "routeReason" : "retained capable member",
+    "passed" : true,
+    "diagnostics" : [ ],
+    "content" : "mem-2048",
+    "outputSha256" : "88aee0ac82253dd39ef3adf187d84fc2069cab400bab8d7d318a6ca123578d19",
+    "toolCalls" : [ ],
+    "metrics" : {
+      "tokenizationMillis" : 1,
+      "promptPreparationMillis" : 0,
+      "prefillMillis" : 5491,
+      "timeToFirstTokenMillis" : 5493,
+      "decodeMillis" : 748,
+      "totalMillis" : 6241,
+      "promptTokens" : 400,
+      "completionTokens" : 6,
+      "cacheInputTokens" : 400,
+      "cacheReadInputTokens" : 348,
+      "cacheWriteInputTokens" : 52,
+      "decodeTokensPerSecond" : 6.680497889330763
+    },
+    "processMemory" : {
+      "highWaterBytes" : 2461892608,
+      "residentBytes" : 2461892608,
+      "anonymousResidentBytes" : 599527424,
+      "fileResidentBytes" : 1862365184,
+      "sharedMemoryResidentBytes" : 0
+    }
+  }, {
+    "id" : "tool-switch-back",
+    "taskType" : "tool-use",
+    "inputRole" : "user",
+    "memberId" : "qwen-1.7b",
+    "boundary" : "SAME_MODEL",
+    "routeReason" : "retained capable member",
+    "passed" : true,
+    "diagnostics" : [ ],
+    "content" : "",
+    "outputSha256" : "2fe59babd35cda61f3d17352aa31e3bba365d758f63d4a9c3dbc076a62824509",
+    "toolCalls" : [ {
+      "id" : "000000000",
+      "name" : "recall",
+      "argumentsJson" : "{\"query\":\"seat preference\"}"
+    } ],
+    "metrics" : {
+      "tokenizationMillis" : 1,
+      "promptPreparationMillis" : 0,
+      "prefillMillis" : 3053,
+      "timeToFirstTokenMillis" : 3078,
+      "decodeMillis" : 2288,
+      "totalMillis" : 5366,
+      "promptTokens" : 425,
+      "completionTokens" : 16,
+      "cacheInputTokens" : 425,
+      "cacheReadInputTokens" : 396,
+      "cacheWriteInputTokens" : 29,
+      "decodeTokensPerSecond" : 6.555511968053598
+    },
+    "processMemory" : {
+      "highWaterBytes" : 2466074624,
+      "residentBytes" : 2466074624,
+      "anonymousResidentBytes" : 603709440,
+      "fileResidentBytes" : 1862365184,
+      "sharedMemoryResidentBytes" : 0
+    }
+  } ]
+}

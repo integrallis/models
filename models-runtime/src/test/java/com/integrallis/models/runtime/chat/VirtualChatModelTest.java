@@ -16,6 +16,7 @@
 package com.integrallis.models.runtime.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.BatchInferenceBackend;
@@ -25,6 +26,7 @@ import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.runtime.InferencePipeline;
 import java.util.ArrayDeque;
@@ -123,6 +125,74 @@ class VirtualChatModelTest {
                 ChatRole.ASSISTANT);
       }
     }
+  }
+
+  @Test
+  void projectsOnlyTheCurrentTurnForAStatelessSpecialist() {
+    RecordingBackend chatBackend = new RecordingBackend("chat", "CHAT");
+    RecordingBackend toolBackend = new RecordingBackend("tools", "TOOL");
+
+    try (InferencePipeline chatPipeline = new InferencePipeline(chatBackend);
+        InferencePipeline toolPipeline = new InferencePipeline(toolBackend)) {
+      VirtualChatModel model =
+          VirtualChatModel.builder()
+              .member(
+                  "chat",
+                  Set.of("chat"),
+                  ChatTemplate.CHATML_NO_THINK,
+                  chatPipeline::openGenerationSession)
+              .member(
+                  "tools",
+                  Set.of("tool-use"),
+                  ChatTemplate.CHATML_NO_THINK,
+                  toolPipeline::openGenerationSession,
+                  VirtualChatModel.ContextProjection.currentTurn())
+              .build();
+
+      try (VirtualChatModel.Session conversation = model.openSession("projected-context")) {
+        conversation.generate("chat", ChatMessage.user("prior prose"), List.of(), OPTIONS);
+        conversation.generate(
+            "tool-use", ChatMessage.user("current tool request"), List.of(), OPTIONS);
+
+        assertThat(toolBackend.prompts())
+            .singleElement()
+            .asString()
+            .contains("current tool request")
+            .doesNotContain("prior prose", "CHAT");
+        assertThat(conversation.history())
+            .extracting(ChatMessage::text)
+            .containsExactly("prior prose", "CHAT", "current tool request", "TOOL");
+      }
+    }
+  }
+
+  @Test
+  void projectsToolProtocolAsPlainConversationForAModelWithoutToolTraining() {
+    var projection = VirtualChatModel.ContextProjection.toolResultsAsUser();
+    var call = ToolCall.of(0, "remember", "{\"fact\":\"aisle\"}");
+    var current = ChatMessage.tool("remember", "{\"stored\":true,\"memoryId\":\"mem-2048\"}");
+    var turn =
+        new VirtualChatModel.Turn(
+            "projection-test",
+            "chat",
+            current,
+            List.of(
+                ChatMessage.system("Be concise."),
+                ChatMessage.user("Remember aisle."),
+                ChatMessage.assistantToolCalls("", List.of(call)),
+                current),
+            TOOLS,
+            "tools",
+            java.util.Map.of());
+
+    assertThat(projection.project(turn))
+        .extracting(ChatMessage::role, ChatMessage::text)
+        .containsExactly(
+            tuple(ChatRole.SYSTEM, "Be concise."),
+            tuple(ChatRole.USER, "Remember aisle."),
+            tuple(
+                ChatRole.USER,
+                "Tool remember returned: {\"stored\":true,\"memoryId\":\"mem-2048\"}"));
   }
 
   @Test
