@@ -1,4 +1,8 @@
-# Projected Qwen hybrid qualification preflight
+# Projected Qwen routing experiment preflight
+
+**Retrospective decision (2026-09-12):** these gates measured routing correctness, latency, and
+memory, but omitted the required cache-state handoff gate. Passing them cannot qualify a hybrid.
+The associated qualification was withdrawn.
 
 - Experiment: compare one Qwen3 1.7B Q8_0 control with a Qwen3 0.6B Q4_0 chat / Qwen3 1.7B
   Q8_0 tool-selection virtual model using capability-specific context projection.

@@ -78,7 +78,7 @@ KV tensors. The built-in policies are:
 * `toolResultsAsUser()` — prose history plus tool results expressed as ordinary user messages,
   without another member's assistant tool-call syntax.
 
-The qualified Qwen chat/tool pair uses the latter two policies:
+The measured Qwen chat/tool routing experiment used the latter two policies:
 
 [source,java]
 ----
@@ -97,7 +97,8 @@ On an isolated eight-vCPU EPYC-Milan host, Qwen3 0.6B Q4_0 for chat and Qwen3 1.
 selection passed every turn in three fresh processes. Its 35.151-second median beat the same
 six-turn workload on Qwen3 1.7B alone at 53.166 seconds, a 33.88% improvement. Peak process RSS
 rose from a 2,404,032 KiB median to 3,270,444 KiB because both weight sets remain resident. The
-recipe is therefore qualified for latency with an explicit memory tradeoff.
+result is useful evidence for semantic routing with an explicit memory tradeoff. It does not share
+or translate cache state and is not a qualified hybrid recipe. No hybrid is currently qualified.
 
 A custom `ContextProjection` receives the complete immutable `Turn` and must return at least one
 message. Keep projection deterministic and preserve any system instruction the member requires.
