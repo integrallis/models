@@ -4,6 +4,14 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Corrected
+
+- Withdrew the projected Qwen router's hybrid qualification. Its measured latency and correctness
+  remain useful semantic-routing evidence, but it shares neither KV tensors nor model state and
+  therefore does not satisfy the cache-sharing composition objective. The retained report was
+  also absent from the Models revision cited by the downstream evidence URL. No hybrid recipe is
+  currently qualified.
+
 ## [0.3.37] - 2026-09-11
 
 ### Added
@@ -12,12 +20,13 @@ All notable changes to models are documented here.
   and tool-result-to-user policies. Physical members still retain independent exact prompt/KV
   state; the projection controls only the semantic messages rendered for that member.
 
-### Qualification
+### Experiment
 
-- Qualified Qwen3 0.6B Q4_0 chat plus Qwen3 1.7B Q8_0 tool selection as a projected virtual model.
+- Measured Qwen3 0.6B Q4_0 chat plus Qwen3 1.7B Q8_0 tool selection as a projected virtual model.
   All 36 turns passed across six counterbalanced fresh JVMs on a dedicated eight-vCPU host. Median
   end-to-end time improved from 53.166 seconds to 35.151 seconds (33.88%), while median peak RSS
-  increased from 2,404,032 KiB to 3,270,444 KiB because both models remain resident.
+  increased from 2,404,032 KiB to 3,270,444 KiB because both models remain resident. This result
+  was subsequently withdrawn as a hybrid qualification because it did not transfer cache state.
 
 ## [0.3.36] - 2026-09-08
 

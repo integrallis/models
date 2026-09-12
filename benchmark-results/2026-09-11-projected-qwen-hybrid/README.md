@@ -1,4 +1,12 @@
-# Projected Qwen hybrid qualification
+# Projected Qwen semantic-routing experiment — hybrid qualification withdrawn
+
+**Current decision:** the performance result below remains reproducible, but it is not a qualified
+hybrid. The implementation projects text and retains independent caches; it does not share,
+translate, or hand off cache state. The original downstream evidence also pinned Models revision
+`e4d130dd8c5986e6cef6d7ff5cb7d3533a5ceb6b`, which did not contain this report; the report first
+appeared at `49159bf15423a5e215406b6b44667bb30f382371`. Both failures violate the release
+boundary. The ModelJars catalog entry was withdrawn on 2026-09-12, and no replacement is
+authorized by these measurements.
 
 This gate compares a single Qwen3 1.7B Q8_0 model with a virtual model that routes prose and
 tool-result narration to Qwen3 0.6B Q4_0 and tool selection to the same Qwen3 1.7B Q8_0 model.
@@ -6,7 +14,7 @@ Both arms use the same six-turn conversation, tools, system instruction, greedy 
 limit, pinned artifact bytes, Models revision, JVM, and dedicated host.
 
 The hybrid does not copy KV state between models. Each physical member keeps an independent exact
-prompt/KV lineage. Its qualified context policy sends translated tool results and normal prose
+prompt/KV lineage. Its measured context policy sends translated tool results and normal prose
 history to the chat member, while the stateless tool specialist receives only the current tool
 selection turn. That removes irrelevant cross-model catch-up without claiming portable KV.
 
@@ -22,7 +30,8 @@ order was C1, H1, H2, C2, C3, H3.
 
 The hybrid improves median end-to-end generation time by **33.88%**, clearing the predeclared 5%
 gate. Its median peak RSS is **36.04% higher** because both weight sets remain resident. This is a
-latency-qualified composition with an explicit memory tradeoff, not a memory optimization.
+semantic-routing latency result with an explicit memory tradeoff, not a cache-sharing composition
+or a memory optimization.
 
 The result is driven by capability-aware prompt composition: the control reflects the usual
 application contract in which registered tool schemas remain visible on every turn, while the

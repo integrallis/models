@@ -1,6 +1,7 @@
 # `models-composite` — a virtual model assembled from smaller ones
 
-Status: QUALIFIED RECIPE PENDING PACKAGING (projected Qwen pair passed 2026-09-11).
+Status: RESEARCH ONLY; NO QUALIFIED RECIPE. The projected Qwen router was withdrawn on 2026-09-12
+because it did not share or translate cache state and therefore did not satisfy the hybrid goal.
 Origin: memory project register rows 5j/5o; the workbench chat-tier question — "what local
 configuration beats the wire?" — kept converging on composition rather than a single bigger model.
 
@@ -143,7 +144,7 @@ The first small Java ridge screen found strong key structure but poor held-out v
 (0.367–0.576 cosine; 0.819–0.987 relative L2), so its single-layer and raw-correlation top-two
 mappers were rejected. No cache-transfer SPI is authorized by that result.
 
-### 5.2 Projected Qwen dispatch qualification, 2026-09-11
+### 5.2 Projected Qwen dispatch experiment, 2026-09-11; withdrawn 2026-09-12
 
 The earlier full-history Qwen pair was rejected because it was 20.55% slower than the single-model
 control. The retained topology changes the work, not the correctness gate: Qwen3 0.6B Q4_0 handles
@@ -153,8 +154,10 @@ turn. Each member keeps its own exact session and KV lineage.
 Three fresh control JVMs and three fresh hybrid JVMs ran a counterbalanced six-turn protocol on an
 isolated eight-vCPU EPYC-Milan host. All 36 turns passed. The control median was 53.166 seconds and
 the hybrid median was 35.151 seconds, a 33.88% improvement. Median peak RSS increased 36.04%, from
-2,404,032 KiB to 3,270,444 KiB, because both models are resident. This authorizes a named
-latency-qualified recipe and records its memory tradeoff; it does not authorize raw KV sharing.
+2,404,032 KiB to 3,270,444 KiB, because both models are resident. This proves a useful semantic
+routing result, but the implementation does not transfer cache state. Treating it as completion of
+the hybrid/cache-sharing objective was incorrect, and the corresponding ModelJars qualification
+was withdrawn. It authorizes no recipe or publication.
 
 ### 5.3 Concurrent-conversation scheduling, 2026-09-07
 
