@@ -1,3 +1,4 @@
+import java.nio.file.Files
 import java.nio.file.Path
 
 // models-langchain4j — LangChain4j chat model adapter
@@ -43,6 +44,8 @@ val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
 val configuredMxbaiRerankerDirectory =
     providers.systemProperty("models.fixtures.mxbaiRerankerDirectory")
+val configuredActivatedLoraDirectory =
+    providers.systemProperty("models.fixtures.activatedLoraDirectory")
 
 tasks.withType<Test>().configureEach {
     systemProperty("models.fixtures.miniLm", miniLmFixture)
@@ -54,6 +57,31 @@ tasks.withType<Test>().configureEach {
     configuredMxbaiRerankerDirectory.orNull?.let {
         systemProperty("models.fixtures.mxbaiRerankerDirectory", it)
     }
+    configuredActivatedLoraDirectory.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraDirectory", it)
+    }
+}
+
+tasks.register<Test>("qwen3ActivatedLangChain4jToolCallingIntegrationTest") {
+    description = "Run LangChain4j's complete tool loop over the Qwen3 activated adapter"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.langchain4j.Qwen3ActivatedLangChain4jToolCallingIntegrationTest",
+        )
+    }
+    dependsOn(project(":backend-java").tasks.named("downloadQwen317BQ80Model"))
+    doFirst {
+        val adapter = configuredActivatedLoraDirectory.orNull?.let(Path::of)
+        require(adapter != null && Files.isDirectory(adapter)) {
+            "-Dmodels.fixtures.activatedLoraDirectory must name the packaged adapter directory"
+        }
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
 }
 
 tasks.register<Test>("qwen3LangChain4jToolCallingIntegrationTest") {

@@ -98,11 +98,15 @@ class KvCacheTest {
 
       float[] key = cache.key(0, 0);
       float[] value = cache.value(0, 0);
+      float[] keyBuffer = cache.keyBuffer();
+      float[] valueBuffer = cache.valueBuffer();
       key[0] = 99;
       value[0] = 99;
+      keyBuffer[0] = 98;
+      valueBuffer[0] = 98;
 
-      assertThat(cache.keyBuffer()).startsWith(1, 2);
-      assertThat(cache.valueBuffer()).startsWith(10, 20);
+      assertThat(cache.key(0, 0)).containsExactly(1, 2);
+      assertThat(cache.value(0, 0)).containsExactly(10, 20);
     }
   }
 
@@ -199,6 +203,147 @@ class KvCacheTest {
       assertThat(cache.value(1, 1)).isNotNull();
       assertThat(cache.key(0, 2)).isNull();
       assertThat(cache.value(1, 3)).isNull();
+    }
+  }
+
+  @Nested
+  class SharedPrefixes {
+
+    @Test
+    void reportsSharedAndBranchOwnedStorageWithoutHidingReservedCapacity() {
+      var source = populatedCache(1, 32, 2, 2, 3);
+
+      KvCache.SharedPrefix prefix = source.freezePrefix(3);
+      KvCache first = prefix.fork();
+      KvCache second = prefix.fork();
+
+      assertThat(source.allocatedBytes()).isEqualTo(prefix.allocatedBytes());
+      assertThat(first.allocatedBytes()).isEqualTo(prefix.allocatedBytes() * 2);
+      assertThat(second.allocatedBytes()).isEqualTo(prefix.allocatedBytes() * 2);
+      assertThat(first.allocatedBytes() + second.allocatedBytes() - prefix.allocatedBytes())
+          .isEqualTo(prefix.allocatedBytes() * 3);
+    }
+
+    @Test
+    void forksReferenceTheSameImmutablePrefixStorageAndOwnIndependentSuffixes() {
+      var source = populatedCache(2, 32, 2, 2, 4);
+
+      KvCache.SharedPrefix prefix = source.freezePrefix(4);
+      KvCache first = prefix.fork();
+      KvCache second = prefix.fork();
+
+      assertThat(first.sharesPrefixStorageWith(second)).isTrue();
+      assertThat(first.sharedPrefixBytes()).isPositive();
+      assertThat(first.sharedPrefixBytes()).isEqualTo(second.sharedPrefixBytes());
+
+      first.store(0, 4, new float[] {101, 102}, new float[] {103, 104});
+      second.store(0, 4, new float[] {201, 202}, new float[] {203, 204});
+
+      assertThat(first.key(0, 3)).containsExactly(3, 3.25f);
+      assertThat(second.key(0, 3)).containsExactly(3, 3.25f);
+      assertThat(first.key(0, 4)).containsExactly(101, 102);
+      assertThat(second.key(0, 4)).containsExactly(201, 202);
+    }
+
+    @Test
+    void attentionViewSplitsAChronologicalRangeAtTheSharedPrefixBoundary() {
+      KvCache fork = populatedCache(1, 32, 2, 2, 3).freezePrefix(3).fork();
+      fork.store(0, 3, new float[] {30, 31}, new float[] {32, 33});
+      fork.store(0, 4, new float[] {40, 41}, new float[] {42, 43});
+
+      KvCache.AttentionView view = fork.attentionView(0, 1, 5);
+
+      assertThat(view.positionCount()).isEqualTo(4);
+      assertThat(view.spanCount()).isEqualTo(2);
+      assertThat(view.span(0).firstPosition()).isEqualTo(1);
+      assertThat(view.span(0).positionCount()).isEqualTo(2);
+      assertThat(view.span(1).firstPosition()).isEqualTo(3);
+      assertThat(view.span(1).positionCount()).isEqualTo(2);
+      assertThat(view.span(0).firstPosition() + view.span(0).positionCount())
+          .isEqualTo(view.span(1).firstPosition());
+    }
+
+    @Test
+    void extendsAndRefreezesAForkWithoutCopyingEarlierPrefixStorage() {
+      KvCache.SharedPrefix firstPrefix = populatedCache(1, 32, 2, 2, 3).freezePrefix(3);
+      long firstBytes = firstPrefix.allocatedBytes();
+      KvCache extension = firstPrefix.fork();
+      extension.store(0, 3, new float[] {30, 31}, new float[] {32, 33});
+      extension.store(0, 4, new float[] {40, 41}, new float[] {42, 43});
+
+      KvCache.SharedPrefix extendedPrefix = extension.freezePrefix(5);
+      KvCache first = extendedPrefix.fork();
+      KvCache second = extendedPrefix.fork();
+      first.store(0, 5, new float[] {50, 51}, new float[] {52, 53});
+
+      assertThat(first.sharesPrefixStorageWith(second)).isTrue();
+      assertThat(extendedPrefix.allocatedBytes()).isGreaterThan(firstBytes);
+      assertThat(first.key(0, 0)).containsExactly(0, 0.25f);
+      assertThat(first.key(0, 3)).containsExactly(30, 31);
+      assertThat(second.value(0, 4)).containsExactly(42, 43);
+
+      KvCache.AttentionView view = first.attentionView(0, 0, 6);
+      assertThat(view.positionCount()).isEqualTo(6);
+      assertThat(view.spanCount()).isEqualTo(3);
+      assertThat(view.span(0).firstPosition()).isZero();
+      assertThat(view.span(0).positionCount()).isEqualTo(3);
+      assertThat(view.span(1).firstPosition()).isEqualTo(3);
+      assertThat(view.span(1).positionCount()).isEqualTo(2);
+      assertThat(view.span(2).firstPosition()).isEqualTo(5);
+      assertThat(view.span(2).positionCount()).isOne();
+    }
+
+    @Test
+    void frozenSourceAndForksCannotMutateOrDiscardTheSharedPrefix() {
+      KvCache source = populatedCache(1, 16, 2, 2, 3);
+      float[] formerBufferSnapshot = source.keyBuffer();
+      KvCache fork = source.freezePrefix(3).fork();
+      formerBufferSnapshot[0] = 999;
+
+      assertThat(fork.key(0, 0)).containsExactly(0, 0.25f);
+
+      assertThatThrownBy(() -> source.store(0, 3, new float[] {1, 2}, new float[] {3, 4}))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("frozen");
+      assertThatThrownBy(() -> source.clear())
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("frozen");
+      assertThatThrownBy(() -> fork.store(0, 2, new float[] {1, 2}, new float[] {3, 4}))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("shared prefix");
+      assertThatThrownBy(() -> fork.discardFrom(2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("shared prefix");
+    }
+
+    @Test
+    void freezingRejectsIncompleteOrEmptyPrefixes() {
+      var cache = new KvCache(2, 16, 2, 2);
+      cache.store(0, 0, new float[] {1, 2}, new float[] {3, 4});
+
+      assertThatThrownBy(() -> cache.freezePrefix(0))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("prefixLength must be > 0");
+      assertThatThrownBy(() -> cache.freezePrefix(1))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("layer 1")
+          .hasMessageContaining("position 0");
+    }
+
+    private KvCache populatedCache(
+        int layers, int maxSequenceLength, int keyDimension, int valueDimension, int positions) {
+      var cache = new KvCache(layers, maxSequenceLength, keyDimension, valueDimension);
+      for (int layer = 0; layer < layers; layer++) {
+        for (int position = 0; position < positions; position++) {
+          float marker = layer * 10 + position;
+          cache.store(
+              layer,
+              position,
+              new float[] {marker, marker + 0.25f},
+              new float[] {marker + 0.5f, marker + 0.75f});
+        }
+      }
+      return cache;
     }
   }
 

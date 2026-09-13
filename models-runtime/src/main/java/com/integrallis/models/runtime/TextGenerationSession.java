@@ -23,9 +23,12 @@ import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.SharedInferencePrefix;
+import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -44,6 +47,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
   private final GenerationLoop generationLoop;
   private final ContinuousBatchingScheduler continuousBatching;
   private final ContinuousBatchingScheduler.SessionState continuousBatchingState;
+  private final int[] preparedPrefixTokens;
   private final Runnable closeListener;
   private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -61,6 +65,16 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
       Object executionLock,
       Runnable closeListener,
       ContinuousBatchingScheduler continuousBatching) {
+    this(backend, session, executionLock, closeListener, continuousBatching, null);
+  }
+
+  TextGenerationSession(
+      BatchInferenceBackend backend,
+      InferenceSession session,
+      Object executionLock,
+      Runnable closeListener,
+      ContinuousBatchingScheduler continuousBatching,
+      int[] preparedPromptTokens) {
     this.executionLock = Objects.requireNonNull(executionLock, "executionLock");
     this.backend = new SessionBackend(backend, session);
     this.generationLoop =
@@ -70,6 +84,13 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     this.continuousBatching = continuousBatching;
     this.continuousBatchingState =
         continuousBatching == null ? null : continuousBatching.session(session);
+    this.preparedPrefixTokens = preparedPromptTokens == null ? null : preparedPromptTokens.clone();
+    if (preparedPromptTokens != null) {
+      generationLoop.restorePromptCache(preparedPromptTokens);
+      if (continuousBatchingState != null) {
+        continuousBatchingState.restorePromptCache(preparedPromptTokens);
+      }
+    }
   }
 
   /** Returns the active context capacity and next token position for this session. */
@@ -93,6 +114,16 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     }
   }
 
+  /** Returns the physical bytes allocated for this session's backend state, when measurable. */
+  public OptionalLong allocatedInferenceStateBytes() {
+    synchronized (operationLock) {
+      requireOpen();
+      synchronized (executionLock) {
+        return backend.allocatedStateBytes();
+      }
+    }
+  }
+
   /**
    * Prefills this session's own prompt/KV lineage without decoding output tokens.
    *
@@ -111,7 +142,12 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     }
   }
 
-  /** Clears this session's context and exact prompt-prefix history. */
+  /**
+   * Clears this session's mutable context and exact prompt history.
+   *
+   * <p>A session forked from an immutable physical prefix returns to that prepared baseline; an
+   * ordinary session returns to an empty context.
+   */
   public void resetContext() {
     synchronized (operationLock) {
       requireOpen();
@@ -121,6 +157,12 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
           continuousBatchingState.invalidatePromptCache();
         }
         backend.reset();
+        if (preparedPrefixTokens != null) {
+          generationLoop.restorePromptCache(preparedPrefixTokens);
+          if (continuousBatchingState != null) {
+            continuousBatchingState.restorePromptCache(preparedPrefixTokens);
+          }
+        }
       }
     }
   }
@@ -128,6 +170,75 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
   /** Returns whether this session has released its backend-owned state. */
   public boolean isClosed() {
     return closed.get();
+  }
+
+  /**
+   * Returns whether this session and another reference the same physical immutable KV prefix.
+   *
+   * <p>False means no shared prefix; it never means that equivalent KV state was copied.
+   */
+  public boolean sharesPrefixStorageWith(TextGenerationSession other) {
+    Objects.requireNonNull(other, "other");
+    requireOpen();
+    other.requireOpen();
+    if (executionLock != other.executionLock) {
+      return false;
+    }
+    synchronized (executionLock) {
+      return backend.sharesPrefixStorageWith(other.backend);
+    }
+  }
+
+  SharedInferencePrefix extendAndFreezeSharedPrefix(
+      SharedPrefixInferenceBackend owner, int[] promptTokens) {
+    Objects.requireNonNull(owner, "owner");
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    synchronized (operationLock) {
+      requireOpen();
+      if (continuousBatching != null) {
+        throw new UnsupportedOperationException(
+            "extending a physical shared prefix is not supported by continuous batching");
+      }
+      synchronized (executionLock) {
+        generationLoop.requireStrictPromptExtension(promptTokens);
+        generationLoop.prefillTokens(promptTokens);
+        SharedInferencePrefix prefix = backend.freezeSharedPrefix(owner);
+        if (!closed.compareAndSet(false, true)) {
+          throw new IllegalStateException("text generation session closed while freezing prefix");
+        }
+        generationLoop.invalidatePromptCache();
+        closeListener.run();
+        return prefix;
+      }
+    }
+  }
+
+  SharedInferencePrefix reconcileAndFreezeSharedPrefix(
+      SharedPrefixInferenceBackend owner, int[] promptTokens) {
+    Objects.requireNonNull(owner, "owner");
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    synchronized (operationLock) {
+      requireOpen();
+      if (continuousBatching != null) {
+        throw new UnsupportedOperationException(
+            "reconciling a physical shared prefix is not supported by continuous batching");
+      }
+      if (preparedPrefixTokens == null) {
+        throw new IllegalStateException(
+            "only a session forked from an immutable prefix can reconcile its prompt");
+      }
+      requireRetainedPreparedPrefix(promptTokens);
+      synchronized (executionLock) {
+        generationLoop.prefillTokens(promptTokens);
+        SharedInferencePrefix prefix = backend.freezeSharedPrefix(owner);
+        if (!closed.compareAndSet(false, true)) {
+          throw new IllegalStateException("text generation session closed while freezing prefix");
+        }
+        generationLoop.invalidatePromptCache();
+        closeListener.run();
+        return prefix;
+      }
+    }
   }
 
   @Override
@@ -244,6 +355,19 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     }
   }
 
+  private void requireRetainedPreparedPrefix(int[] promptTokens) {
+    if (promptTokens.length <= preparedPrefixTokens.length) {
+      throw new IllegalArgumentException(
+          "reconciled prompt must retain the immutable shared prefix and add a suffix");
+    }
+    for (int index = 0; index < preparedPrefixTokens.length; index++) {
+      if (promptTokens[index] != preparedPrefixTokens[index]) {
+        throw new IllegalArgumentException(
+            "reconciled prompt must retain the immutable shared prefix and add a suffix");
+      }
+    }
+  }
+
   private static final class SessionBackend implements RewindableInferenceBackend {
     private final BatchInferenceBackend backend;
     private final InferenceSession session;
@@ -311,6 +435,24 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     @Override
     public void close() {
       session.close();
+    }
+
+    private boolean sharesPrefixStorageWith(SessionBackend other) {
+      if (backend != other.backend || !(backend instanceof SharedPrefixInferenceBackend sharing)) {
+        return false;
+      }
+      return sharing.sharesPrefixStorage(session, other.session);
+    }
+
+    private SharedInferencePrefix freezeSharedPrefix(SharedPrefixInferenceBackend owner) {
+      if (backend != owner) {
+        throw new IllegalArgumentException("shared-prefix backend does not own this session");
+      }
+      return owner.freezePrefix(session);
+    }
+
+    private OptionalLong allocatedStateBytes() {
+      return session.allocatedStateBytes();
     }
   }
 }

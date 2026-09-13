@@ -17,14 +17,19 @@ package com.integrallis.models.bench;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.ActivatedToolCallingModel;
+import com.integrallis.models.runtime.ActivatedToolTurn;
 import com.integrallis.models.runtime.GenerationLoop;
 import com.integrallis.models.runtime.InModelContrastiveEmbeddingBackend;
+import com.integrallis.models.runtime.SharedToolTurn;
+import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
@@ -41,6 +46,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /** Runs the shared small-model tool-calling gate through the pure-Java backend. */
 final class ToolCallingQualificationCli {
@@ -49,13 +55,14 @@ final class ToolCallingQualificationCli {
   private static final int PASS = 0;
   private static final int FAIL = 1;
   private static final Set<String> OPTIONS =
-      Set.of("candidate", "model", "report", "max-tokens", "models-revision", "case");
+      Set.of("candidate", "model", "adapter", "report", "max-tokens", "models-revision", "case");
 
   private ToolCallingQualificationCli() {}
 
   record Configuration(
       ToolCallingCandidate candidate,
       Path model,
+      Path adapter,
       Path report,
       int maxTokens,
       String modelsRevision,
@@ -75,6 +82,8 @@ final class ToolCallingQualificationCli {
       boolean applicable,
       long endToEndMillis,
       String output,
+      String initialToolOutput,
+      String postResultToolOutput,
       boolean conversational,
       boolean grounded,
       boolean repeatedToolCall,
@@ -84,6 +93,8 @@ final class ToolCallingQualificationCli {
       diagnostics = List.copyOf(diagnostics);
     }
   }
+
+  record ActivatedFollowUp(String initialToolOutput, String postResultToolOutput, String answer) {}
 
   record Report(
       int schemaVersion,
@@ -100,6 +111,7 @@ final class ToolCallingQualificationCli {
       GenerationControls generation,
       BenchmarkEnvironment environment,
       BackendDiagnostics backendDiagnostics,
+      ActivatedAdapterMetadata activatedAdapter,
       int plannedAttempts,
       List<String> inapplicableCases,
       boolean complete,
@@ -129,6 +141,21 @@ final class ToolCallingQualificationCli {
     if (!Files.isRegularFile(model)) {
       throw new IllegalArgumentException("artifact does not exist: " + model);
     }
+    Path adapter = null;
+    String configuredAdapter = values.get("adapter");
+    if (configuredAdapter != null) {
+      if (configuredAdapter.isBlank()) {
+        throw new IllegalArgumentException("--adapter must not be blank");
+      }
+      adapter = Path.of(configuredAdapter);
+      if (!Files.isDirectory(adapter)) {
+        throw new IllegalArgumentException("adapter directory does not exist: " + adapter);
+      }
+      if (!candidate.supportsActivatedAdapter()) {
+        throw new IllegalArgumentException(
+            "activated adapter qualification currently requires a supported Qwen3 graph");
+      }
+    }
     int maxTokens = BenchmarkCliArguments.integer(values, "max-tokens", 256);
     if (maxTokens < 32 || maxTokens > 512) {
       throw new IllegalArgumentException("--max-tokens must be between 32 and 512");
@@ -145,7 +172,7 @@ final class ToolCallingQualificationCli {
     if (caseId != null && caseId.isBlank()) {
       throw new IllegalArgumentException("--case must not be blank");
     }
-    return new Configuration(candidate, model, report, maxTokens, revision, caseId);
+    return new Configuration(candidate, model, adapter, report, maxTokens, revision, caseId);
   }
 
   static int run(String[] args) throws IOException {
@@ -171,12 +198,31 @@ final class ToolCallingQualificationCli {
         SamplingOptions.builder().temperature(0.0f).maxTokens(configuration.maxTokens()).build();
     List<Needle2ToolQualification.CaseResult> results = new ArrayList<>();
     BackendDiagnostics diagnostics;
+    ActivatedAdapterMetadata activatedAdapter = null;
     FollowUpResult followUp;
     long loadStart = System.nanoTime();
-    try (PureJavaBackend backend = PureJavaBackend.load(configuration.model())) {
+    PureJavaBackend backend =
+        configuration.adapter() == null
+            ? PureJavaBackend.load(configuration.model())
+            : PureJavaBackend.loadActivatedAdapter(configuration.model(), configuration.adapter());
+    ActivatedToolCallingModel activatedModel = null;
+    try {
+      if (configuration.adapter() != null) {
+        try {
+          activatedModel = new ActivatedToolCallingModel(backend);
+          activatedAdapter = activatedModel.adapter();
+        } catch (RuntimeException | Error failure) {
+          backend.close();
+          throw failure;
+        }
+      }
       System.out.printf(
-          "loaded %s in %.1f ms%n",
-          candidate.modelId(), (System.nanoTime() - loadStart) / 1_000_000.0);
+          "loaded %s%s in %.1f ms%n",
+          candidate.modelId(),
+          activatedModel == null
+              ? ""
+              : " with activated adapter " + activatedAdapter.adapterSha256(),
+          (System.nanoTime() - loadStart) / 1_000_000.0);
       GenerationLoop generation = new GenerationLoop(backend);
       diagnostics = backend.diagnostics();
       for (Needle2ToolQualification.Case item : selected) {
@@ -190,7 +236,10 @@ final class ToolCallingQualificationCli {
             backend.tokenizer().encode(prompt).length,
             tools.stream().map(ToolSpec::name).toList());
         long start = System.nanoTime();
-        String output = generate(candidate, backend, generation, prompt, options, tools);
+        String output =
+            activatedModel == null
+                ? generate(candidate, backend, generation, prompt, options, tools)
+                : generateActivated(activatedModel, prompt, options);
         long elapsedMillis = (System.nanoTime() - start) / 1_000_000L;
         Needle2ToolQualification.CaseResult result =
             Needle2ToolQualification.evaluate(
@@ -203,6 +252,7 @@ final class ToolCallingQualificationCli {
             createdAt,
             environment,
             diagnostics,
+            activatedAdapter,
             selected.size(),
             inapplicable,
             results,
@@ -220,7 +270,14 @@ final class ToolCallingQualificationCli {
             result.expectedArguments());
       }
       followUp =
-          runFollowUp(candidate, backend, generation, suite, mapper, configuration.maxTokens());
+          runFollowUp(
+              candidate,
+              backend,
+              generation,
+              activatedModel,
+              suite,
+              mapper,
+              configuration.maxTokens());
       if (followUp.applicable()) {
         System.out.printf(
             "%-24s %s %6d ms conversational=%s grounded=%s repeated-call=%s%n",
@@ -230,6 +287,12 @@ final class ToolCallingQualificationCli {
             followUp.conversational(),
             followUp.grounded(),
             followUp.repeatedToolCall());
+      }
+    } finally {
+      if (activatedModel != null) {
+        activatedModel.close();
+      } else {
+        backend.close();
       }
     }
 
@@ -241,6 +304,7 @@ final class ToolCallingQualificationCli {
         createdAt,
         environment,
         diagnostics,
+        activatedAdapter,
         selected.size(),
         inapplicable,
         results,
@@ -264,6 +328,7 @@ final class ToolCallingQualificationCli {
       ToolCallingCandidate candidate,
       PureJavaBackend backend,
       GenerationLoop generation,
+      ActivatedToolCallingModel activatedModel,
       Needle2ToolQualification.Suite suite,
       ObjectMapper mapper,
       int maxTokens) {
@@ -272,6 +337,8 @@ final class ToolCallingQualificationCli {
           "tool-result-follow-up",
           false,
           0,
+          "",
+          "",
           "",
           false,
           false,
@@ -290,7 +357,7 @@ final class ToolCallingQualificationCli {
     String result =
         "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
             + "\"temperatureInFahrenheit\":78}";
-    ModelPrompt prompt =
+    ModelPrompt resultPrompt =
         candidate
             .template()
             .render(
@@ -305,10 +372,46 @@ final class ToolCallingQualificationCli {
     SamplingOptions options =
         SamplingOptions.builder().temperature(0.0f).maxTokens(Math.min(maxTokens, 96)).build();
     long start = System.nanoTime();
-    String output = generation.generate(prompt, options);
+    String output;
+    String initialToolOutput = "";
+    String postResultToolOutput = "";
+    if (activatedModel == null) {
+      output = generation.generate(resultPrompt, options);
+    } else {
+      ModelPrompt selectionPrompt =
+          candidate.template().render(List.of(ChatMessage.user(weather.query())), tools);
+      Supplier<TokenConstraint> constraint =
+          () ->
+              ToolCallTokenConstraints.compile(
+                      activatedModel.tokenizer(),
+                      candidate.template().toolSyntax(),
+                      tools,
+                      ignored -> List.of("{\"zipcode\":\"88252\"}"),
+                      activatedModel.toolAbstentionOutputs())
+                  .orElseThrow();
+      try (SharedToolTurn initial = activatedModel.openToolTurn(selectionPrompt)) {
+        ActivatedFollowUp followUp =
+            generateActivatedFollowUp(
+                initial,
+                resultPrompt,
+                options,
+                candidate.template().toolSyntax(),
+                tools,
+                constraint);
+        initialToolOutput = followUp.initialToolOutput();
+        postResultToolOutput = followUp.postResultToolOutput();
+        output = followUp.answer();
+      }
+    }
     long elapsedMillis = (System.nanoTime() - start) / 1_000_000L;
     return evaluateFollowUp(
-        mapper, candidate.template().toolSyntax(), tools, output, elapsedMillis);
+        mapper,
+        candidate.template().toolSyntax(),
+        tools,
+        output,
+        elapsedMillis,
+        initialToolOutput,
+        postResultToolOutput);
   }
 
   static FollowUpResult evaluateFollowUp(
@@ -317,6 +420,17 @@ final class ToolCallingQualificationCli {
       List<ToolSpec> tools,
       String output,
       long elapsedMillis) {
+    return evaluateFollowUp(mapper, syntax, tools, output, elapsedMillis, "", "");
+  }
+
+  private static FollowUpResult evaluateFollowUp(
+      ObjectMapper mapper,
+      ToolSyntax syntax,
+      List<ToolSpec> tools,
+      String output,
+      long elapsedMillis,
+      String initialToolOutput,
+      String postResultToolOutput) {
     String generated = output == null ? "" : output.strip();
     List<String> diagnostics = new ArrayList<>();
     boolean repeatedCall = ToolCallScanner.scan(generated, syntax, tools).hasCalls();
@@ -350,11 +464,37 @@ final class ToolCallingQualificationCli {
         true,
         elapsedMillis,
         generated,
+        initialToolOutput,
+        postResultToolOutput,
         conversational,
         grounded,
         repeatedCall,
         passed,
         diagnostics);
+  }
+
+  static ActivatedFollowUp generateActivatedFollowUp(
+      SharedToolTurn initial,
+      ModelPrompt resultPrompt,
+      SamplingOptions options,
+      ToolSyntax syntax,
+      List<ToolSpec> tools,
+      Supplier<TokenConstraint> constraints) {
+    SharedToolTurn current = initial;
+    try {
+      String initialOutput = current.generateToolCall(options, constraints.get());
+      SharedToolTurn afterResult = current.continueToolSelection(resultPrompt);
+      current.close();
+      current = afterResult;
+      String postResultOutput = current.generateToolCall(options, constraints.get());
+      String answer =
+          ToolCallScanner.scan(postResultOutput, syntax, tools).hasCalls()
+              ? postResultOutput
+              : current.generateBaseResponse(resultPrompt, options);
+      return new ActivatedFollowUp(initialOutput, postResultOutput, answer);
+    } finally {
+      current.close();
+    }
   }
 
   private static String generate(
@@ -376,6 +516,13 @@ final class ToolCallingQualificationCli {
               .orElseThrow());
     }
     return generation.generate(prompt, options);
+  }
+
+  private static String generateActivated(
+      ActivatedToolCallingModel model, ModelPrompt prompt, SamplingOptions options) {
+    try (ActivatedToolTurn turn = model.openToolTurn(prompt)) {
+      return turn.generateToolCall(options, TokenConstraint.unrestricted());
+    }
   }
 
   private static List<ToolSpec> selectedTools(
@@ -430,6 +577,7 @@ final class ToolCallingQualificationCli {
       String createdAt,
       BenchmarkEnvironment environment,
       BackendDiagnostics diagnostics,
+      ActivatedAdapterMetadata activatedAdapter,
       int plannedAttempts,
       List<String> inapplicable,
       List<Needle2ToolQualification.CaseResult> results,
@@ -445,7 +593,7 @@ final class ToolCallingQualificationCli {
             && (followUp == null || !followUp.applicable() || followUp.passed());
     Report report =
         new Report(
-            1,
+            2,
             createdAt,
             POLICY_VERSION,
             configuration.modelsRevision(),
@@ -459,6 +607,7 @@ final class ToolCallingQualificationCli {
             new GenerationControls(0.0, configuration.maxTokens(), candidate.template().id()),
             environment,
             diagnostics,
+            activatedAdapter,
             plannedAttempts,
             inapplicable,
             complete,

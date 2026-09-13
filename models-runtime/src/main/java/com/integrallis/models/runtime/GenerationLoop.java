@@ -101,6 +101,40 @@ public final class GenerationLoop {
     cachedPromptTokens = null;
   }
 
+  /** Restores the exact prompt-token view for backend state prepared outside this loop. */
+  void restorePromptCache(int[] promptTokens) {
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    if (promptTokens.length == 0) {
+      throw new IllegalArgumentException("prepared prompt tokens must not be empty");
+    }
+    if (!(backend instanceof RewindableInferenceBackend rewindable)) {
+      throw new IllegalArgumentException("prepared prompt state requires a rewindable backend");
+    }
+    if (rewindable.checkpoint() != promptTokens.length) {
+      throw new IllegalArgumentException(
+          "prepared prompt token count does not match backend checkpoint: "
+              + promptTokens.length
+              + " != "
+              + rewindable.checkpoint());
+    }
+    cachedPromptTokens = promptTokens.clone();
+  }
+
+  /** Rejects a replacement prompt where a physical-prefix extension was promised. */
+  void requireStrictPromptExtension(int[] promptTokens) {
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    if (cachedPromptTokens == null || promptTokens.length <= cachedPromptTokens.length) {
+      throw new IllegalArgumentException(
+          "shared-prefix prompt must strictly extend the session's prepared prompt");
+    }
+    for (int index = 0; index < cachedPromptTokens.length; index++) {
+      if (promptTokens[index] != cachedPromptTokens[index]) {
+        throw new IllegalArgumentException(
+            "shared-prefix prompt must strictly extend the session's prepared prompt");
+      }
+    }
+  }
+
   /**
    * Prefills a rewindable backend without decoding output and retains the resulting prompt prefix.
    *
@@ -110,43 +144,57 @@ public final class GenerationLoop {
   public PromptPrefillMetrics prefillPrompt(ModelPrompt prompt) {
     requirePrompt(prompt);
     synchronized (executionLock) {
-      if (!(backend instanceof RewindableInferenceBackend)) {
-        throw new UnsupportedOperationException(
-            "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
-      }
       long started = nanoTime.getAsLong();
       long phaseStarted = started;
       int[] promptTokens = backend.tokenizer().encode(prompt);
       long phaseCompleted = nanoTime.getAsLong();
       long tokenizationNanos = elapsed(phaseStarted, phaseCompleted);
-      if (promptTokens.length == 0) {
-        throw new IllegalArgumentException("prompt produced no tokens");
-      }
-      phaseStarted = phaseCompleted;
-      PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
-      phaseCompleted = nanoTime.getAsLong();
-      long cachePreparationNanos = elapsed(phaseStarted, phaseCompleted);
-      long prefillStarted = phaseCompleted;
+      return prefillTokens(promptTokens, started, tokenizationNanos);
+    }
+  }
+
+  /** Prefills already-tokenized trusted input while preserving the exact prompt-cache lineage. */
+  PromptPrefillMetrics prefillTokens(int[] promptTokens) {
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    synchronized (executionLock) {
+      long started = nanoTime.getAsLong();
+      return prefillTokens(promptTokens.clone(), started, 0);
+    }
+  }
+
+  private PromptPrefillMetrics prefillTokens(
+      int[] promptTokens, long started, long tokenizationNanos) {
+    if (!(backend instanceof RewindableInferenceBackend)) {
+      throw new UnsupportedOperationException(
+          "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
+    }
+    if (promptTokens.length == 0) {
+      throw new IllegalArgumentException("prompt produced no tokens");
+    }
+    long phaseStarted = nanoTime.getAsLong();
+    PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
+    long phaseCompleted = nanoTime.getAsLong();
+    long cachePreparationNanos = elapsed(phaseStarted, phaseCompleted);
+    long prefillStarted = phaseCompleted;
+    try {
+      backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
+      cachedPromptTokens = promptTokens.clone();
+      lastPromptCacheMetrics = promptPrefill.metrics();
+      long completed = nanoTime.getAsLong();
+      return new PromptPrefillMetrics(
+          java.time.Duration.ofNanos(tokenizationNanos),
+          java.time.Duration.ofNanos(cachePreparationNanos),
+          java.time.Duration.ofNanos(elapsed(prefillStarted, completed)),
+          java.time.Duration.ofNanos(elapsed(started, completed)),
+          promptPrefill.metrics());
+    } catch (RuntimeException | Error failure) {
+      cachedPromptTokens = null;
       try {
-        backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
-        cachedPromptTokens = promptTokens.clone();
-        lastPromptCacheMetrics = promptPrefill.metrics();
-        long completed = nanoTime.getAsLong();
-        return new PromptPrefillMetrics(
-            java.time.Duration.ofNanos(tokenizationNanos),
-            java.time.Duration.ofNanos(cachePreparationNanos),
-            java.time.Duration.ofNanos(elapsed(prefillStarted, completed)),
-            java.time.Duration.ofNanos(elapsed(started, completed)),
-            promptPrefill.metrics());
-      } catch (RuntimeException | Error failure) {
-        cachedPromptTokens = null;
-        try {
-          backend.reset();
-        } catch (RuntimeException | Error resetFailure) {
-          failure.addSuppressed(resetFailure);
-        }
-        throw failure;
+        backend.reset();
+      } catch (RuntimeException | Error resetFailure) {
+        failure.addSuppressed(resetFailure);
       }
+      throw failure;
     }
   }
 
@@ -289,9 +337,9 @@ public final class GenerationLoop {
         emitter.finish();
         cachedPromptTokens =
             backend instanceof RewindableInferenceBackend ? promptTokens.clone() : null;
-        successful = true;
         stream.onComplete(
             new GenerationUsage(promptTokens.length, allTokens.size() - promptTokens.length));
+        successful = true;
       } catch (Exception e) {
         cachedPromptTokens = null;
         stream.onError(e);

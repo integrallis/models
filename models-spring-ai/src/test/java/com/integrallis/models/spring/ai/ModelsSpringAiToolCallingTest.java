@@ -19,8 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
@@ -28,12 +30,18 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.ActivatedToolModel;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
+import com.integrallis.models.runtime.GenerationMetrics;
+import com.integrallis.models.runtime.PromptCacheMetrics;
+import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -157,6 +165,29 @@ class ModelsSpringAiToolCallingTest {
       @Override
       public String call(String toolInput) {
         return "{}";
+      }
+    };
+  }
+
+  private static ToolCallback zipcodeWeatherCallback() {
+    ToolDefinition definition =
+        DefaultToolDefinition.builder()
+            .name("get-weather-for-zipcode")
+            .description("Gets weather for a given zipcode")
+            .inputSchema(
+                "{\"type\":\"object\",\"properties\":{\"zipcode\":{\"type\":\"string\"}},"
+                    + "\"required\":[\"zipcode\"]}")
+            .build();
+    return new ToolCallback() {
+      @Override
+      public ToolDefinition getToolDefinition() {
+        return definition;
+      }
+
+      @Override
+      public String call(String toolInput) {
+        return "{\"zipcode\":\"88252\",\"conditions\":\"Raining cats and dogs\","
+            + "\"temperature\":78}";
       }
     };
   }
@@ -408,6 +439,212 @@ class ModelsSpringAiToolCallingTest {
     }
 
     @Test
+    void activatedAdapterExecutesTheToolThenSynthesizesWithItsSharedBaseBranch() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"88252\"}}]</tool_call><|im_end|>",
+              "It is raining cats and dogs and 78 degrees in 88252.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "qwen-activated-tools",
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      ZipcodeWeatherTools weatherTools = new ZipcodeWeatherTools();
+      ChatClient client = ChatClient.builder(adapter).defaultTools(weatherTools).build();
+
+      String answer = client.prompt().user("What is the weather for 88252?").call().content();
+
+      assertThat(answer).isEqualTo("It is raining cats and dogs and 78 degrees in 88252.");
+      assertThat(weatherTools.invocations).hasValue(1);
+      assertThat(model.openedTurns).isEqualTo(2);
+      assertThat(model.responsePrompt).contains("88252", "Raining cats and dogs", "78");
+      assertThat(model.closedTurns).isEqualTo(2);
+      assertThat(model.ordinaryGenerations).isZero();
+    }
+
+    @Test
+    void activatedAdapterFiniteGrammarDoesNotForceAnIrrelevantToolCall() {
+      String abstention = "<tool_call>\n[]\n</tool_call>";
+      ActivatedScriptedModel model = new ActivatedScriptedModel(abstention, "Hello from the base.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "qwen-activated-tools",
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+
+      ChatResponse response =
+          adapter.call(promptWithModeTool(List.of(new UserMessage("Hello, how are you?"))));
+
+      assertThat(response.getResult().getOutput().getText()).isEqualTo("Hello from the base.");
+      TokenConstraint constraint = model.constraints.getFirst();
+      for (int token : abstention.chars().toArray()) {
+        assertThat(constraint.allows(token)).isTrue();
+        constraint.accept(token);
+      }
+      assertThat(constraint.isComplete()).isTrue();
+    }
+
+    @Test
+    void activatedAdapterReportsBothGenerationsAndTheirSharedCacheReads() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"88252\"}}]</tool_call><|im_end|>",
+              "It is 78 degrees in 88252.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "qwen-activated-tools",
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+
+      ChatResponse response =
+          adapter.call(
+              new Prompt(
+                  List.of(new UserMessage("What is the weather for 88252?")),
+                  toolOptions(List.of(zipcodeWeatherCallback()), false)));
+
+      assertThat(response.getMetadata().getUsage().getPromptTokens()).isEqualTo(340);
+      assertThat(response.getMetadata().getUsage().getCompletionTokens()).isEqualTo(20);
+      assertThat(response.getMetadata().getUsage().getTotalTokens()).isEqualTo(360);
+      assertThat(response.getMetadata().getUsage().getCacheReadInputTokens()).isEqualTo(30);
+      assertThat(response.getMetadata().getUsage().getCacheWriteInputTokens()).isEqualTo(310);
+    }
+
+    @Test
+    void activatedAdapterContinuesToolSelectionAcrossConsecutiveDependentCalls() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              List.of(
+                  "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"88252\"}}]</tool_call><|im_end|>",
+                  "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"10001\"}}]</tool_call><|im_end|>",
+                  "<tool_call>[]</tool_call><|im_end|>"),
+              "Jal is 78 degrees; New York is 72 degrees.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "qwen-activated-tools",
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      AtomicInteger invocations = new AtomicInteger();
+      ToolCallback callback =
+          new ToolCallback() {
+            @Override
+            public ToolDefinition getToolDefinition() {
+              return zipcodeWeatherCallback().getToolDefinition();
+            }
+
+            @Override
+            public String call(String toolInput) {
+              invocations.incrementAndGet();
+              return toolInput.contains("88252")
+                  ? "{\"zipcode\":\"88252\",\"temperature\":78}"
+                  : "{\"zipcode\":\"10001\",\"temperature\":72}";
+            }
+          };
+
+      ChatResponse response =
+          adapter.call(
+              new Prompt(
+                  List.of(new UserMessage("Compare the weather in 88252 and 10001.")),
+                  toolOptions(List.of(callback), false)));
+
+      assertThat(response.getResult().getOutput().getText())
+          .isEqualTo("Jal is 78 degrees; New York is 72 degrees.");
+      assertThat(invocations).hasValue(2);
+      assertThat(model.openedTurns).isEqualTo(3);
+      assertThat(model.extendedTurns).isEqualTo(2);
+      assertThat(model.closedTurns).isEqualTo(3);
+      assertThat(response.getMetadata().getUsage().getPromptTokens()).isEqualTo(440);
+      assertThat(response.getMetadata().getUsage().getCompletionTokens()).isEqualTo(24);
+    }
+
+    @Test
+    void activatedAdapterStreamsTheBaseAnswerAfterExecutingItsTool() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"88252\"}}]</tool_call><|im_end|>",
+              "It is 78 degrees in 88252.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "qwen-activated-tools",
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      ZipcodeWeatherTools weatherTools = new ZipcodeWeatherTools();
+      ChatClient client = ChatClient.builder(adapter).defaultTools(weatherTools).build();
+
+      String answer =
+          String.join(
+              "",
+              client.prompt().user("What is the weather for 88252?").stream()
+                  .content()
+                  .collectList()
+                  .block());
+
+      assertThat(answer).isEqualTo("It is 78 degrees in 88252.");
+      assertThat(weatherTools.invocations).hasValue(1);
+      assertThat(model.openedTurns).isEqualTo(2);
+      assertThat(model.extendedTurns).isEqualTo(1);
+      assertThat(model.closedTurns).isEqualTo(2);
+      assertThat(model.ordinaryGenerations).isZero();
+    }
+
+    @Test
+    void activatedAdapterStreamsAfterConsecutiveToolSelections() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              List.of(
+                  "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"88252\"}}]</tool_call><|im_end|>",
+                  "<tool_call>[{\"name\":\"get-weather-for-zipcode\",\"arguments\":{\"zipcode\":\"10001\"}}]</tool_call><|im_end|>",
+                  "<tool_call>[]</tool_call><|im_end|>"),
+              "Both weather reports are ready.");
+      ModelsSpringAiChatModel adapter =
+          new ModelsSpringAiChatModel(
+              model,
+              "qwen-activated-tools",
+              ChatTemplate.CHATML,
+              SamplingOptions.builder().build(),
+              Set.of("chat", "text-generation", "tool-calling"));
+      AtomicInteger invocations = new AtomicInteger();
+      ToolCallback callback =
+          new ToolCallback() {
+            @Override
+            public ToolDefinition getToolDefinition() {
+              return zipcodeWeatherCallback().getToolDefinition();
+            }
+
+            @Override
+            public String call(String toolInput) {
+              invocations.incrementAndGet();
+              return toolInput;
+            }
+          };
+      Prompt prompt =
+          new Prompt(
+              List.of(new UserMessage("Compare 88252 and 10001.")),
+              toolOptions(List.of(callback), false));
+
+      List<ChatResponse> responses = adapter.stream(prompt).collectList().block();
+
+      assertThat(responses)
+          .extracting(response -> response.getResult().getOutput().getText())
+          .containsExactly("Both weather reports are ready.", "");
+      assertThat(invocations).hasValue(2);
+      assertThat(model.openedTurns).isEqualTo(3);
+      assertThat(model.extendedTurns).isEqualTo(2);
+      assertThat(model.closedTurns).isEqualTo(3);
+      assertThat(responses.getLast().getMetadata().getUsage().getPromptTokens()).isEqualTo(440);
+      assertThat(responses.getLast().getMetadata().getUsage().getCompletionTokens()).isEqualTo(24);
+    }
+
+    @Test
     void gptOssHarmonyExecutesTheUsersToolAndReturnsOnlyTheFinalChannel() {
       SequentialScriptedModel model =
           new SequentialScriptedModel(
@@ -500,6 +737,215 @@ class ModelsSpringAiToolCallingTest {
 
     List<String> prompts() {
       return List.copyOf(prompts);
+    }
+  }
+
+  private static final class ActivatedScriptedModel implements ActivatedToolModel {
+    private final ArrayDeque<String> toolOutputs;
+    private final String responseOutput;
+    private final Tokenizer tokenizer = new CharacterTokenizer();
+    private int openedTurns;
+    private int closedTurns;
+    private int extendedTurns;
+    private int ordinaryGenerations;
+    private String responsePrompt;
+    private final List<TokenConstraint> constraints = new ArrayList<>();
+
+    private ActivatedScriptedModel(String toolOutput, String responseOutput) {
+      this(List.of(toolOutput, "<tool_call>[]</tool_call><|im_end|>"), responseOutput);
+    }
+
+    private ActivatedScriptedModel(List<String> toolOutputs, String responseOutput) {
+      this.toolOutputs = new ArrayDeque<>(toolOutputs);
+      this.responseOutput = responseOutput;
+    }
+
+    @Override
+    public ActivatedAdapterMetadata adapter() {
+      return new ActivatedAdapterMetadata(
+          "test/base",
+          "a".repeat(40),
+          "b".repeat(64),
+          java.util.Map.of("tokenizer.json", "d".repeat(64)),
+          "c".repeat(64),
+          1,
+          1,
+          List.of(1),
+          testProvenance());
+    }
+
+    @Override
+    public List<String> toolAbstentionOutputs() {
+      return List.of("<tool_call>\n[]\n</tool_call>");
+    }
+
+    private static ActivatedAdapterMetadata.TrainingProvenance testProvenance() {
+      return new ActivatedAdapterMetadata.TrainingProvenance(
+          "test/dataset",
+          "e".repeat(40),
+          "train.jsonl",
+          "f".repeat(64),
+          "1".repeat(64),
+          "2".repeat(64),
+          "3".repeat(64),
+          "formatter.java",
+          "4".repeat(64));
+    }
+
+    @Override
+    public SharedToolTurn openToolTurn(ModelPrompt renderedToolPrompt) {
+      openedTurns++;
+      String toolOutput = toolOutputs.removeFirst();
+      return new SharedToolTurn() {
+        @Override
+        public String generateToolCall(SamplingOptions options, TokenConstraint constraint) {
+          constraints.add(constraint);
+          return toolOutput;
+        }
+
+        @Override
+        public void generateToolCall(
+            SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+          constraints.add(constraint);
+          stream.onToken(toolOutput);
+          stream.onComplete();
+        }
+
+        @Override
+        public SharedToolTurn continueToolSelection(ModelPrompt nextToolPrompt) {
+          extendedTurns++;
+          close();
+          return ActivatedScriptedModel.this.openToolTurn(nextToolPrompt);
+        }
+
+        @Override
+        public String generateBaseResponse(ModelPrompt prompt, SamplingOptions options) {
+          responsePrompt = prompt.text();
+          return responseOutput;
+        }
+
+        @Override
+        public void generateBaseResponse(
+            ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+          responsePrompt = prompt.text();
+          stream.onToken(responseOutput);
+          stream.onComplete();
+        }
+
+        @Override
+        public int sharedPrefixTokens() {
+          return 10;
+        }
+
+        @Override
+        public long sharedPrefixBytes() {
+          return 1_024;
+        }
+
+        @Override
+        public boolean physicallySharesPrefix() {
+          return true;
+        }
+
+        @Override
+        public GenerationMetrics toolMetrics() {
+          return metrics(100, 4, 10);
+        }
+
+        @Override
+        public GenerationMetrics responseMetrics() {
+          return metrics(140, 12, 10);
+        }
+
+        @Override
+        public void close() {
+          if (!closed) {
+            closed = true;
+            closedTurns++;
+          }
+        }
+
+        private boolean closed;
+      };
+    }
+
+    private static GenerationMetrics metrics(
+        int promptTokens, int completionTokens, int cacheReadInputTokens) {
+      return new GenerationMetrics(
+          true,
+          true,
+          Duration.ZERO,
+          Duration.ZERO,
+          Duration.ZERO,
+          Optional.empty(),
+          Duration.ZERO,
+          Duration.ZERO,
+          new GenerationUsage(promptTokens, completionTokens),
+          new PromptCacheMetrics(
+              true, promptTokens, cacheReadInputTokens, promptTokens - cacheReadInputTokens));
+    }
+
+    @Override
+    public String modelName() {
+      return "activated-scripted";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("activated-scripted");
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return tokenizer;
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      ordinaryGenerations++;
+      stream.onError(new AssertionError("ordinary generation must not serve a tool turn"));
+    }
+
+    @Override
+    public void generate(
+        ModelPrompt prompt,
+        SamplingOptions options,
+        TokenStream stream,
+        TokenConstraint constraint) {
+      ordinaryGenerations++;
+      stream.onError(new AssertionError("ordinary generation must not serve a tool turn"));
+    }
+  }
+
+  private static final class CharacterTokenizer implements Tokenizer {
+    @Override
+    public int[] encode(String text) {
+      return text.chars().toArray();
+    }
+
+    @Override
+    public String decode(int[] tokens) {
+      return "";
+    }
+
+    @Override
+    public String decode(int token) {
+      return String.valueOf((char) token);
+    }
+
+    @Override
+    public int vocabSize() {
+      return Character.MAX_VALUE + 1;
+    }
+
+    @Override
+    public int bosToken() {
+      return 0;
+    }
+
+    @Override
+    public int eosToken() {
+      return 1;
     }
   }
 

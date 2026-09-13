@@ -27,8 +27,11 @@ import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.ActivatedToolModel;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
+import com.integrallis.models.runtime.GenerationMetrics;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
@@ -214,6 +217,15 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private ChatResponse callObserved(Prompt prompt, ChatModelObservationContext context) {
+    List<ToolSpec> initialDeclaredTools = declaredTools(prompt);
+    if (model instanceof ActivatedToolModel activatedModel && !initialDeclaredTools.isEmpty()) {
+      requireQualifiedToolCalling(initialDeclaredTools);
+      ChatResponse response =
+          callActivatedToolTurn(
+              prompt, activatedModel, selectedTools(prompt, initialDeclaredTools));
+      context.setResponse(response);
+      return response;
+    }
     Prompt current = prompt;
     for (int toolTurn = 0; toolTurn <= MAX_INTERNAL_TOOL_TURNS; toolTurn++) {
       ChatResponse response = callOnce(current);
@@ -236,6 +248,57 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       current = new Prompt(toolResult.conversationHistory(), current.getOptions());
     }
     throw new IllegalStateException("unreachable tool-calling state");
+  }
+
+  /**
+   * Runs the complete Spring tool round trip while the request-scoped base and activated branches
+   * are alive. Spring's outer advisor therefore receives the final conversational response and
+   * cannot accidentally split the physically shared turn across independent model calls.
+   */
+  private ChatResponse callActivatedToolTurn(
+      Prompt prompt, ActivatedToolModel activatedModel, List<ToolSpec> tools) {
+    Prompt current = prompt;
+    ModelPrompt rendered = render(current, tools);
+    SharedToolTurn turn = activatedModel.openToolTurn(rendered);
+    UsageAccumulator usage = new UsageAccumulator();
+    try {
+      for (int toolTurn = 0; ; toolTurn++) {
+        SamplingOptions requested = options(current, tools);
+        Optional<TokenConstraint> constraint = toolConstraint(tools);
+        String toolOutput =
+            turn.generateToolCall(requested, constraint.orElseGet(TokenConstraint::unrestricted));
+        GenerationMetrics toolMetrics = turn.toolMetrics();
+        usage.add(toolMetrics);
+        GenerationOutput generatedTool =
+            new GenerationOutput(toolOutput, toolMetrics.available() ? toolMetrics.usage() : null);
+        ChatResponse selection =
+            toolAwareResponse(generatedTool.text(), generatedTool.usage(), tools);
+        if (!selection.hasToolCalls()) {
+          String baseOutput = turn.generateBaseResponse(rendered, requested);
+          usage.add(turn.responseMetrics());
+          return responseWithUsage(baseOutput, usage);
+        }
+
+        ToolExecutionResult toolResult = toolCallingManager.executeToolCalls(current, selection);
+        if (toolResult.returnDirect()) {
+          return new ChatResponse(
+              ToolExecutionResult.buildGenerations(toolResult), metadata(usage));
+        }
+        if (toolTurn == MAX_INTERNAL_TOOL_TURNS) {
+          throw new IllegalStateException(
+              "tool-calling exceeded " + MAX_INTERNAL_TOOL_TURNS + " consecutive turns");
+        }
+        Prompt next = new Prompt(toolResult.conversationHistory(), current.getOptions());
+        ModelPrompt nextRendered = render(next, tools);
+        SharedToolTurn previous = turn;
+        turn = previous.continueToolSelection(nextRendered);
+        previous.close();
+        current = next;
+        rendered = nextRendered;
+      }
+    } finally {
+      turn.close();
+    }
   }
 
   private ChatResponse callOnce(Prompt prompt) {
@@ -324,6 +387,9 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     List<ToolSpec> declaredTools = declaredTools(prompt);
     requireQualifiedToolCalling(declaredTools);
     List<ToolSpec> tools = selectedTools(prompt, declaredTools);
+    if (model instanceof ActivatedToolModel activatedModel && !tools.isEmpty()) {
+      return streamActivatedToolTurn(prompt, activatedModel, tools);
+    }
     Flux<ChatResponse> response = streamOnce(prompt, tools);
     if (tools.isEmpty() || !internalToolExecutionEnabled(prompt.getOptions())) {
       return response;
@@ -352,6 +418,107 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     return streamOnce(next, tools)
         .single()
         .flatMapMany(result -> continueToolStream(next, result, toolTurn + 1));
+  }
+
+  private Flux<ChatResponse> streamActivatedToolTurn(
+      Prompt prompt, ActivatedToolModel activatedModel, List<ToolSpec> tools) {
+    return Flux.defer(
+        () -> {
+          ModelPrompt rendered = render(prompt, tools);
+          SharedToolTurn turn = activatedModel.openToolTurn(rendered);
+          return streamActivatedToolTurnStep(
+              prompt, rendered, turn, tools, new UsageAccumulator(), 0);
+        });
+  }
+
+  private Flux<ChatResponse> streamActivatedToolTurnStep(
+      Prompt prompt,
+      ModelPrompt rendered,
+      SharedToolTurn turn,
+      List<ToolSpec> tools,
+      UsageAccumulator usage,
+      int toolTurn) {
+    try {
+      SamplingOptions requested = options(prompt, tools);
+      Optional<TokenConstraint> constraint = toolConstraint(tools);
+      String toolOutput =
+          turn.generateToolCall(requested, constraint.orElseGet(TokenConstraint::unrestricted));
+      GenerationMetrics toolMetrics = turn.toolMetrics();
+      usage.add(toolMetrics);
+      ChatResponse selection =
+          toolAwareResponse(
+              toolOutput, toolMetrics.available() ? toolMetrics.usage() : null, tools);
+      if (!selection.hasToolCalls()) {
+        return streamActivatedBase(turn, rendered, requested, usage)
+            .doFinally(ignored -> turn.close());
+      }
+
+      ToolExecutionResult toolResult = toolCallingManager.executeToolCalls(prompt, selection);
+      if (toolResult.returnDirect()) {
+        turn.close();
+        return Flux.just(
+            new ChatResponse(ToolExecutionResult.buildGenerations(toolResult), metadata(usage)));
+      }
+      if (toolTurn == MAX_INTERNAL_TOOL_TURNS) {
+        turn.close();
+        return Flux.error(
+            new IllegalStateException(
+                "tool-calling exceeded " + MAX_INTERNAL_TOOL_TURNS + " consecutive turns"));
+      }
+      Prompt next = new Prompt(toolResult.conversationHistory(), prompt.getOptions());
+      ModelPrompt nextRendered = render(next, tools);
+      SharedToolTurn nextTurn = turn.continueToolSelection(nextRendered);
+      turn.close();
+      return streamActivatedToolTurnStep(next, nextRendered, nextTurn, tools, usage, toolTurn + 1);
+    } catch (RuntimeException | Error failure) {
+      turn.close();
+      return Flux.error(failure);
+    }
+  }
+
+  private Flux<ChatResponse> streamActivatedBase(
+      SharedToolTurn turn, ModelPrompt prompt, SamplingOptions options, UsageAccumulator usage) {
+    return Flux.create(
+        sink -> {
+          AtomicReference<Throwable> failure = new AtomicReference<>();
+          AtomicReference<GenerationUsage> reportedUsage = new AtomicReference<>();
+          try {
+            turn.generateBaseResponse(
+                prompt,
+                options,
+                new TokenStream() {
+                  @Override
+                  public void onToken(String token) {
+                    sink.next(response(token, null));
+                  }
+
+                  @Override
+                  public void onComplete() {}
+
+                  @Override
+                  public void onComplete(GenerationUsage usage) {
+                    reportedUsage.set(usage);
+                  }
+
+                  @Override
+                  public void onError(Throwable generationFailure) {
+                    failure.compareAndSet(null, generationFailure);
+                  }
+                });
+            throwFailure(failure.get());
+            GenerationMetrics responseMetrics = turn.responseMetrics();
+            if (responseMetrics.available()) {
+              usage.add(responseMetrics);
+              sink.next(responseWithUsage("", usage));
+            } else if (reportedUsage.get() != null) {
+              usage.add(reportedUsage.get());
+              sink.next(responseWithUsage("", usage));
+            }
+            sink.complete();
+          } catch (RuntimeException | Error generationFailure) {
+            sink.error(generationFailure);
+          }
+        });
   }
 
   private Flux<ChatResponse> streamOnce(Prompt prompt, List<ToolSpec> tools) {
@@ -544,8 +711,9 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   /**
    * Reads the tools the caller declared, if any.
    *
-   * <p>Spring AI 2.0 exposes them directly on {@link ToolCallingChatOptions}, so the adapter does
-   * not need a {@code ToolCallingManager} — the execution loop lives in the advisor, not here.
+   * <p>Spring AI 2.0 exposes them directly on {@link ToolCallingChatOptions}. The adapter uses its
+   * {@link ToolCallingManager} for internal tool execution when requested; otherwise it returns the
+   * structured calls for Spring AI's advisor to execute.
    */
   private static List<ToolSpec> declaredTools(Prompt prompt) {
     if (!(prompt.getOptions() instanceof ToolCallingChatOptions toolOptions)) {
@@ -630,7 +798,12 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       return Optional.empty();
     }
     return SpringAiToolCallConstraint.compile(
-        constrainedModel.tokenizer(), template.toolSyntax(), tools);
+        constrainedModel.tokenizer(),
+        template.toolSyntax(),
+        tools,
+        model instanceof ActivatedToolModel activatedModel
+            ? activatedModel.toolAbstentionOutputs()
+            : List.of());
   }
 
   /** Carries any tool calls the assistant previously made back into the rendered history. */
@@ -715,6 +888,10 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     return new ChatResponse(List.of(new Generation(new AssistantMessage(text))), metadata(usage));
   }
 
+  private ChatResponse responseWithUsage(String text, UsageAccumulator usage) {
+    return new ChatResponse(List.of(new Generation(new AssistantMessage(text))), metadata(usage));
+  }
+
   /** Builds a response that surfaces any recovered tool calls to Spring AI's advisor. */
   private ChatResponse toolAwareResponse(
       String output, GenerationUsage usage, List<ToolSpec> tools) {
@@ -741,6 +918,48 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       metadata.usage(new DefaultUsage(usage.promptTokens(), usage.completionTokens()));
     }
     return metadata.build();
+  }
+
+  private ChatResponseMetadata metadata(UsageAccumulator usage) {
+    var metadata = ChatResponseMetadata.builder().model(resolvedModelName());
+    if (usage.available) {
+      int totalTokens = Math.addExact(usage.promptTokens, usage.completionTokens);
+      metadata.usage(
+          new DefaultUsage(
+              usage.promptTokens,
+              usage.completionTokens,
+              totalTokens,
+              null,
+              usage.cacheReadInputTokens,
+              usage.cacheWriteInputTokens));
+    }
+    return metadata.build();
+  }
+
+  private static final class UsageAccumulator {
+    private int promptTokens;
+    private int completionTokens;
+    private long cacheReadInputTokens;
+    private long cacheWriteInputTokens;
+    private boolean available;
+
+    private void add(GenerationMetrics metrics) {
+      if (metrics != null && metrics.available()) {
+        add(metrics.usage());
+        cacheReadInputTokens =
+            Math.addExact(cacheReadInputTokens, metrics.promptCache().cacheReadInputTokens());
+        cacheWriteInputTokens =
+            Math.addExact(cacheWriteInputTokens, metrics.promptCache().cacheWriteInputTokens());
+      }
+    }
+
+    private void add(GenerationUsage usage) {
+      if (usage != null) {
+        available = true;
+        promptTokens = Math.addExact(promptTokens, usage.promptTokens());
+        completionTokens = Math.addExact(completionTokens, usage.completionTokens());
+      }
+    }
   }
 
   private String resolvedModelName() {

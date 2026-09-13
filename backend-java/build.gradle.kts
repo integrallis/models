@@ -213,6 +213,13 @@ val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
 val configuredMxbaiRerankerDirectory =
     providers.systemProperty("models.fixtures.mxbaiRerankerDirectory")
+val configuredActivatedLoraDirectory =
+    providers.systemProperty("models.fixtures.activatedLoraDirectory")
+val configuredActivatedLoraModel = providers.systemProperty("models.fixtures.activatedLoraModel")
+val configuredActivatedLoraOracle =
+    providers.systemProperty("models.fixtures.activatedLoraOracle")
+val configuredActivatedLoraCandidate =
+    providers.systemProperty("models.fixtures.activatedLoraCandidate")
 val configuredDebertaThreads = providers.systemProperty("models.deberta.threads")
 
 tasks.withType<Test>().configureEach {
@@ -243,6 +250,18 @@ tasks.withType<Test>().configureEach {
     }
     configuredMxbaiRerankerDirectory.orNull?.let {
         systemProperty("models.fixtures.mxbaiRerankerDirectory", it)
+    }
+    configuredActivatedLoraDirectory.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraDirectory", it)
+    }
+    configuredActivatedLoraModel.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraModel", it)
+    }
+    configuredActivatedLoraOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraOracle", it)
+    }
+    configuredActivatedLoraCandidate.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraCandidate", it)
     }
     configuredDebertaThreads.orNull?.let {
         systemProperty("models.deberta.threads", it)
@@ -406,6 +425,54 @@ tasks.register<Test>("hammerYarnCompatibilityTest") {
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "2g"
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
+}
+
+tasks.register<Test>("activatedLoraCompatibilityTest") {
+    description = "Verify a pinned real-weight Activated-LoRA through the Java shared-prefix path"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.ActivatedLoraModelIntegrationTest",
+        )
+    }
+    val configuredAdapter = configuredActivatedLoraDirectory.orNull
+    onlyIf("-Dmodels.fixtures.activatedLoraDirectory points to a provenance-bound adapter") {
+        configuredAdapter != null
+    }
+    configuredAdapter?.let {
+        systemProperty("models.fixtures.activatedLoraDirectory", it)
+    }
+    configuredActivatedLoraOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraOracle", it)
+    }
+    dependsOn(
+        providers.provider {
+            if (configuredActivatedLoraModel.orNull != null) {
+                emptyList<String>()
+            } else {
+                listOf(
+                    when (configuredActivatedLoraCandidate.orNull ?: "qwen3-0.6b") {
+                        "qwen3-0.6b" -> "downloadQwen306BQ40Model"
+                        "qwen3-1.7b" -> "downloadQwen317BQ80Model"
+                        else ->
+                            throw GradleException(
+                                "unsupported activated-LoRA candidate: " +
+                                    configuredActivatedLoraCandidate.get(),
+                            )
+                    },
+                )
+            }
+        },
+    )
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "3g"
     extensions.configure<JacocoTaskExtension> {
         isEnabled = false
     }

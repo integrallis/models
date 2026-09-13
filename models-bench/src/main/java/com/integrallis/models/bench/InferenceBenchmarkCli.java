@@ -118,6 +118,15 @@ public final class InferenceBenchmarkCli {
       System.exit(ToolCallingQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "activated-prefix-sharing".equals(args[0])) {
+      System.exit(ActivatedPrefixSharingBenchmarkCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-long-context".equals(args[0])) {
+      System.exit(
+          ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "virtual-model-qualification".equals(args[0])) {
       System.exit(VirtualModelQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;

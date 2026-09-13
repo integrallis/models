@@ -29,3 +29,23 @@ Run the gate only against the pinned artifact bytes:
 The report includes the artifact and suite digests, source revisions, generation controls, every
 raw response, per-case diagnostics, backend diagnostics, and the host/JVM environment. A failed
 gate exits non-zero and is not eligible for a qualified ModelJar.
+
+## Activated-adapter long-context retention
+
+`activated-long-context-v1.json` is the frozen semantic gate for a base-aligned activated adapter.
+Each of its eight cases puts a unique archive code near the beginning of an exact 4,096-token tool
+prompt. The adapter must select the declared weather tool; after the fixed tool result, the exact
+base branch must recover both the early code and the result value.
+
+The gate requires physical KV sharing and the exact prefix length for every case, all eight tool
+calls correct, at least six native base answers correct, every native-correct answer retained, and
+byte-identical output from the native and shared base paths. Run it with the exact base and adapter
+bytes:
+
+```shell
+./gradlew :models-bench:run --args="activated-long-context \
+  --model /path/to/model.gguf \
+  --adapter /path/to/activated-adapter \
+  --models-revision $(git rev-parse HEAD) \
+  --report benchmark-results/activated-long-context.json"
+```

@@ -15,14 +15,27 @@
  */
 package com.integrallis.models.backend.purejava;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.LogitBatch;
 import java.io.IOException;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /** Architecture-neutral decoder contract retained inside the pure-Java backend. */
 interface PureJavaDecoder extends AutoCloseable {
 
   interface Session {
     int checkpoint();
+
+    default OptionalLong allocatedStateBytes() {
+      return OptionalLong.empty();
+    }
+  }
+
+  interface SharedPrefix {
+    int checkpoint();
+
+    long sharedBytes();
   }
 
   int maxBatchSize();
@@ -98,6 +111,34 @@ interface PureJavaDecoder extends AutoCloseable {
   }
 
   Session openSession();
+
+  default boolean supportsSharedPrefixes() {
+    return false;
+  }
+
+  default boolean supportsActivatedBranch() {
+    return false;
+  }
+
+  default Optional<ActivatedAdapterMetadata> activatedAdapter() {
+    return Optional.empty();
+  }
+
+  default void activateAdapter(Session session) {
+    throw new UnsupportedOperationException("this decoder has no activated adapter branch");
+  }
+
+  default SharedPrefix freezePrefix(Session source) {
+    throw new UnsupportedOperationException("this decoder cannot share KV-cache prefixes");
+  }
+
+  default Session fork(SharedPrefix prefix, boolean activated) {
+    throw new UnsupportedOperationException("this decoder cannot share KV-cache prefixes");
+  }
+
+  default boolean sharesPrefixStorage(Session first, Session second) {
+    return false;
+  }
 
   float[] forward(Session session, int token, int position);
 

@@ -131,6 +131,10 @@ enum ToolCallingCandidate {
     return synthesizesToolResults;
   }
 
+  boolean supportsActivatedAdapter() {
+    return this == QWEN3_06B || this == QWEN3_17B;
+  }
+
   static ToolCallingCandidate parse(String value) {
     String normalized = value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     return Arrays.stream(values())

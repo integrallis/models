@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.api;
 
+import java.util.OptionalLong;
+
 /** Opaque state for one independent autoregressive sequence. */
 public interface InferenceSession extends AutoCloseable {
 
@@ -23,6 +25,19 @@ public interface InferenceSession extends AutoCloseable {
 
   /** Returns whether this session has released its backend-owned state. */
   boolean isClosed();
+
+  /**
+   * Returns the backend-reported storage bytes allocated for request-specific inference state, when
+   * measurable.
+   *
+   * <p>The value includes shared storage reachable by this session. Consumers counting multiple
+   * branches must subtract storage proven common through a {@link SharedInferencePrefix} exactly
+   * once. Implementations may report array or native-buffer payload rather than VM object headers;
+   * process RSS remains the complete process-level measurement.
+   */
+  default OptionalLong allocatedStateBytes() {
+    return OptionalLong.empty();
+  }
 
   /** Releases request-specific state. The operation is idempotent. */
   @Override

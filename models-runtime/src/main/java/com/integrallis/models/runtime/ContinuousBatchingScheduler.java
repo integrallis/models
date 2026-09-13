@@ -547,6 +547,18 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
     void invalidatePromptCache() {
       cachedPromptTokens = null;
     }
+
+    void restorePromptCache(int[] promptTokens) {
+      Objects.requireNonNull(promptTokens, "promptTokens");
+      if (session.checkpoint() != promptTokens.length) {
+        throw new IllegalArgumentException(
+            "prepared prompt token count does not match session checkpoint: "
+                + promptTokens.length
+                + " != "
+                + session.checkpoint());
+      }
+      cachedPromptTokens = promptTokens.clone();
+    }
   }
 
   private record TokenizedPrompt(int[] tokens, Duration tokenization) {
