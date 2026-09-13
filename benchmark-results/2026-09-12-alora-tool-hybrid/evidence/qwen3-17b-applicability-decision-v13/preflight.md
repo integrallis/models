@@ -105,5 +105,8 @@ gradient signs and zero-coefficient identity, and reproduced a serialized tensor
   `17cf4c46525705cd6ef147b5f6275079ec825fed8711041bf66b46fc9bd5ea18`
 
 GPU budget is capped at two hours for the paired screen and fixed endpoints, with an absolute
-three-hour deletion ceiling. At the prior A40-8Q rate this is approximately USD 0.58 expected and
-USD 0.86 maximum. Generation or JVM performance work is prohibited on the training host.
+three-hour deletion ceiling. Vultr reported no A40 capacity in any region and AWS reported an
+effective quota of zero for both on-demand and Spot G/VT instances. Before provisioning, the run
+was therefore bound to the available Vultr `ewr` `vcg-a16-3c-32g-8vram` plan at USD 172/month,
+approximately USD 0.236/hour: USD 0.47 expected and USD 0.71 maximum. Generation or JVM performance
+work is prohibited on the training host.
