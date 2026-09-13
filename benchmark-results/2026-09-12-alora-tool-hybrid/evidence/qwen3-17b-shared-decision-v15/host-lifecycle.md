@@ -26,6 +26,25 @@
   `resource_limit_exceeded: dedicated core limit exceeded`; it created no server. The provider
   inventory remained empty. The available `cpx51` was selected before any scored work. Because its
   vCPUs are shared, this run is correctness evidence only and cannot satisfy a performance gate.
+- Created: `2026-09-13T23:22:53Z`
+- Server ID / label: `165735073` / `modeljars-bench-alora-v15-20260913`
+- Address: `5.161.100.228`
+- First observed SSH host-key fingerprint: Ed25519
+  `SHA256:MdShnIGJBGdH40HRLFL2292PI04z6aR5jLTfzT3Kve8`, retained in the experiment-specific
+  `known_hosts`; global host-key checking was not bypassed
+- Network gate: Hetzner firewall `11618700` (`modeljars-alora-v15-ssh`) admits SSH only from the
+  qualification workstation's observed `/32`; no inbound application port is exposed
+- Host identity: Linux 6.8.0-138-generic, 16 single-thread AMD EPYC-Rome vCPUs, one NUMA node,
+  AVX2/FMA, 30 GiB visible RAM, no swap, and no competing model process before the run
+- Toolchain: Temurin 25.0.3+9, Gradle 9.4.1, Rust 1.96 only for compiling the repository's narrow
+  native module
+- Pre-run repository gates: `:models-runtime:check :models-bench:check` passed on the host
+- Uploaded model, adapter, and source-record SHA-256 values matched the preflight values before
+  execution
+- Runtime: exact sequential Java scoring, 16 Vector workers, 256-bit Panama vectors; remote model
+  process PID `6132`, launched under detached Gradle process `6029`
+- Watchdog: local launchd job `org.modeljars.alora-v15-watchdog` is armed to validate and delete the
+  exact server at the hard deadline
 
 Creation, host fingerprint, measured environment, evidence hashes, deletion time, and the final
 provider-wide inventory are appended only after those events occur.
