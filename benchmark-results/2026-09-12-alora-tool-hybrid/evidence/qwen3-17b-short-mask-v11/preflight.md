@@ -1,6 +1,7 @@
 # Qwen3 1.7B short function-masked rank-32 aLoRA preflight
 
-Status: **frozen before training; no V11 candidate result has been inspected**.
+Status: **preflight was frozen before training; V11 was subsequently rejected by its exposed
+smoke gate**.
 
 V11 corrects the input-only retention failure discovered at V10 startup. Callable names are short
 opaque ordinals such as `f0`; parameters use `p0`. Their assignment is shuffled by a deterministic
@@ -73,3 +74,11 @@ The Java oracle, Spring AI, LangChain4j, tool-result synthesis, multi-turn behav
 adapter, exact physical KV-block identity, complete memory accounting, 4,096-token retention,
 recompute equivalence, TTFT crossover, clean-host, packaging, and published-artifact gates are
 unchanged and remain mandatory after both Python gates.
+
+## Recorded outcome
+
+Training completed without changing the frozen inputs. The fixed exposed set then produced 86%
+exact calls, equal to the base and above the 85% floor, but only 97.33% valid syntax, 94.67% valid
+schema, and a 20% irrelevance false-tool rate. Those results fail three immutable gates, so the
+candidate is rejected. The sealed 300-case set was not opened, no JVM or packaging gate was used
+to override the failure, and no V11 artifact is eligible for release.

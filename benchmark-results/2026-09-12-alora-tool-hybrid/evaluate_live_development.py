@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from evaluate_alora import (
     BFCL_REVISION,
     generate_mode,
     load_slice,
+    load_system_policy,
     read_jsonl,
     resolve_adapter_identity,
     select_cases,
@@ -146,6 +148,7 @@ def main() -> None:
     parser.add_argument("--count", type=int, default=25)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument("--system-policy-file", type=Path)
     args = parser.parse_args()
     if args.out.exists():
         parser.error(f"output already exists: {args.out}")
@@ -155,6 +158,11 @@ def main() -> None:
         verify_sha256(args.data / relative, expected)
     verify_bfcl_data(args.qualification_data)
     identity = resolve_adapter_identity(args.adapter, args.training_manifest)
+    system_policy = (
+        load_system_policy(args.system_policy_file)
+        if args.system_policy_file is not None
+        else None
+    )
     development = [
         case
         for kind in ("simple", "multiple", "irrelevance")
@@ -193,6 +201,7 @@ def main() -> None:
         "adapter",
         args.batch_size,
         args.max_new_tokens,
+        system_policy,
     )
     args.out.mkdir(parents=True)
     records_path = args.out / "records.jsonl"
@@ -227,6 +236,15 @@ def main() -> None:
             "sha256": identity["adapterSha256"],
             "trainingManifestSha256": identity["trainingManifestSha256"],
         },
+        "systemPolicy": (
+            {
+                "path": str(args.system_policy_file),
+                "sha256": sha256(args.system_policy_file),
+                "contentSha256": hashlib.sha256(system_policy.encode()).hexdigest(),
+            }
+            if args.system_policy_file is not None and system_policy is not None
+            else None
+        ),
         "environment": {
             "torch": torch.__version__,
             "cuda": torch.version.cuda,

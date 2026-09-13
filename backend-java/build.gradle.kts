@@ -218,6 +218,10 @@ val configuredActivatedLoraDirectory =
 val configuredActivatedLoraModel = providers.systemProperty("models.fixtures.activatedLoraModel")
 val configuredActivatedLoraOracle =
     providers.systemProperty("models.fixtures.activatedLoraOracle")
+val configuredActivatedLoraPolicyOracle =
+    providers.systemProperty("models.fixtures.activatedLoraPolicyOracle")
+val configuredActivatedLoraSystemPolicy =
+    providers.systemProperty("models.fixtures.activatedLoraSystemPolicy")
 val configuredActivatedLoraCandidate =
     providers.systemProperty("models.fixtures.activatedLoraCandidate")
 val configuredDebertaThreads = providers.systemProperty("models.deberta.threads")
@@ -259,6 +263,12 @@ tasks.withType<Test>().configureEach {
     }
     configuredActivatedLoraOracle.orNull?.let {
         systemProperty("models.fixtures.activatedLoraOracle", it)
+    }
+    configuredActivatedLoraPolicyOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraPolicyOracle", it)
+    }
+    configuredActivatedLoraSystemPolicy.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraSystemPolicy", it)
     }
     configuredActivatedLoraCandidate.orNull?.let {
         systemProperty("models.fixtures.activatedLoraCandidate", it)
@@ -450,6 +460,12 @@ tasks.register<Test>("activatedLoraCompatibilityTest") {
     }
     configuredActivatedLoraOracle.orNull?.let {
         systemProperty("models.fixtures.activatedLoraOracle", it)
+    }
+    configuredActivatedLoraPolicyOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraPolicyOracle", it)
+    }
+    configuredActivatedLoraSystemPolicy.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraSystemPolicy", it)
     }
     dependsOn(
         providers.provider {

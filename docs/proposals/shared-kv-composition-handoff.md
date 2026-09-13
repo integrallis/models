@@ -12,6 +12,13 @@ that router passed all 36 turns and improved the median from 53.166 seconds to 3
 therefore did not satisfy the hybrid objective. Its ModelJars catalog qualification was withdrawn
 on 2026-09-12. It remains below as a measured routing experiment, not a releasable composition.
 
+The same-family activated-adapter branch now has real Qwen3 1.7B evidence for exact physical KV
+sharing, including independent recomputation, prepared-session reset, retained multi-turn crossover,
+and byte/token parity with the pinned Hugging Face prompt. None of the V4–V12 tool adapters has
+passed the unchanged behavior gates. V12 was the latest rejection: 75/75 syntax and schema, but
+42/50 exact calls versus a 43/50 floor and 5/25 false calls versus a 1/25 ceiling. The sealed
+qualification window remains unopened, so no hybrid artifact is authorized for publication.
+
 Concurrent-conversation follow-up: an opt-in runtime scheduler now batches compatible decode rows
 for sessions that share one physical model and interleaves bounded prompt chunks. Real
 Qwen3 and MiniCPM gates are token-exact. MiniCPM gains 62.83% aggregate throughput at four requests
@@ -171,16 +178,20 @@ base model's effective weights. Reuse only the exact base-aligned prefix; after 
 adapter owns a separate KV lineage.
 
 *Experimental status:* the Java runtime now freezes the pre-invocation KV once, verifies that the
-base and activated branches reference the same physical storage, applies the adapter during and
-after the pinned invocation tokens, and retains the exact base branch across Spring AI and
-LangChain4j tool execution. Synthetic tests prove the storage and lifecycle contracts; these do
-not replace the pending real-weight and clean-host qualification. The runtime also reports each
+base and activated branches reference the exact same source K/V arrays, applies the adapter during
+and after the pinned invocation tokens, and retains the exact base branch across Spring AI and
+LangChain4j tool execution. A real Qwen3 1.7B Q8_0 test begins below the measured sharing crossover,
+extends the same conversation beyond it, then proves physical array identity and exact base output.
+Tests also cover activation-boundary rewind/reset, prepared-session reset, backend/session lock
+ordering, close-failure cleanup, and retained-session KV release. These mechanics do not replace a
+passing held-out tool-quality and clean-host qualification. The runtime also reports each
 branch's allocated inference-state bytes and the unique two-branch total, subtracting the
 identity-proven shared prefix exactly once. The benchmark command compares that shared path with
 independent recomputation at 256, 1,024, and 4,096 prefix tokens and records JVM memory and process
-RSS alongside handoff TTFT. Its second policy revision also persists the generated token and rejects
-a timing or memory win unless shared and independently recomputed branches are token-exact at every
-measured context tier.
+RSS alongside handoff TTFT. Native-memory tracking is required rather than silently omitted. Its
+third policy revision records eight generated token IDs per arm and rejects a timing or memory win
+unless shared and independently recomputed branches are token-exact at every measured context tier;
+decoded strings alone are not treated as token identity.
 
 The production gate also includes eight exact 4,096-token tool conversations. Each places an opaque
 fact near the beginning, performs tool selection, adds the tool result, and asks the exact base

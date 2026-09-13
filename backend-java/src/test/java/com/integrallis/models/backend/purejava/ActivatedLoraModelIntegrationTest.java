@@ -55,6 +55,8 @@ class ActivatedLoraModelIntegrationTest {
   static final String ADAPTER_PROPERTY = "models.fixtures.activatedLoraDirectory";
   static final String MODEL_PROPERTY = "models.fixtures.activatedLoraModel";
   static final String ORACLE_PROPERTY = "models.fixtures.activatedLoraOracle";
+  static final String POLICY_ORACLE_PROPERTY = "models.fixtures.activatedLoraPolicyOracle";
+  static final String SYSTEM_POLICY_PROPERTY = "models.fixtures.activatedLoraSystemPolicy";
   static final String CANDIDATE_PROPERTY = "models.fixtures.activatedLoraCandidate";
 
   private static final ModelFixtureRequirement QWEN3_0_6B_Q4_0 =
@@ -166,35 +168,46 @@ class ActivatedLoraModelIntegrationTest {
     System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "1024");
     SamplingOptions oneToken = SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
 
+    ModelPrompt initialPrompt =
+        ChatTemplate.CHATML_NO_THINK.render(
+            List.of(ChatMessage.user("What is the weather for 88252?")), List.of(WEATHER));
+    ToolCall selectedCall = ToolCall.of(0, WEATHER.name(), "{\"zipcode\":\"88252\"}");
+    ModelPrompt resultPrompt =
+        ChatTemplate.CHATML_NO_THINK.render(
+            List.of(
+                ChatMessage.user("What is the weather for 88252?"),
+                ChatMessage.assistantToolCalls("", List.of(selectedCall)),
+                ChatMessage.tool(
+                    WEATHER.name(),
+                    "{\"zipcode\":\"88252\",\"conditions\":\"Rain\","
+                        + "\"temperatureInFahrenheit\":78}")),
+            List.of(WEATHER));
+    PureJavaBackend backend = PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath);
+    int[] invocation =
+        backend.activatedAdapter().orElseThrow().invocationTokens().stream()
+            .mapToInt(Integer::intValue)
+            .toArray();
+    int initialBoundary = lastIndexOf(backend.tokenizer().encode(initialPrompt), invocation);
+    int laterBoundary = lastIndexOf(backend.tokenizer().encode(resultPrompt), invocation);
+    assertThat(initialBoundary).isPositive();
+    assertThat(laterBoundary).isGreaterThan(initialBoundary);
+    int measuredCrossover = initialBoundary + 1;
+
     try (ActivatedToolCallingModel model =
-        new ActivatedToolCallingModel(
-            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath), 1)) {
+        new ActivatedToolCallingModel(backend, measuredCrossover)) {
       assertPinnedTrainingProvenance(model.adapter(), modelPath);
-      ModelPrompt initialPrompt =
-          ChatTemplate.CHATML_NO_THINK.render(
-              List.of(ChatMessage.user("What is the weather for 88252?")), List.of(WEATHER));
-      ToolCall selectedCall = ToolCall.of(0, WEATHER.name(), "{\"zipcode\":\"88252\"}");
-      ModelPrompt resultPrompt =
-          ChatTemplate.CHATML_NO_THINK.render(
-              List.of(
-                  ChatMessage.user("What is the weather for 88252?"),
-                  ChatMessage.assistantToolCalls("", List.of(selectedCall)),
-                  ChatMessage.tool(
-                      WEATHER.name(),
-                      "{\"zipcode\":\"88252\",\"conditions\":\"Rain\","
-                          + "\"temperatureInFahrenheit\":78}")),
-              List.of(WEATHER));
       String ordinaryBase = model.generate(resultPrompt, RESPONSE_OPTIONS);
+      assertThat(ordinaryBase).isNotBlank();
 
       try (ActivatedToolTurn first = model.openToolTurn(initialPrompt)) {
+        assertThat(first.physicallySharesPrefix()).isFalse();
+        assertThat(first.sharedPrefixTokens()).isZero();
         first.generateToolCall(oneToken, TokenConstraint.unrestricted());
-        long initialBytes = first.sharedPrefixBytes();
-        int initialTokens = first.sharedPrefixTokens();
 
         try (SharedToolTurn second = first.continueToolSelection(resultPrompt)) {
           assertThat(second.physicallySharesPrefix()).isTrue();
-          assertThat(second.sharedPrefixTokens()).isGreaterThan(initialTokens);
-          assertThat(second.sharedPrefixBytes()).isGreaterThan(initialBytes);
+          assertThat(second.sharedPrefixTokens()).isEqualTo(laterBoundary);
+          assertThat(second.sharedPrefixBytes()).isPositive();
 
           second.generateToolCall(oneToken, TokenConstraint.unrestricted());
           assertThat(second.toolMetrics().promptCache().cacheReadInputTokens())
@@ -209,6 +222,22 @@ class ActivatedLoraModelIntegrationTest {
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previous);
     }
+  }
+
+  private static int lastIndexOf(int[] tokens, int[] sequence) {
+    for (int offset = tokens.length - sequence.length; offset >= 0; offset--) {
+      boolean matches = true;
+      for (int index = 0; index < sequence.length; index++) {
+        if (tokens[offset + index] != sequence[index]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        return offset;
+      }
+    }
+    return -1;
   }
 
   @Test
@@ -293,6 +322,56 @@ class ActivatedLoraModelIntegrationTest {
     int[] expected = integers(tokensPath, integer(oracle, "tokenizer.tokens.count"));
     try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
       assertThat(backend.tokenizer().encode(prompt)).containsExactly(expected);
+    }
+  }
+
+  @Test
+  @EnabledIfSystemProperty(named = POLICY_ORACLE_PROPERTY, matches = ".+")
+  void matchesThePinnedPolicyPromptAndTokensExactly() throws Exception {
+    Path modelPath = modelPath();
+    Path adapterPath = Path.of(System.getProperty(ADAPTER_PROPERTY));
+    Path oraclePath = Path.of(System.getProperty(POLICY_ORACLE_PROPERTY));
+    Path policyPath = Path.of(System.getProperty(SYSTEM_POLICY_PROPERTY));
+    Properties oracle = new Properties();
+    try (InputStream input =
+        Files.newInputStream(oraclePath.resolve("policy-prompt-oracle.properties"))) {
+      oracle.load(input);
+    }
+    ActivatedFixture fixture = fixture();
+    assertThat(integer(oracle, "schema.version")).isEqualTo(1);
+    assertThat(required(oracle, "base.model")).isEqualTo(fixture.baseModel());
+    assertThat(required(oracle, "base.revision")).isEqualTo(fixture.baseRevision());
+    assertThat(required(oracle, "adapter.sha256"))
+        .isEqualTo(sha256(adapterPath.resolve("adapter_model.safetensors")));
+    assertThat(required(oracle, "training.manifest.sha256"))
+        .isEqualTo("d0620df4860c879f6d3f6e5573168bb08afc0b48d954040825e1317972f7de47");
+
+    byte[] policyFileBytes = Files.readAllBytes(policyPath);
+    String rawPolicy = new String(policyFileBytes, java.nio.charset.StandardCharsets.UTF_8);
+    assertThat(rawPolicy).endsWith("\n").doesNotEndWith("\n\n").doesNotContain("\r");
+    String policy = rawPolicy.substring(0, rawPolicy.length() - 1);
+    assertThat(required(oracle, "policy.file.sha256")).isEqualTo(sha256(policyPath));
+    assertThat(required(oracle, "policy.content.sha256"))
+        .isEqualTo(sha256(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+    ModelPrompt prompt =
+        ChatTemplate.CHATML_NO_THINK.render(
+            List.of(ChatMessage.system(policy), ChatMessage.user("What is the weather for 88252?")),
+            List.of(WEATHER));
+    Path promptPath = oraclePath.resolve(required(oracle, "prompt.file"));
+    assertThat(Files.size(promptPath)).isEqualTo(integer(oracle, "prompt.bytes"));
+    assertThat(sha256(promptPath)).isEqualTo(required(oracle, "prompt.sha256"));
+    assertThat(prompt.text()).isEqualTo(Files.readString(promptPath));
+    assertThat(prompt.text().indexOf(policy)).isLessThan(prompt.text().indexOf("# Tools"));
+    assertThat(prompt.text().indexOf(policy)).isEqualTo(prompt.text().lastIndexOf(policy));
+
+    Path tokensPath = oraclePath.resolve(required(oracle, "tokens.file"));
+    assertThat(sha256(tokensPath)).isEqualTo(required(oracle, "tokens.sha256"));
+    int[] expected = integers(tokensPath, integer(oracle, "tokens.count"));
+    try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+      int[] actual = backend.tokenizer().encode(prompt);
+      assertThat(actual).containsExactly(expected);
+      assertThat(lastIndexOf(actual, new int[] {151644, 77091, 198})).isPositive();
     }
   }
 
@@ -501,6 +580,10 @@ class ActivatedLoraModelIntegrationTest {
       }
     }
     return HexFormat.of().formatHex(digest.digest());
+  }
+
+  private static String sha256(byte[] bytes) throws Exception {
+    return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
   }
 
   private static void restoreSystemProperty(String name, String previous) {

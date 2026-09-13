@@ -457,10 +457,55 @@ def resolve_adapter_identity(adapter: Path, training_manifest: Path) -> dict[str
     }
 
 
-def render_prompts(tokenizer: Any, cases: list[dict[str, Any]]) -> list[str]:
+def load_system_policy(path: Path) -> str:
+    """Load one immutable UTF-8 policy file using a single conventional trailing newline."""
+    try:
+        raw = path.read_bytes()
+        decoded = raw.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise ValueError(f"cannot read system policy {path}: {error}") from error
+    if "\r" in decoded or not decoded.endswith("\n") or decoded.endswith("\n\n"):
+        raise ValueError("system policy must be UTF-8 with exactly one trailing LF")
+    policy = decoded[:-1]
+    if not policy.strip():
+        raise ValueError("system policy must not be blank")
+    return policy
+
+
+def apply_system_policy(
+    messages: list[dict[str, Any]], system_policy: str | None
+) -> list[dict[str, Any]]:
+    """Place a specialist policy in exactly one leading system turn without mutating a case."""
+    copied = [dict(message) for message in messages]
+    if system_policy is None:
+        return copied
+    if not system_policy.strip():
+        raise ValueError("system policy must not be blank")
+    system_positions = [
+        index for index, message in enumerate(copied) if message.get("role") == "system"
+    ]
+    if system_positions and system_positions != [0]:
+        raise ValueError("a policy-aware conversation may have only one leading system turn")
+    if system_positions:
+        caller_policy = copied[0].get("content")
+        if not isinstance(caller_policy, str):
+            raise ValueError("existing system content must be text")
+        copied[0]["content"] = (
+            system_policy if not caller_policy else f"{system_policy}\n\n{caller_policy}"
+        )
+    else:
+        copied.insert(0, {"role": "system", "content": system_policy})
+    return copied
+
+
+def render_prompts(
+    tokenizer: Any,
+    cases: list[dict[str, Any]],
+    system_policy: str | None = None,
+) -> list[str]:
     return [
         tokenizer.apply_chat_template(
-            case["messages"],
+            apply_system_policy(case["messages"], system_policy),
             tools=case["tools"],
             tokenize=False,
             add_generation_prompt=True,
@@ -477,10 +522,11 @@ def generate_mode(
     mode: str,
     batch_size: int,
     max_new_tokens: int,
+    system_policy: str | None = None,
 ) -> list[dict[str, Any]]:
     import torch
 
-    prompts = render_prompts(tokenizer, cases)
+    prompts = render_prompts(tokenizer, cases, system_policy)
     results = []
     adapter_context = model.disable_adapter if mode == "base" else contextlib.nullcontext
     started = time.perf_counter()
@@ -576,6 +622,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument("--system-policy-file", type=Path)
     parser.add_argument(
         "--smoke-count",
         type=int,
@@ -606,6 +653,11 @@ def main() -> None:
     count = args.smoke_count or QUALIFICATION_COUNT
     verify_bfcl_data(args.data)
     identity = resolve_adapter_identity(args.adapter, args.training_manifest)
+    system_policy = (
+        load_system_policy(args.system_policy_file)
+        if args.system_policy_file is not None
+        else None
+    )
 
     import peft
     import torch
@@ -645,7 +697,13 @@ def main() -> None:
     for mode in ("base", "adapter"):
         records.extend(
             generate_mode(
-                model, tokenizer, cases, mode, args.batch_size, args.max_new_tokens
+                model,
+                tokenizer,
+                cases,
+                mode,
+                args.batch_size,
+                args.max_new_tokens,
+                system_policy,
             )
         )
     args.out.mkdir(parents=True)
@@ -674,6 +732,15 @@ def main() -> None:
                 "sha256": identity["trainingManifestSha256"],
             },
         },
+        "systemPolicy": (
+            {
+                "path": str(args.system_policy_file),
+                "sha256": sha256(args.system_policy_file),
+                "contentSha256": hashlib.sha256(system_policy.encode()).hexdigest(),
+            }
+            if args.system_policy_file is not None and system_policy is not None
+            else None
+        ),
         "environment": {
             "torch": torch.__version__,
             "cuda": torch.version.cuda,

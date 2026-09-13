@@ -94,7 +94,8 @@ schema result, and expected call so the aggregate can be independently recompute
 
 ## Current status
 
-Protocol fixed; qualification is incomplete. The experimental JVM implementation now includes a
+Protocol and physical cache mechanics are implemented; no adapter has passed qualification. The
+experimental JVM implementation now includes a
 strict safetensors adapter loader, activation-boundary enforcement, physically shared immutable KV
 prefixes, request-scoped base/adapter branches, and Spring AI and LangChain4j tool loops. Synthetic
 tests prove those contracts, and a property-gated real-weight JVM test loads the exact Qwen3 GGUF
@@ -107,8 +108,11 @@ the adapter only after that prefix, and verifies that the two sessions share zer
 storage. A recomputed first turn can later freeze its retained clean base lineage and fork a longer
 turn over shared blocks. This supplies a like-for-like baseline for finding the 256/1,024/4,096-token
 crossover instead of comparing the shared path to a different model or prompt. The complete Python
-experiment suite currently passes 84 tests, and the affected Models API, pure-Java backend, runtime,
-Spring AI, LangChain4j, benchmark, and formatting suites pass together.
+experiment suite currently passes 90 tests, and the affected Models API, pure-Java backend, runtime,
+Spring AI, LangChain4j, benchmark, and formatting suites pass together. The Java real-weight
+crossover gate now also starts below the measured sharing threshold, retains conversation state,
+crosses that threshold on a later turn, and then proves that both branches reference the same
+immutable KV arrays while preserving exact base output.
 
 Runtime adapter metadata schema 4 now fails closed unless every training source and its role,
 revision and hash, the preparation schema and manifest, prepared split hashes, formatter hash,
@@ -269,6 +273,26 @@ V11 replaces those long names with deterministically shuffled short ordinals. Tw
 are byte-identical, and pinned-tokenizer preflight proves the exact V9 usable counts, no-call counts,
 multiple-call counts, and validation source-line hash. V11 is separately frozen under
 `evidence/qwen3-17b-short-mask-v11/preflight.md`; no threshold or evaluation case changed.
+
+V11 completed but was rejected by the exposed screen: 97.33% syntax, 94.67% schema, 86% exact
+calls, and 20% false calls. The sealed 300-case set was not opened. Its evidence was copied and
+hash-verified, the exact A40 instance was deleted, the deadline watchdog was unloaded, and Vultr
+inventory returned zero instances.
+
+V12 tested the strongest V9 weights unchanged under an explicit capability-applicability system
+contract. A new pre-score oracle first found that Models preserved raw schema whitespace while
+Qwen's published Jinja template canonicalized it. The test-first correction now matches the
+published prompt without moving developer-supplied schema into trusted control segments. The
+oracle also rejected a draft policy that spelled Qwen control delimiters in untrusted caller text;
+the delimiters were removed rather than weakening the injection boundary. The accepted oracle then
+matched all 1,072 prompt bytes and 228 token IDs between Hugging Face and the real Java Qwen3 1.7B
+Q8_0 path.
+
+V12 still failed the frozen exposed quality gates. It reached 75/75 syntax and schema, but only
+42/50 exact calls versus the 43/50 floor and the same-policy base's 45/50. It made 5/25 false calls
+versus the 1/25 ceiling. Neither the live-development screen nor the sealed qualification set was
+opened. Evidence is under `evidence/qwen3-17b-applicability-contract-v12/`; the exact A40 instance
+was deleted after hash verification and provider-wide Vultr inventory returned zero.
 
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.

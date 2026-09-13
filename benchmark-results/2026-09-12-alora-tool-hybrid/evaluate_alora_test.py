@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 
 from evaluate_alora import (
+    apply_system_policy,
     exact_calls_match,
     inference_device_name,
+    load_system_policy,
     parse_completion,
     resolve_qualification_window,
     resolve_adapter_identity,
@@ -17,6 +19,42 @@ from prepare_tool_data import canonical_json, query_fingerprint
 
 
 class EvaluateAloraTest(unittest.TestCase):
+    def test_loads_only_an_exact_utf8_policy_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            policy = Path(temporary) / "policy.txt"
+            policy.write_bytes("strict policy\nsecond line\n".encode())
+            self.assertEqual(load_system_policy(policy), "strict policy\nsecond line")
+
+            policy.write_bytes(b"strict policy")
+            with self.assertRaisesRegex(ValueError, "exactly one trailing LF"):
+                load_system_policy(policy)
+
+    def test_applies_one_policy_system_turn_without_mutating_the_case(self):
+        messages = [{"role": "user", "content": "weather"}]
+
+        applied = apply_system_policy(messages, "strict policy")
+
+        self.assertEqual(
+            applied,
+            [
+                {"role": "system", "content": "strict policy"},
+                {"role": "user", "content": "weather"},
+            ],
+        )
+        self.assertEqual(messages, [{"role": "user", "content": "weather"}])
+
+    def test_prepends_the_policy_once_to_an_existing_system_turn(self):
+        messages = [
+            {"role": "system", "content": "domain rules"},
+            {"role": "user", "content": "weather"},
+        ]
+
+        applied = apply_system_policy(messages, "strict policy")
+
+        self.assertEqual(len([message for message in applied if message["role"] == "system"]), 1)
+        self.assertEqual(applied[0]["content"], "strict policy\n\ndomain rules")
+        self.assertEqual(applied[0]["content"].count("strict policy"), 1)
+
     def test_resolves_and_verifies_the_exact_base_from_the_training_manifest(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

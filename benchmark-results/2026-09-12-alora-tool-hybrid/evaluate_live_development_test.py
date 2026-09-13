@@ -8,9 +8,18 @@ from evaluate_live_development import (
     assert_disjoint_from_prepared,
     load_live_slice,
 )
+from evaluate_alora import apply_system_policy
 
 
 class EvaluateLiveDevelopmentTest(unittest.TestCase):
+    def test_live_cases_use_the_same_policy_merge_as_static_evaluation(self):
+        applied = apply_system_policy(
+            [{"role": "user", "content": "weather"}], "strict policy"
+        )
+
+        self.assertEqual(applied[0], {"role": "system", "content": "strict policy"})
+        self.assertEqual(applied[1]["role"], "user")
+
     def test_loads_tool_and_irrelevance_cases_without_changing_ground_truth(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
