@@ -35,6 +35,8 @@ public final class ActivatedToolTurn implements SharedToolTurn {
   private final TextGenerationSession base;
   private final TextGenerationSession tool;
   private final boolean physicallyShared;
+  private final ActivatedToolCallingModel.PrefixStrategy prefixStrategy;
+  private final int minimumSharedPrefixTokens;
   private final AtomicBoolean closed = new AtomicBoolean();
   private boolean toolGenerated;
   private boolean responseGenerated;
@@ -50,7 +52,9 @@ public final class ActivatedToolTurn implements SharedToolTurn {
       long sharedPrefixBytes,
       TextGenerationSession base,
       TextGenerationSession tool,
-      boolean physicallyShared) {
+      boolean physicallyShared,
+      ActivatedToolCallingModel.PrefixStrategy prefixStrategy,
+      int minimumSharedPrefixTokens) {
     this.pipeline = Objects.requireNonNull(pipeline, "pipeline");
     this.invocationTokens = Objects.requireNonNull(invocationTokens, "invocationTokens").clone();
     this.renderedToolPrompt = renderedToolPrompt;
@@ -60,6 +64,8 @@ public final class ActivatedToolTurn implements SharedToolTurn {
     this.base = base;
     this.tool = tool;
     this.physicallyShared = physicallyShared;
+    this.prefixStrategy = Objects.requireNonNull(prefixStrategy, "prefixStrategy");
+    this.minimumSharedPrefixTokens = minimumSharedPrefixTokens;
   }
 
   /** Generates the structured tool selection on the activated branch. */
@@ -110,32 +116,61 @@ public final class ActivatedToolTurn implements SharedToolTurn {
     TextGenerationSession nextBase = null;
     TextGenerationSession nextTool = null;
     try {
-      SharedPromptPrefix nextPrefix =
-          responseGenerated
-              ? pipeline.reconcileSharedTokenPrefix(base, sharedTokens)
-              : pipeline.extendSharedTokenPrefix(base, sharedTokens);
+      if (ActivatedToolCallingModel.shouldShare(
+          prefixLength, prefixStrategy, minimumSharedPrefixTokens)) {
+        SharedPromptPrefix nextPrefix =
+            responseGenerated
+                ? pipeline.reconcileSharedTokenPrefix(base, sharedTokens)
+                : pipeline.extendSharedTokenPrefix(base, sharedTokens);
+        tool.close();
+        advanced = true;
+        nextBase =
+            pipeline.openGenerationSession(nextPrefix, SharedPrefixInferenceBackend.Branch.BASE);
+        nextTool =
+            pipeline.openGenerationSession(
+                nextPrefix, SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER);
+        boolean nextPhysicallyShared = nextBase.sharesPrefixStorageWith(nextTool);
+        if (!nextPhysicallyShared) {
+          throw new IllegalStateException(
+              "backend violated the shared-prefix contract while extending a tool turn");
+        }
+        return new ActivatedToolTurn(
+            pipeline,
+            invocationTokens,
+            nextToolPrompt,
+            nextPrefix.tokenCount(),
+            nextPrefix.tokenCount(),
+            nextPrefix.sharedBytes(),
+            nextBase,
+            nextTool,
+            true,
+            prefixStrategy,
+            minimumSharedPrefixTokens);
+      }
+
+      base.prefillTokenPrefix(sharedTokens);
+      nextBase = base;
+      nextTool =
+          pipeline.openGenerationSessionAfterBasePrefix(
+              sharedTokens, SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER);
+      if (nextBase.sharesPrefixStorageWith(nextTool)) {
+        throw new IllegalStateException(
+            "recomputed branches unexpectedly share physical KV storage");
+      }
       tool.close();
       advanced = true;
-      nextBase =
-          pipeline.openGenerationSession(nextPrefix, SharedPrefixInferenceBackend.Branch.BASE);
-      nextTool =
-          pipeline.openGenerationSession(
-              nextPrefix, SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER);
-      boolean nextPhysicallyShared = nextBase.sharesPrefixStorageWith(nextTool);
-      if (!nextPhysicallyShared) {
-        throw new IllegalStateException(
-            "backend violated the shared-prefix contract while extending a tool turn");
-      }
       return new ActivatedToolTurn(
           pipeline,
           invocationTokens,
           nextToolPrompt,
-          nextPrefix.tokenCount(),
-          nextPrefix.tokenCount(),
-          nextPrefix.sharedBytes(),
+          prefixLength,
+          0,
+          0,
           nextBase,
           nextTool,
-          true);
+          false,
+          prefixStrategy,
+          minimumSharedPrefixTokens);
     } catch (RuntimeException | Error failure) {
       failed = true;
       if (nextTool != null) {

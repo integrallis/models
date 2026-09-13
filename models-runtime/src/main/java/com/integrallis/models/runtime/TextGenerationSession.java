@@ -142,6 +142,21 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     }
   }
 
+  /** Prefills trusted token IDs while preserving this session's exact cache lineage. */
+  PromptPrefillMetrics prefillTokenPrefix(int[] promptTokens) {
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    synchronized (operationLock) {
+      requireOpen();
+      if (continuousBatching != null) {
+        throw new UnsupportedOperationException(
+            "prefilling trusted token IDs is not supported by continuous batching");
+      }
+      synchronized (executionLock) {
+        return generationLoop.prefillTokens(promptTokens);
+      }
+    }
+  }
+
   /**
    * Clears this session's mutable context and exact prompt history.
    *

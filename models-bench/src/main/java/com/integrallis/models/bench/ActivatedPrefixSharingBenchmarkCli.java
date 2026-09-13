@@ -140,7 +140,7 @@ final class ActivatedPrefixSharingBenchmarkCli {
 
     try (PureJavaBackend backend =
             PureJavaBackend.loadActivatedAdapter(configuration.model(), configuration.adapter());
-        ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend)) {
+        ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
       adapter = model.adapter();
       for (int prefixTokens : PREFIX_TIERS) {
         prompts.add(promptWithExactPrefix(model.tokenizer(), adapter, prefixTokens));

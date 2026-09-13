@@ -37,10 +37,87 @@ import org.junit.jupiter.api.Test;
 class ActivatedToolCallingModelTest {
 
   @Test
+  void recomputesIndependentBranchesBelowTheMeasuredSharingCrossover() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 3);
+        ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
+      assertThat(turn.sharedPrefixTokens()).isZero();
+      assertThat(turn.sharedPrefixBytes()).isZero();
+      assertThat(turn.physicallySharesPrefix()).isFalse();
+
+      turn.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
+      turn.generateBaseResponse(ModelPrompt.text("abXYz"), deterministicOptions());
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(true, 2, List.of((int) 'X', (int) 'Y')),
+            new Prefill(false, 2, List.of((int) 'X', (int) 'Y', (int) 'z')));
+  }
+
+  @Test
+  void physicallySharesAtTheMeasuredSharingCrossover() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 2);
+        ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
+      assertThat(turn.sharedPrefixTokens()).isEqualTo(2);
+      assertThat(turn.sharedPrefixBytes()).isEqualTo(64);
+      assertThat(turn.physicallySharesPrefix()).isTrue();
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(new Prefill(false, 0, List.of((int) 'a', (int) 'b')));
+  }
+
+  @Test
+  void explicitSharingOverridesTheAutomaticCrossoverForBenchmarking() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 100);
+        ActivatedToolTurn turn =
+            model.openToolTurn(
+                ModelPrompt.text("abXY"), ActivatedToolCallingModel.PrefixStrategy.SHARED)) {
+      assertThat(turn.sharedPrefixTokens()).isEqualTo(2);
+      assertThat(turn.physicallySharesPrefix()).isTrue();
+    }
+  }
+
+  @Test
+  void retainedConversationRecomputesOnlyTheToolBranchBelowTheCrossover() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 4);
+        ActivatedToolConversation conversation = model.openConversation()) {
+      conversation.generateBase(ModelPrompt.text("a"), deterministicOptions());
+      conversation.generateBase(ModelPrompt.text("ab"), deterministicOptions());
+
+      conversation.selectTool(
+          ModelPrompt.text("abqXY"), deterministicOptions(), TokenConstraint.unrestricted());
+      assertThat(conversation.sharedPrefixTokens()).isZero();
+      assertThat(conversation.sharedPrefixBytes()).isZero();
+      assertThat(conversation.physicallySharesPrefix()).isFalse();
+      conversation.completeToolResult(ModelPrompt.text("abqXYz"), deterministicOptions());
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a')),
+            new Prefill(false, 1, List.of((int) 'b')),
+            new Prefill(false, 2, List.of((int) 'q')),
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b', (int) 'q')),
+            new Prefill(true, 3, List.of((int) 'X', (int) 'Y')),
+            new Prefill(false, 3, List.of((int) 'X', (int) 'Y', (int) 'z')));
+  }
+
+  @Test
   void forksToolAndBaseTurnsFromOnePhysicalPrefixAndEvaluatesOnlyTheirSuffixes() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
         ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
       assertThat(turn.sharedPrefixTokens()).isEqualTo(2);
       assertThat(turn.sharedPrefixBytes()).isEqualTo(64);
@@ -66,7 +143,7 @@ class ActivatedToolCallingModelTest {
   void canRecomputeTheBasePrefixIndependentlyForAnHonestSharingCrossoverComparison() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
         ActivatedToolTurn turn =
             model.openToolTurn(
                 ModelPrompt.text("abXY"), ActivatedToolCallingModel.PrefixStrategy.RECOMPUTED)) {
@@ -92,13 +169,11 @@ class ActivatedToolCallingModelTest {
   }
 
   @Test
-  void aRecomputedFirstTurnCanPromoteItsBaseLineageToPhysicalSharingLater() {
+  void anAutomaticRecomputedFirstTurnPromotesToSharingAtTheMeasuredCrossover() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
-        ActivatedToolTurn first =
-            model.openToolTurn(
-                ModelPrompt.text("abXY"), ActivatedToolCallingModel.PrefixStrategy.RECOMPUTED)) {
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 6);
+        ActivatedToolTurn first = model.openToolTurn(ModelPrompt.text("abXY"))) {
       first.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
       first.generateBaseResponse(ModelPrompt.text("abXYz"), deterministicOptions());
 
@@ -121,8 +196,42 @@ class ActivatedToolCallingModelTest {
   }
 
   @Test
+  void explicitRecomputationRemainsIndependentAcrossConsecutiveTurns() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
+        ActivatedToolTurn first =
+            model.openToolTurn(
+                ModelPrompt.text("abXY"), ActivatedToolCallingModel.PrefixStrategy.RECOMPUTED)) {
+      first.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
+      first.generateBaseResponse(ModelPrompt.text("abXYz"), deterministicOptions());
+
+      try (SharedToolTurn later = first.continueToolSelection(ModelPrompt.text("abXYzqXY"))) {
+        assertThat(later.sharedPrefixTokens()).isZero();
+        assertThat(later.sharedPrefixBytes()).isZero();
+        assertThat(later.physicallySharesPrefix()).isFalse();
+        later.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
+      }
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(true, 2, List.of((int) 'X', (int) 'Y')),
+            new Prefill(false, 2, List.of((int) 'X', (int) 'Y', (int) 'z')),
+            new Prefill(false, 5, List.of((int) 'q')),
+            new Prefill(
+                false,
+                0,
+                List.of((int) 'a', (int) 'b', (int) 'X', (int) 'Y', (int) 'z', (int) 'q')),
+            new Prefill(true, 6, List.of((int) 'X', (int) 'Y')));
+  }
+
+  @Test
   void rejectsAPromptWithoutThePinnedInvocation() {
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(new ActivatedBackend())) {
+    try (ActivatedToolCallingModel model =
+        new ActivatedToolCallingModel(new ActivatedBackend(), 1)) {
       assertThatThrownBy(() -> model.openToolTurn(ModelPrompt.text("abX")))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("invocation sequence");
@@ -142,7 +251,8 @@ class ActivatedToolCallingModelTest {
           public void accept(int token) {}
         };
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(new ActivatedBackend());
+    try (ActivatedToolCallingModel model =
+            new ActivatedToolCallingModel(new ActivatedBackend(), 1);
         ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
       assertThatThrownBy(() -> turn.generateToolCall(deterministicOptions(), rejectsEveryToken))
           .hasMessageContaining("token constraint rejected every token");
@@ -184,7 +294,8 @@ class ActivatedToolCallingModelTest {
           }
         };
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(new ActivatedBackend());
+    try (ActivatedToolCallingModel model =
+            new ActivatedToolCallingModel(new ActivatedBackend(), 1);
         ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
       turn.generateToolCall(deterministicOptions(), acceptingStream, rejectsEveryToken);
 
@@ -218,7 +329,8 @@ class ActivatedToolCallingModelTest {
           }
         };
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(new ActivatedBackend());
+    try (ActivatedToolCallingModel model =
+            new ActivatedToolCallingModel(new ActivatedBackend(), 1);
         ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
       turn.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
       turn.generateBaseResponse(
@@ -259,7 +371,8 @@ class ActivatedToolCallingModelTest {
           }
         };
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(new ActivatedBackend());
+    try (ActivatedToolCallingModel model =
+            new ActivatedToolCallingModel(new ActivatedBackend(), 1);
         ActivatedToolConversation conversation = model.openConversation()) {
       conversation.selectTool(
           ModelPrompt.text("abXY"), deterministicOptions(), TokenConstraint.unrestricted());
@@ -280,7 +393,7 @@ class ActivatedToolCallingModelTest {
   void keepsTemplateControlTokensAfterTheInvocationOnTheActivatedBranch() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
         ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXYn"))) {
       assertThat(turn.sharedPrefixTokens()).isEqualTo(2);
       turn.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
@@ -296,7 +409,7 @@ class ActivatedToolCallingModelTest {
   void extendsTheBaseBranchIntoAConsecutiveToolTurnWithoutReevaluatingPriorContext() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
         ActivatedToolTurn first = model.openToolTurn(ModelPrompt.text("abXY"))) {
       first.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
 
@@ -324,7 +437,7 @@ class ActivatedToolCallingModelTest {
   void extendsTheBaseBranchAfterItsConversationalResponseIntoALaterToolTurn() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
         ActivatedToolTurn first = model.openToolTurn(ModelPrompt.text("abXY"))) {
       first.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
       first.generateBaseResponse(ModelPrompt.text("abXYz"), deterministicOptions());
@@ -354,7 +467,7 @@ class ActivatedToolCallingModelTest {
   void reconcilesTemplateControlChangesAfterAResponseWithoutRebuildingTheSharedPrefix() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
         ActivatedToolTurn first = model.openToolTurn(ModelPrompt.text("abXY"))) {
       first.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
       first.generateBaseResponse(ModelPrompt.text("abXYn"), deterministicOptions());
@@ -379,7 +492,7 @@ class ActivatedToolCallingModelTest {
   void keepsOneBaseCacheLineageAcrossProseToolAndLaterProseTurns() {
     ActivatedBackend backend = new ActivatedBackend();
 
-    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend);
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
         ActivatedToolConversation conversation = model.openConversation()) {
       conversation.generateBase(ModelPrompt.text("a"), deterministicOptions());
       conversation.generateBase(ModelPrompt.text("ab"), deterministicOptions());

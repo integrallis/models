@@ -112,7 +112,7 @@ class ActivatedLoraModelIntegrationTest {
 
     try (ActivatedToolCallingModel model =
         new ActivatedToolCallingModel(
-            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath))) {
+            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath), 1)) {
       assertPinnedTrainingProvenance(model.adapter(), modelPath);
       ModelPrompt selectionPrompt =
           ChatTemplate.CHATML_NO_THINK.render(
@@ -168,7 +168,7 @@ class ActivatedLoraModelIntegrationTest {
 
     try (ActivatedToolCallingModel model =
         new ActivatedToolCallingModel(
-            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath))) {
+            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath), 1)) {
       assertPinnedTrainingProvenance(model.adapter(), modelPath);
       ModelPrompt initialPrompt =
           ChatTemplate.CHATML_NO_THINK.render(
@@ -230,7 +230,7 @@ class ActivatedLoraModelIntegrationTest {
 
     try (ActivatedToolCallingModel model =
         new ActivatedToolCallingModel(
-            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath))) {
+            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath), 1)) {
       assertPinnedTrainingProvenance(model.adapter(), modelPath);
       ModelPrompt selectionPrompt =
           ChatTemplate.CHATML_NO_THINK.render(

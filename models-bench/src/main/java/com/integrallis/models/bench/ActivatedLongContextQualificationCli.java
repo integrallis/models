@@ -168,7 +168,7 @@ final class ActivatedLongContextQualificationCli {
 
     try (PureJavaBackend backend =
             PureJavaBackend.loadActivatedAdapter(configuration.model(), configuration.adapter());
-        ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend)) {
+        ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
       for (Case item : suite.cases()) {
         PreparedPrompt prompt = exactPrefixPrompt(model.tokenizer(), model.adapter(), suite, item);
         long nativeStarted = System.nanoTime();

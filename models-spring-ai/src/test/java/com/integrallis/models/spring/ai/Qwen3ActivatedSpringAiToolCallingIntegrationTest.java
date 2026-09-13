@@ -58,7 +58,7 @@ class Qwen3ActivatedSpringAiToolCallingIntegrationTest {
     Path adapterPath = fixture("models.fixtures.activatedLoraDirectory", true);
     try (ActivatedToolCallingModel model =
         new ActivatedToolCallingModel(
-            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath))) {
+            PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath), 1)) {
       var adapter =
           new ModelsSpringAiChatModel(
               model,

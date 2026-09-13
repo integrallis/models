@@ -209,7 +209,7 @@ final class ToolCallingQualificationCli {
     try {
       if (configuration.adapter() != null) {
         try {
-          activatedModel = new ActivatedToolCallingModel(backend);
+          activatedModel = new ActivatedToolCallingModel(backend, 1);
           activatedAdapter = activatedModel.adapter();
         } catch (RuntimeException | Error failure) {
           backend.close();

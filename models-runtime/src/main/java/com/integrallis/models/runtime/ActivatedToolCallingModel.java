@@ -39,6 +39,8 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
 
   /** How the base and activated branches obtain the context before the activation boundary. */
   public enum PrefixStrategy {
+    /** Select sharing only when the prompt reaches the measured crossover. */
+    AUTO,
     /** Evaluate the prefix once and fork both branches over the same physical KV storage. */
     SHARED,
     /** Evaluate the same base prefix independently in both branches without shared KV storage. */
@@ -47,11 +49,21 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
 
   private final InferencePipeline pipeline;
   private final ActivatedAdapterMetadata adapter;
+  private final int minimumSharedPrefixTokens;
   private final AtomicBoolean closed = new AtomicBoolean();
 
-  /** Creates a model that owns the supplied loaded backend. */
-  public ActivatedToolCallingModel(SharedPrefixInferenceBackend backend) {
+  /**
+   * Creates a model that owns the supplied loaded backend.
+   *
+   * @param minimumSharedPrefixTokens measured token crossover at which physical sharing is no
+   *     slower than independent prefix evaluation
+   */
+  public ActivatedToolCallingModel(
+      SharedPrefixInferenceBackend backend, int minimumSharedPrefixTokens) {
     Objects.requireNonNull(backend, "backend");
+    if (minimumSharedPrefixTokens <= 0) {
+      throw new IllegalArgumentException("minimumSharedPrefixTokens must be > 0");
+    }
     if (!backend.supportsActivatedBranch()) {
       throw new IllegalArgumentException("backend has no activated-adapter branch");
     }
@@ -62,6 +74,7 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
                 () ->
                     new IllegalArgumentException(
                         "backend did not expose its activated-adapter metadata"));
+    this.minimumSharedPrefixTokens = minimumSharedPrefixTokens;
     this.pipeline = new InferencePipeline(backend);
   }
 
@@ -69,6 +82,12 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
   public ActivatedAdapterMetadata adapter() {
     requireOpen();
     return adapter;
+  }
+
+  /** Returns the qualified prefix length at which automatic turns begin physical sharing. */
+  public int minimumSharedPrefixTokens() {
+    requireOpen();
+    return minimumSharedPrefixTokens;
   }
 
   @Override
@@ -79,24 +98,20 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
 
   /** Opens one request-scoped tool turn from a rendered prompt containing the pinned invocation. */
   public ActivatedToolTurn openToolTurn(ModelPrompt renderedToolPrompt) {
-    return openSharedToolTurn(renderedToolPrompt, null);
+    return openToolTurn(renderedToolPrompt, null, PrefixStrategy.AUTO);
   }
 
   /**
    * Opens one request-scoped turn with an explicit prefix strategy.
    *
-   * <p>{@link PrefixStrategy#RECOMPUTED} exists so qualification can measure the real sharing
-   * crossover against the same loaded model and adapter. Normal callers should use the default
-   * shared path.
+   * <p>The forced strategies exist so qualification can measure the real sharing crossover against
+   * the same loaded model and adapter. Normal callers should use the automatic path.
    */
   public ActivatedToolTurn openToolTurn(
       ModelPrompt renderedToolPrompt, PrefixStrategy prefixStrategy) {
     requireOpen();
     Objects.requireNonNull(prefixStrategy, "prefixStrategy");
-    if (prefixStrategy == PrefixStrategy.SHARED) {
-      return openSharedToolTurn(renderedToolPrompt, null);
-    }
-    return openRecomputedToolTurn(renderedToolPrompt);
+    return openToolTurn(renderedToolPrompt, null, prefixStrategy);
   }
 
   /** Opens one stateful base/tool conversation that retains one physical cache lineage. */
@@ -105,10 +120,18 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
     return new ActivatedToolConversation(this, pipeline);
   }
 
-  ActivatedToolTurn openSharedToolTurn(
+  ActivatedToolTurn openAutomaticToolTurn(
       ModelPrompt renderedToolPrompt, TextGenerationSession retainedBaseSession) {
+    return openToolTurn(renderedToolPrompt, retainedBaseSession, PrefixStrategy.AUTO);
+  }
+
+  private ActivatedToolTurn openToolTurn(
+      ModelPrompt renderedToolPrompt,
+      TextGenerationSession retainedBaseSession,
+      PrefixStrategy prefixStrategy) {
     requireOpen();
     Objects.requireNonNull(renderedToolPrompt, "renderedToolPrompt");
+    Objects.requireNonNull(prefixStrategy, "prefixStrategy");
     int[] promptTokens = pipeline.tokenize(renderedToolPrompt);
     int[] invocation = adapter.invocationTokens().stream().mapToInt(Integer::intValue).toArray();
     int prefixLength = lastIndexOf(promptTokens, invocation);
@@ -117,11 +140,25 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
           "rendered tool prompt must contain the activated adapter invocation sequence");
     }
 
-    int[] sharedTokens = java.util.Arrays.copyOf(promptTokens, prefixLength);
+    int[] prefixTokens = java.util.Arrays.copyOf(promptTokens, prefixLength);
+    if (shouldShare(prefixLength, prefixStrategy)) {
+      return openSharedToolTurn(
+          renderedToolPrompt, retainedBaseSession, prefixStrategy, invocation, prefixTokens);
+    }
+    return openRecomputedToolTurn(
+        renderedToolPrompt, retainedBaseSession, prefixStrategy, invocation, prefixTokens);
+  }
+
+  private ActivatedToolTurn openSharedToolTurn(
+      ModelPrompt renderedToolPrompt,
+      TextGenerationSession retainedBaseSession,
+      PrefixStrategy prefixStrategy,
+      int[] invocation,
+      int[] prefixTokens) {
     SharedPromptPrefix prefix =
         retainedBaseSession == null
-            ? pipeline.prepareSharedTokenPrefix(sharedTokens)
-            : pipeline.extendSharedTokenPrefix(retainedBaseSession, sharedTokens);
+            ? pipeline.prepareSharedTokenPrefix(prefixTokens)
+            : pipeline.extendSharedTokenPrefix(retainedBaseSession, prefixTokens);
     TextGenerationSession base = null;
     TextGenerationSession tool = null;
     try {
@@ -143,7 +180,9 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
           prefix.sharedBytes(),
           base,
           tool,
-          physicallyShared);
+          physicallyShared,
+          prefixStrategy,
+          minimumSharedPrefixTokens);
     } catch (RuntimeException | Error failure) {
       if (tool != null) {
         tool.close();
@@ -155,23 +194,23 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
     }
   }
 
-  private ActivatedToolTurn openRecomputedToolTurn(ModelPrompt renderedToolPrompt) {
-    Objects.requireNonNull(renderedToolPrompt, "renderedToolPrompt");
-    int[] promptTokens = pipeline.tokenize(renderedToolPrompt);
-    int[] invocation = adapter.invocationTokens().stream().mapToInt(Integer::intValue).toArray();
-    int prefixLength = lastIndexOf(promptTokens, invocation);
-    if (prefixLength <= 0) {
-      throw new IllegalArgumentException(
-          "rendered tool prompt must contain the activated adapter invocation sequence");
-    }
-
-    int[] prefixTokens = java.util.Arrays.copyOf(promptTokens, prefixLength);
+  private ActivatedToolTurn openRecomputedToolTurn(
+      ModelPrompt renderedToolPrompt,
+      TextGenerationSession retainedBaseSession,
+      PrefixStrategy prefixStrategy,
+      int[] invocation,
+      int[] prefixTokens) {
     TextGenerationSession base = null;
     TextGenerationSession tool = null;
     try {
-      base =
-          pipeline.openGenerationSessionAfterBasePrefix(
-              prefixTokens, SharedPrefixInferenceBackend.Branch.BASE);
+      if (retainedBaseSession == null) {
+        base =
+            pipeline.openGenerationSessionAfterBasePrefix(
+                prefixTokens, SharedPrefixInferenceBackend.Branch.BASE);
+      } else {
+        retainedBaseSession.prefillTokenPrefix(prefixTokens);
+        base = retainedBaseSession;
+      }
       tool =
           pipeline.openGenerationSessionAfterBasePrefix(
               prefixTokens, SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER);
@@ -180,7 +219,17 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
             "recomputed branches unexpectedly share physical KV storage");
       }
       return new ActivatedToolTurn(
-          pipeline, invocation, renderedToolPrompt, prefixLength, 0, 0, base, tool, false);
+          pipeline,
+          invocation,
+          renderedToolPrompt,
+          prefixTokens.length,
+          0,
+          0,
+          base,
+          tool,
+          false,
+          prefixStrategy,
+          minimumSharedPrefixTokens);
     } catch (RuntimeException | Error failure) {
       if (tool != null) {
         tool.close();
@@ -190,6 +239,16 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
       }
       throw failure;
     }
+  }
+
+  static boolean shouldShare(
+      int prefixTokens, PrefixStrategy prefixStrategy, int minimumSharedPrefixTokens) {
+    return prefixStrategy == PrefixStrategy.SHARED
+        || (prefixStrategy == PrefixStrategy.AUTO && prefixTokens >= minimumSharedPrefixTokens);
+  }
+
+  private boolean shouldShare(int prefixTokens, PrefixStrategy prefixStrategy) {
+    return shouldShare(prefixTokens, prefixStrategy, minimumSharedPrefixTokens);
   }
 
   @Override

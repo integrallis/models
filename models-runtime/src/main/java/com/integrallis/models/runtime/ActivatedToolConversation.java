@@ -179,7 +179,7 @@ public final class ActivatedToolConversation implements AutoCloseable {
 
     TextGenerationSession retained = baseSession;
     try {
-      activeTurn = model.openSharedToolTurn(prompt, retained);
+      activeTurn = model.openAutomaticToolTurn(prompt, retained);
       baseSession = null;
       captureSharedPrefix(activeTurn);
       return activeTurn;

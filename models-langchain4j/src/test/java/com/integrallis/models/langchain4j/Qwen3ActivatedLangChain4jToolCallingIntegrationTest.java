@@ -61,7 +61,7 @@ class Qwen3ActivatedLangChain4jToolCallingIntegrationTest {
     try (ModelsChatModel adapter =
         new ModelsChatModel(
             new ActivatedToolCallingModel(
-                PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath)),
+                PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath), 1),
             ChatTemplate.CHATML_NO_THINK,
             SamplingOptions.builder().temperature(0.0f).maxTokens(128).build())) {
       WeatherTools weatherTools = new WeatherTools();
