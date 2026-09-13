@@ -1347,7 +1347,7 @@ class LlamaForwardPassTest {
     }
 
     @Test
-    void stagedQ8LayerPreservesPrefillCacheAndAutoregressiveStateExactly() {
+    void stagedQ8LayerPreservesPrefillCacheAndAutoregressiveStateWithinSimdTolerance() {
       try (Arena arena = Arena.ofShared()) {
         GgufFile file = copyToSharedArena(buildQ8NanoModel(new Random(42)), arena);
         LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
@@ -1527,21 +1527,27 @@ class LlamaForwardPassTest {
         assertThat(staged.usesStagedQuantizedLayer()).isTrue();
         assertThat(staged.usesBlockMajorQ8Activations()).isTrue();
         assertThat(staged.stagedQuantizedLayerStageCount()).isEqualTo(7);
-        assertThat(actual).containsExactly(expected);
-        assertThat(actualKeys).containsExactly(expectedKeys);
-        assertThat(actualValues).containsExactly(expectedValues);
-        assertThat(actualNext).containsExactly(expectedNext);
+        assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(actualKeys).containsExactly(expectedKeys, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(actualValues).containsExactly(expectedValues, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(actualNext).containsExactly(expectedNext, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(parallel.usesParallelQ8FfnPreparation()).isTrue();
-        assertThat(parallelActual).containsExactly(actual);
-        assertThat(parallelCache.keyBuffer()).containsExactly(actualKeys);
-        assertThat(parallelCache.valueBuffer()).containsExactly(actualValues);
-        assertThat(parallel.forward(nextToken, tokens.length)).containsExactly(actualNext);
+        assertThat(parallelActual).containsExactly(actual, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(parallelCache.keyBuffer())
+            .containsExactly(actualKeys, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(parallelCache.valueBuffer())
+            .containsExactly(actualValues, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(parallel.forward(nextToken, tokens.length))
+            .containsExactly(actualNext, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(rowAccumulatedPlan.q8BlockMajorKernel())
             .isEqualTo(GgufQ8BlockMajorKernel.ROW_ACCUMULATED);
-        assertThat(rowAccumulatedActual).containsExactly(actual);
-        assertThat(rowAccumulatedCache.keyBuffer()).containsExactly(actualKeys);
-        assertThat(rowAccumulatedCache.valueBuffer()).containsExactly(actualValues);
-        assertThat(rowAccumulated.forward(nextToken, tokens.length)).containsExactly(actualNext);
+        assertThat(rowAccumulatedActual).containsExactly(actual, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(rowAccumulatedCache.keyBuffer())
+            .containsExactly(actualKeys, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(rowAccumulatedCache.valueBuffer())
+            .containsExactly(actualValues, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(rowAccumulated.forward(nextToken, tokens.length))
+            .containsExactly(actualNext, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(floatLanePlan.q8BlockMajorKernel())
             .isEqualTo(GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED);
         assertThat(secondFloatLaneActual).containsExactly(firstFloatLaneActual);
