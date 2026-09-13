@@ -162,6 +162,53 @@ def combined_loss(language_model_loss: Any, decision_loss: Any, coefficient: flo
     return language_model_loss + coefficient * decision_loss
 
 
+def require_matching_fingerprints(expected: str, actual: str, context: str) -> None:
+    """Fail closed when two canonical fingerprints are not identical."""
+    if actual != expected:
+        raise ValueError(
+            f"{context} fingerprints differ: expected {expected}, got {actual}"
+        )
+
+
+def adapter_state_sha256(state_dict: dict[str, Any], torch_module: Any) -> str:
+    """Fingerprint named adapter tensors without depending on mapping order."""
+    digest = hashlib.sha256()
+    for name in sorted(state_dict):
+        tensor = state_dict[name].detach().cpu().contiguous()
+        digest.update(name.encode())
+        digest.update(b"\0")
+        digest.update(str(tensor.dtype).encode())
+        digest.update(b"\0")
+        digest.update(json.dumps(list(tensor.shape), separators=(",", ":")).encode())
+        digest.update(b"\0")
+        digest.update(tensor.view(torch_module.uint8).numpy().tobytes())
+    return digest.hexdigest()
+
+
+def json_safe(value: Any) -> Any:
+    """Convert PEFT configuration values to deterministic JSON data."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): json_safe(value[key]) for key in sorted(value, key=str)}
+    if isinstance(value, set):
+        return [json_safe(item) for item in sorted(value, key=str)]
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    return str(value)
+
+
+def unwrap_training_model(trainer: Any) -> Any:
+    """Remove Accelerate's autocast forward wrapper before inference gates."""
+    return trainer.accelerator.unwrap_model(
+        trainer.model,
+        keep_fp32_wrapper=False,
+        keep_torch_compile=False,
+    )
+
+
 def load_decision_examples(
     path: Path, tokenizer: Any, max_length: int
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -537,7 +584,7 @@ def main() -> None:
     import safetensors
     import torch
     import transformers
-    from peft import PeftModel
+    from peft import PeftModel, get_peft_model_state_dict
     from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainerCallback, TrainingArguments
 
     if not torch.cuda.is_available():
@@ -634,17 +681,13 @@ def main() -> None:
         callbacks=callbacks,
     )
     train_result = trainer.train()
+    model = unwrap_training_model(trainer)
     prepare_for_evaluation(model, True)
-    evaluation = evaluate_teacher_forcing(
-        model,
-        validation_examples,
-        collator,
-        contract,
-        call_weight,
-        no_call_weight,
-        torch,
-    )
     final_logits = initial_logits_sha256(model, validation_examples, collator, torch)
+    trained_adapter_state = adapter_state_sha256(
+        get_peft_model_state_dict(model), torch
+    )
+    trained_peft_config = model.peft_config[model.active_adapter].to_dict()
     with model.disable_adapter():
         final_disabled_logits = initial_logits_sha256(
             model, validation_examples, collator, torch
@@ -654,6 +697,10 @@ def main() -> None:
     adapter = args.out / "adapter"
     model.save_pretrained(adapter, safe_serialization=True)
     tokenizer.save_pretrained(adapter)
+    post_save_logits = initial_logits_sha256(
+        model, validation_examples, collator, torch
+    )
+    require_matching_fingerprints(final_logits, post_save_logits, "after-save logits")
     adapter_files = [
         {"name": path.name, "bytes": path.stat().st_size, "sha256": sha256(path)}
         for path in sorted(adapter.iterdir())
@@ -676,8 +723,40 @@ def main() -> None:
     reloaded_logits = initial_logits_sha256(
         reloaded, validation_examples, collator, torch
     )
-    if reloaded_logits != final_logits:
-        raise ValueError("saved/reloaded adapter logits differ from the trained checkpoint")
+    reloaded_adapter_state = adapter_state_sha256(
+        get_peft_model_state_dict(reloaded), torch
+    )
+    reload_diagnostic = {
+        "trainedAdapterStateSha256": trained_adapter_state,
+        "reloadedAdapterStateSha256": reloaded_adapter_state,
+        "adapterStateExact": trained_adapter_state == reloaded_adapter_state,
+        "trainedLogitsSha256": final_logits,
+        "postSaveLogitsSha256": post_save_logits,
+        "reloadedLogitsSha256": reloaded_logits,
+        "logitsExact": final_logits == reloaded_logits,
+        "trainedPeftConfig": json_safe(trained_peft_config),
+        "reloadedPeftConfig": json_safe(
+            reloaded.peft_config[reloaded.active_adapter].to_dict()
+        ),
+    }
+    (args.out / "reload-diagnostic.json").write_text(
+        json.dumps(reload_diagnostic, indent=2, sort_keys=True) + "\n"
+    )
+    require_matching_fingerprints(
+        trained_adapter_state, reloaded_adapter_state, "saved/reloaded adapter state"
+    )
+    require_matching_fingerprints(
+        final_logits, reloaded_logits, "saved/reloaded adapter logits"
+    )
+    evaluation = evaluate_teacher_forcing(
+        reloaded,
+        validation_examples,
+        collator,
+        contract,
+        call_weight,
+        no_call_weight,
+        torch,
+    )
     del reloaded
     gc.collect()
     torch.cuda.empty_cache()
@@ -722,10 +801,13 @@ def main() -> None:
             "exactBaseLogitsSha256": base_logits,
             "initialDisabledAdapterLogitsSha256": initial_disabled_logits,
             "finalLogitsSha256": final_logits,
+            "postSaveLogitsSha256": post_save_logits,
             "finalDisabledAdapterLogitsSha256": final_disabled_logits,
             "reloadedLogitsSha256": reloaded_logits,
             "metrics": train_result.metrics,
             "finiteGradientChecks": finite_gradient_checks,
+            "trainedAdapterStateSha256": trained_adapter_state,
+            "reloadedAdapterStateSha256": reloaded_adapter_state,
             "teacherForcedEvaluation": evaluation,
         },
         "continuedFrom": initial_adapter,

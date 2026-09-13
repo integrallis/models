@@ -6,11 +6,15 @@ from train_applicability_alora import (
     CALL_LABEL,
     NO_CALL_LABEL,
     auxiliary_loss,
+    adapter_state_sha256,
     build_decision_example,
     class_weights,
     combined_loss,
     decision_contract,
     decision_prediction_position,
+    json_safe,
+    require_matching_fingerprints,
+    unwrap_training_model,
 )
 from train_alora import INVOCATION_TOKENS
 
@@ -42,6 +46,72 @@ class FakeTokenizer:
 
 
 class ApplicabilityAloraTest(unittest.TestCase):
+    def test_training_model_is_unwrapped_without_the_autocast_forward_wrapper(self):
+        sentinel = object()
+
+        class FakeAccelerator:
+            def unwrap_model(self, model, **kwargs):
+                self.call = (model, kwargs)
+                return sentinel
+
+        class FakeTrainer:
+            model = object()
+            accelerator = FakeAccelerator()
+
+        trainer = FakeTrainer()
+
+        self.assertIs(unwrap_training_model(trainer), sentinel)
+        self.assertEqual(
+            trainer.accelerator.call,
+            (
+                trainer.model,
+                {"keep_fp32_wrapper": False, "keep_torch_compile": False},
+            ),
+        )
+
+    def test_json_safe_canonicalizes_nested_sets_and_paths(self):
+        value = {"targets": {"b", "a"}, "path": Path("adapter")}
+
+        self.assertEqual(
+            json_safe(value),
+            {"path": "adapter", "targets": ["a", "b"]},
+        )
+
+    def test_adapter_state_fingerprint_is_key_order_independent(self):
+        class FakeBytes:
+            def tobytes(self):
+                return b"payload"
+
+        class FakeTensor:
+            dtype = "float32"
+            shape = (1, 2)
+
+            def detach(self):
+                return self
+
+            def cpu(self):
+                return self
+
+            def contiguous(self):
+                return self
+
+            def view(self, _dtype):
+                return self
+
+            def numpy(self):
+                return FakeBytes()
+
+        class FakeTorch:
+            uint8 = object()
+
+        left = {"b": FakeTensor(), "a": FakeTensor()}
+        right = {"a": FakeTensor(), "b": FakeTensor()}
+
+        self.assertEqual(
+            adapter_state_sha256(left, FakeTorch()),
+            adapter_state_sha256(right, FakeTorch()),
+        )
+
     def test_identity_probes_precede_gradient_checkpointing_in_the_trainer_entrypoint(self):
         source = Path(__file__).with_name("train_applicability_alora.py").read_text()
 
@@ -140,6 +210,24 @@ class ApplicabilityAloraTest(unittest.TestCase):
     def test_rejects_an_invalid_auxiliary_coefficient(self):
         with self.assertRaisesRegex(ValueError, "coefficient"):
             combined_loss(1.0, 2.0, -0.1)
+
+    def test_logit_identity_failure_reports_both_fingerprints(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "after save.*expected abc, got def",
+        ):
+            require_matching_fingerprints("abc", "def", "after save")
+
+    def test_logit_identity_accepts_an_exact_match(self):
+        require_matching_fingerprints("abc", "abc", "after save")
+
+    def test_post_save_probe_runs_before_the_trained_model_is_released(self):
+        source = Path(__file__).with_name("train_applicability_alora.py").read_text()
+
+        post_save_probe = source.index("post_save_logits = initial_logits_sha256")
+        release_model = source.index("del model")
+
+        self.assertLess(post_save_probe, release_model)
 
 
 if __name__ == "__main__":
