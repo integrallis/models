@@ -366,8 +366,13 @@ final class ActivatedDecisionProfileCli {
       List<ChatMessage> messages = messages(item.path("messages"));
       List<ToolSpec> tools = tools(mapper, item.path("tools"));
       ModelPrompt prompt = ChatTemplate.CHATML_NO_THINK.render(messages, tools);
-      if (!prompt.text().equals(requiredText(item, "prompt"))) {
-        throw new IllegalArgumentException("Java prompt differs from frozen V9 prompt for " + id);
+      String frozenPrompt = requiredText(item, "prompt");
+      if (!prompt.text().equals(frozenPrompt)) {
+        throw new IllegalArgumentException(
+            "Java prompt differs from frozen V9 prompt for "
+                + id
+                + ": "
+                + firstDifference(frozenPrompt, prompt.text()));
       }
       JsonNode expected = item.path("expected");
       if (!expected.isArray()) {
@@ -435,6 +440,32 @@ final class ActivatedDecisionProfileCli {
       throw new IllegalArgumentException(field + " must not be blank");
     }
     return value;
+  }
+
+  private static String firstDifference(String expected, String actual) {
+    int limit = Math.min(expected.length(), actual.length());
+    int index = 0;
+    while (index < limit && expected.charAt(index) == actual.charAt(index)) {
+      index++;
+    }
+    int from = Math.max(0, index - 40);
+    int expectedTo = Math.min(expected.length(), index + 80);
+    int actualTo = Math.min(actual.length(), index + 80);
+    return "index="
+        + index
+        + " expectedLength="
+        + expected.length()
+        + " actualLength="
+        + actual.length()
+        + " expected='"
+        + visible(expected.substring(from, expectedTo))
+        + "' actual='"
+        + visible(actual.substring(from, actualTo))
+        + "'";
+  }
+
+  private static String visible(String value) {
+    return value.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
   }
 
   private static Path requiredFile(Map<String, String> values, String name) {
