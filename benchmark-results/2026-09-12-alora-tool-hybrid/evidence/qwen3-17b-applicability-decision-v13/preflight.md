@@ -90,13 +90,14 @@ unchanged.
 
 ## Local preflight result
 
-At `2026-09-13T19:56:07Z`, the complete experiment suite passed 106 tests. The CPU preflight passed
+At `2026-09-13T19:56:07Z`, the initial experiment suite passed 106 tests. After the host lifecycle
+regression was added, the complete suite passed 107 tests. The CPU preflight passed
 all 3,311 usable examples, found zero overlap with 735 static BFCL queries, proved that the auxiliary
 gradient touched only token logits 4913 and 19536 at the correct causal position, verified the
 gradient signs and zero-coefficient identity, and reproduced a serialized tensor fixture exactly.
 
-- Trainer SHA-256: `9aa594e6542e725d7f307297d0a4742dd4d2947998d046cbef95d0fdb2b3682b`
-- Trainer tests SHA-256: `d98eabab7adf6e7892a0fb23765d8f5426614c9ddbd51c7811d23012651f4b4c`
+- Trainer SHA-256: `ab318ba63d1e431a8b952df7f0a5c225689b74322b0e683a3c023c6132aa4827`
+- Trainer tests SHA-256: `01b680cf73141f43f9c256826ba265391708f759efe4b9bb316b6feb518a82f3`
 - Paired gate SHA-256: `b58401caab3f858dd5a4a1118db208e2e31e19d3bf6a1ef8f9b89e64b90915ef`
 - CPU preflight SHA-256: `0b4eac37d8998f5d36aee2c9476f1eadf6249b85414f32d9307887c866dbf4a2`
 - Preflight report SHA-256:
@@ -110,3 +111,12 @@ effective quota of zero for both on-demand and Spot G/VT instances. Before provi
 was therefore bound to the available Vultr `ewr` `vcg-a16-3c-32g-8vram` plan at USD 172/month,
 approximately USD 0.236/hour: USD 0.47 expected and USD 0.71 maximum. Generation or JVM performance
 work is prohibited on the training host.
+
+## Host pre-training correction
+
+The first control invocation produced no optimizer step or candidate output. Its initial identity
+probe found that PEFT 0.18.1 rejects a second forward hook while gradient checkpointing is enabled
+and no backward pass has occurred. The trainer now completes the exact base, disabled-adapter, and
+enabled-adapter probes before enabling checkpointing for training. A source-order regression test
+enforces that lifecycle. The failed `v13-control-screen` directory and log are retained; the retry
+uses a new `v13-control-screen-r2` directory. No data, seed, objective, schedule, or gate changed.

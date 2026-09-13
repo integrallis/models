@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 import unittest
 
 from train_applicability_alora import (
@@ -41,6 +42,14 @@ class FakeTokenizer:
 
 
 class ApplicabilityAloraTest(unittest.TestCase):
+    def test_identity_probes_precede_gradient_checkpointing_in_the_trainer_entrypoint(self):
+        source = Path(__file__).with_name("train_applicability_alora.py").read_text()
+
+        probe = source.index("initial_logits = initial_logits_sha256")
+        checkpointing = source.index("model.gradient_checkpointing_enable")
+
+        self.assertLess(probe, checkpointing)
+
     def test_resolves_the_single_contextual_call_no_call_decision(self):
         contract = decision_contract(FakeTokenizer())
 

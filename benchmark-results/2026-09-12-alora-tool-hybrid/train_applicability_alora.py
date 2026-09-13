@@ -574,8 +574,6 @@ def main() -> None:
     base_logits = initial_logits_sha256(model, validation_examples, collator, torch)
     model = PeftModel.from_pretrained(model, args.initial_adapter, is_trainable=True)
     model.config.use_cache = False
-    model.enable_input_require_grads()
-    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.to(torch.device("cuda"))
     with model.disable_adapter():
         initial_disabled_logits = initial_logits_sha256(
@@ -583,6 +581,9 @@ def main() -> None:
         )
     if initial_disabled_logits != base_logits:
         raise ValueError("adapter-disabled initial logits differ from the exact base")
+    initial_logits = initial_logits_sha256(model, validation_examples, collator, torch)
+    model.enable_input_require_grads()
+    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.print_trainable_parameters()
 
     args.out.mkdir(parents=True)
@@ -632,7 +633,6 @@ def main() -> None:
         data_collator=collator,
         callbacks=callbacks,
     )
-    initial_logits = initial_logits_sha256(model, validation_examples, collator, torch)
     train_result = trainer.train()
     prepare_for_evaluation(model, True)
     evaluation = evaluate_teacher_forcing(
