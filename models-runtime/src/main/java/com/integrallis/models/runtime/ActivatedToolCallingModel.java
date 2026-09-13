@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * activated branch.
  */
 public final class ActivatedToolCallingModel implements ActivatedToolModel {
+  static final String TOOL_DECISION_PREFIX = "<tool_call>\n";
   private static final String NO_TOOL_OUTPUT = "<tool_call>\n[]\n</tool_call>";
 
   /** How the base and activated branches obtain the context before the activation boundary. */

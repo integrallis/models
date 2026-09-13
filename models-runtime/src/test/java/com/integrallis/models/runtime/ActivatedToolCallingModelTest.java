@@ -184,6 +184,52 @@ class ActivatedToolCallingModelTest {
   }
 
   @Test
+  void scoresTheActivatedCallDecisionWithoutDiscardingThePhysicalPrefix() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
+        ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
+      ToolDecisionScore score = turn.scoreToolDecision(2, 3);
+
+      assertThat(score.callTokenId()).isEqualTo(2);
+      assertThat(score.callLogit()).isEqualTo(10.0f);
+      assertThat(score.noCallTokenId()).isEqualTo(3);
+      assertThat(score.noCallLogit()).isZero();
+      assertThat(score.callMargin()).isEqualTo(10.0f);
+      assertThat(score.shouldCall(9.99f)).isTrue();
+      assertThat(score.shouldCall(10.0f)).isFalse();
+      assertThat(turn.physicallySharesPrefix()).isTrue();
+
+      turn.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(true, 2, "XY<tool_call>\n".chars().boxed().toList()),
+            new Prefill(true, 3, List.of((int) 'Y')));
+  }
+
+  @Test
+  void rejectsInvalidDecisionTokensBeforeMutatingTheActivatedBranch() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
+        ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
+      assertThatThrownBy(() -> turn.scoreToolDecision(128, 3))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("callTokenId");
+
+      turn.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(true, 2, List.of((int) 'X', (int) 'Y')));
+  }
+
+  @Test
   void canRecomputeTheBasePrefixIndependentlyForAnHonestSharingCrossoverComparison() {
     ActivatedBackend backend = new ActivatedBackend();
 

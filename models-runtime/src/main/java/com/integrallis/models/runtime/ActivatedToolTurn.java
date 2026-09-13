@@ -81,6 +81,33 @@ public final class ActivatedToolTurn implements SharedToolTurn {
     }
   }
 
+  /**
+   * Scores the activated branch's next-token call decision without decoding a tool call.
+   *
+   * <p>The rendered prompt is evaluated on the same activated session that retains the physical
+   * shared prefix. A later {@link #generateToolCall} reuses that lineage and reevaluates at most
+   * the final prompt token. Token IDs must come from the loaded model's contextual call and
+   * abstention forms; adapter qualification records and freezes those IDs rather than guessing them
+   * from standalone text.
+   */
+  public synchronized ToolDecisionScore scoreToolDecision(int callTokenId, int noCallTokenId) {
+    requireToolGenerationAvailable();
+    int vocabularySize = tool.tokenizer().vocabSize();
+    requireVocabularyToken("callTokenId", callTokenId, vocabularySize);
+    requireVocabularyToken("noCallTokenId", noCallTokenId, vocabularySize);
+    if (callTokenId == noCallTokenId) {
+      throw new IllegalArgumentException("call and no-call token IDs must differ");
+    }
+    try {
+      float[] logits = tool.nextTokenLogits(toolDecisionPrompt());
+      return new ToolDecisionScore(
+          callTokenId, logits[callTokenId], noCallTokenId, logits[noCallTokenId]);
+    } catch (RuntimeException | Error failure) {
+      failed = true;
+      throw failure;
+    }
+  }
+
   /** Streams the structured tool selection on the activated branch. */
   public synchronized void generateToolCall(
       SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
@@ -341,6 +368,25 @@ public final class ActivatedToolTurn implements SharedToolTurn {
     if (closed.get()) {
       throw new IllegalStateException("activated tool turn is closed");
     }
+  }
+
+  private static void requireVocabularyToken(String name, int tokenId, int vocabularySize) {
+    if (tokenId < 0 || tokenId >= vocabularySize) {
+      throw new IllegalArgumentException(
+          name + " must be within the loaded vocabulary: " + tokenId + " of " + vocabularySize);
+    }
+  }
+
+  private ModelPrompt toolDecisionPrompt() {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    for (ModelPrompt.Segment segment : renderedToolPrompt.segments()) {
+      if (segment.kind() == ModelPrompt.SegmentKind.CONTROL) {
+        prompt.control(segment.text());
+      } else {
+        prompt.text(segment.text());
+      }
+    }
+    return prompt.control(ActivatedToolCallingModel.TOOL_DECISION_PREFIX).build();
   }
 
   private void requireUsable() {

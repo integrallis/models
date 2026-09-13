@@ -166,6 +166,39 @@ public final class GenerationLoop {
     }
   }
 
+  /** Returns stable next-token logits after prefilling an exact prompt into this lineage. */
+  float[] nextTokenLogits(ModelPrompt prompt) {
+    requirePrompt(prompt);
+    synchronized (executionLock) {
+      int[] promptTokens = backend.tokenizer().encode(prompt);
+      if (!(backend instanceof RewindableInferenceBackend)) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
+      }
+      if (promptTokens.length == 0) {
+        throw new IllegalArgumentException("prompt produced no tokens");
+      }
+      PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
+      try {
+        float[] logits =
+            backend
+                .prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition())
+                .clone();
+        cachedPromptTokens = promptTokens.clone();
+        lastPromptCacheMetrics = promptPrefill.metrics();
+        return logits;
+      } catch (RuntimeException | Error failure) {
+        cachedPromptTokens = null;
+        try {
+          backend.reset();
+        } catch (RuntimeException | Error resetFailure) {
+          failure.addSuppressed(resetFailure);
+        }
+        throw failure;
+      }
+    }
+  }
+
   private PromptPrefillMetrics prefillTokens(
       int[] promptTokens, long started, long tokenizationNanos) {
     if (!(backend instanceof RewindableInferenceBackend)) {

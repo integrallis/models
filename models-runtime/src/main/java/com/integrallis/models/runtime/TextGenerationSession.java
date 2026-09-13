@@ -157,6 +157,20 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     }
   }
 
+  float[] nextTokenLogits(ModelPrompt prompt) {
+    Objects.requireNonNull(prompt, "prompt");
+    synchronized (operationLock) {
+      requireOpen();
+      if (continuousBatching != null) {
+        throw new UnsupportedOperationException(
+            "next-token scoring is not supported by continuous batching");
+      }
+      synchronized (executionLock) {
+        return generationLoop.nextTokenLogits(prompt);
+      }
+    }
+  }
+
   /**
    * Clears this session's mutable context and exact prompt history.
    *
