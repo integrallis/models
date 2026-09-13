@@ -309,12 +309,15 @@ fix for an Accelerate autocast wrapper that made live-training and plain-reload 
 incomparable despite bit-identical adapter tensors. Exact results and the rejection rationale are
 under `evidence/qwen3-17b-applicability-decision-v13/`. No V13 candidate exists.
 
-V14 was frozen after that rejection and before any V14 model output. It treats the immutable V13
-control as a development-only screen baseline and measures the class-balanced decision loss that
-the treatment actually optimizes, while retaining class non-regression, exact artifact identity,
-generation, sealed-data, JVM, physical-sharing, and performance gates. A passing screen must still
-restart both arms from V9 for a fresh fixed-endpoint comparison. The complete preregistration is
-under `evidence/qwen3-17b-applicability-decision-v14/`.
+V14 was frozen after that rejection and before any V14 model output. It treated the immutable V13
+control as a development-only screen baseline and measured the class-balanced decision loss that
+the treatment optimized, while retaining class non-regression and exact artifact identity gates.
+It passed every execution and artifact gate but failed quality: call decisions improved from
+362/390 to 370/390, while no-call decisions regressed from 77/81 to 75/81, balanced accuracy fell
+from 0.939411 to 0.937322, and applicability loss rose from 0.183260 to 0.187295. V14 was rejected;
+no endpoint, generation, sealed, JVM, or packaging gate was opened. Its evidence and preregistration
+are under `evidence/qwen3-17b-applicability-decision-v14/`. The A16 was deleted and Vultr inventory
+returned zero instances.
 
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.

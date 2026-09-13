@@ -1,0 +1,28 @@
+{
+  "baselineExperiment": "qwen3-17b-applicability-decision-v13",
+  "callCorrectLoss": -8,
+  "control": {
+    "applicabilityLoss": 0.18326023501677952,
+    "balancedAccuracy": 0.9394112060778728,
+    "callCorrect": 362,
+    "languageModelLoss": 0.047281891635664736,
+    "noCallCorrect": 77
+  },
+  "expectedOptimizerSteps": 32,
+  "experiment": "qwen3-17b-applicability-decision-v14",
+  "failures": [
+    "treatment may not regress correct no-call decisions",
+    "treatment balanced applicability accuracy must exceed control",
+    "treatment must reduce applicability loss by at least 5%"
+  ],
+  "noCallCorrectGain": -2,
+  "passed": false,
+  "schemaVersion": 1,
+  "treatment": {
+    "applicabilityLoss": 0.18729463593317686,
+    "balancedAccuracy": 0.9373219373219372,
+    "callCorrect": 370,
+    "languageModelLoss": 0.047714136093708,
+    "noCallCorrect": 75
+  }
+}
