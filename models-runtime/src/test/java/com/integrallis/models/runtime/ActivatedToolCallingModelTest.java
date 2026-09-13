@@ -211,6 +211,57 @@ class ActivatedToolCallingModelTest {
   }
 
   @Test
+  void scoresSeveralActivatedDecisionsWithBoundedRaggedPrefillAndPhysicalPrefixes() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
+      assertThat(model.supportsRaggedDecisionPrefill()).isTrue();
+      assertThat(model.maximumDecisionBatchSize()).isEqualTo(4);
+      List<ActivatedToolDecision> decisions =
+          model.scoreToolDecisions(
+              List.of(ModelPrompt.text("abXY"), ModelPrompt.text("cdeXY")), 2, 3, 2);
+
+      assertThat(decisions).hasSize(2);
+      assertThat(decisions)
+          .allSatisfy(
+              decision -> {
+                assertThat(decision.score().callMargin()).isEqualTo(10.0f);
+                assertThat(decision.physicallySharesPrefix()).isTrue();
+                assertThat(decision.sharedPrefixBytes()).isEqualTo(64);
+              });
+      assertThat(decisions).extracting(ActivatedToolDecision::promptTokens).containsExactly(4, 5);
+      assertThat(decisions)
+          .extracting(ActivatedToolDecision::sharedPrefixTokens)
+          .containsExactly(2, 3);
+    }
+
+    assertThat(backend.batchPrefillSizes).containsExactly(2, 2);
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(false, 0, List.of((int) 'c', (int) 'd', (int) 'e')),
+            new Prefill(true, 2, "XY<tool_call>\n".chars().boxed().toList()),
+            new Prefill(true, 3, "XY<tool_call>\n".chars().boxed().toList()));
+  }
+
+  @Test
+  void validatesEveryBatchedDecisionBeforeOpeningBackendState() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
+      assertThatThrownBy(
+              () ->
+                  model.scoreToolDecisions(
+                      List.of(ModelPrompt.text("abXY"), ModelPrompt.text("missing")), 2, 3, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("invocation sequence");
+    }
+
+    assertThat(backend.prefills).isEmpty();
+    assertThat(backend.batchPrefillSizes).isEmpty();
+  }
+
+  @Test
   void rejectsInvalidDecisionTokensBeforeMutatingTheActivatedBranch() {
     ActivatedBackend backend = new ActivatedBackend();
 
@@ -615,6 +666,7 @@ class ActivatedToolCallingModelTest {
 
   private static final class ActivatedBackend implements SharedPrefixInferenceBackend {
     private final List<Prefill> prefills = new ArrayList<>();
+    private final List<Integer> batchPrefillSizes = new ArrayList<>();
     private final Tokenizer tokenizer = new CharacterTokenizer();
     private int nextPrefix;
     private int defaultPosition;
@@ -697,6 +749,17 @@ class ActivatedToolCallingModelTest {
               state.activated, startPosition, java.util.Arrays.stream(tokens).boxed().toList()));
       state.position = startPosition + tokens.length;
       return terminalLogits();
+    }
+
+    @Override
+    public boolean supportsRaggedPrefillBatch() {
+      return true;
+    }
+
+    @Override
+    public LogitBatch prefillBatch(InferenceSession[] sessions, int[][] tokenBatches) {
+      batchPrefillSizes.add(sessions.length);
+      return SharedPrefixInferenceBackend.super.prefillBatch(sessions, tokenBatches);
     }
 
     @Override

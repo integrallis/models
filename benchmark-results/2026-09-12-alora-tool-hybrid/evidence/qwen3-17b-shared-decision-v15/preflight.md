@@ -33,6 +33,18 @@ prefix on the activated branch and records `callLogit - noCallLogit`. Scoring is
 same activated session used for any subsequent generation. The session retains the exact physical
 prefix shared with the base branch; a copied or independently recomputed prefix fails the run.
 
+The first attempted execution evaluated `irrelevance_126` sequentially, reported a rounded margin
+of `0.5556`, and was stopped before producing a report because that path required 220 seconds per
+case. No threshold was selected and no other margin was observed. Before resuming, execution is
+fixed to bounded ragged batches of four independent prompts. This changes only how common weight
+reads are amortized: every item still owns a distinct base prefix, exact-base fork, and activated
+fork. The run must abort unless the backend reports true ragged prefill, accepts at least four
+sessions, proves physical base/tool prefix identity for every item, and produces bit-exact call and
+no-call logits between the sequential and batched forms of that first sentinel. Each complete
+batch is validated before its model state is opened. Batch timing is recorded as batch wall time
+rather than misrepresented as sequential per-case latency. The fixed quality gates below are
+unchanged.
+
 The 75 already-exposed V9 cases are development data, not independent qualification evidence.
 Within each of `simple`, `multiple`, and `irrelevance`, the lowest ten SHA-256 values of
 `qwen3-17b-shared-decision-v15:partition-v1\0<kind>\0<id>` form the 30-case calibration partition.

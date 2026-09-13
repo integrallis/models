@@ -22,6 +22,7 @@ import com.integrallis.models.api.BatchInferenceBackend;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.InferenceContextWindow;
 import com.integrallis.models.api.InferenceSession;
+import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
@@ -31,8 +32,10 @@ import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -58,6 +61,13 @@ public final class InferencePipeline
   private final Set<TextGenerationSession> generationSessions =
       Collections.newSetFromMap(new IdentityHashMap<>());
   private final AtomicBoolean closed = new AtomicBoolean();
+
+  record ActivatedDecisionInput(int promptTokens, int[] basePrefix, int[] activatedSuffix) {
+    ActivatedDecisionInput {
+      basePrefix = basePrefix.clone();
+      activatedSuffix = activatedSuffix.clone();
+    }
+  }
 
   /** Creates a pipeline that owns the supplied loaded backend. */
   public InferencePipeline(InferenceBackend backend) {
@@ -243,6 +253,20 @@ public final class InferencePipeline
     }
   }
 
+  boolean supportsRaggedSharedPrefill() {
+    synchronized (backend) {
+      requireOpen();
+      return sharedPrefixBackend().supportsRaggedPrefillBatch();
+    }
+  }
+
+  int maximumSharedPrefillBatchSize() {
+    synchronized (backend) {
+      requireOpen();
+      return sharedPrefixBackend().maxBatchSize();
+    }
+  }
+
   /**
    * Tokenizes and evaluates one nonempty prompt into immutable, physically shared KV storage.
    *
@@ -270,6 +294,116 @@ public final class InferencePipeline
       requireOpen();
       return prepareSharedTokenPrefix(sharedPrefixBackend(), tokens.clone());
     }
+  }
+
+  List<ActivatedToolDecision> scoreSharedActivatedDecisions(
+      List<ActivatedDecisionInput> inputs,
+      int callTokenId,
+      int noCallTokenId,
+      int maximumBatchSize) {
+    Objects.requireNonNull(inputs, "inputs");
+    synchronized (backend) {
+      requireOpen();
+      SharedPrefixInferenceBackend sharing = sharedPrefixBackend();
+      if (!sharing.supportsActivatedBranch()) {
+        throw new IllegalStateException("loaded model has no activated adapter");
+      }
+      int chunkSize = Math.min(maximumBatchSize, sharing.maxBatchSize());
+      if (chunkSize <= 0) {
+        throw new IllegalStateException("backend reported a non-positive batch capacity");
+      }
+      List<ActivatedToolDecision> results = new ArrayList<>(inputs.size());
+      for (int offset = 0; offset < inputs.size(); offset += chunkSize) {
+        int size = Math.min(chunkSize, inputs.size() - offset);
+        scoreSharedActivatedDecisionChunk(
+            sharing, inputs, offset, size, callTokenId, noCallTokenId, results);
+      }
+      return List.copyOf(results);
+    }
+  }
+
+  private static void scoreSharedActivatedDecisionChunk(
+      SharedPrefixInferenceBackend sharing,
+      List<ActivatedDecisionInput> inputs,
+      int offset,
+      int size,
+      int callTokenId,
+      int noCallTokenId,
+      List<ActivatedToolDecision> results) {
+    InferenceSession[] sources = new InferenceSession[size];
+    InferenceSession[] bases = new InferenceSession[size];
+    InferenceSession[] tools = new InferenceSession[size];
+    SharedInferencePrefix[] prefixes = new SharedInferencePrefix[size];
+    int[][] baseTokens = new int[size][];
+    int[][] suffixTokens = new int[size][];
+    Throwable failure = null;
+    try {
+      for (int index = 0; index < size; index++) {
+        ActivatedDecisionInput input = inputs.get(offset + index);
+        if (input.basePrefix().length == 0 || input.activatedSuffix().length == 0) {
+          throw new IllegalArgumentException(
+              "activated decision token sequences must not be empty");
+        }
+        sources[index] = sharing.openSession();
+        baseTokens[index] = input.basePrefix().clone();
+        suffixTokens[index] = input.activatedSuffix().clone();
+      }
+      sharing.prefillBatch(sources, baseTokens);
+      for (int index = 0; index < size; index++) {
+        prefixes[index] = sharing.freezePrefix(sources[index]);
+        sources[index] = null;
+        bases[index] = sharing.fork(prefixes[index], SharedPrefixInferenceBackend.Branch.BASE);
+        tools[index] =
+            sharing.fork(prefixes[index], SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER);
+        if (!sharing.sharesPrefixStorage(bases[index], tools[index])) {
+          throw new IllegalStateException(
+              "backend violated the shared-prefix contract at batch item " + (offset + index));
+        }
+      }
+      LogitBatch logits = sharing.prefillBatch(tools, suffixTokens);
+      for (int index = 0; index < size; index++) {
+        ActivatedDecisionInput input = inputs.get(offset + index);
+        ToolDecisionScore score =
+            new ToolDecisionScore(
+                callTokenId,
+                logits.logit(index, callTokenId),
+                noCallTokenId,
+                logits.logit(index, noCallTokenId));
+        results.add(
+            new ActivatedToolDecision(
+                score,
+                input.promptTokens(),
+                input.basePrefix().length,
+                prefixes[index].sharedBytes(),
+                true));
+      }
+    } catch (RuntimeException | Error caught) {
+      failure = caught;
+    } finally {
+      failure = closeSessions(failure, tools);
+      failure = closeSessions(failure, bases);
+      failure = closeSessions(failure, sources);
+    }
+    if (failure instanceof RuntimeException runtimeFailure) {
+      throw runtimeFailure;
+    }
+    if (failure instanceof Error error) {
+      throw error;
+    }
+  }
+
+  private static Throwable closeSessions(Throwable failure, InferenceSession[] sessions) {
+    for (InferenceSession session : sessions) {
+      if (session == null || session.isClosed()) {
+        continue;
+      }
+      try {
+        session.close();
+      } catch (RuntimeException | Error closeFailure) {
+        failure = combineCloseFailures(failure, closeFailure);
+      }
+    }
+    return failure;
   }
 
   /**
