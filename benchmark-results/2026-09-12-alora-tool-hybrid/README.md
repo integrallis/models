@@ -294,6 +294,15 @@ versus the 1/25 ceiling. Neither the live-development screen nor the sealed qual
 opened. Evidence is under `evidence/qwen3-17b-applicability-contract-v12/`; the exact A40 instance
 was deleted after hash verification and provider-wide Vultr inventory returned zero.
 
+V13 is frozen as a causal two-arm continuation from the exact V9 adapter over the exact V8 hard-
+mixed corpus. The control retains ordinary completion loss; the treatment adds only a class-
+balanced loss at Qwen's first contextual call/no-call token. Local preflight regenerated every
+corpus byte, reproduced all 3,311 post-tokenization row identities, found zero overlap with the 735
+static BFCL evaluation queries, and proved the auxiliary gradient touches only the two decision
+logits at the causal prediction position. The paired 32-step and fixed-endpoint gates are recorded
+under `evidence/qwen3-17b-applicability-decision-v13/` before GPU provisioning. No V13 candidate
+result exists yet.
+
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.
 The preceding raw-copy, ridge, and CacheBridge Qwen3 0.6B-to-1.7B translations also failed exact
