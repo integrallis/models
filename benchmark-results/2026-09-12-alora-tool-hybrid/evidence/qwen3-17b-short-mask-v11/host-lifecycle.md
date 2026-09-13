@@ -14,11 +14,17 @@
 - Pinned tokenizer retention preflight: passed with 11,827/979 usable rows
 - Training started: approximately `2026-09-13T15:05:48Z`
 - Training PID: `4373`
+- Exposed-smoke continuation PID: `32418`
+- Continuation behavior: wait for training PID `4373` to exit; run the frozen 25-per-kind smoke
+  only when `run/adapter/adapter_model.safetensors` and `run/training-manifest.json` both exist;
+  never open the sealed 300-case window automatically
 - Frozen command: `train_alora.py --prepared prepared --out run --candidate qwen3-1.7b
   --max-length 1024 --rank 32 --alpha 64 --epochs 1 --learning-rate 1e-4
   --gradient-accumulation 16 --seed 20260917`
 - Startup verification: 740 total optimizer steps, matching V9; progress reached step 3 with
   6,565 MiB GPU memory in use and an approximately 2 hour 45 minute remaining estimate
+- Live verification at `2026-09-13T16:00:40Z`: step 272/740, training PID still live, 6,755 MiB
+  GPU memory in use, and an approximately 1 hour 28 minute remaining estimate
 
 The instance is reused only because V10 stopped at its first optimizer step without candidate
 evaluation. It remains subject to the original cumulative cost ceiling and hard deadline. It must
