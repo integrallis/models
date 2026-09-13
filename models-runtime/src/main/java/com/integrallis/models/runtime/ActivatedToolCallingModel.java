@@ -22,9 +22,6 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -94,18 +91,6 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
     return minimumSharedPrefixTokens;
   }
 
-  /** Returns whether this loaded graph performs true ragged multi-session decision prefill. */
-  public boolean supportsRaggedDecisionPrefill() {
-    requireOpen();
-    return pipeline.supportsRaggedSharedPrefill();
-  }
-
-  /** Returns the largest decision batch accepted by the loaded graph. */
-  public int maximumDecisionBatchSize() {
-    requireOpen();
-    return pipeline.maximumSharedPrefillBatchSize();
-  }
-
   @Override
   public java.util.List<String> toolAbstentionOutputs() {
     requireOpen();
@@ -128,61 +113,6 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
     requireOpen();
     Objects.requireNonNull(prefixStrategy, "prefixStrategy");
     return openToolTurn(renderedToolPrompt, null, prefixStrategy);
-  }
-
-  /**
-   * Scores several independent tool prompts using bounded ragged prefill batches.
-   *
-   * <p>Every prompt is validated before backend state is opened. Each item evaluates its base
-   * prefix once, physically forks exact-base and activated-adapter branches from that immutable KV
-   * storage, and scores the configured call/no-call tokens after {@value #TOOL_DECISION_PREFIX}.
-   * The request batch is split at both {@code maximumBatchSize} and the loaded backend's capacity.
-   */
-  public List<ActivatedToolDecision> scoreToolDecisions(
-      List<ModelPrompt> renderedToolPrompts,
-      int callTokenId,
-      int noCallTokenId,
-      int maximumBatchSize) {
-    requireOpen();
-    Objects.requireNonNull(renderedToolPrompts, "renderedToolPrompts");
-    if (renderedToolPrompts.isEmpty()) {
-      throw new IllegalArgumentException("renderedToolPrompts must not be empty");
-    }
-    if (maximumBatchSize <= 0) {
-      throw new IllegalArgumentException("maximumBatchSize must be > 0");
-    }
-    int vocabularySize = pipeline.tokenizer().vocabSize();
-    requireVocabularyToken("callTokenId", callTokenId, vocabularySize);
-    requireVocabularyToken("noCallTokenId", noCallTokenId, vocabularySize);
-    if (callTokenId == noCallTokenId) {
-      throw new IllegalArgumentException("call and no-call token IDs must differ");
-    }
-
-    int[] invocation = adapter.invocationTokens().stream().mapToInt(Integer::intValue).toArray();
-    List<InferencePipeline.ActivatedDecisionInput> inputs =
-        new ArrayList<>(renderedToolPrompts.size());
-    for (int index = 0; index < renderedToolPrompts.size(); index++) {
-      ModelPrompt prompt =
-          Objects.requireNonNull(
-              renderedToolPrompts.get(index), "renderedToolPrompts[" + index + "]");
-      int[] promptTokens = pipeline.tokenize(prompt);
-      int prefixLength = lastIndexOf(promptTokens, invocation);
-      if (prefixLength <= 0) {
-        throw new IllegalArgumentException(
-            "rendered tool prompt at index "
-                + index
-                + " must contain the activated adapter invocation sequence");
-      }
-      int[] decisionTokens = pipeline.tokenize(withDecisionPrefix(prompt));
-      requireTokenPrefix(promptTokens, decisionTokens, index);
-      inputs.add(
-          new InferencePipeline.ActivatedDecisionInput(
-              promptTokens.length,
-              Arrays.copyOf(promptTokens, prefixLength),
-              Arrays.copyOfRange(decisionTokens, prefixLength, decisionTokens.length)));
-    }
-    return pipeline.scoreSharedActivatedDecisions(
-        inputs, callTokenId, noCallTokenId, maximumBatchSize);
   }
 
   /** Opens one stateful base/tool conversation that retains one physical cache lineage. */
@@ -395,41 +325,6 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
       }
     }
     return -1;
-  }
-
-  private static ModelPrompt withDecisionPrefix(ModelPrompt renderedToolPrompt) {
-    ModelPrompt.Builder prompt = ModelPrompt.builder();
-    for (ModelPrompt.Segment segment : renderedToolPrompt.segments()) {
-      if (segment.kind() == ModelPrompt.SegmentKind.CONTROL) {
-        prompt.control(segment.text());
-      } else {
-        prompt.text(segment.text());
-      }
-    }
-    return prompt.control(TOOL_DECISION_PREFIX).build();
-  }
-
-  private static void requireTokenPrefix(int[] expected, int[] actual, int promptIndex) {
-    if (actual.length <= expected.length) {
-      throw new IllegalStateException(
-          "tool decision prefix did not add tokens for prompt at index " + promptIndex);
-    }
-    for (int index = 0; index < expected.length; index++) {
-      if (expected[index] != actual[index]) {
-        throw new IllegalStateException(
-            "tool decision prefix changed the rendered prompt at token "
-                + index
-                + " for item "
-                + promptIndex);
-      }
-    }
-  }
-
-  private static void requireVocabularyToken(String name, int tokenId, int vocabularySize) {
-    if (tokenId < 0 || tokenId >= vocabularySize) {
-      throw new IllegalArgumentException(
-          name + " must be within the loaded vocabulary: " + tokenId + " of " + vocabularySize);
-    }
   }
 
   private void requireOpen() {

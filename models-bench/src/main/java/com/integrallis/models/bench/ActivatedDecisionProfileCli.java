@@ -24,7 +24,6 @@ import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.ToolSpec;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.ActivatedToolCallingModel;
-import com.integrallis.models.runtime.ActivatedToolDecision;
 import com.integrallis.models.runtime.ActivatedToolTurn;
 import com.integrallis.models.runtime.ToolDecisionScore;
 import com.integrallis.models.runtime.chat.ChatMessage;
@@ -49,7 +48,6 @@ final class ActivatedDecisionProfileCli {
       "944d137ba1e325e0f3daa922a73108de0da5ccf0292bcf4dbe4a565aa11fcb4c";
   static final int CALL_TOKEN_ID = 4913;
   static final int NO_CALL_TOKEN_ID = 19536;
-  static final int DECISION_BATCH_SIZE = 4;
   private static final String PARTITION_SEED = EXPERIMENT + ":partition-v1";
   private static final Set<String> OPTIONS =
       Set.of("model", "adapter", "records", "output", "models-revision");
@@ -74,7 +72,7 @@ final class ActivatedDecisionProfileCli {
       float callLogit,
       float noCallLogit,
       float margin,
-      long batchElapsedMillis) {}
+      long elapsedMillis) {}
 
   record Score(
       int calls,
@@ -105,9 +103,6 @@ final class ActivatedDecisionProfileCli {
       SplitContract split,
       int callTokenId,
       int noCallTokenId,
-      int decisionBatchSize,
-      boolean raggedDecisionPrefill,
-      boolean sequentialSentinelExact,
       Calibration result,
       boolean screenPassed,
       String verdict,
@@ -156,61 +151,30 @@ final class ActivatedDecisionProfileCli {
     }
     try (ActivatedToolCallingModel model = activatedModel) {
       adapter = model.adapter();
-      if (!model.supportsRaggedDecisionPrefill()) {
-        throw new IllegalStateException("V15 requires true ragged decision prefill");
-      }
-      if (model.maximumDecisionBatchSize() < DECISION_BATCH_SIZE) {
-        throw new IllegalStateException(
-            "V15 requires decision batch capacity "
-                + DECISION_BATCH_SIZE
-                + ", backend reported "
-                + model.maximumDecisionBatchSize());
-      }
-      SourceCase sentinel = loaded.cases().getFirst();
-      ToolDecisionScore sequentialSentinel;
-      try (ActivatedToolTurn turn =
-          model.openToolTurn(sentinel.prompt(), ActivatedToolCallingModel.PrefixStrategy.SHARED)) {
-        sequentialSentinel = turn.scoreToolDecision(CALL_TOKEN_ID, NO_CALL_TOKEN_ID);
-      }
-      ToolDecisionScore batchedSentinel = null;
       int ordinal = 0;
-      for (int offset = 0; offset < loaded.cases().size(); offset += DECISION_BATCH_SIZE) {
-        List<SourceCase> cases =
-            loaded
-                .cases()
-                .subList(offset, Math.min(offset + DECISION_BATCH_SIZE, loaded.cases().size()));
+      for (SourceCase item : loaded.cases()) {
+        ordinal++;
         long started = System.nanoTime();
-        List<ActivatedToolDecision> decisions =
-            model.scoreToolDecisions(
-                cases.stream().map(SourceCase::prompt).toList(),
-                CALL_TOKEN_ID,
-                NO_CALL_TOKEN_ID,
-                DECISION_BATCH_SIZE);
-        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
-        for (int index = 0; index < cases.size(); index++) {
-          ordinal++;
-          SourceCase item = cases.get(index);
-          ActivatedToolDecision decision = decisions.get(index);
-          ToolDecisionScore score = decision.score();
-          if (offset == 0 && index == 0) {
-            batchedSentinel = score;
-          }
+        try (ActivatedToolTurn turn =
+            model.openToolTurn(item.prompt(), ActivatedToolCallingModel.PrefixStrategy.SHARED)) {
+          ToolDecisionScore score = turn.scoreToolDecision(CALL_TOKEN_ID, NO_CALL_TOKEN_ID);
+          long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
           Observation observation =
               new Observation(
                   item.id(),
                   item.kind(),
                   item.partition(),
                   item.callExpected(),
-                  decision.promptTokens(),
-                  decision.sharedPrefixTokens(),
-                  decision.physicallySharesPrefix(),
+                  backend.tokenizer().encode(item.prompt()).length,
+                  turn.sharedPrefixTokens(),
+                  turn.physicallySharesPrefix(),
                   score.callLogit(),
                   score.noCallLogit(),
                   score.callMargin(),
                   elapsedMillis);
           observations.add(observation);
           System.out.printf(
-              "%2d/%d %-18s %-11s expected=%-5s margin=%10.4f shared=%s batch=%d ms%n",
+              "%2d/%d %-18s %-11s expected=%-5s margin=%10.4f shared=%s %d ms%n",
               ordinal,
               loaded.cases().size(),
               item.id(),
@@ -221,7 +185,6 @@ final class ActivatedDecisionProfileCli {
               elapsedMillis);
         }
       }
-      requireBitExact(sequentialSentinel, Objects.requireNonNull(batchedSentinel));
     }
 
     if (observations.stream().anyMatch(item -> !item.physicallyShared())) {
@@ -234,7 +197,7 @@ final class ActivatedDecisionProfileCli {
             && calibration.screen().balancedAccuracy() > 0.93;
     Report report =
         new Report(
-            2,
+            1,
             EXPERIMENT,
             Instant.now().toString(),
             configuration.modelsRevision(),
@@ -245,9 +208,6 @@ final class ActivatedDecisionProfileCli {
             loaded.split(),
             CALL_TOKEN_ID,
             NO_CALL_TOKEN_ID,
-            DECISION_BATCH_SIZE,
-            true,
-            true,
             calibration,
             screenPassed,
             screenPassed ? "PASS" : "FAIL",
@@ -299,18 +259,6 @@ final class ActivatedDecisionProfileCli {
       }
     }
     return new Calibration(selected, selectedScore, score(screen, selected));
-  }
-
-  private static void requireBitExact(ToolDecisionScore sequential, ToolDecisionScore batched) {
-    if (Float.floatToIntBits(sequential.callLogit()) != Float.floatToIntBits(batched.callLogit())
-        || Float.floatToIntBits(sequential.noCallLogit())
-            != Float.floatToIntBits(batched.noCallLogit())) {
-      throw new IllegalStateException(
-          "ragged decision scoring differs from the sequential sentinel: sequential="
-              + sequential
-              + " batched="
-              + batched);
-    }
   }
 
   static ObjectMapper mapper() {
