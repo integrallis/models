@@ -294,14 +294,20 @@ versus the 1/25 ceiling. Neither the live-development screen nor the sealed qual
 opened. Evidence is under `evidence/qwen3-17b-applicability-contract-v12/`; the exact A40 instance
 was deleted after hash verification and provider-wide Vultr inventory returned zero.
 
-V13 is frozen as a causal two-arm continuation from the exact V9 adapter over the exact V8 hard-
-mixed corpus. The control retains ordinary completion loss; the treatment adds only a class-
+V13 was frozen as a causal two-arm continuation from the exact V9 adapter over the exact V8 hard-
+mixed corpus. The control retained ordinary completion loss; the treatment added only a class-
 balanced loss at Qwen's first contextual call/no-call token. Local preflight regenerated every
 corpus byte, reproduced all 3,311 post-tokenization row identities, found zero overlap with the 735
-static BFCL evaluation queries, and proved the auxiliary gradient touches only the two decision
-logits at the causal prediction position. The paired 32-step and fixed-endpoint gates are recorded
-under `evidence/qwen3-17b-applicability-decision-v13/` before GPU provisioning. No V13 candidate
-result exists yet.
+static BFCL evaluation queries, and proved the auxiliary gradient touched only the two decision
+logits at the causal prediction position.
+
+V13 was rejected before treatment. The corrected 32-step control reached 77/81 no-call decisions
+and 362/390 call decisions, making the frozen requirement of at least nine additional correct no-
+call decisions mathematically impossible. The treatment was stopped before its first optimizer
+step; no generation screen or sealed case was opened. The control also exposed and then verified a
+fix for an Accelerate autocast wrapper that made live-training and plain-reload logit hashes
+incomparable despite bit-identical adapter tensors. Exact results and the rejection rationale are
+under `evidence/qwen3-17b-applicability-decision-v13/`. No V13 candidate exists.
 
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.
