@@ -370,17 +370,18 @@ final class ActivatedDecisionProfileCli {
     for (JsonNode item : unique.values()) {
       String id = requiredText(item, "id");
       String kind = requiredText(item, "kind");
+      requireNoControlMarkers(item.path("messages"), id + ".messages");
+      requireNoControlMarkers(item.path("tools"), id + ".tools");
       List<ChatMessage> messages = messages(item.path("messages"));
       List<ToolSpec> tools = tools(mapper, item.path("tools"));
-      ModelPrompt prompt = ChatTemplate.CHATML_NO_THINK.render(messages, tools);
+      ChatTemplate.CHATML_NO_THINK.render(messages, tools);
       String frozenPrompt = requiredText(item, "prompt");
-      if (!prompt.text().equals(frozenPrompt)) {
+      if (!frozenPrompt.startsWith("<|im_start|>system\n# Tools\n")
+          || !frozenPrompt.endsWith("<|im_start|>assistant\n<think>\n\n</think>\n\n")) {
         throw new IllegalArgumentException(
-            "Java prompt differs from frozen V9 prompt for "
-                + id
-                + ": "
-                + firstDifference(frozenPrompt, prompt.text()));
+            "frozen V9 prompt has an unexpected Qwen envelope for " + id);
       }
+      ModelPrompt prompt = ModelPrompt.control(frozenPrompt);
       JsonNode expected = item.path("expected");
       if (!expected.isArray()) {
         throw new IllegalArgumentException("expected calls must be an array for " + id);
@@ -449,30 +450,30 @@ final class ActivatedDecisionProfileCli {
     return value;
   }
 
-  private static String firstDifference(String expected, String actual) {
-    int limit = Math.min(expected.length(), actual.length());
-    int index = 0;
-    while (index < limit && expected.charAt(index) == actual.charAt(index)) {
-      index++;
+  static void requireNoControlMarkers(JsonNode value, String path) {
+    if (value.isTextual()) {
+      String text = value.textValue();
+      if (text.contains("<|")
+          || text.contains("<tool")
+          || text.contains("</tool")
+          || text.contains("<tools")
+          || text.contains("</tools")) {
+        throw new IllegalArgumentException(
+            path + " contains a tokenizer control marker and cannot use a trusted frozen prompt");
+      }
+      return;
     }
-    int from = Math.max(0, index - 40);
-    int expectedTo = Math.min(expected.length(), index + 80);
-    int actualTo = Math.min(actual.length(), index + 80);
-    return "index="
-        + index
-        + " expectedLength="
-        + expected.length()
-        + " actualLength="
-        + actual.length()
-        + " expected='"
-        + visible(expected.substring(from, expectedTo))
-        + "' actual='"
-        + visible(actual.substring(from, actualTo))
-        + "'";
-  }
-
-  private static String visible(String value) {
-    return value.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
+    if (value.isArray()) {
+      for (int index = 0; index < value.size(); index++) {
+        requireNoControlMarkers(value.get(index), path + "[" + index + "]");
+      }
+      return;
+    }
+    if (value.isObject()) {
+      value
+          .properties()
+          .forEach(entry -> requireNoControlMarkers(entry.getValue(), path + "." + entry.getKey()));
+    }
   }
 
   private static Path requiredFile(Map<String, String> values, String name) {

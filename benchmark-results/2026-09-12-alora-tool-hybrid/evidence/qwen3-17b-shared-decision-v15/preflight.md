@@ -15,6 +15,14 @@ must reference the same immutable physical KV blocks before the adapter invocati
 - Already-exposed V9 development records SHA-256:
   `944d137ba1e325e0f3daa922a73108de0da5ccf0292bcf4dbe4a565aa11fcb4c`.
 
+The records store their auxiliary `tools` tree with sorted JSON keys, while their pinned `prompt`
+field preserves the original upstream schema member order used by V9. Reconstructing prompt bytes
+from that auxiliary tree is therefore prohibited. The profiler consumes the exact pinned prompt.
+Before treating it as template control, it recursively rejects any `<|`, `<tool`, `</tool`,
+`<tools`, or `</tools` marker in every untrusted message and tool value. The frozen 75-case source
+contains zero such values, so recognizing the template's real special tokens cannot accidentally
+promote user or schema text into control tokens.
+
 External Hugging Face/Python execution remains an oracle and training aid only. The scored and
 releasable path is the Java 25 in-process runtime over the exact GGUF and adapter bytes.
 
