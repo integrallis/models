@@ -511,8 +511,28 @@ class ModelsSpringAiToolCallingTest {
       assertThat(response.getMetadata().getUsage().getPromptTokens()).isEqualTo(340);
       assertThat(response.getMetadata().getUsage().getCompletionTokens()).isEqualTo(20);
       assertThat(response.getMetadata().getUsage().getTotalTokens()).isEqualTo(360);
-      assertThat(response.getMetadata().getUsage().getCacheReadInputTokens()).isEqualTo(30);
-      assertThat(response.getMetadata().getUsage().getCacheWriteInputTokens()).isEqualTo(310);
+      assertCacheUsage(response, 30L, 310L);
+    }
+
+    private static void assertCacheUsage(
+        ChatResponse response, long expectedReadTokens, long expectedWriteTokens) {
+      Object usage = response.getMetadata().getUsage();
+      try {
+        assertThat(usage.getClass().getMethod("getCacheReadInputTokens").invoke(usage))
+            .isEqualTo(expectedReadTokens);
+        assertThat(usage.getClass().getMethod("getCacheWriteInputTokens").invoke(usage))
+            .isEqualTo(expectedWriteTokens);
+      } catch (NoSuchMethodException springAiOne) {
+        assertThat(response.getMetadata().getUsage().getNativeUsage())
+            .isEqualTo(
+                java.util.Map.of(
+                    "cacheReadInputTokens",
+                    expectedReadTokens,
+                    "cacheWriteInputTokens",
+                    expectedWriteTokens));
+      } catch (ReflectiveOperationException inaccessibleUsage) {
+        throw new AssertionError("Spring AI prompt-cache usage is inaccessible", inaccessibleUsage);
+      }
     }
 
     @Test

@@ -925,15 +925,52 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     if (usage.available) {
       int totalTokens = Math.addExact(usage.promptTokens, usage.completionTokens);
       metadata.usage(
-          new DefaultUsage(
+          springUsage(
               usage.promptTokens,
               usage.completionTokens,
               totalTokens,
-              null,
               usage.cacheReadInputTokens,
               usage.cacheWriteInputTokens));
     }
     return metadata.build();
+  }
+
+  /**
+   * Preserves source compatibility with Spring AI 1.1 while exposing its first-class prompt-cache
+   * counters when the Spring AI 2.0 usage type is present at runtime.
+   */
+  private static DefaultUsage springUsage(
+      int promptTokens,
+      int completionTokens,
+      int totalTokens,
+      long cacheReadInputTokens,
+      long cacheWriteInputTokens) {
+    try {
+      return DefaultUsage.class
+          .getConstructor(
+              Integer.class, Integer.class, Integer.class, Object.class, Long.class, Long.class)
+          .newInstance(
+              promptTokens,
+              completionTokens,
+              totalTokens,
+              null,
+              cacheReadInputTokens,
+              cacheWriteInputTokens);
+    } catch (NoSuchMethodException springAiOne) {
+      return new DefaultUsage(
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          Map.of(
+              "cacheReadInputTokens",
+              cacheReadInputTokens,
+              "cacheWriteInputTokens",
+              cacheWriteInputTokens));
+    } catch (ReflectiveOperationException incompatibleSpringAiUsage) {
+      throw new IllegalStateException(
+          "Spring AI exposes prompt-cache usage fields but they could not be populated",
+          incompatibleSpringAiUsage);
+    }
   }
 
   private static final class UsageAccumulator {
