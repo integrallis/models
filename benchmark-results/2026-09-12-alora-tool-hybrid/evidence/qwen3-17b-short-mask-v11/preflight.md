@@ -47,7 +47,8 @@ consume any rejected or aborted adapter.
   `1d1b977295ff6e301337c15cb03c8c94bf85a6503e55b05e359f1b087229d43f`
 
 Two independent preparations reproduced the splits and manifest byte-for-byte. Host-side hashes
-match the local hashes. Tokenization with the pinned Qwen3 tokenizer proves exact V9 retention:
+match the local hashes. Tokenization with the pinned Qwen3 tokenizer proves that V11 retains the
+exact V9 usable-row counts:
 
 | Split | Usable | Over 1,024 | No-call | Multiple-call | Source-line hash |
 | --- | ---: | ---: | ---: | ---: | --- |
