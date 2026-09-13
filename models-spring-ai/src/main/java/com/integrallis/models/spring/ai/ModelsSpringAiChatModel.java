@@ -449,8 +449,11 @@ public final class ModelsSpringAiChatModel implements ChatModel {
           toolAwareResponse(
               toolOutput, toolMetrics.available() ? toolMetrics.usage() : null, tools);
       if (!selection.hasToolCalls()) {
-        return streamActivatedBase(turn, rendered, requested, usage)
-            .doFinally(ignored -> turn.close());
+        return Flux.using(
+            () -> turn,
+            acquired -> streamActivatedBase(acquired, rendered, requested, usage),
+            SharedToolTurn::close,
+            true);
       }
 
       ToolExecutionResult toolResult = toolCallingManager.executeToolCalls(prompt, selection);
