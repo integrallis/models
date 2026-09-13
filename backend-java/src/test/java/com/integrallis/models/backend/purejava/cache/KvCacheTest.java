@@ -217,6 +217,8 @@ class KvCacheTest {
       KvCache first = prefix.fork();
       KvCache second = prefix.fork();
 
+      assertThat(prefix.allocatedBytes())
+          .isEqualTo(16L * (2L * Float.BYTES + 2L * Float.BYTES + 1L));
       assertThat(source.allocatedBytes()).isEqualTo(prefix.allocatedBytes());
       assertThat(first.allocatedBytes()).isEqualTo(prefix.allocatedBytes() * 2);
       assertThat(second.allocatedBytes()).isEqualTo(prefix.allocatedBytes() * 2);
