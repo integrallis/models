@@ -18,6 +18,7 @@ package com.integrallis.models.bench;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
 import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.ToolSpec;
@@ -131,7 +132,7 @@ final class ActivatedDecisionProfileCli {
           "V15 requires the frozen V9 exposed records: " + sourceSha256);
     }
 
-    ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    ObjectMapper mapper = mapper();
     LoadedCases loaded = loadCases(mapper, configuration.records());
     List<Observation> observations = new ArrayList<>();
     ActivatedAdapterMetadata adapter;
@@ -258,6 +259,12 @@ final class ActivatedDecisionProfileCli {
       }
     }
     return new Calibration(selected, selectedScore, score(screen, selected));
+  }
+
+  static ObjectMapper mapper() {
+    return new ObjectMapper()
+        .configure(JsonNodeFeature.WRITE_PROPERTIES_SORTED, false)
+        .enable(SerializationFeature.INDENT_OUTPUT);
   }
 
   private static boolean better(

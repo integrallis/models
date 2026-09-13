@@ -63,6 +63,16 @@ class ActivatedDecisionProfileCliTest {
     assertThat(result.calibration().correctNoCalls()).isEqualTo(2);
   }
 
+  @Test
+  void preservesTheFrozenSchemaMemberOrderWhenReconstructingPrompts() throws Exception {
+    var mapper = ActivatedDecisionProfileCli.mapper();
+    var schema = mapper.readTree("{\"type\":\"object\",\"properties\":{\"z\":{},\"a\":{}}}");
+    String serialized = mapper.writeValueAsString(schema);
+
+    assertThat(serialized.indexOf("\"type\"")).isLessThan(serialized.indexOf("\"properties\""));
+    assertThat(serialized.indexOf("\"z\"")).isLessThan(serialized.indexOf("\"a\""));
+  }
+
   private static ActivatedDecisionProfileCli.Observation observation(
       String id, boolean calibration, boolean callExpected, float margin) {
     return new ActivatedDecisionProfileCli.Observation(
