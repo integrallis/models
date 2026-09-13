@@ -271,7 +271,8 @@ class ModelsSpringAiToolCallingTest {
 
       assertThat(model.lastPrompt()).contains("# Tools");
       assertThat(model.lastPrompt()).contains("get_weather");
-      assertThat(model.lastPrompt()).contains(SCHEMA);
+      assertThat(model.lastPrompt())
+          .contains("{\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}}}");
     }
 
     @Test

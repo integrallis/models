@@ -357,9 +357,9 @@ class ModelsChatModelToolCallingTest {
 
       assertThat(model.lastPrompt()).contains("# Tools");
       assertThat(model.lastPrompt()).contains("get_weather");
-      assertThat(model.lastPrompt()).contains("\"type\":\"object\"");
+      assertThat(model.lastPrompt()).contains("\"type\": \"object\"");
       assertThat(model.lastPrompt()).contains("\"city\"");
-      assertThat(model.lastPrompt()).contains("\"required\":[\"city\"]");
+      assertThat(model.lastPrompt()).contains("\"required\": [\"city\"]");
     }
 
     @Test
