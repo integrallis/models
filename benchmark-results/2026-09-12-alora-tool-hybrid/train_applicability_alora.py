@@ -48,6 +48,10 @@ V13_TRAIN_CALL_COUNT = 2356
 V13_TRAIN_NO_CALL_COUNT = 484
 V13_VALIDATION_CALL_COUNT = 390
 V13_VALIDATION_NO_CALL_COUNT = 81
+APPLICABILITY_EXPERIMENTS = (
+    "qwen3-17b-applicability-decision-v13",
+    "qwen3-17b-applicability-decision-v14",
+)
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,12 @@ def require_matching_fingerprints(expected: str, actual: str, context: str) -> N
         raise ValueError(
             f"{context} fingerprints differ: expected {expected}, got {actual}"
         )
+
+
+def resolve_experiment(value: str) -> str:
+    if value not in APPLICABILITY_EXPERIMENTS:
+        raise ValueError(f"unsupported applicability experiment: {value}")
+    return value
 
 
 def adapter_state_sha256(state_dict: dict[str, Any], torch_module: Any) -> str:
@@ -542,6 +552,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument(
+        "--experiment",
+        choices=APPLICABILITY_EXPERIMENTS,
+        default=APPLICABILITY_EXPERIMENTS[0],
+    )
     parser.add_argument("--candidate", choices=sorted(CANDIDATES), default="qwen3-1.7b")
     parser.add_argument("--initial-adapter", required=True, type=Path)
     parser.add_argument("--initial-training-manifest", required=True, type=Path)
@@ -555,6 +570,7 @@ def main() -> None:
     parser.add_argument("--gradient-accumulation", type=int, default=16)
     parser.add_argument("--seed", type=int, default=20260918)
     args = parser.parse_args()
+    resolve_experiment(args.experiment)
     if args.out.exists():
         parser.error(f"output already exists: {args.out}")
     if args.candidate != "qwen3-1.7b":
@@ -763,7 +779,7 @@ def main() -> None:
     manifest = {
         "schemaVersion": 1,
         "kind": "activated-lora-tool-specialist",
-        "experiment": "qwen3-17b-applicability-decision-v13",
+        "experiment": args.experiment,
         "arm": "control" if args.applicability_loss_weight == 0.0 else "treatment",
         "base": {"model": model_id, "revision": model_revision},
         "invocation": {"string": INVOCATION_STRING, "tokens": INVOCATION_TOKENS},

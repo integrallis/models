@@ -14,6 +14,7 @@ from train_applicability_alora import (
     decision_prediction_position,
     json_safe,
     require_matching_fingerprints,
+    resolve_experiment,
     unwrap_training_model,
 )
 from train_alora import INVOCATION_TOKENS
@@ -46,6 +47,14 @@ class FakeTokenizer:
 
 
 class ApplicabilityAloraTest(unittest.TestCase):
+    def test_accepts_only_the_frozen_applicability_experiment_names(self):
+        self.assertEqual(
+            resolve_experiment("qwen3-17b-applicability-decision-v14"),
+            "qwen3-17b-applicability-decision-v14",
+        )
+        with self.assertRaisesRegex(ValueError, "unsupported applicability experiment"):
+            resolve_experiment("v15")
+
     def test_training_model_is_unwrapped_without_the_autocast_forward_wrapper(self):
         sentinel = object()
 
