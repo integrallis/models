@@ -249,6 +249,7 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
                   + backend.contextCapacity());
         }
         synchronized (executionLock) {
+          request.state.requireRetainedPromptPrefix(request.promptTokens);
           int reusable =
               reusablePrefixLength(request.state.cachedPromptTokens, request.promptTokens);
           if (reusable == 0 || request.state.session.checkpoint() < reusable) {
@@ -534,6 +535,7 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
   static final class SessionState {
     private final InferenceSession session;
     private volatile int[] cachedPromptTokens;
+    private int[] retainedPromptPrefix;
     private volatile GenerationMetrics lastGenerationMetrics = GenerationMetrics.unavailable();
 
     private SessionState(InferenceSession session) {
@@ -558,6 +560,25 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
                 + session.checkpoint());
       }
       cachedPromptTokens = promptTokens.clone();
+      if (retainedPromptPrefix == null) {
+        retainedPromptPrefix = promptTokens.clone();
+      }
+    }
+
+    private void requireRetainedPromptPrefix(int[] promptTokens) {
+      if (retainedPromptPrefix == null) {
+        return;
+      }
+      if (promptTokens.length <= retainedPromptPrefix.length) {
+        throw new IllegalArgumentException(
+            "prompt must retain its prepared prefix and add at least one token");
+      }
+      for (int index = 0; index < retainedPromptPrefix.length; index++) {
+        if (promptTokens[index] != retainedPromptPrefix[index]) {
+          throw new IllegalArgumentException(
+              "prompt must retain its prepared prefix and add at least one token");
+        }
+      }
     }
   }
 

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -248,6 +249,32 @@ class KvCacheTest {
     }
 
     @Test
+    void freezingAndForkingReuseTheExactBackingArraysRatherThanCopies() throws Exception {
+      KvCache source = populatedCache(2, 32, 2, 2, 4);
+      Object sourceKeys = fieldValue(source, "keys");
+      Object sourceValues = fieldValue(source, "values");
+      Object sourcePopulation = fieldValue(source, "populated");
+
+      KvCache.SharedPrefix prefix = source.freezePrefix(4);
+      KvCache first = prefix.fork();
+      KvCache second = prefix.fork();
+      List<?> segments = (List<?>) fieldValue(prefix, "segments");
+      Object firstSegment = segments.getFirst();
+
+      assertThat(fieldValue(firstSegment, "keys")).isSameAs(sourceKeys);
+      assertThat(fieldValue(firstSegment, "values")).isSameAs(sourceValues);
+      assertThat(fieldValue(firstSegment, "populated")).isSameAs(sourcePopulation);
+      assertThat(fieldValue(first, "sharedPrefix")).isSameAs(prefix);
+      assertThat(fieldValue(second, "sharedPrefix")).isSameAs(prefix);
+
+      KvCache independent = populatedCache(2, 32, 2, 2, 4);
+      KvCache independentFork = independent.freezePrefix(4).fork();
+      assertThat(first.sharesPrefixStorageWith(independentFork)).isFalse();
+      assertThat(fieldValue(fieldValue(independentFork, "sharedPrefix"), "segments"))
+          .isNotSameAs(segments);
+    }
+
+    @Test
     void attentionViewSplitsAChronologicalRangeAtTheSharedPrefixBoundary() {
       KvCache fork = populatedCache(1, 32, 2, 2, 3).freezePrefix(3).fork();
       fork.store(0, 3, new float[] {30, 31}, new float[] {32, 33});
@@ -445,5 +472,11 @@ class KvCacheTest {
 
     assertThat(cache.keySlice(0, 0, 1)).containsExactly(exact);
     assertThat(cache.valueSlice(0, 0, 1)).containsExactly(exact);
+  }
+
+  private static Object fieldValue(Object target, String name) throws Exception {
+    var field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
   }
 }

@@ -41,8 +41,9 @@ import java.util.Set;
 
 /** Measures an activated adapter against independent prefix recomputation on the same model. */
 final class ActivatedPrefixSharingBenchmarkCli {
-  static final String POLICY_VERSION = "activated-prefix-sharing-crossover-v2";
+  static final String POLICY_VERSION = "activated-prefix-sharing-crossover-v3";
   private static final List<Integer> PREFIX_TIERS = List.of(256, 1_024, 4_096);
+  private static final int EXACT_OUTPUT_TOKENS = 8;
   private static final double MINIMUM_FOUR_K_IMPROVEMENT = 0.20;
   private static final Set<String> OPTIONS =
       Set.of("model", "adapter", "report", "models-revision", "warmups", "trials");
@@ -67,6 +68,7 @@ final class ActivatedPrefixSharingBenchmarkCli {
       long uniqueInferenceStateBytes,
       boolean physicallyShared,
       String output,
+      List<Integer> outputTokenIds,
       ProcessMemory.Snapshot processBefore,
       ProcessMemory.Snapshot processAfter,
       JvmMemorySnapshot jvmBefore,
@@ -145,7 +147,8 @@ final class ActivatedPrefixSharingBenchmarkCli {
       for (int prefixTokens : PREFIX_TIERS) {
         prompts.add(promptWithExactPrefix(model.tokenizer(), adapter, prefixTokens));
       }
-      SamplingOptions options = SamplingOptions.builder().temperature(0).maxTokens(1).build();
+      SamplingOptions options =
+          SamplingOptions.builder().temperature(0).maxTokens(EXACT_OUTPUT_TOKENS).build();
       TokenConstraint nonTerminal = nonTerminal(model.tokenizer());
 
       for (int index = 0; index < PREFIX_TIERS.size(); index++) {
@@ -204,7 +207,7 @@ final class ActivatedPrefixSharingBenchmarkCli {
     boolean qualified = verdict.passed() && memoryComplete;
     Report report =
         new Report(
-            2,
+            3,
             Instant.now().toString(),
             POLICY_VERSION,
             configuration.modelsRevision(),
@@ -287,11 +290,14 @@ final class ActivatedPrefixSharingBenchmarkCli {
         median(recomputed.stream().map(Measurement::uniqueInferenceStateBytes).toList()),
         shared.stream().allMatch(Measurement::physicallyShared),
         recomputed.stream().noneMatch(Measurement::physicallyShared),
-        java.util.stream.Stream.concat(shared.stream(), recomputed.stream())
-                .map(Measurement::output)
-                .distinct()
-                .count()
-            == 1);
+        tokenSequencesExact(
+            java.util.stream.Stream.concat(shared.stream(), recomputed.stream())
+                .map(Measurement::outputTokenIds)
+                .toList()));
+  }
+
+  static boolean tokenSequencesExact(List<List<Integer>> sequences) {
+    return !sequences.isEmpty() && sequences.stream().distinct().count() == 1;
   }
 
   private static Measurement measure(
@@ -307,7 +313,8 @@ final class ActivatedPrefixSharingBenchmarkCli {
     long started = System.nanoTime();
     try (ActivatedToolTurn turn = model.openToolTurn(prompt, mode.strategy)) {
       long opened = System.nanoTime();
-      String output = turn.generateToolCall(options, constraint);
+      RecordingConstraint recording = new RecordingConstraint(constraint);
+      String output = turn.generateToolCall(options, recording);
       long completed = System.nanoTime();
       GenerationMetrics metrics = turn.toolMetrics();
       long generatedTtft =
@@ -334,6 +341,7 @@ final class ActivatedPrefixSharingBenchmarkCli {
               uniqueBytes,
               turn.physicallySharesPrefix(),
               output,
+              recording.acceptedTokens(),
               processBefore,
               ProcessMemory.snapshot(ProcessHandle.current().pid()),
               jvmBefore,
@@ -408,6 +416,35 @@ final class ActivatedPrefixSharingBenchmarkCli {
       @Override
       public void accept(int token) {}
     };
+  }
+
+  private static final class RecordingConstraint implements TokenConstraint {
+    private final TokenConstraint delegate;
+    private final List<Integer> acceptedTokens = new ArrayList<>();
+
+    private RecordingConstraint(TokenConstraint delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public boolean allows(int token) {
+      return delegate.allows(token);
+    }
+
+    @Override
+    public void accept(int token) {
+      delegate.accept(token);
+      acceptedTokens.add(token);
+    }
+
+    @Override
+    public boolean isComplete() {
+      return delegate.isComplete();
+    }
+
+    private List<Integer> acceptedTokens() {
+      return List.copyOf(acceptedTokens);
+    }
   }
 
   private static long median(List<Long> values) {

@@ -290,6 +290,8 @@ public final class InferencePipeline
   public SharedPromptPrefix extendSharedTokenPrefix(TextGenerationSession source, int[] tokens) {
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(tokens, "tokens");
+    SharedPrefixInferenceBackend sharing;
+    int[] trustedTokens;
     synchronized (backend) {
       requireOpen();
       if (!generationSessions.contains(source)) {
@@ -299,9 +301,12 @@ public final class InferencePipeline
       if (tokens.length == 0) {
         throw new IllegalArgumentException("prompt produced no tokens");
       }
-      int[] trustedTokens = tokens.clone();
-      SharedInferencePrefix prefix =
-          source.extendAndFreezeSharedPrefix(sharedPrefixBackend(), trustedTokens);
+      trustedTokens = tokens.clone();
+      sharing = sharedPrefixBackend();
+    }
+    SharedInferencePrefix prefix = source.extendAndFreezeSharedPrefix(sharing, trustedTokens);
+    synchronized (backend) {
+      requireOpen();
       generationSessions.remove(source);
       return new SharedPromptPrefix(this, prefix, trustedTokens, prefix.sharedBytes());
     }
@@ -327,6 +332,8 @@ public final class InferencePipeline
   public SharedPromptPrefix reconcileSharedTokenPrefix(TextGenerationSession source, int[] tokens) {
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(tokens, "tokens");
+    SharedPrefixInferenceBackend sharing;
+    int[] trustedTokens;
     synchronized (backend) {
       requireOpen();
       if (!generationSessions.contains(source)) {
@@ -336,9 +343,12 @@ public final class InferencePipeline
       if (tokens.length == 0) {
         throw new IllegalArgumentException("prompt produced no tokens");
       }
-      int[] trustedTokens = tokens.clone();
-      SharedInferencePrefix prefix =
-          source.reconcileAndFreezeSharedPrefix(sharedPrefixBackend(), trustedTokens);
+      trustedTokens = tokens.clone();
+      sharing = sharedPrefixBackend();
+    }
+    SharedInferencePrefix prefix = source.reconcileAndFreezeSharedPrefix(sharing, trustedTokens);
+    synchronized (backend) {
+      requireOpen();
       generationSessions.remove(source);
       return new SharedPromptPrefix(this, prefix, trustedTokens, prefix.sharedBytes());
     }
@@ -539,19 +549,56 @@ public final class InferencePipeline
   /** Closes the owned backend exactly once. */
   @Override
   public void close() {
+    Set<TextGenerationSession> sessionsToClose;
+    synchronized (backend) {
+      if (!closed.compareAndSet(false, true)) {
+        return;
+      }
+      sessionsToClose = Set.copyOf(generationSessions);
+      generationSessions.clear();
+    }
+
+    Throwable closeFailure = null;
     if (continuousBatching != null) {
-      continuousBatching.close();
+      closeFailure = closeResource(closeFailure, continuousBatching::close);
+    }
+    for (TextGenerationSession session : sessionsToClose) {
+      closeFailure = closeResource(closeFailure, session::close);
     }
     synchronized (backend) {
-      if (closed.compareAndSet(false, true)) {
-        for (TextGenerationSession session : Set.copyOf(generationSessions)) {
-          session.close();
-        }
-        generationSessions.clear();
+      try {
         generationLoop.invalidatePromptCache();
-        backend.close();
+      } catch (RuntimeException | Error failure) {
+        closeFailure = combineCloseFailures(closeFailure, failure);
       }
+      closeFailure = closeResource(closeFailure, backend::close);
     }
+    if (closeFailure instanceof RuntimeException runtimeFailure) {
+      throw runtimeFailure;
+    }
+    if (closeFailure instanceof Error error) {
+      throw error;
+    }
+    if (closeFailure != null) {
+      throw new IllegalStateException("failed to close inference pipeline", closeFailure);
+    }
+  }
+
+  private static Throwable closeResource(Throwable current, Runnable close) {
+    try {
+      close.run();
+      return current;
+    } catch (RuntimeException | Error failure) {
+      return combineCloseFailures(current, failure);
+    }
+  }
+
+  private static Throwable combineCloseFailures(Throwable current, Throwable next) {
+    if (current == null) {
+      return next;
+    }
+    current.addSuppressed(next);
+    return current;
   }
 
   private RewindableInferenceBackend rewindableBackend() {

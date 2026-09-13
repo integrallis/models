@@ -33,11 +33,14 @@ import com.integrallis.models.api.SharedInferencePrefix;
 import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class InferencePipelineTest {
@@ -236,6 +239,40 @@ class InferencePipelineTest {
   }
 
   @Test
+  void resetsRecomputedBaseAndActivatedBranchesToTheirPreparedBoundary() {
+    SessionBackend backend = new SessionBackend(true, true);
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend);
+        TextGenerationSession base =
+            pipeline.openGenerationSessionAfterBasePrefix(
+                ModelPrompt.text("ab"), SharedPrefixInferenceBackend.Branch.BASE);
+        TextGenerationSession activated =
+            pipeline.openGenerationSessionAfterBasePrefix(
+                ModelPrompt.text("ab"), SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER)) {
+      base.generate("abc", deterministicOptions());
+      activated.generate("abc", deterministicOptions());
+
+      base.resetContext();
+      activated.resetContext();
+
+      assertThat(base.contextWindow().position()).hasValue(2);
+      assertThat(activated.contextWindow().position()).hasValue(2);
+      base.generate("abd", deterministicOptions());
+      activated.generate("abd", deterministicOptions());
+      assertThat(base.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+      assertThat(activated.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+      assertThatThrownBy(() -> base.generate("xbc", deterministicOptions()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("retain its prepared prefix");
+      assertThatThrownBy(() -> activated.generate("xbc", deterministicOptions()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("retain its prepared prefix");
+    }
+  }
+
+  @Test
   void reportsTheLoadedGraphsActualPhysicalPrefixCapability() {
     try (InferencePipeline pipeline = new InferencePipeline(new SessionBackend(false))) {
       assertThat(pipeline.supportsSharedPromptPrefixes()).isFalse();
@@ -380,6 +417,88 @@ class InferencePipelineTest {
     assertThatThrownBy(() -> pipeline.openGenerationSession(prefix))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("closed");
+  }
+
+  @Test
+  void closingPipelineNeverInvertsTheSessionAndBackendLockOrder() throws Exception {
+    SessionBackend backend = new SessionBackend();
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    TextGenerationSession session = pipeline.openGenerationSession();
+    Field lockField = TextGenerationSession.class.getDeclaredField("operationLock");
+    lockField.setAccessible(true);
+    Object operationLock = lockField.get(session);
+    CountDownLatch operationLockHeld = new CountDownLatch(1);
+    CountDownLatch inspectContext = new CountDownLatch(1);
+    AtomicReference<Throwable> holderFailure = new AtomicReference<>();
+    AtomicReference<Throwable> closeFailure = new AtomicReference<>();
+
+    Thread holder =
+        Thread.ofPlatform()
+            .daemon()
+            .name("session-operation-holder")
+            .unstarted(
+                () -> {
+                  synchronized (operationLock) {
+                    operationLockHeld.countDown();
+                    try {
+                      if (!inspectContext.await(2, TimeUnit.SECONDS)) {
+                        throw new AssertionError("pipeline close did not reach the session lock");
+                      }
+                      session.contextWindow();
+                    } catch (Throwable failure) {
+                      holderFailure.set(failure);
+                    }
+                  }
+                });
+    Thread closer =
+        Thread.ofPlatform()
+            .daemon()
+            .name("pipeline-closer")
+            .unstarted(
+                () -> {
+                  try {
+                    pipeline.close();
+                  } catch (Throwable failure) {
+                    closeFailure.set(failure);
+                  }
+                });
+
+    holder.start();
+    assertThat(operationLockHeld.await(1, TimeUnit.SECONDS)).isTrue();
+    closer.start();
+    awaitBlocked(closer);
+    inspectContext.countDown();
+    holder.join(2_000);
+    closer.join(2_000);
+
+    assertThat(holder.isAlive()).isFalse();
+    assertThat(closer.isAlive()).isFalse();
+    assertThat(holderFailure.get()).isNull();
+    assertThat(closeFailure.get()).isNull();
+    long[] deadlocked = ManagementFactory.getThreadMXBean().findDeadlockedThreads();
+    assertThat(deadlocked == null ? new long[0] : deadlocked)
+        .doesNotContain(holder.threadId(), closer.threadId());
+    assertThat(backend.closeCount).isEqualTo(1);
+  }
+
+  @Test
+  void pipelineCloseAttemptsEverySessionAndBackendAfterCloseFailures() {
+    SessionBackend backend = new SessionBackend(true, false, 2);
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    TextGenerationSession first = pipeline.openGenerationSession();
+    TextGenerationSession second = pipeline.openGenerationSession();
+
+    assertThatThrownBy(pipeline::close)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("fixture session close failure")
+        .satisfies(failure -> assertThat(failure.getSuppressed()).hasSize(1));
+
+    assertThat(first.isClosed()).isTrue();
+    assertThat(second.isClosed()).isTrue();
+    assertThat(backend.closedSessions).isEqualTo(2);
+    assertThat(backend.closeCount).isEqualTo(1);
+    pipeline.close();
+    assertThat(backend.closeCount).isEqualTo(1);
   }
 
   @Test
@@ -593,6 +712,14 @@ class InferencePipelineTest {
       TextGenerationSession session, String prompt, CountDownLatch ready, CountDownLatch start)
       throws InterruptedException {
     return generateWhenReleased(session, prompt, twoTokenOptions(), ready, start);
+  }
+
+  private static void awaitBlocked(Thread thread) throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+    while (thread.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+      Thread.sleep(5);
+    }
+    assertThat(thread.getState()).isEqualTo(Thread.State.BLOCKED);
   }
 
   private static String generateWhenReleased(
@@ -858,6 +985,7 @@ class InferencePipelineTest {
     private int nextPrefixId;
     private final boolean sharedPrefixes;
     private final boolean activatedBranch;
+    private int sessionCloseFailuresRemaining;
 
     private SessionBackend() {
       this(true, false);
@@ -868,8 +996,14 @@ class InferencePipelineTest {
     }
 
     private SessionBackend(boolean sharedPrefixes, boolean activatedBranch) {
+      this(sharedPrefixes, activatedBranch, 0);
+    }
+
+    private SessionBackend(
+        boolean sharedPrefixes, boolean activatedBranch, int sessionCloseFailuresRemaining) {
       this.sharedPrefixes = sharedPrefixes;
       this.activatedBranch = activatedBranch;
+      this.sessionCloseFailuresRemaining = sessionCloseFailuresRemaining;
     }
 
     @Override
@@ -1070,6 +1204,10 @@ class InferencePipelineTest {
         if (!closed) {
           closed = true;
           closedSessions++;
+          if (sessionCloseFailuresRemaining > 0) {
+            sessionCloseFailuresRemaining--;
+            throw new IllegalStateException("fixture session close failure");
+          }
         }
       }
     }

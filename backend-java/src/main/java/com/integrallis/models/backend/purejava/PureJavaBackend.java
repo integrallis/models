@@ -75,6 +75,9 @@ import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,6 +108,8 @@ public final class PureJavaBackend
   private final BackendDiagnostics diagnostics;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
   private final BatchedCausalAttentionKernel batchedAttentionKernel;
+  private final Set<PureJavaInferenceSession> activeSessions =
+      Collections.newSetFromMap(new IdentityHashMap<>());
   private PureJavaDecoder.Session[] sessionBatch = new PureJavaDecoder.Session[0];
   private boolean closed;
 
@@ -116,7 +121,7 @@ public final class PureJavaBackend
 
   private static final class PureJavaInferenceSession implements InferenceSession {
     private final PureJavaBackend owner;
-    private final PureJavaDecoder.Session delegate;
+    private PureJavaDecoder.Session delegate;
     private boolean closed;
 
     private PureJavaInferenceSession(PureJavaBackend owner, PureJavaDecoder.Session delegate) {
@@ -963,7 +968,7 @@ public final class PureJavaBackend
   @Override
   public InferenceSession openSession() {
     checkOpen();
-    return new PureJavaInferenceSession(this, decoder.openSession());
+    return registerSession(decoder.openSession());
   }
 
   @Override
@@ -1002,6 +1007,8 @@ public final class PureJavaBackend
     }
     PureJavaDecoder.SharedPrefix prefix = decoder.freezePrefix(session.delegate);
     session.closed = true;
+    activeSessions.remove(session);
+    session.delegate = null;
     return new PureJavaSharedPrefix(this, prefix);
   }
 
@@ -1014,7 +1021,7 @@ public final class PureJavaBackend
     if (activated && !decoder.supportsActivatedBranch()) {
       throw new IllegalStateException("loaded model has no activated adapter");
     }
-    return new PureJavaInferenceSession(this, decoder.fork(ownedPrefix.delegate, activated));
+    return registerSession(decoder.fork(ownedPrefix.delegate, activated));
   }
 
   @Override
@@ -1114,6 +1121,12 @@ public final class PureJavaBackend
       return;
     }
     closed = true;
+    for (PureJavaInferenceSession session : Set.copyOf(activeSessions)) {
+      session.closed = true;
+      session.delegate = null;
+    }
+    activeSessions.clear();
+    Arrays.fill(sessionBatch, null);
     RuntimeException closeFailure = null;
     try {
       decoder.close();
@@ -1173,9 +1186,15 @@ public final class PureJavaBackend
 
   private PureJavaInferenceSession requireOpen(PureJavaInferenceSession session) {
     checkOpen();
-    if (session.closed) {
+    if (session.closed || session.delegate == null) {
       throw new IllegalStateException("session is closed");
     }
+    return session;
+  }
+
+  private PureJavaInferenceSession registerSession(PureJavaDecoder.Session delegate) {
+    PureJavaInferenceSession session = new PureJavaInferenceSession(this, delegate);
+    activeSessions.add(session);
     return session;
   }
 
@@ -1183,9 +1202,20 @@ public final class PureJavaBackend
     if (session.closed) {
       return;
     }
+    PureJavaDecoder.Session delegate = session.delegate;
     session.closed = true;
-    if (!closed) {
-      decoder.reset(session.delegate);
+    activeSessions.remove(session);
+    try {
+      if (!closed && delegate != null) {
+        decoder.reset(delegate);
+      }
+    } finally {
+      session.delegate = null;
+      for (int index = 0; index < sessionBatch.length; index++) {
+        if (sessionBatch[index] == delegate) {
+          sessionBatch[index] = null;
+        }
+      }
     }
   }
 

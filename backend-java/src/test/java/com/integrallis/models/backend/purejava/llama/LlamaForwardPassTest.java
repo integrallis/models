@@ -1942,6 +1942,52 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void independentlyActivatedSessionRetainsItsBoundaryAcrossRewindAndReset(
+        @TempDir Path temporaryDirectory) throws Exception {
+      Files.createDirectories(temporaryDirectory);
+      GgufFile file = buildQ4KNanoModel(new Random(145));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+
+      try (Arena arena = Arena.ofConfined()) {
+        ActivatedLoraAdapter adapter =
+            writeNanoAdapter(temporaryDirectory, arena, config, "a".repeat(64));
+        LlamaForwardPass pass =
+            new LlamaForwardPass(
+                config,
+                weights,
+                new KvCache(
+                    config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+                adapter);
+        LlamaForwardPass.Session activated = pass.openSession();
+        pass.prefill(activated, new int[] {5, 7}, 0);
+        pass.activateAdapter(activated);
+        pass.forward(activated, 11, 2);
+        pass.forward(activated, 13, 3);
+
+        pass.rewind(activated, 2);
+
+        assertThatThrownBy(() -> pass.forward(activated, 12, 2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("invocation token 0")
+            .hasMessageContaining("must be 11");
+        assertThatThrownBy(() -> pass.rewind(activated, 1))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("activation boundary");
+
+        pass.forward(activated, 11, 2);
+        pass.forward(activated, 13, 3);
+        pass.reset(activated);
+
+        assertThat(activated.checkpoint()).isEqualTo(2);
+        assertThatThrownBy(() -> pass.forward(activated, 12, 2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("invocation token 0")
+            .hasMessageContaining("must be 11");
+      }
+    }
+
+    @Test
     void raggedSessionPrefillPreservesFinalLogitsKvStateAndContinuation() {
       GgufFile file = buildQ4KNanoModel(new Random(46));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());

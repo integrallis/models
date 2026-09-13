@@ -49,6 +49,7 @@ public final class GenerationLoop {
   private volatile PromptCacheMetrics lastPromptCacheMetrics = PromptCacheMetrics.unavailable();
   private volatile GenerationMetrics lastGenerationMetrics = GenerationMetrics.unavailable();
   private int[] cachedPromptTokens;
+  private int[] retainedPromptPrefix;
 
   public GenerationLoop(InferenceBackend backend) {
     this(backend, SpeculativeGenerationOptions.disabled(), System::nanoTime);
@@ -118,6 +119,9 @@ public final class GenerationLoop {
               + rewindable.checkpoint());
     }
     cachedPromptTokens = promptTokens.clone();
+    if (retainedPromptPrefix == null) {
+      retainedPromptPrefix = promptTokens.clone();
+    }
   }
 
   /** Rejects a replacement prompt where a physical-prefix extension was promised. */
@@ -365,6 +369,7 @@ public final class GenerationLoop {
   }
 
   private PromptPrefill preparePromptTokens(int[] promptTokens) {
+    requireRetainedPromptPrefix(promptTokens);
     if (!(backend instanceof RewindableInferenceBackend rewindableBackend)) {
       backend.reset();
       return new PromptPrefill(
@@ -383,6 +388,22 @@ public final class GenerationLoop {
         Arrays.copyOfRange(promptTokens, reusableTokens, promptTokens.length),
         new PromptCacheMetrics(
             true, promptTokens.length, reusableTokens, promptTokens.length - reusableTokens));
+  }
+
+  private void requireRetainedPromptPrefix(int[] promptTokens) {
+    if (retainedPromptPrefix == null) {
+      return;
+    }
+    if (promptTokens.length <= retainedPromptPrefix.length) {
+      throw new IllegalArgumentException(
+          "prompt must retain its prepared prefix and add at least one token");
+    }
+    for (int index = 0; index < retainedPromptPrefix.length; index++) {
+      if (promptTokens[index] != retainedPromptPrefix[index]) {
+        throw new IllegalArgumentException(
+            "prompt must retain its prepared prefix and add at least one token");
+      }
+    }
   }
 
   private int reusablePrefixLength(int[] promptTokens) {

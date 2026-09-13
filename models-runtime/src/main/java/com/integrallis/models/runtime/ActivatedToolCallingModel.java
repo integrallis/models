@@ -184,12 +184,7 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
           prefixStrategy,
           minimumSharedPrefixTokens);
     } catch (RuntimeException | Error failure) {
-      if (tool != null) {
-        tool.close();
-      }
-      if (base != null) {
-        base.close();
-      }
+      closeAfterFailure(failure, tool, base);
       throw failure;
     }
   }
@@ -231,13 +226,21 @@ public final class ActivatedToolCallingModel implements ActivatedToolModel {
           prefixStrategy,
           minimumSharedPrefixTokens);
     } catch (RuntimeException | Error failure) {
-      if (tool != null) {
-        tool.close();
-      }
-      if (base != null) {
-        base.close();
-      }
+      closeAfterFailure(failure, tool, base);
       throw failure;
+    }
+  }
+
+  static void closeAfterFailure(Throwable primary, TextGenerationSession... sessions) {
+    for (TextGenerationSession session : sessions) {
+      if (session == null) {
+        continue;
+      }
+      try {
+        session.close();
+      } catch (RuntimeException | Error closeFailure) {
+        primary.addSuppressed(closeFailure);
+      }
     }
   }
 

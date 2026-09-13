@@ -173,12 +173,7 @@ public final class ActivatedToolTurn implements SharedToolTurn {
           minimumSharedPrefixTokens);
     } catch (RuntimeException | Error failure) {
       failed = true;
-      if (nextTool != null) {
-        nextTool.close();
-      }
-      if (nextBase != null) {
-        nextBase.close();
-      }
+      ActivatedToolCallingModel.closeAfterFailure(failure, nextTool, nextBase);
       throw failure;
     }
   }
@@ -291,23 +286,26 @@ public final class ActivatedToolTurn implements SharedToolTurn {
       if (advanced) {
         return;
       }
-      RuntimeException failure = null;
+      Throwable failure = null;
       try {
         tool.close();
-      } catch (RuntimeException closeFailure) {
+      } catch (RuntimeException | Error closeFailure) {
         failure = closeFailure;
       }
       try {
         base.close();
-      } catch (RuntimeException closeFailure) {
+      } catch (RuntimeException | Error closeFailure) {
         if (failure == null) {
           failure = closeFailure;
         } else {
           failure.addSuppressed(closeFailure);
         }
       }
-      if (failure != null) {
-        throw failure;
+      if (failure instanceof RuntimeException runtimeFailure) {
+        throw runtimeFailure;
+      }
+      if (failure instanceof Error error) {
+        throw error;
       }
     }
   }

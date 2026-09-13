@@ -13,6 +13,14 @@ java {
     }
 }
 
+val benchmarkJvmArgs =
+    listOf(
+        "--add-modules",
+        "jdk.incubator.vector",
+        "--enable-native-access=ALL-UNNAMED",
+        "-XX:NativeMemoryTracking=summary",
+    )
+
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.addAll(listOf(
@@ -27,7 +35,7 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    jvmArgs(benchmarkJvmArgs)
 }
 
 tasks.named("spotbugsTest") {
@@ -36,15 +44,14 @@ tasks.named("spotbugsTest") {
 
 application {
     mainClass = "com.integrallis.models.bench.InferenceBenchmarkCli"
-    applicationDefaultJvmArgs =
-        listOf("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    applicationDefaultJvmArgs = benchmarkJvmArgs
 }
 
 val aggregateNativeRelease =
     providers.gradleProperty("modelsNativeArtifactDirectory").isPresent
 
 tasks.withType<JavaExec>().configureEach {
-    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    jvmArgs(benchmarkJvmArgs)
     System.getProperty("models.native.kernels.library")?.let {
         systemProperty("models.native.kernels.library", it)
     }

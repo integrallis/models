@@ -416,6 +416,59 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void closedRawSessionDetachesItsOwnedKvState(@TempDir Path dir) throws Exception {
+      Path modelPath = buildNanoModelFile(dir, new Random(146), GgufTensorType.Q4_0);
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        InferenceSession session = backend.openSession();
+        backend.prefill(session, new int[] {5, 7}, 0);
+        assertThat(sessionDelegate(session)).isNotNull();
+
+        session.close();
+        session.close();
+
+        assertThat(session.isClosed()).isTrue();
+        assertThat(sessionDelegate(session)).isNull();
+      }
+    }
+
+    @Test
+    void freezingTransfersPrefixOwnershipAndDetachesTheSourceSession(@TempDir Path dir)
+        throws Exception {
+      Path modelPath = buildNanoModelFile(dir, new Random(147), GgufTensorType.Q4_0);
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        InferenceSession source = backend.openSession();
+        backend.prefill(source, new int[] {5, 7}, 0);
+        var prefix = backend.freezePrefix(source);
+
+        assertThat(source.isClosed()).isTrue();
+        assertThat(sessionDelegate(source)).isNull();
+        InferenceSession fork = backend.fork(prefix);
+        assertThat(backend.forward(fork, 11, 2)).hasSize(VOCAB_SIZE);
+        fork.close();
+        assertThat(sessionDelegate(fork)).isNull();
+      }
+    }
+
+    @Test
+    void backendCloseDetachesEveryStillOpenRawSession(@TempDir Path dir) throws Exception {
+      Path modelPath = buildNanoModelFile(dir, new Random(148), GgufTensorType.Q4_0);
+      PureJavaBackend backend = PureJavaBackend.load(modelPath);
+      InferenceSession first = backend.openSession();
+      InferenceSession second = backend.openSession();
+      backend.prefill(first, new int[] {5, 7}, 0);
+      backend.prefill(second, new int[] {11, 13}, 0);
+
+      backend.close();
+
+      assertThat(first.isClosed()).isTrue();
+      assertThat(second.isClosed()).isTrue();
+      assertThat(sessionDelegate(first)).isNull();
+      assertThat(sessionDelegate(second)).isNull();
+    }
+
+    @Test
     void capsRuntimeContextLengthWithoutChangingModelMetadata(@TempDir Path dir)
         throws IOException {
       Path modelPath = buildNanoModelFile(dir, new Random(43));
@@ -730,5 +783,11 @@ class PureJavaBackendTest {
     } else {
       System.setProperty(name, previous);
     }
+  }
+
+  private static Object sessionDelegate(InferenceSession session) throws Exception {
+    var delegate = session.getClass().getDeclaredField("delegate");
+    delegate.setAccessible(true);
+    return delegate.get(session);
   }
 }

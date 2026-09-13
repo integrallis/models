@@ -129,6 +129,18 @@ class ActivatedPrefixSharingBenchmarkCliTest {
     assertThat(ActivatedPrefixSharingBenchmarkCli.verdict(summaries).passed()).isFalse();
   }
 
+  @Test
+  void distinguishesDifferentTokenSequencesEvenWhenDecodedTextCouldMatch() {
+    assertThat(
+            ActivatedPrefixSharingBenchmarkCli.tokenSequencesExact(
+                List.of(List.of(151_644, 198), List.of(151_644, 198))))
+        .isTrue();
+    assertThat(
+            ActivatedPrefixSharingBenchmarkCli.tokenSequencesExact(
+                List.of(List.of(151_644, 198), List.of(151_645, 198))))
+        .isFalse();
+  }
+
   private static ActivatedPrefixSharingBenchmarkCli.TierSummary summary(
       int tokens, double sharedMillis, double recomputedMillis) {
     return summary(tokens, sharedMillis, recomputedMillis, 1_000, 2_000);

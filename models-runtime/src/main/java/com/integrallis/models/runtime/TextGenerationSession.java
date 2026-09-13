@@ -171,7 +171,11 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
         if (continuousBatchingState != null) {
           continuousBatchingState.invalidatePromptCache();
         }
-        backend.reset();
+        if (preparedPrefixTokens == null) {
+          backend.reset();
+        } else {
+          backend.rewind(preparedPrefixTokens.length);
+        }
         if (preparedPrefixTokens != null) {
           generationLoop.restorePromptCache(preparedPrefixTokens);
           if (continuousBatchingState != null) {

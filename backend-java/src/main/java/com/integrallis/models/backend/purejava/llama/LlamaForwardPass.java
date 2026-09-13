@@ -57,6 +57,7 @@ public final class LlamaForwardPass {
     private final LlamaForwardPass owner;
     private final KvCache cache;
     private boolean adapterActive;
+    private int adapterActivationPosition;
     private int adapterInvocationIndex;
     private int nextPosition;
 
@@ -70,6 +71,7 @@ public final class LlamaForwardPass {
       this.cache = cache;
       this.nextPosition = nextPosition;
       this.adapterActive = adapterActive;
+      this.adapterActivationPosition = adapterActive ? nextPosition : -1;
     }
 
     /** Returns the next sequence position. */
@@ -669,6 +671,7 @@ public final class LlamaForwardPass {
       throw new IllegalStateException("session adapter is already activated");
     }
     session.adapterActive = true;
+    session.adapterActivationPosition = session.nextPosition;
     session.adapterInvocationIndex = 0;
   }
 
@@ -835,9 +838,17 @@ public final class LlamaForwardPass {
   /** Discards session state at and after {@code checkpoint}. */
   public void rewind(Session session, int checkpoint) {
     requireSession(session);
-    if (checkpoint < 0 || checkpoint > session.nextPosition) {
+    int earliestCheckpoint = session.adapterActive ? session.adapterActivationPosition : 0;
+    if (checkpoint < earliestCheckpoint || checkpoint > session.nextPosition) {
+      String lowerBound =
+          session.adapterActive ? "activation boundary " + session.adapterActivationPosition : "0";
       throw new IllegalArgumentException(
-          "checkpoint must be between 0 and " + session.nextPosition + ": " + checkpoint);
+          "checkpoint must be between "
+              + lowerBound
+              + " and "
+              + session.nextPosition
+              + ": "
+              + checkpoint);
     }
     session.cache.discardFrom(checkpoint);
     session.nextPosition = checkpoint;
@@ -845,15 +856,20 @@ public final class LlamaForwardPass {
       session.adapterInvocationIndex =
           Math.min(
               activatedAdapter.invocationTokens().length,
-              checkpoint - session.cache.sharedPrefixLength());
+              checkpoint - session.adapterActivationPosition);
     }
   }
 
   /** Clears one independent session without changing any other sequence. */
   public void reset(Session session) {
     requireSession(session);
-    session.cache.clear();
-    session.nextPosition = session.cache.sharedPrefixLength();
+    if (session.adapterActive) {
+      session.cache.discardFrom(session.adapterActivationPosition);
+      session.nextPosition = session.adapterActivationPosition;
+    } else {
+      session.cache.clear();
+      session.nextPosition = session.cache.sharedPrefixLength();
+    }
     session.adapterInvocationIndex = 0;
   }
 

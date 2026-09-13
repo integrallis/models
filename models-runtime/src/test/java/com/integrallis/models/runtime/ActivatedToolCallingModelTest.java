@@ -74,6 +74,50 @@ class ActivatedToolCallingModelTest {
   }
 
   @Test
+  void failedSharedTurnConstructionPreservesTheCauseAndClosesBothBranches() {
+    ActivatedBackend backend = new ActivatedBackend(true, 2);
+    ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
+
+    assertThatThrownBy(() -> model.openToolTurn(ModelPrompt.text("abXY")))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("fixture physical-sharing failure")
+        .satisfies(
+            failure -> {
+              assertThat(failure.getSuppressed())
+                  .extracting(Throwable::getMessage)
+                  .containsExactly(
+                      "fixture session close failure 1", "fixture session close failure 2");
+              assertThat(backend.sessionCloseAttempts).isEqualTo(2);
+            });
+
+    model.close();
+  }
+
+  @Test
+  void failedConversationCloseReleasesItsTurnReference() throws Exception {
+    ActivatedBackend backend = new ActivatedBackend(false, 2);
+    ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
+    ActivatedToolConversation conversation = model.openConversation();
+    conversation.selectTool(
+        ModelPrompt.text("abXY"), deterministicOptions(), TokenConstraint.unrestricted());
+
+    assertThatThrownBy(conversation::close)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("fixture session close failure 1")
+        .satisfies(
+            failure ->
+                assertThat(failure.getSuppressed())
+                    .extracting(Throwable::getMessage)
+                    .containsExactly("fixture session close failure 2"));
+
+    var activeTurn = ActivatedToolConversation.class.getDeclaredField("activeTurn");
+    activeTurn.setAccessible(true);
+    assertThat(activeTurn.get(conversation)).isNull();
+    assertThat(backend.sessionCloseAttempts).isEqualTo(2);
+    model.close();
+  }
+
+  @Test
   void explicitSharingOverridesTheAutomaticCrossoverForBenchmarking() {
     ActivatedBackend backend = new ActivatedBackend();
 
@@ -528,7 +572,19 @@ class ActivatedToolCallingModelTest {
     private final Tokenizer tokenizer = new CharacterTokenizer();
     private int nextPrefix;
     private int defaultPosition;
+    private final boolean failPhysicalSharingCheck;
+    private int sessionCloseFailuresRemaining;
+    private int sessionCloseAttempts;
     private boolean closed;
+
+    private ActivatedBackend() {
+      this(false, 0);
+    }
+
+    private ActivatedBackend(boolean failPhysicalSharingCheck, int sessionCloseFailuresRemaining) {
+      this.failPhysicalSharingCheck = failPhysicalSharingCheck;
+      this.sessionCloseFailuresRemaining = sessionCloseFailuresRemaining;
+    }
 
     @Override
     public String name() {
@@ -675,6 +731,9 @@ class ActivatedToolCallingModelTest {
 
     @Override
     public boolean sharesPrefixStorage(InferenceSession first, InferenceSession second) {
+      if (failPhysicalSharingCheck) {
+        throw new IllegalStateException("fixture physical-sharing failure");
+      }
       Session left = requireSession(first);
       Session right = requireSession(second);
       return left.prefixId != 0 && left.prefixId == right.prefixId;
@@ -698,7 +757,7 @@ class ActivatedToolCallingModelTest {
       return logits;
     }
 
-    private static final class Session implements InferenceSession {
+    private final class Session implements InferenceSession {
       private boolean activated;
       private int prefixLength;
       private final int prefixId;
@@ -729,7 +788,13 @@ class ActivatedToolCallingModelTest {
 
       @Override
       public void close() {
+        sessionCloseAttempts++;
         closed = true;
+        if (sessionCloseFailuresRemaining > 0) {
+          int ordinal = 3 - sessionCloseFailuresRemaining;
+          sessionCloseFailuresRemaining--;
+          throw new IllegalStateException("fixture session close failure " + ordinal);
+        }
       }
     }
 

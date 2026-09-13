@@ -151,13 +151,34 @@ public final class ActivatedToolConversation implements AutoCloseable {
     if (!closed.compareAndSet(false, true)) {
       return;
     }
-    if (activeTurn != null) {
-      activeTurn.close();
-      activeTurn = null;
+    ActivatedToolTurn turn = activeTurn;
+    TextGenerationSession session = baseSession;
+    activeTurn = null;
+    baseSession = null;
+    Throwable failure = null;
+    if (turn != null) {
+      try {
+        turn.close();
+      } catch (RuntimeException | Error closeFailure) {
+        failure = closeFailure;
+      }
     }
-    if (baseSession != null) {
-      baseSession.close();
-      baseSession = null;
+    if (session != null) {
+      try {
+        session.close();
+      } catch (RuntimeException | Error closeFailure) {
+        if (failure == null) {
+          failure = closeFailure;
+        } else {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+    }
+    if (failure instanceof RuntimeException runtimeFailure) {
+      throw runtimeFailure;
+    }
+    if (failure instanceof Error error) {
+      throw error;
     }
   }
 
@@ -184,10 +205,8 @@ public final class ActivatedToolConversation implements AutoCloseable {
       captureSharedPrefix(activeTurn);
       return activeTurn;
     } catch (RuntimeException | Error failure) {
-      if (retained != null) {
-        retained.close();
-        baseSession = null;
-      }
+      ActivatedToolCallingModel.closeAfterFailure(failure, retained);
+      baseSession = null;
       throw failure;
     }
   }
