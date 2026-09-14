@@ -51,7 +51,7 @@ produce V15's call/no-call logits.
 
 The base and V9 adapter remain frozen. Dropout is disabled. Feature extraction is batch size one,
 BF16, SDPA, TF32 disabled, using Torch `2.6.0+cu124`, Transformers `4.53.3`, and the already proven
-PEFT environment. Inputs longer than 1,024 tokens retain the historical V13 exclusion; no new
+PEFT `0.18.1` environment. Inputs longer than 1,024 tokens retain the historical V13 exclusion; no new
 filtering is allowed. Features are persisted as ordered float32 arrays with row IDs, labels,
 source-line identities, extraction-environment metadata, and SHA-256 values.
 
