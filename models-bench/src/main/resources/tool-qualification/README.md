@@ -1,10 +1,15 @@
 # Needle 2 tool qualification
 
 This gate runs the pure-Java CACT backend against all 13 examples published in Needle's
-playground. The tool declarations and queries in `needle2-playground-v1.json` are copied verbatim
+playground. The tool declarations and queries in `needle2-playground-v2.json` are copied verbatim
 from the exact upstream revision recorded in that file. Expected calls are local assertions layered
 on top of the unchanged upstream inputs. A fourteenth case reproduces the Spring AI zipcode report
 and is a mandatory exact-match regression.
+
+V2 corrects three local assertions in the superseded V1 suite: a URI is represented as a canonical
+URI, the requested email subject is retained in full, and booking dates use ISO-8601 values. This
+is a versioned contract correction, not a relaxed comparison; tool selection, schema validation,
+and every expected value remain exact.
 
 The `needle2-tool-conformance-v2` policy requires:
 
