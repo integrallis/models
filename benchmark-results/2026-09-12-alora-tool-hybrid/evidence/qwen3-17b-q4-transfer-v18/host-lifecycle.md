@@ -88,3 +88,20 @@ and parallel GGUF execution, and found the base path stable. The full finding is
 `cold-activated-determinism.md`. Revision `4ebbc471553d5956970091d72f08fd79ad835a4a` fixes the
 F32 adapter warmup in Java and adds a real-weight regression. The passing pre-fix calibration is
 retained only as diagnostic evidence; Phase 2 remains unscored and Phase 1 must run again.
+
+## Stabilized diagnostic and teardown
+
+A further full calibration diagnostic under revision
+`4ebbc471553d5956970091d72f08fd79ad835a4a` completed successfully: calls `47/50`, no-calls
+`24/25`, balanced accuracy `0.95`, and physical sharing `75/75`. Its report SHA-256 is
+`314d5bf277feafdbc5ed0a7fb1e843713b9c88c090acda5a89067ef0b5bc8817`. This is diagnostic
+evidence only. The implementation still depended on the temporary Models prewarm and therefore
+cannot unlock Phase 2.
+
+The host became idle while the underlying Vectors deterministic-F32 fix awaited CI and release.
+Server `165761108` and firewall `11619238` were verified by exact ID and name, deleted at
+`2026-09-14T07:23:09Z`, and independently verified absent. The local watchdog was unloaded.
+The elapsed allocation was 2 hours 50 minutes 54 seconds, an upper-bound compute estimate of USD
+1.28 at the recorded hourly price. Closing Hetzner inventory contained zero servers and zero
+firewalls. A clean host will be reprovisioned only after the released Vectors dependency and final
+Models revision are available.

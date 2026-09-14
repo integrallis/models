@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -63,31 +64,18 @@ class LoraProjectionTest {
   }
 
   @Test
-  void prewarmingLeavesTheFirstRealProjectionUnchanged() {
-    LoraProjection cold =
-        new LoraProjection(
-            MemorySegment.ofArray(new float[] {1, 2, 3, -1, 0, 2}),
-            MemorySegment.ofArray(new float[] {1, 2, -1, 1}),
-            3,
-            2,
-            2,
-            0.5f);
-    LoraProjection warmed =
-        new LoraProjection(
-            MemorySegment.ofArray(new float[] {1, 2, 3, -1, 0, 2}),
-            MemorySegment.ofArray(new float[] {1, 2, -1, 1}),
-            3,
-            2,
-            2,
-            0.5f);
-    float[] expected = {10, 20};
-    float[] actual = expected.clone();
+  void ownsAdapterWeightsInsteadOfRetainingMutableSourceSegments() {
+    float[] a = {1, 2, 3, -1, 0, 2};
+    float[] b = {1, 2, -1, 1};
+    LoraProjection projection =
+        new LoraProjection(MemorySegment.ofArray(a), MemorySegment.ofArray(b), 3, 2, 2, 0.5f);
+    Arrays.fill(a, 0);
+    Arrays.fill(b, 0);
+    float[] baseOutput = {10, 20};
 
-    cold.addTo(expected, 0, new float[] {1, 2, 1}, 0);
-    warmed.prewarm(4);
-    warmed.addTo(actual, 0, new float[] {1, 2, 1}, 0);
+    projection.addTo(baseOutput, 0, new float[] {1, 2, 1}, 0);
 
-    assertThat(actual).containsExactly(expected);
+    assertThat(baseOutput).containsExactly(new float[] {15, 16.5f}, within(1.0e-6f));
   }
 
   @Test

@@ -15,19 +15,17 @@
  */
 package com.integrallis.models.backend.purejava.lora;
 
-import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
-import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.vectors.core.F32ExecutionMatrix;
 import java.lang.foreign.MemorySegment;
 import java.util.Objects;
 
-/** One mapped low-rank update: {@code output += scale * B * (A * input)}. */
+/** One owned low-rank update: {@code output += scale * B * (A * input)}. */
 final class LoraProjection {
 
-  private final MemorySegment a;
-  private final MemorySegment b;
+  private final F32ExecutionMatrix a;
+  private final F32ExecutionMatrix b;
   private final int inputDimension;
   private final int outputDimension;
-  private final int rank;
   private final float scale;
   private final float[] inputScratch;
   private final float[] rankScratch;
@@ -40,19 +38,20 @@ final class LoraProjection {
       int outputDimension,
       int rank,
       float scale) {
-    this.a = Objects.requireNonNull(a, "a").asReadOnly();
-    this.b = Objects.requireNonNull(b, "b").asReadOnly();
+    Objects.requireNonNull(a, "a");
+    Objects.requireNonNull(b, "b");
     positive("inputDimension", inputDimension);
     positive("outputDimension", outputDimension);
     positive("rank", rank);
     if (!Float.isFinite(scale)) {
       throw new IllegalArgumentException("scale must be finite: " + scale);
     }
-    requireBytes("A", this.a, Math.multiplyExact(rank, inputDimension));
-    requireBytes("B", this.b, Math.multiplyExact(outputDimension, rank));
+    requireBytes("A", a, Math.multiplyExact(rank, inputDimension));
+    requireBytes("B", b, Math.multiplyExact(outputDimension, rank));
+    this.a = F32ExecutionMatrix.copyOf(a, rank, inputDimension);
+    this.b = F32ExecutionMatrix.copyOf(b, outputDimension, rank);
     this.inputDimension = inputDimension;
     this.outputDimension = outputDimension;
-    this.rank = rank;
     this.scale = scale;
     this.inputScratch = new float[inputDimension];
     this.rankScratch = new float[rank];
@@ -70,24 +69,10 @@ final class LoraProjection {
       System.arraycopy(input, inputOffset, inputScratch, 0, inputDimension);
       activeInput = inputScratch;
     }
-    TensorOps.ggufMatmul(rankScratch, activeInput, a, GgufTensorType.F32, rank, inputDimension);
-    TensorOps.ggufMatmul(outputScratch, rankScratch, b, GgufTensorType.F32, outputDimension, rank);
+    a.multiplyBatch(activeInput, 1, rankScratch);
+    b.multiplyBatch(rankScratch, 1, outputScratch);
     for (int index = 0; index < outputDimension; index++) {
       output[outputOffset + index] += scale * outputScratch[index];
-    }
-  }
-
-  /**
-   * Exercises the mapped F32 kernels with neutral input without changing later projection state.
-   */
-  void prewarm(int iterations) {
-    if (iterations <= 0) {
-      throw new IllegalArgumentException("iterations must be positive: " + iterations);
-    }
-    float[] input = new float[inputDimension];
-    float[] output = new float[outputDimension];
-    for (int iteration = 0; iteration < iterations; iteration++) {
-      addTo(output, 0, input, 0);
     }
   }
 

@@ -43,14 +43,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
-/** A pinned PEFT Activated-LoRA adapter executed entirely in Java over mapped F32 tensors. */
+/** A pinned PEFT Activated-LoRA adapter executed in Java over owned F32 execution matrices. */
 public final class ActivatedLoraAdapter {
 
   private static final JsonFactory JSON =
       JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
   private static final String METADATA_FILE = "models-activated-lora.json";
   private static final String ADAPTER_KIND = "activated-lora-tool-specialist";
-  private static final int PROJECTION_PREWARM_ITERATIONS = 512;
   private static final Set<String> REQUIRED_MODULES =
       Set.of("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj");
 
@@ -218,21 +217,18 @@ public final class ActivatedLoraAdapter {
               + ", unexpected="
               + unexpected);
     }
-    ActivatedLoraAdapter adapter =
-        new ActivatedLoraAdapter(
-            metadata.baseModel,
-            metadata.baseRevision,
-            metadata.baseArtifactSha256,
-            metadata.tokenizerFileSha256,
-            metadata.adapterSha256,
-            metadata.rank,
-            metadata.alpha,
-            metadata.invocationTokens.clone(),
-            metadata.trainingProvenance,
-            architecture,
-            projections);
-    adapter.prewarmProjectionKernels();
-    return adapter;
+    return new ActivatedLoraAdapter(
+        metadata.baseModel,
+        metadata.baseRevision,
+        metadata.baseArtifactSha256,
+        metadata.tokenizerFileSha256,
+        metadata.adapterSha256,
+        metadata.rank,
+        metadata.alpha,
+        metadata.invocationTokens.clone(),
+        metadata.trainingProvenance,
+        architecture,
+        projections);
   }
 
   /** Adds one activated low-rank projection update to an already-computed base projection. */
@@ -248,15 +244,6 @@ public final class ActivatedLoraAdapter {
     }
     Objects.requireNonNull(projection, "projection");
     layers[layer][projection.ordinal()].addTo(output, outputOffset, input, inputOffset);
-  }
-
-  private void prewarmProjectionKernels() {
-    // The mapped F32 A/B kernels otherwise settle on a different stable arithmetic result after
-    // the first activated request. All layers have the same seven projection shapes, so exercising
-    // one layer here makes the first user input follow the same path as every later input.
-    for (Projection projection : Projection.values()) {
-      layers[0][projection.ordinal()].prewarm(PROJECTION_PREWARM_ITERATIONS);
-    }
   }
 
   public String baseModel() {
