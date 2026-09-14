@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.ToolSpec;
@@ -263,6 +264,7 @@ final class ActivatedDecisionProfileCli {
 
   static ObjectMapper mapper() {
     return new ObjectMapper()
+        .registerModule(new Jdk8Module())
         .configure(JsonNodeFeature.WRITE_PROPERTIES_SORTED, false)
         .enable(SerializationFeature.INDENT_OUTPUT);
   }

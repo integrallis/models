@@ -18,7 +18,9 @@ package com.integrallis.models.bench;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class ActivatedDecisionProfileCliTest {
@@ -72,6 +74,33 @@ class ActivatedDecisionProfileCliTest {
 
     assertThat(serialized.indexOf("\"type\"")).isLessThan(serialized.indexOf("\"properties\""));
     assertThat(serialized.indexOf("\"z\"")).isLessThan(serialized.indexOf("\"a\""));
+  }
+
+  @Test
+  void serializesExactAdapterTrainingSelectionsInTheQualificationReport() throws Exception {
+    String revision = "a".repeat(40);
+    String hash = "b".repeat(64);
+    var selection = new ActivatedAdapterMetadata.TrainingSelection(10, 1, 2, 3, "c".repeat(64));
+    var provenance =
+        new ActivatedAdapterMetadata.TrainingProvenance(
+            List.of(
+                new ActivatedAdapterMetadata.TrainingSource(
+                    "tool-calls", "example/data", revision, "train.jsonl", hash)),
+            2,
+            hash,
+            hash,
+            hash,
+            Optional.of(selection),
+            Optional.of(selection),
+            "prepare.py",
+            hash);
+
+    String serialized = ActivatedDecisionProfileCli.mapper().writeValueAsString(provenance);
+
+    assertThat(serialized)
+        .contains("\"trainSelection\" : {")
+        .contains("\"usable\" : 10")
+        .doesNotContain("\"present\"");
   }
 
   @Test
