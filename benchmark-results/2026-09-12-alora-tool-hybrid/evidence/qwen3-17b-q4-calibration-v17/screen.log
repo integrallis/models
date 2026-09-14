@@ -1,0 +1,84 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava UP-TO-DATE
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes UP-TO-DATE
+> Task :backend-java:jar UP-TO-DATE
+> Task :backend-native:compileJava UP-TO-DATE
+> Task :backend-native:processResources NO-SOURCE
+> Task :backend-native:classes UP-TO-DATE
+> Task :backend-native:jar UP-TO-DATE
+> Task :backend-native:cargoBuildRelease UP-TO-DATE
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources UP-TO-DATE
+> Task :backend-native:nativePlatformJar UP-TO-DATE
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-router:compileJava UP-TO-DATE
+> Task :models-bench:compileJava UP-TO-DATE
+> Task :models-bench:processResources UP-TO-DATE
+> Task :models-bench:classes UP-TO-DATE
+> Task :models-router:processResources UP-TO-DATE
+> Task :models-router:classes UP-TO-DATE
+> Task :models-router:jar UP-TO-DATE
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 3:37:25 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 3:37:25 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 1/45 irrelevance_100    expected=false score=  -20.54687 shared=true 24142 ms
+ 2/45 irrelevance_117    expected=false score=  -14.00693 shared=true 26843 ms
+ 3/45 irrelevance_13     expected=false score=  -14.96501 shared=true 28568 ms
+ 4/45 irrelevance_145    expected=false score=   -7.37654 shared=true 20797 ms
+ 5/45 irrelevance_147    expected=false score=  -16.77260 shared=true 24376 ms
+ 6/45 irrelevance_148    expected=false score=    1.10381 shared=true 20753 ms
+ 7/45 irrelevance_164    expected=false score=    2.27231 shared=true 21479 ms
+ 8/45 irrelevance_193    expected=false score=   -5.64081 shared=true 21273 ms
+ 9/45 irrelevance_202    expected=false score=  -14.79769 shared=true 22380 ms
+10/45 irrelevance_211    expected=false score=   -8.35402 shared=true 22348 ms
+11/45 irrelevance_214    expected=false score=  -14.49652 shared=true 20504 ms
+12/45 irrelevance_22     expected=false score=   -2.04668 shared=true 24787 ms
+13/45 irrelevance_35     expected=false score=  -10.40378 shared=true 21377 ms
+14/45 irrelevance_54     expected=false score=   -1.91369 shared=true 20245 ms
+15/45 irrelevance_69     expected=false score=  -10.29482 shared=true 22685 ms
+16/45 multiple_10        expected=true  score=    3.50079 shared=true 41761 ms
+17/45 multiple_101       expected=true  score=   24.58173 shared=true 32511 ms
+18/45 multiple_103       expected=true  score=   21.92320 shared=true 62796 ms
+19/45 multiple_115       expected=true  score=    2.72015 shared=true 69045 ms
+20/45 multiple_128       expected=true  score=   21.95884 shared=true 77977 ms
+21/45 multiple_141       expected=true  score=   11.04914 shared=true 45925 ms
+22/45 multiple_148       expected=true  score=   14.82785 shared=true 34116 ms
+23/45 multiple_149       expected=true  score=   12.57932 shared=true 65879 ms
+24/45 multiple_160       expected=true  score=   18.34331 shared=true 65162 ms
+25/45 multiple_20        expected=true  score=   15.24709 shared=true 42041 ms
+26/45 multiple_47        expected=true  score=   20.10463 shared=true 40615 ms
+27/45 multiple_53        expected=true  score=   10.68396 shared=true 40704 ms
+28/45 multiple_56        expected=true  score=   12.16652 shared=true 49082 ms
+29/45 multiple_76        expected=true  score=   -5.04900 shared=true 39416 ms
+30/45 multiple_95        expected=true  score=   12.92735 shared=true 37399 ms
+31/45 simple_114         expected=true  score=   14.15861 shared=true 22649 ms
+32/45 simple_120         expected=true  score=   11.24119 shared=true 27165 ms
+33/45 simple_172         expected=true  score=   10.94757 shared=true 18465 ms
+34/45 simple_22          expected=true  score=   18.18558 shared=true 18915 ms
+35/45 simple_226         expected=true  score=   10.31033 shared=true 22013 ms
+36/45 simple_264         expected=true  score=    6.32658 shared=true 21389 ms
+37/45 simple_291         expected=true  score=   10.08941 shared=true 28543 ms
+38/45 simple_296         expected=true  score=   11.46950 shared=true 26191 ms
+39/45 simple_303         expected=true  score=   10.05536 shared=true 21896 ms
+40/45 simple_308         expected=true  score=    6.56880 shared=true 22665 ms
+41/45 simple_326         expected=true  score=   -1.35086 shared=true 23367 ms
+42/45 simple_35          expected=true  score=    9.83773 shared=true 24481 ms
+43/45 simple_43          expected=true  score=    9.48955 shared=true 25729 ms
