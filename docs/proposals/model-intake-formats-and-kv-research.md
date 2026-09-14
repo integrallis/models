@@ -328,10 +328,36 @@ actual TTFT, TPOT, completion tokens, cost, and quality signal; plus the model/a
 This makes optimization explainable and makes a corporate deployment able to prove that sensitive
 content was kept local.
 
-Remote APIs are a last tier, not a default fallback. A policy must explicitly permit them, specify
-approved vendors/models/regions, cap cost and latency, and define whether raw prompt, redacted
-prompt, retrieved excerpts, or only a local summary may leave the process. A refusal to escalate
-is a valid router outcome.
+The target policy makes remote APIs a last tier, not a default fallback. It must explicitly permit
+them, specify approved vendors/models/regions, cap cost and latency, and define whether raw
+prompt, redacted prompt, retrieved excerpts, or only a local summary may leave the process. A
+refusal to escalate is a valid router outcome.
+
+### Router audit, 2026-09-14
+
+The current router is a useful, tested selection layer rather than a blank slate. It already:
+
+- filters for context, configured quality/cost/TTFT floors, live availability and explicit
+  application filters before it scores;
+- scores measured quality, cost, latency, reliability, locality, model residency, queue depth, and
+  *per-model* retained prompt-prefix evidence;
+- preserves an active tool/provider-state turn on its current healthy model and binds fallback
+  execution to application-owned local or hosted clients without importing any provider SDK; and
+- retains bounded session affinity, but never presents one model's KV tensors as usable by another.
+
+This round adds two previously missing hard constraints: `RoutingRequirements` carries exact
+declared capabilities (for example `tool-calling`) and `RoutingDataBoundary.LOCAL_ONLY` keeps one
+request in process even when the fleet policy otherwise permits remote models. `DiscoveredModel`
+now preserves capabilities separately from quality/task tags, so catalog discovery does not
+silently collapse “tool-capable” into a vague `tool-use` label. The capability and boundary tests,
+including provider-neutral hosted-client selection, are part of the router's unit suite.
+
+It is intentionally **not** yet a universal cache-mobility system. Cache affinity is an observed
+token count keyed by the physical model, not proof that blocks can move. The next runtime work is
+an internal, non-public `KVCacheEnvelopeV1` plus block ownership/fingerprints; only then can a
+same-base activated adapter or another independently proved pair share a prefix. There is also no
+automatic PII classifier yet: an application or separately qualified local policy layer must set
+the data boundary, rather than relying on unsafe prompt-text guessing.
 
 ## Execution roadmap
 
