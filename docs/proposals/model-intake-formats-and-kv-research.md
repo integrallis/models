@@ -72,10 +72,12 @@ evidence-producing intake/compatibility experiment, not that it is already quali
 Desert Ant’s catalog is a strong design reference for narrow on-device products: one model per task,
 small downloads, clear capability boundaries, benchmark disclosure, and explicit platform behavior.
 Its available models cover word alignment, enhancement, spoken-language ID, PII redaction,
-speech recognition, text tagging, and structured extraction. Its current SDK-oriented, often
-compiled Core ML distribution means each model needs an exact license and artifact review before
-intake; it is an engineering and distribution question, not a reason to exclude those models from
-ModelJars. [Desert Ant catalog](https://desertant.com/models/)
+speech recognition, text tagging, and structured extraction. They are not candidates for the
+ModelJars public catalog under the current terms: the license is source-available rather than
+open source, requires product attribution and device-count telemetry, and prohibits standalone
+model or SDK redistribution. A ModelJar is necessarily a standalone redistributable model
+artifact. [Desert Ant catalog](https://desertant.com/models/)
+[Desert Ant license](https://license.desertant.com/1.0)
 
 The direct lessons for Models are:
 
@@ -85,10 +87,10 @@ The direct lessons for Models are:
 - **Measure end-to-end audio behavior.** Clear reports codec, mastering, chunked I/O, model size,
   and device-specific throughput, not a single abstract “tokens per second” number.
   [Clear model page](https://desertant.com/models/clear/)
-- **Do not wrap their SDK as our inference implementation.** A model is eligible for ModelJars
-  when its exact upstream terms permit the intended distribution/use and Models can execute it
-  through its own Java or owned Apple bridge. A present SDK/Core ML package therefore prompts
-  artifact and license work; it does not curtail a distributable model lane.
+- **Do not wrap or redistribute their SDK.** Desert Ant is a benchmark and product-design
+  reference only unless the vendor offers terms explicitly permitting standalone ModelJar
+  distribution without required telemetry. Their current Core ML/ONNX artifacts may be used for
+  controlled interoperability research, never as a released ModelJar.
 
 The initial Desert Ant-inspired JVM work should therefore be small, reproducible models in our own
 catalog: language ID, PII redaction/classification, VAD, ASR post-processing, and reranking. These
@@ -399,10 +401,11 @@ the data boundary, rather than relying on unsafe prompt-text guessing.
 10. [Desert Ant Labs, “Models.”](https://desertant.com/models/)
 11. [Desert Ant Labs, “Align.”](https://desertant.com/models/align/)
 12. [Desert Ant Labs, “Clear.”](https://desertant.com/models/clear/)
-13. [0xShug0, “audio.cpp.”](https://github.com/0xShug0/audio.cpp)
-14. [ONNX Runtime, “Java.”](https://onnxruntime.ai/docs/get-started/with-java.html)
-15. [PyTorch, “ExecuTorch Android.”](https://docs.pytorch.org/executorch/stable/using-executorch-android.html)
-16. Kwon et al., [“Efficient Memory Management for LLM Serving with PagedAttention.”](https://arxiv.org/abs/2309.06180)
-17. Zheng et al., [“SGLang: Efficient Execution of Structured Language Model Programs.”](https://openreview.net/attachment?id=VqkAKQibpq&name=pdf)
-18. Liu et al., [“KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache.”](https://arxiv.org/abs/2402.02750)
-19. [LMCache, “KV Cache Compression.”](https://docs.lmcache.ai/mp/serde.html)
+13. [Desert Ant Labs, “Source-Available License.”](https://license.desertant.com/1.0)
+14. [0xShug0, “audio.cpp.”](https://github.com/0xShug0/audio.cpp)
+15. [ONNX Runtime, “Java.”](https://onnxruntime.ai/docs/get-started/with-java.html)
+16. [PyTorch, “ExecuTorch Android.”](https://docs.pytorch.org/executorch/stable/using-executorch-android.html)
+17. Kwon et al., [“Efficient Memory Management for LLM Serving with PagedAttention.”](https://arxiv.org/abs/2309.06180)
+18. Zheng et al., [“SGLang: Efficient Execution of Structured Language Model Programs.”](https://openreview.net/attachment?id=VqkAKQibpq&name=pdf)
+19. Liu et al., [“KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache.”](https://arxiv.org/abs/2402.02750)
+20. [LMCache, “KV Cache Compression.”](https://docs.lmcache.ai/mp/serde.html)
