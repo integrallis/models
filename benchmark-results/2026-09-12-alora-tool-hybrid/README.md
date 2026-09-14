@@ -22,6 +22,11 @@ Training uses external Python libraries only to produce and independently evalua
 The releasable runtime must load and execute the base, adapter, cache fork, and tool loop inside the
 JVM. No Python service or external inference process is permitted in production.
 
+That boundary is unchanged for a hybrid. Java owns both branches, activation, physical KV sharing,
+and the tool loop. A failed performance gate may justify only a measured Models-owned Rust/FFM
+kernel with a Java reference and fallback; it may not justify importing or launching an external
+inference engine.
+
 ## Predeclared gates
 
 These gates are fixed before training or evaluation results are inspected:
