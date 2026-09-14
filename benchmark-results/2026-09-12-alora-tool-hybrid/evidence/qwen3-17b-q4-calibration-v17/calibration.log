@@ -1,0 +1,76 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava UP-TO-DATE
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes UP-TO-DATE
+> Task :backend-java:jar UP-TO-DATE
+> Task :backend-native:compileJava UP-TO-DATE
+> Task :backend-native:processResources NO-SOURCE
+> Task :backend-native:classes UP-TO-DATE
+> Task :backend-native:jar UP-TO-DATE
+> Task :backend-native:cargoBuildRelease UP-TO-DATE
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources UP-TO-DATE
+> Task :backend-native:nativePlatformJar UP-TO-DATE
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-router:compileJava UP-TO-DATE
+> Task :models-bench:compileJava UP-TO-DATE
+> Task :models-bench:processResources UP-TO-DATE
+> Task :models-bench:classes UP-TO-DATE
+> Task :models-router:processResources UP-TO-DATE
+> Task :models-router:classes UP-TO-DATE
+> Task :models-router:jar UP-TO-DATE
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 3:20:01 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 3:20:01 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 1/30 irrelevance_126    expected=false score=    2.03176 shared=true 26895 ms
+ 2/30 irrelevance_165    expected=false score=    8.34644 shared=true 20457 ms
+ 3/30 irrelevance_169    expected=false score=  -16.29031 shared=true 23758 ms
+ 4/30 irrelevance_172    expected=false score=    0.40805 shared=true 20970 ms
+ 5/30 irrelevance_175    expected=false score=  -18.86819 shared=true 18816 ms
+ 6/30 irrelevance_26     expected=false score=   -1.35988 shared=true 26834 ms
+ 7/30 irrelevance_29     expected=false score=    1.26514 shared=true 20150 ms
+ 8/30 irrelevance_56     expected=false score=  -11.75374 shared=true 20531 ms
+ 9/30 irrelevance_73     expected=false score=   -0.87088 shared=true 22580 ms
+10/30 irrelevance_90     expected=false score=  -26.85805 shared=true 22349 ms
+11/30 multiple_123       expected=true  score=   11.56045 shared=true 49452 ms
+12/30 multiple_124       expected=true  score=   10.98253 shared=true 50107 ms
+13/30 multiple_133       expected=true  score=   19.27611 shared=true 35644 ms
+14/30 multiple_145       expected=true  score=   16.85989 shared=true 57596 ms
+15/30 multiple_153       expected=true  score=   10.76932 shared=true 47739 ms
+16/30 multiple_176       expected=true  score=   18.01358 shared=true 93358 ms
+17/30 multiple_22        expected=true  score=   17.43732 shared=true 42513 ms
+18/30 multiple_62        expected=true  score=   12.03606 shared=true 35341 ms
+19/30 multiple_64        expected=true  score=    6.34367 shared=true 41436 ms
+20/30 multiple_93        expected=true  score=    4.40946 shared=true 44252 ms
+21/30 simple_121         expected=true  score=   16.79216 shared=true 23567 ms
+22/30 simple_161         expected=true  score=   15.56814 shared=true 23484 ms
+23/30 simple_185         expected=true  score=    3.41103 shared=true 22520 ms
+24/30 simple_259         expected=true  score=    8.57387 shared=true 25069 ms
+25/30 simple_273         expected=true  score=    6.48603 shared=true 21255 ms
+26/30 simple_278         expected=true  score=    6.43654 shared=true 23505 ms
+27/30 simple_344         expected=true  score=    9.01807 shared=true 21564 ms
+28/30 simple_40          expected=true  score=    9.86985 shared=true 24168 ms
+29/30 simple_48          expected=true  score=   11.78365 shared=true 21684 ms
+30/30 simple_52          expected=true  score=   11.77961 shared=true 22945 ms
+PASS threshold=2.72139822 balanced=0.950000 calls=20/20 no-calls=9/10 physical=30/30 report=/opt/modeljars-runs/alora-v17-java/evidence/calibration.json
+
+BUILD SUCCESSFUL in 16m 3s
+18 actionable tasks: 2 executed, 16 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
