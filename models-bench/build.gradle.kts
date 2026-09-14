@@ -64,6 +64,9 @@ dependencies {
     implementation(project(":backend-java"))
     implementation(project(":models-router"))
     if (nativeBenchmarkRuntime && !aggregateNativeRelease) {
+        // The platform artifact contains only the compiled library and metadata. The Java FFM
+        // bridge lives in backend-native's ordinary JAR and must be present as well.
+        runtimeOnly(project(":backend-native"))
         runtimeOnly(
             project(
                 path = ":backend-native",
