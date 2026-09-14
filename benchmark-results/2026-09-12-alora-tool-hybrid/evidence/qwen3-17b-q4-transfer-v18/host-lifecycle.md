@@ -5,11 +5,11 @@
 - Provider / region / exact plan: Hetzner Cloud `ash`, `cpx51`
 - Hardware: 16 shared x86 vCPUs, 32 GB RAM, 360 GB disk, Ubuntu 24.04 x86-64
 - Live price at preflight: USD 0.4479/hour
-- Expected use: under two hours for setup, calibration, evidence freeze, live screen if permitted,
-  evidence transfer, and teardown
-- Maximum authorized spend: USD 1.35; three-hour hard deletion ceiling
+- Expected use: under five hours for setup, repeated calibration after defects, evidence freeze,
+  live screen if permitted, evidence transfer, and teardown
+- Maximum authorized spend: USD 2.23; `4.98`-hour hard deletion ceiling
 - Created no earlier than: `2026-09-14T04:30:53Z`
-- Hard deletion deadline: `2026-09-14T07:30:53Z`
+- Hard deletion deadline: `2026-09-14T09:30:53Z`
 - State before creation: zero Hetzner servers, volumes, floating IPs, primary IPs, firewalls, and
   snapshots; zero Vultr instances
 - Resolved server type: `cpx51` ID `26`
@@ -39,7 +39,12 @@ deletion actions, elapsed cost, and closing provider inventory are appended as t
 - Measured runtime: OpenJDK `25.0.4`, Ubuntu Linux `6.8.0-138-generic`, AMD EPYC-Rome, 16
   processors, 32,859,291,648 physical bytes
 - Automatic cleanup: local LaunchAgent `org.integrallis.modeljars-alora-v18-watchdog` checks the
-  exact IDs every 60 seconds and enforces the `2026-09-14T07:30:53Z` deadline.
+  exact IDs every 60 seconds and enforces the `2026-09-14T09:30:53Z` deadline.
+
+The first watchdog epoch was discovered to resolve to `2026-09-14T14:30:53Z`, despite the
+documented `07:30:53Z` deadline. It was corrected before the original deadline passed. The corrected
+deadline includes a two-hour extension for an honest calibration rerun and caps total compute at
+approximately USD 2.23 instead of the erroneous roughly USD 4.48 window.
 
 The host checked out code revision `8616c7d03bf23c77d5486eda754a2f89b5a4250a` and passed a clean
 `:models-bench:check`. An initial launcher invocation used a module-relative records path and failed
@@ -61,3 +66,25 @@ are not qualification evidence. The corrected invocation used the absolute, hash
 
 The evidence was copied to the local worktree and independently recomputed before Phase 2. Phase 2
 did not start before the Phase 1 evidence and hashes were committed.
+
+## Pre-score corrections and determinism audit
+
+The first Phase 2 launcher stopped with zero cases scored because the frozen source contained one
+valid prior `assistant` message and the qualification loader accepted only `system` and `user`.
+Revision `9f1e5c60fda30ee1ec036d5d1decb9d76cd76527` added that source role test-first. A clean
+`:models-bench:check` rerun passed with SHA-256
+`2f98ead556c8f8dbd50a94087dd230ed4aeef0d0f37a28ff23783de89a918bc0`.
+
+Because the code revision changed, the full exposed calibration was repeated rather than reusing
+the committed result. It completed at `2026-09-14T06:16:37Z` and again reported threshold
+`2.4962309929993705`, calls 47/50, no-calls 24/25, balanced accuracy 0.95, and physical sharing
+75/75. Its report and log hashes were
+`93359d5ca1ca0fd08351c90f41afe78d79e496d2fb6961b4dfc0d63f44a12a1c` and
+`73c9bbd1ee088915b08a377ac2b40ec569751dd489b84e549ca7ed8640b48b9e`.
+
+An exact comparison found that only the first cold score differed from the first process. Targeted
+local experiments reproduced first-call-only Activated-LoRA variation, ruled out physical sharing
+and parallel GGUF execution, and found the base path stable. The full finding is recorded in
+`cold-activated-determinism.md`. Revision `4ebbc471553d5956970091d72f08fd79ad835a4a` fixes the
+F32 adapter warmup in Java and adds a real-weight regression. The passing pre-fix calibration is
+retained only as diagnostic evidence; Phase 2 remains unscored and Phase 1 must run again.

@@ -1,8 +1,19 @@
 # V18 result
 
-Status: **Phase 1 calibration passed; Phase 2 live screen not yet scored**.
+Status: **returned to Phase 1 after fixing cold activated-inference determinism; Phase 2 has not
+been scored**.
 
-The fixed Java 25 production-Q4 calibration completed on all 75 exposed cases. Independent
+The first calibration below remains historical evidence. A pre-score live-loader defect required a
+new Models revision and a complete calibration rerun. That rerun passed, but comparison with the
+first process exposed a different first cold score while the other 74 were bit-identical. Targeted
+shared, recomputed, sequential, and base-only experiments localized the behavior to the cold
+Activated-LoRA F32 path. The test-first Java fix is revision
+`4ebbc471553d5956970091d72f08fd79ad835a4a`; see `cold-activated-determinism.md`.
+
+The live screen remained untouched. Calibration must now pass again under the fixed revision, and
+the new report and hash must be committed before Phase 2 begins.
+
+The original Java 25 production-Q4 calibration completed on all 75 exposed cases. Independent
 recomputation of the committed observations reproduced threshold `2.4962309929993705` and the
 following result:
 
@@ -31,4 +42,3 @@ model, adapter, prompt construction, source records, or admission gates.
 This is not model qualification. V18 can advance only if the live screen and every later generation,
 sealed, product, framework, cache, memory, performance, packaging, clean-host, and published-artifact
 gate pass.
-
