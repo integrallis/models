@@ -30,6 +30,26 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ToolCallingQualificationCliTest {
 
+  @Test
+  void acceptsThePinnedQwen3EightBArtifact() throws Exception {
+    Path artifact = temporary.resolve("qwen3-8b.gguf");
+    Files.writeString(artifact, "fixture");
+
+    ToolCallingQualificationCli.Configuration configuration =
+        ToolCallingQualificationCli.parse(
+            new String[] {
+              "--candidate",
+              "qwen3-8b",
+              "--model",
+              artifact.toString(),
+              "--models-revision",
+              "2c702d4b0801b6b16de6c93c04c373efb4ee1853"
+            });
+
+    assertThat(configuration.candidate()).isEqualTo(ToolCallingCandidate.QWEN3_8B);
+    assertThat(configuration.candidate().modelId()).isEqualTo("qwen3_8b_q4_k_m");
+  }
+
   private static final String REVISION = "a".repeat(40);
 
   @TempDir Path temporary;
@@ -60,6 +80,27 @@ class ToolCallingQualificationCliTest {
     assertThat(configuration.maxTokens()).isEqualTo(192);
     assertThat(configuration.caseId()).isEqualTo("currency");
     assertThat(configuration.modelsRevision()).isEqualTo(REVISION);
+    assertThat(configuration.backend()).isEqualTo("pure-java");
+  }
+
+  @Test
+  void acceptsTheOwnedRustFfmBackendForQwenQualification() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("model.gguf"), "fixture");
+
+    ToolCallingQualificationCli.Configuration configuration =
+        ToolCallingQualificationCli.parse(
+            new String[] {
+              "--candidate",
+              "qwen3-8b",
+              "--model",
+              artifact.toString(),
+              "--backend",
+              "rust-ffm",
+              "--models-revision",
+              REVISION
+            });
+
+    assertThat(configuration.backend()).isEqualTo("rust-ffm");
   }
 
   @Test
