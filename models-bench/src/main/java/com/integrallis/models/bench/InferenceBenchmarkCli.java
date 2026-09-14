@@ -130,6 +130,15 @@ public final class InferenceBenchmarkCli {
       System.exit(ActivatedHiddenDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "activated-hidden-calibrate".equals(args[0])) {
+      System.exit(
+          ActivatedQ4CalibrationCli.runCalibration(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-hidden-screen".equals(args[0])) {
+      System.exit(ActivatedQ4CalibrationCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "activated-long-context".equals(args[0])) {
       System.exit(
           ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
