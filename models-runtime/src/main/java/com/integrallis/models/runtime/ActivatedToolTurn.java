@@ -108,6 +108,18 @@ public final class ActivatedToolTurn implements SharedToolTurn {
     }
   }
 
+  /** Scores the activated branch at the shared call/no-call boundary using a persisted head. */
+  public synchronized ToolApplicabilityScore scoreToolApplicability(ToolApplicabilityHead head) {
+    requireToolGenerationAvailable();
+    Objects.requireNonNull(head, "head");
+    try {
+      return head.score(tool.nextTokenHiddenState(toolDecisionPrompt()));
+    } catch (RuntimeException | Error failure) {
+      failed = true;
+      throw failure;
+    }
+  }
+
   /** Streams the structured tool selection on the activated branch. */
   public synchronized void generateToolCall(
       SamplingOptions options, TokenStream stream, TokenConstraint constraint) {

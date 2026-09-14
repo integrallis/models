@@ -55,3 +55,18 @@ deletion timestamps, cost, and final provider inventory are appended after those
   rejected cuBLAS without `CUBLAS_WORKSPACE_CONFIG`. The failed log/output path is retained. A
   regression test and fail-fast requirement now freeze `CUBLAS_WORKSPACE_CONFIG=:4096:8`; retry 2
   uses a new output path and changes no data, representation, model, or gate.
+- Feature-extraction retry 2: completed all 2,840 training and 471 untouched validation rows with
+  frozen cuBLAS determinism, BF16, SDPA, batch size one, and TF32 disabled. Train/validation feature
+  SHA-256 values are `b2a385073021edc4fd6a6ba9d229610e2e8bb3e8e6e5a476df39e4624e1b2b29`
+  and `dcead1d83a46c3b785eb07b59634c6957178e20ec9d0c6257a42b96a3613eea6`.
+- Frozen affine-head result: selected `lambda=1e-5`; untouched validation passed with 389/390
+  calls, 79/81 no-calls, and 0.986372269705603 balanced accuracy. Artifact file SHA-256 is
+  `67b1f5fd231f924554d02daf450ce049fbccd24c084f7730d4ce2724ca234d1e`; canonical artifact
+  SHA-256 is `acece5d8e0188b874ef8a919597ba7a359d876bc20fd828af5fbfab00984445a`.
+- Evidence transfer: both feature tensors, manifests, head, result, successful logs, failed-attempt
+  log, and host preflight were copied locally and independently hashed before deletion.
+- Deleted: `2026-09-14T02:20Z`; the exact instance endpoint returned HTTP 404 and the provider-wide
+  Vultr inventory returned zero instances. Runtime was about 1.02 hours; estimated charge was USD
+  0.24 at the bound USD 0.236/hour rate.
+- Cleanup: the launchd watchdog was unloaded; its exact plist and deletion script were moved to the
+  macOS Trash and remain recoverable.

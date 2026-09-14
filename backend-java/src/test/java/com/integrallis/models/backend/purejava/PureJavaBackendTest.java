@@ -394,6 +394,34 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void exposesActivatedSessionHiddenStateWithoutBreakingPhysicalPrefixSharing(@TempDir Path dir)
+        throws Exception {
+      Path modelPath = buildNanoModelFile(dir, new Random(45), GgufTensorType.Q4_0);
+      Path adapterDirectory = Files.createDirectory(dir.resolve("tool-hidden-adapter"));
+      writeNanoAdapter(adapterDirectory, modelPath);
+
+      try (PureJavaBackend backend =
+          PureJavaBackend.loadActivatedAdapter(modelPath, adapterDirectory)) {
+        InferenceSession source = backend.openSession();
+        backend.prefill(source, new int[] {5, 7}, 0);
+        var prefix = backend.freezePrefix(source);
+        try (InferenceSession base = backend.fork(prefix);
+            InferenceSession specialist =
+                backend.fork(prefix, SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER)) {
+          float[] baseHidden = backend.forwardHiddenState(base, 11, 2);
+          float[] specialistHidden = backend.forwardHiddenState(specialist, 11, 2);
+
+          assertThat(backend.supportsHiddenState()).isTrue();
+          assertThat(baseHidden).hasSize(DIM);
+          assertThat(specialistHidden).hasSize(DIM).isNotEqualTo(baseHidden);
+          assertThat(backend.sharesPrefixStorage(base, specialist)).isTrue();
+          assertThat(base.checkpoint()).isEqualTo(3);
+          assertThat(specialist.checkpoint()).isEqualTo(3);
+        }
+      }
+    }
+
+    @Test
     void exposesIndependentHighLevelGenerationSessions(@TempDir Path dir) throws IOException {
       Path modelPath = buildNanoModelFile(dir, new Random(42), GgufTensorType.Q4_0);
       var options = SamplingOptions.builder().temperature(0).maxTokens(1).build();

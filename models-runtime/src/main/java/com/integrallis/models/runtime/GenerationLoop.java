@@ -16,6 +16,7 @@
 package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.GenerationUsage;
+import com.integrallis.models.api.HiddenStateInferenceBackend;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelPrompt;
@@ -187,6 +188,44 @@ public final class GenerationLoop {
         cachedPromptTokens = promptTokens.clone();
         lastPromptCacheMetrics = promptPrefill.metrics();
         return logits;
+      } catch (RuntimeException | Error failure) {
+        cachedPromptTokens = null;
+        try {
+          backend.reset();
+        } catch (RuntimeException | Error resetFailure) {
+          failure.addSuppressed(resetFailure);
+        }
+        throw failure;
+      }
+    }
+  }
+
+  /** Returns a stable final hidden state after prefilling an exact prompt into this lineage. */
+  float[] nextTokenHiddenState(ModelPrompt prompt) {
+    requirePrompt(prompt);
+    synchronized (executionLock) {
+      int[] promptTokens = backend.tokenizer().encode(prompt);
+      if (!(backend instanceof RewindableInferenceBackend)) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
+      }
+      if (!(backend instanceof HiddenStateInferenceBackend hiddenBackend)
+          || !hiddenBackend.supportsHiddenState()) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " does not expose hidden states");
+      }
+      if (promptTokens.length == 0) {
+        throw new IllegalArgumentException("prompt produced no tokens");
+      }
+      PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
+      try {
+        float[] hidden =
+            hiddenBackend
+                .prefillHiddenState(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition())
+                .clone();
+        cachedPromptTokens = promptTokens.clone();
+        lastPromptCacheMetrics = promptPrefill.metrics();
+        return hidden;
       } catch (RuntimeException | Error failure) {
         cachedPromptTokens = null;
         try {

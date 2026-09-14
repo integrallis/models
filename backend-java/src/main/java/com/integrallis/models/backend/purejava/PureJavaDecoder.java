@@ -146,6 +146,18 @@ interface PureJavaDecoder extends AutoCloseable {
 
   float[] prefill(Session session, int[] tokens, int startPosition);
 
+  default float[] hiddenState(Session session, int token, int position) {
+    throw new UnsupportedOperationException("this decoder does not expose session hidden states");
+  }
+
+  default float[] hiddenStateTransient(Session session, int token, int position) {
+    return hiddenState(session, token, position);
+  }
+
+  default float[] prefillHiddenState(Session session, int[] tokens, int startPosition) {
+    throw new UnsupportedOperationException("this decoder does not expose session hidden states");
+  }
+
   default boolean supportsRaggedPrefillBatch() {
     return false;
   }

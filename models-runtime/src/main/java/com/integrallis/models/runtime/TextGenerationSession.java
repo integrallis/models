@@ -17,6 +17,7 @@ package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.HiddenStateInferenceBackend;
 import com.integrallis.models.api.InferenceContextWindow;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.ModelMetadata;
@@ -167,6 +168,20 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
       }
       synchronized (executionLock) {
         return generationLoop.nextTokenLogits(prompt);
+      }
+    }
+  }
+
+  float[] nextTokenHiddenState(ModelPrompt prompt) {
+    Objects.requireNonNull(prompt, "prompt");
+    synchronized (operationLock) {
+      requireOpen();
+      if (continuousBatching != null) {
+        throw new UnsupportedOperationException(
+            "next-token hidden-state scoring is not supported by continuous batching");
+      }
+      synchronized (executionLock) {
+        return generationLoop.nextTokenHiddenState(prompt);
       }
     }
   }
@@ -401,7 +416,8 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     }
   }
 
-  private static final class SessionBackend implements RewindableInferenceBackend {
+  private static final class SessionBackend
+      implements RewindableInferenceBackend, HiddenStateInferenceBackend {
     private final BatchInferenceBackend backend;
     private final InferenceSession session;
 
@@ -448,6 +464,26 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
     @Override
     public float[] prefill(int[] tokens, int startPosition) {
       return backend.prefill(session, tokens, startPosition);
+    }
+
+    @Override
+    public boolean supportsHiddenState() {
+      return backend.supportsHiddenState();
+    }
+
+    @Override
+    public float[] forwardHiddenState(int token, int position) {
+      return backend.forwardHiddenState(session, token, position);
+    }
+
+    @Override
+    public float[] forwardHiddenStateTransient(int token, int position) {
+      return backend.forwardHiddenStateTransient(session, token, position);
+    }
+
+    @Override
+    public float[] prefillHiddenState(int[] tokens, int startPosition) {
+      return backend.prefillHiddenState(session, tokens, startPosition);
     }
 
     @Override

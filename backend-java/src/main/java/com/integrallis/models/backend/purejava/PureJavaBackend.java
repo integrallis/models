@@ -19,6 +19,7 @@ import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.AuxiliaryInferenceBackend;
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.HiddenStateInferenceBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
@@ -94,6 +95,7 @@ import java.util.Set;
 public final class PureJavaBackend
     implements SpeculativeInferenceBackend,
         AuxiliaryInferenceBackend,
+        HiddenStateInferenceBackend,
         SharedPrefixInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
@@ -896,6 +898,7 @@ public final class PureJavaBackend
    *
    * <p>The array is backend-owned scratch, valid until the next call. Copy it to keep it.
    */
+  @Override
   public float[] prefillHiddenState(int[] tokens, int startPosition) {
     checkOpen();
     return decoder.prefillHiddenState(tokens, startPosition);
@@ -914,6 +917,7 @@ public final class PureJavaBackend
   }
 
   /** Whether this model's architecture exposes hidden states for embedding. */
+  @Override
   public boolean supportsHiddenState() {
     return decoder.supportsHiddenState();
   }
@@ -1042,6 +1046,31 @@ public final class PureJavaBackend
   @Override
   public float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
     return decoder.prefill(requireOpen(session).delegate, tokens, startPosition);
+  }
+
+  @Override
+  public float[] forwardHiddenState(int token, int position) {
+    return decoder.hiddenState(token, position).clone();
+  }
+
+  @Override
+  public float[] forwardHiddenStateTransient(int token, int position) {
+    return decoder.hiddenState(token, position);
+  }
+
+  @Override
+  public float[] forwardHiddenState(InferenceSession session, int token, int position) {
+    return decoder.hiddenState(requireOpen(session).delegate, token, position);
+  }
+
+  @Override
+  public float[] forwardHiddenStateTransient(InferenceSession session, int token, int position) {
+    return decoder.hiddenStateTransient(requireOpen(session).delegate, token, position);
+  }
+
+  @Override
+  public float[] prefillHiddenState(InferenceSession session, int[] tokens, int startPosition) {
+    return decoder.prefillHiddenState(requireOpen(session).delegate, tokens, startPosition);
   }
 
   @Override

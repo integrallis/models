@@ -126,6 +126,10 @@ public final class InferenceBenchmarkCli {
       System.exit(ActivatedDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "activated-hidden-decision-profile".equals(args[0])) {
+      System.exit(ActivatedHiddenDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "activated-long-context".equals(args[0])) {
       System.exit(
           ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));

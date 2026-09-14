@@ -610,6 +610,27 @@ class LlamaForwardPassTest {
     }
 
     @Test
+    void sessionHiddenStateUsesItsOwnKvLineageAndRemainsUsableForGeneration() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11};
+      LlamaForwardPass expectedPass = freshPass(config, weights);
+      float[] expectedHidden = expectedPass.prefillHiddenState(tokens, 0).clone();
+      float[] expectedLogits = expectedPass.forward(17, tokens.length);
+
+      LlamaForwardPass actualPass = freshPass(config, weights);
+      LlamaForwardPass.Session session = actualPass.openSession();
+      float[] actualHidden = actualPass.prefillHiddenState(session, tokens, 0);
+      float[] actualLogits = actualPass.forward(session, 17, tokens.length);
+
+      assertThat(actualHidden).containsExactly(expectedHidden);
+      assertThat(actualLogits).containsExactly(expectedLogits);
+      assertThat(session.checkpoint()).isEqualTo(tokens.length + 1);
+      assertThat(actualPass.checkpoint()).isZero();
+    }
+
+    @Test
     void hiddenStateLeavesTheSequenceUsableForGeneration() {
       // Embedding a prompt must advance cache state exactly like an ordinary prefill, so a caller
       // can keep generating afterwards.

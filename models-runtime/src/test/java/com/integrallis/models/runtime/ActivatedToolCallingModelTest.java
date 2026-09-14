@@ -211,6 +211,30 @@ class ActivatedToolCallingModelTest {
   }
 
   @Test
+  void scoresAnActivatedHiddenStateWithoutDiscardingThePhysicalPrefix() {
+    ActivatedBackend backend = new ActivatedBackend();
+    ToolApplicabilityHead head =
+        new ToolApplicabilityHead(
+            new float[] {1, 2}, new float[] {2, 4}, new float[] {0.5f, -0.25f}, 0.125f);
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
+        ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
+      ToolApplicabilityScore score = turn.scoreToolApplicability(head);
+
+      assertThat(score.score()).isEqualTo(0.375);
+      assertThat(score.shouldCall()).isTrue();
+      assertThat(turn.physicallySharesPrefix()).isTrue();
+      turn.generateToolCall(deterministicOptions(), TokenConstraint.unrestricted());
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(true, 2, "XY<tool_call>\n".chars().boxed().toList()),
+            new Prefill(true, 3, List.of((int) 'Y')));
+  }
+
+  @Test
   void rejectsInvalidDecisionTokensBeforeMutatingTheActivatedBranch() {
     ActivatedBackend backend = new ActivatedBackend();
 
@@ -697,6 +721,17 @@ class ActivatedToolCallingModelTest {
               state.activated, startPosition, java.util.Arrays.stream(tokens).boxed().toList()));
       state.position = startPosition + tokens.length;
       return terminalLogits();
+    }
+
+    @Override
+    public boolean supportsHiddenState() {
+      return true;
+    }
+
+    @Override
+    public float[] prefillHiddenState(InferenceSession session, int[] tokens, int startPosition) {
+      prefill(session, tokens, startPosition);
+      return new float[] {3, 6};
     }
 
     @Override

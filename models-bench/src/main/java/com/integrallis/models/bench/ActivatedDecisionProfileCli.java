@@ -319,7 +319,7 @@ final class ActivatedDecisionProfileCli {
     }
   }
 
-  private static LoadedCases loadCases(ObjectMapper mapper, Path path) throws IOException {
+  static LoadedCases loadCases(ObjectMapper mapper, Path path) throws IOException {
     Map<String, JsonNode> unique = new LinkedHashMap<>();
     try (var lines = Files.lines(path)) {
       for (String line : lines.toList()) {
@@ -502,8 +502,8 @@ final class ActivatedDecisionProfileCli {
     return value;
   }
 
-  private record LoadedCases(List<SourceCase> cases, SplitContract split) {
-    private LoadedCases {
+  record LoadedCases(List<SourceCase> cases, SplitContract split) {
+    LoadedCases {
       cases = List.copyOf(Objects.requireNonNull(cases, "cases"));
       Objects.requireNonNull(split, "split");
     }

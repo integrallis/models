@@ -709,6 +709,17 @@ public final class LlamaForwardPass {
     return forwardSessionInternal(session, token, position, Head.LOGITS);
   }
 
+  /** Runs one independent session step and returns a stable final normalized hidden state. */
+  public float[] hiddenState(Session session, int token, int position) {
+    return hiddenStateTransient(session, token, position).clone();
+  }
+
+  /** Runs one independent session step using reusable hidden-state storage. */
+  public float[] hiddenStateTransient(Session session, int token, int position) {
+    requireSession(session);
+    return forwardSessionInternal(session, token, position, Head.HIDDEN);
+  }
+
   /** Prefills one independent session without changing the default sequence. */
   public float[] prefill(Session session, int[] tokens, int startPosition) {
     requireSession(session);
@@ -735,6 +746,35 @@ public final class LlamaForwardPass {
     }
     return forwardSessionInternal(
         session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
+  }
+
+  /** Prefills one independent session and returns its final normalized hidden state. */
+  public float[] prefillHiddenState(Session session, int[] tokens, int startPosition) {
+    requireSession(session);
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (startPosition != session.nextPosition) {
+      throw new IllegalArgumentException(
+          "position must be sequential: expected "
+              + session.nextPosition
+              + ", got "
+              + startPosition);
+    }
+    if (tokens.length > session.cache.maxSeqLen() - startPosition) {
+      throw new IllegalArgumentException(
+          "prompt exceeds context length: " + (startPosition + (long) tokens.length));
+    }
+
+    int finalIndex = tokens.length - 1;
+    for (int index = 0; index < finalIndex; index++) {
+      forwardSessionInternal(
+          session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
+    }
+    return forwardSessionInternal(
+            session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.HIDDEN)
+        .clone();
   }
 
   /**

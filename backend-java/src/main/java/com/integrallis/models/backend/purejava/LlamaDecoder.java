@@ -160,6 +160,21 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
+  public float[] hiddenState(Session session, int token, int position) {
+    return forwardPass.hiddenState(requireSession(session), token, position);
+  }
+
+  @Override
+  public float[] hiddenStateTransient(Session session, int token, int position) {
+    return forwardPass.hiddenStateTransient(requireSession(session), token, position);
+  }
+
+  @Override
+  public float[] prefillHiddenState(Session session, int[] tokens, int startPosition) {
+    return forwardPass.prefillHiddenState(requireSession(session), tokens, startPosition);
+  }
+
+  @Override
   public boolean supportsRaggedPrefillBatch() {
     return true;
   }
