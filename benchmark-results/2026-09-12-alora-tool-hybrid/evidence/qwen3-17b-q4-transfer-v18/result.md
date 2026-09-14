@@ -1,7 +1,7 @@
 # V18 result
 
-Status: **returned to Phase 1 after fixing cold activated-inference determinism in the Java
-execution kernel; Phase 2 has not been scored**.
+Status: **final Phase 1 passed under the deterministic Java execution kernel; Phase 2 has not been
+scored**.
 
 The first calibration below remains historical evidence. A pre-score live-loader defect required a
 new Models revision and a complete calibration rerun. That rerun passed, but comparison with the
@@ -13,9 +13,13 @@ evidence. The retained fix moves deterministic reduction into Vectors 0.1.21 and
 F32 execution matrices in Models, with no load-time prewarm, external inference runtime, or Rust
 kernel. See `cold-activated-determinism.md`.
 
-The live screen remained untouched. Calibration must now pass again under the final Models revision
-resolving Vectors 0.1.21 from Maven Central, and the new report and hash must be committed before
-Phase 2 begins.
+The live screen remained untouched while calibration was repeated under the final Models revision
+resolving Vectors 0.1.21 from Maven Central. That required rerun passed under Models revision
+`55a624ca68bb62115563dfdd5b0f982149ab8396`:
+threshold `2.4962309929993705`, calls `47/50`, no-calls `24/25`, balanced accuracy `0.95`, and
+physical sharing `75/75`. Its report SHA-256 is
+`74588d3431a7d81e9e9df2ce2eab748df7a8533ffdcd101793fff0be0f8d542b`. The report and hash
+were committed before Phase 2.
 
 The original Java 25 production-Q4 calibration completed on all 75 exposed cases. Independent
 recomputation of the committed observations reproduced threshold `2.4962309929993705` and the

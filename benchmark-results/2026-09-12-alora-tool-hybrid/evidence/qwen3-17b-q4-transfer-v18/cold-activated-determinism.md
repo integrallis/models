@@ -1,7 +1,7 @@
 # V18 cold activated-inference determinism finding
 
-Status: **fixed in the Java execution kernel; production-Q4 calibration must be repeated on the
-final released dependency and Models revision**.
+Status: **fixed and verified in the Java execution kernel under public Vectors 0.1.21 and the final
+Models revision**.
 
 The first live-screen launcher stopped before scoring because one frozen BFCL case contained a
 legitimate prior `assistant` message. After the loader fix, the exposed calibration was repeated at
@@ -63,3 +63,11 @@ The BFCL-live window remained unscored. V18 returns to Phase 1 and must repeat a
 under the final Models revision resolving Vectors 0.1.21 from Maven Central. That report and hash
 must be committed before a new live-screen attempt. No pre-fix or prewarm-dependent score or
 threshold is carried forward.
+
+## Final verification
+
+The required fresh-host Phase 1 rerun under Models revision
+`55a624ca68bb62115563dfdd5b0f982149ab8396` and public Vectors 0.1.21 passed all 75 exposed
+cases. The first cold score was `2.1539079427156906`, physical prefix identity was `75/75`, and the
+complete gate remained calls `47/50`, no-calls `24/25`, and balanced accuracy `0.95`. Report
+SHA-256: `74588d3431a7d81e9e9df2ce2eab748df7a8533ffdcd101793fff0be0f8d542b`.

@@ -105,3 +105,40 @@ The elapsed allocation was 2 hours 50 minutes 54 seconds, an upper-bound compute
 1.28 at the recorded hourly price. Closing Hetzner inventory contained zero servers and zero
 firewalls. A clean host will be reprovisioned only after the released Vectors dependency and final
 Models revision are available.
+
+## Final Vectors 0.1.21 qualification run
+
+All 28 checks on Models revision `55a624ca68bb62115563dfdd5b0f982149ab8396` passed before
+capacity was created. The repository resolves Vectors 0.1.21 from Maven Central and retains no
+Activated-LoRA prewarm.
+
+- Server ID / name: `165788606` / `modeljars-alora-v18-final-20260914`
+- Firewall ID / name: `11620007` / `modeljars-alora-v18-final-ssh`
+- Created: `2026-09-14T08:41:42Z`
+- Hard deletion deadline: `2026-09-14T13:41:42Z`
+- Plan / price ceiling: Hetzner `cpx51` in `ash`, USD 0.4479/hour, at most five hours / USD 2.24
+- Measured runtime: OpenJDK `25.0.4`, Ubuntu Linux `6.8.0-138-generic`, AMD EPYC-Rome, 16
+  processors, 32,859,291,648 physical bytes
+- SSH host-key fingerprint: `SHA256:d4WZMXiZ4YFxwglN5Akzxhup16GE3eplp6Diy1MvP/A`
+- Automatic cleanup: local LaunchAgent
+  `org.integrallis.modeljars-alora-v18-final-watchdog` checks the exact server and firewall IDs
+  every 60 seconds and enforces the deadline.
+
+The opening inventory contained zero Hetzner servers and zero firewalls. The firewall permits SSH
+only from the operator workstation and was verified as attached to the exact server. The clean
+checkout and all model, adapter, head, and exposed-record hashes were verified before scoring. A
+clean `:models-bench:check` passed after installing Java 25 and the repository-pinned Rust build
+toolchain. Rust was used only to compile Models' existing owned native-kernel module as required by
+the benchmark distribution; V18 constructs `PureJavaBackend` directly and cannot use that module
+or an external inference runtime for scoring.
+
+The final Phase 1 calibration ran from `2026-09-14T08:54:59Z` through
+`2026-09-14T09:34:26Z`. It passed at threshold `2.4962309929993705`: calls `47/50`, no-calls
+`24/25`, balanced accuracy `0.95`, and physical shared-prefix identity `75/75`. The independently
+verified report and log SHA-256 values are
+`74588d3431a7d81e9e9df2ce2eab748df7a8533ffdcd101793fff0be0f8d542b` and
+`9e87a39cf1acc5c301f85f20aaf5dec5028701e9e2c2e95e5f88e8f69c34c459`. Independent
+recomputation from the 75 observations reproduced all four counts and balanced accuracy. The
+formerly unstable first cold score is now `2.1539079427156906`; all repeated-path scores remained
+stable. Phase 2 was not started before this report, log, hash manifest, and lifecycle update were
+committed.
