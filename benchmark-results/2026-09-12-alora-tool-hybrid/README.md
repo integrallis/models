@@ -345,6 +345,13 @@ A subsequent in-process MiniLM semantic gate was also rejected. It removed every
 reduced valid-call recall to 40/50, adding a second model without solving the quality problem. Its
 complete 75-case diagnostic is under `evidence/qwen3-17b-semantic-applicability-diagnostic/`.
 
+V19 then scored the exact base and activated call/no-call decisions from the same physically shared
+prefix. Calibration selected `specialist + 1.0 * base`, but the rule reached only 40/50 correct
+calls and 25/25 no-calls across the exposed development set. That is five fewer correct calls than
+V15, so the dual-margin decision family is rejected without opening fresh qualification data. All
+75 observations physically shared their prefix. The report, complete log, frozen preflight, and
+host lifecycle are under `evidence/qwen3-17b-dual-decision-diagnostic/`.
+
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.
 The preceding raw-copy, ridge, and CacheBridge Qwen3 0.6B-to-1.7B translations also failed exact
