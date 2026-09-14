@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.ToolCall;
@@ -48,14 +49,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/** Runs the shared small-model tool-calling gate through the pure-Java backend. */
+/** Runs the shared small-model tool-calling gate through an owned in-process backend. */
 final class ToolCallingQualificationCli {
   static final String POLICY_VERSION = "small-model-tool-conformance-v1";
 
   private static final int PASS = 0;
   private static final int FAIL = 1;
   private static final Set<String> OPTIONS =
-      Set.of("candidate", "model", "adapter", "report", "max-tokens", "models-revision", "case");
+      Set.of(
+          "candidate",
+          "model",
+          "adapter",
+          "report",
+          "max-tokens",
+          "models-revision",
+          "case",
+          "backend");
 
   private ToolCallingQualificationCli() {}
 
@@ -66,7 +75,8 @@ final class ToolCallingQualificationCli {
       Path report,
       int maxTokens,
       String modelsRevision,
-      String caseId) {}
+      String caseId,
+      String backend) {}
 
   record GenerationControls(double temperature, int maxTokens, String promptTemplate) {}
 
@@ -133,6 +143,10 @@ final class ToolCallingQualificationCli {
       throw new IllegalArgumentException("--candidate is required");
     }
     ToolCallingCandidate candidate = ToolCallingCandidate.parse(candidateValue);
+    String backend = values.getOrDefault("backend", "pure-java");
+    if (!Set.of("pure-java", "rust-ffm").contains(backend)) {
+      throw new IllegalArgumentException("--backend must be pure-java or rust-ffm");
+    }
     String configuredModel = values.get("model");
     if (configuredModel == null || configuredModel.isBlank()) {
       throw new IllegalArgumentException("--model is required");
@@ -155,6 +169,10 @@ final class ToolCallingQualificationCli {
         throw new IllegalArgumentException(
             "activated adapter qualification currently requires a supported Qwen3 graph");
       }
+      if (!"pure-java".equals(backend)) {
+        throw new IllegalArgumentException(
+            "activated adapter qualification requires --backend pure-java");
+      }
     }
     int maxTokens = BenchmarkCliArguments.integer(values, "max-tokens", 256);
     if (maxTokens < 32 || maxTokens > 512) {
@@ -172,7 +190,31 @@ final class ToolCallingQualificationCli {
     if (caseId != null && caseId.isBlank()) {
       throw new IllegalArgumentException("--case must not be blank");
     }
-    return new Configuration(candidate, model, adapter, report, maxTokens, revision, caseId);
+    if (candidate == ToolCallingCandidate.NEEDLE2 && !"pure-java".equals(backend)) {
+      throw new IllegalArgumentException(
+          "Needle 2 tool retrieval qualification requires --backend pure-java");
+    }
+    return new Configuration(
+        candidate, model, adapter, report, maxTokens, revision, caseId, backend);
+  }
+
+  private static InferenceBackend loadBackend(Configuration configuration) {
+    if ("pure-java".equals(configuration.backend())) {
+      return PureJavaBackend.load(configuration.model());
+    }
+    try {
+      Class<?> backendClass =
+          Class.forName("com.integrallis.models.backend.nativekernel.RustFfmBackend");
+      return (InferenceBackend)
+          backendClass.getMethod("load", Path.class).invoke(null, configuration.model());
+    } catch (ClassNotFoundException failure) {
+      throw new IllegalStateException(
+          "rust-ffm qualification requires the optional backend-native runtime; "
+              + "rerun with -PmodelsBenchNative=true",
+          failure);
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("Could not load the Models-owned Rust/FFM backend", failure);
+    }
   }
 
   static int run(String[] args) throws IOException {
@@ -201,15 +243,15 @@ final class ToolCallingQualificationCli {
     ActivatedAdapterMetadata activatedAdapter = null;
     FollowUpResult followUp;
     long loadStart = System.nanoTime();
-    PureJavaBackend backend =
+    InferenceBackend backend =
         configuration.adapter() == null
-            ? PureJavaBackend.load(configuration.model())
+            ? loadBackend(configuration)
             : PureJavaBackend.loadActivatedAdapter(configuration.model(), configuration.adapter());
     ActivatedToolCallingModel activatedModel = null;
     try {
       if (configuration.adapter() != null) {
         try {
-          activatedModel = new ActivatedToolCallingModel(backend, 1);
+          activatedModel = new ActivatedToolCallingModel((PureJavaBackend) backend, 1);
           activatedAdapter = activatedModel.adapter();
         } catch (RuntimeException | Error failure) {
           backend.close();
@@ -326,7 +368,7 @@ final class ToolCallingQualificationCli {
 
   private static FollowUpResult runFollowUp(
       ToolCallingCandidate candidate,
-      PureJavaBackend backend,
+      InferenceBackend backend,
       GenerationLoop generation,
       ActivatedToolCallingModel activatedModel,
       Needle2ToolQualification.Suite suite,
@@ -499,7 +541,7 @@ final class ToolCallingQualificationCli {
 
   private static String generate(
       ToolCallingCandidate candidate,
-      PureJavaBackend backend,
+      InferenceBackend backend,
       GenerationLoop generation,
       ModelPrompt prompt,
       SamplingOptions options,
@@ -527,14 +569,18 @@ final class ToolCallingQualificationCli {
 
   private static List<ToolSpec> selectedTools(
       ToolCallingCandidate candidate,
-      PureJavaBackend backend,
+      InferenceBackend backend,
       String query,
       List<ToolSpec> declaredTools) {
     if (candidate != ToolCallingCandidate.NEEDLE2 || declaredTools.size() <= 5) {
       return declaredTools;
     }
+    if (!(backend instanceof PureJavaBackend pureJavaBackend)) {
+      throw new IllegalArgumentException("Needle 2 tool retrieval requires the pure-Java backend");
+    }
     ToolSpecRetriever retriever =
-        new ToolSpecRetriever(new InModelContrastiveEmbeddingBackend(backend), declaredTools);
+        new ToolSpecRetriever(
+            new InModelContrastiveEmbeddingBackend(pureJavaBackend), declaredTools);
     return retriever.select(query, 5).stream().map(ToolSpecRetriever.Match::tool).toList();
   }
 
@@ -599,7 +645,7 @@ final class ToolCallingQualificationCli {
             configuration.modelsRevision(),
             candidate.modelId(),
             candidate.modelName(),
-            "pure-java",
+            configuration.backend(),
             Needle2ToolQualificationCli.implementationVersion(configuration.modelsRevision()),
             artifactSha256,
             Files.size(configuration.model()),

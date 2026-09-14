@@ -87,6 +87,51 @@ class ToolCallingQualificationCliTest {
     assertThat(configuration.caseId()).isEqualTo("currency");
     assertThat(configuration.modelsRevision()).isEqualTo(REVISION);
     assertThat(configuration.adapter()).isNull();
+    assertThat(configuration.backend()).isEqualTo("pure-java");
+  }
+
+  @Test
+  void acceptsTheOwnedRustFfmBackendForQwenQualification() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("model.gguf"), "fixture");
+
+    ToolCallingQualificationCli.Configuration configuration =
+        ToolCallingQualificationCli.parse(
+            new String[] {
+              "--candidate",
+              "qwen3-8b",
+              "--model",
+              artifact.toString(),
+              "--backend",
+              "rust-ffm",
+              "--models-revision",
+              REVISION
+            });
+
+    assertThat(configuration.backend()).isEqualTo("rust-ffm");
+  }
+
+  @Test
+  void rejectsAnActivatedAdapterWithTheRustFfmBackend() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("model.gguf"), "fixture");
+    Path adapter = Files.createDirectory(temporary.resolve("adapter"));
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ToolCallingQualificationCli.parse(
+                    new String[] {
+                      "--candidate",
+                      "qwen3-0.6b",
+                      "--model",
+                      artifact.toString(),
+                      "--adapter",
+                      adapter.toString(),
+                      "--backend",
+                      "rust-ffm",
+                      "--models-revision",
+                      REVISION
+                    }))
+        .withMessageContaining("requires --backend pure-java");
   }
 
   @Test
