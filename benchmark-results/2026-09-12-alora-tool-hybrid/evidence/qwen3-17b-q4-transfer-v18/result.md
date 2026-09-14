@@ -1,0 +1,34 @@
+# V18 result
+
+Status: **Phase 1 calibration passed; Phase 2 live screen not yet scored**.
+
+The fixed Java 25 production-Q4 calibration completed on all 75 exposed cases. Independent
+recomputation of the committed observations reproduced threshold `2.4962309929993705` and the
+following result:
+
+- positive calls: 47/50;
+- no-calls: 24/25;
+- balanced accuracy: 0.95; and
+- physically shared immutable prefix: 75/75 cases.
+
+The four decision errors are retained in `calibration.json`: false call `irrelevance_165`, and
+missed calls `multiple_76`, `simple_326`, and `simple_94`. They are not removed or reinterpreted.
+The result meets the exact predeclared Phase 1 floor without margin on either class.
+
+Evidence SHA-256:
+
+- `calibration.json`:
+  `973aa08df9a4bde2969453ffd3d041e2eef79de6ef1be68468f37dd0c5f929e6`
+- `calibration.log`:
+  `9b1352791d421f17355035e360f2bae8137d2f47d995683b23e936eae06e977a`
+- `clean-check.log`:
+  `c25d165a87e9dbf44b28f14f439d6aad44d42cb2f04dbda192f99859df3f2ff6`
+
+The separately frozen BFCL-live screen remains untouched at this commit. Its command must consume
+the committed calibration report and its exact SHA-256 and may not change the threshold, head,
+model, adapter, prompt construction, source records, or admission gates.
+
+This is not model qualification. V18 can advance only if the live screen and every later generation,
+sealed, product, framework, cache, memory, performance, packaging, clean-host, and published-artifact
+gate pass.
+
