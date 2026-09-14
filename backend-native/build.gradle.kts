@@ -302,6 +302,24 @@ tasks.register<Test>("gemma426BA4BNativeSlowTest") {
     maxHeapSize = "4g"
 }
 
+tasks.register<Test>("qwen38BNativeSlowTest") {
+    group = "verification"
+    description = "Run the pinned Qwen3 8B Q4_K_M Rust/FFM qualification test"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("slow")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.nativekernel.Qwen3NativeLargeModelFixtureSlowTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
 tasks.named("check") {
     dependsOn(cargoTest, cargoClippy, verifyNativePlatformJar)
 }
