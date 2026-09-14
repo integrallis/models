@@ -43,8 +43,33 @@
   execution
 - Runtime: exact sequential Java scoring, 16 Vector workers, 256-bit Panama vectors; remote model
   process PID `6132`, launched under detached Gradle process `6029`
-- Watchdog: local launchd job `org.modeljars.alora-v15-watchdog` is armed to validate and delete the
+- Watchdog: local launchd job `org.modeljars.alora-v15-watchdog` was armed to validate and delete the
   exact server at the hard deadline
-
-Creation, host fingerprint, measured environment, evidence hashes, deletion time, and the final
-provider-wide inventory are appended only after those events occur.
+- First scored run: all 75 sequential observations completed on Models revision
+  `2c8851e32c3d721db2f1b2345caeccfb4e4d09c3`, but report serialization failed on the optional
+  adapter training-selection provenance. The partial report and full log were copied and matched
+  remote SHA-256 values before teardown.
+- Report-only correction: commit `2fab0dc6e4a52ea6f0b98e257f9f6e62946984a2` added the Jackson JDK
+  8 datatype module and a regression test. `:models-bench:check` passed locally and on the host.
+  No model, adapter, data, prompt, partition, score, threshold, or gate changed.
+- Corrected run completed: `2026-09-14T01:01:36.920114918Z`; 39 minutes 20 seconds; threshold
+  `4.8179874`; calibration 17/20 calls and 9/10 no-calls; held-out screen 28/30 calls and 15/15
+  no-calls; all 75 observations physically shared their prefix.
+- Overall V15 decision result: 45/50 calls and 24/25 no-calls. The frozen 47/50 positive floor is
+  impossible, so V15 was rejected before dual generation and the sealed 300 cases remained closed.
+- Copied evidence SHA-256 values: corrected report
+  `799b1645ec510b6765ad50057ef379bd549e9dabc127516289189484e159643a`, corrected log
+  `9b075c9df6f1f242d9a893a1540c853f5f51f84d1722a81ed46ade034ebea2a5`, first partial report
+  `fe58482a9b02922436ecc164b8573645d1feebfb642f831dfb678edb45d99f65`, and first log
+  `44fbe6be7dd32b9b8b7065758a1496fef0e1bca0e3452a10fe2a4e4e927957d7`.
+- Server deletion action `655180087629089` started `2026-09-14T01:04:22Z` and succeeded at
+  `2026-09-14T01:04:33Z`, 1 hour 41 minutes 29 seconds after creation. At the quoted rate this is
+  about USD 0.76 of elapsed usage and at most USD 0.90 if rounded to two whole hours.
+- The initial firewall deletion reached Hetzner while the server deletion was settling and returned
+  HTTP 422. A read-only check then showed firewall `11618700` with the exact expected identity and
+  no attachments; its deletion returned HTTP 204.
+- Final audit at `2026-09-14T01:05:24Z`: the exact server and firewall both returned HTTP 404;
+  Hetzner reported zero servers, volumes, floating IPs, primary IPs, firewalls, and snapshots;
+  Vultr reported zero instances.
+- After provider absence was proven, the launchd watchdog was unloaded and its exact plist and
+  script were moved to macOS Trash. They are recoverable from Trash; they are no longer active.
