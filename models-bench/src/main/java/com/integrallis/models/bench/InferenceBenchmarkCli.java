@@ -159,6 +159,10 @@ public final class InferenceBenchmarkCli {
       System.exit(ActivatedHybridDevelopmentCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "activated-hybrid-live-decision".equals(args[0])) {
+      System.exit(ActivatedHybridLiveDecisionCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "activated-long-context".equals(args[0])) {
       System.exit(
           ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
