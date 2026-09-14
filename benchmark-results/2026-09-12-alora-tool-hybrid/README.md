@@ -362,6 +362,15 @@ complete in-process report and analysis are under `evidence/qwen3-17b-hybrid-gen
 The sealed 300-case window remains unopened, no hybrid was qualified or published, and no remote
 infrastructure was provisioned for V20.
 
+V21/V22 tested whether a slightly relaxed primary margin could reproduce the V20 retrospective
+decision count without changing the adapter. V21 was deliberately stopped after one local Intel
+case required 389,649 ms; V22 reran the same checksum-pinned Java-only scorer on a bounded
+16-vCPU Linux host. Its completed no-call portion was 24/25 and every observed turn physically
+shared the immutable prefix, but the third applicable-call abstention at case 37 made the frozen
+48/50 call floor unreachable (9/12 at stop). V22 is rejected, its live evidence cannot be used to
+retune the rule, the sealed window remains unopened, and the temporary host/firewall were deleted.
+See `evidence/qwen3-17b-hybrid-live-decision-v22/`.
+
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.
 The preceding raw-copy, ridge, and CacheBridge Qwen3 0.6B-to-1.7B translations also failed exact
