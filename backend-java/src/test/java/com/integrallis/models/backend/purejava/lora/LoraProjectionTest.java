@@ -63,6 +63,34 @@ class LoraProjectionTest {
   }
 
   @Test
+  void prewarmingLeavesTheFirstRealProjectionUnchanged() {
+    LoraProjection cold =
+        new LoraProjection(
+            MemorySegment.ofArray(new float[] {1, 2, 3, -1, 0, 2}),
+            MemorySegment.ofArray(new float[] {1, 2, -1, 1}),
+            3,
+            2,
+            2,
+            0.5f);
+    LoraProjection warmed =
+        new LoraProjection(
+            MemorySegment.ofArray(new float[] {1, 2, 3, -1, 0, 2}),
+            MemorySegment.ofArray(new float[] {1, 2, -1, 1}),
+            3,
+            2,
+            2,
+            0.5f);
+    float[] expected = {10, 20};
+    float[] actual = expected.clone();
+
+    cold.addTo(expected, 0, new float[] {1, 2, 1}, 0);
+    warmed.prewarm(4);
+    warmed.addTo(actual, 0, new float[] {1, 2, 1}, 0);
+
+    assertThat(actual).containsExactly(expected);
+  }
+
+  @Test
   void rejectsShapeAndRangeMismatchesBeforeTouchingOutput() {
     assertThatThrownBy(
             () ->

@@ -77,6 +77,20 @@ final class LoraProjection {
     }
   }
 
+  /**
+   * Exercises the mapped F32 kernels with neutral input without changing later projection state.
+   */
+  void prewarm(int iterations) {
+    if (iterations <= 0) {
+      throw new IllegalArgumentException("iterations must be positive: " + iterations);
+    }
+    float[] input = new float[inputDimension];
+    float[] output = new float[outputDimension];
+    for (int iteration = 0; iteration < iterations; iteration++) {
+      addTo(output, 0, input, 0);
+    }
+  }
+
   private static void requireBytes(String name, MemorySegment tensor, int elements) {
     long expected = Math.multiplyExact((long) elements, Float.BYTES);
     if (tensor.byteSize() != expected) {

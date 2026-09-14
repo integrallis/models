@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.api.ActivatedAdapterMetadata;
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.ToolCall;
@@ -96,6 +97,49 @@ class ActivatedLoraModelIntegrationTest {
       "3fe555c1e4a68b65b6715341cd1d1cbf9995e549cbdb267f15896b0a9b7edf77";
   private static final String PREPARED_VALIDATION_SHA256 =
       "f12c4c34c875d929b252d075749468f2c53d919744eca711e907927d9ecd83ca";
+
+  @Test
+  void producesTheSameActivatedHiddenStateOnTheFirstAndSecondTurn() {
+    Path modelPath = modelPath();
+    Path adapterPath = Path.of(System.getProperty(ADAPTER_PROPERTY));
+    ModelPrompt rendered =
+        ChatTemplate.CHATML_NO_THINK.render(
+            List.of(ChatMessage.user("What is the weather for 88252?")), List.of(WEATHER));
+
+    try (PureJavaBackend backend = PureJavaBackend.loadActivatedAdapter(modelPath, adapterPath)) {
+      int[] invocation =
+          backend.activatedAdapter().orElseThrow().invocationTokens().stream()
+              .mapToInt(Integer::intValue)
+              .toArray();
+      ModelPrompt.Builder decisionPrompt = ModelPrompt.builder();
+      for (ModelPrompt.Segment segment : rendered.segments()) {
+        if (segment.kind() == ModelPrompt.SegmentKind.CONTROL) {
+          decisionPrompt.control(segment.text());
+        } else {
+          decisionPrompt.text(segment.text());
+        }
+      }
+      int[] promptTokens =
+          backend.tokenizer().encode(decisionPrompt.control("<tool_call>\n").build());
+      int boundary = lastIndexOf(promptTokens, invocation);
+      assertThat(boundary).isPositive();
+      int[] prefix = java.util.Arrays.copyOf(promptTokens, boundary);
+      int[] suffix = java.util.Arrays.copyOfRange(promptTokens, boundary, promptTokens.length);
+
+      float[] first = activatedHiddenState(backend, prefix, suffix);
+      float[] second = activatedHiddenState(backend, prefix, suffix);
+
+      assertThat(second).containsExactly(first);
+    }
+  }
+
+  private static float[] activatedHiddenState(PureJavaBackend backend, int[] prefix, int[] suffix) {
+    try (InferenceSession session = backend.openSession()) {
+      backend.prefill(session, prefix, 0);
+      backend.activateAdapter(session);
+      return backend.prefillHiddenState(session, suffix, prefix.length).clone();
+    }
+  }
 
   private record ActivatedFixture(
       ModelFixtureRequirement requirement,

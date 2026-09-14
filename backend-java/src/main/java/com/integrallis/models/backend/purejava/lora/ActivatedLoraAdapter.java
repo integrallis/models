@@ -50,6 +50,7 @@ public final class ActivatedLoraAdapter {
       JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
   private static final String METADATA_FILE = "models-activated-lora.json";
   private static final String ADAPTER_KIND = "activated-lora-tool-specialist";
+  private static final int PROJECTION_PREWARM_ITERATIONS = 512;
   private static final Set<String> REQUIRED_MODULES =
       Set.of("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj");
 
@@ -217,18 +218,21 @@ public final class ActivatedLoraAdapter {
               + ", unexpected="
               + unexpected);
     }
-    return new ActivatedLoraAdapter(
-        metadata.baseModel,
-        metadata.baseRevision,
-        metadata.baseArtifactSha256,
-        metadata.tokenizerFileSha256,
-        metadata.adapterSha256,
-        metadata.rank,
-        metadata.alpha,
-        metadata.invocationTokens.clone(),
-        metadata.trainingProvenance,
-        architecture,
-        projections);
+    ActivatedLoraAdapter adapter =
+        new ActivatedLoraAdapter(
+            metadata.baseModel,
+            metadata.baseRevision,
+            metadata.baseArtifactSha256,
+            metadata.tokenizerFileSha256,
+            metadata.adapterSha256,
+            metadata.rank,
+            metadata.alpha,
+            metadata.invocationTokens.clone(),
+            metadata.trainingProvenance,
+            architecture,
+            projections);
+    adapter.prewarmProjectionKernels();
+    return adapter;
   }
 
   /** Adds one activated low-rank projection update to an already-computed base projection. */
@@ -244,6 +248,15 @@ public final class ActivatedLoraAdapter {
     }
     Objects.requireNonNull(projection, "projection");
     layers[layer][projection.ordinal()].addTo(output, outputOffset, input, inputOffset);
+  }
+
+  private void prewarmProjectionKernels() {
+    // The mapped F32 A/B kernels otherwise settle on a different stable arithmetic result after
+    // the first activated request. All layers have the same seven projection shapes, so exercising
+    // one layer here makes the first user input follow the same path as every later input.
+    for (Projection projection : Projection.values()) {
+      layers[0][projection.ordinal()].prewarm(PROJECTION_PREWARM_ITERATIONS);
+    }
   }
 
   public String baseModel() {
