@@ -32,6 +32,7 @@ import java.util.Set;
  * @param id stable identifier the application maps back to a client
  * @param local whether the model runs in this process
  * @param tags folksonomy labels such as {@code code} or {@code math}
+ * @param capabilities concrete features the candidate can provide, such as {@code tool-calling}
  * @param costPerMillionInputTokens prompt price, zero for local
  * @param costPerMillionOutputTokens completion price, zero for local
  * @param timeToFirstTokenMillis measured or advertised time to first token
@@ -44,6 +45,7 @@ public record ModelCandidate(
     String id,
     boolean local,
     Set<String> tags,
+    Set<String> capabilities,
     double costPerMillionInputTokens,
     double costPerMillionOutputTokens,
     long timeToFirstTokenMillis,
@@ -56,6 +58,7 @@ public record ModelCandidate(
   public ModelCandidate {
     id = requireText(id);
     tags = Set.copyOf(Objects.requireNonNull(tags, "tags"));
+    capabilities = Set.copyOf(Objects.requireNonNull(capabilities, "capabilities"));
     quality = Map.copyOf(Objects.requireNonNull(quality, "quality"));
     requireNonNegative(costPerMillionInputTokens, "costPerMillionInputTokens");
     requireNonNegative(costPerMillionOutputTokens, "costPerMillionOutputTokens");
@@ -77,6 +80,37 @@ public record ModelCandidate(
     if (!Double.isFinite(successRate) || successRate < 0 || successRate > 1) {
       throw new IllegalArgumentException("successRate must be within [0, 1]");
     }
+  }
+
+  /**
+   * Source-compatible constructor for descriptors written before capability requirements existed.
+   *
+   * <p>Older callers only supplied task tags. Treating those tags as the declared capability set
+   * preserves their prior routing behavior; catalog providers should supply exact capabilities.
+   */
+  public ModelCandidate(
+      String id,
+      boolean local,
+      Set<String> tags,
+      double costPerMillionInputTokens,
+      double costPerMillionOutputTokens,
+      long timeToFirstTokenMillis,
+      double tokensPerSecond,
+      int contextWindow,
+      Map<String, Double> quality,
+      double successRate) {
+    this(
+        id,
+        local,
+        tags,
+        tags,
+        costPerMillionInputTokens,
+        costPerMillionOutputTokens,
+        timeToFirstTokenMillis,
+        tokensPerSecond,
+        contextWindow,
+        quality,
+        successRate);
   }
 
   /**
@@ -132,6 +166,8 @@ public record ModelCandidate(
     private final String id;
     private boolean local;
     private Set<String> tags = Set.of();
+    private Set<String> capabilities = Set.of();
+    private boolean capabilitiesExplicit;
     private double inputCost;
     private double outputCost;
     private long ttftMillis = 1_000;
@@ -165,6 +201,16 @@ public record ModelCandidate(
       // Copy here as well as in the record: the builder would otherwise hold the caller's
       // collection between this call and build(), where a mutation would still land.
       this.tags = Set.copyOf(value);
+      if (!capabilitiesExplicit) {
+        this.capabilities = this.tags;
+      }
+      return this;
+    }
+
+    /** Sets concrete capabilities independently from task-quality tags. */
+    public Builder capabilities(Set<String> value) {
+      this.capabilities = Set.copyOf(Objects.requireNonNull(value, "capabilities"));
+      this.capabilitiesExplicit = true;
       return this;
     }
 
@@ -246,6 +292,7 @@ public record ModelCandidate(
           id,
           local,
           tags,
+          capabilities,
           inputCost,
           outputCost,
           ttftMillis,

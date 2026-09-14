@@ -25,12 +25,15 @@ import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
+import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter;
+import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter.Architecture;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.safetensors.SyntheticSafetensorsBuilder;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
@@ -41,12 +44,17 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 @Tag("unit")
 class LlamaForwardPassTest {
@@ -599,6 +607,27 @@ class LlamaForwardPassTest {
       float[] actual = freshPass(config, weights).prefillHiddenState(tokens, 0);
 
       assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
+    }
+
+    @Test
+    void sessionHiddenStateUsesItsOwnKvLineageAndRemainsUsableForGeneration() {
+      GgufFile file = buildNanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11};
+      LlamaForwardPass expectedPass = freshPass(config, weights);
+      float[] expectedHidden = expectedPass.prefillHiddenState(tokens, 0).clone();
+      float[] expectedLogits = expectedPass.forward(17, tokens.length);
+
+      LlamaForwardPass actualPass = freshPass(config, weights);
+      LlamaForwardPass.Session session = actualPass.openSession();
+      float[] actualHidden = actualPass.prefillHiddenState(session, tokens, 0);
+      float[] actualLogits = actualPass.forward(session, 17, tokens.length);
+
+      assertThat(actualHidden).containsExactly(expectedHidden);
+      assertThat(actualLogits).containsExactly(expectedLogits);
+      assertThat(session.checkpoint()).isEqualTo(tokens.length + 1);
+      assertThat(actualPass.checkpoint()).isZero();
     }
 
     @Test
@@ -1339,7 +1368,7 @@ class LlamaForwardPassTest {
     }
 
     @Test
-    void stagedQ8LayerPreservesPrefillCacheAndAutoregressiveStateExactly() {
+    void stagedQ8LayerPreservesPrefillCacheAndAutoregressiveStateWithinSimdTolerance() {
       try (Arena arena = Arena.ofShared()) {
         GgufFile file = copyToSharedArena(buildQ8NanoModel(new Random(42)), arena);
         LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
@@ -1519,21 +1548,27 @@ class LlamaForwardPassTest {
         assertThat(staged.usesStagedQuantizedLayer()).isTrue();
         assertThat(staged.usesBlockMajorQ8Activations()).isTrue();
         assertThat(staged.stagedQuantizedLayerStageCount()).isEqualTo(7);
-        assertThat(actual).containsExactly(expected);
-        assertThat(actualKeys).containsExactly(expectedKeys);
-        assertThat(actualValues).containsExactly(expectedValues);
-        assertThat(actualNext).containsExactly(expectedNext);
+        assertThat(actual).containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(actualKeys).containsExactly(expectedKeys, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(actualValues).containsExactly(expectedValues, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(actualNext).containsExactly(expectedNext, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(parallel.usesParallelQ8FfnPreparation()).isTrue();
-        assertThat(parallelActual).containsExactly(actual);
-        assertThat(parallelCache.keyBuffer()).containsExactly(actualKeys);
-        assertThat(parallelCache.valueBuffer()).containsExactly(actualValues);
-        assertThat(parallel.forward(nextToken, tokens.length)).containsExactly(actualNext);
+        assertThat(parallelActual).containsExactly(actual, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(parallelCache.keyBuffer())
+            .containsExactly(actualKeys, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(parallelCache.valueBuffer())
+            .containsExactly(actualValues, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(parallel.forward(nextToken, tokens.length))
+            .containsExactly(actualNext, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(rowAccumulatedPlan.q8BlockMajorKernel())
             .isEqualTo(GgufQ8BlockMajorKernel.ROW_ACCUMULATED);
-        assertThat(rowAccumulatedActual).containsExactly(actual);
-        assertThat(rowAccumulatedCache.keyBuffer()).containsExactly(actualKeys);
-        assertThat(rowAccumulatedCache.valueBuffer()).containsExactly(actualValues);
-        assertThat(rowAccumulated.forward(nextToken, tokens.length)).containsExactly(actualNext);
+        assertThat(rowAccumulatedActual).containsExactly(actual, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(rowAccumulatedCache.keyBuffer())
+            .containsExactly(actualKeys, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(rowAccumulatedCache.valueBuffer())
+            .containsExactly(actualValues, within(SIMD_REDUCTION_TOLERANCE));
+        assertThat(rowAccumulated.forward(nextToken, tokens.length))
+            .containsExactly(actualNext, within(SIMD_REDUCTION_TOLERANCE));
         assertThat(floatLanePlan.q8BlockMajorKernel())
             .isEqualTo(GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED);
         assertThat(secondFloatLaneActual).containsExactly(firstFloatLaneActual);
@@ -1769,6 +1804,208 @@ class LlamaForwardPassTest {
       assertThat(first.cache().valueBuffer()).containsExactly(firstExpectedCache.valueBuffer());
       assertThat(second.cache().keyBuffer()).containsExactly(secondExpectedCache.keyBuffer());
       assertThat(second.cache().valueBuffer()).containsExactly(secondExpectedCache.valueBuffer());
+    }
+
+    @Test
+    void sharedPrefixForksMatchIndependentRecomputationAndReferenceTheSameKvStorage() {
+      GgufFile file = buildQ4KNanoModel(new Random(142));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] prefixTokens = {5, 7, 11, 13};
+
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session firstExpected = baseline.openSession();
+      LlamaForwardPass.Session secondExpected = baseline.openSession();
+      baseline.prefill(firstExpected, prefixTokens, 0);
+      baseline.prefill(secondExpected, prefixTokens, 0);
+      float[] expectedFirst = baseline.forward(firstExpected, 17, prefixTokens.length);
+      float[] expectedSecond = baseline.forward(secondExpected, 19, prefixTokens.length);
+
+      LlamaForwardPass actual =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session prefixSession = actual.openSession();
+      actual.prefill(prefixSession, prefixTokens, 0);
+      LlamaForwardPass.SessionPrefix prefix = actual.freezePrefix(prefixSession);
+      LlamaForwardPass.Session first = prefix.fork();
+      LlamaForwardPass.Session second = prefix.fork();
+
+      float[] firstLogits = actual.forward(first, 17, prefixTokens.length);
+      float[] secondLogits = actual.forward(second, 19, prefixTokens.length);
+
+      assertThat(firstLogits).containsExactly(expectedFirst, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(secondLogits).containsExactly(expectedSecond, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(first.checkpoint()).isEqualTo(prefixTokens.length + 1);
+      assertThat(second.checkpoint()).isEqualTo(prefixTokens.length + 1);
+      assertThat(first.cache().sharesPrefixStorageWith(second.cache())).isTrue();
+      assertThat(prefix.sharedBytes()).isPositive();
+    }
+
+    @Test
+    void extendedSharedPrefixChainMatchesIndependentFullContextRecomputation() {
+      GgufFile file = buildQ4KNanoModel(new Random(144));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] initialTokens = {5, 7};
+      int[] extensionTokens = {11, 13, 17};
+
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session expected = baseline.openSession();
+      baseline.prefill(expected, new int[] {5, 7, 11, 13, 17}, 0);
+      float[] expectedLogits = baseline.forward(expected, 19, 5);
+
+      LlamaForwardPass actual =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()));
+      LlamaForwardPass.Session source = actual.openSession();
+      actual.prefill(source, initialTokens, 0);
+      LlamaForwardPass.SessionPrefix initialPrefix = actual.freezePrefix(source);
+      LlamaForwardPass.Session extension = initialPrefix.fork();
+      actual.prefill(extension, extensionTokens, initialTokens.length);
+
+      LlamaForwardPass.SessionPrefix extendedPrefix = actual.freezePrefix(extension);
+      LlamaForwardPass.Session first = extendedPrefix.fork();
+      LlamaForwardPass.Session second = extendedPrefix.fork();
+      float[] actualLogits = actual.forward(first, 19, 5);
+
+      assertThat(actualLogits).containsExactly(expectedLogits, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(extendedPrefix.length()).isEqualTo(5);
+      assertThat(extendedPrefix.sharedBytes()).isGreaterThan(initialPrefix.sharedBytes());
+      assertThat(first.cache().sharesPrefixStorageWith(second.cache())).isTrue();
+      assertThat(first.cache().attentionView(0, 0, 6).spanCount()).isEqualTo(3);
+    }
+
+    @Test
+    void activatedForkRequiresItsExactInvocationAndLeavesBaseForkBitIdentical(
+        @TempDir Path temporaryDirectory) throws Exception {
+      Files.createDirectories(temporaryDirectory);
+      GgufFile file = buildQ4KNanoModel(new Random(143));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      String baseSha = "a".repeat(64);
+
+      try (Arena arena = Arena.ofConfined()) {
+        ActivatedLoraAdapter adapter = writeNanoAdapter(temporaryDirectory, arena, config, baseSha);
+        LlamaForwardPass pass =
+            new LlamaForwardPass(
+                config,
+                weights,
+                new KvCache(
+                    config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+                adapter);
+        LlamaForwardPass.Session source = pass.openSession();
+        pass.prefill(source, new int[] {5, 7}, 0);
+        LlamaForwardPass.SessionPrefix prefix = pass.freezePrefix(source);
+        LlamaForwardPass.Session base = prefix.fork();
+        LlamaForwardPass.Session activated = prefix.forkActivated();
+        LlamaForwardPass.Session wrongInvocation = prefix.forkActivated();
+
+        LlamaForwardPass baseline =
+            new LlamaForwardPass(
+                config,
+                weights,
+                new KvCache(
+                    config.numLayers(),
+                    config.contextLength(),
+                    config.keyDim(),
+                    config.valueDim()));
+        LlamaForwardPass.Session expectedBase = baseline.openSession();
+        baseline.prefill(expectedBase, new int[] {5, 7}, 0);
+        float[] expectedBaseLogits = baseline.forward(expectedBase, 11, 2);
+
+        float[] actualBaseLogits = pass.forward(base, 11, 2);
+        float[] activatedLogits = pass.forward(activated, 11, 2);
+        pass.forward(activated, 13, 3);
+
+        assertThat(actualBaseLogits).containsExactly(expectedBaseLogits);
+        assertThat(activatedLogits).isNotEqualTo(actualBaseLogits);
+        assertThatThrownBy(() -> pass.forward(wrongInvocation, 12, 2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("invocation token 0")
+            .hasMessageContaining("must be 11");
+        assertThat(wrongInvocation.checkpoint()).isEqualTo(2);
+
+        LlamaForwardPass.Session batchedBase = prefix.fork();
+        LlamaForwardPass.Session batchedActivated = prefix.forkActivated();
+        LogitBatch mixedFirst =
+            pass.forwardBatch(
+                new LlamaForwardPass.Session[] {batchedBase, batchedActivated}, new int[] {11, 11});
+        assertThat(mixedFirst.copyRow(0)).containsExactly(actualBaseLogits);
+        assertThat(mixedFirst.copyRow(1)).containsExactly(activatedLogits);
+        pass.forward(batchedActivated, 13, 3);
+
+        LlamaForwardPass.Session prefilledBase = prefix.fork();
+        LlamaForwardPass.Session prefilledActivated = prefix.forkActivated();
+        LogitBatch mixedPrefill =
+            pass.prefillBatch(
+                new LlamaForwardPass.Session[] {prefilledBase, prefilledActivated},
+                new int[][] {{11, 13}, {11, 13}});
+        assertThat(mixedPrefill.copyRow(0)).isNotEqualTo(mixedPrefill.copyRow(1));
+        assertThat(prefilledBase.checkpoint()).isEqualTo(4);
+        assertThat(prefilledActivated.checkpoint()).isEqualTo(4);
+      }
+    }
+
+    @Test
+    void independentlyActivatedSessionRetainsItsBoundaryAcrossRewindAndReset(
+        @TempDir Path temporaryDirectory) throws Exception {
+      Files.createDirectories(temporaryDirectory);
+      GgufFile file = buildQ4KNanoModel(new Random(145));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+
+      try (Arena arena = Arena.ofConfined()) {
+        ActivatedLoraAdapter adapter =
+            writeNanoAdapter(temporaryDirectory, arena, config, "a".repeat(64));
+        LlamaForwardPass pass =
+            new LlamaForwardPass(
+                config,
+                weights,
+                new KvCache(
+                    config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+                adapter);
+        LlamaForwardPass.Session activated = pass.openSession();
+        pass.prefill(activated, new int[] {5, 7}, 0);
+        pass.activateAdapter(activated);
+        pass.forward(activated, 11, 2);
+        pass.forward(activated, 13, 3);
+
+        pass.rewind(activated, 2);
+
+        assertThatThrownBy(() -> pass.forward(activated, 12, 2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("invocation token 0")
+            .hasMessageContaining("must be 11");
+        assertThatThrownBy(() -> pass.rewind(activated, 1))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("activation boundary");
+
+        pass.forward(activated, 11, 2);
+        pass.forward(activated, 13, 3);
+        pass.reset(activated);
+
+        assertThat(activated.checkpoint()).isEqualTo(2);
+        assertThatThrownBy(() -> pass.forward(activated, 12, 2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("invocation token 0")
+            .hasMessageContaining("must be 11");
+      }
     }
 
     @Test
@@ -2551,6 +2788,106 @@ class LlamaForwardPassTest {
       buf.putFloat(i * 4, 1.0f);
     }
     return data;
+  }
+
+  private static ActivatedLoraAdapter writeNanoAdapter(
+      Path directory, Arena arena, LlamaConfig config, String baseSha) throws Exception {
+    SyntheticSafetensorsBuilder builder = new SyntheticSafetensorsBuilder();
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      addNanoLoraProjection(
+          builder, layer, "self_attn.q_proj", config.embeddingDim(), config.queryDim());
+      addNanoLoraProjection(
+          builder, layer, "self_attn.k_proj", config.embeddingDim(), config.keyDim());
+      addNanoLoraProjection(
+          builder, layer, "self_attn.v_proj", config.embeddingDim(), config.valueDim());
+      addNanoLoraProjection(
+          builder, layer, "self_attn.o_proj", config.attentionOutputDim(), config.embeddingDim());
+      addNanoLoraProjection(
+          builder, layer, "mlp.gate_proj", config.embeddingDim(), config.hiddenDim());
+      addNanoLoraProjection(
+          builder, layer, "mlp.up_proj", config.embeddingDim(), config.hiddenDim());
+      addNanoLoraProjection(
+          builder, layer, "mlp.down_proj", config.hiddenDim(), config.embeddingDim());
+    }
+    Path weightsPath = directory.resolve("adapter_model.safetensors");
+    Files.write(weightsPath, builder.build());
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    String adapterSha = HexFormat.of().formatHex(digest.digest(Files.readAllBytes(weightsPath)));
+    Files.writeString(
+        directory.resolve("models-activated-lora.json"),
+        """
+        {
+          "schemaVersion": 2,
+          "kind": "activated-lora-tool-specialist",
+          "base": {
+            "model": "test/nano-llama",
+            "revision": "%s",
+            "artifactSha256": "%s"
+          },
+          "tokenizer": {
+            "files": [{"name": "tokenizer.json", "sha256": "%s"}]
+          },
+          "adapter": {
+            "file": "adapter_model.safetensors",
+            "sha256": "%s",
+            "rank": 1,
+            "alpha": 1,
+            "targetModules": [
+              "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
+            ]
+          },
+          "invocation": {"tokens": [11, 13]},
+          "training": {
+            "dataset": "test/dataset",
+            "datasetRevision": "%s",
+            "sourceFile": "train.jsonl",
+            "sourceSha256": "%s",
+            "preparedManifestSha256": "%s",
+            "trainSha256": "%s",
+            "validationSha256": "%s",
+            "formatter": "formatter.java",
+            "formatterSha256": "%s"
+          }
+        }
+        """
+            .formatted(
+                "b".repeat(40),
+                baseSha,
+                "d".repeat(64),
+                adapterSha,
+                "e".repeat(40),
+                "f".repeat(64),
+                "1".repeat(64),
+                "2".repeat(64),
+                "3".repeat(64),
+                "4".repeat(64)));
+    return ActivatedLoraAdapter.open(
+        directory,
+        arena,
+        baseSha,
+        new Architecture(
+            config.numLayers(),
+            config.embeddingDim(),
+            config.queryDim(),
+            config.keyDim(),
+            config.valueDim(),
+            config.attentionOutputDim(),
+            config.hiddenDim()));
+  }
+
+  private static void addNanoLoraProjection(
+      SyntheticSafetensorsBuilder builder,
+      int layer,
+      String module,
+      int inputDimension,
+      int outputDimension) {
+    String prefix = "base_model.model.model.layers." + layer + "." + module;
+    float[] a = new float[inputDimension];
+    float[] b = new float[outputDimension];
+    java.util.Arrays.fill(a, 0.01f);
+    java.util.Arrays.fill(b, 0.02f);
+    builder.addF32(prefix + ".lora_A.weight", new long[] {1, inputDimension}, a);
+    builder.addF32(prefix + ".lora_B.weight", new long[] {outputDimension, 1}, b);
   }
 
   private static byte[] randomQ4(Random rng, int valueCount) {

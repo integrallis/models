@@ -26,10 +26,33 @@ public record RoutingEvaluation(
     List<ModelCandidate> eligibleCandidates,
     RoutingModelStatus status,
     String previousModelId,
-    RoutingContinuity continuity) {
+    RoutingContinuity continuity,
+    RoutingRequirements requirements) {
 
   /** Defensively copies the eligible fleet. */
   public RoutingEvaluation {
     eligibleCandidates = List.copyOf(eligibleCandidates);
+  }
+
+  /** Source-compatible constructor for extensions compiled before request requirements existed. */
+  public RoutingEvaluation(
+      RoutingRequest request,
+      RoutingPolicy policy,
+      String taskType,
+      ModelCandidate candidate,
+      List<ModelCandidate> eligibleCandidates,
+      RoutingModelStatus status,
+      String previousModelId,
+      RoutingContinuity continuity) {
+    this(
+        request,
+        policy,
+        taskType,
+        candidate,
+        eligibleCandidates,
+        status,
+        previousModelId,
+        continuity,
+        RoutingRequirements.none());
   }
 }

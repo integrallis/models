@@ -36,16 +36,37 @@ public final class ToolCallTokenConstraints {
       ToolSyntax syntax,
       List<ToolSpec> tools,
       Function<ToolSpec, List<String>> argumentAlternatives) {
+    return compile(tokenizer, syntax, tools, argumentAlternatives, List.of());
+  }
+
+  /**
+   * Builds a finite tool grammar while preserving explicitly declared no-tool completions.
+   *
+   * <p>An activated tool specialist may use a small protocol sentinel to decline every declared
+   * tool and hand the turn back to its base branch. Supplying that sentinel here prevents finite
+   * argument constraints from forcing an irrelevant call.
+   */
+  public static Optional<TokenConstraint> compile(
+      Tokenizer tokenizer,
+      ToolSyntax syntax,
+      List<ToolSpec> tools,
+      Function<ToolSpec, List<String>> argumentAlternatives,
+      List<String> noToolAlternatives) {
     Objects.requireNonNull(tokenizer, "tokenizer");
     Objects.requireNonNull(syntax, "syntax");
     Objects.requireNonNull(tools, "tools");
     Objects.requireNonNull(argumentAlternatives, "argumentAlternatives");
+    Objects.requireNonNull(noToolAlternatives, "noToolAlternatives");
     if (syntax.mode() != ToolSyntax.Mode.TAG_WITH_JSON
         && syntax.mode() != ToolSyntax.Mode.JSON_NATIVE
         && syntax.mode() != ToolSyntax.Mode.JSON_ARRAY) {
       return Optional.empty();
     }
     if (syntax.arrayWrapped()) {
+      if (!noToolAlternatives.isEmpty()) {
+        throw new IllegalArgumentException(
+            "explicit no-tool alternatives are not supported by array grammar " + syntax);
+      }
       if (syntax == ToolSyntax.NEEDLE2) {
         return Optional.of(Needle2ToolCallConstraint.compile(tokenizer, tools));
       }
@@ -64,6 +85,16 @@ public final class ToolCallTokenConstraints {
         if (alternatives.size() > MAX_ALTERNATIVES) {
           return Optional.empty();
         }
+      }
+    }
+    for (String alternative : noToolAlternatives) {
+      if (alternative == null || alternative.isEmpty()) {
+        throw new IllegalArgumentException(
+            "noToolAlternatives must not contain null or empty strings");
+      }
+      alternatives.add(alternative);
+      if (alternatives.size() > MAX_ALTERNATIVES) {
+        return Optional.empty();
       }
     }
     return Optional.of(new StringAlternativesTokenConstraint(tokenizer, alternatives));

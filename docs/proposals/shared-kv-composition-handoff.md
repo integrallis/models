@@ -12,6 +12,13 @@ that router passed all 36 turns and improved the median from 53.166 seconds to 3
 therefore did not satisfy the hybrid objective. Its ModelJars catalog qualification was withdrawn
 on 2026-09-12. It remains below as a measured routing experiment, not a releasable composition.
 
+The same-family activated-adapter branch now has real Qwen3 1.7B evidence for exact physical KV
+sharing, including independent recomputation, prepared-session reset, retained multi-turn crossover,
+and byte/token parity with the pinned Hugging Face prompt. None of the V4–V12 tool adapters has
+passed the unchanged behavior gates. V12 was the latest rejection: 75/75 syntax and schema, but
+42/50 exact calls versus a 43/50 floor and 5/25 false calls versus a 1/25 ceiling. The sealed
+qualification window remains unopened, so no hybrid artifact is authorized for publication.
+
 Concurrent-conversation follow-up: an opt-in runtime scheduler now batches compatible decode rows
 for sessions that share one physical model and interleaves bounded prompt chunks. Real
 Qwen3 and MiniCPM gates are token-exact. MiniCPM gains 62.83% aggregate throughput at four requests
@@ -33,7 +40,7 @@ cache is a tensor of per-layer key/value projections; its shape is tied to layer
 and head dimension, and its *values* are tied to the specific weights that produced them. Matching
 shapes make a transfer experiment possible; they do not make the values interchangeable.
 
-There are three honest choices at a routing boundary:
+There are four honest choices at a routing boundary:
 
 1. Keep independent KV state for each model or adapter identity.
 2. Recompute the missing context when switching, while retaining each model's last exact prefix.
@@ -48,7 +55,7 @@ caches interchangeable.
 
 Two recent research paths make that distinction important:
 
-- **[Activated LoRA (aLoRA)](https://arxiv.org/abs/2512.17910)** keeps the prefix before explicit
+- **[Activated LoRA (aLoRA)](https://arxiv.org/abs/2504.12397)** keeps the prefix before explicit
   invocation tokens aligned with the base model. That prefix has the same effective model state and
   can be reused exactly; ordinary LoRA does not have this invariant.
 - **Cross-model KV translation** fits per-head mappings between source and target caches. A 2026
@@ -57,8 +64,11 @@ Two recent research paths make that distinction important:
   proposal](https://arxiv.org/abs/2608.30963) also reports cross-family and cross-tokenizer
   translation, but remains research evidence rather than a runtime contract.
 
-Models implements neither mechanism today. `VirtualChatModel` keeps independent exact state and
-never silently substitutes translated activations.
+The released Models runtime implements neither mechanism. `VirtualChatModel` keeps independent
+exact state and never silently substitutes translated activations. The 2026-09-12 experimental
+branch implements the aLoRA path with a Java adapter loader and physically shared immutable prefix
+storage; it remains unreleased until its real adapter, tool-quality, framework, and performance
+qualification gates pass.
 
 ### Corrected assumption: Q + MLP-only adapters are not enough
 
@@ -73,9 +83,11 @@ stronger invariant over the produced activations is demonstrated. Output-head-on
 may preserve transformer KV, but its usefulness for prose/tool specialization is an experiment, not
 an assumption.
 
-Models 0.3.37 has no adapter/LoRA loader or swap API, so adapter experiments remain blocked. It does
-provide one high-level `TextGenerationSession` per conversation over the existing low-level
-`InferenceSession`, with isolated prompt/KV lineage and metrics.
+Models 0.3.37 has no released adapter/LoRA loader or swap API. The experimental 2026-09-12 branch
+adds the loader and the narrower activated-adapter contract described above; it is not a published
+capability until its behavioral and performance gates pass. The released runtime does provide one
+high-level `TextGenerationSession` per conversation over the existing low-level `InferenceSession`,
+with isolated prompt/KV lineage and metrics.
 
 ---
 
@@ -155,13 +167,38 @@ Two specialists as adapters over one loaded base. The base weights are shared, w
 keeps its own KV lineage. Measure adapter-switch overhead, duplicate KV memory, and catch-up prefill
 before considering a more aggressive cache policy.
 
-*Blocked on:* adapter load/swap support in the Models runtime and qualified specialist adapters.
+*Experimental status:* Java adapter loading and the branch-isolated cache mechanism exist on the
+2026-09-12 worktree. A qualified specialist adapter and real-weight end-to-end evidence are still
+required.
 *Decides:* whether sharing weights is worthwhile even without sharing KV.
 
 ### Rung 5a — base-aligned adapter prefix
 Implement an activated-adapter boundary so tokens before the invocation marker execute with the
 base model's effective weights. Reuse only the exact base-aligned prefix; after activation, the
 adapter owns a separate KV lineage.
+
+*Experimental status:* the Java runtime now freezes the pre-invocation KV once, verifies that the
+base and activated branches reference the exact same source K/V arrays, applies the adapter during
+and after the pinned invocation tokens, and retains the exact base branch across Spring AI and
+LangChain4j tool execution. A real Qwen3 1.7B Q8_0 test begins below the measured sharing crossover,
+extends the same conversation beyond it, then proves physical array identity and exact base output.
+Tests also cover activation-boundary rewind/reset, prepared-session reset, backend/session lock
+ordering, close-failure cleanup, and retained-session KV release. These mechanics do not replace a
+passing held-out tool-quality and clean-host qualification. The runtime also reports each
+branch's allocated inference-state bytes and the unique two-branch total, subtracting the
+identity-proven shared prefix exactly once. The benchmark command compares that shared path with
+independent recomputation at 256, 1,024, and 4,096 prefix tokens and records JVM memory and process
+RSS alongside handoff TTFT. Native-memory tracking is required rather than silently omitted. Its
+third policy revision records eight generated token IDs per arm and rejects a timing or memory win
+unless shared and independently recomputed branches are token-exact at every measured context tier;
+decoded strings alone are not treated as token identity.
+
+The production gate also includes eight exact 4,096-token tool conversations. Each places an opaque
+fact near the beginning, performs tool selection, adds the tool result, and asks the exact base
+branch to recover both the early fact and the result value. It requires correct tool selection,
+physical sharing, byte-identical shared-versus-native base output, at least 75% native correctness,
+and retention of every native-correct answer. This is a semantic long-context check, not an
+inference from a timing curve.
 
 *Gate:* token-exact logits or a documented numerical tolerance at every handoff position, followed
 by unchanged task quality. A latency win cannot waive correctness.
@@ -190,11 +227,11 @@ to install a complete translated cache.
 
 ## 4. Protocol — how to judge any rung
 
-Use the **same 5-interaction tool-fidelity protocol** as the chat-model speed ladder (row 5j's
-workbench arm), so results are comparable to work already done. Per rung, record:
+Use the **same six-turn tool-fidelity protocol** as the chat-model speed ladder (row 5j's workbench
+arm), so results are comparable to work already done. Per rung, record:
 
 - tool-call validity rate (well-formed and schema-correct)
-- task completion over the 5 interactions
+- task completion over all six turns
 - tokenization, prompt preparation, prefill, **time to first token**, decode, and total wall clock
 - prompt-cache read/write tokens for each model-specific session
 - cold start, same-model warm turn, first switch, and switch-back measurements

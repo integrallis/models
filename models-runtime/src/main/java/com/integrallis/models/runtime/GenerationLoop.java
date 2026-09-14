@@ -16,6 +16,7 @@
 package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.GenerationUsage;
+import com.integrallis.models.api.HiddenStateInferenceBackend;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelPrompt;
@@ -49,6 +50,7 @@ public final class GenerationLoop {
   private volatile PromptCacheMetrics lastPromptCacheMetrics = PromptCacheMetrics.unavailable();
   private volatile GenerationMetrics lastGenerationMetrics = GenerationMetrics.unavailable();
   private int[] cachedPromptTokens;
+  private int[] retainedPromptPrefix;
 
   public GenerationLoop(InferenceBackend backend) {
     this(backend, SpeculativeGenerationOptions.disabled(), System::nanoTime);
@@ -101,6 +103,43 @@ public final class GenerationLoop {
     cachedPromptTokens = null;
   }
 
+  /** Restores the exact prompt-token view for backend state prepared outside this loop. */
+  void restorePromptCache(int[] promptTokens) {
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    if (promptTokens.length == 0) {
+      throw new IllegalArgumentException("prepared prompt tokens must not be empty");
+    }
+    if (!(backend instanceof RewindableInferenceBackend rewindable)) {
+      throw new IllegalArgumentException("prepared prompt state requires a rewindable backend");
+    }
+    if (rewindable.checkpoint() != promptTokens.length) {
+      throw new IllegalArgumentException(
+          "prepared prompt token count does not match backend checkpoint: "
+              + promptTokens.length
+              + " != "
+              + rewindable.checkpoint());
+    }
+    cachedPromptTokens = promptTokens.clone();
+    if (retainedPromptPrefix == null) {
+      retainedPromptPrefix = promptTokens.clone();
+    }
+  }
+
+  /** Rejects a replacement prompt where a physical-prefix extension was promised. */
+  void requireStrictPromptExtension(int[] promptTokens) {
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    if (cachedPromptTokens == null || promptTokens.length <= cachedPromptTokens.length) {
+      throw new IllegalArgumentException(
+          "shared-prefix prompt must strictly extend the session's prepared prompt");
+    }
+    for (int index = 0; index < cachedPromptTokens.length; index++) {
+      if (promptTokens[index] != cachedPromptTokens[index]) {
+        throw new IllegalArgumentException(
+            "shared-prefix prompt must strictly extend the session's prepared prompt");
+      }
+    }
+  }
+
   /**
    * Prefills a rewindable backend without decoding output and retains the resulting prompt prefix.
    *
@@ -110,34 +149,45 @@ public final class GenerationLoop {
   public PromptPrefillMetrics prefillPrompt(ModelPrompt prompt) {
     requirePrompt(prompt);
     synchronized (executionLock) {
-      if (!(backend instanceof RewindableInferenceBackend)) {
-        throw new UnsupportedOperationException(
-            "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
-      }
       long started = nanoTime.getAsLong();
       long phaseStarted = started;
       int[] promptTokens = backend.tokenizer().encode(prompt);
       long phaseCompleted = nanoTime.getAsLong();
       long tokenizationNanos = elapsed(phaseStarted, phaseCompleted);
+      return prefillTokens(promptTokens, started, tokenizationNanos);
+    }
+  }
+
+  /** Prefills already-tokenized trusted input while preserving the exact prompt-cache lineage. */
+  PromptPrefillMetrics prefillTokens(int[] promptTokens) {
+    Objects.requireNonNull(promptTokens, "promptTokens");
+    synchronized (executionLock) {
+      long started = nanoTime.getAsLong();
+      return prefillTokens(promptTokens.clone(), started, 0);
+    }
+  }
+
+  /** Returns stable next-token logits after prefilling an exact prompt into this lineage. */
+  float[] nextTokenLogits(ModelPrompt prompt) {
+    requirePrompt(prompt);
+    synchronized (executionLock) {
+      int[] promptTokens = backend.tokenizer().encode(prompt);
+      if (!(backend instanceof RewindableInferenceBackend)) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
+      }
       if (promptTokens.length == 0) {
         throw new IllegalArgumentException("prompt produced no tokens");
       }
-      phaseStarted = phaseCompleted;
       PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
-      phaseCompleted = nanoTime.getAsLong();
-      long cachePreparationNanos = elapsed(phaseStarted, phaseCompleted);
-      long prefillStarted = phaseCompleted;
       try {
-        backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
+        float[] logits =
+            backend
+                .prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition())
+                .clone();
         cachedPromptTokens = promptTokens.clone();
         lastPromptCacheMetrics = promptPrefill.metrics();
-        long completed = nanoTime.getAsLong();
-        return new PromptPrefillMetrics(
-            java.time.Duration.ofNanos(tokenizationNanos),
-            java.time.Duration.ofNanos(cachePreparationNanos),
-            java.time.Duration.ofNanos(elapsed(prefillStarted, completed)),
-            java.time.Duration.ofNanos(elapsed(started, completed)),
-            promptPrefill.metrics());
+        return logits;
       } catch (RuntimeException | Error failure) {
         cachedPromptTokens = null;
         try {
@@ -147,6 +197,80 @@ public final class GenerationLoop {
         }
         throw failure;
       }
+    }
+  }
+
+  /** Returns a stable final hidden state after prefilling an exact prompt into this lineage. */
+  float[] nextTokenHiddenState(ModelPrompt prompt) {
+    requirePrompt(prompt);
+    synchronized (executionLock) {
+      int[] promptTokens = backend.tokenizer().encode(prompt);
+      if (!(backend instanceof RewindableInferenceBackend)) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
+      }
+      if (!(backend instanceof HiddenStateInferenceBackend hiddenBackend)
+          || !hiddenBackend.supportsHiddenState()) {
+        throw new UnsupportedOperationException(
+            "Backend " + backend.name() + " does not expose hidden states");
+      }
+      if (promptTokens.length == 0) {
+        throw new IllegalArgumentException("prompt produced no tokens");
+      }
+      PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
+      try {
+        float[] hidden =
+            hiddenBackend
+                .prefillHiddenState(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition())
+                .clone();
+        cachedPromptTokens = promptTokens.clone();
+        lastPromptCacheMetrics = promptPrefill.metrics();
+        return hidden;
+      } catch (RuntimeException | Error failure) {
+        cachedPromptTokens = null;
+        try {
+          backend.reset();
+        } catch (RuntimeException | Error resetFailure) {
+          failure.addSuppressed(resetFailure);
+        }
+        throw failure;
+      }
+    }
+  }
+
+  private PromptPrefillMetrics prefillTokens(
+      int[] promptTokens, long started, long tokenizationNanos) {
+    if (!(backend instanceof RewindableInferenceBackend)) {
+      throw new UnsupportedOperationException(
+          "Backend " + backend.name() + " cannot retain a prepared prompt prefix");
+    }
+    if (promptTokens.length == 0) {
+      throw new IllegalArgumentException("prompt produced no tokens");
+    }
+    long phaseStarted = nanoTime.getAsLong();
+    PromptPrefill promptPrefill = preparePromptTokens(promptTokens);
+    long phaseCompleted = nanoTime.getAsLong();
+    long cachePreparationNanos = elapsed(phaseStarted, phaseCompleted);
+    long prefillStarted = phaseCompleted;
+    try {
+      backend.prefill(promptPrefill.tokensToEvaluate(), promptPrefill.startPosition());
+      cachedPromptTokens = promptTokens.clone();
+      lastPromptCacheMetrics = promptPrefill.metrics();
+      long completed = nanoTime.getAsLong();
+      return new PromptPrefillMetrics(
+          java.time.Duration.ofNanos(tokenizationNanos),
+          java.time.Duration.ofNanos(cachePreparationNanos),
+          java.time.Duration.ofNanos(elapsed(prefillStarted, completed)),
+          java.time.Duration.ofNanos(elapsed(started, completed)),
+          promptPrefill.metrics());
+    } catch (RuntimeException | Error failure) {
+      cachedPromptTokens = null;
+      try {
+        backend.reset();
+      } catch (RuntimeException | Error resetFailure) {
+        failure.addSuppressed(resetFailure);
+      }
+      throw failure;
     }
   }
 
@@ -289,9 +413,9 @@ public final class GenerationLoop {
         emitter.finish();
         cachedPromptTokens =
             backend instanceof RewindableInferenceBackend ? promptTokens.clone() : null;
-        successful = true;
         stream.onComplete(
             new GenerationUsage(promptTokens.length, allTokens.size() - promptTokens.length));
+        successful = true;
       } catch (Exception e) {
         cachedPromptTokens = null;
         stream.onError(e);
@@ -317,6 +441,7 @@ public final class GenerationLoop {
   }
 
   private PromptPrefill preparePromptTokens(int[] promptTokens) {
+    requireRetainedPromptPrefix(promptTokens);
     if (!(backend instanceof RewindableInferenceBackend rewindableBackend)) {
       backend.reset();
       return new PromptPrefill(
@@ -335,6 +460,22 @@ public final class GenerationLoop {
         Arrays.copyOfRange(promptTokens, reusableTokens, promptTokens.length),
         new PromptCacheMetrics(
             true, promptTokens.length, reusableTokens, promptTokens.length - reusableTokens));
+  }
+
+  private void requireRetainedPromptPrefix(int[] promptTokens) {
+    if (retainedPromptPrefix == null) {
+      return;
+    }
+    if (promptTokens.length <= retainedPromptPrefix.length) {
+      throw new IllegalArgumentException(
+          "prompt must retain its prepared prefix and add at least one token");
+    }
+    for (int index = 0; index < retainedPromptPrefix.length; index++) {
+      if (promptTokens[index] != retainedPromptPrefix[index]) {
+        throw new IllegalArgumentException(
+            "prompt must retain its prepared prefix and add at least one token");
+      }
+    }
   }
 
   private int reusablePrefixLength(int[] promptTokens) {

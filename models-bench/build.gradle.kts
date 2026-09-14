@@ -13,6 +13,14 @@ java {
     }
 }
 
+val benchmarkJvmArgs =
+    listOf(
+        "--add-modules",
+        "jdk.incubator.vector",
+        "--enable-native-access=ALL-UNNAMED",
+        "-XX:NativeMemoryTracking=summary",
+    )
+
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.addAll(listOf(
@@ -27,7 +35,7 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    jvmArgs(benchmarkJvmArgs)
 }
 
 tasks.named("spotbugsTest") {
@@ -36,15 +44,16 @@ tasks.named("spotbugsTest") {
 
 application {
     mainClass = "com.integrallis.models.bench.InferenceBenchmarkCli"
-    applicationDefaultJvmArgs =
-        listOf("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    applicationDefaultJvmArgs = benchmarkJvmArgs
 }
 
 val aggregateNativeRelease =
     providers.gradleProperty("modelsNativeArtifactDirectory").isPresent
+val nativeBenchmarkRuntime =
+    providers.gradleProperty("modelsBenchNative").map(String::toBoolean).getOrElse(false)
 
 tasks.withType<JavaExec>().configureEach {
-    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    jvmArgs(benchmarkJvmArgs)
     System.getProperty("models.native.kernels.library")?.let {
         systemProperty("models.native.kernels.library", it)
     }
@@ -53,9 +62,11 @@ tasks.withType<JavaExec>().configureEach {
 dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
-    implementation(project(":backend-native"))
     implementation(project(":models-router"))
-    if (!aggregateNativeRelease) {
+    if (nativeBenchmarkRuntime && !aggregateNativeRelease) {
+        // The platform artifact contains only the compiled library and metadata. The Java FFM
+        // bridge lives in backend-native's ordinary JAR and must be present as well.
+        runtimeOnly(project(":backend-native"))
         runtimeOnly(
             project(
                 path = ":backend-native",
@@ -65,9 +76,20 @@ dependencies {
     }
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.4")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
+}
+
+if (nativeBenchmarkRuntime) {
+    dependencies {
+        testImplementation(project(":backend-native"))
+    }
+} else {
+    sourceSets.named("test") {
+        java.exclude("**/NativeBenchmarkRuntimeTest.java")
+    }
 }
 
 jmh {

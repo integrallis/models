@@ -118,6 +118,56 @@ public final class InferenceBenchmarkCli {
       System.exit(ToolCallingQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "activated-prefix-sharing".equals(args[0])) {
+      System.exit(ActivatedPrefixSharingBenchmarkCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-decision-profile".equals(args[0])) {
+      System.exit(ActivatedDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-hidden-decision-profile".equals(args[0])) {
+      System.exit(ActivatedHiddenDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-hidden-calibrate".equals(args[0])) {
+      System.exit(
+          ActivatedQ4CalibrationCli.runCalibration(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-hidden-screen".equals(args[0])) {
+      System.exit(ActivatedQ4CalibrationCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-transfer-calibrate".equals(args[0])) {
+      System.exit(ActivatedQ4TransferCli.runCalibration(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-transfer-screen".equals(args[0])) {
+      System.exit(ActivatedQ4TransferCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "semantic-applicability-diagnostic".equals(args[0])) {
+      System.exit(SemanticApplicabilityDiagnosticCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-dual-decision-diagnostic".equals(args[0])) {
+      System.exit(ActivatedDualDecisionDiagnosticCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-hybrid-development".equals(args[0])) {
+      System.exit(ActivatedHybridDevelopmentCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-hybrid-live-decision".equals(args[0])) {
+      System.exit(ActivatedHybridLiveDecisionCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-long-context".equals(args[0])) {
+      System.exit(
+          ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "virtual-model-qualification".equals(args[0])) {
       System.exit(VirtualModelQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;

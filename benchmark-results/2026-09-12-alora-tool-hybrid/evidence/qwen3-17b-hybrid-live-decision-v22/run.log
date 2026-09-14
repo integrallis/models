@@ -1,0 +1,100 @@
+Downloading https://services.gradle.org/distributions/gradle-9.4.1-all.zip
+......................10%.......................20%.......................30%......................40%.......................50%.......................60%......................70%.......................80%.......................90%.......................100%
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Welcome to Gradle 9.4.1!
+
+Here are the highlights of this release:
+ - Java 26 support
+ - Non-class-based JVM tests
+ - Enhanced console progress bar
+
+For more details see https://docs.gradle.org/9.4.1/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava
+> Task :backend-java:compileJava
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :backend-native:compileJava
+> Task :backend-native:processResources NO-SOURCE
+> Task :backend-native:classes
+> Task :backend-native:jar
+
+> Task :backend-native:cargoBuildRelease
+info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu
+info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+info: downloading 5 components
+warn: the missing active toolchain `1.96.0-x86_64-unknown-linux-gnu` has been auto-installed
+warn: this might cause rustup commands to take longer time to finish than expected
+info: you may opt out with `RUSTUP_AUTO_INSTALL=0` or `rustup set auto-install disable`
+   Compiling jmodels-kernels v0.3.37 (/opt/modeljars-v22/models/backend-native/src/main/rust/model-kernels)
+    Finished `release` profile [optimized] target(s) in 5.47s
+
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources
+> Task :backend-native:nativePlatformJar
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes
+> Task :models-api:jar
+> Task :models-runtime:compileJava
+> Task :models-router:compileJava
+> Task :models-bench:compileJava
+> Task :models-bench:processResources
+> Task :models-bench:classes
+> Task :models-router:processResources
+> Task :models-router:classes
+> Task :models-router:jar
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes
+> Task :models-runtime:jar
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 4:38:16 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 4:38:16 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 1/75 live_irrelevance_107-5-1   expected=false decision=NO_CALL      shared=true  65208 ms
+ 2/75 live_irrelevance_132-11-7  expected=false decision=NO_CALL      shared=true  133558 ms
+ 3/75 live_irrelevance_225-35-0  expected=false decision=NO_CALL      shared=true  54435 ms
+ 4/75 live_irrelevance_226-35-1  expected=false decision=NO_CALL      shared=true  52828 ms
+ 5/75 live_irrelevance_271-57-6  expected=false decision=NO_CALL      shared=true  126267 ms
+ 6/75 live_irrelevance_32-2-20   expected=false decision=NO_CALL      shared=true  28936 ms
+ 7/75 live_irrelevance_335-79-0  expected=false decision=NO_CALL      shared=true  32344 ms
+ 8/75 live_irrelevance_346-81-7  expected=false decision=NO_CALL      shared=true  81245 ms
+ 9/75 live_irrelevance_38-2-26   expected=false decision=NO_CALL      shared=true  24104 ms
+10/75 live_irrelevance_391-81-52 expected=false decision=NO_CALL      shared=true  82496 ms
+11/75 live_irrelevance_408-90-0  expected=false decision=NO_CALL      shared=true  32432 ms
+12/75 live_irrelevance_426-102-0 expected=false decision=CALL_PRIMARY shared=true  45296 ms
+13/75 live_irrelevance_464-128-1 expected=false decision=NO_CALL      shared=true  18121 ms
+14/75 live_irrelevance_497-143-0 expected=false decision=NO_CALL      shared=true  20538 ms
+15/75 live_irrelevance_511-151-0 expected=false decision=NO_CALL      shared=true  36039 ms
+16/75 live_irrelevance_525-162-0 expected=false decision=NO_CALL      shared=true  26746 ms
+17/75 live_irrelevance_657-209-0 expected=false decision=NO_CALL      shared=true  45769 ms
+18/75 live_irrelevance_72-2-60   expected=false decision=NO_CALL      shared=true  27169 ms
+19/75 live_irrelevance_739-253-0 expected=false decision=NO_CALL      shared=true  55940 ms
+20/75 live_irrelevance_764-274-0 expected=false decision=NO_CALL      shared=true  83877 ms
+21/75 live_irrelevance_767-276-0 expected=false decision=NO_CALL      shared=true  22136 ms
+22/75 live_irrelevance_802-305-6 expected=false decision=NO_CALL      shared=true  117977 ms
+23/75 live_irrelevance_806-305-10 expected=false decision=NO_CALL      shared=true  111455 ms
+24/75 live_irrelevance_820-314-4 expected=false decision=NO_CALL      shared=true  78785 ms
+25/75 live_irrelevance_86-2-74   expected=false decision=NO_CALL      shared=true  24717 ms
+26/75 live_multiple_1032-260-0   expected=true  decision=CALL_PRIMARY shared=true  52764 ms
+27/75 live_multiple_1051-278-0   expected=true  decision=NO_CALL      shared=true  62751 ms
+28/75 live_multiple_134-51-0     expected=true  decision=CALL_PRIMARY shared=true  49546 ms
+29/75 live_multiple_139-53-1     expected=true  decision=CALL_PRIMARY shared=true  52338 ms
+30/75 live_multiple_154-58-8     expected=true  decision=CALL_PRIMARY shared=true  329043 ms
+31/75 live_multiple_287-129-2    expected=true  decision=CALL_PRIMARY shared=true  80013 ms
+32/75 live_multiple_292-130-1    expected=true  decision=CALL_PRIMARY shared=true  60853 ms
+33/75 live_multiple_309-131-8    expected=true  decision=CALL_PRIMARY shared=true  231592 ms
+34/75 live_multiple_32-10-2      expected=true  decision=NO_CALL      shared=true  84906 ms
+35/75 live_multiple_447-144-7    expected=true  decision=CALL_PRIMARY shared=true  173769 ms
+36/75 live_multiple_595-158-1    expected=true  decision=CALL_PRIMARY shared=true  64742 ms
+37/75 live_multiple_673-162-15   expected=true  decision=NO_CALL      shared=true  336401 ms

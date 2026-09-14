@@ -837,7 +837,9 @@ public enum ChatTemplate {
    * Appends one tool declaration in the OpenAI shape both families render.
    *
    * <p>The wrapper is template-owned so it stays {@code CONTROL}; the caller's name, description
-   * and schema are {@code TEXT}. The schema is copied verbatim because it is already JSON.
+   * and schema are {@code TEXT}. Schema whitespace is normalized to the spacing emitted by the
+   * published templates' {@code tojson} filter, while string contents and member order remain
+   * unchanged.
    */
   private static void appendToolJson(ModelPrompt.Builder prompt, ToolSpec tool) {
     prompt
@@ -846,8 +848,63 @@ public enum ChatTemplate {
         .control("\", \"description\": \"")
         .text(escapeJson(tool.description()))
         .control("\", \"parameters\": ")
-        .text(tool.inputSchema())
+        .text(normalizeJsonWhitespace(tool.inputSchema()))
         .control("}}");
+  }
+
+  private static String normalizeJsonWhitespace(String json) {
+    StringBuilder normalized = new StringBuilder(json.length());
+    char[] containers = new char[json.length()];
+    int depth = 0;
+    boolean inString = false;
+    boolean escaped = false;
+    for (int index = 0; index < json.length(); index++) {
+      char current = json.charAt(index);
+      if (inString) {
+        normalized.append(current);
+        if (escaped) {
+          escaped = false;
+        } else if (current == '\\') {
+          escaped = true;
+        } else if (current == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      switch (current) {
+        case '"' -> {
+          inString = true;
+          normalized.append(current);
+        }
+        case '{', '[' -> {
+          containers[depth++] = current;
+          normalized.append(current);
+        }
+        case '}' -> {
+          if (depth == 0 || containers[--depth] != '{') {
+            throw new IllegalArgumentException("tool schema has unbalanced JSON containers");
+          }
+          normalized.append(current);
+        }
+        case ']' -> {
+          if (depth == 0 || containers[--depth] != '[') {
+            throw new IllegalArgumentException("tool schema has unbalanced JSON containers");
+          }
+          normalized.append(current);
+        }
+        case ':' -> normalized.append(": ");
+        case ',' -> normalized.append(", ");
+        default -> {
+          if (!Character.isWhitespace(current)) {
+            normalized.append(current);
+          }
+        }
+      }
+    }
+    if (inString || escaped || depth != 0) {
+      throw new IllegalArgumentException("tool schema has incomplete JSON syntax");
+    }
+    return normalized.toString();
   }
 
   /** Escapes a value for inclusion in a JSON string literal. */

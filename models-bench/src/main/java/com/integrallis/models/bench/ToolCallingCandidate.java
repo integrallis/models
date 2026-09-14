@@ -61,6 +61,12 @@ enum ToolCallingCandidate {
       "Qwen3 1.7B GGUF Q8_0",
       "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
       ChatTemplate.CHATML_NO_THINK),
+  QWEN3_8B(
+      "qwen3-8b",
+      "qwen3_8b_q4_k_m",
+      "Qwen3 8B GGUF Q4_K_M",
+      "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      ChatTemplate.CHATML_NO_THINK),
   SMOLLM3_3B(
       "smollm3-3b",
       "smollm3_3b_q4_k_m",
@@ -129,6 +135,10 @@ enum ToolCallingCandidate {
 
   boolean synthesizesToolResults() {
     return synthesizesToolResults;
+  }
+
+  boolean supportsActivatedAdapter() {
+    return this == QWEN3_06B || this == QWEN3_17B;
   }
 
   static ToolCallingCandidate parse(String value) {
