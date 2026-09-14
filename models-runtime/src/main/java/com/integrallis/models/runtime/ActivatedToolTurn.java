@@ -108,6 +108,31 @@ public final class ActivatedToolTurn implements SharedToolTurn {
     }
   }
 
+  /**
+   * Scores the exact base branch at the same call/no-call boundary as the activated specialist.
+   *
+   * <p>The base and specialist sessions retain the same immutable physical prefix. This method
+   * evaluates only the base suffix, allowing a composition policy to use both models' evidence
+   * without recomputing or copying their common KV state.
+   */
+  public synchronized ToolDecisionScore scoreBaseToolDecision(int callTokenId, int noCallTokenId) {
+    requireToolGenerationAvailable();
+    int vocabularySize = base.tokenizer().vocabSize();
+    requireVocabularyToken("callTokenId", callTokenId, vocabularySize);
+    requireVocabularyToken("noCallTokenId", noCallTokenId, vocabularySize);
+    if (callTokenId == noCallTokenId) {
+      throw new IllegalArgumentException("call and no-call token IDs must differ");
+    }
+    try {
+      float[] logits = base.nextTokenLogits(toolDecisionPrompt());
+      return new ToolDecisionScore(
+          callTokenId, logits[callTokenId], noCallTokenId, logits[noCallTokenId]);
+    } catch (RuntimeException | Error failure) {
+      failed = true;
+      throw failure;
+    }
+  }
+
   /** Scores the activated branch at the shared call/no-call boundary using a persisted head. */
   public synchronized ToolApplicabilityScore scoreToolApplicability(ToolApplicabilityHead head) {
     requireToolGenerationAvailable();

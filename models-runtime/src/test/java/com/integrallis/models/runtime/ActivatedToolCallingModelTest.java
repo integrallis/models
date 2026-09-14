@@ -211,6 +211,27 @@ class ActivatedToolCallingModelTest {
   }
 
   @Test
+  void scoresTheBaseAndActivatedDecisionsFromTheSamePhysicalPrefix() {
+    ActivatedBackend backend = new ActivatedBackend();
+
+    try (ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1);
+        ActivatedToolTurn turn = model.openToolTurn(ModelPrompt.text("abXY"))) {
+      ToolDecisionScore base = turn.scoreBaseToolDecision(2, 3);
+      ToolDecisionScore specialist = turn.scoreToolDecision(2, 3);
+
+      assertThat(base.callMargin()).isEqualTo(10.0f);
+      assertThat(specialist.callMargin()).isEqualTo(10.0f);
+      assertThat(turn.physicallySharesPrefix()).isTrue();
+    }
+
+    assertThat(backend.prefills)
+        .containsExactly(
+            new Prefill(false, 0, List.of((int) 'a', (int) 'b')),
+            new Prefill(false, 2, "XY<tool_call>\n".chars().boxed().toList()),
+            new Prefill(true, 2, "XY<tool_call>\n".chars().boxed().toList()));
+  }
+
+  @Test
   void scoresAnActivatedHiddenStateWithoutDiscardingThePhysicalPrefix() {
     ActivatedBackend backend = new ActivatedBackend();
     ToolApplicabilityHead head =

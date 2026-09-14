@@ -324,6 +324,27 @@ no endpoint, generation, sealed, JVM, or packaging gate was opened. Its evidence
 are under `evidence/qwen3-17b-applicability-decision-v14/`. The A16 was deleted and Vultr inventory
 returned zero instances.
 
+V15 moved the applicability decision into the production Java Q4 runtime and proved physical
+base/specialist KV-prefix sharing on all 75 exposed cases. Its held-out screen passed, but the
+combined exposed result reached only 45/50 calls against the fixed 47/50 floor; it was rejected
+before dual generation. V16 replaced the two-logit margin with an affine head over the activated
+hidden state. Its BF16 validation reached 389/390 calls and 79/81 no-calls, but the fixed-zero head
+failed to transfer to the production Q4 representation after two false calls in its first three
+Java observations.
+
+V17 calibrated that unchanged head on a frozen production-Q4 partition. Calibration passed, but
+the untouched screen stopped when three positive misses made its call floor unreachable. V18 then
+used all exposed static cases as calibration and froze a disjoint BFCL-live screen. After the
+Java/Vectors cold-path determinism defect was fixed and independently verified, final calibration
+passed at 47/50 calls, 24/25 no-calls, and 75/75 physically shared prefixes. The live screen was
+rejected after four positive misses in its first six positive cases made 47/50 unreachable. The
+threshold must not be retuned on those exposed live results. Evidence is retained under the V15
+through V18 directories.
+
+A subsequent in-process MiniLM semantic gate was also rejected. It removed every false call but
+reduced valid-call recall to 40/50, adding a second model without solving the quality problem. Its
+complete 75-case diagnostic is under `evidence/qwen3-17b-semantic-applicability-diagnostic/`.
+
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.
 The preceding raw-copy, ridge, and CacheBridge Qwen3 0.6B-to-1.7B translations also failed exact

@@ -147,6 +147,14 @@ public final class InferenceBenchmarkCli {
       System.exit(ActivatedQ4TransferCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "semantic-applicability-diagnostic".equals(args[0])) {
+      System.exit(SemanticApplicabilityDiagnosticCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-dual-decision-diagnostic".equals(args[0])) {
+      System.exit(ActivatedDualDecisionDiagnosticCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "activated-long-context".equals(args[0])) {
       System.exit(
           ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
