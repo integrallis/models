@@ -60,6 +60,27 @@ class ToolCallingQualificationCliTest {
     assertThat(configuration.maxTokens()).isEqualTo(192);
     assertThat(configuration.caseId()).isEqualTo("currency");
     assertThat(configuration.modelsRevision()).isEqualTo(REVISION);
+    assertThat(configuration.backend()).isEqualTo("pure-java");
+  }
+
+  @Test
+  void acceptsTheOwnedRustFfmBackendForQwenQualification() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("model.gguf"), "fixture");
+
+    ToolCallingQualificationCli.Configuration configuration =
+        ToolCallingQualificationCli.parse(
+            new String[] {
+              "--candidate",
+              "qwen3-8b",
+              "--model",
+              artifact.toString(),
+              "--backend",
+              "rust-ffm",
+              "--models-revision",
+              REVISION
+            });
+
+    assertThat(configuration.backend()).isEqualTo("rust-ffm");
   }
 
   @Test
