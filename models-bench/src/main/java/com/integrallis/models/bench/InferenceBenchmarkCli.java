@@ -139,6 +139,14 @@ public final class InferenceBenchmarkCli {
       System.exit(ActivatedQ4CalibrationCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "activated-transfer-calibrate".equals(args[0])) {
+      System.exit(ActivatedQ4TransferCli.runCalibration(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "activated-transfer-screen".equals(args[0])) {
+      System.exit(ActivatedQ4TransferCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "activated-long-context".equals(args[0])) {
       System.exit(
           ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));

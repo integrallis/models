@@ -66,9 +66,9 @@ The complete calibration report and SHA-256 are committed before the live screen
 
 ## Phase 2: untouched production-Q4 live screen
 
-The screen command accepts the calibration report, calibration hash, live records, live manifest,
-and live manifest hash. It recomputes and verifies every frozen identity and uses the calibration
-threshold without adjustment.
+The screen command accepts the calibration report, calibration hash, exact exposed calibration
+records, live records, live manifest, and live manifest hash. It recomputes and verifies every
+frozen identity and case label and uses the calibration threshold without adjustment.
 
 V18 passes this phase only with all of:
 
