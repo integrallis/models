@@ -522,6 +522,7 @@ final class ActivatedQ4TransferCli {
           switch (role) {
             case "system" -> ChatMessage.system(content);
             case "user" -> ChatMessage.user(content);
+            case "assistant" -> ChatMessage.assistant(content);
             default -> throw new IllegalArgumentException("unsupported source role: " + role);
           });
     }

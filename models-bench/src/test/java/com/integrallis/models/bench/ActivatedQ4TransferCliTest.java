@@ -44,7 +44,9 @@ class ActivatedQ4TransferCliTest {
         path,
         """
         {"phase":"screen","id":"live_simple_1","kind":"simple",\
-        "messages":[{"role":"user","content":"Weather in Jal?"}],\
+        "messages":[{"role":"user","content":"What did the forecast say?"},\
+        {"role":"assistant","content":"It did not include Jal."},\
+        {"role":"user","content":"Weather in Jal?"}],\
         "tools":[{"type":"function","function":{"name":"weather",\
         "description":"Get weather",\
         "parameters":{"type":"object","properties":{"zipcode":{"type":"string"}},\
@@ -60,6 +62,7 @@ class ActivatedQ4TransferCliTest {
     assertThat(cases.getFirst().callExpected()).isTrue();
     assertThat(cases.getFirst().prompt().text())
         .startsWith("<|im_start|>system\n# Tools\n")
+        .contains("<|im_start|>assistant\nIt did not include Jal.<|im_end|>")
         .contains("Weather in Jal?")
         .endsWith("<|im_start|>assistant\n<think>\n\n</think>\n\n");
   }
