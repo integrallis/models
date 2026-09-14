@@ -372,7 +372,7 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Spring AI | `models-spring-ai` | observed blocking and streaming chat, embeddings, document reranking, and qualified `ChatClient` tool execution |
 | Spring Boot | `models-spring-boot-starter` | local Spring AI `ChatModel`, observations, and token-usage meters |
 | Guarded RAG | `models-rag` | retrieval abstention, citation validation, and fallback |
-| Model routing | `models-router` | adaptive selection and failover across in-process and hosted clients without a provider SDK dependency |
+| Model routing | `models-router` | adaptive selection and failover across in-process and hosted clients, with hard per-request capability and data-boundary requirements, without a provider SDK dependency |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 | Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |
 | Java GPU acceleration | `backend-tornado` | optional Java-authored Q4_0 projections on qualified NVIDIA GPUs |
@@ -386,6 +386,20 @@ starter across the supported versions. See the guides for
 [Spring Boot](https://integrallis.github.io/models/docs/models/current/spring-boot.html). See
 [Model routing](https://integrallis.github.io/models/docs/models/current/routing.html) to combine
 those local clients with hosted models while preserving framework-native requests.
+
+For a tool turn whose prompt may leave the process, make both decisions explicit:
+
+```java
+var requirements = RoutingRequirements.builder()
+    .requireCapability("tool-calling")
+    .dataBoundary(RoutingDataBoundary.REMOTE_ALLOWED)
+    .build();
+var selected = fleet.route(request, requirements);
+```
+
+Use `RoutingDataBoundary.LOCAL_ONLY` for unredacted sensitive input. The router enforces declared
+capabilities and the boundary before it scores candidates; an application still owns provider
+credentials and clients through `ModelFleet`.
 
 ## Documentation
 

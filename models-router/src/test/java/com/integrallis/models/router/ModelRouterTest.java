@@ -89,7 +89,7 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class Presets {
+  class Presets {
 
     @Test
     void cheapestPrefersAFreeLocalModel() {
@@ -151,7 +151,61 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class Constraints {
+  class Constraints {
+
+    @Test
+    void requiresDeclaredCapabilitiesBeforeScoring() {
+      ModelCandidate chatOnly =
+          ModelCandidate.builder("chat-only")
+              .local(true)
+              .capabilities(Set.of("chat", "text-generation"))
+              .tags(Set.of("chat"))
+              .timeToFirstTokenMillis(40)
+              .tokensPerSecond(100)
+              .quality(Map.of("chat", 0.95))
+              .build();
+      ModelCandidate toolCapable =
+          ModelCandidate.builder("tool-capable")
+              .local(true)
+              .capabilities(Set.of("chat", "text-generation", "tool-calling"))
+              .tags(Set.of("chat", "tool-use"))
+              .timeToFirstTokenMillis(200)
+              .tokensPerSecond(20)
+              .quality(Map.of("chat", 0.70, "tool-use", 0.90))
+              .build();
+      ModelRouter router =
+          ModelRouter.builder()
+              .candidates(List.of(chatOnly, toolCapable))
+              .policy(RoutingPolicy.FASTEST)
+              .build();
+
+      RoutingDecision decision =
+          router.route(
+              RoutingRequest.builder("Look up today's weather.").build(),
+              RoutingRequirements.builder().requireCapability("tool-calling").build());
+
+      assertThat(decision.selected()).isEqualTo(toolCapable);
+      assertThat(decision.fallbacks()).isEmpty();
+    }
+
+    @Test
+    void keepsSensitiveRequestsInProcessWithoutChangingTheFleetPolicy() {
+      ModelCandidate local = LOCAL_SMALL;
+      ModelCandidate hosted = FRONTIER;
+      ModelRouter router =
+          ModelRouter.builder()
+              .candidates(List.of(local, hosted))
+              .policy(RoutingPolicy.BEST_QUALITY)
+              .build();
+
+      RoutingDecision decision =
+          router.route(
+              RoutingRequest.builder("Summarize the confidential incident report.").build(),
+              RoutingRequirements.builder().dataBoundary(RoutingDataBoundary.LOCAL_ONLY).build());
+
+      assertThat(decision.selected()).isEqualTo(local);
+      assertThat(decision.fallbacks()).allMatch(ModelCandidate::local);
+    }
 
     @Test
     void privacyStrictNeverLeavesTheLocalFleet() {
@@ -203,7 +257,7 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class TaskAwareness {
+  class TaskAwareness {
 
     @Test
     void routesAMathQueryToTheStrongestMathModel() {
@@ -233,7 +287,7 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class Explainability {
+  class Explainability {
 
     @Test
     void reportsWhyEachDimensionContributed() {
@@ -254,7 +308,7 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class Availability {
+  class Availability {
 
     @Test
     void avoidsAModelThatIsCurrentlyFailing() {
@@ -333,7 +387,7 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class RuntimeAwareScoring {
+  class RuntimeAwareScoring {
 
     @Test
     void prefersAnAlreadyResidentModelWhenTheStaticCandidatesTie() {
@@ -358,18 +412,10 @@ class ModelRouterTest {
       assertThat(router.route("hello").selected()).isEqualTo(idle);
       assertThat(router.route("hello").scoreBreakdown()).containsKey("load");
     }
-
-    private static ModelCandidate tied(String id) {
-      return ModelCandidate.builder(id)
-          .timeToFirstTokenMillis(100)
-          .tokensPerSecond(20)
-          .quality(Map.of("chat", 0.8))
-          .build();
-    }
   }
 
   @Nested
-  static class SessionContinuity {
+  class SessionContinuity {
 
     @Test
     void switchesWhenAChallengerIsMateriallyBetter() {
@@ -432,8 +478,8 @@ class ModelRouterTest {
 
     @Test
     void usesCachedPrefixEvidenceWithoutPretendingKvIsPortable() {
-      ModelCandidate current = RuntimeAwareScoring.tied("current");
-      ModelCandidate challenger = RuntimeAwareScoring.tied("challenger");
+      ModelCandidate current = tied("current");
+      ModelCandidate challenger = tied("challenger");
       ModelRouter router = ModelRouter.builder().candidates(List.of(current, challenger)).build();
       RoutingRequest request =
           RoutingRequest.builder("continuation").estimatedTokens(1_000).sessionId("cached").build();
@@ -487,7 +533,7 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class Extensions {
+  class Extensions {
 
     @Test
     void appliesApplicationFiltersBeforeScoring() {
@@ -525,7 +571,7 @@ class ModelRouterTest {
   }
 
   @Nested
-  static class Validation {
+  class Validation {
 
     @Test
     void requiresAtLeastOneCandidate() {
@@ -540,6 +586,14 @@ class ModelRouterTest {
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("duplicate");
     }
+  }
+
+  private static ModelCandidate tied(String id) {
+    return ModelCandidate.builder(id)
+        .timeToFirstTokenMillis(100)
+        .tokensPerSecond(20)
+        .quality(Map.of("chat", 0.8))
+        .build();
   }
 
   private static final class MutableClock extends Clock {

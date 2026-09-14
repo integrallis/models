@@ -30,7 +30,7 @@ or retune against the exposed V20/V22 decision screens.
 | No external inference server | Ollama, llama.cpp server, vLLM, SGLang, Python, and Docker may be oracle or benchmark peers only. They are never prerequisites for a ModelJars application. |
 | No user-pluggable backend SPI | Models owns a sealed set of execution paths. A platform bridge is selected internally from a descriptor and capability policy, not supplied by an application. |
 | Provenance before convenience | Every artifact pins upstream revision, every downloaded file hash, source license/notice, importer version, architecture mapping, tokenizer/template hashes, and qualification report. |
-| PII stays local by default | Routing is allowed to escalate remotely only after explicit policy permits it and local redaction/classification succeeds. |
+| Sensitive data stays local when declared | A request can require an in-process model; a future policy/redaction layer will make that decision from audited data classification rather than pretending the router can infer PII from arbitrary text. |
 
 ## Candidate assessment
 
@@ -72,9 +72,10 @@ evidence-producing intake/compatibility experiment, not that it is already quali
 Desert Ant’s catalog is a strong design reference for narrow on-device products: one model per task,
 small downloads, clear capability boundaries, benchmark disclosure, and explicit platform behavior.
 Its available models cover word alignment, enhancement, spoken-language ID, PII redaction,
-speech recognition, text tagging, and structured extraction. The catalog currently distributes
-SDK-oriented, often compiled Core ML assets under its own licensing and platform constraints—not
-generic, redistributable ModelJars packages. [Desert Ant catalog](https://desertant.com/models/)
+speech recognition, text tagging, and structured extraction. Its current SDK-oriented, often
+compiled Core ML distribution means each model needs an exact license and artifact review before
+intake; it is an engineering and distribution question, not a reason to exclude those models from
+ModelJars. [Desert Ant catalog](https://desertant.com/models/)
 
 The direct lessons for Models are:
 
@@ -84,10 +85,10 @@ The direct lessons for Models are:
 - **Measure end-to-end audio behavior.** Clear reports codec, mastering, chunked I/O, model size,
   and device-specific throughput, not a single abstract “tokens per second” number.
   [Clear model page](https://desertant.com/models/clear/)
-- **Do not wrap their SDK as our inference implementation.** A model can only enter ModelJars if
-  the upstream terms permit our distribution/use and Models can execute the artifact through its
-  own Java or owned Apple bridge. Otherwise it remains a comparative reference or a documented
-  interoperability integration.
+- **Do not wrap their SDK as our inference implementation.** A model is eligible for ModelJars
+  when its exact upstream terms permit the intended distribution/use and Models can execute it
+  through its own Java or owned Apple bridge. A present SDK/Core ML package therefore prompts
+  artifact and license work; it does not curtail a distributable model lane.
 
 The initial Desert Ant-inspired JVM work should therefore be small, reproducible models in our own
 catalog: language ID, PII redaction/classification, VAD, ASR post-processing, and reranking. These
