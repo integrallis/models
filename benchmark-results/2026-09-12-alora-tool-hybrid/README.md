@@ -352,6 +352,16 @@ V15, so the dual-margin decision family is rejected without opening fresh qualif
 75 observations physically shared their prefix. The report, complete log, frozen preflight, and
 host lifecycle are under `evidence/qwen3-17b-dual-decision-diagnostic/`.
 
+V20 froze a two-branch rule from the already-exposed margins and ran real Java tool generation on
+all 75 development cases. It is rejected: 47/50 call decisions missed the 48/50 floor and 74/75
+schema-valid results missed the 75/75 floor. It did meet 24/25 no-call decisions, 43/50 exact
+generated calls, 75/75 strict syntax, and 75/75 physically shared prefixes. Live Q4 margins moved
+enough to change a predicted call into an abstention; another generated result disagreed with the
+source-declared JSON schema even though the upstream evaluator called the same output valid. The
+complete in-process report and analysis are under `evidence/qwen3-17b-hybrid-generation-v20/`.
+The sealed 300-case window remains unopened, no hybrid was qualified or published, and no remote
+infrastructure was provisioned for V20.
+
 Exact Java-vs-oracle equivalence, held-out tool quality, clean-host framework runs, and the
 performance crossover gates still require a candidate that first passes the development smoke.
 The preceding raw-copy, ridge, and CacheBridge Qwen3 0.6B-to-1.7B translations also failed exact
