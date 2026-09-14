@@ -1,7 +1,6 @@
 # V18 result
 
-Status: **final Phase 1 passed under the deterministic Java execution kernel; Phase 2 has not been
-scored**.
+Status: **rejected by the frozen Phase 2 live-call gate; no hybrid artifact is qualified by V18**.
 
 The first calibration below remains historical evidence. A pre-score live-loader defect required a
 new Models revision and a complete calibration rerun. That rerun passed, but comparison with the
@@ -43,10 +42,25 @@ Evidence SHA-256:
 - `clean-check.log`:
   `c25d165a87e9dbf44b28f14f439d6aad44d42cb2f04dbda192f99859df3f2ff6`
 
-The separately frozen BFCL-live screen remains untouched at this commit. Its command must consume
-the committed calibration report and its exact SHA-256 and may not change the threshold, head,
-model, adapter, prompt construction, source records, or admission gates.
+At the Phase 1 evidence commit, the separately frozen BFCL-live screen was still untouched. Its
+subsequent command consumed the committed calibration report and exact SHA-256 without changing the
+threshold, head, model, adapter, prompt construction, source records, or admission gates.
 
-This is not model qualification. V18 can advance only if the live screen and every later generation,
-sealed, product, framework, cache, memory, performance, packaging, clean-host, and published-artifact
-gate pass.
+## Phase 2 result
+
+The live screen used the committed final calibration and unchanged threshold. It was stopped at
+31/75 observations after the fourth positive miss made the `47/50` call floor mathematically
+unreachable. Independent recomputation of the partial log produced:
+
+- no-calls: `24/25`;
+- positive calls: `2/6`;
+- physical shared-prefix identity: `31/31`; and
+- partial log SHA-256:
+  `fffb0b94044bfb096a9be764031431c33b05f118b3a3b004c5eac2dd05adcdee`.
+
+V18 is rejected. The threshold and artifacts must not be tuned against this exposed live window,
+and its unscored remainder does not become a reusable untouched screen.
+
+This is not model qualification. Because the live screen failed, no later generation, sealed,
+product, framework, cache, memory, performance, packaging, clean-host, or published-artifact gate
+was opened.

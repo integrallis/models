@@ -142,3 +142,16 @@ recomputation from the 75 observations reproduced all four counts and balanced a
 formerly unstable first cold score is now `2.1539079427156906`; all repeated-path scores remained
 stable. Phase 2 was not started before this report, log, hash manifest, and lifecycle update were
 committed.
+
+Phase 2 started at `2026-09-14T09:39:54Z` with the committed calibration hash and unchanged
+threshold. It was stopped after observation 31 made the predeclared gate mathematically impossible:
+no-calls `24/25`, calls `2/6`, four positive misses, and physical sharing `31/31`. Reaching the
+required `47/50` calls was no longer possible even if every remaining positive passed. The partial
+log SHA-256 is `fffb0b94044bfb096a9be764031431c33b05f118b3a3b004c5eac2dd05adcdee`.
+No threshold, model, adapter, head, prompt, or gate was changed, and the remainder of the live
+window was not scored.
+
+The exact server and firewall were deleted and verified absent at `2026-09-14T10:15:37Z`; the
+watchdog was unloaded. Closing inventory contained zero servers, firewalls, volumes, floating IPs,
+primary IPs, and snapshots. The allocation lasted 1 hour 33 minutes 55 seconds, an upper-bound
+compute estimate of USD 0.71 at the recorded hourly price.
