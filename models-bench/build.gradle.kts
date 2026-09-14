@@ -49,6 +49,8 @@ application {
 
 val aggregateNativeRelease =
     providers.gradleProperty("modelsNativeArtifactDirectory").isPresent
+val nativeBenchmarkRuntime =
+    providers.gradleProperty("modelsBenchNative").map(String::toBoolean).getOrElse(false)
 
 tasks.withType<JavaExec>().configureEach {
     jvmArgs(benchmarkJvmArgs)
@@ -60,9 +62,8 @@ tasks.withType<JavaExec>().configureEach {
 dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
-    implementation(project(":backend-native"))
     implementation(project(":models-router"))
-    if (!aggregateNativeRelease) {
+    if (nativeBenchmarkRuntime && !aggregateNativeRelease) {
         runtimeOnly(
             project(
                 path = ":backend-native",
@@ -76,6 +77,16 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
+}
+
+if (nativeBenchmarkRuntime) {
+    dependencies {
+        testImplementation(project(":backend-native"))
+    }
+} else {
+    sourceSets.named("test") {
+        java.exclude("**/NativeBenchmarkRuntimeTest.java")
+    }
 }
 
 jmh {
