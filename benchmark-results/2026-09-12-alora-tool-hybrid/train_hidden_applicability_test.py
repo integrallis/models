@@ -6,6 +6,7 @@ from train_hidden_applicability import (
     artifact_sha256,
     balanced_score,
     decision_feature_tokens,
+    require_cublas_deterministic_workspace,
     select_regularization,
     stratified_folds,
     validation_passes,
@@ -19,6 +20,19 @@ class FakeTokenizer:
 
 
 class HiddenApplicabilityTest(unittest.TestCase):
+    def test_cuda_extraction_requires_the_frozen_deterministic_workspace(self):
+        require_cublas_deterministic_workspace(
+            {"CUBLAS_WORKSPACE_CONFIG": ":4096:8"}
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "CUBLAS_WORKSPACE_CONFIG=:4096:8"):
+            require_cublas_deterministic_workspace({})
+
+        with self.assertRaisesRegex(RuntimeError, "CUBLAS_WORKSPACE_CONFIG=:4096:8"):
+            require_cublas_deterministic_workspace(
+                {"CUBLAS_WORKSPACE_CONFIG": ":16:8"}
+            )
+
     def test_feature_ends_before_the_call_or_no_call_token(self):
         tokenizer = FakeTokenizer()
 

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import gc
 import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 from typing import Any, Iterable, Sequence
@@ -44,6 +45,7 @@ REGULARIZATION = (1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0)
 TORCH_VERSION = "2.6.0+cu124"
 TRANSFORMERS_VERSION = "4.53.3"
 PEFT_VERSION = "0.18.1"
+CUBLAS_WORKSPACE_CONFIG = ":4096:8"
 
 
 @dataclass(frozen=True)
@@ -175,6 +177,15 @@ def _require_version(name: str, actual: str, expected: str) -> None:
         raise RuntimeError(f"V16 requires {name} {expected}; got {actual}")
 
 
+def require_cublas_deterministic_workspace(environment: dict[str, str]) -> None:
+    actual = environment.get("CUBLAS_WORKSPACE_CONFIG")
+    if actual != CUBLAS_WORKSPACE_CONFIG:
+        raise RuntimeError(
+            "V16 CUDA extraction requires "
+            f"CUBLAS_WORKSPACE_CONFIG={CUBLAS_WORKSPACE_CONFIG}; got {actual!r}"
+        )
+
+
 def _write_json(path: Path, value: Any) -> None:
     path.write_text(
         json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False)
@@ -270,6 +281,7 @@ def extract_features(args: argparse.Namespace) -> None:
     _require_version("PEFT", peft.__version__, PEFT_VERSION)
     if not torch.cuda.is_available():
         raise RuntimeError("V16 feature extraction requires CUDA")
+    require_cublas_deterministic_workspace(os.environ)
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
     torch.use_deterministic_algorithms(True)
@@ -313,6 +325,7 @@ def extract_features(args: argparse.Namespace) -> None:
         "peft": peft.__version__,
         "safetensors": safetensors.__version__,
         "tf32": False,
+        "cublasWorkspaceConfig": CUBLAS_WORKSPACE_CONFIG,
         "dtype": "bfloat16",
         "attention": "sdpa",
         "batchSize": 1,
