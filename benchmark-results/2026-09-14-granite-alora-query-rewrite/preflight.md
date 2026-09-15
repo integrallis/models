@@ -37,7 +37,27 @@
 - The first run completed all inference but failed only while serializing the `Optional` crossover
   field in its JSON evidence. Commit `84fad94` adds the JDK8 Jackson module and a regression test;
   the corrected benchmark must be re-run to produce its machine-readable report.
-- The Java-only query-rewrite smoke from the IBM model-card conversation passed at temperature zero:
-  a physically shared 42-token prefix produced `{"rewritten_question":"Who is the CEO of
-  Microsoft?"}`. This confirms marker placement and adapter behavior, but is not the independent
-  multi-case semantic/reference gate required for qualification.
+- The prior Java-only smoke entry is superseded. It did not preserve the upstream literal marker
+  through packaging, so it is excluded from qualification evidence.
+
+## 2026-09-15 local artifact correction and rerun
+
+- The initially staged runtime metadata encoded `\"` around `rewritten_question`. IBM's published
+  `adapter_config.json` contains literal JSON quotes. The runtime correctly rejected that altered
+  marker before inference; it was a packaging error, not a model failure and it is not counted as
+  a qualification run.
+- The fail-closed upstream packager now pins the source model card, adapter configuration, base
+  revision, base GGUF SHA-256, tokenizer source hashes, projection set, and the marker tokens from
+  the loaded Granite tokenizer. Its three unit tests cover successful packaging, a wrong base, and
+  an unsupported projection.
+- The verified Q4_K_M base hash is
+  `363f0bbc3200b9c9b0ab87efe237d77b1e05bb929d5d7e4b57c1447c911223e8`. The unmodified adapter
+  hash is `ecb2d17dee8147b310d3d8e1ac925d34aac3551b3a960540b7a7f57165cdaa2e`.
+- The new dedicated `granite32AloraIntegrationTest` passed against the actual base and adapter:
+  the 81-token publisher marker was found at the generated prompt boundary and the base and
+  activated branches physically shared their prefix.
+- A fresh Java-only smoke on the local Apple-Silicon workstation passed at temperature zero:
+  `PASS shared=true prefix=41 rewrite={"rewritten_question":"Who is the CEO of Microsoft?"}`.
+  Wall time was 4m46s including model load, shared-prefix prefill, and decoding. This remains a
+  smoke only; held-out semantic cases, an independent reference comparison, and the corrected
+  machine-readable crossover report remain required before any catalog promotion.
