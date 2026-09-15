@@ -20,6 +20,8 @@ import java.util.Objects;
 
 /** Structural contract for a bidirectional BERT GGUF encoder. */
 public record BertConfig(
+    String architecture,
+    EncoderStyle encoderStyle,
     int embeddingDim,
     int numLayers,
     int numHeads,
@@ -27,7 +29,14 @@ public record BertConfig(
     int contextLength,
     int hiddenDim,
     float layerNormEps,
+    float ropeTheta,
     Pooling pooling) {
+
+  /** Encoder layouts that deliberately share the BERT whole-sequence execution contract. */
+  public enum EncoderStyle {
+    BERT,
+    NOMIC_BERT
+  }
 
   /** Sequence-reduction modes defined by GGUF's BERT pooling metadata. */
   public enum Pooling {
@@ -52,6 +61,8 @@ public record BertConfig(
   }
 
   public BertConfig {
+    Objects.requireNonNull(architecture, "architecture");
+    Objects.requireNonNull(encoderStyle, "encoderStyle");
     requirePositive(embeddingDim, "embeddingDim");
     requirePositive(numLayers, "numLayers");
     requirePositive(numHeads, "numHeads");
@@ -66,6 +77,10 @@ public record BertConfig(
       throw new IllegalArgumentException("layerNormEps must be finite and > 0: " + layerNormEps);
     }
     Objects.requireNonNull(pooling, "pooling");
+    if (encoderStyle == EncoderStyle.NOMIC_BERT
+        && (!(ropeTheta > 0.0f) || !Float.isFinite(ropeTheta))) {
+      throw new IllegalArgumentException("ropeTheta must be finite and > 0: " + ropeTheta);
+    }
   }
 
   /** Width of one attention head. */
@@ -73,33 +88,58 @@ public record BertConfig(
     return embeddingDim / numHeads;
   }
 
-  /** Reads and validates the standard BERT GGUF metadata contract. */
+  /** Reads and validates the BERT or Nomic-BERT GGUF metadata contract. */
   public static BertConfig fromMetadata(GgufMetadata metadata) {
     Objects.requireNonNull(metadata, "metadata");
     String architecture = metadata.getString("general.architecture").orElse("");
-    if (!"bert".equals(architecture)) {
+    EncoderStyle style =
+        switch (architecture) {
+          case "bert" -> EncoderStyle.BERT;
+          case "nomic-bert" -> EncoderStyle.NOMIC_BERT;
+          default -> null;
+        };
+    if (style == null) {
       throw new IllegalArgumentException(
-          "BERT configuration requires architecture bert: " + architecture);
+          "BERT configuration requires architecture bert or nomic-bert: " + architecture);
     }
-    if (metadata.getBool("bert.attention.causal").orElse(false)) {
+    String prefix = architecture + ".";
+    if (metadata.getBool(prefix + "attention.causal").orElse(false)) {
       throw new IllegalArgumentException(
           "BERT encoder attention must be bidirectional, but the artifact declares causal attention");
     }
     return new BertConfig(
-        requiredUint32(metadata, "bert.embedding_length"),
-        requiredUint32(metadata, "bert.block_count"),
-        requiredUint32(metadata, "bert.attention.head_count"),
+        architecture,
+        style,
+        requiredUint32(metadata, prefix + "embedding_length"),
+        requiredUint32(metadata, prefix + "block_count"),
+        requiredUint32(metadata, prefix + "attention.head_count"),
         metadata
             .getArraySize("tokenizer.ggml.tokens")
             .orElseThrow(
                 () -> new IllegalArgumentException("missing tokenizer.ggml.tokens vocabulary")),
-        requiredUint32(metadata, "bert.context_length"),
-        requiredUint32(metadata, "bert.feed_forward_length"),
+        requiredUint32(metadata, prefix + "context_length"),
+        requiredUint32(metadata, prefix + "feed_forward_length"),
         metadata
-            .getFloat32("bert.attention.layer_norm_epsilon")
+            .getFloat32(prefix + "attention.layer_norm_epsilon")
             .orElseThrow(
-                () -> new IllegalArgumentException("missing bert.attention.layer_norm_epsilon")),
-        Pooling.fromCode(requiredUint32(metadata, "bert.pooling_type")));
+                () ->
+                    new IllegalArgumentException(
+                        "missing " + prefix + "attention.layer_norm_epsilon")),
+        style == EncoderStyle.NOMIC_BERT
+            ? metadata
+                .getFloat32(prefix + "rope.freq_base")
+                .orElseThrow(
+                    () -> new IllegalArgumentException("missing " + prefix + "rope.freq_base"))
+            : 1.0f,
+        Pooling.fromCode(requiredUint32(metadata, prefix + "pooling_type")));
+  }
+
+  public boolean usesRotaryPositions() {
+    return encoderStyle == EncoderStyle.NOMIC_BERT;
+  }
+
+  public boolean usesGatedFeedForward() {
+    return encoderStyle == EncoderStyle.NOMIC_BERT;
   }
 
   private static int requiredUint32(GgufMetadata metadata, String key) {

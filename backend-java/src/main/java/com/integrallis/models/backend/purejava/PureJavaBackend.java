@@ -370,7 +370,7 @@ public final class PureJavaBackend
                   batchedMatrixKernel);
         } else if ("qwen35".equals(modelFamily)) {
           loaded = loadQwen35(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
-        } else if ("bert".equals(modelFamily)) {
+        } else if ("bert".equals(modelFamily) || "nomic-bert".equals(modelFamily)) {
           loaded = loadBert(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else {
           loaded =
@@ -470,7 +470,7 @@ public final class PureJavaBackend
     int contextCapacity = runtimeContextLength(config.contextLength());
     ModelMetadata metadata =
         new ModelMetadata(
-            "bert",
+            config.architecture(),
             modelPath.getFileName().toString(),
             config.contextLength(),
             config.vocabSize(),

@@ -38,9 +38,11 @@ public final class BertForwardPass implements SequenceEncoder {
   private float[] queries = new float[0];
   private float[] keys = new float[0];
   private float[] values = new float[0];
+  private float[] queryKeyValues = new float[0];
   private float[] attention = new float[0];
   private float[] attentionProjected = new float[0];
   private float[] feedForward = new float[0];
+  private float[] feedForwardGate = new float[0];
   private float[] feedForwardProjected = new float[0];
   private float[] scores = new float[0];
   private byte[] quantizedActivations = new byte[0];
@@ -48,6 +50,8 @@ public final class BertForwardPass implements SequenceEncoder {
   private int[] quantizedActivationZeroPointCorrections = new int[0];
   private short[] quantizedActivationSums = new short[0];
   private float[] q4LaneScratch = new float[0];
+  private float[] exactHiddenWeightRow = new float[0];
+  private float[] exactFeedForwardWeightRow = new float[0];
   private int capacity;
 
   BertForwardPass(BertConfig config, BertWeights weights) {
@@ -112,12 +116,14 @@ public final class BertForwardPass implements SequenceEncoder {
             "token type " + tokenType + " is outside the model's token type table");
       }
       weights.tokenEmbedding(tokens[position], tokenEmbedding);
-      weights.positionEmbedding(position, positionEmbedding);
+      if (!config.usesRotaryPositions()) {
+        weights.positionEmbedding(position, positionEmbedding);
+      }
       int offset = position * dim;
       for (int index = 0; index < dim; index++) {
         normalized[offset + index] =
             tokenEmbedding[index]
-                + positionEmbedding[index]
+                + (config.usesRotaryPositions() ? 0.0f : positionEmbedding[index])
                 + tokenTypeEmbeddings[tokenType][index];
       }
       TensorOps.layerNorm(
@@ -130,7 +136,6 @@ public final class BertForwardPass implements SequenceEncoder {
           dim,
           config.layerNormEps());
     }
-
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
       executeLayer(weights.layer(layerIndex), sequenceLength);
     }
@@ -139,12 +144,18 @@ public final class BertForwardPass implements SequenceEncoder {
   private void executeLayer(BertWeights.Layer layer, int sequenceLength) {
     int dim = config.embeddingDim();
     int batchElements = sequenceLength * dim;
-    project(queries, hidden, sequenceLength, layer.query());
-    project(keys, hidden, sequenceLength, layer.key());
-    project(values, hidden, sequenceLength, layer.value());
-    addBias(queries, sequenceLength, dim, layer.queryBias());
-    addBias(keys, sequenceLength, dim, layer.keyBias());
-    addBias(values, sequenceLength, dim, layer.valueBias());
+    if (layer.queryKeyValue() == null) {
+      project(queries, hidden, sequenceLength, layer.query());
+      project(keys, hidden, sequenceLength, layer.key());
+      project(values, hidden, sequenceLength, layer.value());
+      addBias(queries, sequenceLength, dim, layer.queryBias());
+      addBias(keys, sequenceLength, dim, layer.keyBias());
+      addBias(values, sequenceLength, dim, layer.valueBias());
+    } else {
+      project(queryKeyValues, hidden, sequenceLength, layer.queryKeyValue());
+      splitQueryKeyValue(sequenceLength, dim);
+      applyRotaryPositions(sequenceLength, dim);
+    }
 
     attend(sequenceLength);
     project(attentionProjected, attention, sequenceLength, layer.attentionOutput());
@@ -161,7 +172,13 @@ public final class BertForwardPass implements SequenceEncoder {
 
     project(feedForward, normalized, sequenceLength, layer.feedForwardUp());
     addBias(feedForward, sequenceLength, config.hiddenDim(), layer.feedForwardUpBias());
-    TensorOps.geluErf(feedForward, 0, feedForward, 0, sequenceLength * config.hiddenDim());
+    if (layer.feedForwardGate() == null) {
+      TensorOps.geluErf(feedForward, 0, feedForward, 0, sequenceLength * config.hiddenDim());
+    } else {
+      project(feedForwardGate, normalized, sequenceLength, layer.feedForwardGate());
+      TensorOps.swiGlu(
+          feedForward, feedForwardGate, feedForward, sequenceLength * config.hiddenDim());
+    }
     project(feedForwardProjected, feedForward, sequenceLength, layer.feedForwardDown());
     addBias(feedForwardProjected, sequenceLength, dim, layer.feedForwardDownBias());
     for (int index = 0; index < batchElements; index++) {
@@ -212,6 +229,29 @@ public final class BertForwardPass implements SequenceEncoder {
     }
   }
 
+  private void splitQueryKeyValue(int sequenceLength, int dim) {
+    for (int position = 0; position < sequenceLength; position++) {
+      int source = position * dim * 3;
+      int target = position * dim;
+      System.arraycopy(queryKeyValues, source, queries, target, dim);
+      System.arraycopy(queryKeyValues, source + dim, keys, target, dim);
+      System.arraycopy(queryKeyValues, source + dim * 2, values, target, dim);
+    }
+  }
+
+  private void applyRotaryPositions(int sequenceLength, int dim) {
+    int headDim = config.headDim();
+    for (int position = 0; position < sequenceLength; position++) {
+      for (int head = 0; head < config.numHeads(); head++) {
+        int offset = position * dim + head * headDim;
+        // Nomic-BERT follows the same split-half (NeoX) RoPE layout as llama.cpp's
+        // LLM_ARCH_NOMIC_BERT, not the adjacent-pair layout used by Llama.
+        TensorOps.ropeNeox(queries, offset, position, headDim, config.ropeTheta());
+        TensorOps.ropeNeox(keys, offset, position, headDim, config.ropeTheta());
+      }
+    }
+  }
+
   private void normalizeRows(
       float[] output, float[] input, int sequenceLength, float[] normWeight, float[] normBias) {
     int dim = config.embeddingDim();
@@ -224,6 +264,20 @@ public final class BertForwardPass implements SequenceEncoder {
 
   private void project(
       float[] output, float[] input, int sequenceLength, BertWeights.Matrix matrix) {
+    if (config.usesRotaryPositions()) {
+      TensorOps.ggufExactBatchedMatmul(
+          output,
+          input,
+          matrix.data(),
+          matrix.type(),
+          sequenceLength,
+          matrix.rows(),
+          matrix.columns(),
+          matrix.columns() == config.hiddenDim()
+              ? exactFeedForwardWeightRow
+              : exactHiddenWeightRow);
+      return;
+    }
     TensorOps.ggufBatchedMatmul(
         output,
         input,
@@ -281,9 +335,11 @@ public final class BertForwardPass implements SequenceEncoder {
     queries = new float[stateElements];
     keys = new float[stateElements];
     values = new float[stateElements];
+    queryKeyValues = new float[Math.multiplyExact(stateElements, 3)];
     attention = new float[stateElements];
     attentionProjected = new float[stateElements];
     feedForward = new float[Math.multiplyExact(sequenceLength, hiddenDim)];
+    feedForwardGate = new float[Math.multiplyExact(sequenceLength, hiddenDim)];
     feedForwardProjected = new float[stateElements];
     scores = new float[Math.multiplyExact(sequenceLength, sequenceLength)];
 
@@ -300,6 +356,8 @@ public final class BertForwardPass implements SequenceEncoder {
         q4Rows == 0
             ? new float[0]
             : new float[Math.multiplyExact(Math.multiplyExact(sequenceLength, q4Rows), 8)];
+    exactHiddenWeightRow = new float[dim];
+    exactFeedForwardWeightRow = new float[hiddenDim];
     capacity = sequenceLength;
   }
 }

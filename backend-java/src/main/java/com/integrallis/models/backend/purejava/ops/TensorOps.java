@@ -16,11 +16,14 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.nio.ByteOrder;
 import java.util.Objects;
 
 /** Core tensor operations for transformer inference. */
@@ -30,6 +33,8 @@ public final class TensorOps {
   private static final int TANH_TABLE_SIZE = 1 << 16;
   private static final float TANH_TABLE_SCALE = TANH_TABLE_SIZE / (2.0f * TANH_TABLE_LIMIT);
   private static final float[] TANH_TABLE = createTanhTable();
+  private static final ValueLayout.OfShort LITTLE_ENDIAN_SHORT =
+      ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   enum GroupedProjectionPlan {
     NONE,
@@ -1156,13 +1161,48 @@ public final class TensorOps {
 
   /** Returns whether the mapped tensor type has a weight-reusing batched prefill kernel. */
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
-    return type == GgufTensorType.Q4_0
+    return type == GgufTensorType.F16
+        || type == GgufTensorType.Q4_0
         || type == GgufTensorType.BF16
         || type == GgufTensorType.Q5_0
         || type == GgufTensorType.Q8_0
         || type == GgufTensorType.Q4_K
         || type == GgufTensorType.Q5_K
         || type == GgufTensorType.Q6_K;
+  }
+
+  /**
+   * Exact mapped-weight batched projection for architectures whose output equivalence matters more
+   * than Q8 activation reuse.
+   *
+   * <p>The supplied row buffer is reused for every weight row; the method never expands the model
+   * weights into heap memory. Unlike the fast GGML Qx×Q8 path, activations remain F32.
+   */
+  public static void ggufExactBatchedMatmul(
+      float[] output,
+      float[] input,
+      MemorySegment weights,
+      GgufTensorType type,
+      int batchSize,
+      int rows,
+      int columns,
+      float[] decodedWeightRow) {
+    Objects.requireNonNull(output, "output");
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(weights, "weights");
+    Objects.requireNonNull(type, "type");
+    Objects.requireNonNull(decodedWeightRow, "decodedWeightRow");
+    if (decodedWeightRow.length < columns) {
+      throw new IllegalArgumentException(
+          "decoded weight row is too small: " + decodedWeightRow.length + " < " + columns);
+    }
+    for (int row = 0; row < rows; row++) {
+      GgufTensorValues.dequantizeRow(weights, type, row, columns, decodedWeightRow);
+      for (int batch = 0; batch < batchSize; batch++) {
+        output[batch * rows + row] =
+            VectorUtil.dotProduct(input, batch * columns, decodedWeightRow, 0, columns);
+      }
+    }
   }
 
   /** Batched matrix multiplication with caller-owned scratch and an explicit Q4 policy. */
@@ -1219,6 +1259,7 @@ public final class TensorOps {
       throw new UnsupportedOperationException("GGUF batched matmul not supported for: " + type);
     }
     switch (type) {
+      case F16 -> multiplyF16Batch(out, x, qWeight, batchSize, rows, cols);
       case BF16 -> BFloat16Matrix.of(qWeight, rows, cols).multiplyBatch(x, 0, batchSize, out, 0);
       case Q4_0 ->
           VectorUtil.ggufQ4_0Q8_0BatchedMatmul(
@@ -1287,6 +1328,26 @@ public final class TensorOps {
               quantizedActivationScales,
               q6BatchedKernel);
       default -> throw new AssertionError("unhandled batched matmul type: " + type);
+    }
+  }
+
+  /** Multiplies mapped IEEE-754 half weights without materializing a full F32 copy. */
+  private static void multiplyF16Batch(
+      float[] output, float[] input, MemorySegment weights, int batchSize, int rows, int columns) {
+    for (int batch = 0; batch < batchSize; batch++) {
+      int inputOffset = batch * columns;
+      int outputOffset = batch * rows;
+      for (int row = 0; row < rows; row++) {
+        long weightOffset = (long) row * columns * Short.BYTES;
+        float sum = 0.0f;
+        for (int column = 0; column < columns; column++) {
+          sum +=
+              Float.float16ToFloat(
+                      weights.get(LITTLE_ENDIAN_SHORT, weightOffset + (long) column * Short.BYTES))
+                  * input[inputOffset + column];
+        }
+        output[outputOffset + row] = sum;
+      }
     }
   }
 
