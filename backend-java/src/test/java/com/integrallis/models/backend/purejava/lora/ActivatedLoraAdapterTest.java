@@ -125,6 +125,9 @@ class ActivatedLoraAdapterTest {
             .replace(
                 "\"kind\": \"activated-lora-tool-specialist\"",
                 "\"kind\": \"activated-lora-specialist\"")
+            .replace(
+                "\"invocation\": {\"tokens\":",
+                "\"invocation\": {\"text\": \"<|start_of_role|>rewrite<|end_of_role|>\", \"tokens\":")
             .replaceFirst(
                 "(?s),\\s*\"training\": \\{.*\\}\\s*$",
                 java.util.regex.Matcher.quoteReplacement(upstreamBlock));
@@ -137,6 +140,7 @@ class ActivatedLoraAdapterTest {
       assertThat(adapter.provenance())
           .isInstanceOf(
               com.integrallis.models.api.ActivatedAdapterMetadata.UpstreamProvenance.class);
+      assertThat(adapter.invocationText()).isEqualTo("<|start_of_role|>rewrite<|end_of_role|>");
     }
   }
 

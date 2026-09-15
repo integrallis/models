@@ -51,8 +51,34 @@ class ActivatedAdapterMetadataTest {
     assertThat(metadata.trainingProvenance().orElseThrow().datasetRevision())
         .isEqualTo("e".repeat(40));
     assertThat(metadata.invocationTokens()).containsExactly(151644, 77091, 198);
+    assertThat(metadata.invocationText()).isEmpty();
     assertThatThrownBy(() -> metadata.invocationTokens().add(1))
         .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  void retainsADeclaredInvocationTextForAnUpstreamSpecialist() {
+    ActivatedAdapterMetadata metadata =
+        new ActivatedAdapterMetadata(
+            "ibm-granite/granite-3.2-8b-instruct",
+            "a".repeat(40),
+            "b".repeat(64),
+            tokenizers(),
+            "c".repeat(64),
+            32,
+            32,
+            "<|start_of_role|>rewrite<|end_of_role|>",
+            List.of(2, 3),
+            new ActivatedAdapterMetadata.UpstreamProvenance(
+                "IBM Research",
+                "ibm-granite/granite-3.2-8b-alora-rag-query-rewrite",
+                "d".repeat(40),
+                "e".repeat(64),
+                "f".repeat(64),
+                "Apache-2.0"));
+
+    assertThat(metadata.invocationText())
+        .isEqualTo("<|start_of_role|>rewrite<|end_of_role|>");
   }
 
   @Test

@@ -32,6 +32,7 @@ public record ActivatedAdapterMetadata(
     String adapterSha256,
     int rank,
     int alpha,
+    String invocationText,
     List<Integer> invocationTokens,
     Provenance provenance) {
 
@@ -57,6 +58,7 @@ public record ActivatedAdapterMetadata(
     if (alpha <= 0) {
       throw new IllegalArgumentException("alpha must be > 0: " + alpha);
     }
+    invocationText = invocationText == null ? "" : invocationText;
     Objects.requireNonNull(invocationTokens, "invocationTokens");
     if (invocationTokens.isEmpty()
         || invocationTokens.stream().anyMatch(token -> token == null || token < 0)) {
@@ -64,6 +66,30 @@ public record ActivatedAdapterMetadata(
     }
     invocationTokens = List.copyOf(invocationTokens);
     provenance = Objects.requireNonNull(provenance, "provenance");
+  }
+
+  /** Compatibility constructor for token-only activation manifests. */
+  public ActivatedAdapterMetadata(
+      String baseModel,
+      String baseRevision,
+      String baseArtifactSha256,
+      Map<String, String> tokenizerFileSha256,
+      String adapterSha256,
+      int rank,
+      int alpha,
+      List<Integer> invocationTokens,
+      Provenance provenance) {
+    this(
+        baseModel,
+        baseRevision,
+        baseArtifactSha256,
+        tokenizerFileSha256,
+        adapterSha256,
+        rank,
+        alpha,
+        "",
+        invocationTokens,
+        provenance);
   }
 
   /** Compatibility constructor for an adapter trained from fully pinned source data. */
@@ -85,6 +111,7 @@ public record ActivatedAdapterMetadata(
         adapterSha256,
         rank,
         alpha,
+        "",
         invocationTokens,
         (Provenance) trainingProvenance);
   }

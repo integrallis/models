@@ -132,6 +132,7 @@ public final class ActivatedLoraAdapter {
   private final String adapterSha256;
   private final int rank;
   private final int alpha;
+  private final String invocationText;
   private final int[] invocationTokens;
   private final Provenance provenance;
   private final Architecture architecture;
@@ -145,6 +146,7 @@ public final class ActivatedLoraAdapter {
       String adapterSha256,
       int rank,
       int alpha,
+      String invocationText,
       int[] invocationTokens,
       Provenance provenance,
       Architecture architecture,
@@ -156,6 +158,7 @@ public final class ActivatedLoraAdapter {
     this.adapterSha256 = adapterSha256;
     this.rank = rank;
     this.alpha = alpha;
+    this.invocationText = invocationText;
     this.invocationTokens = invocationTokens;
     this.provenance = provenance;
     this.architecture = architecture;
@@ -242,6 +245,7 @@ public final class ActivatedLoraAdapter {
         metadata.adapterSha256,
         metadata.rank,
         metadata.alpha,
+        metadata.invocationText,
         metadata.invocationTokens.clone(),
         metadata.provenance,
         architecture,
@@ -300,6 +304,11 @@ public final class ActivatedLoraAdapter {
 
   public int[] invocationTokens() {
     return invocationTokens.clone();
+  }
+
+  /** Renderable activation marker, or empty for an older token-only manifest. */
+  public String invocationText() {
+    return invocationText;
   }
 
   public int inputDimension(Projection projection) {
@@ -437,10 +446,11 @@ public final class ActivatedLoraAdapter {
     while (parser.nextToken() != JsonToken.END_OBJECT) {
       String name = parser.currentName();
       JsonToken value = parser.nextToken();
-      if (!"tokens".equals(name)) {
-        throw new IOException("unsupported invocation metadata field: " + name);
+      switch (name) {
+        case "text" -> fields.invocationText = readString(parser, value, "invocation.text");
+        case "tokens" -> fields.invocationTokens = readInts(parser, value, "invocation.tokens");
+        default -> throw new IOException("unsupported invocation metadata field: " + name);
       }
-      fields.invocationTokens = readInts(parser, value, "invocation.tokens");
     }
   }
 
@@ -675,6 +685,7 @@ public final class ActivatedLoraAdapter {
     int rank;
     int alpha;
     List<String> targetModules = List.of();
+    String invocationText = "";
     int[] invocationTokens = new int[0];
     String dataset;
     String datasetRevision;
@@ -725,6 +736,10 @@ public final class ActivatedLoraAdapter {
           if (upstreamProvenance == null || trainingSources.size() != 0 || dataset != null) {
             throw new IllegalArgumentException(
                 "schema 5 requires upstream provenance and must not contain training metadata");
+          }
+          if (invocationText.isBlank()) {
+            throw new IllegalArgumentException(
+                "schema 5 requires invocation.text so a generic specialist can render its marker");
           }
           provenance = upstreamProvenance;
         } else if (upstreamProvenance != null) {
@@ -804,6 +819,7 @@ public final class ActivatedLoraAdapter {
             adapterSha256,
             rank,
             alpha,
+            invocationText,
             Arrays.stream(invocationTokens).boxed().toList(),
             provenance);
       } catch (RuntimeException invalid) {

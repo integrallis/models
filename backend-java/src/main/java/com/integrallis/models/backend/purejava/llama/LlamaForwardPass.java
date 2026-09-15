@@ -689,6 +689,7 @@ public final class LlamaForwardPass {
             activatedAdapter.adapterSha256(),
             activatedAdapter.rank(),
             activatedAdapter.alpha(),
+            activatedAdapter.invocationText(),
             java.util.Arrays.stream(activatedAdapter.invocationTokens()).boxed().toList(),
             activatedAdapter.provenance()));
   }

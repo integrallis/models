@@ -364,6 +364,7 @@ final class ActivatedPrefixSharingBenchmarkCli {
       Tokenizer tokenizer, ActivatedAdapterMetadata adapter, int targetPrefixTokens) {
     String leading = "<|im_start|>system\nYou are a tool selector.<|im_end|>\n<|im_start|>user\n";
     String trailing = "<|im_end|>\n<|im_start|>assistant\n";
+    String invocationText = adapter.invocationText();
     String unit =
         List.of(" context", " transit", " data", " x").stream()
             .filter(candidate -> tokenizer.encode(candidate).length == 1)
@@ -373,11 +374,14 @@ final class ActivatedPrefixSharingBenchmarkCli {
     int high = targetPrefixTokens * 2;
     while (low <= high) {
       int count = (low + high) >>> 1;
-      ModelPrompt prompt =
-          ModelPrompt.builder().control(leading).text(unit.repeat(count)).control(trailing).build();
-      int prefix = activationBoundary(tokenizer.encode(prompt), adapter);
+      ModelPrompt.Builder prompt =
+          ModelPrompt.builder().control(leading).text(unit.repeat(count)).control(trailing);
+      if (!invocationText.isEmpty()) {
+        prompt.control(invocationText);
+      }
+      int prefix = activationBoundary(tokenizer.encode(prompt.build()), adapter);
       if (prefix == targetPrefixTokens) {
-        return prompt;
+        return prompt.build();
       }
       if (prefix < targetPrefixTokens) {
         low = count + 1;
