@@ -20,9 +20,11 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.integrallis.models.api.ActivatedAdapterMetadata;
+import com.integrallis.models.api.ActivatedAdapterMetadata.Provenance;
 import com.integrallis.models.api.ActivatedAdapterMetadata.TrainingProvenance;
 import com.integrallis.models.api.ActivatedAdapterMetadata.TrainingSelection;
 import com.integrallis.models.api.ActivatedAdapterMetadata.TrainingSource;
+import com.integrallis.models.api.ActivatedAdapterMetadata.UpstreamProvenance;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsDtype;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsTensor;
@@ -50,23 +52,36 @@ public final class ActivatedLoraAdapter {
       JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
   private static final String METADATA_FILE = "models-activated-lora.json";
   private static final String ADAPTER_KIND = "activated-lora-tool-specialist";
-  private static final Set<String> REQUIRED_MODULES =
-      Set.of("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj");
 
   /** Transformer projections supported by the activated adapter. */
   public enum Projection {
-    QUERY("self_attn.q_proj"),
-    KEY("self_attn.k_proj"),
-    VALUE("self_attn.v_proj"),
-    ATTENTION_OUTPUT("self_attn.o_proj"),
-    FFN_GATE("mlp.gate_proj"),
-    FFN_UP("mlp.up_proj"),
-    FFN_DOWN("mlp.down_proj");
+    QUERY("q_proj", "self_attn.q_proj"),
+    KEY("k_proj", "self_attn.k_proj"),
+    VALUE("v_proj", "self_attn.v_proj"),
+    ATTENTION_OUTPUT("o_proj", "self_attn.o_proj"),
+    FFN_GATE("gate_proj", "mlp.gate_proj"),
+    FFN_UP("up_proj", "mlp.up_proj"),
+    FFN_DOWN("down_proj", "mlp.down_proj");
 
+    private final String targetModule;
     private final String tensorModule;
 
-    Projection(String tensorModule) {
+    Projection(String targetModule, String tensorModule) {
+      this.targetModule = targetModule;
       this.tensorModule = tensorModule;
+    }
+
+    /** Name used by PEFT's {@code target_modules} metadata. */
+    public String targetModule() {
+      return targetModule;
+    }
+
+    private static Projection fromTargetModule(String targetModule) {
+      for (Projection projection : values()) {
+        if (projection.targetModule.equals(targetModule)) return projection;
+      }
+      throw new IllegalArgumentException(
+          "unsupported activated adapter target module: " + targetModule);
     }
   }
 
@@ -117,7 +132,7 @@ public final class ActivatedLoraAdapter {
   private final int rank;
   private final int alpha;
   private final int[] invocationTokens;
-  private final TrainingProvenance trainingProvenance;
+  private final Provenance provenance;
   private final Architecture architecture;
   private final LoraProjection[][] layers;
 
@@ -130,7 +145,7 @@ public final class ActivatedLoraAdapter {
       int rank,
       int alpha,
       int[] invocationTokens,
-      TrainingProvenance trainingProvenance,
+      Provenance provenance,
       Architecture architecture,
       LoraProjection[][] layers) {
     this.baseModel = baseModel;
@@ -141,7 +156,7 @@ public final class ActivatedLoraAdapter {
     this.rank = rank;
     this.alpha = alpha;
     this.invocationTokens = invocationTokens;
-    this.trainingProvenance = trainingProvenance;
+    this.provenance = provenance;
     this.architecture = architecture;
     this.layers = layers;
   }
@@ -188,8 +203,9 @@ public final class ActivatedLoraAdapter {
     LoraProjection[][] projections =
         new LoraProjection[architecture.layers()][Projection.values().length];
     float scale = (float) metadata.alpha / metadata.rank;
+    Set<Projection> declaredProjections = metadata.declaredProjections();
     for (int layer = 0; layer < architecture.layers(); layer++) {
-      for (Projection projection : Projection.values()) {
+      for (Projection projection : declaredProjections) {
         String prefix =
             "base_model.model.model.layers." + layer + "." + projection.tensorModule + ".lora_";
         String aName = prefix + "A.weight";
@@ -226,7 +242,7 @@ public final class ActivatedLoraAdapter {
         metadata.rank,
         metadata.alpha,
         metadata.invocationTokens.clone(),
-        metadata.trainingProvenance,
+        metadata.provenance,
         architecture,
         projections);
   }
@@ -243,7 +259,10 @@ public final class ActivatedLoraAdapter {
       throw new IllegalArgumentException("layer out of range: " + layer);
     }
     Objects.requireNonNull(projection, "projection");
-    layers[layer][projection.ordinal()].addTo(output, outputOffset, input, inputOffset);
+    LoraProjection loraProjection = layers[layer][projection.ordinal()];
+    if (loraProjection != null) {
+      loraProjection.addTo(output, outputOffset, input, inputOffset);
+    }
   }
 
   public String baseModel() {
@@ -266,8 +285,8 @@ public final class ActivatedLoraAdapter {
     return tokenizerFileSha256;
   }
 
-  public TrainingProvenance trainingProvenance() {
-    return trainingProvenance;
+  public Provenance provenance() {
+    return provenance;
   }
 
   public int rank() {
@@ -327,6 +346,7 @@ public final class ActivatedLoraAdapter {
           case "adapter" -> readAdapter(parser, value, fields);
           case "invocation" -> readInvocation(parser, value, fields);
           case "training" -> readTraining(parser, value, fields);
+          case "upstream" -> readUpstream(parser, value, fields);
           default -> throw new IOException("unsupported adapter metadata field: " + name);
         }
       }
@@ -457,6 +477,44 @@ public final class ActivatedLoraAdapter {
         default -> throw new IOException("unsupported training metadata field: " + name);
       }
     }
+  }
+
+  private static void readUpstream(JsonParser parser, JsonToken token, Metadata fields)
+      throws IOException {
+    require(token, JsonToken.START_OBJECT, "upstream");
+    String publisher = null;
+    String repository = null;
+    String revision = null;
+    String modelCardSha256 = null;
+    String adapterConfigSha256 = null;
+    String license = null;
+    while (parser.nextToken() != JsonToken.END_OBJECT) {
+      String name = parser.currentName();
+      JsonToken value = parser.nextToken();
+      switch (name) {
+        case "publisher" -> publisher = readString(parser, value, "upstream.publisher");
+        case "repository" -> repository = readString(parser, value, "upstream.repository");
+        case "revision" -> revision = readString(parser, value, "upstream.revision");
+        case "modelCardSha256" ->
+            modelCardSha256 = readString(parser, value, "upstream.modelCardSha256");
+        case "adapterConfigSha256" ->
+            adapterConfigSha256 = readString(parser, value, "upstream.adapterConfigSha256");
+        case "license" -> license = readString(parser, value, "upstream.license");
+        default -> throw new IOException("unsupported upstream metadata field: " + name);
+      }
+    }
+    if (publisher == null
+        || repository == null
+        || revision == null
+        || modelCardSha256 == null
+        || adapterConfigSha256 == null
+        || license == null) {
+      throw new IOException(
+          "upstream provenance requires publisher, repository, revision, modelCardSha256, adapterConfigSha256, and license");
+    }
+    fields.upstreamProvenance =
+        new UpstreamProvenance(
+            publisher, repository, revision, modelCardSha256, adapterConfigSha256, license);
   }
 
   private static TrainingSelection readTrainingSelection(
@@ -631,9 +689,11 @@ public final class ActivatedLoraAdapter {
     String formatterSha256;
     List<TrainingSource> trainingSources = List.of();
     TrainingProvenance trainingProvenance;
+    UpstreamProvenance upstreamProvenance;
+    Provenance provenance;
 
     void validate() throws IOException {
-      if (schemaVersion != 2 && schemaVersion != 3 && schemaVersion != 4)
+      if (schemaVersion != 2 && schemaVersion != 3 && schemaVersion != 4 && schemaVersion != 5)
         throw new IOException("unsupported adapter schemaVersion: " + schemaVersion);
       if (!ADAPTER_KIND.equals(kind)) throw new IOException("unsupported adapter kind: " + kind);
       if (baseModel == null || baseModel.isBlank()) throw new IOException("base.model is required");
@@ -647,9 +707,10 @@ public final class ActivatedLoraAdapter {
         throw new IOException(invalid.getMessage(), invalid);
       }
       if (rank <= 0 || alpha <= 0) throw new IOException("adapter rank and alpha must be > 0");
-      if (!Set.copyOf(targetModules).equals(REQUIRED_MODULES)
-          || targetModules.size() != REQUIRED_MODULES.size()) {
-        throw new IOException("adapter targetModules must be exactly " + REQUIRED_MODULES);
+      try {
+        declaredProjections();
+      } catch (IllegalArgumentException unsupported) {
+        throw new IOException(unsupported.getMessage(), unsupported);
       }
       if (invocationTokens.length == 0)
         throw new IOException("invocation.tokens must not be empty");
@@ -657,7 +718,15 @@ public final class ActivatedLoraAdapter {
         if (token < 0) throw new IOException("invocation token must be >= 0: " + token);
       }
       try {
-        if (schemaVersion >= 3) {
+        if (schemaVersion == 5) {
+          if (upstreamProvenance == null || trainingSources.size() != 0 || dataset != null) {
+            throw new IllegalArgumentException(
+                "schema 5 requires upstream provenance and must not contain training metadata");
+          }
+          provenance = upstreamProvenance;
+        } else if (upstreamProvenance != null) {
+          throw new IllegalArgumentException("upstream provenance requires schemaVersion 5");
+        } else if (schemaVersion >= 3) {
           if (trainingSources.isEmpty()) {
             throw new IllegalArgumentException("training.sources must not be empty");
           }
@@ -723,6 +792,7 @@ public final class ActivatedLoraAdapter {
                   formatter,
                   formatterSha256);
         }
+        if (provenance == null) provenance = trainingProvenance;
         new ActivatedAdapterMetadata(
             baseModel,
             baseRevision,
@@ -732,11 +802,25 @@ public final class ActivatedLoraAdapter {
             rank,
             alpha,
             Arrays.stream(invocationTokens).boxed().toList(),
-            trainingProvenance);
+            provenance);
       } catch (RuntimeException invalid) {
         throw new IOException(
             "invalid activated adapter provenance: " + invalid.getMessage(), invalid);
       }
+    }
+
+    Set<Projection> declaredProjections() {
+      if (targetModules.isEmpty()) {
+        throw new IllegalArgumentException("adapter targetModules must not be empty");
+      }
+      Set<Projection> projections = new HashSet<>();
+      for (String targetModule : targetModules) {
+        if (!projections.add(Projection.fromTargetModule(targetModule))) {
+          throw new IllegalArgumentException(
+              "adapter targetModules contains duplicate or aliased module: " + targetModule);
+        }
+      }
+      return Set.copyOf(projections);
     }
   }
 }

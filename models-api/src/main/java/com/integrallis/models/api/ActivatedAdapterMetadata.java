@@ -33,7 +33,7 @@ public record ActivatedAdapterMetadata(
     int rank,
     int alpha,
     List<Integer> invocationTokens,
-    TrainingProvenance trainingProvenance) {
+    Provenance provenance) {
 
   public ActivatedAdapterMetadata {
     baseModel = requireText(baseModel, "baseModel");
@@ -63,7 +63,67 @@ public record ActivatedAdapterMetadata(
       throw new IllegalArgumentException("invocationTokens must contain nonnegative token IDs");
     }
     invocationTokens = List.copyOf(invocationTokens);
-    trainingProvenance = Objects.requireNonNull(trainingProvenance, "trainingProvenance");
+    provenance = Objects.requireNonNull(provenance, "provenance");
+  }
+
+  /** Compatibility constructor for an adapter trained from fully pinned source data. */
+  public ActivatedAdapterMetadata(
+      String baseModel,
+      String baseRevision,
+      String baseArtifactSha256,
+      Map<String, String> tokenizerFileSha256,
+      String adapterSha256,
+      int rank,
+      int alpha,
+      List<Integer> invocationTokens,
+      TrainingProvenance trainingProvenance) {
+    this(
+        baseModel,
+        baseRevision,
+        baseArtifactSha256,
+        tokenizerFileSha256,
+        adapterSha256,
+        rank,
+        alpha,
+        invocationTokens,
+        (Provenance) trainingProvenance);
+  }
+
+  /** Returns source-training evidence when the adapter was trained from a pinned public corpus. */
+  public Optional<TrainingProvenance> trainingProvenance() {
+    return provenance instanceof TrainingProvenance training
+        ? Optional.of(training)
+        : Optional.empty();
+  }
+
+  /** Returns publisher-attested evidence when a third party distributes the adapter. */
+  public Optional<UpstreamProvenance> upstreamProvenance() {
+    return provenance instanceof UpstreamProvenance upstream
+        ? Optional.of(upstream)
+        : Optional.empty();
+  }
+
+  /** One honest, immutable source of adapter provenance. */
+  public sealed interface Provenance permits TrainingProvenance, UpstreamProvenance {}
+
+  /** Immutable identity of an adapter released by a third party rather than trained by us. */
+  public record UpstreamProvenance(
+      String publisher,
+      String repository,
+      String revision,
+      String modelCardSha256,
+      String adapterConfigSha256,
+      String license)
+      implements Provenance {
+
+    public UpstreamProvenance {
+      publisher = requireText(publisher, "publisher");
+      repository = requireRepository(repository);
+      revision = requireHex(revision, 40, "upstream revision");
+      modelCardSha256 = requireHex(modelCardSha256, 64, "upstream model-card SHA-256");
+      adapterConfigSha256 = requireHex(adapterConfigSha256, 64, "upstream adapter-config SHA-256");
+      license = requireText(license, "license");
+    }
   }
 
   /** One exact, immutable training input and its role in the prepared corpus. */
@@ -115,7 +175,8 @@ public record ActivatedAdapterMetadata(
       Optional<TrainingSelection> trainSelection,
       Optional<TrainingSelection> validationSelection,
       String formatter,
-      String formatterSha256) {
+      String formatterSha256)
+      implements Provenance {
 
     public TrainingProvenance {
       Objects.requireNonNull(sources, "sources");
@@ -229,6 +290,14 @@ public record ActivatedAdapterMetadata(
       if (element.isBlank() || ".".equals(element) || "..".equals(element)) {
         throw new IllegalArgumentException(name + " must be a normalized relative path: " + value);
       }
+    }
+    return normalized;
+  }
+
+  private static String requireRepository(String value) {
+    String normalized = requireText(value, "repository");
+    if (!normalized.matches("[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*")) {
+      throw new IllegalArgumentException("repository must be an owner/name identifier: " + value);
     }
     return normalized;
   }

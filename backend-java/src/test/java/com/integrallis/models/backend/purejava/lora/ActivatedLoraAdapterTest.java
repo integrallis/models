@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,17 +53,21 @@ class ActivatedLoraAdapterTest {
       assertThat(adapter.baseRevision()).isEqualTo(REVISION);
       assertThat(adapter.tokenizerFileSha256())
           .containsExactly(java.util.Map.entry("tokenizer.json", "d".repeat(64)));
-      assertThat(adapter.trainingProvenance().datasetRevision()).isEqualTo("e".repeat(40));
-      assertThat(adapter.trainingProvenance().sources())
+      assertThat(adapter.provenance())
+          .isInstanceOf(
+              com.integrallis.models.api.ActivatedAdapterMetadata.TrainingProvenance.class);
+      var provenance =
+          (com.integrallis.models.api.ActivatedAdapterMetadata.TrainingProvenance)
+              adapter.provenance();
+      assertThat(provenance.datasetRevision()).isEqualTo("e".repeat(40));
+      assertThat(provenance.sources())
           .extracting(com.integrallis.models.api.ActivatedAdapterMetadata.TrainingSource::role)
           .containsExactly("tool-calls", "no-call");
-      assertThat(adapter.trainingProvenance().preparedSchemaVersion()).isEqualTo(2);
-      assertThat(adapter.trainingProvenance().trainSelection()).isPresent();
-      assertThat(adapter.trainingProvenance().trainSelection().orElseThrow().usable())
-          .isEqualTo(4000);
-      assertThat(adapter.trainingProvenance().trainSelection().orElseThrow().noCall())
-          .isEqualTo(760);
-      assertThat(adapter.trainingProvenance().validationSelection()).isPresent();
+      assertThat(provenance.preparedSchemaVersion()).isEqualTo(2);
+      assertThat(provenance.trainSelection()).isPresent();
+      assertThat(provenance.trainSelection().orElseThrow().usable()).isEqualTo(4000);
+      assertThat(provenance.trainSelection().orElseThrow().noCall()).isEqualTo(760);
+      assertThat(provenance.validationSelection()).isPresent();
       assertThat(adapter.invocationTokens()).containsExactly(151644, 77091, 198);
       for (Projection projection : Projection.values()) {
         float[] output = new float[adapter.outputDimension(projection)];
@@ -74,6 +79,61 @@ class ActivatedLoraAdapterTest {
           assertThat(output[index]).isCloseTo(0.2f * (0.3f + index), within(1.0e-6f));
         }
       }
+    }
+  }
+
+  @Test
+  void loadsAnActivatedAdapterThatDeclaresOnlyQkvProjections() throws Exception {
+    Set<Projection> qkv = Set.of(Projection.QUERY, Projection.KEY, Projection.VALUE);
+    writeAdapter(false, qkv);
+
+    try (Arena arena = Arena.ofConfined()) {
+      ActivatedLoraAdapter adapter =
+          ActivatedLoraAdapter.open(temporaryDirectory, arena, BASE_SHA, ARCHITECTURE);
+
+      float[] key = new float[adapter.outputDimension(Projection.KEY)];
+      adapter.addTo(0, Projection.KEY, key, 0, new float[] {1.0f, 0.0f}, 0);
+      assertThat(key[0]).isCloseTo(0.06f, within(1.0e-6f));
+
+      float[] absentProjection = new float[adapter.outputDimension(Projection.FFN_UP)];
+      adapter.addTo(0, Projection.FFN_UP, absentProjection, 0, new float[] {1.0f, 0.0f}, 0);
+      assertThat(absentProjection).containsOnly(0.0f);
+    }
+  }
+
+  @Test
+  void loadsAnUpstreamAdapterWithoutInventingTrainingData() throws Exception {
+    writeAdapter(false, Set.of(Projection.QUERY, Projection.KEY, Projection.VALUE));
+    Path metadata = temporaryDirectory.resolve("models-activated-lora.json");
+    String upstreamBlock =
+        """
+        ,
+          "upstream": {
+            "publisher": "IBM Research",
+            "repository": "ibm-granite/granite-3.2-8b-alora-rag-query-rewrite",
+            "revision": "%s",
+            "modelCardSha256": "%s",
+            "adapterConfigSha256": "%s",
+            "license": "Apache-2.0"
+          }
+        }
+        """
+            .formatted("1".repeat(40), "2".repeat(64), "3".repeat(64));
+    String upstream =
+        Files.readString(metadata)
+            .replace("\"schemaVersion\": 4", "\"schemaVersion\": 5")
+            .replaceFirst(
+                "(?s),\\s*\"training\": \\{.*\\}\\s*$",
+                java.util.regex.Matcher.quoteReplacement(upstreamBlock));
+    Files.writeString(metadata, upstream);
+
+    try (Arena arena = Arena.ofConfined()) {
+      ActivatedLoraAdapter adapter =
+          ActivatedLoraAdapter.open(temporaryDirectory, arena, BASE_SHA, ARCHITECTURE);
+
+      assertThat(adapter.provenance())
+          .isInstanceOf(
+              com.integrallis.models.api.ActivatedAdapterMetadata.UpstreamProvenance.class);
     }
   }
 
@@ -167,20 +227,33 @@ class ActivatedLoraAdapterTest {
       ActivatedLoraAdapter adapter =
           ActivatedLoraAdapter.open(temporaryDirectory, arena, BASE_SHA, ARCHITECTURE);
 
-      assertThat(adapter.trainingProvenance().trainSelection()).isEmpty();
-      assertThat(adapter.trainingProvenance().validationSelection()).isEmpty();
+      var provenance =
+          (com.integrallis.models.api.ActivatedAdapterMetadata.TrainingProvenance)
+              adapter.provenance();
+      assertThat(provenance.trainSelection()).isEmpty();
+      assertThat(provenance.validationSelection()).isEmpty();
     }
   }
 
   private void writeAdapter(boolean wrongQShape) throws Exception {
+    writeAdapter(wrongQShape, Set.of(Projection.values()));
+  }
+
+  private void writeAdapter(boolean wrongQShape, Set<Projection> projections) throws Exception {
     SyntheticSafetensorsBuilder tensors = new SyntheticSafetensorsBuilder();
-    addProjection(tensors, "self_attn.q_proj", wrongQShape ? 3 : 2, 2, wrongQShape);
-    addProjection(tensors, "self_attn.k_proj", 2, 1, false);
-    addProjection(tensors, "self_attn.v_proj", 2, 1, false);
-    addProjection(tensors, "self_attn.o_proj", 2, 2, false);
-    addProjection(tensors, "mlp.gate_proj", 2, 3, false);
-    addProjection(tensors, "mlp.up_proj", 2, 3, false);
-    addProjection(tensors, "mlp.down_proj", 3, 2, false);
+    if (projections.contains(Projection.QUERY))
+      addProjection(tensors, "self_attn.q_proj", wrongQShape ? 3 : 2, 2, wrongQShape);
+    if (projections.contains(Projection.KEY))
+      addProjection(tensors, "self_attn.k_proj", 2, 1, false);
+    if (projections.contains(Projection.VALUE))
+      addProjection(tensors, "self_attn.v_proj", 2, 1, false);
+    if (projections.contains(Projection.ATTENTION_OUTPUT))
+      addProjection(tensors, "self_attn.o_proj", 2, 2, false);
+    if (projections.contains(Projection.FFN_GATE))
+      addProjection(tensors, "mlp.gate_proj", 2, 3, false);
+    if (projections.contains(Projection.FFN_UP)) addProjection(tensors, "mlp.up_proj", 2, 3, false);
+    if (projections.contains(Projection.FFN_DOWN))
+      addProjection(tensors, "mlp.down_proj", 3, 2, false);
     Path weights = temporaryDirectory.resolve("adapter_model.safetensors");
     Files.write(weights, tensors.build());
     String hash = sha256(weights);
@@ -205,9 +278,7 @@ class ActivatedLoraAdapterTest {
             "sha256": "%s",
             "rank": 1,
             "alpha": 2,
-            "targetModules": [
-              "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
-            ]
+            "targetModules": [%s]
           },
           "invocation": {"tokens": [151644, 77091, 198]},
           "training": {
@@ -255,6 +326,10 @@ class ActivatedLoraAdapterTest {
                 BASE_SHA,
                 "d".repeat(64),
                 hash,
+                projections.stream()
+                    .map(projection -> "\"" + projection.targetModule() + "\"")
+                    .sorted()
+                    .collect(java.util.stream.Collectors.joining(", ")),
                 "e".repeat(40),
                 "f".repeat(64),
                 "5".repeat(40),

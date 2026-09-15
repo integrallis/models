@@ -690,7 +690,7 @@ public final class LlamaForwardPass {
             activatedAdapter.rank(),
             activatedAdapter.alpha(),
             java.util.Arrays.stream(activatedAdapter.invocationTokens()).boxed().toList(),
-            activatedAdapter.trainingProvenance()));
+            activatedAdapter.provenance()));
   }
 
   /** Returns the largest independent-session batch supported by this execution plan. */
@@ -1026,7 +1026,7 @@ public final class LlamaForwardPass {
             dim,
             attentionOutputDim);
         normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
-        addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
+        addScaledActiveInPlace(batchX, batchAttnProjected, batchSize * dim, config.residualScale());
 
         if (pruneFinalLayer) {
           if (computeFinalLogits) {
@@ -1092,7 +1092,7 @@ public final class LlamaForwardPass {
         }
       }
       normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
-      addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
+      addScaledActiveInPlace(batchX, batchFfnProjected, batchSize * dim, config.residualScale());
       if (layerObserver != null) {
         for (int batch = 0; batch < batchSize; batch++) {
           layerObserver.onLayerComplete(layer, startPosition + batch, batchX, batch * dim, dim);
@@ -1108,6 +1108,7 @@ public final class LlamaForwardPass {
             xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
         matmulDispatch(
             logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+        scaleLogits(logits, 0, vocabSize);
         softcapLogits(logits);
         System.arraycopy(logits, 0, batchLogits, batchLogitsOffset + batch * vocabSize, vocabSize);
       }
@@ -1117,6 +1118,7 @@ public final class LlamaForwardPass {
           xNorm, 0, batchX, finalOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
       matmulDispatch(
           logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+      scaleLogits(logits, 0, config.vocabSize());
       softcapLogits(logits);
     }
   }
@@ -1192,7 +1194,7 @@ public final class LlamaForwardPass {
         batchAttnOut,
         attentionOutputDim);
     normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
-    addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
+    addScaledActiveInPlace(batchX, batchAttnProjected, batchSize * dim, config.residualScale());
 
     executeIndependentSessionFfn(sessions, lw, batchSize, layer, dim);
     observeIndependentSessionLayer(sessions, batchSize, layer, dim);
@@ -1323,7 +1325,7 @@ public final class LlamaForwardPass {
           hiddenDim);
     }
     normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
-    addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
+    addScaledActiveInPlace(batchX, batchFfnProjected, batchSize * dim, config.residualScale());
   }
 
   private void projectIndependentSessionGateUp(
@@ -1393,6 +1395,7 @@ public final class LlamaForwardPass {
           vocabSize,
           dim);
       for (int batch = 0; batch < batchSize; batch++) {
+        scaleLogits(sessionBatchLogits, batch * vocabSize, vocabSize);
         softcapLogits(sessionBatchLogits, batch * vocabSize, vocabSize);
       }
       return;
@@ -1402,6 +1405,7 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(
           xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
       matmulDispatch(logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+      scaleLogits(logits, 0, vocabSize);
       softcapLogits(logits);
       System.arraycopy(logits, 0, sessionBatchLogits, batch * vocabSize, vocabSize);
     }
@@ -1660,7 +1664,7 @@ public final class LlamaForwardPass {
       // Grouped-query attention
       java.util.Arrays.fill(attnOut, 0.0f);
       int groupSize = numHeads / numKvHeads;
-      float scale = (float) (1.0 / Math.sqrt(keyLength));
+      float scale = config.attentionScale();
 
       for (int h = 0; h < numHeads; h++) {
         int kvHead = h / groupSize;
@@ -1694,9 +1698,7 @@ public final class LlamaForwardPass {
       normalizeProjection(attnProjected, lw.attentionPostNorm(), dim);
 
       // Residual connection
-      for (int i = 0; i < dim; i++) {
-        x[i] += attnProjected[i];
-      }
+      addScaledActiveInPlace(x, attnProjected, dim, config.residualScale());
 
       // Second pruning shortcut: the last layer's FFN cannot change a discarded activation.
       // HIDDEN consumes that activation, so it must run the FFN.
@@ -1737,9 +1739,7 @@ public final class LlamaForwardPass {
       normalizeProjection(ffnProjected, lw.ffnPostNorm(), dim);
 
       // Residual connection
-      for (int i = 0; i < dim; i++) {
-        x[i] += ffnProjected[i];
-      }
+      addScaledActiveInPlace(x, ffnProjected, dim, config.residualScale());
       if (layerObserver != null) {
         layerObserver.onLayerComplete(layer, position, x, 0, dim);
       }
@@ -1756,6 +1756,7 @@ public final class LlamaForwardPass {
     }
     matmulDispatch(
         logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+    scaleLogits(logits, 0, config.vocabSize());
     softcapLogits(logits);
     return logits;
   }
@@ -2031,7 +2032,7 @@ public final class LlamaForwardPass {
     matmulDispatch(ffnProjected, ffnOut, layer.ffnDown(), layer.ffnDownType(), dim, hiddenDim);
     normalizeProjection(ffnProjected, layer.ffnPostNorm(), dim);
     for (int index = 0; index < dim; index++) {
-      batchX[stateOffset + index] += ffnProjected[index];
+      batchX[stateOffset + index] += config.residualScale() * ffnProjected[index];
     }
   }
 
@@ -2080,7 +2081,8 @@ public final class LlamaForwardPass {
     int batchSize = toBatch - fromBatch;
     int chunkStartPosition = startPosition + fromBatch;
     int slidingWindow = config.usesSlidingWindow(layerIndex) ? config.slidingWindow() : 0;
-    if (fromBatch == 0
+    if (!config.usesGraniteScaling()
+        && fromBatch == 0
         && batchedAttentionKernel.isEligible(
             layerIndex,
             chunkStartPosition,
@@ -2139,7 +2141,7 @@ public final class LlamaForwardPass {
     int valueLength = config.valueLength();
     int numHeads = config.numHeads();
     int groupSize = numHeads / config.numKvHeads();
-    float scale = (float) (1.0 / Math.sqrt(keyLength));
+    float scale = config.attentionScale();
     java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
 
     for (int head = 0; head < numHeads; head++) {
@@ -2340,6 +2342,21 @@ public final class LlamaForwardPass {
     for (int index = 0; index < length; index++) {
       target[index] += addend[index];
     }
+  }
+
+  private static void addScaledActiveInPlace(
+      float[] target, float[] addend, int length, float scale) {
+    if (scale == 1.0f) {
+      addActiveInPlace(target, addend, length);
+      return;
+    }
+    for (int index = 0; index < length; index++) {
+      target[index] += scale * addend[index];
+    }
+  }
+
+  private void scaleLogits(float[] values, int offset, int length) {
+    scaleActive(values, offset, length, 1.0f / config.logitScale());
   }
 
   private void addActivatedAdapter(

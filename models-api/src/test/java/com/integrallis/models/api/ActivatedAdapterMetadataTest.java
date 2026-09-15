@@ -48,10 +48,37 @@ class ActivatedAdapterMetadataTest {
     assertThat(metadata.adapterSha256()).isEqualTo("c".repeat(64));
     assertThat(metadata.tokenizerFileSha256())
         .containsExactly(Map.entry("tokenizer.json", "d".repeat(64)));
-    assertThat(metadata.trainingProvenance().datasetRevision()).isEqualTo("e".repeat(40));
+    assertThat(metadata.trainingProvenance().orElseThrow().datasetRevision())
+        .isEqualTo("e".repeat(40));
     assertThat(metadata.invocationTokens()).containsExactly(151644, 77091, 198);
     assertThatThrownBy(() -> metadata.invocationTokens().add(1))
         .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  void keepsPublisherEvidenceDistinctFromTrainingEvidence() {
+    ActivatedAdapterMetadata metadata =
+        new ActivatedAdapterMetadata(
+            "ibm-granite/granite-3.2-8b-instruct",
+            "a".repeat(40),
+            "b".repeat(64),
+            tokenizers(),
+            "c".repeat(64),
+            32,
+            32,
+            List.of(1, 2, 3),
+            new ActivatedAdapterMetadata.UpstreamProvenance(
+                "IBM Research",
+                "ibm-granite/granite-3.2-8b-alora-rag-query-rewrite",
+                "d".repeat(40),
+                "e".repeat(64),
+                "f".repeat(64),
+                "Apache-2.0"));
+
+    assertThat(metadata.trainingProvenance()).isEmpty();
+    assertThat(metadata.upstreamProvenance())
+        .hasValueSatisfying(
+            upstream -> assertThat(upstream.repository()).startsWith("ibm-granite/"));
   }
 
   @Test

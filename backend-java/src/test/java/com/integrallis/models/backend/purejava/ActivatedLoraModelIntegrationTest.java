@@ -496,7 +496,8 @@ class ActivatedLoraModelIntegrationTest {
     } catch (Exception failure) {
       throw new IllegalStateException("cannot hash real base fixture", failure);
     }
-    ActivatedAdapterMetadata.TrainingProvenance training = adapter.trainingProvenance();
+    ActivatedAdapterMetadata.TrainingProvenance training =
+        adapter.trainingProvenance().orElseThrow();
     assertThat(training.dataset()).isEqualTo(TRAINING_DATASET);
     assertThat(training.datasetRevision()).isEqualTo(TRAINING_DATASET_REVISION);
     assertThat(training.sourceFile()).isEqualTo("train.javajs.messages.jsonl");
