@@ -122,6 +122,11 @@ public final class InferenceBenchmarkCli {
       System.exit(ActivatedPrefixSharingBenchmarkCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "activated-query-rewrite".equals(args[0])) {
+      System.exit(
+          ActivatedQueryRewriteQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "activated-decision-profile".equals(args[0])) {
       System.exit(ActivatedDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
