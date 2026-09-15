@@ -198,6 +198,43 @@ class TensorOpsTest {
       assertThat(singleOutput).containsExactly(5.0f, 11.0f, 17.0f);
       assertThat(batchOutput).containsExactly(5.0f, 11.0f, 17.0f, 0.0f, -1.0f, -2.0f);
     }
+
+    @Test
+    void f16MatrixSupportsBatchedActivationsWithoutExpandingWeights() {
+      float[] batchInput = {1.0f, 2.0f, -1.0f, 0.5f};
+      MemorySegment weight = MemorySegment.ofArray(f16Bits(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f));
+      float[] batchOutput = new float[6];
+
+      TensorOps.ggufBatchedMatmul(
+          batchOutput,
+          batchInput,
+          weight,
+          GgufTensorType.F16,
+          2,
+          3,
+          2,
+          new byte[0],
+          new float[0],
+          new int[0],
+          new short[0],
+          new float[0],
+          GgufQ4Kernel.WIDENED);
+
+      assertThat(TensorOps.supportsBatchedMatmul(GgufTensorType.F16)).isTrue();
+      assertThat(batchOutput).containsExactly(5.0f, 11.0f, 17.0f, 0.0f, -1.0f, -2.0f);
+    }
+
+    @Test
+    void exactMappedProjectionRetainsF32Activations() {
+      float[] batchInput = {1.0f, 2.0f, -1.0f, 0.5f};
+      MemorySegment weight = MemorySegment.ofArray(f16Bits(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f));
+      float[] actual = new float[6];
+
+      TensorOps.ggufExactBatchedMatmul(
+          actual, batchInput, weight, GgufTensorType.F16, 2, 3, 2, new float[2]);
+
+      assertThat(actual).containsExactly(5.0f, 11.0f, 17.0f, 0.0f, -1.0f, -2.0f);
+    }
   }
 
   @Nested
@@ -1432,6 +1469,15 @@ class TensorOpsTest {
         ByteBuffer.allocate(bits.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
     for (int value : bits) {
       bytes.putShort((short) value);
+    }
+    return bytes.array();
+  }
+
+  private static byte[] f16Bits(float... values) {
+    ByteBuffer bytes =
+        ByteBuffer.allocate(values.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+    for (float value : values) {
+      bytes.putShort(Float.floatToFloat16(value));
     }
     return bytes.array();
   }

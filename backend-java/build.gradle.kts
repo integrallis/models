@@ -96,6 +96,14 @@ val modelFixtures =
             "granite_embedding_107m_multilingual_q4_k_m",
         ),
         modelFixture(
+            "downloadNomicEmbedTextV15F16Model",
+            "nomic_embed_text_v1_5_f16",
+        ),
+        modelFixture(
+            "downloadBgeSmallEnV15F16Model",
+            "bge_small_en_v1_5_f16",
+        ),
+        modelFixture(
             "downloadQwen38BQ4KMModel",
             "qwen3_8b_q4_k_m",
         ),
@@ -757,6 +765,44 @@ tasks.register<Test>("graniteEmbeddingIntegrationTest") {
         )
     }
     dependsOn(tasks.named("downloadGraniteEmbedding107MMultilingualQ4KMModel"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
+}
+
+tasks.register<Test>("nomicEmbeddingIntegrationTest") {
+    description = "Run the pinned Nomic Embed Text v1.5 F16 pure-Java embedding tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.NomicEmbeddingModelFixtureIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadNomicEmbedTextV15F16Model"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "2g"
+}
+
+tasks.register<Test>("bgeSmallEmbeddingIntegrationTest") {
+    description = "Run the pinned BGE Small EN v1.5 F16 pure-Java embedding tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.BgeSmallEmbeddingModelFixtureIntegrationTest",
+        )
+    }
+    dependsOn(tasks.named("downloadBgeSmallEnV15F16Model"))
     outputs.upToDateWhen { false }
     maxParallelForks = 1
     maxHeapSize = "2g"
