@@ -40,7 +40,7 @@ def prepare(conversations_path: Path, lastturns_path: Path, rewrites_path: Path,
     rewrites = load_jsonl(rewrites_path)
     lastturns = load_jsonl(lastturns_path)
     rewrite_by_lastturn = {
-        text.removeprefix("|user|: ").strip(): rewrites[identifier]
+        text.removeprefix("|user|: ").strip(): (identifier, rewrites[identifier])
         for identifier, text in lastturns.items()
         if identifier in rewrites
     }
@@ -60,12 +60,14 @@ def prepare(conversations_path: Path, lastturns_path: Path, rewrites_path: Path,
             prefix.append({"role": "assistant" if speaker == "agent" else speaker, "text": text})
             if speaker != "user" or not isinstance(timestamp, int):
                 continue
-            expected = rewrite_by_lastturn.get(text.strip())
-            if expected is None:
+            match = rewrite_by_lastturn.get(text.strip())
+            if match is None:
                 continue
+            query_id, expected = match
             cases.append(
                 {
                     "id": hashlib.sha256((author + str(timestamp)).encode()).hexdigest(),
+                    "queryId": query_id,
                     "messages": list(prefix),
                     "expectedRewrite": expected.removeprefix("|user|: ").strip(),
                 }
