@@ -51,7 +51,8 @@ public final class ActivatedLoraAdapter {
   private static final JsonFactory JSON =
       JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
   private static final String METADATA_FILE = "models-activated-lora.json";
-  private static final String ADAPTER_KIND = "activated-lora-tool-specialist";
+  private static final String ADAPTER_KIND = "activated-lora-specialist";
+  private static final String LEGACY_TOOL_ADAPTER_KIND = "activated-lora-tool-specialist";
 
   /** Transformer projections supported by the activated adapter. */
   public enum Projection {
@@ -695,7 +696,9 @@ public final class ActivatedLoraAdapter {
     void validate() throws IOException {
       if (schemaVersion != 2 && schemaVersion != 3 && schemaVersion != 4 && schemaVersion != 5)
         throw new IOException("unsupported adapter schemaVersion: " + schemaVersion);
-      if (!ADAPTER_KIND.equals(kind)) throw new IOException("unsupported adapter kind: " + kind);
+      if (!ADAPTER_KIND.equals(kind) && !LEGACY_TOOL_ADAPTER_KIND.equals(kind)) {
+        throw new IOException("unsupported adapter kind: " + kind);
+      }
       if (baseModel == null || baseModel.isBlank()) throw new IOException("base.model is required");
       if (baseRevision == null || !baseRevision.matches("[0-9a-f]{40}")) {
         throw new IOException("base.revision must be a pinned 40-character commit hash");

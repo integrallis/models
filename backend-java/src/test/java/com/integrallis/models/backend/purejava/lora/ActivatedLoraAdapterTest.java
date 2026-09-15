@@ -122,6 +122,9 @@ class ActivatedLoraAdapterTest {
     String upstream =
         Files.readString(metadata)
             .replace("\"schemaVersion\": 4", "\"schemaVersion\": 5")
+            .replace(
+                "\"kind\": \"activated-lora-tool-specialist\"",
+                "\"kind\": \"activated-lora-specialist\"")
             .replaceFirst(
                 "(?s),\\s*\"training\": \\{.*\\}\\s*$",
                 java.util.regex.Matcher.quoteReplacement(upstreamBlock));
@@ -134,6 +137,16 @@ class ActivatedLoraAdapterTest {
       assertThat(adapter.provenance())
           .isInstanceOf(
               com.integrallis.models.api.ActivatedAdapterMetadata.UpstreamProvenance.class);
+    }
+  }
+
+  @Test
+  void retainsTheLegacyToolSpecialistKindForExistingAdapters() throws Exception {
+    writeAdapter(false);
+
+    try (Arena arena = Arena.ofConfined()) {
+      assertThat(ActivatedLoraAdapter.open(temporaryDirectory, arena, BASE_SHA, ARCHITECTURE))
+          .isNotNull();
     }
   }
 
