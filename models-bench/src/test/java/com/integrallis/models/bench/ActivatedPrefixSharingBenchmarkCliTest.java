@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.within;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -139,6 +140,17 @@ class ActivatedPrefixSharingBenchmarkCliTest {
             ActivatedPrefixSharingBenchmarkCli.tokenSequencesExact(
                 List.of(List.of(151_644, 198), List.of(151_645, 198))))
         .isFalse();
+  }
+
+  @Test
+  void serializesTheOptionalCrossoverInQualificationEvidence() throws Exception {
+    ObjectMapper mapper = ActivatedPrefixSharingBenchmarkCli.reportMapper();
+
+    String json =
+        mapper.writeValueAsString(
+            new ActivatedPrefixSharingBenchmarkCli.Verdict(java.util.Optional.of(256), 0.4, true));
+
+    assertThat(json).contains("\"crossoverPrefixTokens\" : 256");
   }
 
   private static ActivatedPrefixSharingBenchmarkCli.TierSummary summary(

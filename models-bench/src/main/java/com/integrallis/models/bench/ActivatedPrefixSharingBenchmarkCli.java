@@ -17,6 +17,7 @@ package com.integrallis.models.bench;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
@@ -501,7 +502,7 @@ final class ActivatedPrefixSharingBenchmarkCli {
     if (parent != null) {
       Files.createDirectories(parent);
     }
-    ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    ObjectMapper mapper = reportMapper();
     Path temporary = output.resolveSibling(output.getFileName() + ".tmp");
     Files.writeString(temporary, mapper.writeValueAsString(report) + System.lineSeparator());
     try {
@@ -510,6 +511,12 @@ final class ActivatedPrefixSharingBenchmarkCli {
     } catch (AtomicMoveNotSupportedException unsupported) {
       Files.move(temporary, output, StandardCopyOption.REPLACE_EXISTING);
     }
+  }
+
+  static ObjectMapper reportMapper() {
+    return new ObjectMapper()
+        .registerModule(new Jdk8Module())
+        .enable(SerializationFeature.INDENT_OUTPUT);
   }
 
   private enum PrefixMode {
