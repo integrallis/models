@@ -22,6 +22,8 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /** Parses a GGUF file from disk using memory-mapped I/O for zero-copy tensor access. */
@@ -110,9 +112,7 @@ public final class GgufParser {
               + " exceeds file size "
               + segment.byteSize());
     }
-    for (GgufTensorInfo tensor : tensorInfos) {
-      validateTensorRange(tensor, tensorDataOffset, segment.byteSize());
-    }
+    validateTensorRanges(tensorInfos, tensorDataOffset, segment.byteSize());
 
     return new GgufFile(header, metadata, tensorInfos, tensorDataOffset, segment);
   }
@@ -129,31 +129,88 @@ public final class GgufParser {
     }
   }
 
-  private static void validateTensorRange(
-      GgufTensorInfo tensor, long tensorDataOffset, long fileSize) {
-    long tensorBytes;
-    try {
-      tensorBytes = tensor.byteSize();
-    } catch (IllegalArgumentException | ArithmeticException invalidLayout) {
-      throw new MalformedGgufException(
-          "tensor '" + tensor.name() + "' has an invalid block layout", invalidLayout);
-    }
-    try {
-      long start = Math.addExact(tensorDataOffset, tensor.offset());
-      long end = Math.addExact(start, tensorBytes);
-      if (end > fileSize) {
+  /**
+   * Asserts that every tensor's data region holds exactly the bytes its type and shape require.
+   *
+   * <p>The expected length is {@code elements / blockSize * typeSize}. The bytes available to a
+   * tensor are those between its start and the start of the next tensor in offset order (or the end
+   * of the file for the last one). A region that is short, overlaps the next tensor, or runs past
+   * the file is rejected with the tensor name, the expected length, and the available length; it is
+   * never skipped or zero-filled.
+   */
+  private static void validateTensorRanges(
+      List<GgufTensorInfo> tensors, long tensorDataOffset, long fileSize) {
+    int count = tensors.size();
+    long[] starts = new long[count];
+    long[] expectedBytes = new long[count];
+    Integer[] order = new Integer[count];
+    for (int index = 0; index < count; index++) {
+      GgufTensorInfo tensor = tensors.get(index);
+      try {
+        expectedBytes[index] = tensor.byteSize();
+      } catch (IllegalArgumentException | ArithmeticException invalidLayout) {
         throw new MalformedGgufException(
-            "tensor '"
-                + tensor.name()
-                + "' extends past the file (end "
-                + end
+            "tensor '" + tensor.name() + "' has an invalid block layout", invalidLayout);
+      }
+      try {
+        starts[index] = Math.addExact(tensorDataOffset, tensor.offset());
+        Math.addExact(starts[index], expectedBytes[index]);
+      } catch (ArithmeticException overflow) {
+        throw new MalformedGgufException(
+            "tensor '" + tensor.name() + "' range overflows a 64-bit offset", overflow);
+      }
+      order[index] = index;
+    }
+    Arrays.sort(order, Comparator.comparingLong(index -> starts[index]));
+    for (int rank = 0; rank < count; rank++) {
+      int index = order[rank];
+      GgufTensorInfo tensor = tensors.get(index);
+      long start = starts[index];
+      long expected = expectedBytes[index];
+      if (start > fileSize) {
+        throw new MalformedGgufException(
+            sizeMessage(tensor, expected, 0)
+                + ": data starts at "
+                + start
+                + ", past the end of the file (size "
+                + fileSize
+                + ")");
+      }
+      boolean last = rank + 1 == count;
+      long limit = last ? fileSize : Math.min(starts[order[rank + 1]], fileSize);
+      long available = limit - start;
+      if (expected <= available) {
+        continue;
+      }
+      if (last || limit == fileSize && starts[order[rank + 1]] >= fileSize) {
+        throw new MalformedGgufException(
+            sizeMessage(tensor, expected, available)
+                + " before the end of file (data starts at "
+                + start
                 + ", file size "
                 + fileSize
                 + ")");
       }
-    } catch (ArithmeticException overflow) {
+      GgufTensorInfo next = tensors.get(order[rank + 1]);
       throw new MalformedGgufException(
-          "tensor '" + tensor.name() + "' range overflows a 64-bit offset", overflow);
+          sizeMessage(tensor, expected, available)
+              + ": it overlaps tensor '"
+              + next.name()
+              + "', which starts at data offset "
+              + next.offset());
     }
+  }
+
+  private static String sizeMessage(GgufTensorInfo tensor, long expected, long available) {
+    return "tensor '"
+        + tensor.name()
+        + "' ("
+        + tensor.type()
+        + ", shape "
+        + Arrays.toString(tensor.shape())
+        + ") expected "
+        + expected
+        + " bytes, available "
+        + available;
   }
 }
