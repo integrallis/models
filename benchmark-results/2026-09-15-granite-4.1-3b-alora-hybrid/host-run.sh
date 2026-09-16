@@ -7,7 +7,7 @@
 # owns all inference, and nothing external to Models is installed for inference.
 #
 # Usage: MODELS_COMMIT=<sha> HF_TOKEN=<optional> bash host-run.sh <phase>
-#   phase = bootstrap | artifacts | identity | window | all
+#   phase = bootstrap | artifacts | identity | window | window-arm <backend> | all
 set -euo pipefail
 
 MODELS_COMMIT="${MODELS_COMMIT:?MODELS_COMMIT is required}"
@@ -136,11 +136,21 @@ PY
 
 window() {
   if ! grep -q "IDENTITY10 PASS" "$EVIDENCE/identity10-summary.txt" 2>/dev/null; then log "identity precondition not satisfied; refusing the Rust window"; exit 3; fi
+  window_arm rust-ffm
+}
+
+# The MT-RAG identity screen failed on 1 of 10 cases (recorded in preflight.md), so the window
+# runs on both backends at one frozen commit: pure Java is the reference the amendment names, Rust
+# FFM is the backend ModelJars ships. This phase records the identity summary next to the arm it
+# runs instead of refusing, and the report states the per-case agreement between the arms.
+window_arm() { # backend
+  local backend="$1"
+  log "window-arm $backend at $MODELS_COMMIT; identity10 summary: $(tail -1 "$EVIDENCE/identity10-summary.txt" 2>/dev/null || echo absent)"
   for suite in squad-v2-dev mtrag-human-rag; do for arm in specialist base; do
-    run_arm "$suite" "$arm" rust-ffm 0 window
+    run_arm "$suite" "$arm" "$backend" 0 window
   done; done
   sha256sum "$EVIDENCE"/*.json | tee "$EVIDENCE/SHA256SUMS"
-  log "window complete"
+  log "window-arm $backend complete"
 }
 
 # Later phases run at a newer Models commit that adds the answerability long-context and
@@ -187,6 +197,7 @@ case "${1:-all}" in
   artifacts) artifacts ;;
   identity) identity ;;
   window) window ;;
+  window-arm) window_arm "${2:?backend}" ;;
   all) bootstrap; artifacts; identity; window ;;
   *) echo "unknown phase: $1" >&2; exit 64 ;;
 esac

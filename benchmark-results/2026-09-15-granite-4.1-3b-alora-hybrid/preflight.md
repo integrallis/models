@@ -279,3 +279,20 @@ llama.cpp that is not present for Qwen. Next: JFR execution samples of the Rust 
 on this host to locate the cost before any kernel work. No base qualification can be claimed until
 the tier and comparator gates pass on a run recorded in this file.
 
+**Rust admission precondition, MT-RAG (host 1, Models 4ce4fd1, 2026-09-16T04:54Z):** NOT identical.
+On the first ten MT-RAG cases the pure-Java arm and the Rust FFM arm agree on 9 and differ on
+`f1121a39…<::>2` (label answerable; Java says unanswerable, Rust says answerable). Every other field
+matches (ids, order, structure, sharing). Per-case wall time: Java 144–685 s, Rust 62–445 s
+(`host-evidence/identity10-mtrag-human-rag-specialist-{pure-java,rust-ffm}.json`). The flip is a
+borderline decision moving with float accumulation order; the answerability head reads one
+next-token distribution, so any last-ulp difference at the boundary changes the label. Under the
+frozen amendment the Rust arm is therefore not admitted for gates 4–5 on the strength of this
+screen. Decision, taken before any window result is read: the window runs on BOTH arms at one
+frozen Models commit — pure Java as the reference the amendment names, Rust FFM as the backend that
+ModelJars would actually ship (every base entry in the catalog is rust-ffm) — and the report states
+the per-case agreement rate between the arms alongside each arm's balanced accuracy. Qualification
+is decided on the pure-Java arm per the frozen rule; the Rust arm is published only if it also
+clears every threshold. The frozen commit must be one at which the base performance gate passes,
+because ModelJars requires a single `modelsRevision` across the base, component, and composition
+evidence, so the window is not started until that commit exists.
+

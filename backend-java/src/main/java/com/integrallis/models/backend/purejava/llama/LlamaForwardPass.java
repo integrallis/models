@@ -2325,8 +2325,11 @@ public final class LlamaForwardPass {
   }
 
   private boolean usesVectorizedSwiGlu() {
+    // Granite joins the Qwen families: its greedy oracle tests hold with the vector EXP, and the
+    // scalar Math.exp loop was 14% of Java-side samples in the Granite 4.1 3B RAG profile.
     return config.architecture() == DecoderArchitecture.QWEN2
-        || config.architecture() == DecoderArchitecture.QWEN3;
+        || config.architecture() == DecoderArchitecture.QWEN3
+        || config.architecture() == DecoderArchitecture.GRANITE;
   }
 
   private static void scaleActive(float[] values, int offset, int length, float scale) {
@@ -2377,9 +2380,9 @@ public final class LlamaForwardPass {
       addActiveInPlace(target, addend, length);
       return;
     }
-    for (int index = 0; index < length; index++) {
-      target[index] += scale * addend[index];
-    }
+    // Only Granite's residual multiplier reaches this branch; the vector FMA replaces a scalar
+    // loop that was 13% of Java-side samples in the Granite 4.1 3B RAG profile.
+    VectorUtil.addScaledInPlace(target, 0, addend, 0, length, scale);
   }
 
   private void scaleLogits(float[] values, int offset, int length) {
