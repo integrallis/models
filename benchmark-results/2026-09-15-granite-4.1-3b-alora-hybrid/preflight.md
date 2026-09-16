@@ -461,3 +461,10 @@ Prefill and TTFT gain as expected from the larger pool; decode loses against a p
 every job still wakes all workers (the generation broadcast is pool-wide) and the idle ones cost
 their wake and their decrement. Keeping a pool of 8 for the qualification profile; the per-phase
 switch stays available but is not part of the recorded tuning until the wake path is selective.
+
+Interleaved A/B on the same instance (three iterations each, native workers 8): pre-fusion
+4a0d5cc → decode 17.8 and 18.1 tok/s, TTFT 1534/1575 ms, e2e 3451/3371 ms; fused v2 with the
+per-phase commit (987211a, decode threads unset) → 16.8 and 16.9, TTFT 1602/1604, e2e 3646/3682.
+The fused v2 path is a real ~6% decode regression on this host, not noise. Kernel v3 (4c617ac:
+lane reductions, register-resident value accumulators, vector softmax; 616 tests and the Granite
+oracle pass) is measured next; if it does not beat the pre-fusion path, the per-head path returns.
