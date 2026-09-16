@@ -19,6 +19,7 @@ import com.integrallis.vectors.core.MathUtil;
 import com.integrallis.vectors.core.PanamaConstants;
 import java.util.Objects;
 import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.IntVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorShape;
 import jdk.incubator.vector.VectorShuffle;
@@ -178,13 +179,22 @@ public final class GroupedQueryAttentionKernel {
     if (!Float.isFinite(max)) {
       throw new IllegalArgumentException("softmax requires at least one finite input");
     }
-    // The exponential stays scalar Math.exp on purpose: HotSpot gives Math.exp the same result in
-    // the interpreter and in compiled code, whereas lanewise(EXP) switches to the vector math
-    // library once C2 compiles this method and then differs from its pre-compilation fallback in
-    // the last bits. Attention outputs must not depend on JIT tier.
-    float sum = 0.0f;
-    for (index = 0; index < size; index++) {
-      float value = (float) Math.exp(x[offset + index] - max);
+    // lanewise(EXP) is not used: it resolves to the vector math library once C2 compiles this
+    // method and to scalar Math.exp before that, so results would depend on JIT tier. expVector is
+    // plain lanewise arithmetic (range reduction and a polynomial) and is identical in both tiers;
+    // the scalar tail uses the same arithmetic so a row's probabilities do not depend on where the
+    // vector loop stops.
+    FloatVector maxBroadcast = FloatVector.broadcast(SPECIES, max);
+    FloatVector sumVector = FloatVector.zero(SPECIES);
+    index = 0;
+    for (; index < vectorLimit; index += lanes) {
+      FloatVector value = expVector(load(x, offset + index).sub(maxBroadcast));
+      value.intoArray(x, offset + index);
+      sumVector = sumVector.add(value);
+    }
+    float sum = reduceAddFixedTree(sumVector);
+    for (; index < size; index++) {
+      float value = expScalar(x[offset + index] - max);
       x[offset + index] = value;
       sum += value;
     }
@@ -374,6 +384,61 @@ public final class GroupedQueryAttentionKernel {
       vector = vector.add(vector.rearrange(ROTATE_1));
     }
     return vector.lane(0);
+  }
+
+  private static final float LOG2E = 1.44269504f;
+  private static final float LN2_HI = 0.693145752f;
+  private static final float LN2_LO = 1.42860677e-6f;
+  private static final float EXP_LOWER = -87.0f;
+  private static final float EXP_UPPER = 88.0f;
+  private static final float ROUND_MAGIC = 12582912.0f;
+  private static final float P0 = 1.0f / 720.0f;
+  private static final float P1 = 1.0f / 120.0f;
+  private static final float P2 = 1.0f / 24.0f;
+  private static final float P3 = 1.0f / 6.0f;
+  private static final float P4 = 0.5f;
+
+  /**
+   * {@code e^x} for softmax inputs ({@code x <= 0} after the max shift) from lanewise arithmetic
+   * only: clamp, Cody-Waite range reduction {@code x = n ln2 + r}, a degree-six Taylor polynomial
+   * for {@code e^r} on {@code |r| <= ln2/2}, and {@code 2^n} assembled through the exponent bits.
+   * Relative error is below 2e-7 on that range. Every step is a lanewise mul, add, FMA, round, or
+   * integer shift, so the interpreter fallback and the compiled intrinsics agree bit for bit.
+   */
+  static FloatVector expVector(FloatVector x) {
+    x = x.max(EXP_LOWER).min(EXP_UPPER);
+    // Round to nearest through the 1.5 * 2^23 magic constant: plain add and subtract, exact for
+    // the clamped range, and the same operation in the scalar twin.
+    FloatVector magic = FloatVector.broadcast(SPECIES, ROUND_MAGIC);
+    FloatVector n = x.mul(LOG2E).add(magic).sub(magic);
+    FloatVector r = fma(n, FloatVector.broadcast(SPECIES, -LN2_HI), x);
+    r = fma(n, FloatVector.broadcast(SPECIES, -LN2_LO), r);
+    FloatVector p = FloatVector.broadcast(SPECIES, P0);
+    p = fma(p, r, FloatVector.broadcast(SPECIES, P1));
+    p = fma(p, r, FloatVector.broadcast(SPECIES, P2));
+    p = fma(p, r, FloatVector.broadcast(SPECIES, P3));
+    p = fma(p, r, FloatVector.broadcast(SPECIES, P4));
+    p = fma(p, r, FloatVector.broadcast(SPECIES, 1.0f));
+    p = fma(p, r, FloatVector.broadcast(SPECIES, 1.0f));
+    IntVector exponent = (IntVector) n.convert(VectorOperators.F2I, 0);
+    exponent = exponent.add(127).lanewise(VectorOperators.LSHL, 23);
+    return p.mul(exponent.reinterpretAsFloats());
+  }
+
+  /** Scalar twin of {@link #expVector}, the same operations in the same order. */
+  static float expScalar(float x) {
+    x = Math.min(Math.max(x, EXP_LOWER), EXP_UPPER);
+    float n = (x * LOG2E + ROUND_MAGIC) - ROUND_MAGIC;
+    float r = MathUtil.fma(n, -LN2_HI, x);
+    r = MathUtil.fma(n, -LN2_LO, r);
+    float p = P0;
+    p = MathUtil.fma(p, r, P1);
+    p = MathUtil.fma(p, r, P2);
+    p = MathUtil.fma(p, r, P3);
+    p = MathUtil.fma(p, r, P4);
+    p = MathUtil.fma(p, r, 1.0f);
+    p = MathUtil.fma(p, r, 1.0f);
+    return p * Float.intBitsToFloat(((int) n + 127) << 23);
   }
 
   private static FloatVector load(float[] array, int offset) {

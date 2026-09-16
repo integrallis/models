@@ -158,6 +158,38 @@ class GroupedQueryAttentionKernelTest {
         .hasMessageContaining("NaN");
   }
 
+  @Test
+  void vectorExponentialMatchesItsScalarTwinAndMathExp() {
+    float[] inputs = new float[64];
+    Random random = new Random(3);
+    for (int index = 0; index < inputs.length; index++) {
+      inputs[index] = -random.nextFloat() * 30.0f;
+    }
+    inputs[0] = 0.0f;
+    inputs[1] = -1e-7f;
+    inputs[2] = -0.34657359f;
+    inputs[3] = -0.3465736f;
+    inputs[4] = -90.0f;
+    float[] fromVector = new float[inputs.length];
+    int lanes = GroupedQueryAttentionKernel.SPECIES.length();
+    for (int index = 0; index + lanes <= inputs.length; index += lanes) {
+      GroupedQueryAttentionKernel.expVector(
+              jdk.incubator.vector.FloatVector.fromArray(
+                  GroupedQueryAttentionKernel.SPECIES, inputs, index))
+          .intoArray(fromVector, index);
+    }
+    for (int index = 0; index < inputs.length; index++) {
+      float scalar = GroupedQueryAttentionKernel.expScalar(inputs[index]);
+      assertThat(fromVector[index]).as("lane %d", index).isEqualTo(scalar);
+      // Inputs below -87 are clamped: their probability mass is below 1e-37 of the row and
+      // the clamp keeps the exponent assembly in normal range.
+      double expected = Math.exp(Math.max(inputs[index], -87.0f));
+      assertThat((double) scalar)
+          .as("x=%s", inputs[index])
+          .isCloseTo(expected, org.assertj.core.data.Offset.offset(expected * 4e-7));
+    }
+  }
+
   private static float[] randomArray(Random random, int length) {
     float[] values = new float[length];
     for (int index = 0; index < length; index++) {
