@@ -112,3 +112,45 @@ decode gap is inside the matmul, not around it.
 figures above): Models 144.7 prefill tok/s against llama.cpp 280.6 and Ollama 596.4 —
 1.9× and 4.1×. Prefill is compute-bound, so that ratio points at the dot-product ISA, not
 the pool: c7a is Zen 4 (AVX-512, VNNI). Checked next.
+
+## The prefill gap, read from source (b10012 `ggml-cpu/repack.cpp`, `arch/x86/repack.cpp`, `arch/x86/quants.c`)
+
+6. **Repacked, register-tiled GEMM for prefill.** With `GGML_CPU_REPACK` (default on), every
+   Q4_K weight tensor whose row count is a multiple of 8 is repacked at load into
+   `block_q4_Kx8` (eight rows interleaved per super-block) and multi-token matmuls go through
+   `ggml_gemm_q4_K_8x8_q8_K`: four activation rows (`block_q8_Kx4`) × eight or sixteen weight
+   rows per register tile, accumulators held in `__m256`/`__m512` across the whole K loop,
+   scales and mins folded per tile. Each weight load feeds 4 activation rows and each
+   activation load feeds 8–16 weight rows. Single-token decode uses `ggml_gemv_q4_K_8x8_q8_K`.
+   Ours (`compute_q4_k_batched_row_range_avx2`): one weight row at a time; the block's nibbles
+   are decoded once into 8 registers and reused across the batch (good), but every batch column
+   reloads its 8 activation vectors from L2 and does its own `maddubs`/`madd`/`cvt`/`fmadd`
+   chain, then the row is horizontally reduced per column. Loads per MAC are ~4–8× ggml's, and
+   the float conversion happens per (row, column, block) instead of per tile. Q6_K (`v`,
+   `down`, LM head) has the same shape.
+7. **ISA.** Every Rust kernel is `#[target_feature(enable = "avx2,fma,f16c")]`; there is no
+   AVX-512 or VNNI path. ggml built with `GGML_NATIVE` (the certified arm) on c7a (Zen 4:
+   AVX-512 F/BW/DQ/VL, VNNI, BF16) takes the 512-bit tile body in the repacked GEMM and
+   `_mm256_dpbusd_epi32` (VNNI) for the `maddubs`+`madd` pair in `vec_dot`. Zen 4 double-pumps
+   512-bit ops, so the win is fewer instructions and half the loads, not 2× ALU throughput.
+
+Prefill is compute-bound (Result 3), so 6 and 7 are the candidates for the 1.9× prefill gap
+and, through the LM head and `gemv` layout, a slice of the decode gap. Decided by measurement:
+llama-bench (pp512 / tg64) on the reference host across a build matrix — native+repack,
+AVX2+repack, native without repack, AVX2 without repack — separates the tiling gain from the
+ISA gain before any kernel is written (`/opt/ref-llamabench.sh`, results below when they land).
+
+### Result 4 — chunk stealing × decode threads (reference host, interleaved, 3 rounds)
+
+| config        | r1    | r2    | r3    |
+|---------------|------:|------:|------:|
+| chunk 0, dt 8 | 28.28 | 25.08 | 22.90 |
+| chunk 16, dt 8| 24.67 | 21.43 | 23.28 |
+| chunk 16, dt16| 25.39 | 33.58 | (pending) |
+| chunk 64, dt16| 23.17 | 33.63 | (pending) |
+
+Spread inside one configuration (21–34 tok/s) exceeds any difference between configurations:
+the shared host cannot decide Difference 2. Chunk stealing stays behind
+`JMODELS_KERNELS_CHUNK_ROWS` (off by default) until a c7a run says otherwise. Context switches
+rise with stealing (≈250–370 k against ≈175 k), which is the atomic cursor contending across
+SMT siblings — a mild reason to expect it not to win on 8 single-token workers.
