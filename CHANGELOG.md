@@ -9,6 +9,11 @@ All notable changes to models are documented here.
 - Native backend: the vectors persistent executor, which the Java side still drives for its parallel ops, is parked when the native kernel pool opens (vectors 0.1.22, `VectorUtil.setGgufPollMillis(0)`; reported as `java-executor-poll-millis`). With both pools polling, prefill on the native backend fell from 126 to 40 tok/s and context switches rose from 0.2 M to 24 M per run; parked, it matches the previous release exactly.
 - vectors 0.1.22: the pure-Java backend's executor polls at every stage barrier before parking, measured +45% decode on dedicated cores (6.4 to 9.4 tok/s) and up to +80% on shared vCPUs.
 
+## [0.3.39] - 2026-09-16
+
+### Added
+- Qwen3 8B Q4_K_M qualification through the owned Rust/FFM kernel: an independent pinned llama.cpp greedy-token oracle through the FFM kernel, a repeatable named native fixture task, and tool-conformance CLI support for the `rust-ffm` backend; 14/14 tool suite plus the conversational tool-result follow-up pass on the pinned artifact, with the matched controlled-host benchmark recording p95 TTFT 13.98 s to 1.83 s. No external inference runtime is introduced. (#177)
+- Java-native support for Apache-2.0/MIT-licensed local embedding artifacts: Nomic Embed Text v1.5 F16 and BGE Small EN v1.5 F16, qualified against pinned llama.cpp a582222 oracles across eight probes (minimum cosine 0.9999999 and 0.9999988); the Nomic Q4_K_M sibling stays excluded at 0.9957 against the 0.999 admission gate. (#178)
 
 ## [0.3.38] - 2026-09-16
 
