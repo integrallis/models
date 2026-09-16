@@ -1330,7 +1330,6 @@ public final class LlamaForwardPass {
     int queryDim = config.queryDim();
     int keyDim = config.keyDim();
     int valueDim = config.valueDim();
-    int attentionOutputDim = config.attentionOutputDim();
     boolean usesRope = config.usesRope(layer);
     for (int batch = 0; batch < batchSize; batch++) {
       int queryOffset = batch * queryDim;
@@ -1654,7 +1653,6 @@ public final class LlamaForwardPass {
 
     int dim = config.embeddingDim();
     int keyLength = config.keyLength();
-    int valueLength = config.valueLength();
     int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads();
     prepareRope(position);
