@@ -433,3 +433,17 @@ USABLE with decode 0.75× and e2e 1.63–1.89× the controls on the certified ho
 every fix; hosts 2, 3 and the AWS instance are deleted after their evidence was copied; host 1
 (`166122805`) is stopped and kept with its artifact store until its 2026-09-17T04:00Z watchdog.
 Nothing is published or claimed qualified.
+
+**Second certified-class instance (AWS `i-0374e4bc6139ab0b5`, c7a.4xlarge, key
+SHA256:VaXNnD2G4RoWcT7TV3McuoH27gAQfWfoMOgHn53RgLQ), control at Models 4a0d5cc with the certified
+tuning:** verdict FAILED_RELATIVE_GATE — the absolute gate now passes. Rust arm USABLE: decode 18.6
+tok/s, p95 TTFT 1546 ms, p95 e2e 3429 ms. Ollama 24.95 tok/s / 681 ms / 1888 ms (PRODUCTION_READY),
+llama.cpp 25.5 / 1095 / 2484 (USABLE). This instance is slower for every engine than the first
+(Ollama 28.4 there); the ratios are what the policy reads: decode 0.75, e2e 1.82. Correctness
+27/27 and 9/9 again.
+
+Fused grouped-query attention, first version (Models 12cb99b, same instance, three iterations):
+native workers 8 → decode 16.5, prefill 90, TTFT 1519, e2e 3588; workers 12 → 15.6 / 107 / 1258 /
+3424. Slower than the control on decode: the value pass walked column chunks outermost and rows
+innermost, revisiting each V row per chunk per head. Second version (cbb00e6) streams rows in
+blocks of four; its measurement follows.
