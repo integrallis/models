@@ -471,7 +471,7 @@ public final class PureJavaBackend
         } else if ("qwen35".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadQwen35(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
-        } else if ("bert".equals(modelFamily)) {
+        } else if ("bert".equals(modelFamily) || "nomic-bert".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadBert(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else {
@@ -574,7 +574,7 @@ public final class PureJavaBackend
     int contextCapacity = runtimeContextLength(config.contextLength());
     ModelMetadata metadata =
         new ModelMetadata(
-            "bert",
+            config.architecture(),
             modelPath.getFileName().toString(),
             config.contextLength(),
             config.vocabSize(),

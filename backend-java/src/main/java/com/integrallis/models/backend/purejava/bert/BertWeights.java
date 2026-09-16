@@ -55,7 +55,9 @@ final class BertWeights {
       Matrix feedForwardDown,
       float[] feedForwardDownBias,
       float[] outputNormWeight,
-      float[] outputNormBias) {}
+      float[] outputNormBias,
+      Matrix queryKeyValue,
+      Matrix feedForwardGate) {}
 
   private final Matrix tokenEmbeddings;
   private final Matrix positionEmbeddings;
@@ -85,7 +87,10 @@ final class BertWeights {
     Objects.requireNonNull(config, "config");
     int dim = config.embeddingDim();
     Matrix tokenEmbeddings = table(file, "token_embd.weight", config.vocabSize(), dim);
-    Matrix positionEmbeddings = table(file, "position_embd.weight", config.contextLength(), dim);
+    Matrix positionEmbeddings =
+        config.usesRotaryPositions()
+            ? null
+            : table(file, "position_embd.weight", config.contextLength(), dim);
     GgufTensorData tokenTypes = file.getTensor("token_types.weight");
     long[] tokenTypeShape = tokenTypes.shape();
     if (tokenTypeShape.length != 2 || tokenTypeShape[0] != dim || tokenTypeShape[1] < 1) {
@@ -102,24 +107,29 @@ final class BertWeights {
     Layer[] layers = new Layer[config.numLayers()];
     for (int layer = 0; layer < layers.length; layer++) {
       String prefix = "blk." + layer + ".";
+      boolean nomic = config.usesRotaryPositions();
       layers[layer] =
           new Layer(
-              projection(file, prefix + "attn_q.weight", dim, dim),
-              vector(file, prefix + "attn_q.bias", dim),
-              projection(file, prefix + "attn_k.weight", dim, dim),
-              vector(file, prefix + "attn_k.bias", dim),
-              projection(file, prefix + "attn_v.weight", dim, dim),
-              vector(file, prefix + "attn_v.bias", dim),
+              nomic ? null : projection(file, prefix + "attn_q.weight", dim, dim),
+              nomic ? zero(dim) : vector(file, prefix + "attn_q.bias", dim),
+              nomic ? null : projection(file, prefix + "attn_k.weight", dim, dim),
+              nomic ? zero(dim) : vector(file, prefix + "attn_k.bias", dim),
+              nomic ? null : projection(file, prefix + "attn_v.weight", dim, dim),
+              nomic ? zero(dim) : vector(file, prefix + "attn_v.bias", dim),
               projection(file, prefix + "attn_output.weight", dim, dim),
-              vector(file, prefix + "attn_output.bias", dim),
+              nomic ? zero(dim) : vector(file, prefix + "attn_output.bias", dim),
               vector(file, prefix + "attn_output_norm.weight", dim),
               vector(file, prefix + "attn_output_norm.bias", dim),
               projection(file, prefix + "ffn_up.weight", config.hiddenDim(), dim),
-              vector(file, prefix + "ffn_up.bias", config.hiddenDim()),
+              nomic
+                  ? zero(config.hiddenDim())
+                  : vector(file, prefix + "ffn_up.bias", config.hiddenDim()),
               projection(file, prefix + "ffn_down.weight", dim, config.hiddenDim()),
-              vector(file, prefix + "ffn_down.bias", dim),
+              nomic ? zero(dim) : vector(file, prefix + "ffn_down.bias", dim),
               vector(file, prefix + "layer_output_norm.weight", dim),
-              vector(file, prefix + "layer_output_norm.bias", dim));
+              vector(file, prefix + "layer_output_norm.bias", dim),
+              nomic ? projection(file, prefix + "attn_qkv.weight", dim * 3, dim) : null,
+              nomic ? projection(file, prefix + "ffn_gate.weight", config.hiddenDim(), dim) : null);
     }
 
     return new BertWeights(
@@ -148,6 +158,10 @@ final class BertWeights {
   }
 
   void positionEmbedding(int position, float[] output) {
+    if (positionEmbeddings == null) {
+      throw new IllegalStateException(
+          "Nomic-BERT uses rotary positions, not a position embedding table");
+    }
     row(positionEmbeddings, position, output);
   }
 
@@ -163,11 +177,19 @@ final class BertWeights {
   int maxQ40ProjectionRows() {
     int rows = 0;
     for (Layer layer : layers) {
-      rows = maxQ40Rows(rows, layer.query());
-      rows = maxQ40Rows(rows, layer.key());
-      rows = maxQ40Rows(rows, layer.value());
+      if (layer.query() != null) {
+        rows = maxQ40Rows(rows, layer.query());
+        rows = maxQ40Rows(rows, layer.key());
+        rows = maxQ40Rows(rows, layer.value());
+      }
+      if (layer.queryKeyValue() != null) {
+        rows = maxQ40Rows(rows, layer.queryKeyValue());
+      }
       rows = maxQ40Rows(rows, layer.attentionOutput());
       rows = maxQ40Rows(rows, layer.feedForwardUp());
+      if (layer.feedForwardGate() != null) {
+        rows = maxQ40Rows(rows, layer.feedForwardGate());
+      }
       rows = maxQ40Rows(rows, layer.feedForwardDown());
     }
     return rows;
@@ -182,6 +204,10 @@ final class BertWeights {
 
   private static int maxQ40Rows(int current, Matrix matrix) {
     return matrix.type() == GgufTensorType.Q4_0 ? Math.max(current, matrix.rows()) : current;
+  }
+
+  private static float[] zero(int size) {
+    return new float[size];
   }
 
   private static Matrix table(GgufFile file, String name, int rows, int columns) {
