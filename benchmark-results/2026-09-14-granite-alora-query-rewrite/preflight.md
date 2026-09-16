@@ -61,3 +61,20 @@
   Wall time was 4m46s including model load, shared-prefix prefill, and decoding. This remains a
   smoke only; held-out semantic cases, an independent reference comparison, and the corrected
   machine-readable crossover report remain required before any catalog promotion.
+
+## 2026-09-15 MT-RAG Cloud retrieval screen — rejected
+
+- The completed 12-case Java run was joined to the identically selected, traceable MT-RAG Cloud
+  suite by its deterministic case identifier. All 12 results were structured and physically shared.
+- `score_mtrag_cloud_retrieval.py` applies the same pinned BM25 implementation (k1 1.2, b 0.75)
+  to the final user turn, MT-RAG reference rewrite, and generated rewrite against the benchmark's
+  passage-level Cloud corpus and judged relevance ids. It retains only query-term postings, so the
+  corpus remains source data rather than a product dependency. The unit test covers both scoring
+  and refusal of unshared/unstructured output.
+- The predeclared screen requires generated Recall@10 to be at least the raw final-turn Recall@10
+  and at least 90% of the reference-rewrite Recall@10. Results: raw 0.333, reference 0.417,
+  generated 0.167. The generated rewrite is below both thresholds.
+- **Decision: reject this adapter as a ModelJar candidate.** The artifact must not be published,
+  listed in the public catalog, or described as a qualified hybrid model. The machine-readable
+  screen report is retained outside the source checkout with the pinned suite, report, qrels, and
+  corpus SHA-256 values embedded in it.
