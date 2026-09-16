@@ -468,3 +468,14 @@ per-phase commit (987211a, decode threads unset) → 16.8 and 16.9, TTFT 1602/16
 The fused v2 path is a real ~6% decode regression on this host, not noise. Kernel v3 (4c617ac:
 lane reductions, register-resident value accumulators, vector softmax; 616 tests and the Granite
 oracle pass) is measured next; if it does not beat the pre-fusion path, the per-head path returns.
+
+Kernel v3 (4c617ac; lane reductions, register-resident value accumulators, vector softmax) on the
+same instance: workers 8 → decode 19.1, prefill 93, TTFT 1450, e2e 3152; workers 12 → 18.3 / 115 /
+1183 / 3068. Against the interleaved pre-fusion control (17.8–18.1 / 1534–1575 / 3371–3451) that is
++6% decode and −8% e2e; ratios 0.76 decode, 1.63 e2e. JFR on v3, main thread: 863 Java samples
+(scoreGroup 333, accumulateGroup 160, softmax 54, swiGlu 42, rmsNorm 19, rope 15) against 1807
+native samples; the score loop is a latency-bound dependent FMA chain per (row, head). Kernel v4
+scores four rows per head with independent accumulators and pairs heads in the value pass: local
+probe 94 → 52 µs per 300-row group, values still bit-identical, 616 tests and the oracle pass.
+Native pool gains selective wake so a 16-worker pool with 8 active on decode no longer wakes the
+idle eight; measured next together with v4.
