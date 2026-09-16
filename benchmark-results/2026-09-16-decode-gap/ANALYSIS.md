@@ -154,3 +154,17 @@ the shared host cannot decide Difference 2. Chunk stealing stays behind
 `JMODELS_KERNELS_CHUNK_ROWS` (off by default) until a c7a run says otherwise. Context switches
 rise with stealing (≈250–370 k against ≈175 k), which is the atomic cursor contending across
 SMT siblings — a mild reason to expect it not to win on 8 single-token workers.
+
+### Result 5 — productised default (25 ms) against a 1 ms budget (reference host, interleaved)
+
+| budget                       | r1    | r2    | r3    | context switches |
+|------------------------------|------:|------:|------:|-----------------:|
+| `pollMillis=25` (default)    | 22.35 | 24.88 | 27.46 | ≈175 k           |
+| `pollMillis=1`               | 22.39 | 22.87 | 24.72 | ≈350 k           |
+
+The productised path runs at the level the experiment reached (Result 1: 24–26 tok/s), so
+the property, the ABI call and the diagnostics did not cost anything. A 1 ms budget is not the
+old regime — it already outlasts the intra-token glue — which is why it sits close to the
+default; the 4,000-round regime is the 15.6–16.6 tok/s row of Result 1. The remaining
+context-switch halving comes from the inter-token gaps (sampling, tokenizer, harness) that
+1 ms does not cover.
