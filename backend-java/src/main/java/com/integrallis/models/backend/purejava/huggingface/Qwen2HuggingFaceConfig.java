@@ -66,7 +66,7 @@ public record Qwen2HuggingFaceConfig(
         switch (name) {
           case "architectures" -> fields.architectures = readStringArray(parser, value, name);
           case "bos_token_id" -> fields.bosTokenId = readInt(parser, value, name);
-          case "eos_token_id" -> fields.eosTokenId = readInt(parser, value, name);
+          case "eos_token_id" -> fields.eosTokenId = readPrimaryTokenId(parser, value, name);
           case "head_dim" -> fields.headDim = readInt(parser, value, name);
           case "hidden_act" -> fields.hiddenActivation = readString(parser, value, name);
           case "hidden_size" -> fields.hiddenSize = readInt(parser, value, name);
@@ -124,6 +124,13 @@ public record Qwen2HuggingFaceConfig(
       }
     }
     return theta;
+  }
+
+  /** Reads an {@code eos_token_id} that may be one integer or a list; the first ID is primary. */
+  private static Integer readPrimaryTokenId(JsonParser parser, JsonToken token, String name)
+      throws IOException {
+    List<Integer> ids = HuggingFaceEndOfGeneration.readTokenIds(parser, token, name);
+    return ids.isEmpty() ? null : ids.getFirst();
   }
 
   private static int readInt(JsonParser parser, JsonToken token, String name) throws IOException {

@@ -45,6 +45,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gptoss.GptOssForwardPass;
 import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
+import com.integrallis.models.backend.purejava.huggingface.HuggingFaceEndOfGeneration;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import com.integrallis.models.backend.purejava.internal.ModelMemoryArena;
 import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
@@ -402,7 +403,8 @@ public final class PureJavaBackend
               HuggingFaceTokenizer.fromMobileMoe(
                   modelPath.resolve("tokenizer.json"),
                   modelPath.resolve("tokenizer_config.json"),
-                  config);
+                  config,
+                  Set.copyOf(HuggingFaceEndOfGeneration.tokenIds(modelPath)));
           loaded =
               loadHuggingFaceMobileMoe(
                   modelPath,
@@ -418,7 +420,8 @@ public final class PureJavaBackend
               HuggingFaceTokenizer.fromGptOss(
                   modelPath.resolve("tokenizer.json"),
                   modelPath.resolve("tokenizer_config.json"),
-                  config);
+                  config,
+                  Set.copyOf(HuggingFaceEndOfGeneration.tokenIds(modelPath)));
           loaded =
               loadHuggingFaceGptOss(
                   modelPath,
@@ -433,7 +436,8 @@ public final class PureJavaBackend
               HuggingFaceTokenizer.fromQwen2(
                   modelPath.resolve("tokenizer.json"),
                   modelPath.resolve("tokenizer_config.json"),
-                  config);
+                  config,
+                  Set.copyOf(HuggingFaceEndOfGeneration.tokenIds(modelPath)));
           loaded =
               loadHuggingFaceQwen2(
                   modelPath,

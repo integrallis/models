@@ -707,6 +707,36 @@ class GgufTokenizerTest {
     }
 
     @Test
+    void exposesTheResolvedEndOfGenerationSetForDiagnostics() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createEndOfGenerationMetadata());
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(2, 3, 4, 5);
+    }
+
+    @Test
+    void honorsEndOfGenerationMetadataIdsWhoseTextIsNotARecognizedTerminator() {
+      List<String> tokens = List.of("<unk>", "answer", "[END]", "[TURN]", "[MESSAGE]", "plain");
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put(
+          "tokenizer.ggml.tokens",
+          new GgufMetadataValue.ArrayValue(
+              GgufValueType.STRING,
+              tokens.stream()
+                  .map(token -> (GgufMetadataValue) new GgufMetadataValue.StringValue(token))
+                  .toList()));
+      entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
+      entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(0));
+      entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(2));
+      entries.put("tokenizer.ggml.eot_token_id", new GgufMetadataValue.Uint32Value(3));
+      entries.put("tokenizer.ggml.eom_token_id", new GgufMetadataValue.Uint32Value(4));
+
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(2, 3, 4);
+      assertThat(tokenizer.isEndOfGeneration(5)).isFalse();
+    }
+
+    @Test
     void doesNotDecodeEndOfGenerationTokensAsAnswerText() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createEndOfGenerationMetadata());
 

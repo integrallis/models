@@ -59,6 +59,29 @@ public final class HuggingFaceTokenizer {
   public static Tokenizer fromQwen2(
       Path tokenizerJson, Path tokenizerConfigJson, Qwen2HuggingFaceConfig modelConfig)
       throws IOException {
+    return fromQwen2(tokenizerJson, tokenizerConfigJson, modelConfig, Set.of());
+  }
+
+  /**
+   * Creates the tokenizer declared beside a Hugging Face Qwen 2 Safetensors checkpoint, also ending
+   * generation on declared token IDs.
+   *
+   * @param tokenizerJson {@code tokenizer.json}
+   * @param tokenizerConfigJson {@code tokenizer_config.json}
+   * @param modelConfig parsed {@code config.json}
+   * @param endOfGenerationTokenIds additional end-of-generation IDs, typically every {@code
+   *     eos_token_id} from {@code config.json} and {@code generation_config.json}
+   * @return the tokenizer
+   * @throws IOException if a file cannot be read
+   * @throws IllegalArgumentException if a declared ID is outside the vocabulary
+   */
+  public static Tokenizer fromQwen2(
+      Path tokenizerJson,
+      Path tokenizerConfigJson,
+      Qwen2HuggingFaceConfig modelConfig,
+      Set<Integer> endOfGenerationTokenIds)
+      throws IOException {
+    Objects.requireNonNull(endOfGenerationTokenIds, "endOfGenerationTokenIds");
     Objects.requireNonNull(tokenizerJson, "tokenizerJson");
     Objects.requireNonNull(tokenizerConfigJson, "tokenizerConfigJson");
     Objects.requireNonNull(modelConfig, "modelConfig");
@@ -80,13 +103,37 @@ public final class HuggingFaceTokenizer {
         settings.addEosToken(),
         unknown,
         definition.normalizeNfc(),
-        definition.preTokenizerName());
+        definition.preTokenizerName(),
+        endOfGenerationTokenIds);
   }
 
   /** Creates the tokenizer and Harmony control vocabulary declared by a GPT-OSS checkpoint. */
   public static Tokenizer fromGptOss(
       Path tokenizerJson, Path tokenizerConfigJson, GptOssHuggingFaceConfig modelConfig)
       throws IOException {
+    return fromGptOss(tokenizerJson, tokenizerConfigJson, modelConfig, Set.of());
+  }
+
+  /**
+   * Creates the tokenizer and Harmony control vocabulary declared by a GPT-OSS checkpoint, also
+   * ending generation on declared token IDs.
+   *
+   * @param tokenizerJson {@code tokenizer.json}
+   * @param tokenizerConfigJson {@code tokenizer_config.json}
+   * @param modelConfig parsed {@code config.json}
+   * @param endOfGenerationTokenIds additional end-of-generation IDs, typically every {@code
+   *     eos_token_id} from {@code config.json} and {@code generation_config.json}
+   * @return the tokenizer
+   * @throws IOException if a file cannot be read
+   * @throws IllegalArgumentException if a declared ID is outside the vocabulary
+   */
+  public static Tokenizer fromGptOss(
+      Path tokenizerJson,
+      Path tokenizerConfigJson,
+      GptOssHuggingFaceConfig modelConfig,
+      Set<Integer> endOfGenerationTokenIds)
+      throws IOException {
+    Objects.requireNonNull(endOfGenerationTokenIds, "endOfGenerationTokenIds");
     Objects.requireNonNull(tokenizerJson, "tokenizerJson");
     Objects.requireNonNull(tokenizerConfigJson, "tokenizerConfigJson");
     Objects.requireNonNull(modelConfig, "modelConfig");
@@ -107,13 +154,37 @@ public final class HuggingFaceTokenizer {
         settings.addEosToken(),
         unknown,
         definition.normalizeNfc(),
-        definition.preTokenizerName());
+        definition.preTokenizerName(),
+        endOfGenerationTokenIds);
   }
 
   /** Creates the Llama-3 byte-level tokenizer declared beside a MobileMoE checkpoint. */
   public static Tokenizer fromMobileMoe(
       Path tokenizerJson, Path tokenizerConfigJson, MobileMoeHuggingFaceConfig modelConfig)
       throws IOException {
+    return fromMobileMoe(tokenizerJson, tokenizerConfigJson, modelConfig, Set.of());
+  }
+
+  /**
+   * Creates the Llama-3 byte-level tokenizer declared beside a MobileMoE checkpoint, also ending
+   * generation on declared token IDs.
+   *
+   * @param tokenizerJson {@code tokenizer.json}
+   * @param tokenizerConfigJson {@code tokenizer_config.json}
+   * @param modelConfig parsed {@code config.json}
+   * @param endOfGenerationTokenIds additional end-of-generation IDs, typically every {@code
+   *     eos_token_id} from {@code config.json} and {@code generation_config.json}
+   * @return the tokenizer
+   * @throws IOException if a file cannot be read
+   * @throws IllegalArgumentException if a declared ID is outside the vocabulary
+   */
+  public static Tokenizer fromMobileMoe(
+      Path tokenizerJson,
+      Path tokenizerConfigJson,
+      MobileMoeHuggingFaceConfig modelConfig,
+      Set<Integer> endOfGenerationTokenIds)
+      throws IOException {
+    Objects.requireNonNull(endOfGenerationTokenIds, "endOfGenerationTokenIds");
     Objects.requireNonNull(tokenizerJson, "tokenizerJson");
     Objects.requireNonNull(tokenizerConfigJson, "tokenizerConfigJson");
     Objects.requireNonNull(modelConfig, "modelConfig");
@@ -135,7 +206,8 @@ public final class HuggingFaceTokenizer {
         settings.addEosToken(),
         unknown,
         definition.normalizeNfc(),
-        definition.preTokenizerName());
+        definition.preTokenizerName(),
+        endOfGenerationTokenIds);
   }
 
   private static Definition readDefinition(Path path, int modelVocabularySize, Family family)
