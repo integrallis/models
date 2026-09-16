@@ -92,6 +92,21 @@ class Granite41AloraIntegrationTest {
           .as("greedy IDs after a digit-heavy prompt must match llama.cpp b9960")
           .containsExactly(ORACLE_PUNCTUATION_GREEDY_TOKENS);
 
+      try (var session = backend.openSession()) {
+        float[] logits = backend.prefill(session, punctuationTokens, 0);
+        int[] generated = new int[8];
+        int position = punctuationTokens.length;
+        for (int index = 0; index < generated.length; index++) {
+          generated[index] = argmax(logits);
+          if (index + 1 < generated.length) {
+            logits = backend.forward(session, generated[index], position++);
+          }
+        }
+        assertThat(generated)
+            .as("a batched session prefill must continue greedily exactly like the oracle")
+            .containsExactly(ORACLE_PUNCTUATION_GREEDY_TOKENS);
+      }
+
       int[] invocationTokens = tokenizer.encodeControl(INVOCATION);
       assertThat(invocationTokens).containsExactly(INVOCATION_TOKENS);
       assertThat(tokenizer.decode(invocationTokens)).isEqualTo(INVOCATION);
@@ -153,6 +168,16 @@ class Granite41AloraIntegrationTest {
         .control("<|end_of_text|>\n")
         .control(INVOCATION)
         .build();
+  }
+
+  private static int argmax(float[] values) {
+    int best = 0;
+    for (int index = 1; index < values.length; index++) {
+      if (values[index] > values[best]) {
+        best = index;
+      }
+    }
+    return best;
   }
 
   private static int lastIndexOf(int[] values, int[] target) {

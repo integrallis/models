@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BatchInferenceBackend;
@@ -251,6 +252,35 @@ class PureJavaBackendTest {
         backend.rewind(checkpoint + 1);
         assertThat(backend.checkpoint()).isEqualTo(checkpoint + 1);
         assertThat(backend.forward(17, checkpoint + 1)).hasSize(VOCAB_SIZE);
+      }
+    }
+
+    @Test
+    void batchedSessionPrefillMatchesTokenAtATimeSessionForward(@TempDir Path dir)
+        throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(42), GgufTensorType.Q4_0);
+      int[] tokens = {5, 7, 11, 13, 17};
+
+      try (PureJavaBackend sequentialBackend = PureJavaBackend.load(modelPath);
+          PureJavaBackend batchedBackend = PureJavaBackend.load(modelPath);
+          InferenceSession sequential = sequentialBackend.openSession();
+          InferenceSession batched = batchedBackend.openSession()) {
+        assertThat(((BatchInferenceBackend) batchedBackend).maxBatchSize())
+            .as("the nano plan must batch, or this test proves nothing")
+            .isGreaterThanOrEqualTo(2);
+        float[] expected = null;
+        for (int index = 0; index < tokens.length; index++) {
+          expected = sequentialBackend.forward(sequential, tokens[index], index);
+        }
+        float[] expectedNext = sequentialBackend.forward(sequential, 19, tokens.length).clone();
+
+        float[] actual = batchedBackend.prefill(batched, tokens, 0).clone();
+
+        assertThat(batched.checkpoint()).isEqualTo(tokens.length);
+        assertThat(actual).containsExactly(expected, within(1e-4f));
+        assertThat(batchedBackend.forward(batched, 19, tokens.length))
+            .as("the session's KV lineage after a batched prefill must continue identically")
+            .containsExactly(expectedNext, within(1e-4f));
       }
     }
 

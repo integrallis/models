@@ -173,6 +173,8 @@ public final class LlamaForwardPass {
   private final float[] ffnOut;
   private final float[] ffnProjected;
   private final float[] logits;
+  private final Session[] singleSessionBatch = new Session[1];
+  private final int[][] singleSessionTokens = new int[1][];
   private final byte[] quantizedActivation;
   private final float[] quantizedActivationScales;
   private final int[] quantizedActivationZeroPointCorrections;
@@ -740,6 +742,10 @@ public final class LlamaForwardPass {
           "prompt exceeds context length: " + (startPosition + (long) tokens.length));
     }
 
+    if (batchedPrefill && tokens.length > 1) {
+      return prefillSessionBatched(session, tokens);
+    }
+
     int finalIndex = tokens.length - 1;
     for (int index = 0; index < finalIndex; index++) {
       forwardSessionInternal(
@@ -747,6 +753,26 @@ public final class LlamaForwardPass {
     }
     return forwardSessionInternal(
         session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
+  }
+
+  /**
+   * Prefills one session through the ragged session-batch path so consecutive prompt positions
+   * share physical projection batches. Each row's key/value state is stored before any row of the
+   * same chunk attends, so the causal boundary and the activated-adapter rows are exactly those of
+   * the token-by-token path; only the matrix products are batched.
+   */
+  private float[] prefillSessionBatched(Session session, int[] tokens) {
+    singleSessionBatch[0] = session;
+    singleSessionTokens[0] = tokens;
+    try {
+      prefillBatchTransient(singleSessionBatch, singleSessionTokens);
+    } finally {
+      singleSessionBatch[0] = null;
+      singleSessionTokens[0] = null;
+    }
+    int vocabSize = config.vocabSize();
+    System.arraycopy(sessionBatchLogits, 0, logits, 0, vocabSize);
+    return logits;
   }
 
   /** Prefills one independent session and returns its final normalized hidden state. */
@@ -794,7 +820,7 @@ public final class LlamaForwardPass {
     validateSessionPrefillBatch(sessions, tokenBatches);
     int sessionCount = sessions.length;
     int vocabSize = config.vocabSize();
-    if (sessionCount == 1) {
+    if (sessionCount == 1 && (!batchedPrefill || tokenBatches[0].length == 1)) {
       ensureSessionBatchLogits(vocabSize);
       float[] row = prefill(sessions[0], tokenBatches[0], sessions[0].nextPosition);
       System.arraycopy(row, 0, sessionBatchLogits, 0, vocabSize);
