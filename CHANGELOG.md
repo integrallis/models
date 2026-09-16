@@ -25,6 +25,9 @@ All notable changes to models are documented here.
   retention gate, a Granite documents template for the prefix-sharing crossover, the fail-closed
   upstream adapter packager, and the ModelJars component report assembler.
 
+### Changed
+- Attention in the Llama-family forward pass is partitioned over the GGUF worker pool: single-token decode over query heads, batched and independent-session prefill over batch rows. Same arithmetic and order; Granite 4.1 3B (40 heads of 64) had been bounded by the serial loops. Granite also uses the vector swiGlu and a vector FMA for its residual multiplier.
+
 ### Fixed
 
 - Mapped the `dbrx` GGUF pre-tokenizer to the Llama-3 split pattern with ordinary merge ranking;
