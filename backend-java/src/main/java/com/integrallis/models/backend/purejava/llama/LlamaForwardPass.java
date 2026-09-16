@@ -498,9 +498,11 @@ public final class LlamaForwardPass {
     this.batchFfnOut = batchBuffer(prefillBatchCapacity, hiddenDim);
     this.batchFfnProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchSessions = new Session[prefillBatchCapacity];
-    this.attentionScratch = ThreadLocal.withInitial(() -> new float[cache.maxSeqLen()]);
+    int attentionGroupSize = config.numHeads() / config.numKvHeads();
+    this.attentionScratch =
+        ThreadLocal.withInitial(() -> new float[attentionGroupSize * cache.maxSeqLen()]);
     this.headAttentionPlan =
-        GgufStagePlan.of(GgufStagePlan.stage(config.numHeads(), this::attendHeadRange));
+        GgufStagePlan.of(GgufStagePlan.stage(config.numKvHeads(), this::attendKvHeadRange));
     this.rowAttentionPlan =
         prefillBatchCapacity > 1
             ? GgufStagePlan.of(GgufStagePlan.stage(prefillBatchCapacity, this::attendRowRange))
@@ -2138,12 +2140,7 @@ public final class LlamaForwardPass {
           slidingWindow);
       return;
     }
-    boolean separateScores = batchAttentionScores.length != 0;
-    int scoreStride = cache.maxSeqLen();
-    float[] scratch = separateScores ? null : attentionScratch.get();
     for (int batch = fromBatch; batch < toBatch; batch++) {
-      float[] scores = separateScores ? batchAttentionScores : scratch;
-      int scoreOffset = separateScores ? batch * scoreStride : 0;
       groupedQueryAttention(
           batchQ,
           batch * config.queryDim(),
@@ -2151,9 +2148,7 @@ public final class LlamaForwardPass {
           batch * config.attentionOutputDim(),
           layerIndex,
           startPosition + batch,
-          cache,
-          scores,
-          scoreOffset);
+          cache);
     }
   }
 
@@ -2170,15 +2165,7 @@ public final class LlamaForwardPass {
     if (position - firstPosition + 1 < PARALLEL_HEAD_ATTENTION_MIN_POSITIONS) {
       // Short contexts: one stage publication per layer costs more than the head loop it splits.
       groupedQueryAttention(
-          query,
-          queryOffset,
-          output,
-          outputOffset,
-          layer,
-          position,
-          sequenceCache,
-          attentionScratch.get(),
-          0);
+          query, queryOffset, output, outputOffset, layer, position, sequenceCache);
       return;
     }
     java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
@@ -2198,7 +2185,7 @@ public final class LlamaForwardPass {
     }
   }
 
-  private void attendHeadRange(int fromHead, int toHead) {
+  private void attendKvHeadRange(int fromKvHead, int toKvHead) {
     int keyLength = config.keyLength();
     int valueLength = config.valueLength();
     int groupSize = config.numHeads() / config.numKvHeads();
@@ -2207,34 +2194,26 @@ public final class LlamaForwardPass {
     int position = activeHeadPosition;
     KvCache sequenceCache = activeHeadCache;
     float[] scores = attentionScratch.get();
+    int scoresHeadStride = cache.maxSeqLen();
     int firstPosition = config.attentionStartPosition(layer, position);
     AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
-    for (int head = fromHead; head < toHead; head++) {
-      int kvHead = head / groupSize;
-      sequenceCache.writeAttentionScores(
+    for (int kvHead = fromKvHead; kvHead < toKvHead; kvHead++) {
+      attendGroup(
           view,
+          sequenceCache,
           firstPosition,
-          position + 1,
-          kvHead * keyLength,
-          activeHeadQuery,
-          activeHeadQueryOffset + head * keyLength,
+          position,
+          kvHead,
+          groupSize,
           keyLength,
-          scale,
-          scores,
-          0,
-          batchedAttentionScores);
-      TensorOps.softmax(scores, firstPosition, position - firstPosition + 1);
-      sequenceCache.addAttentionValues(
-          view,
-          firstPosition,
-          position + 1,
-          kvHead * valueLength,
-          activeHeadOutput,
-          activeHeadOutputOffset + head * valueLength,
           valueLength,
+          scale,
+          activeHeadQuery,
+          activeHeadQueryOffset,
+          activeHeadOutput,
+          activeHeadOutputOffset,
           scores,
-          0,
-          batchedAttentionValues);
+          scoresHeadStride);
     }
   }
 
@@ -2316,7 +2295,6 @@ public final class LlamaForwardPass {
       Session[] sessions, int[] batchPositions, int layer, int fromBatch, int toBatch) {
     int queryDim = config.queryDim();
     int attentionOutputDim = config.attentionOutputDim();
-    float[] scores = attentionScratch.get();
     for (int batch = fromBatch; batch < toBatch; batch++) {
       Session session = sessions[batch];
       groupedQueryAttention(
@@ -2326,9 +2304,7 @@ public final class LlamaForwardPass {
           batch * attentionOutputDim,
           layer,
           batchPositions[batch],
-          session.cache,
-          scores,
-          0);
+          session.cache);
     }
   }
 
@@ -2339,45 +2315,90 @@ public final class LlamaForwardPass {
       int outputOffset,
       int layer,
       int position,
-      KvCache sequenceCache,
-      float[] scores,
-      int scoresOffset) {
+      KvCache sequenceCache) {
     int keyLength = config.keyLength();
     int valueLength = config.valueLength();
-    int numHeads = config.numHeads();
-    int groupSize = numHeads / config.numKvHeads();
+    int numKvHeads = config.numKvHeads();
+    int groupSize = config.numHeads() / numKvHeads;
     float scale = config.attentionScale();
+    float[] scores = attentionScratch.get();
+    int scoresHeadStride = cache.maxSeqLen();
     java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
-
     int firstPosition = config.attentionStartPosition(layer, position);
     AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
-    for (int head = 0; head < numHeads; head++) {
-      int kvHead = head / groupSize;
-      sequenceCache.writeAttentionScores(
+    for (int kvHead = 0; kvHead < numKvHeads; kvHead++) {
+      attendGroup(
           view,
+          sequenceCache,
           firstPosition,
-          position + 1,
-          kvHead * keyLength,
-          query,
-          queryOffset + head * keyLength,
+          position,
+          kvHead,
+          groupSize,
           keyLength,
-          scale,
-          scores,
-          scoresOffset,
-          batchedAttentionScores);
-      TensorOps.softmax(scores, scoresOffset + firstPosition, position - firstPosition + 1);
-      sequenceCache.addAttentionValues(
-          view,
-          firstPosition,
-          position + 1,
-          kvHead * valueLength,
-          output,
-          outputOffset + head * valueLength,
           valueLength,
+          scale,
+          query,
+          queryOffset,
+          output,
+          outputOffset,
           scores,
-          scoresOffset,
-          batchedAttentionValues);
+          scoresHeadStride);
     }
+  }
+
+  /**
+   * One grouped-query group: scores for every head sharing {@code kvHead} in one pass over the
+   * cached keys, a softmax per head, then one pass over the cached values. Bit-identical to the
+   * former head-by-head loop; the K and V rows are read once instead of {@code groupSize} times.
+   */
+  private void attendGroup(
+      AttentionView view,
+      KvCache sequenceCache,
+      int firstPosition,
+      int position,
+      int kvHead,
+      int groupSize,
+      int keyLength,
+      int valueLength,
+      float scale,
+      float[] query,
+      int queryOffset,
+      float[] output,
+      int outputOffset,
+      float[] scores,
+      int scoresHeadStride) {
+    int firstHead = kvHead * groupSize;
+    sequenceCache.writeGroupedAttentionScores(
+        view,
+        firstPosition,
+        position + 1,
+        kvHead * keyLength,
+        query,
+        queryOffset + firstHead * keyLength,
+        keyLength,
+        groupSize,
+        keyLength,
+        scale,
+        scores,
+        0,
+        scoresHeadStride);
+    int count = position - firstPosition + 1;
+    for (int head = 0; head < groupSize; head++) {
+      TensorOps.softmax(scores, head * scoresHeadStride + firstPosition, count);
+    }
+    sequenceCache.addGroupedAttentionValues(
+        view,
+        firstPosition,
+        position + 1,
+        kvHead * valueLength,
+        output,
+        outputOffset + firstHead * valueLength,
+        valueLength,
+        groupSize,
+        valueLength,
+        scores,
+        0,
+        scoresHeadStride);
   }
 
   private void normalizeHead(float[] vector, int offset, float[] weight, int headDim) {

@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.cache;
 
+import com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -514,6 +515,95 @@ public final class KvCache {
                   * scale;
         }
       }
+    }
+  }
+
+  /**
+   * Scores every query head of one grouped-query group against the cached keys of its KV head,
+   * reading each key row once. Head {@code h} of the group writes {@code scores[scoresOffset + h *
+   * scoresHeadStride + position]}. Arithmetic matches the per-head exact scoring kernel.
+   */
+  public void writeGroupedAttentionScores(
+      AttentionView view,
+      int fromPosition,
+      int toPosition,
+      int keyHeadOffset,
+      float[] query,
+      int queryOffset,
+      int queryHeadStride,
+      int groupSize,
+      int vectorLength,
+      float scale,
+      float[] scores,
+      int scoresOffset,
+      int scoresHeadStride) {
+    Objects.requireNonNull(view, "view");
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(scores, "scores");
+    checkHeadRange("key", keyHeadOffset, vectorLength, keyDim);
+    Objects.checkFromIndexSize(
+        scoresOffset + (groupSize - 1) * scoresHeadStride + fromPosition,
+        toPosition - fromPosition,
+        scores.length);
+    for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
+      AttentionSpan span = view.span(spanIndex);
+      GroupedQueryAttentionKernel.scoreGroup(
+          query,
+          queryOffset,
+          queryHeadStride,
+          groupSize,
+          span.keyBuffer,
+          span.keyOffset + keyHeadOffset,
+          keyDim,
+          span.positionCount,
+          vectorLength,
+          scale,
+          scores,
+          scoresOffset + span.firstPosition,
+          scoresHeadStride);
+    }
+  }
+
+  /**
+   * Accumulates score-weighted cached values for every query head of one group, reading each value
+   * row once. Arithmetic matches the per-head weighted-rows kernel.
+   */
+  public void addGroupedAttentionValues(
+      AttentionView view,
+      int fromPosition,
+      int toPosition,
+      int valueHeadOffset,
+      float[] output,
+      int outputOffset,
+      int outputHeadStride,
+      int groupSize,
+      int vectorLength,
+      float[] scores,
+      int scoresOffset,
+      int scoresHeadStride) {
+    Objects.requireNonNull(view, "view");
+    Objects.requireNonNull(output, "output");
+    Objects.requireNonNull(scores, "scores");
+    checkHeadRange("value", valueHeadOffset, vectorLength, valueDim);
+    Objects.checkFromIndexSize(
+        scoresOffset + (groupSize - 1) * scoresHeadStride + fromPosition,
+        toPosition - fromPosition,
+        scores.length);
+    for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
+      AttentionSpan span = view.span(spanIndex);
+      GroupedQueryAttentionKernel.accumulateGroup(
+          output,
+          outputOffset,
+          outputHeadStride,
+          groupSize,
+          span.valueBuffer,
+          span.valueOffset + valueHeadOffset,
+          valueDim,
+          span.positionCount,
+          vectorLength,
+          scores,
+          scoresOffset + span.firstPosition,
+          scoresHeadStride);
     }
   }
 

@@ -1087,3 +1087,12 @@ listOf(
         }
     }
 }
+
+// GroupedQueryAttentionKernel uses the Vector API directly (vectors-core exposes no fused
+// grouped-query kernel), so main sources compile against the incubator module too.
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("--add-modules", "jdk.incubator.vector"))
+}
+tasks.withType<Javadoc>().configureEach {
+    (options as StandardJavadocDocletOptions).addStringOption("-add-modules", "jdk.incubator.vector")
+}
