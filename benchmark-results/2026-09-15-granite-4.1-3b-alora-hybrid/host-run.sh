@@ -143,7 +143,46 @@ window() {
   log "window complete"
 }
 
+# Later phases run at a newer Models commit that adds the answerability long-context and
+# crossover runners. The checkout is moved forward explicitly and both revisions are recorded.
+checkout() { # commit
+  export JAVA_HOME=/opt/java/current PATH=/opt/java/current/bin:$HOME/.cargo/bin:$PATH
+  git -C "$MODELS" fetch --quiet origin "$1"
+  git -C "$MODELS" switch --detach --quiet "$1"
+  test -z "$(git -C "$MODELS" status --short)"
+  ( cd "$MODELS" && ./gradlew :backend-native:cargoBuildRelease :backend-native:prepareNativePlatformResources :models-bench:classes --console=plain -q ) >> "$EVIDENCE/build.log" 2>&1
+  log "models checkout now $(git -C "$MODELS" rev-parse HEAD)"
+}
+
+longcontext() { # backend
+  local backend="${1:-rust-ffm}"
+  export JAVA_HOME=/opt/java/current PATH=/opt/java/current/bin:$HOME/.cargo/bin:$PATH
+  local rev; rev="$(git -C "$MODELS" rev-parse HEAD)"
+  local report="$EVIDENCE/gate5-long-context-$backend.json"
+  if [ -s "$report" ]; then log "present $report"; return 0; fi
+  log "start gate5 long-context $backend at $rev"
+  ( cd "$MODELS" && ./gradlew :models-bench:run -PmodelsBenchNative=true --console=plain -q --args="activated-answerability-long-context \
+      --model $STORE/models/granite-4.1-3b-Q4_K_M.gguf --adapter $STORE/adapter --models-revision $rev --report $report" ) > "$EVIDENCE/gate5-long-context-$backend.log" 2>&1 || log "NONZERO exit for gate5 $backend"
+  log "done gate5 long-context $backend: $(grep -E '^(PASS|FAIL) ' "$EVIDENCE/gate5-long-context-$backend.log" | tail -1)"
+}
+
+crossover() { # backend
+  local backend="${1:-pure-java}"
+  export JAVA_HOME=/opt/java/current PATH=/opt/java/current/bin:$HOME/.cargo/bin:$PATH
+  local rev; rev="$(git -C "$MODELS" rev-parse HEAD)"
+  local report="$EVIDENCE/gate6-crossover-$backend.json"
+  if [ -s "$report" ]; then log "present $report"; return 0; fi
+  log "start gate6 crossover $backend at $rev"
+  ( cd "$MODELS" && ./gradlew :models-bench:run -PmodelsBenchNative=true --console=plain -q --args="activated-prefix-sharing \
+      --model $STORE/models/granite-4.1-3b-Q4_K_M.gguf --adapter $STORE/adapter --models-revision $rev \
+      --template granite-documents --warmups 1 --trials 3 --report $report" ) > "$EVIDENCE/gate6-crossover-$backend.log" 2>&1 || log "NONZERO exit for gate6 $backend"
+  log "done gate6 crossover $backend: $(grep -E '^(PASS|FAIL) ' "$EVIDENCE/gate6-crossover-$backend.log" | tail -1)"
+}
+
 case "${1:-all}" in
+  checkout) checkout "$2" ;;
+  longcontext) longcontext "${2:-rust-ffm}" ;;
+  crossover) crossover "${2:-pure-java}" ;;
   bootstrap) bootstrap ;;
   artifacts) artifacts ;;
   identity) identity ;;
