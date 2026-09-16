@@ -39,6 +39,19 @@ public final class NativeKernelLibrary implements AutoCloseable {
    */
   public static final String DECODE_THREAD_COUNT_PROPERTY = "models.native.kernels.decodeThreads";
 
+  /**
+   * Milliseconds the native workers keep polling for the next dispatch before they park. The
+   * default (5 ms) is longer than any gap between two dispatches of one token, so the pool stays
+   * hot for a whole generation and parks shortly after it ends; ggml's CPU backend runs the same
+   * regime unbounded. Measured 2026-09-16: on a shared 16-vCPU host 4,000 spin rounds then park
+   * gave 15.6-16.6 tok/s with ~800k context switches per run and a token-sized budget 24.0-26.0
+   * tok/s with ~180k; on dedicated cores (c7a.4xlarge) 1 / 5 / 25 ms gave 25.8 / 25.9 / 26.1 tok/s
+   * against 25.5. Five milliseconds keeps the whole gain and a fifth of the idle tail.
+   */
+  public static final String POLL_MILLIS_PROPERTY = "models.native.kernels.pollMillis";
+
+  static final long DEFAULT_POLL_MILLIS = 5;
+
   private static final int STATUS_OK = 0;
   private static final int FORMAT_Q4_0 = 0;
   private static final int FORMAT_Q8_0 = 1;
@@ -55,6 +68,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
   private static final FunctionDescriptor SET_ACTIVE_THREADS_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor SET_POLL_NANOS_DESCRIPTOR =
+      FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG);
   private static final FunctionDescriptor GROUPED_ATTENTION_DESCRIPTOR =
       FunctionDescriptor.of(
           ValueLayout.JAVA_INT,
@@ -170,6 +185,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle groupedAttentionHandle;
   private final int threadCount;
   private final int decodeThreadCount;
+  private final long pollMillis;
   private int activeThreadCount;
   private boolean closed;
 
@@ -185,7 +201,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle setActiveThreadsHandle,
       MethodHandle groupedAttentionHandle,
       int threadCount,
-      int decodeThreadCount) {
+      int decodeThreadCount,
+      long pollMillis) {
     this.libraryArena = libraryArena;
     this.capabilities = capabilities;
     this.context = context;
@@ -196,6 +213,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.gatedDeltaNetHandle = gatedDeltaNetHandle;
     this.setActiveThreadsHandle = setActiveThreadsHandle;
     this.groupedAttentionHandle = groupedAttentionHandle;
+    this.pollMillis = pollMillis;
     this.threadCount = threadCount;
     this.decodeThreadCount = decodeThreadCount;
     this.activeThreadCount = threadCount;
@@ -269,10 +287,26 @@ public final class NativeKernelLibrary implements AutoCloseable {
                   "jmodels_grouped_attention_f32_with_context",
                   GROUPED_ATTENTION_DESCRIPTOR)
               : null;
+      MethodHandle setPollNanos =
+          (capabilityMask & NativeKernelCapability.POLL_BUDGET.mask()) != 0
+              ? downcall(
+                  lookup, "jmodels_kernels_context_set_poll_nanos", SET_POLL_NANOS_DESCRIPTOR)
+              : null;
       int decodeThreadCount = configuredDecodeThreadCount(threadCount);
+      long pollMillis = configuredPollMillis();
       MemorySegment context = invokeAddress(contextCreate, threadCount, "create worker context");
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
+      }
+      if (setPollNanos != null) {
+        try {
+          long applied = (long) setPollNanos.invokeExact(context, pollMillis * 1_000_000L);
+          if (applied <= 0) {
+            throw new IllegalStateException("native kernel poll budget was not applied");
+          }
+        } catch (Throwable failure) {
+          throw new IllegalStateException("native kernel poll budget could not be set", failure);
+        }
       }
       return new NativeKernelLibrary(
           arena,
@@ -286,7 +320,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
           setActiveThreads,
           groupedAttention,
           threadCount,
-          decodeThreadCount);
+          decodeThreadCount,
+          pollMillis);
     } catch (RuntimeException | LinkageError failure) {
       arena.close();
       throw failure;
@@ -961,6 +996,16 @@ public final class NativeKernelLibrary implements AutoCloseable {
     }
   }
 
+  /** Milliseconds the native workers poll before parking, as configured for this context. */
+  long pollMillis() {
+    return pollMillis;
+  }
+
+  /** Whether the loaded library lets the poll budget be set per context. */
+  boolean supportsPollBudget() {
+    return (capabilities & NativeKernelCapability.POLL_BUDGET.mask()) != 0;
+  }
+
   /**
    * Rows-taking workers on single-token projections, as configured; equals the pool size by
    * default.
@@ -1077,6 +1122,24 @@ public final class NativeKernelLibrary implements AutoCloseable {
   }
 
   private static final float[] EMPTY = new float[0];
+
+  static long configuredPollMillis() {
+    String configured = System.getProperty(POLL_MILLIS_PROPERTY);
+    if (configured == null || configured.isBlank()) {
+      return DEFAULT_POLL_MILLIS;
+    }
+    try {
+      long millis = Long.parseLong(configured.trim());
+      if (millis < 1 || millis > 60_000) {
+        throw new IllegalArgumentException(
+            POLL_MILLIS_PROPERTY + " must be between 1 and 60000 milliseconds: " + configured);
+      }
+      return millis;
+    } catch (NumberFormatException failure) {
+      throw new IllegalArgumentException(
+          POLL_MILLIS_PROPERTY + " must be an integer: " + configured, failure);
+    }
+  }
 
   private static int configuredDecodeThreadCount(int threadCount) {
     String configured = System.getProperty(DECODE_THREAD_COUNT_PROPERTY);

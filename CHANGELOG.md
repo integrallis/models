@@ -4,6 +4,11 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Changed
+- Native worker pool: workers poll for the next dispatch for a time budget before they park (`models.native.kernels.pollMillis`, default 5 ms; reported as `native-kernel-poll-millis`). Parking after 4,000 spin rounds cost a third of decode on a shared 16-vCPU host (15.6-16.6 to 24.0-26.0 tok/s, 4.3x fewer context switches) and about 2% on dedicated cores (c7a.4xlarge, 25.5 to 26.1); 5 ms keeps the whole gain and a fifth of the idle tail of 25 ms. The chunk-stealing experiment was measured on dedicated cores (-10% decode, -25% prefill) and removed.
+- Native backend: the vectors persistent executor, which the Java side still drives for its parallel ops, is parked when the native kernel pool opens (vectors 0.1.22, `VectorUtil.setGgufPollMillis(0)`; reported as `java-executor-poll-millis`). With both pools polling, prefill on the native backend fell from 126 to 40 tok/s and context switches rose from 0.2 M to 24 M per run; parked, it matches the previous release exactly.
+- vectors 0.1.22: the pure-Java backend's executor polls at every stage barrier before parking, measured +45% decode on dedicated cores (6.4 to 9.4 tok/s) and up to +80% on shared vCPUs.
+
 ## [0.3.39] - 2026-09-16
 
 ### Added

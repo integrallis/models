@@ -102,7 +102,50 @@ def squad_cases(path: Path) -> list[dict[str, Any]]:
     return cases
 
 
-def prepare(mtrag_path: Path, squad_path: Path, mtrag_revision: str) -> dict[str, Any]:
+NO_ANSWER = "No Answer Present."
+
+
+def msmarco_cases(path: Path) -> list[dict[str, Any]]:
+    """MS MARCO v2.1 rows as single-turn cases: every passage of the query is a document, the
+    label is unanswerable when the only answer is the dataset's no-answer marker and answerable
+    when there is at least one answer and none is the marker. Rows with no passages, no answers,
+    or a mix of the marker and answers are ineligible."""
+    import pyarrow.parquet as pq  # imported here: only the MS MARCO source needs it
+
+    table = pq.read_table(path, columns=["query_id", "query", "passages", "answers"])
+    cases = []
+    for row in table.to_pylist():
+        answers = row["answers"] or []
+        passages = (row["passages"] or {}).get("passage_text") or []
+        if not answers or not passages:
+            continue
+        marker = [a == NO_ANSWER for a in answers]
+        if all(marker):
+            label = "unanswerable"
+        elif not any(marker):
+            label = "answerable"
+        else:
+            continue
+        cases.append(
+            {
+                "id": str(row["query_id"]),
+                "label": label,
+                "messages": [{"role": "user", "text": row["query"]}],
+                "documents": [
+                    {"doc_id": index + 1, "text": text} for index, text in enumerate(passages)
+                ],
+            }
+        )
+    return cases
+
+
+def prepare(
+    mtrag_path: Path,
+    squad_path: Path,
+    mtrag_revision: str,
+    msmarco_path: Path | None = None,
+    msmarco_revision: str | None = None,
+) -> dict[str, Any]:
     mtrag = mtrag_cases(mtrag_path)
     squad = squad_cases(squad_path)
     unanswerable = [c for c in mtrag if c["label"] == "unanswerable"]
@@ -110,11 +153,16 @@ def prepare(mtrag_path: Path, squad_path: Path, mtrag_revision: str) -> dict[str
         mtrag, "answerable", len(unanswerable)
     )
     squad_selected = select(squad, "unanswerable", 100) + select(squad, "answerable", 100)
-    suites = []
-    for name, source, revision, selected, eligible in (
+    plan = [
         ("mtrag-human-rag", mtrag_path, mtrag_revision, mtrag_selected, mtrag),
         ("squad-v2-dev", squad_path, None, squad_selected, squad),
-    ):
+    ]
+    if msmarco_path is not None:
+        msmarco = msmarco_cases(msmarco_path)
+        msmarco_selected = select(msmarco, "unanswerable", 100) + select(msmarco, "answerable", 100)
+        plan.append(("msmarco-v2.1-validation", msmarco_path, msmarco_revision, msmarco_selected, msmarco))
+    suites = []
+    for name, source, revision, selected, eligible in plan:
         ordered = sorted(selected, key=lambda c: rank_key(c["id"]))
         suites.append(
             {
@@ -151,11 +199,21 @@ def main() -> None:
     parser.add_argument("--mtrag-rag-jsonl", type=Path, required=True)
     parser.add_argument("--mtrag-revision", required=True)
     parser.add_argument("--squad-dev-json", type=Path, required=True)
+    parser.add_argument("--msmarco-parquet", type=Path, help="MS MARCO v2.1 validation parquet")
+    parser.add_argument("--msmarco-revision", help="Hugging Face dataset revision of the parquet")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
         raise SystemExit(f"refusing to overwrite a frozen window: {args.output}")
-    window = prepare(args.mtrag_rag_jsonl, args.squad_dev_json, args.mtrag_revision)
+    if (args.msmarco_parquet is None) != (args.msmarco_revision is None):
+        raise SystemExit("--msmarco-parquet and --msmarco-revision go together")
+    window = prepare(
+        args.mtrag_rag_jsonl,
+        args.squad_dev_json,
+        args.mtrag_revision,
+        args.msmarco_parquet,
+        args.msmarco_revision,
+    )
     args.output.write_text(json.dumps(window, indent=2, sort_keys=True) + "\n")
     for suite in window["suites"]:
         print(suite["name"], suite["selectedByLabel"], "of", suite["eligibleByLabel"])

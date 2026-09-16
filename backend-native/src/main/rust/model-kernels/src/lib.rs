@@ -80,6 +80,8 @@ const CAPABILITY_INDEPENDENT_BATCHED_MATMUL: u64 = 1 << 17;
 const CAPABILITY_GATED_DELTA_NET_F32: u64 = 1 << 18;
 const CAPABILITY_ACTIVE_THREADS: u64 = 1 << 19;
 const CAPABILITY_GROUPED_ATTENTION_F32: u64 = 1 << 20;
+/// The worker pool's poll budget before parking is settable per context.
+const CAPABILITY_POLL_BUDGET: u64 = 1 << 21;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -98,6 +100,25 @@ const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 const WORKER_SPIN_ITERS: usize = 4_000;
+
+/// Default poll budget before a worker parks: 5 ms, longer than any gap between two dispatches
+/// of one token (Java-side norms, RoPE, residuals, sampling are all far shorter), so the pool
+/// stays hot for the whole generation and parks a few milliseconds after it ends. ggml's CPU
+/// backend polls `1024 * 128 * poll` relax rounds with `poll = 50` before sleeping, which is the
+/// same regime unbounded; the bound keeps a sporadic caller's idle tail (workers × budget per
+/// call) small. Measured on dedicated cores (c7a.4xlarge, 3 rounds): 1 / 5 / 25 ms decode
+/// 25.8 / 25.9 / 26.1 tok/s against 25.5 for the old 4,000-round spin; on a shared 16-vCPU
+/// host the old regime lost a third of decode. `JMODELS_KERNELS_POLL_NANOS` overrides the
+/// default for experiments; the Java side sets it per context through
+/// `jmodels_kernels_context_set_poll_nanos`.
+const DEFAULT_POLL_NANOS: u64 = 5_000_000;
+
+fn default_poll_nanos() -> u64 {
+    std::env::var("JMODELS_KERNELS_POLL_NANOS")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(DEFAULT_POLL_NANOS)
+}
 /// Low bits of a published job word that carry the partition count the job was published with.
 const JOB_PARTITION_BITS: u32 = 16;
 
@@ -265,6 +286,8 @@ struct WorkerShared {
     /// Generation that was current when the active count last grew; a worker leaving idleness
     /// resumes from it so it cannot skip a job published right after its activation.
     activation_generation: CachePadded<AtomicU64>,
+    /// Nanoseconds a worker (and the caller's completion wait) polls before parking.
+    poll_nanos: CachePadded<AtomicU64>,
     state: Mutex<WorkerState>,
     work_available: Condvar,
     work_complete: Condvar,
@@ -363,6 +386,7 @@ impl WorkerPool {
             remaining: CachePadded(AtomicUsize::new(0)),
             partitions: CachePadded(AtomicUsize::new(total_threads)),
             activation_generation: CachePadded(AtomicU64::new(0)),
+            poll_nanos: CachePadded(AtomicU64::new(default_poll_nanos())),
             state: Mutex::new(WorkerState {
                 shutdown: false,
                 job: None,
@@ -559,7 +583,10 @@ impl WorkerPool {
     }
 
     fn await_workers(&self, caller_succeeded: bool) -> bool {
-        let completed = poll_completion(&self.shared.remaining.0, COMPLETION_SPIN_ITERS);
+        let completed = poll_completion(
+            &self.shared.remaining.0,
+            self.shared.poll_nanos.0.load(Ordering::Relaxed),
+        );
         let mut state = lock(&self.shared.state);
         while !completed && self.shared.remaining.0.load(Ordering::Acquire) != 0 {
             state = wait(&self.shared.work_complete, state);
@@ -607,8 +634,11 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
             }
         }
         let (job, partitions) = {
-            let mut next_generation =
-                poll_generation(&shared.generation.0, observed_generation, WORKER_SPIN_ITERS);
+            let mut next_generation = poll_generation(
+                &shared.generation.0,
+                observed_generation,
+                shared.poll_nanos.0.load(Ordering::Relaxed),
+            );
             let mut state = lock(&shared.state);
             while !state.shutdown && next_generation.is_none() {
                 let published_generation = shared.generation.0.load(Ordering::Acquire);
@@ -661,29 +691,49 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
     }
 }
 
+/// Polls for a generation newer than `observed_generation` for at most `poll_nanos` (always at
+/// least `WORKER_SPIN_ITERS` rounds; the clock is read every 64 rounds).
 fn poll_generation(
     generation: &AtomicU64,
     observed_generation: u64,
-    iterations: usize,
+    poll_nanos: u64,
 ) -> Option<u64> {
-    for _ in 0..iterations {
+    let start = std::time::Instant::now();
+    let mut round: u64 = 0;
+    loop {
         let published_generation = generation.load(Ordering::Acquire);
         if published_generation != observed_generation {
             return Some(published_generation);
         }
-        std::hint::spin_loop();
-    }
-    None
-}
-
-fn poll_completion(remaining: &AtomicUsize, iterations: usize) -> bool {
-    for _ in 0..iterations {
-        if remaining.load(Ordering::Acquire) == 0 {
-            return true;
+        round += 1;
+        if round >= WORKER_SPIN_ITERS as u64
+            && round.is_multiple_of(64)
+            && start.elapsed().as_nanos() as u64 >= poll_nanos
+        {
+            return None;
         }
         std::hint::spin_loop();
     }
-    false
+}
+
+/// Polls for job completion for at most `poll_nanos` (always at least `COMPLETION_SPIN_ITERS`
+/// rounds; the clock is read every 64 rounds).
+fn poll_completion(remaining: &AtomicUsize, poll_nanos: u64) -> bool {
+    let start = std::time::Instant::now();
+    let mut round: u64 = 0;
+    loop {
+        if remaining.load(Ordering::Acquire) == 0 {
+            return true;
+        }
+        round += 1;
+        if round >= COMPLETION_SPIN_ITERS as u64
+            && round.is_multiple_of(64)
+            && start.elapsed().as_nanos() as u64 >= poll_nanos
+        {
+            return false;
+        }
+        std::hint::spin_loop();
+    }
 }
 
 unsafe fn execute_matrix_job_partition(
@@ -1181,6 +1231,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_GATED_DELTA_NET_F32
         | CAPABILITY_ACTIVE_THREADS
         | CAPABILITY_GROUPED_ATTENTION_F32
+        | CAPABILITY_POLL_BUDGET
 }
 
 #[unsafe(no_mangle)]
@@ -1351,6 +1402,36 @@ pub unsafe extern "C" fn jmodels_kernels_context_set_active_threads(
         thread_count as usize
     };
     context.workers.set_active_threads(requested) as i32
+}
+
+#[unsafe(no_mangle)]
+/// Sets how long the pool's workers (and the caller's completion wait) poll before parking, in
+/// nanoseconds; 0 restores the default. Returns the budget in effect.
+///
+/// # Safety
+///
+/// `context` must be a live pointer returned by `jmodels_kernels_context_create`.
+pub unsafe extern "C" fn jmodels_kernels_context_set_poll_nanos(
+    context: *const KernelContext,
+    poll_nanos: u64,
+) -> u64 {
+    if context.is_null() {
+        return 0;
+    }
+    // SAFETY: Java owns the context for the duration of this synchronous call.
+    let context = unsafe { &*context };
+    let budget = if poll_nanos == 0 {
+        default_poll_nanos()
+    } else {
+        poll_nanos
+    };
+    context
+        .workers
+        .shared
+        .poll_nanos
+        .0
+        .store(budget, Ordering::Release);
+    budget
 }
 
 #[unsafe(no_mangle)]
@@ -5121,6 +5202,7 @@ mod tests {
                 | CAPABILITY_GATED_DELTA_NET_F32
                 | CAPABILITY_ACTIVE_THREADS
                 | CAPABILITY_GROUPED_ATTENTION_F32
+                | CAPABILITY_POLL_BUDGET
         );
     }
 
@@ -5493,6 +5575,7 @@ mod tests {
             remaining: CachePadded(AtomicUsize::new(1)),
             partitions: CachePadded(AtomicUsize::new(2)),
             activation_generation: CachePadded(AtomicU64::new(0)),
+            poll_nanos: CachePadded(AtomicU64::new(default_poll_nanos())),
             state: Mutex::new(WorkerState {
                 shutdown: false,
                 job: None,

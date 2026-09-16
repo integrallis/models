@@ -37,7 +37,9 @@ public enum NativeKernelCapability {
   INDEPENDENT_BATCHED_MATMUL(1L << 17),
   GATED_DELTA_NET_F32(1L << 18),
   ACTIVE_THREADS(1L << 19),
-  GROUPED_ATTENTION_F32(1L << 20);
+  GROUPED_ATTENTION_F32(1L << 20),
+  /** The worker pool's poll budget before parking is settable per context. */
+  POLL_BUDGET(1L << 21);
 
   private final long mask;
 
