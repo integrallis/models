@@ -453,13 +453,43 @@ public final class KvCache {
       float[] scores,
       int scoresOffset,
       boolean batched) {
+    writeAttentionScores(
+        attentionView(layer, fromPosition, toPosition),
+        fromPosition,
+        toPosition,
+        keyHeadOffset,
+        query,
+        queryOffset,
+        vectorLength,
+        scale,
+        scores,
+        scoresOffset,
+        batched);
+  }
+
+  /**
+   * Scores against an {@link AttentionView} the caller resolved once for this layer and position
+   * range, so a row's heads share one population check and span resolution.
+   */
+  public void writeAttentionScores(
+      AttentionView view,
+      int fromPosition,
+      int toPosition,
+      int keyHeadOffset,
+      float[] query,
+      int queryOffset,
+      int vectorLength,
+      float scale,
+      float[] scores,
+      int scoresOffset,
+      boolean batched) {
+    Objects.requireNonNull(view, "view");
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(scores, "scores");
     Objects.checkFromIndexSize(queryOffset, vectorLength, query.length);
     checkHeadRange("key", keyHeadOffset, vectorLength, keyDim);
     Objects.checkFromIndexSize(
         scoresOffset + fromPosition, toPosition - fromPosition, scores.length);
-    AttentionView view = attentionView(layer, fromPosition, toPosition);
     for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
       AttentionSpan span = view.span(spanIndex);
       if (batched) {
@@ -499,13 +529,38 @@ public final class KvCache {
       float[] scores,
       int scoresOffset,
       boolean batched) {
+    addAttentionValues(
+        attentionView(layer, fromPosition, toPosition),
+        fromPosition,
+        toPosition,
+        valueHeadOffset,
+        output,
+        outputOffset,
+        vectorLength,
+        scores,
+        scoresOffset,
+        batched);
+  }
+
+  /** Value accumulation against a caller-resolved {@link AttentionView}. */
+  public void addAttentionValues(
+      AttentionView view,
+      int fromPosition,
+      int toPosition,
+      int valueHeadOffset,
+      float[] output,
+      int outputOffset,
+      int vectorLength,
+      float[] scores,
+      int scoresOffset,
+      boolean batched) {
+    Objects.requireNonNull(view, "view");
     Objects.requireNonNull(output, "output");
     Objects.requireNonNull(scores, "scores");
     Objects.checkFromIndexSize(outputOffset, vectorLength, output.length);
     checkHeadRange("value", valueHeadOffset, vectorLength, valueDim);
     Objects.checkFromIndexSize(
         scoresOffset + fromPosition, toPosition - fromPosition, scores.length);
-    AttentionView view = attentionView(layer, fromPosition, toPosition);
     for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
       AttentionSpan span = view.span(spanIndex);
       if (batched) {

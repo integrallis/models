@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.llama;
 import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
+import com.integrallis.models.backend.purejava.cache.KvCache.AttentionView;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter.Projection;
@@ -162,6 +163,13 @@ public final class LlamaForwardPass {
   // query heads, batched prefill over batch rows. Each work item writes a disjoint output slice and
   // scores its own thread-local buffer, so the arithmetic and its order are those of the serial
   // loops; only the wall clock changes. The "active" fields carry the call context to the stages.
+  /**
+   * Below this many attended positions a single query row's heads stay on the calling thread.
+   * Measured on Granite 4.1 3B, AWS c7a.4xlarge, ~300-position RAG turns: partitioning heads cost
+   * 15% of decode throughput while partitioning prefill rows gained 58%.
+   */
+  private static final int PARALLEL_HEAD_ATTENTION_MIN_POSITIONS = 1_024;
+
   private final GgufStagePlan headAttentionPlan;
   private final GgufStagePlan rowAttentionPlan;
   private final GgufStagePlan sessionRowAttentionPlan;
@@ -2158,6 +2166,21 @@ public final class LlamaForwardPass {
       int layer,
       int position,
       KvCache sequenceCache) {
+    int firstPosition = config.attentionStartPosition(layer, position);
+    if (position - firstPosition + 1 < PARALLEL_HEAD_ATTENTION_MIN_POSITIONS) {
+      // Short contexts: one stage publication per layer costs more than the head loop it splits.
+      groupedQueryAttention(
+          query,
+          queryOffset,
+          output,
+          outputOffset,
+          layer,
+          position,
+          sequenceCache,
+          attentionScratch.get(),
+          0);
+      return;
+    }
     java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
     activeHeadQuery = query;
     activeHeadQueryOffset = queryOffset;
@@ -2185,30 +2208,33 @@ public final class LlamaForwardPass {
     KvCache sequenceCache = activeHeadCache;
     float[] scores = attentionScratch.get();
     int firstPosition = config.attentionStartPosition(layer, position);
+    AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
     for (int head = fromHead; head < toHead; head++) {
       int kvHead = head / groupSize;
-      computeAttentionScores(
+      sequenceCache.writeAttentionScores(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * keyLength,
           activeHeadQuery,
           activeHeadQueryOffset + head * keyLength,
-          layer,
-          position,
-          kvHead,
-          sequenceCache,
           keyLength,
           scale,
           scores,
-          0);
+          0,
+          batchedAttentionScores);
       TensorOps.softmax(scores, firstPosition, position - firstPosition + 1);
-      accumulateAttentionValues(
+      sequenceCache.addAttentionValues(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * valueLength,
           activeHeadOutput,
           activeHeadOutputOffset + head * valueLength,
-          layer,
-          position,
-          kvHead,
-          sequenceCache,
           valueLength,
           scores,
-          0);
+          0,
+          batchedAttentionValues);
     }
   }
 
@@ -2323,85 +2349,35 @@ public final class LlamaForwardPass {
     float scale = config.attentionScale();
     java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
 
+    int firstPosition = config.attentionStartPosition(layer, position);
+    AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
     for (int head = 0; head < numHeads; head++) {
       int kvHead = head / groupSize;
-      int qOffset = queryOffset + head * keyLength;
-      int headOutputOffset = outputOffset + head * valueLength;
-      int firstPosition = config.attentionStartPosition(layer, position);
-      computeAttentionScores(
+      sequenceCache.writeAttentionScores(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * keyLength,
           query,
-          qOffset,
-          layer,
-          position,
-          kvHead,
-          sequenceCache,
+          queryOffset + head * keyLength,
           keyLength,
           scale,
           scores,
-          scoresOffset);
-
+          scoresOffset,
+          batchedAttentionScores);
       TensorOps.softmax(scores, scoresOffset + firstPosition, position - firstPosition + 1);
-      accumulateAttentionValues(
+      sequenceCache.addAttentionValues(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * valueLength,
           output,
-          headOutputOffset,
-          layer,
-          position,
-          kvHead,
-          sequenceCache,
+          outputOffset + head * valueLength,
           valueLength,
           scores,
-          scoresOffset);
+          scoresOffset,
+          batchedAttentionValues);
     }
-  }
-
-  private void computeAttentionScores(
-      float[] query,
-      int queryOffset,
-      int layer,
-      int position,
-      int kvHead,
-      KvCache sequenceCache,
-      int keyLength,
-      float scale,
-      float[] scores,
-      int scoresOffset) {
-    int firstPosition = config.attentionStartPosition(layer, position);
-    sequenceCache.writeAttentionScores(
-        layer,
-        firstPosition,
-        position + 1,
-        kvHead * keyLength,
-        query,
-        queryOffset,
-        keyLength,
-        scale,
-        scores,
-        scoresOffset,
-        batchedAttentionScores);
-  }
-
-  private void accumulateAttentionValues(
-      float[] output,
-      int outputOffset,
-      int layer,
-      int position,
-      int kvHead,
-      KvCache sequenceCache,
-      int valueLength,
-      float[] scores,
-      int scoresOffset) {
-    int firstPosition = config.attentionStartPosition(layer, position);
-    sequenceCache.addAttentionValues(
-        layer,
-        firstPosition,
-        position + 1,
-        kvHead * valueLength,
-        output,
-        outputOffset,
-        valueLength,
-        scores,
-        scoresOffset,
-        batchedAttentionValues);
   }
 
   private void normalizeHead(float[] vector, int offset, float[] weight, int headDim) {

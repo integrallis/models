@@ -325,6 +325,11 @@ certified entries used: Hetzner `ccx43` (16 dedicated AMD vCPU, 64 GiB), Ubuntu 
 the performance phase only; the library-default smoke stays untuned as the harness enforces. The
 verdict is read from `qualification.json` on that host and copied into `host-evidence/` whatever
 it says.
+Substitution at creation time: the account's dedicated-core limit refused `ccx43`
+(`resource_limit_exceeded`), so the host is `ccx33` (8 dedicated AMD vCPU, 32 GiB), Hetzner id
+166128429, host key SHA256:aJRKPYLpCoIqW18+h6r2Gt12RGjYP4/GmKRKtAtlebE (`known_hosts_ded`). The
+certified Qwen entry ran on 16 processors; the ratio gates compare candidate and controls on the
+same host, so the core count changes absolute numbers, not the comparison.
 
 **Base run, attempt 4 result (host 3, ccx33 8 dedicated Milan vCPU, Models be61bd8,
 `granite-documents`, tuned batched attention):** FAILED_ABSOLUTE_GATE, every arm OFFLINE.
