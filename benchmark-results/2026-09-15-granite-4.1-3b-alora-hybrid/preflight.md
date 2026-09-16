@@ -534,3 +534,13 @@ launch). Same instance, same harness invocation and recorded tuning as attempt 6
 8, batched attention properties). If it passes, `7a3f3e7` is the frozen commit for every remaining
 gate; the identity screen and both window arms restart at it (host 1 Rust, host `166144162`
 pure Java), and attempt 6's bundle stays on record as the failed run it was.
+
+**Base run, attempt 7 result (Models 7a3f3e7, instance 2, pool 16 / decode 8):** absolute tier
+PRODUCTION_READY, verdict FAILED_RELATIVE_GATE by 0.00006: decode 20.507 tok/s against Ollama
+25.636 → ratio 0.79994 (floor 0.8); e2e 2588 against 1976 → 1.31 (ceiling 1.5). llama.cpp 25.76 /
+2456: decode 0.796, e2e 1.05 (llama.cpp is supporting evidence, not the qualifying comparator).
+Correctness 9/9 and 27/27. Rust arm p95 TTFT 975 ms, prefill 141 tok/s. Bundle in
+`host-evidence/base-attempt7/`. Per the attempt 6 plan a fail this close is re-run once on a fresh
+instance of the same class before any conclusion: attempt 8 runs on a new c7a.4xlarge at the same
+commit and settings; whichever way it lands is recorded, and no third roll follows without a code
+change.
