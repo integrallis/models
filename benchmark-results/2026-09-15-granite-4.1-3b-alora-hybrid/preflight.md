@@ -489,3 +489,28 @@ JIT tier; ARM has no such library, which is why the local suite passed. Fixed in
 normalisation stay). Confirmed on the x86 host 1 (EPYC Genoa): 50 forward-pass and 3 kernel tests
 pass at f4d53f2. Rule for this campaign: attention arithmetic must not depend on JIT tier, so no
 vector transcendental intrinsics in the forward pass.
+
+**Kernel v4 + selective wake (Models fe3bbbe, instance 2, three iterations each):**
+
+| pool | decode workers | decode tok/s | prefill tok/s | p95 TTFT ms | p95 e2e ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 8 | 8 | 19.4 | 92 | 1445 | 2956 |
+| 16 | 8 | 20.2 | 140 | 1000 | 2694 |
+| 12 | 8 | 19.6 | 113 | 1198 | 2905 |
+| 16 | 10 | 20.0 | 130 | 1060 | 2783 |
+
+Against this instance's Ollama control (24.95 tok/s, p95 e2e 1888 ms): pool 16 / decode 8 gives
+decode 0.81 (floor 0.8) and e2e 1.43 (ceiling 1.5) — the first configuration that clears both
+relative gates, with the absolute tier at USABLE (TTFT 1000 ms). Against llama.cpp (25.5, 2484):
+decode 0.79, e2e 1.08. The selective wake is what makes the 16/8 split pay: with all workers woken
+the same split gave 15.1 tok/s.
+
+**Base run, attempt 6 plan (written before it runs):** same instance `i-0374e4bc6139ab0b5`, the
+final Models commit that also carries the two JIT-tier determinism fixes (tier-stable exponential
+and fixed-tree lane reduction; kernel arithmetic otherwise as measured above), harness invocation
+via `base-host-run.sh` with `RAG_NATIVE_THREADS=16` and `RAG_TUNED_JAVA_OPTS` =
+`-Dmodels.native.kernels.decodeThreads=8 -Dmodels.purejava.batchedAttentionScores=true
+-Dmodels.purejava.batchedAttentionValues=true` for the performance phase; smoke untuned. The
+previous bundle on this instance (control at 4a0d5cc) is moved aside as `rag.control-4a0d5cc`. The
+verdict is copied whatever it says; the margins above are thin enough that instance variance can
+decide it, and a FAIL is re-run once on a fresh instance of the same class before any conclusion.
