@@ -362,3 +362,13 @@ Host 2 scratch, certified-profile settings (`models.native.kernels.threads=8`, b
 scores/values, Models be61bd8): decode 18.9 tok/s, prefill 41, p95 TTFT 3254 ms, p95 e2e 4620 ms
 (native threads 4: 14.1 / 33 / 3950). That is +62% decode over the harness default of 16 native
 workers on this 16-vCPU shared host, still 0.39× the Ollama control there; TTFT stays prefill-bound.
+
+**Base run, attempt 5 result (AWS c7a.4xlarge, EPYC 9R14 16 vCPU, Models be61bd8,
+`granite-documents`, `RAG_NATIVE_THREADS=8` + batched attention):** FAILED_ABSOLUTE_GATE. Smoke 9/9
+correct 1.0 (untuned, 9.7 tok/s). Performance phase 27/27 correct 1.0, abstention 1.0. Rust arm
+p50 decode 20.9 tok/s, p95 TTFT 2310 ms, p95 e2e 3810 ms → OFFLINE by 310 ms of TTFT (USABLE ≤
+2000). Ollama 28.4 tok/s, p95 TTFT 635 ms, PRODUCTION_READY; llama.cpp 29.0 tok/s, p95 TTFT 992
+ms, PRODUCTION_READY. Decode ratio 0.74 (Ollama) / 0.72 (llama.cpp) against the 0.8 floor; e2e
+ratio 2.3 against the 1.5 ceiling. Bundle in `host-evidence/base-attempt5/`. On the protocol's
+own host class the base is within reach: the gates need roughly −15% TTFT, +10% decode, and −35%
+end-to-end, and the runtime items named after attempt 4 (parallel attention first) are the path.
