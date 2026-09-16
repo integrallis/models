@@ -179,6 +179,196 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void groupedAttentionMatchesTheJavaKernelAcrossTwoSpans() {
+    int numKv = 2;
+    int group = 3;
+    int numHeads = numKv * group;
+    int keyLength = 64;
+    int valueLength = 64;
+    int keyDim = numKv * keyLength;
+    int valueDim = numKv * valueLength;
+    int positionsA = 37;
+    int positionsB = 5;
+    java.util.Random random = new java.util.Random(11);
+    float[] query = new float[3 + numHeads * keyLength];
+    float[] keysA = new float[5 + positionsA * keyDim];
+    float[] valuesA = new float[5 + positionsA * valueDim];
+    float[] keysB = new float[positionsB * keyDim];
+    float[] valuesB = new float[positionsB * valueDim];
+    for (float[] array : new float[][] {query, keysA, valuesA, keysB, valuesB}) {
+      for (int index = 0; index < array.length; index++) {
+        array[index] = random.nextFloat() - 0.5f;
+      }
+    }
+    float scale = 0.015625f;
+    int total = positionsA + positionsB;
+    // Java reference through the same grouped kernels the pure-Java path uses.
+    float[] expected = new float[2 + numHeads * valueLength];
+    float[] javaScores = new float[group * total];
+    for (int kv = 0; kv < numKv; kv++) {
+      com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.scoreGroup(
+          query,
+          3 + kv * group * keyLength,
+          keyLength,
+          group,
+          keysA,
+          5 + kv * keyLength,
+          keyDim,
+          positionsA,
+          keyLength,
+          scale,
+          javaScores,
+          0,
+          total);
+      com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.scoreGroup(
+          query,
+          3 + kv * group * keyLength,
+          keyLength,
+          group,
+          keysB,
+          kv * keyLength,
+          keyDim,
+          positionsB,
+          keyLength,
+          scale,
+          javaScores,
+          positionsA,
+          total);
+      for (int head = 0; head < group; head++) {
+        com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.softmax(
+            javaScores, head * total, total);
+      }
+      com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.accumulateGroup(
+          expected,
+          2 + kv * group * valueLength,
+          valueLength,
+          group,
+          valuesA,
+          5 + kv * valueLength,
+          valueDim,
+          positionsA,
+          valueLength,
+          javaScores,
+          0,
+          total);
+      com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.accumulateGroup(
+          expected,
+          2 + kv * group * valueLength,
+          valueLength,
+          group,
+          valuesB,
+          kv * valueLength,
+          valueDim,
+          positionsB,
+          valueLength,
+          javaScores,
+          positionsA,
+          total);
+    }
+    float[] actual = new float[2 + numHeads * valueLength];
+    float[] scores = new float[numHeads * total];
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4)) {
+      assertThat(kernels.supports(NativeKernelCapability.GROUPED_ATTENTION_F32)).isTrue();
+      kernels.groupedAttentionF32(
+          query,
+          3,
+          keysA,
+          5,
+          valuesA,
+          5,
+          positionsA,
+          keysB,
+          0,
+          valuesB,
+          0,
+          positionsB,
+          actual,
+          2,
+          scores,
+          keyDim,
+          valueDim,
+          keyLength,
+          valueLength,
+          numHeads,
+          numKv,
+          scale);
+      for (int index = 0; index < numHeads * valueLength; index++) {
+        assertThat(actual[2 + index])
+            .as("index %d", index)
+            .isCloseTo(
+                expected[2 + index],
+                org.assertj.core.data.Offset.offset(1e-5f + Math.abs(expected[2 + index]) * 1e-5f));
+      }
+      // Empty second span: same result as the Java path over the first span only.
+      float[] expectedSingle = new float[2 + numHeads * valueLength];
+      float[] singleScores = new float[group * positionsA];
+      for (int kv = 0; kv < numKv; kv++) {
+        com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.scoreGroup(
+            query,
+            3 + kv * group * keyLength,
+            keyLength,
+            group,
+            keysA,
+            5 + kv * keyLength,
+            keyDim,
+            positionsA,
+            keyLength,
+            scale,
+            singleScores,
+            0,
+            positionsA);
+        for (int head = 0; head < group; head++) {
+          com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.softmax(
+              singleScores, head * positionsA, positionsA);
+        }
+        com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel.accumulateGroup(
+            expectedSingle,
+            2 + kv * group * valueLength,
+            valueLength,
+            group,
+            valuesA,
+            5 + kv * valueLength,
+            valueDim,
+            positionsA,
+            valueLength,
+            singleScores,
+            0,
+            positionsA);
+      }
+      kernels.groupedAttentionF32(
+          query,
+          3,
+          keysA,
+          5,
+          valuesA,
+          5,
+          positionsA,
+          null,
+          0,
+          null,
+          0,
+          0,
+          actual,
+          2,
+          scores,
+          keyDim,
+          valueDim,
+          keyLength,
+          valueLength,
+          numHeads,
+          numKv,
+          scale);
+      for (int index = 0; index < numHeads * valueLength; index++) {
+        assertThat(actual[2 + index])
+            .isCloseTo(
+                expectedSingle[2 + index],
+                org.assertj.core.data.Offset.offset(
+                    1e-5f + Math.abs(expectedSingle[2 + index]) * 1e-5f));
+      }
+    }
+  }
+
+  @Test
   void decodeThreadCountMustFitThePool() {
     System.setProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY, "9");
     try {

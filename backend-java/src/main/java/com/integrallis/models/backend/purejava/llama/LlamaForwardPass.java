@@ -175,6 +175,8 @@ public final class LlamaForwardPass {
   private final GgufStagePlan rowAttentionPlan;
   private final GgufStagePlan sessionRowAttentionPlan;
   private final ThreadLocal<float[]> attentionScratch;
+  private final boolean nativeGroupedAttention;
+  private float[] nativeAttentionScores;
   private float[] activeHeadQuery;
   private int activeHeadQueryOffset;
   private float[] activeHeadOutput;
@@ -502,6 +504,11 @@ public final class LlamaForwardPass {
     int attentionGroupSize = config.numHeads() / config.numKvHeads();
     this.attentionScratch =
         ThreadLocal.withInitial(() -> new float[attentionGroupSize * cache.maxSeqLen()]);
+    // Native grouped attention is wired for Granite only: the Rust kernel's arithmetic differs
+    // from the Java kernels in the last bits, and the pinned greedy expectations of other
+    // architectures stay on the Java path they were recorded with.
+    this.nativeGroupedAttention =
+        config.usesGraniteScaling() && loadedMatrixKernel.supportsGroupedAttention();
     this.headAttentionPlan =
         GgufStagePlan.of(GgufStagePlan.stage(config.numKvHeads(), this::attendKvHeadRange));
     this.rowAttentionPlan =
@@ -2163,6 +2170,18 @@ public final class LlamaForwardPass {
       int position,
       KvCache sequenceCache) {
     int firstPosition = config.attentionStartPosition(layer, position);
+    if (nativeGroupedAttention
+        && attendNatively(
+            query,
+            queryOffset,
+            output,
+            outputOffset,
+            layer,
+            firstPosition,
+            position,
+            sequenceCache)) {
+      return;
+    }
     if (position - firstPosition + 1 < PARALLEL_HEAD_ATTENTION_MIN_POSITIONS) {
       // Short contexts: one stage publication per layer costs more than the head loop it splits.
       groupedQueryAttention(
@@ -2184,6 +2203,56 @@ public final class LlamaForwardPass {
       activeHeadOutput = null;
       activeHeadCache = null;
     }
+  }
+
+  /**
+   * One query row through the native grouped attention kernel when the cache view has at most two
+   * spans (a shared prefix segment and the branch's own rows); returns false otherwise.
+   */
+  private boolean attendNatively(
+      float[] query,
+      int queryOffset,
+      float[] output,
+      int outputOffset,
+      int layer,
+      int firstPosition,
+      int position,
+      KvCache sequenceCache) {
+    AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
+    if (view.spanCount() > 2) {
+      return false;
+    }
+    int positions = position - firstPosition + 1;
+    int needed = config.numHeads() * positions;
+    if (nativeAttentionScores == null || nativeAttentionScores.length < needed) {
+      nativeAttentionScores = new float[Math.max(needed, config.numHeads() * 256)];
+    }
+    KvCache.AttentionSpan first = view.span(0);
+    KvCache.AttentionSpan second = view.spanCount() > 1 ? view.span(1) : null;
+    batchedMatrixKernel.groupedAttention(
+        query,
+        queryOffset,
+        first.keyBuffer(),
+        first.keyOffset(),
+        first.valueBuffer(),
+        first.valueOffset(),
+        first.positionCount(),
+        second == null ? null : second.keyBuffer(),
+        second == null ? 0 : second.keyOffset(),
+        second == null ? null : second.valueBuffer(),
+        second == null ? 0 : second.valueOffset(),
+        second == null ? 0 : second.positionCount(),
+        output,
+        outputOffset,
+        nativeAttentionScores,
+        sequenceCache.keyDim(),
+        sequenceCache.valueDim(),
+        config.keyLength(),
+        config.valueLength(),
+        config.numHeads(),
+        config.numKvHeads(),
+        config.attentionScale());
+    return true;
   }
 
   private void attendKvHeadRange(int fromKvHead, int toKvHead) {

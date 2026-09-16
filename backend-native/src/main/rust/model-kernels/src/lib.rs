@@ -79,6 +79,7 @@ const CAPABILITY_MANY_GROUPED_BATCHED_MATMUL: u64 = 1 << 16;
 const CAPABILITY_INDEPENDENT_BATCHED_MATMUL: u64 = 1 << 17;
 const CAPABILITY_GATED_DELTA_NET_F32: u64 = 1 << 18;
 const CAPABILITY_ACTIVE_THREADS: u64 = 1 << 19;
+const CAPABILITY_GROUPED_ATTENTION_F32: u64 = 1 << 20;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -265,6 +266,7 @@ struct WorkerState {
 enum WorkerJob {
     Matrix(ParallelJob),
     GatedDeltaNet(GatedDeltaNetJob),
+    Attention(AttentionJob),
 }
 
 #[derive(Clone, Copy)]
@@ -291,6 +293,30 @@ struct ParallelJob {
     output_elements: usize,
     /// Workers that receive rows for this job; set by the pool from its active thread count.
     partitions: usize,
+}
+
+/// One query row of grouped-query attention over up to two cached key/value spans (a shared
+/// prefix segment and the branch's own rows). Pointers are Java heap arrays pinned for the
+/// synchronous critical call; offsets are in elements.
+#[derive(Clone, Copy)]
+struct AttentionJob {
+    query: usize,
+    query_offset: usize,
+    keys: [usize; 2],
+    key_offsets: [usize; 2],
+    values: [usize; 2],
+    value_offsets: [usize; 2],
+    positions: [usize; 2],
+    output: usize,
+    output_offset: usize,
+    scores: usize,
+    key_dim: usize,
+    value_dim: usize,
+    key_length: usize,
+    value_length: usize,
+    num_heads: usize,
+    num_kv_heads: usize,
+    scale: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -453,6 +479,53 @@ impl WorkerPool {
         self.await_workers(caller_succeeded)
     }
 
+    fn execute_attention(&self, job: AttentionJob) -> bool {
+        if self.workers.is_empty() || job.num_kv_heads == 1 {
+            return catch_unwind(AssertUnwindSafe(|| {
+                // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
+                // A single KV head has nothing to partition.
+                unsafe { execute_attention_partition(job, 0, 1) }
+            }))
+            .is_ok();
+        }
+
+        let partitions = self
+            .active_threads
+            .load(Ordering::Acquire)
+            .clamp(1, self.total_threads);
+        if partitions == 1 {
+            return catch_unwind(AssertUnwindSafe(|| {
+                // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
+                unsafe { execute_attention_partition(job, 0, 1) }
+            }))
+            .is_ok();
+        }
+        let _execution = lock(&self.execution);
+        {
+            let mut state = lock(&self.shared.state);
+            state.job = Some(WorkerJob::Attention(job));
+            state.failed = false;
+            self.shared
+                .partitions
+                .0
+                .store(partitions, Ordering::Release);
+            self.shared
+                .remaining
+                .0
+                .store(partitions - 1, Ordering::Relaxed);
+            self.shared.generation.0.fetch_add(1, Ordering::Release);
+            self.shared.work_available.notify_all();
+        }
+
+        let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
+            // SAFETY: each worker owns disjoint recurrent heads and output rows.
+            unsafe { execute_attention_partition(job, 0, partitions) }
+        }))
+        .is_ok();
+
+        self.await_workers(caller_succeeded)
+    }
+
     fn await_workers(&self, caller_succeeded: bool) -> bool {
         let completed = poll_completion(&self.shared.remaining.0, COMPLETION_SPIN_ITERS);
         let mut state = lock(&self.shared.state);
@@ -529,6 +602,12 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
             Some(WorkerJob::GatedDeltaNet(job)) => catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: every worker receives disjoint recurrent heads and output rows.
                 unsafe { execute_gated_delta_net_partition(job, worker_index, partitions) }
+            }))
+            .is_ok(),
+            Some(WorkerJob::Attention(job)) => catch_unwind(AssertUnwindSafe(|| {
+                // SAFETY: every worker receives disjoint KV-head groups, hence disjoint output
+                // heads and score rows; the caller validated every buffer length.
+                unsafe { execute_attention_partition(job, worker_index, partitions) }
             }))
             .is_ok(),
             None => false,
@@ -614,6 +693,170 @@ unsafe fn execute_matrix_job_partition(
                 matrix.kernel,
             );
         }
+    }
+}
+
+/// Grouped-query attention for one query row: for every KV head in this worker's range, scores
+/// for each query head of the group over both spans, a softmax per head, and the value
+/// accumulation. Every reduction runs in a fixed order, so results are deterministic.
+unsafe fn execute_attention_partition(
+    job: AttentionJob,
+    worker_index: usize,
+    total_threads: usize,
+) {
+    if worker_index >= total_threads {
+        return;
+    }
+    let start_kv = job.num_kv_heads * worker_index / total_threads;
+    let end_kv = job.num_kv_heads * (worker_index + 1) / total_threads;
+    if start_kv >= end_kv {
+        return;
+    }
+    let group = job.num_heads / job.num_kv_heads;
+    let total_positions = job.positions[0] + job.positions[1];
+    // SAFETY: the exported entry point validated every length against the shapes below.
+    let query = unsafe {
+        slice::from_raw_parts(
+            (job.query as *const f32).add(job.query_offset),
+            job.num_heads * job.key_length,
+        )
+    };
+    let output = unsafe {
+        slice::from_raw_parts_mut(
+            (job.output as *mut f32).add(job.output_offset),
+            job.num_heads * job.value_length,
+        )
+    };
+    let scores = unsafe {
+        slice::from_raw_parts_mut(job.scores as *mut f32, job.num_heads * total_positions)
+    };
+    let vectorized = gated_delta_net_avx2_available();
+    for kv in start_kv..end_kv {
+        for head in kv * group..(kv + 1) * group {
+            let q = &query[head * job.key_length..(head + 1) * job.key_length];
+            let row_scores = &mut scores[head * total_positions..(head + 1) * total_positions];
+            let mut written = 0;
+            for span in 0..2 {
+                let positions = job.positions[span];
+                if positions == 0 {
+                    continue;
+                }
+                let keys = unsafe {
+                    slice::from_raw_parts(
+                        (job.keys[span] as *const f32)
+                            .add(job.key_offsets[span] + kv * job.key_length),
+                        (positions - 1) * job.key_dim + job.key_length,
+                    )
+                };
+                for row in 0..positions {
+                    let k = &keys[row * job.key_dim..row * job.key_dim + job.key_length];
+                    row_scores[written + row] = attention_dot(q, k, vectorized) * job.scale;
+                }
+                written += positions;
+            }
+            attention_softmax(row_scores);
+            let out = &mut output[head * job.value_length..(head + 1) * job.value_length];
+            out.fill(0.0);
+            let mut consumed = 0;
+            for span in 0..2 {
+                let positions = job.positions[span];
+                if positions == 0 {
+                    continue;
+                }
+                let values = unsafe {
+                    slice::from_raw_parts(
+                        (job.values[span] as *const f32)
+                            .add(job.value_offsets[span] + kv * job.value_length),
+                        (positions - 1) * job.value_dim + job.value_length,
+                    )
+                };
+                for row in 0..positions {
+                    let v = &values[row * job.value_dim..row * job.value_dim + job.value_length];
+                    attention_axpy(out, v, row_scores[consumed + row], vectorized);
+                }
+                consumed += positions;
+            }
+        }
+    }
+}
+
+fn attention_dot(a: &[f32], b: &[f32], vectorized: bool) -> f32 {
+    #[cfg(target_arch = "x86_64")]
+    if vectorized && a.len() >= 16 {
+        // SAFETY: gated_delta_net_avx2_available() checked AVX2 and FMA.
+        return unsafe { attention_dot_avx2(a, b) };
+    }
+    let _ = vectorized;
+    attention_dot_scalar(a, b)
+}
+
+fn attention_dot_scalar(a: &[f32], b: &[f32]) -> f32 {
+    let mut sum = 0.0_f32;
+    for (x, y) in a.iter().zip(b) {
+        sum = x.mul_add(*y, sum);
+    }
+    sum
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn attention_dot_avx2(a: &[f32], b: &[f32]) -> f32 {
+    let mut acc0 = _mm256_setzero_ps();
+    let mut acc1 = _mm256_setzero_ps();
+    let mut index = 0;
+    while index + 16 <= a.len() {
+        // SAFETY: index + 16 <= len on both slices, which share a length.
+        let a0 = unsafe { _mm256_loadu_ps(a.as_ptr().add(index)) };
+        let b0 = unsafe { _mm256_loadu_ps(b.as_ptr().add(index)) };
+        let a1 = unsafe { _mm256_loadu_ps(a.as_ptr().add(index + 8)) };
+        let b1 = unsafe { _mm256_loadu_ps(b.as_ptr().add(index + 8)) };
+        acc0 = _mm256_fmadd_ps(a0, b0, acc0);
+        acc1 = _mm256_fmadd_ps(a1, b1, acc1);
+        index += 16;
+    }
+    while index + 8 <= a.len() {
+        // SAFETY: index + 8 <= len.
+        let a0 = unsafe { _mm256_loadu_ps(a.as_ptr().add(index)) };
+        let b0 = unsafe { _mm256_loadu_ps(b.as_ptr().add(index)) };
+        acc0 = _mm256_fmadd_ps(a0, b0, acc0);
+        index += 8;
+    }
+    let mut sum = horizontal_sum_f32_avx2(_mm256_add_ps(acc0, acc1));
+    while index < a.len() {
+        sum = a[index].mul_add(b[index], sum);
+        index += 1;
+    }
+    sum
+}
+
+fn attention_softmax(scores: &mut [f32]) {
+    let mut max = f32::NEG_INFINITY;
+    for &score in scores.iter() {
+        if score > max {
+            max = score;
+        }
+    }
+    let mut sum = 0.0_f32;
+    for score in scores.iter_mut() {
+        *score = (*score - max).exp();
+        sum += *score;
+    }
+    let inverse = 1.0_f32 / sum;
+    for score in scores.iter_mut() {
+        *score *= inverse;
+    }
+}
+
+fn attention_axpy(out: &mut [f32], v: &[f32], weight: f32, vectorized: bool) {
+    #[cfg(target_arch = "x86_64")]
+    if vectorized && out.len() >= 8 {
+        // SAFETY: gated_delta_net_avx2_available() checked AVX2 and FMA.
+        unsafe { gated_delta_net_add_scaled_avx2(out, v, weight) };
+        return;
+    }
+    let _ = vectorized;
+    for (o, x) in out.iter_mut().zip(v) {
+        *o = x.mul_add(weight, *o);
     }
 }
 
@@ -900,6 +1143,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_INDEPENDENT_BATCHED_MATMUL
         | CAPABILITY_GATED_DELTA_NET_F32
         | CAPABILITY_ACTIVE_THREADS
+        | CAPABILITY_GROUPED_ATTENTION_F32
 }
 
 #[unsafe(no_mangle)]
@@ -921,6 +1165,130 @@ pub extern "C" fn jmodels_kernels_context_create(thread_count: u32) -> *mut Kern
     })) {
         Ok(context) => context,
         Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+/// Grouped-query attention for one query row over up to two cached key/value spans; the second
+/// span may be empty (null pointers, zero positions). Output rows are overwritten, not
+/// accumulated. `scores` is caller scratch of at least `num_heads * total positions` floats.
+///
+/// # Safety
+///
+/// `context` must be live. Every pointer must remain valid for its advertised length for the
+/// synchronous call; output and scores must be writable and must not alias the inputs.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn jmodels_grouped_attention_f32_with_context(
+    context: *const KernelContext,
+    query: *const f32,
+    query_offset: u64,
+    query_elements: u64,
+    keys_a: *const f32,
+    keys_a_offset: u64,
+    keys_a_elements: u64,
+    values_a: *const f32,
+    values_a_offset: u64,
+    values_a_elements: u64,
+    positions_a: u32,
+    keys_b: *const f32,
+    keys_b_offset: u64,
+    keys_b_elements: u64,
+    values_b: *const f32,
+    values_b_offset: u64,
+    values_b_elements: u64,
+    positions_b: u32,
+    output: *mut f32,
+    output_offset: u64,
+    output_elements: u64,
+    scores: *mut f32,
+    scores_elements: u64,
+    key_dim: u32,
+    value_dim: u32,
+    key_length: u32,
+    value_length: u32,
+    num_heads: u32,
+    num_kv_heads: u32,
+    scale: f32,
+) -> i32 {
+    if context.is_null() || query.is_null() || output.is_null() || scores.is_null() {
+        return STATUS_NULL_POINTER;
+    }
+    let positions = [positions_a as usize, positions_b as usize];
+    let keys = [keys_a, keys_b];
+    let values = [values_a, values_b];
+    for span in 0..2 {
+        if positions[span] > 0 && (keys[span].is_null() || values[span].is_null()) {
+            return STATUS_NULL_POINTER;
+        }
+    }
+    let (key_dim, value_dim, key_length, value_length, num_heads, num_kv_heads) = (
+        key_dim as usize,
+        value_dim as usize,
+        key_length as usize,
+        value_length as usize,
+        num_heads as usize,
+        num_kv_heads as usize,
+    );
+    let total = positions[0] + positions[1];
+    if total == 0
+        || num_heads == 0
+        || num_kv_heads == 0
+        || !num_heads.is_multiple_of(num_kv_heads)
+        || key_length == 0
+        || value_length == 0
+        || key_dim < num_kv_heads * key_length
+        || value_dim < num_kv_heads * value_length
+        || !scale.is_finite()
+    {
+        return STATUS_INVALID_SHAPE;
+    }
+    if (query_offset as usize) + num_heads * key_length > query_elements as usize
+        || (output_offset as usize) + num_heads * value_length > output_elements as usize
+        || num_heads * total > scores_elements as usize
+    {
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+    let key_offsets = [keys_a_offset as usize, keys_b_offset as usize];
+    let value_offsets = [values_a_offset as usize, values_b_offset as usize];
+    let key_elements = [keys_a_elements as usize, keys_b_elements as usize];
+    let value_elements = [values_a_elements as usize, values_b_elements as usize];
+    for span in 0..2 {
+        if positions[span] == 0 {
+            continue;
+        }
+        let key_needed = key_offsets[span] + (positions[span] - 1) * key_dim + key_dim;
+        let value_needed = value_offsets[span] + (positions[span] - 1) * value_dim + value_dim;
+        if key_needed > key_elements[span] || value_needed > value_elements[span] {
+            return STATUS_BUFFER_TOO_SMALL;
+        }
+    }
+    let job = AttentionJob {
+        query: query as usize,
+        query_offset: query_offset as usize,
+        keys: [keys_a as usize, keys_b as usize],
+        key_offsets,
+        values: [values_a as usize, values_b as usize],
+        value_offsets,
+        positions,
+        output: output as usize,
+        output_offset: output_offset as usize,
+        scores: scores as usize,
+        key_dim,
+        value_dim,
+        key_length,
+        value_length,
+        num_heads,
+        num_kv_heads,
+        scale,
+    };
+    match catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: Java owns the context and every buffer for this synchronous call.
+        let context = unsafe { &*context };
+        context.workers.execute_attention(job)
+    })) {
+        Ok(true) => STATUS_OK,
+        Ok(false) => STATUS_PANIC,
+        Err(_) => STATUS_PANIC,
     }
 }
 
@@ -4715,6 +5083,7 @@ mod tests {
                 | CAPABILITY_INDEPENDENT_BATCHED_MATMUL
                 | CAPABILITY_GATED_DELTA_NET_F32
                 | CAPABILITY_ACTIVE_THREADS
+                | CAPABILITY_GROUPED_ATTENTION_F32
         );
     }
 
@@ -4834,6 +5203,186 @@ mod tests {
         assert_eq!(pool.set_active_threads(2), 2);
         assert_eq!(pool.set_active_threads(99), 4);
         assert_eq!(pool.active_threads.load(Ordering::Acquire), 4);
+    }
+
+    #[test]
+    fn grouped_attention_matches_a_naive_reference_across_two_spans_and_workers() {
+        let (num_kv, group, key_length, value_length) = (2, 3, 64, 64);
+        let num_heads = num_kv * group;
+        let (key_dim, value_dim) = (num_kv * key_length, num_kv * value_length);
+        let positions = [5_usize, 3_usize];
+        let mut seed = 12345_u32;
+        let mut next = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            ((seed >> 8) as f32 / (1u32 << 24) as f32) - 0.5
+        };
+        let query: Vec<f32> = (0..num_heads * key_length + 7).map(|_| next()).collect();
+        let keys_a: Vec<f32> = (0..positions[0] * key_dim + 3).map(|_| next()).collect();
+        let values_a: Vec<f32> = (0..positions[0] * value_dim + 3).map(|_| next()).collect();
+        let keys_b: Vec<f32> = (0..positions[1] * key_dim).map(|_| next()).collect();
+        let values_b: Vec<f32> = (0..positions[1] * value_dim).map(|_| next()).collect();
+        let scale = 0.015625_f32;
+        // naive reference
+        let total = positions[0] + positions[1];
+        let mut expected = vec![0.0_f32; num_heads * value_length];
+        for head in 0..num_heads {
+            let kv = head / group;
+            let q = &query[7 + head * key_length..7 + (head + 1) * key_length];
+            let mut sc = vec![0.0_f32; total];
+            for row in 0..total {
+                let k: &[f32] = if row < positions[0] {
+                    &keys_a[3 + row * key_dim + kv * key_length..][..key_length]
+                } else {
+                    &keys_b[(row - positions[0]) * key_dim + kv * key_length..][..key_length]
+                };
+                sc[row] = q
+                    .iter()
+                    .zip(k)
+                    .map(|(a, b)| (*a as f64) * (*b as f64))
+                    .sum::<f64>() as f32
+                    * scale;
+            }
+            let max = sc.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let exps: Vec<f64> = sc.iter().map(|s| ((*s - max) as f64).exp()).collect();
+            let sum: f64 = exps.iter().sum();
+            for row in 0..total {
+                let v: &[f32] = if row < positions[0] {
+                    &values_a[3 + row * value_dim + kv * value_length..][..value_length]
+                } else {
+                    &values_b[(row - positions[0]) * value_dim + kv * value_length..]
+                        [..value_length]
+                };
+                let p = (exps[row] / sum) as f32;
+                for c in 0..value_length {
+                    expected[head * value_length + c] += p * v[c];
+                }
+            }
+        }
+        let context = jmodels_kernels_context_create(4);
+        assert!(!context.is_null());
+        let mut output = vec![0.0_f32; num_heads * value_length + 2];
+        let mut scores = vec![0.0_f32; num_heads * total];
+        let status = unsafe {
+            jmodels_grouped_attention_f32_with_context(
+                context,
+                query.as_ptr(),
+                7,
+                query.len() as u64,
+                keys_a.as_ptr(),
+                3,
+                keys_a.len() as u64,
+                values_a.as_ptr(),
+                3,
+                values_a.len() as u64,
+                positions[0] as u32,
+                keys_b.as_ptr(),
+                0,
+                keys_b.len() as u64,
+                values_b.as_ptr(),
+                0,
+                values_b.len() as u64,
+                positions[1] as u32,
+                output.as_mut_ptr(),
+                2,
+                output.len() as u64,
+                scores.as_mut_ptr(),
+                scores.len() as u64,
+                key_dim as u32,
+                value_dim as u32,
+                key_length as u32,
+                value_length as u32,
+                num_heads as u32,
+                num_kv as u32,
+                scale,
+            )
+        };
+        assert_eq!(status, STATUS_OK);
+        for (index, (actual, want)) in output[2..].iter().zip(&expected).enumerate() {
+            assert!(
+                (actual - want).abs() <= 1e-5 + want.abs() * 1e-5,
+                "index {index}: {actual} vs {want}"
+            );
+        }
+        // Empty second span and a 1-worker context must agree with the 4-worker result.
+        let single = jmodels_kernels_context_create(1);
+        let mut output_single = vec![0.0_f32; num_heads * value_length + 2];
+        let status = unsafe {
+            jmodels_grouped_attention_f32_with_context(
+                single,
+                query.as_ptr(),
+                7,
+                query.len() as u64,
+                keys_a.as_ptr(),
+                3,
+                keys_a.len() as u64,
+                values_a.as_ptr(),
+                3,
+                values_a.len() as u64,
+                positions[0] as u32,
+                keys_b.as_ptr(),
+                0,
+                keys_b.len() as u64,
+                values_b.as_ptr(),
+                0,
+                values_b.len() as u64,
+                positions[1] as u32,
+                output_single.as_mut_ptr(),
+                2,
+                output_single.len() as u64,
+                scores.as_mut_ptr(),
+                scores.len() as u64,
+                key_dim as u32,
+                value_dim as u32,
+                key_length as u32,
+                value_length as u32,
+                num_heads as u32,
+                num_kv as u32,
+                scale,
+            )
+        };
+        assert_eq!(status, STATUS_OK);
+        assert_eq!(output, output_single);
+        assert_eq!(
+            unsafe {
+                jmodels_grouped_attention_f32_with_context(
+                    context,
+                    query.as_ptr(),
+                    7,
+                    query.len() as u64,
+                    keys_a.as_ptr(),
+                    3,
+                    keys_a.len() as u64,
+                    values_a.as_ptr(),
+                    3,
+                    values_a.len() as u64,
+                    0,
+                    std::ptr::null(),
+                    0,
+                    0,
+                    std::ptr::null(),
+                    0,
+                    0,
+                    0,
+                    output.as_mut_ptr(),
+                    2,
+                    output.len() as u64,
+                    scores.as_mut_ptr(),
+                    scores.len() as u64,
+                    key_dim as u32,
+                    value_dim as u32,
+                    key_length as u32,
+                    value_length as u32,
+                    num_heads as u32,
+                    num_kv as u32,
+                    scale,
+                )
+            },
+            STATUS_INVALID_SHAPE
+        );
+        unsafe {
+            jmodels_kernels_context_destroy(context);
+            jmodels_kernels_context_destroy(single);
+        }
     }
 
     #[test]

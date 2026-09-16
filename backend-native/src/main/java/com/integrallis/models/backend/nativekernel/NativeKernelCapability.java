@@ -36,7 +36,8 @@ public enum NativeKernelCapability {
   MANY_GROUPED_BATCHED_MATMUL(1L << 16),
   INDEPENDENT_BATCHED_MATMUL(1L << 17),
   GATED_DELTA_NET_F32(1L << 18),
-  ACTIVE_THREADS(1L << 19);
+  ACTIVE_THREADS(1L << 19),
+  GROUPED_ATTENTION_F32(1L << 20);
 
   private final long mask;
 

@@ -84,6 +84,24 @@ public final class KvCache {
     public int positionCount() {
       return positionCount;
     }
+
+    /** Backing key rows; row {@code r} of this span starts at {@code keyOffset() + r * keyDim}. */
+    public float[] keyBuffer() {
+      return keyBuffer;
+    }
+
+    public int keyOffset() {
+      return keyOffset;
+    }
+
+    /** Backing value rows; row {@code r} starts at {@code valueOffset() + r * valueDim}. */
+    public float[] valueBuffer() {
+      return valueBuffer;
+    }
+
+    public int valueOffset() {
+      return valueOffset;
+    }
   }
 
   /** A chronological attention range represented without copying by one or more spans. */

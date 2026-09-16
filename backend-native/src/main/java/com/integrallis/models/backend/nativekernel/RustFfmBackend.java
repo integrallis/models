@@ -309,6 +309,8 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
     environment.put("native-kernel-threads", Integer.toString(kernel.threadCount()));
     environment.put("native-kernel-decode-threads", Integer.toString(kernel.decodeThreadCount()));
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
+    environment.put(
+        "native-grouped-attention", Boolean.toString(kernel.supportsGroupedAttention()));
     environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
     environment.put("native-gated-delta-net", Boolean.toString(kernel.gatedDeltaNetEnabled()));
     environment.put("native-load-warmup", Boolean.toString(loadWarmup));

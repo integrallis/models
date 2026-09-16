@@ -55,6 +55,39 @@ public final class NativeKernelLibrary implements AutoCloseable {
       FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
   private static final FunctionDescriptor SET_ACTIVE_THREADS_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor GROUPED_ATTENTION_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_FLOAT);
   private static final FunctionDescriptor CONTEXT_DESTROY_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
   private static final FunctionDescriptor QUANTIZED_BATCHED_WITH_CONTEXT_DESCRIPTOR =
@@ -134,6 +167,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle quantizedIndependentBatchedHandle;
   private final MethodHandle gatedDeltaNetHandle;
   private final MethodHandle setActiveThreadsHandle;
+  private final MethodHandle groupedAttentionHandle;
   private final int threadCount;
   private final int decodeThreadCount;
   private int activeThreadCount;
@@ -149,6 +183,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle quantizedIndependentBatchedHandle,
       MethodHandle gatedDeltaNetHandle,
       MethodHandle setActiveThreadsHandle,
+      MethodHandle groupedAttentionHandle,
       int threadCount,
       int decodeThreadCount) {
     this.libraryArena = libraryArena;
@@ -160,6 +195,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.quantizedIndependentBatchedHandle = quantizedIndependentBatchedHandle;
     this.gatedDeltaNetHandle = gatedDeltaNetHandle;
     this.setActiveThreadsHandle = setActiveThreadsHandle;
+    this.groupedAttentionHandle = groupedAttentionHandle;
     this.threadCount = threadCount;
     this.decodeThreadCount = decodeThreadCount;
     this.activeThreadCount = threadCount;
@@ -226,6 +262,13 @@ public final class NativeKernelLibrary implements AutoCloseable {
                   "jmodels_kernels_context_set_active_threads",
                   SET_ACTIVE_THREADS_DESCRIPTOR)
               : null;
+      MethodHandle groupedAttention =
+          (capabilityMask & NativeKernelCapability.GROUPED_ATTENTION_F32.mask()) != 0
+              ? downcallCritical(
+                  lookup,
+                  "jmodels_grouped_attention_f32_with_context",
+                  GROUPED_ATTENTION_DESCRIPTOR)
+              : null;
       int decodeThreadCount = configuredDecodeThreadCount(threadCount);
       MemorySegment context = invokeAddress(contextCreate, threadCount, "create worker context");
       if (context.address() == 0) {
@@ -241,6 +284,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
           quantizedIndependentBatched,
           gatedDeltaNet,
           setActiveThreads,
+          groupedAttention,
           threadCount,
           decodeThreadCount);
     } catch (RuntimeException | LinkageError failure) {
@@ -948,6 +992,91 @@ public final class NativeKernelLibrary implements AutoCloseable {
       throw bridgeFailure("set active worker count", failure);
     }
   }
+
+  /**
+   * Grouped-query attention for one query row over up to two cached key/value spans, computed by
+   * the native kernel on its worker pool and written into {@code output} (overwritten, not
+   * accumulated). Heap arrays cross the boundary without copying under the critical linker option.
+   * {@code scores} is scratch of at least {@code numHeads * (positionsA + positionsB)}.
+   */
+  public void groupedAttentionF32(
+      float[] query,
+      int queryOffset,
+      float[] keysA,
+      int keysAOffset,
+      float[] valuesA,
+      int valuesAOffset,
+      int positionsA,
+      float[] keysB,
+      int keysBOffset,
+      float[] valuesB,
+      int valuesBOffset,
+      int positionsB,
+      float[] output,
+      int outputOffset,
+      float[] scores,
+      int keyDim,
+      int valueDim,
+      int keyLength,
+      int valueLength,
+      int numHeads,
+      int numKvHeads,
+      float scale) {
+    if (groupedAttentionHandle == null) {
+      throw new UnsupportedOperationException(
+          "loaded native library has no grouped attention kernel");
+    }
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(keysA, "keysA");
+    Objects.requireNonNull(valuesA, "valuesA");
+    Objects.requireNonNull(output, "output");
+    Objects.requireNonNull(scores, "scores");
+    float[] safeKeysB = keysB == null ? EMPTY : keysB;
+    float[] safeValuesB = valuesB == null ? EMPTY : valuesB;
+    selectWorkers(1);
+    try {
+      int status =
+          (int)
+              groupedAttentionHandle.invokeExact(
+                  context,
+                  MemorySegment.ofArray(query),
+                  (long) queryOffset,
+                  (long) query.length,
+                  MemorySegment.ofArray(keysA),
+                  (long) keysAOffset,
+                  (long) keysA.length,
+                  MemorySegment.ofArray(valuesA),
+                  (long) valuesAOffset,
+                  (long) valuesA.length,
+                  positionsA,
+                  MemorySegment.ofArray(safeKeysB),
+                  (long) keysBOffset,
+                  (long) safeKeysB.length,
+                  MemorySegment.ofArray(safeValuesB),
+                  (long) valuesBOffset,
+                  (long) safeValuesB.length,
+                  positionsB,
+                  MemorySegment.ofArray(output),
+                  (long) outputOffset,
+                  (long) output.length,
+                  MemorySegment.ofArray(scores),
+                  (long) scores.length,
+                  keyDim,
+                  valueDim,
+                  keyLength,
+                  valueLength,
+                  numHeads,
+                  numKvHeads,
+                  scale);
+      if (status != 0) {
+        throw new IllegalStateException("native grouped attention failed: " + statusName(status));
+      }
+    } catch (Throwable failure) {
+      throw bridgeFailure("grouped attention", failure);
+    }
+  }
+
+  private static final float[] EMPTY = new float[0];
 
   private static int configuredDecodeThreadCount(int threadCount) {
     String configured = System.getProperty(DECODE_THREAD_COUNT_PROPERTY);
