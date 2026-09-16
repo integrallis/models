@@ -203,22 +203,34 @@ final class ActivatedAnswerabilityQualificationCli {
   }
 
   /**
-   * Applies the exact contract from the adapter's published {@code io.yaml}: the completion is a
-   * JSON string whose value is one of the two labels. Surrounding whitespace is trimmed; anything
-   * that is not a JSON string literal equal to a label is unstructured.
+   * Applies each arm's own output contract. The specialist follows the adapter's published {@code
+   * io.yaml}: the completion is a JSON string whose value is one of the two labels. The base arm is
+   * instructed to answer with exactly one word, so its contract is the bare label. Surrounding
+   * whitespace is trimmed on both; anything else is unstructured.
    */
-  static String prediction(String output) {
+  static String prediction(String output, Arm arm) {
     String trimmed = output == null ? "" : output.strip();
     for (String label : LABELS) {
-      try {
-        if (JSON.writeValueAsString(label).equals(trimmed)) {
-          return label;
+      String expected;
+      if (arm == Arm.BASE) {
+        expected = label;
+      } else {
+        try {
+          expected = JSON.writeValueAsString(label);
+        } catch (IOException impossible) {
+          throw new IllegalStateException(impossible);
         }
-      } catch (IOException impossible) {
-        throw new IllegalStateException(impossible);
+      }
+      if (expected.equals(trimmed)) {
+        return label;
       }
     }
     return "";
+  }
+
+  /** Specialist contract, kept for callers that only see adapter completions. */
+  static String prediction(String output) {
+    return prediction(output, Arm.SPECIALIST);
   }
 
   static int run(String[] args) throws Exception {
@@ -287,7 +299,7 @@ final class ActivatedAnswerabilityQualificationCli {
           output = model.generate(prompt, options);
         }
         long millis = (System.nanoTime() - started) / 1_000_000L;
-        String predicted = prediction(output);
+        String predicted = prediction(output, configuration.arm());
         boolean structured = !predicted.isEmpty();
         boolean correct = structured && predicted.equals(item.label());
         results.add(

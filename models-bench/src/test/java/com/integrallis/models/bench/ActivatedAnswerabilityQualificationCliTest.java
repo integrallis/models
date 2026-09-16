@@ -109,6 +109,23 @@ class ActivatedAnswerabilityQualificationCliTest {
   }
 
   @Test
+  void baseArmPredictionIsTheBareWordItsInstructionAsksFor() {
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("unanswerable\n", Arm.BASE))
+        .isEqualTo("unanswerable");
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction(" answerable", Arm.BASE))
+        .isEqualTo("answerable");
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("\"answerable\"", Arm.BASE))
+        .as("the base was not asked for JSON")
+        .isEmpty();
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("Answerable", Arm.BASE)).isEmpty();
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("answerable.", Arm.BASE))
+        .isEmpty();
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("answerable", Arm.SPECIALIST))
+        .as("the specialist contract is unchanged")
+        .isEmpty();
+  }
+
+  @Test
   void predictionAcceptsOnlyAJsonStringLiteralEqualToALabel() {
     assertThat(ActivatedAnswerabilityQualificationCli.prediction(" \"answerable\"\n"))
         .isEqualTo("answerable");

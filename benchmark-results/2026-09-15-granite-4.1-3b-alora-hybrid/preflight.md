@@ -377,3 +377,24 @@ ms, PRODUCTION_READY. Decode ratio 0.74 (Ollama) / 0.72 (llama.cpp) against the 
 ratio 2.3 against the 1.5 ceiling. Bundle in `host-evidence/base-attempt5/`. On the protocol's
 own host class the base is within reach: the gates need roughly −15% TTFT, +10% decode, and −35%
 end-to-end, and the runtime items named after attempt 4 (parallel attention first) are the path.
+
+
+**Runner defect found by the identity screen, base arm (host 1, 2026-09-16T05:52Z):** the base arm
+answered the bare word `unanswerable` on all ten MT-RAG cases and the runner scored every case
+unstructured, because `prediction()` applied the specialist's JSON-literal contract to both arms.
+The base arm's own instruction asks for exactly one word, so its contract is the bare label. Fixed
+in `ActivatedAnswerabilityQualificationCli.prediction(output, arm)` with a test; the specialist
+contract is unchanged. The ten base outputs are kept in
+`host-evidence/identity10-mtrag-human-rag-base-pure-java.json` (all ten said `unanswerable` for
+answerable cases, so the base's MT-RAG accuracy on this slice is 0/10 under either reading). Every
+identity and window arm is re-run at the frozen commit, so this changes no recorded number.
+
+
+**Attention partitioning, measured on the AWS host (scratch, certified profile):** Models 10d0caf
+(heads always partitioned): prefill 59 → 94 tok/s, p95 TTFT 2310 → 1439 ms, decode 20.9 → 17.9
+tok/s. Models 8b1e15b (heads serial below 1024 positions, one KV view per row): decode 21.3,
+prefill 90, p95 TTFT 1501 ms, p95 e2e 3103 ms, tier USABLE. Against attempt 5's controls: decode
+0.75× Ollama (floor 0.8), e2e 1.89× (ceiling 1.5). Host 2 with heads always partitioned: decode
+18.9 → 10.9, prefill 41 → 59 — the same shape, which fixed the threshold. Next scratch: native
+worker count {8, 12, 16} × `vectors.maxBits` {256, 512}; the runtime caps Panama at 256 bits on
+this AVX-512 host by default and the attention arithmetic runs on the Java side.
