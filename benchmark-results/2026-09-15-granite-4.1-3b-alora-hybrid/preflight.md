@@ -777,3 +777,12 @@ one-word label (borderline generations, no adapter involved). The summary theref
 IDENTITY10 FAIL by the all-four-arms rule, and the window still runs on both arms; the specialist
 identity, which is what the component gate's `kernelIdentity` requires, holds 20/20. Reports and
 hashes in `host-evidence/identity-fcd38d3/`. The Rust window started on host 1 at 14:24Z.
+
+**Gate 4, SQuAD 2.0 specialist arms at fcd38d3 (2026-09-16T14:34Z pure Java on the pure-Java
+host; 14:42Z Rust on host 1):** pure Java 200/200 structured, balanced accuracy 0.825
+(answerable 93/100, unanswerable 72/100), all 200 physically shared; Rust 200/200 structured,
+balanced accuracy 0.820 (93/100, 71/100), all shared; 199/200 outputs identical between the arms
+(one unanswerable case flips to `answerable` on Rust). The case that produced `"kick back"` at
+f6252cc produces `"answerable"` on both arms. Structure clause and the 0.80 floor pass on the
+deciding arm; the base arms and the MT-RAG arms are still running. Reports in
+`host-evidence/window-fcd38d3/` (pure Java sha256 55fce92d…, Rust 6ad4793b…).
