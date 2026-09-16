@@ -247,10 +247,23 @@ final class ActivatedAnswerabilityQualificationCli {
     return prompt.control(INVOCATION).build();
   }
 
-  /** Applies the exact two-label contract: whitespace is trimmed and nothing else is forgiven. */
+  /**
+   * Applies the exact contract from the adapter's published {@code io.yaml}: the completion is a
+   * JSON string whose value is one of the two labels. Surrounding whitespace is trimmed; anything
+   * that is not a JSON string literal equal to a label is unstructured.
+   */
   static String prediction(String output) {
     String trimmed = output == null ? "" : output.strip();
-    return LABELS.contains(trimmed) ? trimmed : "";
+    for (String label : LABELS) {
+      try {
+        if (JSON.writeValueAsString(label).equals(trimmed)) {
+          return label;
+        }
+      } catch (IOException impossible) {
+        throw new IllegalStateException(impossible);
+      }
+    }
+    return "";
   }
 
   static int run(String[] args) throws Exception {

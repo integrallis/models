@@ -109,13 +109,17 @@ class ActivatedAnswerabilityQualificationCliTest {
   }
 
   @Test
-  void predictionForgivesOnlySurroundingWhitespace() {
-    assertThat(ActivatedAnswerabilityQualificationCli.prediction(" answerable\n"))
+  void predictionAcceptsOnlyAJsonStringLiteralEqualToALabel() {
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction(" \"answerable\"\n"))
         .isEqualTo("answerable");
-    assertThat(ActivatedAnswerabilityQualificationCli.prediction("unanswerable"))
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("\"unanswerable\""))
         .isEqualTo("unanswerable");
-    assertThat(ActivatedAnswerabilityQualificationCli.prediction("Answerable")).isEmpty();
-    assertThat(ActivatedAnswerabilityQualificationCli.prediction("answerable.")).isEmpty();
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("answerable"))
+        .as("io.yaml declares a JSON string, so a bare word is unstructured")
+        .isEmpty();
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("\"Answerable\"")).isEmpty();
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("\"answerable\".")).isEmpty();
+    assertThat(ActivatedAnswerabilityQualificationCli.prediction("\"answerable")).isEmpty();
     assertThat(
             ActivatedAnswerabilityQualificationCli.prediction(
                 "{\"answerability\": \"answerable\"}"))

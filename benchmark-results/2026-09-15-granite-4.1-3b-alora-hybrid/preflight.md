@@ -164,3 +164,12 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   SQuAD 2.0 cases in both arms (620 prompts). The machine-readable comparisons are in
   `prompt-oracle/`. Gate 4's prompt precondition is therefore satisfied for every case, not only
   the first.
+- 2026-09-15, runner contract correction: the first two SQuAD cases in hash order were run on the
+  Rust arm as a smoke while the unit suite was executing. Both completions were correct JSON
+  string literals (`"unanswerable"` and `"answerable"`), which is exactly what the adapter's
+  published `io.yaml` declares (`response_format: {"type": "string", "enum": [...]}`). The
+  runner had demanded bare words, so it scored both as unstructured. The structure check now
+  parses the completion as a JSON string equal to a label, per the published contract. This
+  changes how outputs are read, not any threshold; the two exposed cases stay in the frozen
+  window because excluding them would bias it. The Rust-arm timings from that smoke are
+  discarded because the host was shared with the unit suite.
