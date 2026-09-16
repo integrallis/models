@@ -76,6 +76,8 @@ class ModelsStreamingChatModelTest {
             .maxTokens(100)
             .repetitionPenalty(1.2f)
             .minP(0.05f)
+            .repetitionLoopDetection(
+                new com.integrallis.models.api.RepetitionLoopDetection(32, 4, 16))
             .seed(42L)
             .stopSequences(List.of("DEFAULT_STOP"))
             .build();
@@ -116,6 +118,8 @@ class ModelsStreamingChatModelTest {
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
     assertThat(delegate.options.minP()).isEqualTo(0.05f);
+    assertThat(delegate.options.repetitionLoopDetection())
+        .isEqualTo(new com.integrallis.models.api.RepetitionLoopDetection(32, 4, 16));
     assertThat(delegate.options.seed()).isEqualTo(42L);
     assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(model.diagnostics().backend()).isEqualTo("stream-recording");

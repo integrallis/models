@@ -51,6 +51,7 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
   private final AtomicLong rejectedRequests = new AtomicLong();
   private final AtomicLong batchInvocations = new AtomicLong();
   private final AtomicLong sessionSteps = new AtomicLong();
+  private final AtomicLong repetitionLoopStops = new AtomicLong();
   private final AtomicInteger largestBatch = new AtomicInteger();
   private final AtomicInteger activeRequests = new AtomicInteger();
   private int prefillCursor;
@@ -149,7 +150,8 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
         sessionSteps.get(),
         largestBatch.get(),
         activeRequests.get(),
-        waiting.size());
+        waiting.size(),
+        repetitionLoopStops.get());
   }
 
   @Override
@@ -452,6 +454,9 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
       stopReason = StopReason.STOP_SEQUENCE;
     } else if (request.constraint.isComplete()) {
       stopReason = StopReason.CONSTRAINT_COMPLETE;
+    } else if (request.loopDetector.accept(next)) {
+      stopReason = StopReason.REPETITION_LOOP;
+      repetitionLoopStops.incrementAndGet();
     } else if (request.stream.isCancelled()) {
       stopReason = StopReason.CANCELLED;
     } else if (request.generatedTokens == request.options.maxTokens()) {
@@ -609,6 +614,7 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
     private final TokenConstraint constraint;
     private final Sampler sampler;
     private final StopSequenceEmitter emitter;
+    private final RepetitionLoopDetector loopDetector;
     private final boolean prefillOnly;
     private final long submittedAt;
     private final CompletableFuture<GenerationMetrics> generationResult = new CompletableFuture<>();
@@ -642,6 +648,8 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
           options == null || stream == null
               ? null
               : new StopSequenceEmitter(stream, options.stopSequences());
+      loopDetector =
+          options == null ? null : new RepetitionLoopDetector(options.repetitionLoopDetection());
       this.prefillOnly = prefillOnly;
       this.submittedAt = submittedAt;
       Arrays.stream(promptTokens).forEach(allTokens::add);

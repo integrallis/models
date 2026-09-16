@@ -23,6 +23,7 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.RepetitionLoopDetection;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TokenStream;
@@ -173,6 +174,62 @@ class GenerationStopReasonTest {
     }
 
     @Test
+    void repetitionLoopStopsGenerationAndIncrementsTheCounter() {
+      int[] loop = new int[40];
+      for (int index = 0; index < loop.length; index++) {
+        loop[index] = index % 2 == 0 ? A : B;
+      }
+      GenerationLoop generationLoop = new GenerationLoop(new ScriptedBackend(loop));
+      SamplingOptions options =
+          greedy(50).repetitionLoopDetection(new RepetitionLoopDetection(8, 3, 0)).build();
+      Recorder first = new Recorder();
+      Recorder second = new Recorder();
+
+      assertThat(generationLoop.repetitionLoopStops()).isZero();
+      generationLoop.generate("p", options, first);
+      generationLoop.generate("p", options, second);
+
+      assertThat(first.text).hasToString("ababab");
+      assertThat(first.reason).isEqualTo(StopReason.REPETITION_LOOP);
+      assertThat(first.usage.completionTokens()).isEqualTo(6);
+      assertThat(second.reason).isEqualTo(StopReason.REPETITION_LOOP);
+      assertThat(generationLoop.lastGenerationMetrics().stopReason())
+          .contains(StopReason.REPETITION_LOOP);
+      assertThat(generationLoop.repetitionLoopStops()).isEqualTo(2);
+    }
+
+    @Test
+    void repetitionLoopDetectionIsOffByDefault() {
+      int[] loop = new int[40];
+      for (int index = 0; index < loop.length; index++) {
+        loop[index] = index % 2 == 0 ? A : B;
+      }
+      GenerationLoop generationLoop = new GenerationLoop(new ScriptedBackend(loop));
+      Recorder recorder = new Recorder();
+
+      generationLoop.generate("p", greedy(30).build(), recorder);
+
+      assertThat(recorder.text).hasToString("ab".repeat(15));
+      assertThat(recorder.reason).isEqualTo(StopReason.MAX_TOKENS);
+      assertThat(generationLoop.repetitionLoopStops()).isZero();
+    }
+
+    @Test
+    void runtimeModelExposesTheRepetitionLoopCounter() {
+      RuntimeTextGenerationModel model =
+          new RuntimeTextGenerationModel(new ScriptedBackend(new int[] {C, C, C, C, C, C}));
+
+      String output =
+          model.generate(
+              "p",
+              greedy(20).repetitionLoopDetection(new RepetitionLoopDetection(4, 4, 0)).build());
+
+      assertThat(output).isEqualTo("cccc");
+      assertThat(model.repetitionLoopStops()).isEqualTo(1);
+      assertThat(model.lastGenerationMetrics().stopReason()).contains(StopReason.REPETITION_LOOP);
+    }
+
+    @Test
     void failedGenerationHasNoStopReason() {
       GenerationLoop loop = new GenerationLoop(new ScriptedBackend(new int[] {A, B, EOS}));
       Recorder recorder = new Recorder();
@@ -252,6 +309,31 @@ class GenerationStopReasonTest {
               new Outcome("a", StopReason.STOP_SEQUENCE, Optional.of(StopReason.STOP_SEQUENCE)));
       assertThat(generate(new int[] {A, B, C, A, B, C}, greedy(10).build(), 2))
           .isEqualTo(new Outcome("ab", StopReason.CANCELLED, Optional.of(StopReason.CANCELLED)));
+    }
+
+    @Test
+    void repetitionLoopStopsABatchedSessionAndIsCounted() {
+      ScriptedBatchBackend backend = new ScriptedBatchBackend(new int[] {A, B, C, C, C, C, C, C});
+      ContinuousBatchingOptions batching =
+          ContinuousBatchingOptions.builder()
+              .maximumBatchSize(1)
+              .batchFormationDelay(Duration.ZERO)
+              .build();
+      try (InferencePipeline pipeline = new InferencePipeline(backend, batching);
+          TextGenerationSession session = pipeline.openGenerationSession()) {
+        Recorder recorder = new Recorder();
+        session.generate(
+            com.integrallis.models.api.ModelPrompt.text("p"),
+            greedy(20).repetitionLoopDetection(new RepetitionLoopDetection(4, 3, 0)).build(),
+            recorder);
+
+        assertThat(recorder.text).hasToString("abccc");
+        assertThat(recorder.reason).isEqualTo(StopReason.REPETITION_LOOP);
+        assertThat(session.lastGenerationMetrics().stopReason())
+            .contains(StopReason.REPETITION_LOOP);
+        assertThat(pipeline.continuousBatchingMetrics().orElseThrow().repetitionLoopStops())
+            .isEqualTo(1);
+      }
     }
 
     private Outcome generate(int[] script, SamplingOptions options, int cancelAfterTokens) {

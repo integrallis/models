@@ -15,7 +15,19 @@
  */
 package com.integrallis.models.runtime;
 
-/** Lifetime scheduler measurements for one loaded physical model. */
+/**
+ * Lifetime scheduler measurements for one loaded physical model.
+ *
+ * @param completedRequests requests that completed normally
+ * @param failedRequests requests that failed or were rejected
+ * @param rejectedRequests requests rejected because the scheduler was closed or its queue full
+ * @param batchInvocations backend batch decode calls
+ * @param sessionSteps session decode steps across all batch calls
+ * @param largestBatch largest batch decoded
+ * @param activeRequests requests currently admitted
+ * @param queuedRequests requests currently waiting
+ * @param repetitionLoopStops completed requests the repetition-loop detector stopped
+ */
 public record ContinuousBatchingMetrics(
     long completedRequests,
     long failedRequests,
@@ -24,7 +36,8 @@ public record ContinuousBatchingMetrics(
     long sessionSteps,
     int largestBatch,
     int activeRequests,
-    int queuedRequests) {
+    int queuedRequests,
+    long repetitionLoopStops) {
 
   public ContinuousBatchingMetrics {
     if (completedRequests < 0
@@ -34,9 +47,43 @@ public record ContinuousBatchingMetrics(
         || sessionSteps < 0
         || largestBatch < 0
         || activeRequests < 0
-        || queuedRequests < 0) {
+        || queuedRequests < 0
+        || repetitionLoopStops < 0) {
       throw new IllegalArgumentException("continuous batching metrics must not be negative");
     }
+  }
+
+  /**
+   * Creates metrics without a repetition-loop count, preserving the original signature.
+   *
+   * @param completedRequests requests that completed normally
+   * @param failedRequests requests that failed or were rejected
+   * @param rejectedRequests rejected requests
+   * @param batchInvocations backend batch decode calls
+   * @param sessionSteps session decode steps
+   * @param largestBatch largest batch decoded
+   * @param activeRequests requests currently admitted
+   * @param queuedRequests requests currently waiting
+   */
+  public ContinuousBatchingMetrics(
+      long completedRequests,
+      long failedRequests,
+      long rejectedRequests,
+      long batchInvocations,
+      long sessionSteps,
+      int largestBatch,
+      int activeRequests,
+      int queuedRequests) {
+    this(
+        completedRequests,
+        failedRequests,
+        rejectedRequests,
+        batchInvocations,
+        sessionSteps,
+        largestBatch,
+        activeRequests,
+        queuedRequests,
+        0);
   }
 
   /** Mean number of independent sessions advanced per backend batch call. */

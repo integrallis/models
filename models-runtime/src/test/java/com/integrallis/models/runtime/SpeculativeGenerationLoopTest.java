@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
+import com.integrallis.models.api.RepetitionLoopDetection;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.StopReason;
@@ -79,6 +80,29 @@ class SpeculativeGenerationLoopTest {
     assertThat(backend.verifiedBatches).containsExactly(new int[] {5, 2, 3, 4});
     assertThat(backend.forwardTokens).isEmpty();
     assertThat(loop.lastGenerationMetrics().stopReason()).contains(StopReason.EOS);
+  }
+
+  @Test
+  void stopsARepetitionLoopFormedFromAcceptedDraftTokens() {
+    int[] promptTokens = {2, 3, 4, 5, 2, 3, 4};
+    SequenceBackend backend =
+        new SequenceBackend(promptTokens, new int[] {5, 2, 3, 4, 5, 2, 3, 4, 5, 2, 3, 4, 1});
+    GenerationLoop loop = new GenerationLoop(backend, threeTokenDraftOptions());
+
+    String result =
+        loop.generate(
+            "prompt",
+            SamplingOptions.builder()
+                .temperature(0.0f)
+                .repetitionPenalty(1.0f)
+                .maxTokens(20)
+                .repetitionLoopDetection(new RepetitionLoopDetection(4, 2, 0))
+                .build());
+
+    assertThat(result).isEqualTo("[5][2][3][4][5][2][3][4]");
+    assertThat(loop.lastGenerationMetrics().stopReason()).contains(StopReason.REPETITION_LOOP);
+    assertThat(loop.repetitionLoopStops()).isEqualTo(1);
+    assertThat(loop.lastSpeculativeMetrics().acceptedTokens()).isPositive();
   }
 
   @Test

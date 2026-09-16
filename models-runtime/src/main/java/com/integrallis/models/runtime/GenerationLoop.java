@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 /**
@@ -50,6 +51,7 @@ public final class GenerationLoop {
       SpeculativeGenerationMetrics.inactive();
   private volatile PromptCacheMetrics lastPromptCacheMetrics = PromptCacheMetrics.unavailable();
   private volatile GenerationMetrics lastGenerationMetrics = GenerationMetrics.unavailable();
+  private final AtomicLong repetitionLoopStops = new AtomicLong();
   private int[] cachedPromptTokens;
   private int[] retainedPromptPrefix;
 
@@ -87,6 +89,20 @@ public final class GenerationLoop {
   /** Returns prompt-prefix cache measurements for the most recently completed request. */
   public PromptCacheMetrics lastPromptCacheMetrics() {
     return lastPromptCacheMetrics;
+  }
+
+  /**
+   * Returns how many requests on this loop the repetition-loop detector has stopped.
+   *
+   * <p>The count is cumulative for the loop's lifetime and only moves when a request enables
+   * detection through {@link SamplingOptions#repetitionLoopDetection()}. Each such request also
+   * reports {@link StopReason#REPETITION_LOOP} to its stream and in {@link
+   * #lastGenerationMetrics()}.
+   *
+   * @return lifetime repetition-loop stops
+   */
+  public long repetitionLoopStops() {
+    return repetitionLoopStops.get();
   }
 
   /** Returns phase timings and token usage for the most recently completed request. */
@@ -361,6 +377,8 @@ public final class GenerationLoop {
 
       Sampler sampler = new Sampler(options);
       StopSequenceEmitter emitter = new StopSequenceEmitter(stream, options.stopSequences());
+      RepetitionLoopDetector loopDetector =
+          new RepetitionLoopDetector(options.repetitionLoopDetection());
       List<Integer> allTokens = new ArrayList<>();
       boolean speculativeActive =
           constraint == TokenConstraint.unrestricted()
@@ -395,6 +413,7 @@ public final class GenerationLoop {
                   sampler,
                   emitter,
                   stream,
+                  loopDetector,
                   allTokens,
                   logits,
                   position,
@@ -408,12 +427,16 @@ public final class GenerationLoop {
                   sampler,
                   emitter,
                   stream,
+                  loopDetector,
                   allTokens,
                   logits,
                   position,
                   options.maxTokens(),
                   constraint,
                   generationMetrics);
+        }
+        if (stopReason == StopReason.REPETITION_LOOP) {
+          repetitionLoopStops.incrementAndGet();
         }
 
         emitter.finish();
@@ -504,6 +527,7 @@ public final class GenerationLoop {
       Sampler sampler,
       StopSequenceEmitter emitter,
       TokenStream stream,
+      RepetitionLoopDetector loopDetector,
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
@@ -524,6 +548,9 @@ public final class GenerationLoop {
       if (constraint.isComplete()) {
         return StopReason.CONSTRAINT_COMPLETE;
       }
+      if (loopDetector.accept(nextToken)) {
+        return StopReason.REPETITION_LOOP;
+      }
       if (stream.isCancelled()) {
         return StopReason.CANCELLED;
       }
@@ -543,6 +570,7 @@ public final class GenerationLoop {
       Sampler sampler,
       StopSequenceEmitter emitter,
       TokenStream stream,
+      RepetitionLoopDetector loopDetector,
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
@@ -588,6 +616,9 @@ public final class GenerationLoop {
         return StopReason.STOP_SEQUENCE;
       }
       generated++;
+      if (loopDetector.accept(nextToken)) {
+        return StopReason.REPETITION_LOOP;
+      }
       if (stream.isCancelled()) {
         return StopReason.CANCELLED;
       }
@@ -630,6 +661,7 @@ public final class GenerationLoop {
       boolean reachedEos = false;
       boolean reachedStopSequence = false;
       boolean cancelled = false;
+      boolean loopDetected = false;
       while (accepted < draft.length && generated < maxTokens) {
         int targetToken = sampler.sample(verification, accepted, allTokens);
         if (tokenizer.isEndOfGeneration(targetToken)) {
@@ -644,6 +676,10 @@ public final class GenerationLoop {
         accepted++;
         generated++;
         if (reachedStopSequence) {
+          break;
+        }
+        if (loopDetector.accept(targetToken)) {
+          loopDetected = true;
           break;
         }
         if (stream.isCancelled()) {
@@ -669,6 +705,9 @@ public final class GenerationLoop {
       }
       if (reachedStopSequence) {
         return StopReason.STOP_SEQUENCE;
+      }
+      if (loopDetected) {
+        return StopReason.REPETITION_LOOP;
       }
       if (cancelled) {
         return StopReason.CANCELLED;

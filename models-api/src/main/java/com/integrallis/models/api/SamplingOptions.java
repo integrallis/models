@@ -39,6 +39,7 @@ import java.util.Objects;
  * @param repetitionPenalty CTRL-style penalty, {@code >= 1}
  * @param stopSequences non-empty text sequences that end generation
  * @param minP min-p threshold in {@code [0, 1]}; zero disables it
+ * @param repetitionLoopDetection repetition-loop detector thresholds; disabled by default
  */
 public record SamplingOptions(
     float temperature,
@@ -48,10 +49,12 @@ public record SamplingOptions(
     Long seed,
     float repetitionPenalty,
     List<String> stopSequences,
-    float minP) {
+    float minP,
+    RepetitionLoopDetection repetitionLoopDetection) {
 
   public SamplingOptions {
     stopSequences = List.copyOf(Objects.requireNonNull(stopSequences, "stopSequences"));
+    Objects.requireNonNull(repetitionLoopDetection, "repetitionLoopDetection");
     if (!Float.isFinite(temperature) || temperature < 0) {
       throw new IllegalArgumentException(
           "temperature must be finite and >= 0, got: " + temperature);
@@ -80,7 +83,8 @@ public record SamplingOptions(
   }
 
   /**
-   * Creates options without min-p filtering, preserving the original canonical signature.
+   * Creates options without min-p filtering or repetition-loop detection, preserving the original
+   * canonical signature.
    *
    * @param temperature softmax temperature, {@code >= 0}
    * @param topP nucleus threshold in {@code (0, 1]}
@@ -98,7 +102,16 @@ public record SamplingOptions(
       Long seed,
       float repetitionPenalty,
       List<String> stopSequences) {
-    this(temperature, topP, topK, maxTokens, seed, repetitionPenalty, stopSequences, 0.0f);
+    this(
+        temperature,
+        topP,
+        topK,
+        maxTokens,
+        seed,
+        repetitionPenalty,
+        stopSequences,
+        0.0f,
+        RepetitionLoopDetection.disabled());
   }
 
   /** Returns a new builder with default values. */
@@ -116,6 +129,7 @@ public record SamplingOptions(
     private Float repetitionPenalty;
     private final List<String> stopSequences = new ArrayList<>();
     private Float minP;
+    private RepetitionLoopDetection repetitionLoopDetection = RepetitionLoopDetection.disabled();
 
     Builder() {}
 
@@ -171,6 +185,17 @@ public record SamplingOptions(
       return this;
     }
 
+    /**
+     * Sets repetition-loop detection; {@link RepetitionLoopDetection#disabled()} is the default.
+     *
+     * @param repetitionLoopDetection detector thresholds
+     * @return this builder
+     */
+    public Builder repetitionLoopDetection(RepetitionLoopDetection repetitionLoopDetection) {
+      this.repetitionLoopDetection = repetitionLoopDetection;
+      return this;
+    }
+
     public SamplingOptions build() {
       return new SamplingOptions(
           temperature != null ? temperature : 1.0f,
@@ -180,7 +205,8 @@ public record SamplingOptions(
           seed,
           repetitionPenalty != null ? repetitionPenalty : 1.0f,
           stopSequences,
-          minP != null ? minP : 0.0f);
+          minP != null ? minP : 0.0f,
+          repetitionLoopDetection);
     }
   }
 }

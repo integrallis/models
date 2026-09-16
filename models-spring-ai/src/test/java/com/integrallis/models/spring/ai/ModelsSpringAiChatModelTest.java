@@ -209,6 +209,8 @@ class ModelsSpringAiChatModelTest {
             .maxTokens(32)
             .repetitionPenalty(1.1f)
             .minP(0.1f)
+            .repetitionLoopDetection(
+                new com.integrallis.models.api.RepetitionLoopDetection(32, 4, 16))
             .stopSequences(List.of("END"))
             .build();
     ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);
