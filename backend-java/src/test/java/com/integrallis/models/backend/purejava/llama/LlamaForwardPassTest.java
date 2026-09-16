@@ -2469,8 +2469,11 @@ class LlamaForwardPassTest {
               config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass = new LlamaForwardPass(config, weights, cache);
 
+      // Different tokens: RoPE only rotates queries and keys, so attending over two identical
+      // value rows yields that value at either position, and equal tokens would leave only
+      // rounding noise to tell the positions apart.
       float[] logits0 = forwardPass.forward(5, 0);
-      float[] logits1 = forwardPass.forward(5, 1);
+      float[] logits1 = forwardPass.forward(7, 1);
 
       assertThat(logits0).isNotEqualTo(logits1);
     }
