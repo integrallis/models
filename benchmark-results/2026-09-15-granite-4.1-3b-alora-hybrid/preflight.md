@@ -596,3 +596,14 @@ e2e margin against Ollama is 0.002 and is recorded as such; the decode margin is
 `host-evidence/base-attempt9/` and published as
 `benchmark-results/certified-20260916/rag/granite-4.1-3b-q4_k_m/` (README rendered from the
 reports, SHA256SUMS). The ModelJars base entry is assembled from that bundle.
+
+**Chain state after the base qualification (2026-09-16T10:20Z):** ModelJars branch
+`feat/activated-hybrid-catalog` carries the base entry (commit 0573416: entry assembled from the
+certified bundle, `modelsRevision` = evidence commit e5eba1b, `backends.rust-ffm` true); the
+catalog tool tests (131) and the smoke gate with remote verification pass. Models candidate branch
+head edc0ef7 adds the CI-only fixes (two dead stores SpotBugs flagged, aggregate Javadoc option);
+runtime code is identical to f6252cc. Running at f6252cc: host 1 identity screen then Rust window,
+pure-Java window host, gates 5 and 6 on instance 3. Still to do: the window verdicts and per-case
+arm agreement, gate 7 packaging check, the component report and its ModelJars entry, the
+composition entry, PR merges and the Models 0.3.38 release (user action), the ModelJars
+modelsVersion bump and publication.
