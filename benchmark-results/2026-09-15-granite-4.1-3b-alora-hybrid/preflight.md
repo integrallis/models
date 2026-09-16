@@ -664,3 +664,31 @@ Rust arm's output on the same case will be compared when it lands. Report
 2e8dfe29ad483b1fc73b476ad657a943ac809e923d4d117678c01c44c11f4760). Next measurement, decided
 before it is run: the IBM reference implementation (Transformers + PEFT activated LoRA) on this
 one case, to separate adapter behaviour from a runtime defect. No threshold is changed.
+
+**Reference check on the unstructured SQuAD case (2026-09-16T11:26–11:32Z, measured on a fresh
+Hetzner cpx62, `host-evidence/reference-alora/`, script `reference_alora_case.py`):** IBM's
+reference implementation (Transformers 5.17.0 + PEFT 0.21.0 activated LoRA, adapter files
+hash-identical to the packaged ones) was run on the failing case and on one answerable and one
+unanswerable control. With the unquantized bf16 base it answered `"answerable"` on all three,
+including the unanswerable control, so that run is confounded by weight precision and is kept
+only as a record. With the base weights replaced by the dequantized tensors of the very
+Q4_K_M GGUF the window uses (362 tensors, q/k rows un-permuted; max relative error against the
+unquantized weights 0.081, i.e. Q4_K_M error, which validates the mapping), the reference
+matches our runtime on both controls (`"answerable"`, `"unanswerable"`) and differs only on the
+failing case: `"answerable"`, where our runtime produces `"kick back"` on both arms and on this
+machine as well as on the window hosts. Per-step reference distribution on the Q4_K_M weights:
+step 0 `"` 27.75 over `answer` 19.77; step 1 `answer` 24.52 over `un` 21.86, with no `k`/`kick`
+token in the top 5 (floor 15.2); the unadapted base wants `"k` 41.6 / `"` 39.0 there. So the
+adapter's intent on this case is the label by a margin of several logits, and our runtime's
+`"kick back"` looks like the base branch's continuation. This is a runtime deviation to
+locate, not a near-tie; the probe `Granite41AloraCaseProbeIntegrationTest` replays the dumped
+prompt along the single-token, batched-invocation and shared-fork activation paths with top-5
+logits per step.
+
+**Gate 4, SQuAD 2.0 specialist arm, Rust FFM, f6252cc (host 1, 2026-09-16T11:36Z):** 199/200
+structured, the same case `57115f0a…` producing `"kick back"`; balanced accuracy 0.795
+(answerable 93/100, unanswerable 66/100), below the 0.80 floor; 4/200 outputs differ from the
+pure-Java arm (three unanswerable and one answerable case flipping in both directions, the
+borderline-flip pattern of the identity screen). Report
+`host-evidence/window-f6252cc/window-squad-v2-dev-specialist-rust-ffm.json` (sha256
+a1d0dee5499e894ea4fc4596547af0e01124cedac0fd96e778ff45643541e1ff).
