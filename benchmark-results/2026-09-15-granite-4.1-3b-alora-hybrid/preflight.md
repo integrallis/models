@@ -786,3 +786,9 @@ balanced accuracy 0.820 (93/100, 71/100), all shared; 199/200 outputs identical 
 f6252cc produces `"answerable"` on both arms. Structure clause and the 0.80 floor pass on the
 deciding arm; the base arms and the MT-RAG arms are still running. Reports in
 `host-evidence/window-fcd38d3/` (pure Java sha256 55fce92d…, Rust 6ad4793b…).
+
+**Gate 6 crossover, pure Java, fcd38d3 (instance 3, 2026-09-16T14:54Z): PASS** — crossover at
+256 tokens; improvement 0.486 / 0.494 / 0.485 at 256 / 1,024 / 4,096; token-exact across
+strategies at every tier; memory accounting complete; peak RSS 6.71 GB. Report
+`host-evidence/gates-fcd38d3/gate6-crossover-pure-java.json` (sha256 7e126f29…). Rust arm
+started 14:54Z.
