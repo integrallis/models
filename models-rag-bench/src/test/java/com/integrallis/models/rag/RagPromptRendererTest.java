@@ -336,4 +336,26 @@ class RagPromptRendererTest {
         .contains("<|im_end|>\n<|im_start|>user\nCONTEXT\n[source-1] Policy")
         .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n");
   }
+
+  @Test
+  void graniteProfileUsesSingleTokenRoleMarkersAndClosesEveryTurnWithEndOfText() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.parse("granite"));
+
+    assertThat(prompt)
+        .startsWith("<|start_of_role|>system<|end_of_role|>You answer questions")
+        .contains("<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>CONTEXT\n[source-1] Policy")
+        .endsWith("<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>");
+    assertThat(RagPromptTemplate.GRANITE.applyPrompt("hi").segments())
+        .extracting(segment -> segment.kind().name() + ":" + segment.text())
+        .containsExactly(
+            "CONTROL:<|start_of_role|>user<|end_of_role|>",
+            "TEXT:hi",
+            "CONTROL:<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>");
+  }
 }

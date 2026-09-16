@@ -34,7 +34,8 @@ public enum RagPromptTemplate {
   DEEPSEEK("deepseek"),
   H2O("h2o"),
   H2O_DIRECT("h2o-direct"),
-  MINICPM5_NO_THINK("minicpm5-no-think");
+  MINICPM5_NO_THINK("minicpm5-no-think"),
+  GRANITE("granite");
 
   private final String id;
 
@@ -131,6 +132,12 @@ public enum RagPromptTemplate {
               .control("<s><|im_start|>user\n")
               .text(prompt)
               .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
+              .build();
+      case GRANITE ->
+          result
+              .control("<|start_of_role|>user<|end_of_role|>")
+              .text(prompt)
+              .control("<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>")
               .build();
     };
   }
@@ -237,6 +244,17 @@ public enum RagPromptTemplate {
               .text(userPrompt)
               .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
               .build();
+      // Granite 4.x: role markers are single tokens, message text is passed through untouched, and
+      // every turn closes with <|end_of_text|> plus a newline (byte-identical to the Transformers
+      // chat template, see ChatTemplate.GRANITE).
+      case GRANITE ->
+          result
+              .control("<|start_of_role|>system<|end_of_role|>")
+              .text(systemPrompt)
+              .control("<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>")
+              .text(userPrompt)
+              .control("<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>")
+              .build();
     };
   }
 
@@ -250,6 +268,6 @@ public enum RagPromptTemplate {
     throw new IllegalArgumentException(
         "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
             + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, phi3, deepseek, h2o, "
-            + "h2o-direct, minicpm5-no-think");
+            + "h2o-direct, minicpm5-no-think, granite");
   }
 }

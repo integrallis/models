@@ -230,3 +230,10 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   per hour, ceiling 12 hours (EUR 2.95), `delete-by` 2026-09-16T18-00Z, provider firewall
   admitting TCP/22 from the operator /32 only, Models commit `4ce4fd1` (the 0.3.38 release
   preparation on the candidate branch). The first host keeps running gate 4 undisturbed.
+
+**Base run, attempt 1 (2026-09-16T04:13Z):** the harness rejected `--prompt-template granite` before
+the first case because `RagPromptTemplate` had no Granite envelope; the ModelJars catalog names the
+template but the RAG bench had never rendered it. Added `GRANITE` (single-token role markers, text
+passed through, `<|end_of_text|>\n` after every turn, same bytes as `ChatTemplate.GRANITE`) with a
+renderer test. Attempt 2 runs at the commit that carries it; the base entry's `backendVersion` pins
+that commit, not 4ce4fd1.

@@ -65,6 +65,11 @@ emit BOS markers when the GGUF tokenizer owns that setting. MiniCPM5 is the
 exception: use `--prompt-template minicpm5-no-think`, which emits its
 template-owned `<s>` marker before the ChatML turns and suppresses reasoning.
 
+Granite 4.x uses `--prompt-template granite`: single-token role markers
+(`<|start_of_role|>system<|end_of_role|>` and friends), message text passed
+through untouched, and every turn closed by `<|end_of_text|>` plus a newline,
+byte-identical to the model's Transformers chat template.
+
 Gemma 4 uses a different envelope: `--prompt-template gemma4` emits role-aware
 `<|turn>` messages and opens the model's `thought` channel. Do not substitute
 the older `gemma` template; the two model-facing byte sequences are not

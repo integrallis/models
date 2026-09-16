@@ -7,6 +7,7 @@ All notable changes to models are documented here.
 ## [0.3.38] - 2026-09-16
 
 ### Added
+- `granite` RAG prompt template in `models-rag-bench` so Granite 4.x artifacts can run the controlled RAG qualification harness with the byte-exact Transformers envelope.
 
 - Added the Granite decoder graph (embedding, attention, residual, and logit scalars) and the
   activated-adapter runtime: a fail-closed Safetensors activated-LoRA loader, exact activation
