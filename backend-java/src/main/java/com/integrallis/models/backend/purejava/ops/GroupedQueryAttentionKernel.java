@@ -21,6 +21,7 @@ import java.util.Objects;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorShape;
+import jdk.incubator.vector.VectorShuffle;
 import jdk.incubator.vector.VectorSpecies;
 
 /**
@@ -35,6 +36,10 @@ import jdk.incubator.vector.VectorSpecies;
  */
 public final class GroupedQueryAttentionKernel {
   static final VectorSpecies<Float> SPECIES = species();
+  private static final VectorShuffle<Float> ROTATE_8 = rotation(8);
+  private static final VectorShuffle<Float> ROTATE_4 = rotation(4);
+  private static final VectorShuffle<Float> ROTATE_2 = rotation(2);
+  private static final VectorShuffle<Float> ROTATE_1 = rotation(1);
 
   private GroupedQueryAttentionKernel() {}
 
@@ -101,10 +106,10 @@ public final class GroupedQueryAttentionKernel {
           acc2 = fma(q, load(keys, key2 + column), acc2);
           acc3 = fma(q, load(keys, key3 + column), acc3);
         }
-        float sum0 = acc0.reduceLanes(VectorOperators.ADD);
-        float sum1 = acc1.reduceLanes(VectorOperators.ADD);
-        float sum2 = acc2.reduceLanes(VectorOperators.ADD);
-        float sum3 = acc3.reduceLanes(VectorOperators.ADD);
+        float sum0 = reduceAddFixedTree(acc0);
+        float sum1 = reduceAddFixedTree(acc1);
+        float sum2 = reduceAddFixedTree(acc2);
+        float sum3 = reduceAddFixedTree(acc3);
         for (; column < columns; column++) {
           float q = query[queryBase + column];
           sum0 = MathUtil.fma(q, keys[key0 + column], sum0);
@@ -128,7 +133,7 @@ public final class GroupedQueryAttentionKernel {
         for (; column < vectorLimit; column += lanes) {
           acc = fma(load(query, queryBase + column), load(keys, keyBase + column), acc);
         }
-        float sum = acc.reduceLanes(VectorOperators.ADD);
+        float sum = reduceAddFixedTree(acc);
         for (; column < columns; column++) {
           sum = MathUtil.fma(query[queryBase + column], keys[keyBase + column], sum);
         }
@@ -341,6 +346,34 @@ public final class GroupedQueryAttentionKernel {
         output[outputBase + column] = result;
       }
     }
+  }
+
+  private static VectorShuffle<Float> rotation(int distance) {
+    int mask = SPECIES.length() - 1;
+    return VectorShuffle.fromOp(SPECIES, lane -> (lane + distance) & mask);
+  }
+
+  /**
+   * Sums the lanes through an explicit rotate-and-add tree. {@code reduceLanes(ADD)} is not used
+   * because its compiled form reduces as a tree while its pre-compilation fallback sums lanes in
+   * sequence, so the same input would round differently by JIT tier; this tree is the same sequence
+   * of lanewise adds in both.
+   */
+  private static float reduceAddFixedTree(FloatVector vector) {
+    int lanes = vector.length();
+    if (lanes == 16) {
+      vector = vector.add(vector.rearrange(ROTATE_8));
+    }
+    if (lanes >= 8) {
+      vector = vector.add(vector.rearrange(ROTATE_4));
+    }
+    if (lanes >= 4) {
+      vector = vector.add(vector.rearrange(ROTATE_2));
+    }
+    if (lanes >= 2) {
+      vector = vector.add(vector.rearrange(ROTATE_1));
+    }
+    return vector.lane(0);
   }
 
   private static FloatVector load(float[] array, int offset) {

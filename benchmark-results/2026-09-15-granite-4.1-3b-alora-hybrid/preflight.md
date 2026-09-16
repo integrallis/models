@@ -479,3 +479,13 @@ scores four rows per head with independent accumulators and pairs heads in the v
 probe 94 → 52 µs per 300-row group, values still bit-identical, 616 tests and the oracle pass.
 Native pool gains selective wake so a 16-worker pool with 8 active on decode no longer wakes the
 idle eight; measured next together with v4.
+
+**JIT-tier determinism defect found by CI (x86 runners, Models 4c617ac):** the nano-model
+base-fork bit-identity test and the Spring AI embedding identity test failed in the last bits.
+Cause: the vector softmax used `lanewise(EXP)`, which HotSpot serves from the vector math library
+once C2 compiles the method and from scalar `Math.exp` before that, so identical inputs differed by
+JIT tier; ARM has no such library, which is why the local suite passed. Fixed in f4d53f2 (scalar
+`Math.exp`, which HotSpot keeps identical across interpreter and compiled code; vector maximum and
+normalisation stay). Confirmed on the x86 host 1 (EPYC Genoa): 50 forward-pass and 3 kernel tests
+pass at f4d53f2. Rule for this campaign: attention arithmetic must not depend on JIT tier, so no
+vector transcendental intrinsics in the forward pass.
