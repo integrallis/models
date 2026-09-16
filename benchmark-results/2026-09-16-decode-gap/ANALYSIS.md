@@ -324,3 +324,19 @@ nothing before it; (3) the same tile shape in the Java Vector API path for the p
 backend, whose prefill (17 tok/s) is compute-bound in the kernel and gains nothing from the
 barrier budget. Decode needs neither: it is bandwidth-bound at the kernel and serial at the
 dispatch structure (Result 8).
+
+### Result 9e — two pools on one box (c7a, Rust arm, round 1; rounds 2–3 below when they land)
+
+| Java executor (vectors)            | decode | TTFT p50 ms | prefill tok/s | context switches |
+|------------------------------------|-------:|------------:|--------------:|-----------------:|
+| polling 25 ms beside the Rust pool | 25.46  | 2,895       | 40.1          | 24.4 M           |
+| parked (budget 0)                  | 25.81  | 939         | 126.0         | 0.21 M           |
+| released vectors 0.1.21 (parks)    | 25.04  | 943         | 123.0         | 0.21 M           |
+
+The Rust arm drives the Java executor for its Java-side parallel ops; with that executor
+polling, its 16 workers (yielding every 64 rounds) sit on the cores the 16 Rust workers need
+during prefill: prefill −68 %, 100× the context switches. Decode is untouched because the
+single-token path barely uses the Java executor. Parking it restores the released numbers
+exactly. Consequence: the budget belongs to whoever owns the box's compute pool —
+`VectorUtil.setGgufPollMillis(long)` (vectors #72) and the Models native backend sets 0 at
+load. Two unbounded spinners never coexisted in ggml because ggml has one pool.
