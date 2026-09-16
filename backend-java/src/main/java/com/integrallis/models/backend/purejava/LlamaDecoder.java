@@ -15,12 +15,33 @@
  */
 package com.integrallis.models.backend.purejava;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /** Adapts the Llama-family graph to the backend's architecture-neutral decoder contract. */
 final class LlamaDecoder implements PureJavaDecoder {
+
+  private final class LlamaPrefix implements SharedPrefix {
+    private final LlamaForwardPass.SessionPrefix delegate;
+
+    private LlamaPrefix(LlamaForwardPass.SessionPrefix delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int checkpoint() {
+      return delegate.length();
+    }
+
+    @Override
+    public long sharedBytes() {
+      return delegate.sharedBytes();
+    }
+  }
 
   private final class LlamaSession implements Session {
     private final LlamaForwardPass.Session delegate;
@@ -32,6 +53,11 @@ final class LlamaDecoder implements PureJavaDecoder {
     @Override
     public int checkpoint() {
       return delegate.checkpoint();
+    }
+
+    @Override
+    public OptionalLong allocatedStateBytes() {
+      return OptionalLong.of(delegate.allocatedStateBytes());
     }
   }
 
@@ -83,6 +109,42 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
+  public boolean supportsSharedPrefixes() {
+    return true;
+  }
+
+  @Override
+  public boolean supportsActivatedBranch() {
+    return forwardPass.supportsActivatedBranch();
+  }
+
+  @Override
+  public Optional<ActivatedAdapterMetadata> activatedAdapter() {
+    return forwardPass.activatedAdapterMetadata();
+  }
+
+  @Override
+  public void activateAdapter(Session session) {
+    forwardPass.activateAdapter(requireSession(session));
+  }
+
+  @Override
+  public SharedPrefix freezePrefix(Session source) {
+    return new LlamaPrefix(forwardPass.freezePrefix(requireSession(source)));
+  }
+
+  @Override
+  public Session fork(SharedPrefix prefix, boolean activated) {
+    LlamaForwardPass.SessionPrefix llamaPrefix = requirePrefix(prefix);
+    return new LlamaSession(activated ? llamaPrefix.forkActivated() : llamaPrefix.fork());
+  }
+
+  @Override
+  public boolean sharesPrefixStorage(Session first, Session second) {
+    return forwardPass.sharesPrefixStorage(requireSession(first), requireSession(second));
+  }
+
+  @Override
   public float[] forward(Session session, int token, int position) {
     return forwardPass.forward(requireSession(session), token, position);
   }
@@ -95,6 +157,21 @@ final class LlamaDecoder implements PureJavaDecoder {
   @Override
   public float[] prefill(Session session, int[] tokens, int startPosition) {
     return forwardPass.prefill(requireSession(session), tokens, startPosition);
+  }
+
+  @Override
+  public float[] hiddenState(Session session, int token, int position) {
+    return forwardPass.hiddenState(requireSession(session), token, position);
+  }
+
+  @Override
+  public float[] hiddenStateTransient(Session session, int token, int position) {
+    return forwardPass.hiddenStateTransient(requireSession(session), token, position);
+  }
+
+  @Override
+  public float[] prefillHiddenState(Session session, int[] tokens, int startPosition) {
+    return forwardPass.prefillHiddenState(requireSession(session), tokens, startPosition);
   }
 
   @Override
@@ -177,5 +254,13 @@ final class LlamaDecoder implements PureJavaDecoder {
       throw new IllegalArgumentException("session belongs to a different decoder");
     }
     return llamaSession.delegate;
+  }
+
+  private LlamaForwardPass.SessionPrefix requirePrefix(SharedPrefix prefix) {
+    Objects.requireNonNull(prefix, "prefix");
+    if (!(prefix instanceof LlamaDecoder.LlamaPrefix llamaPrefix)) {
+      throw new IllegalArgumentException("prefix belongs to a different decoder");
+    }
+    return llamaPrefix.delegate;
   }
 }

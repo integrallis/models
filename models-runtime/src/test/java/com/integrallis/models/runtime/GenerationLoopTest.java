@@ -663,6 +663,40 @@ class GenerationLoopTest {
       assertThat(tokens).containsExactly(" ", "world");
       assertThat(completed[0]).isTrue();
     }
+
+    @Test
+    void terminalCallbackFailureReportsUnsuccessfulGenerationMetrics() {
+      InferenceBackend backend = mockBackend(new int[] {3, 4, 1});
+      GenerationLoop loop = new GenerationLoop(backend);
+      List<Throwable> failures = new ArrayList<>();
+
+      loop.generate(
+          "hello",
+          SamplingOptions.builder().temperature(0.0f).maxTokens(10).build(),
+          new TokenStream() {
+            @Override
+            public void onToken(String token) {}
+
+            @Override
+            public void onComplete() {
+              throw new IllegalStateException("completion consumer failed");
+            }
+
+            @Override
+            public void onError(Throwable failure) {
+              failures.add(failure);
+            }
+          });
+
+      assertThat(failures)
+          .singleElement()
+          .satisfies(
+              failure ->
+                  assertThat(failure)
+                      .isInstanceOf(IllegalStateException.class)
+                      .hasMessageContaining("completion consumer failed"));
+      assertThat(loop.lastGenerationMetrics().successful()).isFalse();
+    }
   }
 
   @Nested

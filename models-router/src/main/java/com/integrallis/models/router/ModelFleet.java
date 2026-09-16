@@ -59,9 +59,19 @@ public final class ModelFleet<T> {
     return binding(decide(request).selected());
   }
 
+  /** Routes with per-request capabilities and a data boundary. */
+  public RoutedModel<T> route(RoutingRequest request, RoutingRequirements requirements) {
+    return binding(decide(request, requirements).selected());
+  }
+
   /** Returns the full explainable decision without invoking a client. */
   public RoutingDecision decide(RoutingRequest request) {
     return router.route(request);
+  }
+
+  /** Returns a decision constrained by the request's capabilities and data boundary. */
+  public RoutingDecision decide(RoutingRequest request, RoutingRequirements requirements) {
+    return router.route(request, requirements);
   }
 
   /** Returns a full decision that accounts for the current conversation boundary. */
@@ -91,15 +101,35 @@ public final class ModelFleet<T> {
     return execute(request, RoutingContinuity.none(), invocation);
   }
 
+  /** Executes ordered fallbacks while enforcing per-request routing requirements. */
+  public <R> RoutedResult<R> execute(
+      RoutingRequest request,
+      RoutingRequirements requirements,
+      ModelInvocation<? super T, ? extends R> invocation) {
+    return execute(request, requirements, RoutingContinuity.none(), invocation);
+  }
+
   /** Executes with tool-loop, provider-state, and model-specific cache evidence. */
   public <R> RoutedResult<R> execute(
       RoutingRequest request,
       RoutingContinuity continuity,
       ModelInvocation<? super T, ? extends R> invocation) {
+    return execute(request, RoutingRequirements.none(), continuity, invocation);
+  }
+
+  /**
+   * Executes with continuity plus explicit per-request capability and data-boundary requirements.
+   */
+  public <R> RoutedResult<R> execute(
+      RoutingRequest request,
+      RoutingRequirements requirements,
+      RoutingContinuity continuity,
+      ModelInvocation<? super T, ? extends R> invocation) {
     Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(requirements, "requirements");
     Objects.requireNonNull(continuity, "continuity");
     Objects.requireNonNull(invocation, "invocation");
-    RoutingDecision initial = router.route(request, continuity);
+    RoutingDecision initial = router.route(request, continuity, requirements);
     List<ModelCandidate> order = new ArrayList<>();
     order.add(initial.selected());
     order.addAll(initial.fallbacks());

@@ -29,13 +29,18 @@ import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.SharedInferencePrefix;
+import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class InferencePipelineTest {
@@ -189,6 +194,311 @@ class InferencePipelineTest {
           .isEqualTo(new PromptCacheMetrics(true, 2, 0, 2));
       assertThat(backend.prefillStartPositions()).containsExactly(List.of(0), List.of(0, 2));
     }
+  }
+
+  @Test
+  void preparesOnePhysicalPromptPrefixAndForksTrackedGenerationSessionsFromIt() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend)) {
+      SharedPromptPrefix prefix = pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+
+      assertThat(prefix.tokenCount()).isEqualTo(2);
+      assertThat(prefix.sharedBytes()).isEqualTo(128);
+      try (TextGenerationSession first =
+              pipeline.openGenerationSession(prefix, SharedPrefixInferenceBackend.Branch.BASE);
+          TextGenerationSession second = pipeline.openGenerationSession(prefix)) {
+        first.generate("abc", deterministicOptions());
+        second.generate("abx", deterministicOptions());
+
+        assertThat(first.lastGenerationMetrics().promptCache().cacheReadInputTokens()).isEqualTo(2);
+        assertThat(second.lastGenerationMetrics().promptCache().cacheReadInputTokens())
+            .isEqualTo(2);
+        assertThat(first.sharesPrefixStorageWith(second)).isTrue();
+        assertThat(backend.prefillStartPositions())
+            .containsExactly(List.of(0), List.of(2), List.of(2));
+      }
+    }
+  }
+
+  @Test
+  void opensAnIndependentActivatedBranchAfterEvaluatingTheBasePrefix() {
+    SessionBackend backend = new SessionBackend(true, true);
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend);
+        TextGenerationSession specialist =
+            pipeline.openGenerationSessionAfterBasePrefix(
+                ModelPrompt.text("ab"), SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER)) {
+      specialist.generate("abc", deterministicOptions());
+
+      assertThat(backend.activatedAtPositions()).containsExactly(2);
+      assertThat(backend.prefillStartPositions()).containsExactly(List.of(0, 2));
+      assertThat(specialist.lastGenerationMetrics().promptCache().cacheReadInputTokens())
+          .isEqualTo(2);
+    }
+  }
+
+  @Test
+  void resetsRecomputedBaseAndActivatedBranchesToTheirPreparedBoundary() {
+    SessionBackend backend = new SessionBackend(true, true);
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend);
+        TextGenerationSession base =
+            pipeline.openGenerationSessionAfterBasePrefix(
+                ModelPrompt.text("ab"), SharedPrefixInferenceBackend.Branch.BASE);
+        TextGenerationSession activated =
+            pipeline.openGenerationSessionAfterBasePrefix(
+                ModelPrompt.text("ab"), SharedPrefixInferenceBackend.Branch.ACTIVATED_ADAPTER)) {
+      base.generate("abc", deterministicOptions());
+      activated.generate("abc", deterministicOptions());
+
+      base.resetContext();
+      activated.resetContext();
+
+      assertThat(base.contextWindow().position()).hasValue(2);
+      assertThat(activated.contextWindow().position()).hasValue(2);
+      base.generate("abd", deterministicOptions());
+      activated.generate("abd", deterministicOptions());
+      assertThat(base.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+      assertThat(activated.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+      assertThatThrownBy(() -> base.generate("xbc", deterministicOptions()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("retain its prepared prefix");
+      assertThatThrownBy(() -> activated.generate("xbc", deterministicOptions()))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("retain its prepared prefix");
+    }
+  }
+
+  @Test
+  void reportsTheLoadedGraphsActualPhysicalPrefixCapability() {
+    try (InferencePipeline pipeline = new InferencePipeline(new SessionBackend(false))) {
+      assertThat(pipeline.supportsSharedPromptPrefixes()).isFalse();
+      assertThatThrownBy(() -> pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab")))
+          .isInstanceOf(UnsupportedOperationException.class)
+          .hasMessageContaining("cannot physically share");
+    }
+  }
+
+  @Test
+  void resettingAPrefixForkReturnsToItsImmutablePreparedBaseline() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend)) {
+      SharedPromptPrefix prefix = pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+      try (TextGenerationSession branch = pipeline.openGenerationSession(prefix)) {
+        branch.generate("abc", deterministicOptions());
+
+        branch.resetContext();
+        branch.generate("abd", deterministicOptions());
+
+        assertThat(branch.contextWindow().position()).hasValue(3);
+        assertThat(branch.lastGenerationMetrics().promptCache())
+            .isEqualTo(new PromptCacheMetrics(true, 3, 2, 1));
+        assertThat(backend.prefillStartPositions()).containsExactly(List.of(0), List.of(2, 2));
+      }
+    }
+  }
+
+  @Test
+  void extendsAForkIntoANewPhysicalPrefixWithoutReevaluatingItsExistingTokens() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend)) {
+      SharedPromptPrefix initial = pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+      TextGenerationSession extension = pipeline.openGenerationSession(initial);
+
+      SharedPromptPrefix extended =
+          pipeline.extendSharedPromptPrefix(extension, ModelPrompt.text("abcd"));
+
+      assertThat(extension.isClosed()).isTrue();
+      assertThat(extended.tokenCount()).isEqualTo(4);
+      try (TextGenerationSession first = pipeline.openGenerationSession(extended);
+          TextGenerationSession second = pipeline.openGenerationSession(extended)) {
+        first.generate("abcde", deterministicOptions());
+        second.generate("abcdf", deterministicOptions());
+
+        assertThat(first.lastGenerationMetrics().promptCache().cacheReadInputTokens()).isEqualTo(4);
+        assertThat(second.lastGenerationMetrics().promptCache().cacheReadInputTokens())
+            .isEqualTo(4);
+        assertThat(first.sharesPrefixStorageWith(second)).isTrue();
+        assertThat(backend.prefillStartPositions())
+            .containsExactly(List.of(0), List.of(2), List.of(4), List.of(4));
+      }
+    }
+  }
+
+  @Test
+  void rejectsReplacingRatherThanExtendingAPhysicalPrefix() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend)) {
+      SharedPromptPrefix initial = pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+      try (TextGenerationSession branch = pipeline.openGenerationSession(initial)) {
+        assertThatThrownBy(() -> pipeline.extendSharedPromptPrefix(branch, ModelPrompt.text("axc")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("must strictly extend");
+        assertThat(branch.isClosed()).isFalse();
+      }
+    }
+  }
+
+  @Test
+  void reconcilesARerenderedConversationSuffixWithoutReplacingItsImmutablePrefix() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend)) {
+      SharedPromptPrefix initial = pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+      TextGenerationSession branch = pipeline.openGenerationSession(initial);
+      branch.generate("abc", deterministicOptions());
+
+      SharedPromptPrefix reconciled =
+          pipeline.reconcileSharedPromptPrefix(branch, ModelPrompt.text("abde"));
+
+      assertThat(branch.isClosed()).isTrue();
+      assertThat(reconciled.tokenCount()).isEqualTo(4);
+      try (TextGenerationSession first = pipeline.openGenerationSession(reconciled);
+          TextGenerationSession second = pipeline.openGenerationSession(reconciled)) {
+        assertThat(first.sharesPrefixStorageWith(second)).isTrue();
+      }
+      assertThat(backend.prefillStartPositions())
+          .containsExactly(List.of(0), List.of(2, 2), List.of(), List.of());
+    }
+  }
+
+  @Test
+  void refusesToReconcileAcrossTheImmutablePhysicalPrefix() {
+    SessionBackend backend = new SessionBackend();
+
+    try (InferencePipeline pipeline = new InferencePipeline(backend)) {
+      SharedPromptPrefix initial = pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+      try (TextGenerationSession branch = pipeline.openGenerationSession(initial)) {
+        branch.generate("abc", deterministicOptions());
+
+        assertThatThrownBy(
+                () -> pipeline.reconcileSharedPromptPrefix(branch, ModelPrompt.text("axde")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("retain the immutable shared prefix");
+        assertThat(branch.isClosed()).isFalse();
+      }
+    }
+  }
+
+  @Test
+  void rejectsAPhysicalPromptPrefixOwnedByAnotherPipeline() {
+    SessionBackend firstBackend = new SessionBackend();
+    SessionBackend secondBackend = new SessionBackend();
+
+    try (InferencePipeline first = new InferencePipeline(firstBackend);
+        InferencePipeline second = new InferencePipeline(secondBackend)) {
+      SharedPromptPrefix prefix = first.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+
+      assertThatThrownBy(() -> second.openGenerationSession(prefix))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("different pipeline");
+    }
+  }
+
+  @Test
+  void closesEveryForkedPhysicalPrefixBranchWithTheOwningPipeline() {
+    SessionBackend backend = new SessionBackend();
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    SharedPromptPrefix prefix = pipeline.prepareSharedPromptPrefix(ModelPrompt.text("ab"));
+    TextGenerationSession base = pipeline.openGenerationSession(prefix);
+    TextGenerationSession sibling = pipeline.openGenerationSession(prefix);
+
+    pipeline.close();
+
+    assertThat(base.isClosed()).isTrue();
+    assertThat(sibling.isClosed()).isTrue();
+    assertThat(backend.closedSessions).isEqualTo(3);
+    assertThatThrownBy(() -> pipeline.openGenerationSession(prefix))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("closed");
+  }
+
+  @Test
+  void closingPipelineNeverInvertsTheSessionAndBackendLockOrder() throws Exception {
+    SessionBackend backend = new SessionBackend();
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    TextGenerationSession session = pipeline.openGenerationSession();
+    Field lockField = TextGenerationSession.class.getDeclaredField("operationLock");
+    lockField.setAccessible(true);
+    Object operationLock = lockField.get(session);
+    CountDownLatch operationLockHeld = new CountDownLatch(1);
+    CountDownLatch inspectContext = new CountDownLatch(1);
+    AtomicReference<Throwable> holderFailure = new AtomicReference<>();
+    AtomicReference<Throwable> closeFailure = new AtomicReference<>();
+
+    Thread holder =
+        Thread.ofPlatform()
+            .daemon()
+            .name("session-operation-holder")
+            .unstarted(
+                () -> {
+                  synchronized (operationLock) {
+                    operationLockHeld.countDown();
+                    try {
+                      if (!inspectContext.await(2, TimeUnit.SECONDS)) {
+                        throw new AssertionError("pipeline close did not reach the session lock");
+                      }
+                      session.contextWindow();
+                    } catch (Throwable failure) {
+                      holderFailure.set(failure);
+                    }
+                  }
+                });
+    Thread closer =
+        Thread.ofPlatform()
+            .daemon()
+            .name("pipeline-closer")
+            .unstarted(
+                () -> {
+                  try {
+                    pipeline.close();
+                  } catch (Throwable failure) {
+                    closeFailure.set(failure);
+                  }
+                });
+
+    holder.start();
+    assertThat(operationLockHeld.await(1, TimeUnit.SECONDS)).isTrue();
+    closer.start();
+    awaitBlocked(closer);
+    inspectContext.countDown();
+    holder.join(2_000);
+    closer.join(2_000);
+
+    assertThat(holder.isAlive()).isFalse();
+    assertThat(closer.isAlive()).isFalse();
+    assertThat(holderFailure.get()).isNull();
+    assertThat(closeFailure.get()).isNull();
+    long[] deadlocked = ManagementFactory.getThreadMXBean().findDeadlockedThreads();
+    assertThat(deadlocked == null ? new long[0] : deadlocked)
+        .doesNotContain(holder.threadId(), closer.threadId());
+    assertThat(backend.closeCount).isEqualTo(1);
+  }
+
+  @Test
+  void pipelineCloseAttemptsEverySessionAndBackendAfterCloseFailures() {
+    SessionBackend backend = new SessionBackend(true, false, 2);
+    InferencePipeline pipeline = new InferencePipeline(backend);
+    TextGenerationSession first = pipeline.openGenerationSession();
+    TextGenerationSession second = pipeline.openGenerationSession();
+
+    assertThatThrownBy(pipeline::close)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("fixture session close failure")
+        .satisfies(failure -> assertThat(failure.getSuppressed()).hasSize(1));
+
+    assertThat(first.isClosed()).isTrue();
+    assertThat(second.isClosed()).isTrue();
+    assertThat(backend.closedSessions).isEqualTo(2);
+    assertThat(backend.closeCount).isEqualTo(1);
+    pipeline.close();
+    assertThat(backend.closeCount).isEqualTo(1);
   }
 
   @Test
@@ -402,6 +712,14 @@ class InferencePipelineTest {
       TextGenerationSession session, String prompt, CountDownLatch ready, CountDownLatch start)
       throws InterruptedException {
     return generateWhenReleased(session, prompt, twoTokenOptions(), ready, start);
+  }
+
+  private static void awaitBlocked(Thread thread) throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+    while (thread.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+      Thread.sleep(5);
+    }
+    assertThat(thread.getState()).isEqualTo(Thread.State.BLOCKED);
   }
 
   private static String generateWhenReleased(
@@ -660,10 +978,33 @@ class InferencePipelineTest {
     }
   }
 
-  private static final class SessionBackend implements BatchInferenceBackend {
+  private static final class SessionBackend implements SharedPrefixInferenceBackend {
     private final List<Session> sessions = new ArrayList<>();
     private int closedSessions;
     private int closeCount;
+    private int nextPrefixId;
+    private final boolean sharedPrefixes;
+    private final boolean activatedBranch;
+    private int sessionCloseFailuresRemaining;
+
+    private SessionBackend() {
+      this(true, false);
+    }
+
+    private SessionBackend(boolean sharedPrefixes) {
+      this(sharedPrefixes, false);
+    }
+
+    private SessionBackend(boolean sharedPrefixes, boolean activatedBranch) {
+      this(sharedPrefixes, activatedBranch, 0);
+    }
+
+    private SessionBackend(
+        boolean sharedPrefixes, boolean activatedBranch, int sessionCloseFailuresRemaining) {
+      this.sharedPrefixes = sharedPrefixes;
+      this.activatedBranch = activatedBranch;
+      this.sessionCloseFailuresRemaining = sessionCloseFailuresRemaining;
+    }
 
     @Override
     public String name() {
@@ -728,6 +1069,59 @@ class InferencePipelineTest {
     }
 
     @Override
+    public boolean supportsActivatedBranch() {
+      return activatedBranch;
+    }
+
+    @Override
+    public void activateAdapter(InferenceSession session) {
+      if (!activatedBranch) {
+        SharedPrefixInferenceBackend.super.activateAdapter(session);
+      }
+      Session state = requireSession(session);
+      state.adapterActivatedAt = state.position;
+    }
+
+    @Override
+    public boolean supportsSharedPrefixes() {
+      return sharedPrefixes;
+    }
+
+    @Override
+    public SharedInferencePrefix freezePrefix(InferenceSession source) {
+      Session session = requireSession(source);
+      if (session.position == 0) {
+        throw new IllegalArgumentException("cannot freeze an empty prefix");
+      }
+      session.closed = true;
+      closedSessions++;
+      return new Prefix(session.position, ++nextPrefixId);
+    }
+
+    @Override
+    public InferenceSession fork(SharedInferencePrefix prefix, Branch branch) {
+      if (!(prefix instanceof Prefix owned)) {
+        throw new IllegalArgumentException("foreign prefix");
+      }
+      if (branch == Branch.ACTIVATED_ADAPTER) {
+        throw new IllegalStateException("no activated adapter");
+      }
+      Session session = new Session();
+      session.position = owned.checkpoint;
+      session.prefixCheckpoint = owned.checkpoint;
+      session.prefixId = owned.id;
+      sessions.add(session);
+      return session;
+    }
+
+    @Override
+    public boolean sharesPrefixStorage(InferenceSession first, InferenceSession second) {
+      Session left = requireSession(first);
+      Session right = requireSession(second);
+      return left.prefixId != 0 && left.prefixId == right.prefixId;
+    }
+
+    @Override
     public float[] forward(InferenceSession session, int token, int position) {
       Session state = requireSession(session);
       state.position = position + 1;
@@ -754,7 +1148,8 @@ class InferencePipelineTest {
 
     @Override
     public void reset(InferenceSession session) {
-      requireSession(session).position = 0;
+      Session state = requireSession(session);
+      state.position = state.prefixCheckpoint;
     }
 
     @Override
@@ -764,6 +1159,13 @@ class InferencePipelineTest {
 
     List<List<Integer>> prefillStartPositions() {
       return sessions.stream().map(session -> List.copyOf(session.prefillStartPositions)).toList();
+    }
+
+    List<Integer> activatedAtPositions() {
+      return sessions.stream()
+          .filter(session -> session.adapterActivatedAt >= 0)
+          .map(session -> session.adapterActivatedAt)
+          .toList();
     }
 
     private Session requireSession(InferenceSession session) {
@@ -783,6 +1185,9 @@ class InferencePipelineTest {
       private final List<Integer> prefillStartPositions = new ArrayList<>();
       private int position;
       private boolean closed;
+      private int prefixId;
+      private int prefixCheckpoint;
+      private int adapterActivatedAt = -1;
 
       @Override
       public int checkpoint() {
@@ -799,7 +1204,18 @@ class InferencePipelineTest {
         if (!closed) {
           closed = true;
           closedSessions++;
+          if (sessionCloseFailuresRemaining > 0) {
+            sessionCloseFailuresRemaining--;
+            throw new IllegalStateException("fixture session close failure");
+          }
         }
+      }
+    }
+
+    private record Prefix(int checkpoint, int id) implements SharedInferencePrefix {
+      @Override
+      public long sharedBytes() {
+        return 128;
       }
     }
   }

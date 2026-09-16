@@ -74,22 +74,37 @@ public final class ModelRouter {
 
   /** Routes a plain query under the configured policy. */
   public RoutingDecision route(String query) {
-    return route(RoutingRequest.builder(query).build(), policy, RoutingContinuity.none());
+    return route(
+        RoutingRequest.builder(query).build(),
+        policy,
+        RoutingContinuity.none(),
+        RoutingRequirements.none());
   }
 
   /** Routes a request under the configured policy. */
   public RoutingDecision route(RoutingRequest request) {
-    return route(request, policy, RoutingContinuity.none());
+    return route(request, policy, RoutingContinuity.none(), RoutingRequirements.none());
+  }
+
+  /** Routes a request with explicit capabilities and a data boundary. */
+  public RoutingDecision route(RoutingRequest request, RoutingRequirements requirements) {
+    return route(request, policy, RoutingContinuity.none(), requirements);
   }
 
   /** Routes a request under a one-off policy. */
   public RoutingDecision route(RoutingRequest request, RoutingPolicy override) {
-    return route(request, override, RoutingContinuity.none());
+    return route(request, override, RoutingContinuity.none(), RoutingRequirements.none());
   }
 
   /** Routes a request under the configured policy with explicit continuity evidence. */
   public RoutingDecision route(RoutingRequest request, RoutingContinuity continuity) {
-    return route(request, policy, continuity);
+    return route(request, policy, continuity, RoutingRequirements.none());
+  }
+
+  /** Routes with continuity plus per-request capabilities and a data boundary. */
+  public RoutingDecision route(
+      RoutingRequest request, RoutingContinuity continuity, RoutingRequirements requirements) {
+    return route(request, policy, continuity, requirements);
   }
 
   /**
@@ -101,18 +116,35 @@ public final class ModelRouter {
    */
   public RoutingDecision route(
       RoutingRequest request, RoutingPolicy override, RoutingContinuity continuity) {
+    return route(request, override, continuity, RoutingRequirements.none());
+  }
+
+  /** Routes with policy, continuity, and per-request capability/data-boundary requirements. */
+  public RoutingDecision route(
+      RoutingRequest request,
+      RoutingPolicy override,
+      RoutingContinuity continuity,
+      RoutingRequirements requirements) {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(override, "policy");
     Objects.requireNonNull(continuity, "continuity");
+    Objects.requireNonNull(requirements, "requirements");
 
     String taskType = request.taskType().orElseGet(() -> classifier.classify(request.query()));
     SessionState session = activeSession(request);
     String previousModel = session == null ? null : session.modelId;
     RoutingContinuity effectiveContinuity = mergeContinuity(continuity, session);
     List<ModelCandidate> eligible =
-        eligible(request, override, taskType, previousModel, effectiveContinuity);
+        eligible(request, override, taskType, previousModel, effectiveContinuity, requirements);
     Scoring scoring =
-        new Scoring(request, override, taskType, eligible, previousModel, effectiveContinuity);
+        new Scoring(
+            request,
+            override,
+            taskType,
+            eligible,
+            previousModel,
+            effectiveContinuity,
+            requirements);
     List<ScoredCandidate> ranked = new ArrayList<>(eligible.size());
     for (ModelCandidate candidate : eligible) {
       ranked.add(scoring.score(candidate));
@@ -216,7 +248,8 @@ public final class ModelRouter {
       RoutingPolicy override,
       String taskType,
       String previousModel,
-      RoutingContinuity continuity) {
+      RoutingContinuity continuity,
+      RoutingRequirements requirements) {
     List<ModelCandidate> eligible = new ArrayList<>();
     LinkedHashSet<String> rejections = new LinkedHashSet<>();
     Instant now = clock.instant();
@@ -232,8 +265,14 @@ public final class ModelRouter {
         rejections.add(candidate.id() + " is cooling down after repeated failures");
         continue;
       }
-      if (override.isLocalOnly() && !candidate.local()) {
+      if ((override.isLocalOnly() || requirements.dataBoundary().localOnly())
+          && !candidate.local()) {
         rejections.add("policy is local-only");
+        continue;
+      }
+      if (!candidate.capabilities().containsAll(requirements.requiredCapabilities())) {
+        rejections.add(
+            "no model declares required capabilities " + requirements.requiredCapabilities());
         continue;
       }
       if (candidate.contextWindow() < request.estimatedTokens()) {
@@ -275,7 +314,8 @@ public final class ModelRouter {
               candidates,
               status,
               previousModel,
-              continuity);
+              continuity,
+              requirements);
       Optional<String> customRejection = customRejection(evaluation);
       if (customRejection.isPresent()) {
         rejections.add(customRejection.orElseThrow());
@@ -452,6 +492,7 @@ public final class ModelRouter {
     private final List<ModelCandidate> eligible;
     private final String previousModel;
     private final RoutingContinuity continuity;
+    private final RoutingRequirements requirements;
     private final double minCost;
     private final double maxCost;
     private final long minTtft;
@@ -468,13 +509,15 @@ public final class ModelRouter {
         String taskType,
         List<ModelCandidate> eligible,
         String previousModel,
-        RoutingContinuity continuity) {
+        RoutingContinuity continuity,
+        RoutingRequirements requirements) {
       this.request = request;
       this.policy = policy;
       this.taskType = taskType;
       this.eligible = eligible;
       this.previousModel = previousModel;
       this.continuity = continuity;
+      this.requirements = requirements;
       double lowCost = Double.MAX_VALUE;
       double highCost = 0;
       long lowTtft = Long.MAX_VALUE;
@@ -553,7 +596,15 @@ public final class ModelRouter {
       }
       RoutingEvaluation evaluation =
           new RoutingEvaluation(
-              request, policy, taskType, candidate, eligible, status, previousModel, continuity);
+              request,
+              policy,
+              taskType,
+              candidate,
+              eligible,
+              status,
+              previousModel,
+              continuity,
+              requirements);
       for (NamedScorer scorer : scorers) {
         double value = scorer.scorer().score(evaluation);
         if (!Double.isFinite(value) || value < 0 || value > 1) {

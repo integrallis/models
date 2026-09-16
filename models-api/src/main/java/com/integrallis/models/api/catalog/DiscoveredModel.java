@@ -29,6 +29,8 @@ import java.util.Set;
  * @param id stable identifier, unique within the providing catalog
  * @param local whether the weights run on this machine
  * @param tags task labels this model is suitable for, e.g. {@code code}, {@code sql}
+ * @param capabilities concrete supported features, e.g. {@code tool-calling}, distinct from task
+ *     quality labels
  * @param contextWindow maximum tokens the model accepts
  * @param costPerMillionInputTokens currency-neutral input price; zero for local models
  * @param costPerMillionOutputTokens currency-neutral output price; zero for local models
@@ -43,6 +45,7 @@ public record DiscoveredModel(
     String id,
     boolean local,
     Set<String> tags,
+    Set<String> capabilities,
     int contextWindow,
     double costPerMillionInputTokens,
     double costPerMillionOutputTokens,
@@ -58,6 +61,7 @@ public record DiscoveredModel(
       throw new IllegalArgumentException("id must not be blank");
     }
     tags = Set.copyOf(Objects.requireNonNull(tags, "tags"));
+    capabilities = Set.copyOf(Objects.requireNonNull(capabilities, "capabilities"));
     quality = Map.copyOf(Objects.requireNonNull(quality, "quality"));
     if (contextWindow < 1) {
       throw new IllegalArgumentException("contextWindow must be positive: " + contextWindow);
@@ -71,6 +75,38 @@ public record DiscoveredModel(
     if (successRate < 0.0 || successRate > 1.0) {
       throw new IllegalArgumentException("successRate must be within [0, 1]: " + successRate);
     }
+  }
+
+  /**
+   * Source-compatible constructor for catalog providers written before concrete capabilities were
+   * represented.
+   *
+   * <p>Older providers supplied only task tags. They retain their previous behavior by exposing
+   * those tags as capabilities; providers should supply the exact set whenever it is known.
+   */
+  public DiscoveredModel(
+      String id,
+      boolean local,
+      Set<String> tags,
+      int contextWindow,
+      double costPerMillionInputTokens,
+      double costPerMillionOutputTokens,
+      long sizeBytes,
+      Performance performance,
+      Map<String, Double> quality,
+      double successRate) {
+    this(
+        id,
+        local,
+        tags,
+        tags,
+        contextWindow,
+        costPerMillionInputTokens,
+        costPerMillionOutputTokens,
+        sizeBytes,
+        performance,
+        quality,
+        successRate);
   }
 
   /**

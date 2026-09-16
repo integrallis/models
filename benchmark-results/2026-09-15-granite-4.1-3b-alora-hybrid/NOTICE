@@ -1,0 +1,27 @@
+Granite 4.1 3B activated-adapter hybrid candidate
+
+Base model artifact
+  IBM Granite, ibm-granite/granite-4.1-3b-GGUF
+  revision ab4701481089b58a082ef63cc1cee738887293ff
+  granite-4.1-3b-Q4_K_M.gguf
+  SHA-256 662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29
+
+Base tokenizer and chat template
+  IBM Granite, ibm-granite/granite-4.1-3b
+  revision c0650403e44e78ec0262dab1c90914c65b196c4e
+
+Activated adapters (Granite RAG Library)
+  IBM Granite, ibm-granite/granitelib-rag-r1.0
+  revision 2f0b2c79c6731068625aca8045c2eb2e8912b353
+  answerability/granite-4.1-3b/alora/adapter_model.safetensors
+    SHA-256 765e85650d39b89e055634c8da0c2d469c3bfa436df271df17f516ad7466d6ca
+  query_clarification/granite-4.1-3b/alora/adapter_model.safetensors
+    SHA-256 e1a8bdf9dda6667e745847b492ac47e46a2abc54f57035e11d5a4a0f66c82157
+  query_rewrite/granite-4.1-3b/alora/adapter_model.safetensors
+    SHA-256 fa6a30d7518ee4f1e2c00fd62e29662d7c217d15b90bbc5e213657b9e08a236c
+
+The upstream model cards declare Apache-2.0 for the base model and for every
+adapter in the library. The runtime package retains this notice and the
+Apache-2.0 license text. Its generated metadata pins the exact base artifact,
+upstream adapter, model card, configuration, tokenizer source files, and the
+activation-token sequence used for Java qualification.

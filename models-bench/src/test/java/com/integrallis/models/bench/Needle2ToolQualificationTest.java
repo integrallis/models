@@ -51,6 +51,41 @@ class Needle2ToolQualificationTest {
   }
 
   @Test
+  void acceptsCanonicalUriSubjectAndIsoDateArguments() throws Exception {
+    Needle2ToolQualification.Suite suite = Needle2ToolQualification.loadSuite(mapper);
+
+    assertThat(
+            Needle2ToolQualification.evaluate(
+                    mapper,
+                    caseWithId(suite, "device"),
+                    "<tool_call>{\"name\":\"set_theme\",\"arguments\":{\"accent_color\":\"green\"}}"
+                        + "</tool_call><tool_call>{\"name\":\"open_website\",\"arguments\":{\"url\":\"https://github.com\"}}"
+                        + "</tool_call><tool_call>{\"name\":\"speak\",\"arguments\":{\"text\":\"hello\"}}</tool_call>",
+                    10,
+                    ToolSyntax.QWEN)
+                .passed())
+        .isTrue();
+    assertThat(
+            Needle2ToolQualification.evaluate(
+                    mapper,
+                    caseWithId(suite, "email"),
+                    "<tool_call>{\"name\":\"send_email\",\"arguments\":{\"to\":\"finance@cactus.dev\",\"subject\":\"expenses: Blue Bottle Coffee, $14.50, August 4th\",\"body\":\"receipt\"}}</tool_call>",
+                    10,
+                    ToolSyntax.QWEN)
+                .passed())
+        .isTrue();
+    assertThat(
+            Needle2ToolQualification.evaluate(
+                    mapper,
+                    caseWithId(suite, "document"),
+                    "<tool_call>{\"name\":\"record_booking\",\"arguments\":{\"confirmation_number\":\"HL-88213\",\"check_in\":\"2026-09-14\",\"check_out\":\"2026-09-18\",\"total\":642.5}}</tool_call>",
+                    10,
+                    ToolSyntax.QWEN)
+                .passed())
+        .isTrue();
+  }
+
+  @Test
   void treatsANormalAnswerAsAValidNoToolDecisionForGeneralChatModels() throws Exception {
     Needle2ToolQualification.Case item =
         Needle2ToolQualification.loadSuite(mapper).cases().stream()
@@ -68,12 +103,20 @@ class Needle2ToolQualificationTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
 
+  private static Needle2ToolQualification.Case caseWithId(
+      Needle2ToolQualification.Suite suite, String id) {
+    return suite.cases().stream()
+        .filter(candidate -> candidate.id().equals(id))
+        .findFirst()
+        .orElseThrow();
+  }
+
   @Test
   void loadsTheCompleteVersionedUpstreamPlaygroundSuite() throws Exception {
     Needle2ToolQualification.Suite suite = Needle2ToolQualification.loadSuite(mapper);
 
     assertThat(suite.schemaVersion()).isEqualTo(1);
-    assertThat(suite.suiteId()).isEqualTo("needle2-upstream-playground-v1");
+    assertThat(suite.suiteId()).isEqualTo("models-tool-conformance-v2");
     assertThat(suite.sourceRevision()).hasSize(40);
     assertThat(suite.cases())
         .extracting(Needle2ToolQualification.Case::id)

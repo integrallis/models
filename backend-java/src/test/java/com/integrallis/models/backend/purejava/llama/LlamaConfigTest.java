@@ -241,6 +241,31 @@ class LlamaConfigTest {
     }
 
     @Test
+    void extractsGraniteScalingSemanticsWithoutTreatingItAsLlama() {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("granite"));
+      entries.put("granite.embedding_length", new GgufMetadataValue.Uint32Value(4096));
+      entries.put("granite.block_count", new GgufMetadataValue.Uint32Value(40));
+      entries.put("granite.attention.head_count", new GgufMetadataValue.Uint32Value(32));
+      entries.put("granite.attention.head_count_kv", new GgufMetadataValue.Uint32Value(8));
+      entries.put("granite.feed_forward_length", new GgufMetadataValue.Uint32Value(12800));
+      entries.put("granite.rope.freq_base", new GgufMetadataValue.Float32Value(10_000_000.0f));
+      entries.put("granite.embedding_scale", new GgufMetadataValue.Float32Value(12.0f));
+      entries.put("granite.attention.scale", new GgufMetadataValue.Float32Value(0.0078125f));
+      entries.put("granite.residual_scale", new GgufMetadataValue.Float32Value(0.22f));
+      entries.put("granite.logit_scale", new GgufMetadataValue.Float32Value(16.0f));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.architecture()).isEqualTo(DecoderArchitecture.GRANITE);
+      assertThat(config.embeddingScale()).isEqualTo(12.0f);
+      assertThat(config.attentionScale()).isEqualTo(0.0078125f);
+      assertThat(config.residualScale()).isEqualTo(0.22f);
+      assertThat(config.logitScale()).isEqualTo(16.0f);
+      assertThat(config.usesNeoxRope()).isFalse();
+    }
+
+    @Test
     void derivesVocabSizeFromTokenizerTokensWhenArchitectureKeyIsMissing() {
       Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
       entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));

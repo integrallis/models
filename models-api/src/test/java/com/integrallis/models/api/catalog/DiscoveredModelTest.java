@@ -35,6 +35,27 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class DiscoveredModelTest {
 
+  @Test
+  void retainsCapabilitiesSeparatelyFromTaskTags() {
+    DiscoveredModel model =
+        new DiscoveredModel(
+            "tool-model",
+            true,
+            Set.of("tool-use"),
+            Set.of("chat", "text-generation", "tool-calling"),
+            4_096,
+            0.0,
+            0.0,
+            1L,
+            null,
+            Map.of("tool-use", 0.9),
+            1.0);
+
+    assertThat(model.tags()).containsExactly("tool-use");
+    assertThat(model.capabilities())
+        .containsExactlyInAnyOrder("chat", "text-generation", "tool-calling");
+  }
+
   private static DiscoveredModel model(double successRate, int contextWindow) {
     return new DiscoveredModel(
         "m",

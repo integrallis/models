@@ -16,9 +16,9 @@
 package com.integrallis.models.bench;
 
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TokenStream;
-import com.integrallis.models.backend.nativekernel.RustFfmBackend;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.GenerationLoop;
 import com.integrallis.models.runtime.SpeculativeGenerationMetrics;
@@ -62,10 +62,35 @@ final class PureJavaBenchmarkTarget implements BenchmarkTarget {
       Path model, int contextLength, SpeculativeGenerationOptions speculativeOptions) {
     System.setProperty("models.purejava.maxContextLength", Integer.toString(contextLength));
     long start = System.nanoTime();
-    RustFfmBackend loaded = RustFfmBackend.load(model);
+    InferenceBackend loaded = loadNativeBackend(model);
     double elapsedMillis = nanosToMillis(System.nanoTime() - start);
     return new PureJavaBenchmarkTarget(
-        new TimingBackend(loaded), elapsedMillis, loaded.diagnostics(), speculativeOptions);
+        new TimingBackend(loaded), elapsedMillis, nativeDiagnostics(loaded), speculativeOptions);
+  }
+
+  private static InferenceBackend loadNativeBackend(Path model) {
+    try {
+      Class<?> backendClass =
+          Class.forName("com.integrallis.models.backend.nativekernel.RustFfmBackend");
+      Object loaded = backendClass.getMethod("load", Path.class).invoke(null, model);
+      return (InferenceBackend) loaded;
+    } catch (ClassNotFoundException failure) {
+      throw new IllegalStateException(
+          "rust-ffm benchmarking requires the optional backend-native runtime; "
+              + "rerun with -PmodelsBenchNative=true",
+          failure);
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException(
+          "Could not load the Models-owned Rust/FFM benchmark backend", failure);
+    }
+  }
+
+  private static BackendDiagnostics nativeDiagnostics(InferenceBackend backend) {
+    try {
+      return (BackendDiagnostics) backend.getClass().getMethod("diagnostics").invoke(backend);
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("Could not read Rust/FFM backend diagnostics", failure);
+    }
   }
 
   @Override

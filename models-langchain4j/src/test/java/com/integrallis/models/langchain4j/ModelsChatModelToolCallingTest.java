@@ -18,6 +18,7 @@ package com.integrallis.models.langchain4j;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
@@ -27,7 +28,11 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.ActivatedToolModel;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
+import com.integrallis.models.runtime.GenerationMetrics;
+import com.integrallis.models.runtime.PromptCacheMetrics;
+import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -40,8 +45,11 @@ import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.FinishReason;
+import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -122,6 +130,199 @@ class ModelsChatModelToolCallingTest {
     }
   }
 
+  private static final class ActivatedScriptedModel implements ActivatedToolModel {
+    private final ArrayDeque<String> toolOutputs;
+    private final String responseOutput;
+    private final Tokenizer tokenizer = new CharacterTokenizer();
+    private int openedTurns;
+    private int closedTurns;
+    private int ordinaryGenerations;
+    private int extendedTurns;
+    private String responsePrompt;
+    private final List<TokenConstraint> constraints = new ArrayList<>();
+
+    private ActivatedScriptedModel(String toolOutput, String responseOutput) {
+      this(List.of(toolOutput, "<tool_call>[]</tool_call>"), responseOutput);
+    }
+
+    private ActivatedScriptedModel(List<String> toolOutputs, String responseOutput) {
+      this.toolOutputs = new ArrayDeque<>(toolOutputs);
+      this.responseOutput = responseOutput;
+    }
+
+    @Override
+    public ActivatedAdapterMetadata adapter() {
+      return new ActivatedAdapterMetadata(
+          "test/base",
+          "a".repeat(40),
+          "b".repeat(64),
+          java.util.Map.of("tokenizer.json", "d".repeat(64)),
+          "c".repeat(64),
+          1,
+          1,
+          List.of(1),
+          testProvenance());
+    }
+
+    @Override
+    public List<String> toolAbstentionOutputs() {
+      return List.of("<tool_call>\n[]\n</tool_call>");
+    }
+
+    private static ActivatedAdapterMetadata.TrainingProvenance testProvenance() {
+      return new ActivatedAdapterMetadata.TrainingProvenance(
+          "test/dataset",
+          "e".repeat(40),
+          "train.jsonl",
+          "f".repeat(64),
+          "1".repeat(64),
+          "2".repeat(64),
+          "3".repeat(64),
+          "formatter.java",
+          "4".repeat(64));
+    }
+
+    @Override
+    public SharedToolTurn openToolTurn(ModelPrompt renderedToolPrompt) {
+      int turnIndex = openedTurns++;
+      String toolOutput = toolOutputs.removeFirst();
+      return new SharedToolTurn() {
+        @Override
+        public String generateToolCall(SamplingOptions options, TokenConstraint constraint) {
+          constraints.add(constraint);
+          return toolOutput;
+        }
+
+        @Override
+        public void generateToolCall(
+            SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+          constraints.add(constraint);
+          stream.onToken(toolOutput);
+          stream.onComplete();
+        }
+
+        @Override
+        public SharedToolTurn continueToolSelection(ModelPrompt nextToolPrompt) {
+          extendedTurns++;
+          close();
+          return ActivatedScriptedModel.this.openToolTurn(nextToolPrompt);
+        }
+
+        @Override
+        public String generateBaseResponse(ModelPrompt prompt, SamplingOptions options) {
+          responsePrompt = prompt.text();
+          return responseOutput;
+        }
+
+        @Override
+        public void generateBaseResponse(
+            ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+          responsePrompt = prompt.text();
+          stream.onToken(responseOutput);
+          stream.onComplete();
+        }
+
+        @Override
+        public int sharedPrefixTokens() {
+          return 10;
+        }
+
+        @Override
+        public long sharedPrefixBytes() {
+          return 1_024;
+        }
+
+        @Override
+        public boolean physicallySharesPrefix() {
+          return true;
+        }
+
+        @Override
+        public GenerationMetrics toolMetrics() {
+          return metrics(100 + turnIndex, 5);
+        }
+
+        @Override
+        public GenerationMetrics responseMetrics() {
+          return metrics(200, 10);
+        }
+
+        @Override
+        public void close() {
+          if (!closed) {
+            closed = true;
+            closedTurns++;
+          }
+        }
+
+        private boolean closed;
+      };
+    }
+
+    @Override
+    public String modelName() {
+      return "activated-scripted";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("activated-scripted");
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return tokenizer;
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      ordinaryGenerations++;
+      stream.onError(new AssertionError("ordinary generation must not serve a tool turn"));
+    }
+
+    @Override
+    public void generate(
+        ModelPrompt prompt,
+        SamplingOptions options,
+        TokenStream stream,
+        TokenConstraint constraint) {
+      ordinaryGenerations++;
+      stream.onError(new AssertionError("ordinary generation must not serve a tool turn"));
+    }
+  }
+
+  private static final class CharacterTokenizer implements Tokenizer {
+    @Override
+    public int[] encode(String text) {
+      return text.chars().toArray();
+    }
+
+    @Override
+    public String decode(int[] tokens) {
+      return "";
+    }
+
+    @Override
+    public String decode(int token) {
+      return String.valueOf((char) token);
+    }
+
+    @Override
+    public int vocabSize() {
+      return Character.MAX_VALUE + 1;
+    }
+
+    @Override
+    public int bosToken() {
+      return 0;
+    }
+
+    @Override
+    public int eosToken() {
+      return 1;
+    }
+  }
+
   private static ModelsChatModel chatModel(ScriptedModel model, ChatTemplate template) {
     return new ModelsChatModel(model, template, SamplingOptions.builder().build());
   }
@@ -156,9 +357,9 @@ class ModelsChatModelToolCallingTest {
 
       assertThat(model.lastPrompt()).contains("# Tools");
       assertThat(model.lastPrompt()).contains("get_weather");
-      assertThat(model.lastPrompt()).contains("\"type\":\"object\"");
+      assertThat(model.lastPrompt()).contains("\"type\": \"object\"");
       assertThat(model.lastPrompt()).contains("\"city\"");
-      assertThat(model.lastPrompt()).contains("\"required\":[\"city\"]");
+      assertThat(model.lastPrompt()).contains("\"required\": [\"city\"]");
     }
 
     @Test
@@ -466,6 +667,150 @@ class ModelsChatModelToolCallingTest {
   static class RoundTrip {
 
     @Test
+    void activatedAdapterFiniteGrammarDoesNotForceAnIrrelevantToolCall() {
+      String abstention = "<tool_call>\n[]\n</tool_call>";
+      ActivatedScriptedModel model = new ActivatedScriptedModel(abstention, "Hello from the base.");
+      ModelsChatModel adapter =
+          new ModelsChatModel(model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+      ChatRequest request =
+          ChatRequest.builder()
+              .messages(UserMessage.from("Hello, how are you?"))
+              .toolSpecifications(MODE)
+              .build();
+
+      ChatResponse response = adapter.chat(request);
+
+      assertThat(response.aiMessage().text()).isEqualTo("Hello from the base.");
+      TokenConstraint constraint = model.constraints.getFirst();
+      for (int token : abstention.chars().toArray()) {
+        assertThat(constraint.allows(token)).isTrue();
+        constraint.accept(token);
+      }
+      assertThat(constraint.isComplete()).isTrue();
+    }
+
+    @Test
+    void activatedAdapterRetainsItsPhysicalBaseBranchAcrossTheLangChainToolRoundTrip() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              "<tool_call>{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Austin\"}}</tool_call>",
+              "It is 88 degrees.");
+      ModelsChatModel adapter =
+          new ModelsChatModel(model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+      ChatRequest initial =
+          ChatRequest.builder()
+              .messages(UserMessage.from("weather?"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse toolSelection = adapter.chat(initial);
+      ToolExecutionRequest call = toolSelection.aiMessage().toolExecutionRequests().getFirst();
+      ChatRequest followUp =
+          ChatRequest.builder()
+              .messages(
+                  UserMessage.from("weather?"),
+                  toolSelection.aiMessage(),
+                  ToolExecutionResultMessage.from(call.id(), call.name(), "{\"tempF\":88}"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse answer = adapter.chat(followUp);
+
+      assertThat(answer.aiMessage().text()).isEqualTo("It is 88 degrees.");
+      assertThat(model.openedTurns).isEqualTo(2);
+      assertThat(model.extendedTurns).isEqualTo(1);
+      assertThat(model.responsePrompt).contains("{\"tempF\":88}");
+      assertThat(model.closedTurns).isEqualTo(2);
+      assertThat(model.ordinaryGenerations).isZero();
+    }
+
+    @Test
+    void activatedAdapterReportsTheFinalSelectionAndBaseGenerationUsage() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              "<tool_call>{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Austin\"}}</tool_call>",
+              "It is 88 degrees.");
+      ModelsChatModel adapter =
+          new ModelsChatModel(model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+      ChatRequest initial =
+          ChatRequest.builder()
+              .messages(UserMessage.from("weather?"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse toolSelection = adapter.chat(initial);
+      ToolExecutionRequest call = toolSelection.aiMessage().toolExecutionRequests().getFirst();
+      ChatResponse answer =
+          adapter.chat(
+              ChatRequest.builder()
+                  .messages(
+                      UserMessage.from("weather?"),
+                      toolSelection.aiMessage(),
+                      ToolExecutionResultMessage.from(call.id(), call.name(), "{\"tempF\":88}"))
+                  .toolSpecifications(WEATHER)
+                  .build());
+
+      assertThat(toolSelection.tokenUsage().inputTokenCount()).isEqualTo(100);
+      assertThat(toolSelection.tokenUsage().outputTokenCount()).isEqualTo(5);
+      assertThat(answer.tokenUsage().inputTokenCount()).isEqualTo(301);
+      assertThat(answer.tokenUsage().outputTokenCount()).isEqualTo(15);
+      assertThat(answer.tokenUsage().totalTokenCount()).isEqualTo(316);
+    }
+
+    @Test
+    void activatedAdapterCanRequestASecondToolBeforeSynthesizingTheAnswer() {
+      ActivatedScriptedModel model =
+          new ActivatedScriptedModel(
+              List.of(
+                  "<tool_call>{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Austin\"}}</tool_call>",
+                  "<tool_call>{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Dallas\"}}</tool_call>",
+                  "<tool_call>[]</tool_call>"),
+              "Austin is 88; Dallas is 90.");
+      ModelsChatModel adapter =
+          new ModelsChatModel(model, ChatTemplate.CHATML, SamplingOptions.builder().build());
+      ChatRequest initial =
+          ChatRequest.builder()
+              .messages(UserMessage.from("compare weather"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse firstSelection = adapter.chat(initial);
+      ToolExecutionRequest firstCall =
+          firstSelection.aiMessage().toolExecutionRequests().getFirst();
+      ChatRequest secondRequest =
+          ChatRequest.builder()
+              .messages(
+                  UserMessage.from("compare weather"),
+                  firstSelection.aiMessage(),
+                  ToolExecutionResultMessage.from(
+                      firstCall.id(), firstCall.name(), "{\"tempF\":88}"))
+              .toolSpecifications(WEATHER)
+              .build();
+      ChatResponse secondSelection = adapter.chat(secondRequest);
+      ToolExecutionRequest secondCall =
+          secondSelection.aiMessage().toolExecutionRequests().getFirst();
+      ChatRequest finalRequest =
+          ChatRequest.builder()
+              .messages(
+                  UserMessage.from("compare weather"),
+                  firstSelection.aiMessage(),
+                  ToolExecutionResultMessage.from(
+                      firstCall.id(), firstCall.name(), "{\"tempF\":88}"),
+                  secondSelection.aiMessage(),
+                  ToolExecutionResultMessage.from(
+                      secondCall.id(), secondCall.name(), "{\"tempF\":90}"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse answer = adapter.chat(finalRequest);
+
+      assertThat(answer.aiMessage().text()).isEqualTo("Austin is 88; Dallas is 90.");
+      assertThat(model.openedTurns).isEqualTo(3);
+      assertThat(model.extendedTurns).isEqualTo(2);
+      assertThat(model.closedTurns).isEqualTo(3);
+    }
+
+    @Test
     void preservesTheToolNameForGptOssHarmonyResults() {
       ScriptedModel model = new ScriptedModel("It is raining.");
       ChatRequest request =
@@ -554,6 +899,20 @@ class ModelsChatModelToolCallingTest {
       // Gemma 4 has a real tool format, but a tagged one this runtime cannot yet decode.
       assertThat(chatModel(model, ChatTemplate.GEMMA4).supportsTools()).isFalse();
     }
+  }
+
+  private static GenerationMetrics metrics(int promptTokens, int completionTokens) {
+    return new GenerationMetrics(
+        true,
+        true,
+        Duration.ZERO,
+        Duration.ZERO,
+        Duration.ZERO,
+        Optional.empty(),
+        Duration.ZERO,
+        Duration.ZERO,
+        new com.integrallis.models.api.GenerationUsage(promptTokens, completionTokens),
+        new PromptCacheMetrics(true, promptTokens, 0, promptTokens));
   }
 
   private static final class ConstraintRecordingModel implements ConstrainedTextGenerationModel {

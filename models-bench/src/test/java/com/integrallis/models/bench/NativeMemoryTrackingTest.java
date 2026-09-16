@@ -22,6 +22,11 @@ import org.junit.jupiter.api.Test;
 class NativeMemoryTrackingTest {
 
   @Test
+  void qualificationTestJvmStartsWithNativeMemoryTrackingEnabled() {
+    assertThat(NativeMemoryTracking.capture().available()).isTrue();
+  }
+
+  @Test
   void parsesJdk25SummaryUsingTheRequestedKilobyteScale() {
     String output =
         """

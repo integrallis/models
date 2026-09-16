@@ -1,0 +1,86 @@
+Picked up JAVA_TOOL_OPTIONS: -Dvectors.maxBits=512
+Downloading https://services.gradle.org/distributions/gradle-9.4.1-all.zip
+......................10%.......................20%.......................30%......................40%.......................50%.......................60%......................70%.......................80%.......................90%.......................100%
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/home/ubuntu/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Welcome to Gradle 9.4.1!
+
+Here are the highlights of this release:
+ - Java 26 support
+ - Non-class-based JVM tests
+ - Enhanced console progress bar
+
+For more details see https://docs.gradle.org/9.4.1/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :models-api:compileJava
+> Task :backend-java:compileJava
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes
+> Task :models-api:jar
+> Task :models-runtime:compileJava
+> Task :models-router:compileJava
+> Task :models-bench:compileJava
+> Task :models-bench:processResources
+> Task :models-bench:classes
+> Task :models-router:processResources
+> Task :models-router:classes
+> Task :models-router:jar
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes
+> Task :models-runtime:jar
+
+> Task :models-bench:run
+Picked up JAVA_TOOL_OPTIONS: -Dvectors.maxBits=512
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 15, 2026 1:37:39 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 512)
+Sep 15, 2026 1:37:39 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=512 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[vectors.maxBits=512]
+ 256 recomputed trial=1 handoff-ttft=260560.6 ms unique-state=251688960 shared=false
+ 256 shared     trial=1 handoff-ttft=148578.6 ms unique-state=131088000 shared=true
+1024 recomputed trial=1 handoff-ttft=1073533.2 ms unique-state=1006755840 shared=false
+1024 shared     trial=1 handoff-ttft=553470.3 ms unique-state=382776960 shared=true
+4096 recomputed trial=1 handoff-ttft=6597127.7 ms unique-state=4027023360 shared=false
+4096 shared     trial=1 handoff-ttft=3367132.8 ms unique-state=1389532800 shared=true
+Exception in thread "main" com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Java 8 optional type `java.util.Optional<java.lang.Integer>` not supported by default: add Module "com.fasterxml.jackson.datatype:jackson-datatype-jdk8" to enable handling (or disable `MapperFeature.REQUIRE_HANDLERS_FOR_JAVA8_OPTIONALS`) (through reference chain: com.integrallis.models.bench.ActivatedPrefixSharingBenchmarkCli$Report["verdict"]->com.integrallis.models.bench.ActivatedPrefixSharingBenchmarkCli$Verdict["crossoverPrefixTokens"])
+	at com.fasterxml.jackson.databind.exc.InvalidDefinitionException.from(InvalidDefinitionException.java:77)
+	at com.fasterxml.jackson.databind.SerializerProvider.reportBadDefinition(SerializerProvider.java:1359)
+	at com.fasterxml.jackson.databind.ser.impl.UnsupportedTypeSerializer.serialize(UnsupportedTypeSerializer.java:34)
+	at com.fasterxml.jackson.databind.ser.BeanPropertyWriter.serializeAsField(BeanPropertyWriter.java:732)
+	at com.fasterxml.jackson.databind.ser.std.BeanSerializerBase.serializeFields(BeanSerializerBase.java:760)
+	at com.fasterxml.jackson.databind.ser.BeanSerializer.serialize(BeanSerializer.java:183)
+	at com.fasterxml.jackson.databind.ser.BeanPropertyWriter.serializeAsField(BeanPropertyWriter.java:732)
+	at com.fasterxml.jackson.databind.ser.std.BeanSerializerBase.serializeFields(BeanSerializerBase.java:760)
+	at com.fasterxml.jackson.databind.ser.BeanSerializer.serialize(BeanSerializer.java:183)
+	at com.fasterxml.jackson.databind.ser.DefaultSerializerProvider._serialize(DefaultSerializerProvider.java:503)
+	at com.fasterxml.jackson.databind.ser.DefaultSerializerProvider.serializeValue(DefaultSerializerProvider.java:342)
+	at com.fasterxml.jackson.databind.ObjectMapper._writeValueAndClose(ObjectMapper.java:4938)
+	at com.fasterxml.jackson.databind.ObjectMapper.writeValueAsString(ObjectMapper.java:4146)
+	at com.integrallis.models.bench.ActivatedPrefixSharingBenchmarkCli.write(ActivatedPrefixSharingBenchmarkCli.java:506)
+	at com.integrallis.models.bench.ActivatedPrefixSharingBenchmarkCli.run(ActivatedPrefixSharingBenchmarkCli.java:228)
+	at com.integrallis.models.bench.InferenceBenchmarkCli.main(InferenceBenchmarkCli.java:122)
+
+> Task :models-bench:run FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':models-bench:run'.
+> Process 'command '/opt/jdks/jdk-25.0.4.1+1/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3h 21m 42s
+12 actionable tasks: 12 executed

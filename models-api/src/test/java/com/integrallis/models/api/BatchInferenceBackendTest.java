@@ -39,6 +39,18 @@ class BatchInferenceBackendTest {
     assertThat(backend.supportsRaggedPrefillBatch()).isFalse();
   }
 
+  @Test
+  void defaultHiddenStatePrefillAdvancesTheSameSessionWithoutProjectingLogits() {
+    StubBackend backend = new StubBackend();
+    StubSession session = new StubSession();
+
+    float[] hidden = backend.prefillHiddenState(session, new int[] {2, 3, 5}, 0);
+
+    assertThat(hidden).containsExactly(5, 2);
+    assertThat(session.checkpoint()).isEqualTo(3);
+    assertThat(backend.supportsHiddenState()).isTrue();
+  }
+
   private static final class StubBackend implements BatchInferenceBackend {
     @Override
     public int maxBatchSize() {
@@ -57,6 +69,18 @@ class BatchInferenceBackendTest {
       float[] logits = new float[12];
       logits[Math.floorMod(token, logits.length)] = 1;
       return logits;
+    }
+
+    @Override
+    public boolean supportsHiddenState() {
+      return true;
+    }
+
+    @Override
+    public float[] forwardHiddenState(InferenceSession session, int token, int position) {
+      StubSession state = (StubSession) session;
+      state.position = position + 1;
+      return new float[] {token, position};
     }
 
     @Override

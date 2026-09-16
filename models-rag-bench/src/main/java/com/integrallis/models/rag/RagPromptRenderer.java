@@ -48,6 +48,7 @@ public final class RagPromptRenderer {
                         hit.rank()))
             .toList();
     GroundedRagPrompt prompt = GroundedRagPrompt.formatUnchecked(question, evidence);
-    return template.applyPrompt(prompt.instructions(), prompt.request());
+    return template.applyGroundedPrompt(
+        prompt.instructions(), evidence, question, prompt.request());
   }
 }

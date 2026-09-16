@@ -1,0 +1,31 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/opt/modeljars-runs/granite41-base-20260916/evidence/rag/models-rust-ffm.json",
+    "sha256" : "4a976065d2bd20a00251a5fe99f3efad6cb071477090687b070659329d692957"
+  },
+  "comparators" : [ {
+    "path" : "/opt/modeljars-runs/granite41-base-20260916/evidence/rag/llama.cpp.json",
+    "sha256" : "37922a639867ee32348b8938c78aaa48fa54c5352fc8375f5a4ff3138b49f9ec"
+  }, {
+    "path" : "/opt/modeljars-runs/granite41-base-20260916/evidence/rag/ollama.json",
+    "sha256" : "900c40b452557c18f4df915699fc14fb001e264cb6c1b283de09b3ce4c6a92aa"
+  } ],
+  "qualification" : {
+    "modelId" : "ibm_granite_granite_4_1_3b_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29",
+    "absoluteTier" : "OFFLINE",
+    "verdict" : "FAILED_ABSOLUTE_GATE",
+    "qualified" : false,
+    "modelAnswerCount" : 21,
+    "modelAnswerRate" : 0.7777777777777778,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ ],
+    "comparisons" : [ ],
+    "exclusions" : { }
+  }
+}

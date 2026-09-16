@@ -1,0 +1,84 @@
+{
+  "adapter": {
+    "path": "qwen17-abstention-v6/adapter",
+    "sha256": "ae7f4813aea4c8eb47b7d82999ff4b85bc086e21633acf3657ed7cead887c536",
+    "trainingManifest": {
+      "path": "qwen17-abstention-v6/training-manifest.json",
+      "sha256": "97035e81e492f7af18363eda2c1dcbd67e81c8389d4b5c1a2f594f61cb8cbcce"
+    }
+  },
+  "base": {
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+  },
+  "environment": {
+    "cuda": "12.4",
+    "device": "cuda",
+    "gpu": "NVIDIA A40-8Q",
+    "peft": "0.18.1",
+    "torch": "2.6.0+cu124",
+    "transformers": "4.53.3"
+  },
+  "evaluationSource": {
+    "files": [
+      {
+        "path": "BFCL_v3_irrelevance.json",
+        "sha256": "975f51c51f688649fd190078efd87081241e0a326f9114a2ea3c1ca2440d8690"
+      },
+      {
+        "path": "BFCL_v3_multiple.json",
+        "sha256": "aef168155ebd74b7ac2401198b201343bc7d16d7a3d7e0d4e6d8ee82c6969b2a"
+      },
+      {
+        "path": "BFCL_v3_simple.json",
+        "sha256": "fbc37b2ad252bf9af985582e0e07b456173fe627d957491472ea9cef5fb83158"
+      },
+      {
+        "path": "possible_answer/BFCL_v3_multiple.json",
+        "sha256": "244e00ce9395df948bcafc7bee64e8f9c87ef70887587d83cae45b13699f3047"
+      },
+      {
+        "path": "possible_answer/BFCL_v3_simple.json",
+        "sha256": "2911a2bc00df82c4f999ffa64fedb0164cb88e96212ffa5972087eb91fd496ee"
+      }
+    ],
+    "repository": "ShishirPatil/gorilla",
+    "revision": "c15b2a151662cac9839c96d7dfb1493b5329c975"
+  },
+  "qualifyingRun": false,
+  "records": {
+    "path": "records.jsonl",
+    "sha256": "6a36674e7aa015fad6e87c89c2e88b8a6a46955adbbee69ace236440baa24e72"
+  },
+  "schemaVersion": 1,
+  "selection": {
+    "perKind": 25,
+    "seed": 20260912
+  },
+  "summary": {
+    "adapter": {
+      "cases": 75,
+      "elapsedSeconds": 28.09465513000032,
+      "irrelevanceFalseToolRate": 0.0,
+      "schemaRate": 1.0,
+      "syntaxRate": 1.0,
+      "toolExactRate": 0.18
+    },
+    "base": {
+      "cases": 75,
+      "elapsedSeconds": 31.823039103001065,
+      "irrelevanceFalseToolRate": 0.12,
+      "schemaRate": 0.6533333333333333,
+      "syntaxRate": 0.6533333333333333,
+      "toolExactRate": 0.86
+    },
+    "qualificationGates": {
+      "irrelevanceFalseToolAtMost5Percent": true,
+      "schema100Percent": true,
+      "syntax100Percent": true,
+      "toolExactAtLeast85Percent": false,
+      "toolExactNoWorseThanBase": false
+    },
+    "qualificationPassed": false
+  }
+}

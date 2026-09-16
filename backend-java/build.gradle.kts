@@ -213,6 +213,25 @@ val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
 val configuredMxbaiRerankerDirectory =
     providers.systemProperty("models.fixtures.mxbaiRerankerDirectory")
+val configuredActivatedLoraDirectory =
+    providers.systemProperty("models.fixtures.activatedLoraDirectory")
+val configuredActivatedLoraModel = providers.systemProperty("models.fixtures.activatedLoraModel")
+val configuredActivatedLoraOracle =
+    providers.systemProperty("models.fixtures.activatedLoraOracle")
+val configuredActivatedLoraPolicyOracle =
+    providers.systemProperty("models.fixtures.activatedLoraPolicyOracle")
+val configuredActivatedLoraSystemPolicy =
+    providers.systemProperty("models.fixtures.activatedLoraSystemPolicy")
+val configuredActivatedLoraCandidate =
+    providers.systemProperty("models.fixtures.activatedLoraCandidate")
+val configuredGranite32AloraBase =
+    providers.systemProperty("models.fixtures.granite32AloraBase")
+val configuredGranite32AloraAdapter =
+    providers.systemProperty("models.fixtures.granite32AloraAdapter")
+val configuredGranite41AloraBase =
+    providers.systemProperty("models.fixtures.granite41AloraBase")
+val configuredGranite41AloraAdapter =
+    providers.systemProperty("models.fixtures.granite41AloraAdapter")
 val configuredDebertaThreads = providers.systemProperty("models.deberta.threads")
 
 tasks.withType<Test>().configureEach {
@@ -243,6 +262,42 @@ tasks.withType<Test>().configureEach {
     }
     configuredMxbaiRerankerDirectory.orNull?.let {
         systemProperty("models.fixtures.mxbaiRerankerDirectory", it)
+    }
+    configuredActivatedLoraDirectory.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraDirectory", it)
+    }
+    configuredActivatedLoraModel.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraModel", it)
+    }
+    configuredActivatedLoraOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraOracle", it)
+    }
+    configuredActivatedLoraPolicyOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraPolicyOracle", it)
+    }
+    configuredActivatedLoraSystemPolicy.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraSystemPolicy", it)
+    }
+    configuredActivatedLoraCandidate.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraCandidate", it)
+    }
+    configuredGranite32AloraBase.orNull?.let {
+        systemProperty("models.fixtures.granite32AloraBase", it)
+    }
+    configuredGranite32AloraAdapter.orNull?.let {
+        systemProperty("models.fixtures.granite32AloraAdapter", it)
+    }
+    configuredGranite41AloraBase.orNull?.let {
+        systemProperty("models.fixtures.granite41AloraBase", it)
+    }
+    configuredGranite41AloraAdapter.orNull?.let {
+        systemProperty("models.fixtures.granite41AloraAdapter", it)
+    }
+    providers.systemProperty("models.fixtures.granite41AloraProbeDump").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeDump", it)
+    }
+    providers.systemProperty("models.fixtures.granite41AloraProbeHiddenOutput").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeHiddenOutput", it)
     }
     configuredDebertaThreads.orNull?.let {
         systemProperty("models.deberta.threads", it)
@@ -411,6 +466,60 @@ tasks.register<Test>("hammerYarnCompatibilityTest") {
     }
 }
 
+tasks.register<Test>("activatedLoraCompatibilityTest") {
+    description = "Verify a pinned real-weight Activated-LoRA through the Java shared-prefix path"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.ActivatedLoraModelIntegrationTest",
+        )
+    }
+    val configuredAdapter = configuredActivatedLoraDirectory.orNull
+    onlyIf("-Dmodels.fixtures.activatedLoraDirectory points to a provenance-bound adapter") {
+        configuredAdapter != null
+    }
+    configuredAdapter?.let {
+        systemProperty("models.fixtures.activatedLoraDirectory", it)
+    }
+    configuredActivatedLoraOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraOracle", it)
+    }
+    configuredActivatedLoraPolicyOracle.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraPolicyOracle", it)
+    }
+    configuredActivatedLoraSystemPolicy.orNull?.let {
+        systemProperty("models.fixtures.activatedLoraSystemPolicy", it)
+    }
+    dependsOn(
+        providers.provider {
+            if (configuredActivatedLoraModel.orNull != null) {
+                emptyList<String>()
+            } else {
+                listOf(
+                    when (configuredActivatedLoraCandidate.orNull ?: "qwen3-0.6b") {
+                        "qwen3-0.6b" -> "downloadQwen306BQ40Model"
+                        "qwen3-1.7b" -> "downloadQwen317BQ80Model"
+                        else ->
+                            throw GradleException(
+                                "unsupported activated-LoRA candidate: " +
+                                    configuredActivatedLoraCandidate.get(),
+                            )
+                    },
+                )
+            }
+        },
+    )
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "3g"
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
+}
+
 modelFixtures.forEach { fixture ->
     tasks.register<JavaExec>(fixture.taskName) {
         description =
@@ -450,6 +559,74 @@ tasks.named<Test>("integrationTest") {
     // Real-weight inference is correctness/compatibility evidence, not unit coverage. Instrumenting
     // every tensor loop makes these tests several times slower and does not feed the unit JaCoCo
     // gate.
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
+}
+
+tasks.register<Test>("granite41AloraIntegrationTest") {
+    description = "Run the pinned IBM Granite 4.1 3B aLoRA real-artifact conformance and boundary gates"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.Granite41AloraIntegrationTest",
+        )
+    }
+    val configuredBase = configuredGranite41AloraBase.orNull
+    onlyIf("-Dmodels.fixtures.granite41AloraBase points to the pinned Granite 4.1 3B GGUF") {
+        configuredBase != null
+    }
+    configuredBase?.let {
+        systemProperty("models.fixtures.granite41AloraBase", it)
+    }
+    configuredGranite41AloraAdapter.orNull?.let {
+        systemProperty("models.fixtures.granite41AloraAdapter", it)
+    }
+    providers.systemProperty("models.fixtures.granite41AloraProbeDump").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeDump", it)
+    }
+    providers.systemProperty("models.fixtures.granite41AloraProbeHiddenOutput").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeHiddenOutput", it)
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
+}
+
+tasks.register<Test>("granite32AloraIntegrationTest") {
+    description = "Run the pinned IBM Granite 3.2 aLoRA real-artifact compatibility gate"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.GraniteAloraIntegrationTest",
+        )
+    }
+    val configuredBase = configuredGranite32AloraBase.orNull
+    onlyIf("-Dmodels.fixtures.granite32AloraBase points to the pinned Granite GGUF") {
+        configuredBase != null
+    }
+    configuredBase?.let {
+        systemProperty("models.fixtures.granite32AloraBase", it)
+    }
+    configuredGranite32AloraAdapter.orNull?.let {
+        systemProperty("models.fixtures.granite32AloraAdapter", it)
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
     extensions.configure<JacocoTaskExtension> {
         isEnabled = false
     }
@@ -921,4 +1098,13 @@ listOf(
             systemProperty("models.purejava.maxContextLength", "128")
         }
     }
+}
+
+// GroupedQueryAttentionKernel uses the Vector API directly (vectors-core exposes no fused
+// grouped-query kernel), so main sources compile against the incubator module too.
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("--add-modules", "jdk.incubator.vector"))
+}
+tasks.withType<Javadoc>().configureEach {
+    (options as StandardJavadocDocletOptions).addStringOption("-add-modules", "jdk.incubator.vector")
 }

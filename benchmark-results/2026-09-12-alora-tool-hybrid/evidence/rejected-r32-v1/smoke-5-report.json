@@ -1,0 +1,54 @@
+{
+  "adapter": {
+    "path": "/opt/alora-work/qwen3-06b-tool-alora-r32-v1/adapter",
+    "sha256": "dec7257a3aaedc7e20b94f996482821d512d957737d9d64bc713802671f7c310"
+  },
+  "base": {
+    "model": "Qwen/Qwen3-0.6B",
+    "revision": "c1899de289a04d12100db370d81485cdf75e47ca"
+  },
+  "environment": {
+    "cuda": "12.4",
+    "device": "cuda",
+    "gpu": "NVIDIA A40-8Q",
+    "peft": "0.18.1",
+    "torch": "2.6.0+cu124",
+    "transformers": "4.53.3"
+  },
+  "qualifyingRun": false,
+  "records": {
+    "path": "records.jsonl",
+    "sha256": "ab2b1f388fe15a0ffd41e41fc904de93ad338cad9252560f45bf3f7e494b2f40"
+  },
+  "schemaVersion": 1,
+  "selection": {
+    "perKind": 5,
+    "seed": 20260912
+  },
+  "summary": {
+    "adapter": {
+      "cases": 15,
+      "elapsedSeconds": 9.17103566699734,
+      "irrelevanceFalseToolRate": 0.4,
+      "schemaRate": 1.0,
+      "syntaxRate": 1.0,
+      "toolExactRate": 0.8
+    },
+    "base": {
+      "cases": 15,
+      "elapsedSeconds": 3.6555826580006396,
+      "irrelevanceFalseToolRate": 0.0,
+      "schemaRate": 0.6,
+      "syntaxRate": 0.6,
+      "toolExactRate": 0.7
+    },
+    "qualificationGates": {
+      "irrelevanceFalseToolAtMost5Percent": false,
+      "schema100Percent": true,
+      "syntax100Percent": true,
+      "toolExactAtLeast85Percent": false,
+      "toolExactNoWorseThanBase": true
+    },
+    "qualificationPassed": false
+  }
+}

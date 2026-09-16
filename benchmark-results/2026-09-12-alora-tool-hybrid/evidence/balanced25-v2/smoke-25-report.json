@@ -1,0 +1,80 @@
+{
+  "adapter": {
+    "path": "/opt/alora-work/qwen3-06b-tool-alora-r32-balanced25-e2-v2/adapter",
+    "sha256": "b7b3397b629494fca4ae6ae59d9c0cae9c5dcc1288f1cb65ea0ae4f2e770a490"
+  },
+  "base": {
+    "model": "Qwen/Qwen3-0.6B",
+    "revision": "c1899de289a04d12100db370d81485cdf75e47ca"
+  },
+  "environment": {
+    "cuda": "12.4",
+    "device": "cuda",
+    "gpu": "NVIDIA A40-8Q",
+    "peft": "0.18.1",
+    "torch": "2.6.0+cu124",
+    "transformers": "4.53.3"
+  },
+  "evaluationSource": {
+    "files": [
+      {
+        "path": "BFCL_v3_irrelevance.json",
+        "sha256": "975f51c51f688649fd190078efd87081241e0a326f9114a2ea3c1ca2440d8690"
+      },
+      {
+        "path": "BFCL_v3_multiple.json",
+        "sha256": "aef168155ebd74b7ac2401198b201343bc7d16d7a3d7e0d4e6d8ee82c6969b2a"
+      },
+      {
+        "path": "BFCL_v3_simple.json",
+        "sha256": "fbc37b2ad252bf9af985582e0e07b456173fe627d957491472ea9cef5fb83158"
+      },
+      {
+        "path": "possible_answer/BFCL_v3_multiple.json",
+        "sha256": "244e00ce9395df948bcafc7bee64e8f9c87ef70887587d83cae45b13699f3047"
+      },
+      {
+        "path": "possible_answer/BFCL_v3_simple.json",
+        "sha256": "2911a2bc00df82c4f999ffa64fedb0164cb88e96212ffa5972087eb91fd496ee"
+      }
+    ],
+    "repository": "ShishirPatil/gorilla",
+    "revision": "c15b2a151662cac9839c96d7dfb1493b5329c975"
+  },
+  "qualifyingRun": false,
+  "records": {
+    "path": "records.jsonl",
+    "sha256": "55cf8eb436de1b4bc60a0fe9d5bd7569509a76920b4355c35df12f703fb94633"
+  },
+  "schemaVersion": 1,
+  "selection": {
+    "perKind": 25,
+    "seed": 20260912
+  },
+  "summary": {
+    "adapter": {
+      "cases": 75,
+      "elapsedSeconds": 60.7796415949997,
+      "irrelevanceFalseToolRate": 0.36,
+      "schemaRate": 0.9733333333333334,
+      "syntaxRate": 0.9866666666666667,
+      "toolExactRate": 0.76
+    },
+    "base": {
+      "cases": 75,
+      "elapsedSeconds": 24.808077665999008,
+      "irrelevanceFalseToolRate": 0.08,
+      "schemaRate": 0.64,
+      "syntaxRate": 0.64,
+      "toolExactRate": 0.7
+    },
+    "qualificationGates": {
+      "irrelevanceFalseToolAtMost5Percent": false,
+      "schema100Percent": false,
+      "syntax100Percent": false,
+      "toolExactAtLeast85Percent": false,
+      "toolExactNoWorseThanBase": true
+    },
+    "qualificationPassed": false
+  }
+}

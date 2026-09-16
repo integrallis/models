@@ -43,6 +43,34 @@ class ModelFleetTest {
   }
 
   @Test
+  void selectsAnExternalClientOnlyWhenItDeclaresTheRequestedCapability() {
+    Client local = prompt -> "local: " + prompt;
+    Client hosted = prompt -> "hosted: " + prompt;
+    ModelFleet<Client> fleet =
+        ModelFleet.<Client>builder()
+            .model(
+                candidateBuilder("local", true, 0.9, 0)
+                    .capabilities(java.util.Set.of("chat"))
+                    .build(),
+                local)
+            .model(
+                candidateBuilder("hosted", false, 0.8, 1)
+                    .capabilities(java.util.Set.of("chat", "tool-calling"))
+                    .build(),
+                hosted)
+            .policy(RoutingPolicy.FASTEST)
+            .build();
+
+    RoutedModel<Client> selected =
+        fleet.route(
+            RoutingRequest.builder("Find the weather.").build(),
+            RoutingRequirements.builder().requireCapability("tool-calling").build());
+
+    assertThat(selected.candidate().id()).isEqualTo("hosted");
+    assertThat(selected.client()).isSameAs(hosted);
+  }
+
+  @Test
   void executesOrderedFallbackAndReportsTheFailedAttempt() {
     Client failingLocal =
         prompt -> {
@@ -112,13 +140,17 @@ class ModelFleetTest {
   }
 
   private static ModelCandidate candidate(String id, boolean local, double quality, double cost) {
+    return candidateBuilder(id, local, quality, cost).build();
+  }
+
+  private static ModelCandidate.Builder candidateBuilder(
+      String id, boolean local, double quality, double cost) {
     return ModelCandidate.builder(id)
         .local(local)
         .costPerMillionTokens(cost, cost)
         .timeToFirstTokenMillis(100)
         .tokensPerSecond(20)
-        .quality(Map.of("chat", quality))
-        .build();
+        .quality(Map.of("chat", quality));
   }
 
   @FunctionalInterface
