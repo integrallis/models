@@ -347,3 +347,18 @@ for single-token decode, (3) batch-tiled K-quant GEMM for prefill. Until at leas
 land, the base cannot clear the comparator gate on a host where the controls clear the absolute
 gate, and ModelJars refuses the component without a qualified base.
 
+
+**Base run, attempt 5 plan (written before the instance exists):** the host class every certified
+RAG entry used — AWS `c7a.4xlarge` (16 vCPU AMD EPYC 9R14, 32 GiB), us-east-1, Ubuntu 24.04
+(`ami-025d99823a4caad37`), on-demand, 80 GiB gp3 root, existing key pair
+`modeljars-qualification-20260830` (matches the operator's ed25519 key) and security group
+`modeljars-qual-20260830` (TCP/22 from the operator /32 only), tag `delete-by` 2026-09-16T12-00Z
+with a local watchdog. Same `base-host-run.sh` at Models `be61bd8`, `granite-documents`, and the
+recorded tuning the certified Qwen2.5 3B entry used: `RAG_NATIVE_THREADS=8` plus
+`models.purejava.batchedAttentionScores/Values=true` for the performance phase; the smoke stays
+untuned. Purpose: decide whether the base qualifies under the existing protocol on the protocol's
+own host class before any runtime work is scheduled. The verdict is copied whatever it says.
+Host 2 scratch, certified-profile settings (`models.native.kernels.threads=8`, batched attention
+scores/values, Models be61bd8): decode 18.9 tok/s, prefill 41, p95 TTFT 3254 ms, p95 e2e 4620 ms
+(native threads 4: 14.1 / 33 / 3950). That is +62% decode over the harness default of 16 native
+workers on this 16-vCPU shared host, still 0.39× the Ollama control there; TTFT stays prefill-bound.
