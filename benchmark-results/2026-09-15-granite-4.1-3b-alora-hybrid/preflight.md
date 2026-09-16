@@ -257,3 +257,25 @@ decode 5.7 tok/s and 38 tok/s prefill on 16 threads versus 54 tok/s decode on th
 control; the performance phase enables `models.native.quantizedDecode` itself, but the base may
 still miss the 0.8 decode-throughput ratio. That is a measurement to take, not a reason to skip it.
 
+**Base run, attempt 3 (2026-09-16T04:34Z, Models bc1e978, `--prompt-template granite-documents`):**
+every correctness gate passes and the performance gates fail. Library-default smoke 9/9 attempts,
+correct 1.0, abstention 1.0. Performance phase (quantized native decode on, 27 attempts): correct
+1.0, abstention 1.0, model answer rate 0.78, model answer correct rate 1.0. Rust arm p50 decode
+11.7 tok/s, p50 prefill 37 tok/s, p95 TTFT 3672 ms, p95 end-to-end 6350 ms → absolute tier
+OFFLINE (USABLE needs p95 TTFT ≤ 2000 ms). Controls on the same host and prompts: Ollama v0.32.0
+48.1 tok/s decode, 504 tok/s prefill, p95 TTFT 776 ms (PRODUCTION_READY); llama.cpp b10012 48.3
+tok/s decode, 241 tok/s prefill, p95 TTFT 1175 ms (USABLE). Verdict FAILED_ABSOLUTE_GATE, no
+qualifying comparator (decode ratio 0.24 against both). Bundle copied to
+`host-evidence/base-attempt3/` (measured, not publishable).
+
+Is it the host or the model? Qwen2.5 3B Instruct Q4_K_M under the same harness settings on this
+host: 16.7 tok/s decode, 63.5 tok/s prefill, p95 TTFT 1266 ms (its certified run on an AWS EPYC
+9R14 host gave 29.4 / 83.3 / 1085 ms, so this shared-vCPU host is roughly 1.75× slower on decode).
+Granite on our path is 0.70× Qwen on decode and 0.58× on prefill at near-identical parameter count
+(40 × 2560 / 8192 FFN / 40 heads of 64 / 8 KV heads / 100k vocab, tied Q6_K embedding, versus
+36 × 2048 / 11008 / 16 heads of 128 / 2 KV heads / 152k vocab), while Ollama runs Granite faster
+than it ran Qwen. The Java path therefore carries a Granite-specific cost of roughly 3× against
+llama.cpp that is not present for Qwen. Next: JFR execution samples of the Rust arm for both models
+on this host to locate the cost before any kernel work. No base qualification can be claimed until
+the tier and comparator gates pass on a run recorded in this file.
+
