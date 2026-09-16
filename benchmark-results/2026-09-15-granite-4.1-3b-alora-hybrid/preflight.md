@@ -82,9 +82,16 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
 6. **Performance.** Shared versus recomputed handoff at 256, 1,024, and 4,096 prefix tokens with
    token-exact outputs; sharing must improve 4,096-token handoff TTFT by at least 20%; unique
    inference-state bytes, JVM memory, native-memory tracking, and process RSS are reported for
-   every arm, including losing ones. A Models-owned Rust/FFM kernel may be measured as a separate
-   arm only after the pure-Java arm passes gates 1 to 5, only with a Java reference and fallback,
-   and only if it is token-identical to the Java arm at every tier.
+   every arm, including losing ones. The pure-Java arm is the reference for every tier; a
+   Models-owned Rust/FFM kernel arm is measured beside it, keeps the Java fallback, and must be
+   token-identical to the Java arm at every tier.
+   **Amendment, 2026-09-15, before any gate 4 or 5 result existed:** gates 4 and 5 may execute on
+   the Rust/FFM kernel arm because the workstation's pure-Java prefill would put the 310-case
+   window at tens of hours. The Rust arm is admitted for those gates only after its outputs are
+   token-identical to the pure-Java arm on the first ten cases of each suite in both arms, with
+   that comparison retained beside the reports; any divergence returns those gates to pure Java.
+   The kernel is a matrix-product shim under the unchanged Java transformer, adapter delta, and
+   cache code, and it is never an external inference runtime.
 7. **Packaging.** ModelJars two-stage publication: the hidden component marker binds the complete
    file bundle, the report at an immutable Models revision, and the measured crossover; the
    visible composition is published only after a clean Java 25 host resolves the released Models
@@ -119,3 +126,20 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   window content SHA-256 `1d88443775ac8c32dd52239a43b6deae5cd3793eb639ad9e21193196335e9d67`,
   file SHA-256 `2c98968950d192099605b13e6ed73db86281bfc29d455886af7d5d8ec3e19781`. No adapter
   output existed when the window was frozen.
+- 2026-09-15, prompt-byte oracle, first MT-RAG case, specialist arm: the Java runner's rendered
+  bytes matched the Transformers rendering exactly (SHA-256
+  `9f8b4aa1e76baa715c1a975156b0b954a5117aabb94948cc29498dd2f85e85d0`), but the token IDs
+  diverged at position 37 (Java 1,604 tokens, oracle 1,601). Cause: Granite 4.1 declares
+  `<documents>` and `</documents>` as special tokens (ids 100282 and 100283), Transformers and
+  llama.cpp with special parsing emit them as single IDs, and the runner had placed them inside a
+  text segment. Correction, made before any scored output: the two template markers are rendered
+  as control segments while every document body and message stays a text segment, which is also
+  the stricter injection boundary. The frozen window contains no literal special-token string in
+  any message or document, so the corrected rendering is expected to be byte- and token-identical
+  to the oracle for every case; that is verified over all 310 cases and both arms below rather than
+  on the first case only. The one-case inference smoke that ran under the old rendering was
+  stopped and is not evidence.
+- 2026-09-15: Rust/FFM activated loaders added (`PureJavaBackend.loadActivatedAdapter` with an
+  injected kernel, `RustFfmBackend.loadActivatedAdapter`) and the runner gained `--backend`; the
+  macOS x86_64 kernel library built locally with SHA-256
+  `53a8233ee8202b085f72de41552868cecc8b55fe634a29529a455c7548b741e3`. No Rust result exists yet.

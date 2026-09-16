@@ -50,14 +50,18 @@ import java.util.Set;
 final class ActivatedAnswerabilityQualificationCli {
   static final String INVOCATION = "<|start_of_role|>assistant<|end_of_role|>";
   static final String BASE_INSTRUCTION = "Answer with exactly one word: answerable or unanswerable";
-  static final String DOCUMENTS_PREFIX =
+
+  /** Granite 4.1 declares these template markers as special tokens (ids 100282 and 100283). */
+  static final String DOCUMENTS_OPEN = "<documents>";
+
+  static final String DOCUMENTS_CLOSE = "</documents>";
+  static final String DOCUMENTS_INTRO =
       "You are a helpful assistant with access to the following documents. You may use one or "
           + "more documents to assist with the user query.\n\n"
-          + "You are given a list of documents within <documents></documents> XML tags:\n"
-          + "<documents>";
-  static final String DOCUMENTS_SUFFIX =
-      "\n</documents>\n\n"
-          + "Write the response to the user's input by strictly aligning with the facts in the "
+          + "You are given a list of documents within ";
+  static final String DOCUMENTS_TAGS_SUFFIX = " XML tags:\n";
+  static final String DOCUMENTS_OUTRO =
+      "\n\nWrite the response to the user's input by strictly aligning with the facts in the "
           + "provided documents. If the information needed to answer the question is not "
           + "available in the documents, inform the user that the question cannot be answered "
           + "based on the available data.";
@@ -73,7 +77,9 @@ final class ActivatedAnswerabilityQualificationCli {
           "arm",
           "report",
           "limit",
-          "dump-first-prompt");
+          "dump-first-prompt",
+          "dump-prompts",
+          "backend");
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private ActivatedAnswerabilityQualificationCli() {}
@@ -92,7 +98,9 @@ final class ActivatedAnswerabilityQualificationCli {
       Arm arm,
       Path report,
       int limit,
-      Path dumpFirstPrompt) {}
+      Path dumpFirstPrompt,
+      Path dumpPrompts,
+      String backend) {}
 
   record Message(String role, String text) {}
 
@@ -127,6 +135,8 @@ final class ActivatedAnswerabilityQualificationCli {
       int schemaVersion,
       String createdAt,
       String modelsRevision,
+      String backend,
+      String kernelPlan,
       String arm,
       String suite,
       JsonNode source,
@@ -154,6 +164,10 @@ final class ActivatedAnswerabilityQualificationCli {
     if (limit < 0) {
       throw new IllegalArgumentException("--limit must be >= 0");
     }
+    String backend = values.getOrDefault("backend", "pure-java");
+    if (!Set.of("pure-java", "rust-ffm").contains(backend)) {
+      throw new IllegalArgumentException("--backend must be pure-java or rust-ffm");
+    }
     return new Configuration(
         Path.of(required(values, "model")),
         Path.of(required(values, "adapter")),
@@ -163,7 +177,9 @@ final class ActivatedAnswerabilityQualificationCli {
         arm,
         Path.of(required(values, "report")),
         limit,
-        values.get("dump-first-prompt") == null ? null : Path.of(values.get("dump-first-prompt")));
+        values.get("dump-first-prompt") == null ? null : Path.of(values.get("dump-first-prompt")),
+        values.get("dump-prompts") == null ? null : Path.of(values.get("dump-prompts")),
+        backend);
   }
 
   /** Renders one document exactly as Transformers' {@code tojson} filter renders the mapping. */
@@ -179,29 +195,49 @@ final class ActivatedAnswerabilityQualificationCli {
     }
   }
 
-  static String documentsSystemMessage(List<Document> documents) {
-    StringBuilder message = new StringBuilder(DOCUMENTS_PREFIX);
+  /** The document block rendered between the two {@code <documents>} markers. */
+  static String documentsBlock(List<Document> documents) {
+    StringBuilder block = new StringBuilder();
     for (Document document : documents) {
-      message.append('\n').append(documentJson(document));
+      block.append('\n').append(documentJson(document));
     }
-    return message.append(DOCUMENTS_SUFFIX).toString();
+    return block.append('\n').toString();
+  }
+
+  /**
+   * Appends the documents system message exactly as the published template renders it. The two
+   * {@code <documents>} markers are special tokens in the Granite 4.1 tokenizer, so they are
+   * control segments; the surrounding instruction text and every document body are text segments,
+   * so caller data can never be interpreted as a control token even when it spells one.
+   */
+  static ModelPrompt.Builder appendDocumentsSystemMessage(
+      ModelPrompt.Builder prompt, List<Document> documents, String leadingInstruction) {
+    prompt.control("<|start_of_role|>system<|end_of_role|>");
+    String intro =
+        leadingInstruction == null
+            ? DOCUMENTS_INTRO
+            : leadingInstruction + "\n\n" + DOCUMENTS_INTRO;
+    return prompt
+        .text(intro)
+        .control(DOCUMENTS_OPEN)
+        .control(DOCUMENTS_CLOSE)
+        .text(DOCUMENTS_TAGS_SUFFIX)
+        .control(DOCUMENTS_OPEN)
+        .text(documentsBlock(documents))
+        .control(DOCUMENTS_CLOSE)
+        .text(DOCUMENTS_OUTRO)
+        .control("<|end_of_text|>\n");
   }
 
   /**
    * Renders the prompt for one arm. Document and conversation content are text segments so caller
-   * data can never be interpreted as Granite control tokens; only the role delimiters and the
-   * marker are control.
+   * data can never be interpreted as Granite control tokens; only the role delimiters, the two
+   * documents markers, and the assistant marker are control.
    */
   static ModelPrompt prompt(Case item, Arm arm) {
-    String system = documentsSystemMessage(item.documents());
-    if (arm == Arm.BASE) {
-      system = BASE_INSTRUCTION + "\n\n" + system;
-    }
     ModelPrompt.Builder prompt =
-        ModelPrompt.builder()
-            .control("<|start_of_role|>system<|end_of_role|>")
-            .text(system)
-            .control("<|end_of_text|>\n");
+        appendDocumentsSystemMessage(
+            ModelPrompt.builder(), item.documents(), arm == Arm.BASE ? BASE_INSTRUCTION : null);
     for (Message message : item.messages()) {
       prompt
           .control("<|start_of_role|>" + message.role() + "<|end_of_role|>")
@@ -229,13 +265,31 @@ final class ActivatedAnswerabilityQualificationCli {
     SamplingOptions options =
         SamplingOptions.builder().temperature(0).maxTokens(MAX_COMPLETION_TOKENS).build();
     List<CaseResult> results = new ArrayList<>();
-    try (PureJavaBackend backend =
-            PureJavaBackend.loadActivatedAdapter(configuration.model(), configuration.adapter());
+    try (PureJavaBackend backend = loadBackend(configuration);
         ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
       if (!INVOCATION.equals(model.adapter().invocationText())) {
         throw new IllegalStateException(
             "adapter marker differs from the Granite assistant marker: "
                 + model.adapter().invocationText());
+      }
+      if (configuration.dumpPrompts() != null) {
+        Files.createDirectories(configuration.dumpPrompts());
+        int index = 0;
+        for (Case item : cases) {
+          ModelPrompt prompt = prompt(item, configuration.arm());
+          dumpPrompt(
+              configuration.dumpPrompts().resolve(index++ + ".json"),
+              item,
+              prompt,
+              model.tokenizer().encode(prompt));
+        }
+        System.out.printf(
+            "DUMPED %d %s prompts for %s to %s%n",
+            cases.size(),
+            configuration.arm().name().toLowerCase(Locale.ROOT),
+            configuration.suite(),
+            configuration.dumpPrompts());
+        return 0;
       }
       for (Case item : cases) {
         ModelPrompt prompt = prompt(item, configuration.arm());
@@ -288,6 +342,8 @@ final class ActivatedAnswerabilityQualificationCli {
             1,
             Instant.now().toString(),
             configuration.modelsRevision(),
+            configuration.backend(),
+            kernelPlan(configuration.backend()),
             configuration.arm().name().toLowerCase(Locale.ROOT),
             configuration.suite(),
             suite.get("source"),
@@ -300,8 +356,10 @@ final class ActivatedAnswerabilityQualificationCli {
             List.copyOf(results));
     JSON.writerWithDefaultPrettyPrinter().writeValue(configuration.report().toFile(), report);
     System.out.printf(
-        "%s arm=%s suite=%s cases=%d structured=%.4f balancedAccuracy=%.4f shared=%d complete=%s%n",
+        "%s backend=%s arm=%s suite=%s cases=%d structured=%.4f balancedAccuracy=%.4f shared=%d"
+            + " complete=%s%n",
         summary.executionPassed() ? "EXECUTED" : "EXECUTION-FAILED",
+        report.backend(),
         report.arm(),
         report.suite(),
         summary.cases(),
@@ -310,6 +368,44 @@ final class ActivatedAnswerabilityQualificationCli {
         summary.physicallyShared(),
         complete);
     return summary.executionPassed() ? 0 : 1;
+  }
+
+  private static final String RUST_BACKEND_CLASS =
+      "com.integrallis.models.backend.nativekernel.RustFfmBackend";
+
+  /**
+   * Loads the activated backend for the requested kernel runtime. The Rust arm is the same Java
+   * transformer, adapter, and shared-prefix code with only the base matrix products native.
+   */
+  static PureJavaBackend loadBackend(Configuration configuration) {
+    if ("pure-java".equals(configuration.backend())) {
+      return PureJavaBackend.loadActivatedAdapter(configuration.model(), configuration.adapter());
+    }
+    try {
+      Class<?> backendClass = Class.forName(RUST_BACKEND_CLASS);
+      return (PureJavaBackend)
+          backendClass
+              .getMethod("loadActivatedAdapter", Path.class, Path.class)
+              .invoke(null, configuration.model(), configuration.adapter());
+    } catch (ClassNotFoundException failure) {
+      throw new IllegalStateException(
+          "rust-ffm qualification requires the optional backend-native runtime; "
+              + "rerun with -PmodelsBenchNative=true",
+          failure);
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("Could not load the Models-owned Rust/FFM backend", failure);
+    }
+  }
+
+  static String kernelPlan(String backend) {
+    if ("pure-java".equals(backend)) {
+      return "pure-java";
+    }
+    try {
+      return (String) Class.forName(RUST_BACKEND_CLASS).getField("PLAN_VERSION").get(null);
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("Could not read the Rust/FFM kernel plan version", failure);
+    }
   }
 
   static Summary summarize(List<CaseResult> results, Arm arm) {

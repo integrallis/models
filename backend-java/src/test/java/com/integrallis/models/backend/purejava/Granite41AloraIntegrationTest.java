@@ -46,18 +46,10 @@ class Granite41AloraIntegrationTest {
   private static final int[] ORACLE_PROMPT_TOKENS = {791, 4062, 14198, 39935};
   private static final int[] ORACLE_GREEDY_TOKENS = {35308, 927, 279, 16053, 5679, 1210, 578, 734};
 
-  private static final String DOCUMENTS_SYSTEM_MESSAGE =
-      "You are a helpful assistant with access to the following documents. You may use one or "
-          + "more documents to assist with the user query.\n\n"
-          + "You are given a list of documents within <documents></documents> XML tags:\n"
-          + "<documents>\n"
-          + "{\"doc_id\": 1, \"text\": \"Tim Cook has served as the chief executive officer of "
-          + "Apple since August 2011, when he succeeded Steve Jobs.\"}\n"
-          + "</documents>\n\n"
-          + "Write the response to the user's input by strictly aligning with the facts in the "
-          + "provided documents. If the information needed to answer the question is not "
-          + "available in the documents, inform the user that the question cannot be answered "
-          + "based on the available data.";
+  private static final int[] DOCUMENTS_MARKER_TOKENS = {100282, 100283};
+  private static final String DOCUMENT =
+      "{\"doc_id\": 1, \"text\": \"Tim Cook has served as the chief executive officer of Apple "
+          + "since August 2011, when he succeeded Steve Jobs.\"}";
 
   @Test
   void matchesTheLlamaCppOracleAndPinsTheMarkerToTheGraniteTokenizer() {
@@ -80,10 +72,16 @@ class Granite41AloraIntegrationTest {
       assertThat(invocationTokens).containsExactly(INVOCATION_TOKENS);
       assertThat(tokenizer.decode(invocationTokens)).isEqualTo(INVOCATION);
 
+      assertThat(tokenizer.encodeControl("<documents></documents>"))
+          .as("Granite 4.1 declares the documents markers as special tokens")
+          .containsExactly(DOCUMENTS_MARKER_TOKENS);
       int[] renderedPromptTokens = tokenizer.encode(answerabilityPrompt());
       assertThat(lastIndexOf(renderedPromptTokens, INVOCATION_TOKENS))
           .as("the marker must close the rendered documents prompt")
           .isEqualTo(renderedPromptTokens.length - INVOCATION_TOKENS.length);
+      assertThat(lastIndexOf(renderedPromptTokens, DOCUMENTS_MARKER_TOKENS))
+          .as("the empty <documents></documents> pair must render as the two special tokens")
+          .isGreaterThan(0);
     }
   }
 
@@ -107,10 +105,24 @@ class Granite41AloraIntegrationTest {
     }
   }
 
+  /** Mirrors the published documents template: markers are control, everything else is text. */
   static ModelPrompt answerabilityPrompt() {
     return ModelPrompt.builder()
         .control("<|start_of_role|>system<|end_of_role|>")
-        .text(DOCUMENTS_SYSTEM_MESSAGE)
+        .text(
+            "You are a helpful assistant with access to the following documents. You may use one "
+                + "or more documents to assist with the user query.\n\n"
+                + "You are given a list of documents within ")
+        .control("<documents></documents>")
+        .text(" XML tags:\n")
+        .control("<documents>")
+        .text("\n" + DOCUMENT + "\n")
+        .control("</documents>")
+        .text(
+            "\n\nWrite the response to the user's input by strictly aligning with the facts in "
+                + "the provided documents. If the information needed to answer the question is "
+                + "not available in the documents, inform the user that the question cannot be "
+                + "answered based on the available data.")
         .control("<|end_of_text|>\n")
         .control("<|start_of_role|>user<|end_of_role|>")
         .text("Who is the CEO of Apple?")

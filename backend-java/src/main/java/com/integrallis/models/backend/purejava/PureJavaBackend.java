@@ -231,11 +231,28 @@ public final class PureJavaBackend
   /** Loads a pinned Activated-LoRA adapter with registry-neutral backend recommendations. */
   public static PureJavaBackend loadActivatedAdapter(
       Path modelPath, Path adapterDirectory, BackendConfiguration backendConfiguration) {
+    return loadActivatedAdapter(
+        modelPath, adapterDirectory, backendConfiguration, GgufBatchedMatrixKernel.none());
+  }
+
+  /**
+   * Loads a pinned Activated-LoRA adapter with an injected batched projection kernel.
+   *
+   * <p>The kernel only replaces the base matrix products. The transformer plan, the adapter delta,
+   * the activation boundary, and the physically shared KV prefix remain the Java implementation, so
+   * a kernel arm must be token-identical to the pure-Java arm to count as the same model. The
+   * returned backend owns and closes {@code batchedMatrixKernel}.
+   */
+  public static PureJavaBackend loadActivatedAdapter(
+      Path modelPath,
+      Path adapterDirectory,
+      BackendConfiguration backendConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
     return load(
         modelPath,
         ModelMemoryArena.create(),
         Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
-        GgufBatchedMatrixKernel.none(),
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"),
         BatchedCausalAttentionKernel.none(),
         Objects.requireNonNull(adapterDirectory, "adapterDirectory"));
   }

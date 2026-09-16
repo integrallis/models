@@ -48,10 +48,10 @@ class ActivatedAnswerabilityQualificationCliTest {
     assertThat(ActivatedAnswerabilityQualificationCli.documentJson(CASE.documents().get(1)))
         .as("non-ASCII stays literal because Transformers renders with ensure_ascii=False")
         .isEqualTo("{\"doc_id\": 2, \"text\": \"é\"}");
-    assertThat(ActivatedAnswerabilityQualificationCli.documentsSystemMessage(CASE.documents()))
-        .startsWith(ActivatedAnswerabilityQualificationCli.DOCUMENTS_PREFIX + "\n{\"doc_id\": 1")
+    assertThat(ActivatedAnswerabilityQualificationCli.documentsBlock(CASE.documents()))
+        .startsWith("\n{\"doc_id\": 1")
         .contains("}\n{\"doc_id\": 2")
-        .endsWith(ActivatedAnswerabilityQualificationCli.DOCUMENTS_SUFFIX);
+        .endsWith("}\n");
   }
 
   @Test
@@ -68,7 +68,10 @@ class ActivatedAnswerabilityQualificationCliTest {
                 .filter(segment -> segment.kind() == ModelPrompt.SegmentKind.TEXT)
                 .map(ModelPrompt.Segment::text))
         .containsExactly(
-            ActivatedAnswerabilityQualificationCli.documentsSystemMessage(CASE.documents()),
+            ActivatedAnswerabilityQualificationCli.DOCUMENTS_INTRO,
+            ActivatedAnswerabilityQualificationCli.DOCUMENTS_TAGS_SUFFIX,
+            ActivatedAnswerabilityQualificationCli.documentsBlock(CASE.documents()),
+            ActivatedAnswerabilityQualificationCli.DOCUMENTS_OUTRO,
             "first",
             "reply",
             "what \"now\"?");
@@ -76,8 +79,12 @@ class ActivatedAnswerabilityQualificationCliTest {
             segments.stream()
                 .filter(segment -> segment.kind() == ModelPrompt.SegmentKind.CONTROL)
                 .map(ModelPrompt.Segment::text))
+        .as("the documents markers are special tokens and must be control, never text")
         .containsExactly(
             "<|start_of_role|>system<|end_of_role|>",
+            "<documents></documents>",
+            "<documents>",
+            "</documents>",
             "<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>",
             "<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>",
             "<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>",
@@ -94,7 +101,9 @@ class ActivatedAnswerabilityQualificationCliTest {
         .isEqualTo(
             ActivatedAnswerabilityQualificationCli.BASE_INSTRUCTION
                 + "\n\n"
-                + specialist.segments().get(1).text());
+                + ActivatedAnswerabilityQualificationCli.DOCUMENTS_INTRO);
+    assertThat(specialist.segments().get(1).text())
+        .isEqualTo(ActivatedAnswerabilityQualificationCli.DOCUMENTS_INTRO);
     assertThat(base.segments().subList(2, base.segments().size()))
         .isEqualTo(specialist.segments().subList(2, specialist.segments().size()));
   }
@@ -206,6 +215,19 @@ class ActivatedAnswerabilityQualificationCliTest {
         ActivatedAnswerabilityQualificationCli.parse(valid);
     assertThat(configuration.arm()).isEqualTo(Arm.SPECIALIST);
     assertThat(configuration.limit()).isEqualTo(3);
+    assertThat(configuration.backend()).isEqualTo("pure-java");
+    assertThat(ActivatedAnswerabilityQualificationCli.kernelPlan("pure-java"))
+        .isEqualTo("pure-java");
+
+    String[] rust = java.util.Arrays.copyOf(valid, valid.length + 2);
+    rust[valid.length] = "--backend";
+    rust[valid.length + 1] = "rust-ffm";
+    assertThat(ActivatedAnswerabilityQualificationCli.parse(rust).backend()).isEqualTo("rust-ffm");
+
+    String[] badBackend = rust.clone();
+    badBackend[valid.length + 1] = "llama.cpp";
+    assertThatThrownBy(() -> ActivatedAnswerabilityQualificationCli.parse(badBackend))
+        .hasMessageContaining("--backend must be pure-java or rust-ffm");
 
     String[] badArm = valid.clone();
     badArm[11] = "hybrid";
