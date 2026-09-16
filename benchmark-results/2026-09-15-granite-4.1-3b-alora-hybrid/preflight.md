@@ -607,3 +607,43 @@ pure-Java window host, gates 5 and 6 on instance 3. Still to do: the window verd
 arm agreement, gate 7 packaging check, the component report and its ModelJars entry, the
 composition entry, PR merges and the Models 0.3.38 release (user action), the ModelJars
 modelsVersion bump and publication.
+
+**CI regression found and fixed (2026-09-16T11:10Z, measured):** Model Integration on CI has
+failed at every commit since 4c617ac (fused attention kernel v3) on
+`RustFfmBackendIntegrationTest.matchesPinnedQwen3GreedyTokenOracle`: Qwen3 0.6B Q4_0 on the Rust
+arm produced `[34208, 916, 279, 2804]` against the pinned llama.cpp oracle `[34208, 916, 279,
+15678]`; the pure-Java Qwen3 fixture tests kept passing on this machine. A local `git bisect`
+between the main merge-base and the branch head (7 steps, each running that one test) lands on
+4c617ac. The fused kernel's lane reductions and vector exponential differ from the head-by-head
+loop in the last bits, and that is enough to flip a near-tie greedy token in an architecture the
+kernel was never qualified on. Fix, Models `c5c6591`: the fused kernel runs only when
+`config.usesGraniteScaling()` (the predicate that already gates the native grouped attention and
+the vectorised swiGlu); every other architecture goes through `attendGroupHeadByHead`, the exact
+per-head scores / scalar softmax / per-head values loop from before 12cb99b. Granite's executed
+code is unchanged by construction. Measured at c5c6591 on this machine: the Rust Qwen3 oracle
+test and the two pure-Java Qwen3 fixture tests pass (5/5, 5/5, 2/2); backend-java 616 and
+backend-native 39 unit tests, SpotBugs and spotless pass; `Granite41AloraIntegrationTest` (gates
+1–3) passes 2/2 on the real Granite 4.1 3B weights and the packaged answerability adapter. CI at
+c5c6591 is running. The `models-bench` SpotBugs failure at edc0ef7 was a nullable class-loader
+resource lookup and an unguarded report parent directory in the long-context CLI (c1a5709).
+Consequence for the evidence chain: the windows, gates 5 and 6 and the base qualification were
+produced at f6252cc, whose Granite code path c5c6591 does not touch; the component report records
+f6252cc as the revision the evidence was produced at, and the release will carry c5c6591. The
+squash-merge re-pin already planned for ModelJars applies the same code-identity argument.
+
+**Gate 5 (long-context retention) PASS at f6252cc, instance 3, Rust arm (2026-09-16T10:54Z):**
+specialist 8/8, base 7/8 (lc-07, an unanswerable case at a 4096-token prefix, answered by the
+base), retained 7/7, exact 8/8, shared 8/8. Report
+`host-evidence/gates-f6252cc/gate5-long-context-rust-ffm.json`
+(sha256 007f4dad2bff02966a2edb812131309ed672c45c241acf82e8e32e4e8cd3b914). Gate 6 (crossover,
+pure Java then Rust) started on the same instance at 10:54Z.
+
+**MT-RAG identity screen at f6252cc, host 1 (2026-09-16T11:04Z):** specialist arms 9/10
+identical between pure Java and Rust (case `1c041ce4…<::>6`, java `unanswerable`, rust
+`answerable`; the same one-case borderline pattern seen at 7a3f3e7). Base arm on pure Java:
+structured 6/10 — the base model answers the question in prose in four cases ("Vulnerability
+Advisor scans images", "Yes, you are charged for…") instead of the one word the harness asks
+for, which the runner reports as EXECUTION-FAILED for that arm. That is the base's behaviour
+under the reference contract and is recorded as such; it does not stop the window (window arms
+record the identity summary next to their results instead of refusing). Base Rust arm running;
+then the Rust window on host 1. Reports in `host-evidence/identity-f6252cc/`.
