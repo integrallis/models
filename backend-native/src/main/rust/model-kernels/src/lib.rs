@@ -98,6 +98,26 @@ const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 const WORKER_SPIN_ITERS: usize = 4_000;
+/// Low bits of a published job word that carry the partition count the job was published with.
+const JOB_PARTITION_BITS: u32 = 16;
+
+/// A published job word: the generation in the high bits and the partition count the job was
+/// published with in the low bits. A worker judges its membership in a generation against the
+/// count that applied to that generation, never against the current active count: a worker that
+/// was counted out of one generation and had not yet reached the idle wait when the active count
+/// grew again would otherwise treat the finished generation as new, run it against the grown
+/// count, and decrement the completion counter of the generation published after it.
+fn job_word(generation: u64, partitions: usize) -> u64 {
+    (generation << JOB_PARTITION_BITS) | (partitions as u64 & ((1 << JOB_PARTITION_BITS) - 1))
+}
+
+fn job_generation(word: u64) -> u64 {
+    word >> JOB_PARTITION_BITS
+}
+
+fn job_partitions(word: u64) -> usize {
+    (word & ((1 << JOB_PARTITION_BITS) - 1)) as usize
+}
 const COMPLETION_SPIN_ITERS: usize = 4_000;
 const MAX_GROUPED_MATRICES: usize = 16;
 const STACK_BATCH_CAPACITY: usize = 128;
@@ -419,7 +439,11 @@ impl WorkerPool {
                 .remaining
                 .0
                 .store(partitions - 1, Ordering::Relaxed);
-            self.shared.generation.0.fetch_add(1, Ordering::Release);
+            let current = self.shared.generation.0.load(Ordering::Acquire);
+            self.shared.generation.0.store(
+                job_word(job_generation(current) + 1, partitions),
+                Ordering::Release,
+            );
             self.shared.work_available.notify_all();
         }
 
@@ -466,7 +490,11 @@ impl WorkerPool {
                 .remaining
                 .0
                 .store(partitions - 1, Ordering::Relaxed);
-            self.shared.generation.0.fetch_add(1, Ordering::Release);
+            let current = self.shared.generation.0.load(Ordering::Acquire);
+            self.shared.generation.0.store(
+                job_word(job_generation(current) + 1, partitions),
+                Ordering::Release,
+            );
             self.shared.work_available.notify_all();
         }
 
@@ -513,7 +541,11 @@ impl WorkerPool {
                 .remaining
                 .0
                 .store(partitions - 1, Ordering::Relaxed);
-            self.shared.generation.0.fetch_add(1, Ordering::Release);
+            let current = self.shared.generation.0.load(Ordering::Acquire);
+            self.shared.generation.0.store(
+                job_word(job_generation(current) + 1, partitions),
+                Ordering::Release,
+            );
             self.shared.work_available.notify_all();
         }
 
@@ -541,7 +573,11 @@ impl Drop for WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.shutdown = true;
-            self.shared.generation.0.fetch_add(1, Ordering::Release);
+            let current = self.shared.generation.0.load(Ordering::Acquire);
+            self.shared
+                .generation
+                .0
+                .store(job_word(job_generation(current) + 1, 0), Ordering::Release);
             self.shared.work_available.notify_all();
             self.shared.activation.notify_all();
         }
@@ -587,10 +623,11 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
             }
             observed_generation =
                 next_generation.unwrap_or_else(|| shared.generation.0.load(Ordering::Acquire));
-            (state.job, shared.partitions.0.load(Ordering::Acquire))
+            (state.job, job_partitions(observed_generation))
         };
         if worker_index >= partitions {
-            // The active count shrank while this worker was spinning; the job counted it out.
+            // This generation was published without this worker (the active count was smaller
+            // at publish time, or the pool is shutting down); it owes it nothing.
             continue;
         }
         let succeeded = match job {
@@ -5452,7 +5489,7 @@ mod tests {
     #[test]
     fn worker_accounts_for_a_published_generation_without_a_job() {
         let shared = Arc::new(WorkerShared {
-            generation: CachePadded(AtomicU64::new(1)),
+            generation: CachePadded(AtomicU64::new(job_word(1, 2))),
             remaining: CachePadded(AtomicUsize::new(1)),
             partitions: CachePadded(AtomicUsize::new(2)),
             activation_generation: CachePadded(AtomicU64::new(0)),
@@ -5477,7 +5514,7 @@ mod tests {
         {
             let mut state = lock(&shared.state);
             state.shutdown = true;
-            shared.generation.0.fetch_add(1, Ordering::Release);
+            shared.generation.0.store(job_word(2, 0), Ordering::Release);
             shared.work_available.notify_all();
         }
 
@@ -5563,12 +5600,14 @@ mod tests {
         let mut output = [0_f32; 64 * 3];
         // SAFETY: the test owns the live context until the final destroy call.
         let context_ref = unsafe { &*context };
-        let before = context_ref
-            .workers
-            .shared
-            .generation
-            .0
-            .load(Ordering::Acquire);
+        let before = job_generation(
+            context_ref
+                .workers
+                .shared
+                .generation
+                .0
+                .load(Ordering::Acquire),
+        );
 
         // SAFETY: the context and every test buffer remain live and non-aliasing for the call.
         assert_eq!(
@@ -5591,12 +5630,14 @@ mod tests {
             STATUS_OK
         );
         // SAFETY: the call completed synchronously and the context remains live.
-        let after = context_ref
-            .workers
-            .shared
-            .generation
-            .0
-            .load(Ordering::Acquire);
+        let after = job_generation(
+            context_ref
+                .workers
+                .shared
+                .generation
+                .0
+                .load(Ordering::Acquire),
+        );
 
         assert_eq!(after.wrapping_sub(before), 1);
         // SAFETY: the test consumes the unique context pointer exactly once.
@@ -5626,12 +5667,14 @@ mod tests {
         let mut output = [f32::NAN; 64 * 3];
         // SAFETY: the test owns the live context until the final destroy call.
         let context_ref = unsafe { &*context };
-        let before = context_ref
-            .workers
-            .shared
-            .generation
-            .0
-            .load(Ordering::Acquire);
+        let before = job_generation(
+            context_ref
+                .workers
+                .shared
+                .generation
+                .0
+                .load(Ordering::Acquire),
+        );
 
         // SAFETY: the context and every test buffer remain live and non-aliasing for the call.
         assert_eq!(
@@ -5653,12 +5696,14 @@ mod tests {
             },
             STATUS_OK
         );
-        let after = context_ref
-            .workers
-            .shared
-            .generation
-            .0
-            .load(Ordering::Acquire);
+        let after = job_generation(
+            context_ref
+                .workers
+                .shared
+                .generation
+                .0
+                .load(Ordering::Acquire),
+        );
 
         assert_eq!(after.wrapping_sub(before), 1);
         assert!(output.iter().all(|value| *value == 0.0));
@@ -5680,12 +5725,14 @@ mod tests {
         let mut output = [0_f32; 64];
         // SAFETY: the test owns the live context until the final destroy call.
         let context_ref = unsafe { &*context };
-        let before = context_ref
-            .workers
-            .shared
-            .generation
-            .0
-            .load(Ordering::Acquire);
+        let before = job_generation(
+            context_ref
+                .workers
+                .shared
+                .generation
+                .0
+                .load(Ordering::Acquire),
+        );
 
         for _ in 0..GENERATIONS {
             output.fill(f32::NAN);
@@ -5711,12 +5758,14 @@ mod tests {
             assert!(output.iter().all(|value| *value == 0.0));
         }
 
-        let after = context_ref
-            .workers
-            .shared
-            .generation
-            .0
-            .load(Ordering::Acquire);
+        let after = job_generation(
+            context_ref
+                .workers
+                .shared
+                .generation
+                .0
+                .load(Ordering::Acquire),
+        );
         assert_eq!(after.wrapping_sub(before), GENERATIONS);
         // SAFETY: the test consumes the unique context pointer exactly once.
         assert_eq!(
