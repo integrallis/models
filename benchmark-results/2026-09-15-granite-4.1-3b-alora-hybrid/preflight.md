@@ -514,3 +514,6 @@ via `base-host-run.sh` with `RAG_NATIVE_THREADS=16` and `RAG_TUNED_JAVA_OPTS` =
 previous bundle on this instance (control at 4a0d5cc) is moved aside as `rag.control-4a0d5cc`. The
 verdict is copied whatever it says; the margins above are thin enough that instance variance can
 decide it, and a FAIL is re-run once on a fresh instance of the same class before any conclusion.
+Attempt 6 runs at Models `82a7433` (kernel v4, selective wake, tier-stable exponential and
+fixed-tree lane reduction, nano test corrected to different tokens). Confirmed on the x86 host 1
+before launch: 614 backend-java, 38 backend-native, and 4 embedding-adapter tests pass.
