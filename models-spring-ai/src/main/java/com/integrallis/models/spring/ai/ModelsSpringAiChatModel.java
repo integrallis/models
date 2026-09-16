@@ -23,6 +23,7 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelGenerationException;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
@@ -50,6 +51,7 @@ import java.util.function.Function;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -270,13 +272,17 @@ public final class ModelsSpringAiChatModel implements ChatModel {
         GenerationMetrics toolMetrics = turn.toolMetrics();
         usage.add(toolMetrics);
         GenerationOutput generatedTool =
-            new GenerationOutput(toolOutput, toolMetrics.available() ? toolMetrics.usage() : null);
+            new GenerationOutput(
+                toolOutput,
+                toolMetrics.available() ? toolMetrics.usage() : null,
+                toolMetrics.stopReason().orElse(null));
         ChatResponse selection =
             toolAwareResponse(generatedTool.text(), generatedTool.usage(), tools);
         if (!selection.hasToolCalls()) {
           String baseOutput = turn.generateBaseResponse(rendered, requested);
           usage.add(turn.responseMetrics());
-          return responseWithUsage(baseOutput, usage);
+          return responseWithUsage(
+              baseOutput, usage, turn.responseMetrics().stopReason().orElse(null));
         }
 
         ToolExecutionResult toolResult = toolCallingManager.executeToolCalls(current, selection);
@@ -313,8 +319,8 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     SamplingOptions requested = options(prompt, tools);
     GenerationOutput generated = generate(rendered, requested, tools);
     return tools.isEmpty()
-        ? response(generated.text(), generated.usage())
-        : toolAwareResponse(generated.text(), generated.usage(), tools);
+        ? response(generated.text(), generated.usage(), generated.stopReason())
+        : toolAwareResponse(generated.text(), generated.usage(), tools, generated.stopReason());
   }
 
   /**
@@ -485,6 +491,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
         sink -> {
           AtomicReference<Throwable> failure = new AtomicReference<>();
           AtomicReference<GenerationUsage> reportedUsage = new AtomicReference<>();
+          AtomicReference<StopReason> reportedReason = new AtomicReference<>();
           try {
             turn.generateBaseResponse(
                 prompt,
@@ -496,11 +503,22 @@ public final class ModelsSpringAiChatModel implements ChatModel {
                   }
 
                   @Override
+                  public boolean isCancelled() {
+                    return sink.isCancelled();
+                  }
+
+                  @Override
                   public void onComplete() {}
 
                   @Override
                   public void onComplete(GenerationUsage usage) {
                     reportedUsage.set(usage);
+                  }
+
+                  @Override
+                  public void onComplete(GenerationUsage usage, StopReason stopReason) {
+                    reportedUsage.set(usage);
+                    reportedReason.set(stopReason);
                   }
 
                   @Override
@@ -510,12 +528,13 @@ public final class ModelsSpringAiChatModel implements ChatModel {
                 });
             throwFailure(failure.get());
             GenerationMetrics responseMetrics = turn.responseMetrics();
+            StopReason stopReason = responseMetrics.stopReason().orElseGet(reportedReason::get);
             if (responseMetrics.available()) {
               usage.add(responseMetrics);
-              sink.next(responseWithUsage("", usage));
+              sink.next(responseWithUsage("", usage, stopReason));
             } else if (reportedUsage.get() != null) {
               usage.add(reportedUsage.get());
-              sink.next(responseWithUsage("", usage));
+              sink.next(responseWithUsage("", usage, stopReason));
             }
             sink.complete();
           } catch (RuntimeException | Error generationFailure) {
@@ -548,20 +567,30 @@ public final class ModelsSpringAiChatModel implements ChatModel {
                 }
 
                 @Override
+                public boolean isCancelled() {
+                  return sink.isCancelled();
+                }
+
+                @Override
                 public void onComplete() {
-                  complete(null);
+                  complete(null, null);
                 }
 
                 @Override
                 public void onComplete(GenerationUsage usage) {
-                  complete(usage);
+                  complete(usage, null);
                 }
 
-                private void complete(GenerationUsage usage) {
+                @Override
+                public void onComplete(GenerationUsage usage, StopReason stopReason) {
+                  complete(usage, stopReason);
+                }
+
+                private void complete(GenerationUsage usage, StopReason stopReason) {
                   if (accumulated != null) {
-                    sink.next(toolAwareResponse(accumulated.toString(), usage, tools));
-                  } else if (usage != null) {
-                    sink.next(response("", usage));
+                    sink.next(toolAwareResponse(accumulated.toString(), usage, tools, stopReason));
+                  } else if (usage != null || stopReason != null) {
+                    sink.next(response("", usage, stopReason));
                   }
                   sink.complete();
                 }
@@ -845,6 +874,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       ModelPrompt prompt, SamplingOptions options, List<ToolSpec> tools) {
     StringBuilder output = new StringBuilder();
     AtomicReference<GenerationUsage> usage = new AtomicReference<>();
+    AtomicReference<StopReason> stopReason = new AtomicReference<>();
     AtomicReference<Throwable> failure = new AtomicReference<>();
     TokenStream stream =
         new TokenStream() {
@@ -862,6 +892,12 @@ public final class ModelsSpringAiChatModel implements ChatModel {
           }
 
           @Override
+          public void onComplete(GenerationUsage completedUsage, StopReason completedReason) {
+            usage.set(completedUsage);
+            stopReason.set(completedReason);
+          }
+
+          @Override
           public void onError(Throwable generationFailure) {
             failure.compareAndSet(null, generationFailure);
           }
@@ -873,7 +909,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
       model.generate(prompt, options, stream);
     }
     throwFailure(failure.get());
-    return new GenerationOutput(output.toString(), usage.get());
+    return new GenerationOutput(output.toString(), usage.get(), stopReason.get());
   }
 
   private static void throwFailure(Throwable failure) {
@@ -889,22 +925,59 @@ public final class ModelsSpringAiChatModel implements ChatModel {
   }
 
   private ChatResponse response(String text, GenerationUsage usage) {
-    return new ChatResponse(List.of(new Generation(new AssistantMessage(text))), metadata(usage));
+    return response(text, usage, null);
   }
 
-  private ChatResponse responseWithUsage(String text, UsageAccumulator usage) {
-    return new ChatResponse(List.of(new Generation(new AssistantMessage(text))), metadata(usage));
+  private ChatResponse response(String text, GenerationUsage usage, StopReason stopReason) {
+    return new ChatResponse(List.of(generation(text, stopReason)), metadata(usage));
+  }
+
+  private ChatResponse responseWithUsage(
+      String text, UsageAccumulator usage, StopReason stopReason) {
+    return new ChatResponse(List.of(generation(text, stopReason)), metadata(usage));
+  }
+
+  /**
+   * Builds a text generation carrying the runtime's stop reason.
+   *
+   * <p>Spring AI's finish reason is provider-defined text. Model-chosen ends report {@code STOP}
+   * and the token limit {@code LENGTH}, the values Spring AI's OpenAI-compatible providers use; a
+   * repetition loop or cancellation keeps its own name so it is never read as a natural end. The
+   * exact runtime reason is also available under the {@code stopReason} metadata key. An engine
+   * that reports no reason produces no finish reason, as before.
+   */
+  private static Generation generation(String text, StopReason stopReason) {
+    if (stopReason == null) {
+      return new Generation(new AssistantMessage(text));
+    }
+    String finishReason =
+        switch (stopReason) {
+          case EOS, STOP_SEQUENCE, CONSTRAINT_COMPLETE -> "STOP";
+          case MAX_TOKENS -> "LENGTH";
+          case REPETITION_LOOP, CANCELLED -> stopReason.name();
+        };
+    return new Generation(
+        new AssistantMessage(text),
+        ChatGenerationMetadata.builder()
+            .finishReason(finishReason)
+            .metadata("stopReason", stopReason.name())
+            .build());
   }
 
   /** Builds a response that surfaces any recovered tool calls to Spring AI's advisor. */
   private ChatResponse toolAwareResponse(
       String output, GenerationUsage usage, List<ToolSpec> tools) {
+    return toolAwareResponse(output, usage, tools, null);
+  }
+
+  private ChatResponse toolAwareResponse(
+      String output, GenerationUsage usage, List<ToolSpec> tools, StopReason stopReason) {
     ToolCallScanner.Result scan = ToolCallScanner.scan(output, template.toolSyntax(), tools);
     if (!scan.hasCalls()) {
       if (template == ChatTemplate.NEEDLE2 && isEmptyNeedleToolSelection(output)) {
-        return response(noApplicableToolResponse, usage);
+        return response(noApplicableToolResponse, usage, stopReason);
       }
-      return response(scan.content(), usage);
+      return response(scan.content(), usage, stopReason);
     }
     List<AssistantMessage.ToolCall> calls = new ArrayList<>(scan.toolCalls().size());
     for (ToolCall call : scan.toolCalls()) {
@@ -1049,5 +1122,5 @@ public final class ModelsSpringAiChatModel implements ChatModel {
     }
   }
 
-  private record GenerationOutput(String text, GenerationUsage usage) {}
+  private record GenerationOutput(String text, GenerationUsage usage, StopReason stopReason) {}
 }

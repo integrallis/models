@@ -22,6 +22,7 @@ import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelGenerationException;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
@@ -127,6 +128,7 @@ public final class ModelsChatModel implements ChatModel, AutoCloseable {
       var response =
           ChatResponse.builder()
               .aiMessage(AiMessage.from(scan.content()))
+              .finishReason(LangChain4jFinishReasons.of(generated.stopReason()))
               .modelName(model.modelName());
       addUsage(response, generated.usage());
       return response.build();
@@ -187,7 +189,10 @@ public final class ModelsChatModel implements ChatModel, AutoCloseable {
         String baseOutput = turn.generateBaseResponse(prompt, options);
         GenerationUsage baseUsage =
             turn.responseMetrics().available() ? turn.responseMetrics().usage() : null;
-        return textResponse(baseOutput, combineUsage(usage, baseUsage));
+        return textResponse(
+            baseOutput,
+            combineUsage(usage, baseUsage),
+            turn.responseMetrics().stopReason().orElse(null));
       }
 
       List<ToolExecutionRequest> requests = activatedTurns.retain(turn, toolRequests(scan));
@@ -200,9 +205,12 @@ public final class ModelsChatModel implements ChatModel, AutoCloseable {
     }
   }
 
-  private ChatResponse textResponse(String text, GenerationUsage usage) {
+  private ChatResponse textResponse(String text, GenerationUsage usage, StopReason stopReason) {
     var response =
-        ChatResponse.builder().aiMessage(AiMessage.from(text)).modelName(model.modelName());
+        ChatResponse.builder()
+            .aiMessage(AiMessage.from(text))
+            .finishReason(LangChain4jFinishReasons.of(stopReason))
+            .modelName(model.modelName());
     addUsage(response, usage);
     return response.build();
   }
@@ -235,6 +243,7 @@ public final class ModelsChatModel implements ChatModel, AutoCloseable {
       ModelPrompt prompt, SamplingOptions options, List<ToolSpec> tools) {
     StringBuilder output = new StringBuilder();
     AtomicReference<GenerationUsage> usage = new AtomicReference<>();
+    AtomicReference<StopReason> stopReason = new AtomicReference<>();
     AtomicReference<Throwable> failure = new AtomicReference<>();
     TokenStream stream =
         new TokenStream() {
@@ -252,6 +261,12 @@ public final class ModelsChatModel implements ChatModel, AutoCloseable {
           }
 
           @Override
+          public void onComplete(GenerationUsage completedUsage, StopReason completedReason) {
+            usage.set(completedUsage);
+            stopReason.set(completedReason);
+          }
+
+          @Override
           public void onError(Throwable generationFailure) {
             failure.compareAndSet(null, generationFailure);
           }
@@ -263,7 +278,7 @@ public final class ModelsChatModel implements ChatModel, AutoCloseable {
       model.generate(prompt, options, stream);
     }
     throwFailure(failure.get());
-    return new GenerationOutput(output.toString(), usage.get());
+    return new GenerationOutput(output.toString(), usage.get(), stopReason.get());
   }
 
   private static void addUsage(ChatResponse.Builder response, GenerationUsage usage) {
@@ -317,7 +332,7 @@ public final class ModelsChatModel implements ChatModel, AutoCloseable {
     return toolSelector.select(LangChain4jChatRequestMapper.latestUserText(request), tools);
   }
 
-  private record GenerationOutput(String text, GenerationUsage usage) {}
+  private record GenerationOutput(String text, GenerationUsage usage, StopReason stopReason) {}
 
   @Override
   public void close() {
