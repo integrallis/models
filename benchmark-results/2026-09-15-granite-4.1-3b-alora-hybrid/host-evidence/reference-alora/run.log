@@ -1,0 +1,13 @@
+torch 2.14.0+cpu peft 0.21.0 transformers 5.17.0
+adapter /root/.cache/huggingface/hub/models--ibm-granite--granitelib-rag-r1.0/snapshots/2f0b2c79c6731068625aca8045c2eb2e8912b353
+base /root/.cache/huggingface/hub/models--ibm-granite--granite-4.1-3b/snapshots/c0650403e44e78ec0262dab1c90914c65b196c4e
+79409b5fc9702a59d89b55d827cb9fa5d1c41fe1af01ddafceae4349ae227698  /root/.cache/huggingface/hub/models--ibm-granite--granitelib-rag-r1.0/snapshots/2f0b2c79c6731068625aca8045c2eb2e8912b353/answerability/granite-4.1-3b/alora/adapter_config.json
+765e85650d39b89e055634c8da0c2d469c3bfa436df271df17f516ad7466d6ca  /root/.cache/huggingface/hub/models--ibm-granite--granitelib-rag-r1.0/snapshots/2f0b2c79c6731068625aca8045c2eb2e8912b353/answerability/granite-4.1-3b/alora/adapter_model.safetensors
+2c98968950d192099605b13e6ed73db86281bfc29d455886af7d5d8ec3e19781  qualification-window.json
+2026-09-16T11:25:08Z start case 57115f0a50c2381900b54aa8 (failing)
+2026-09-16T11:25:28Z done case 57115f0a50c2381900b54aa8: {"generatedText":"\"answerable\"<|end_of_text|>","top":[{"token":1,"text":"\"","logit":30.583974838256836},{"token":9399,"text":"answer","logit":20.566638946533203},{"token":30309,"text":"\"(","logit":18.809362411499023}]}
+2026-09-16T11:25:28Z start case 5726a3c6f1498d1400e8e5b0 (control-answerable)
+2026-09-16T11:25:49Z done case 5726a3c6f1498d1400e8e5b0: {"generatedText":"\"answerable\"<|end_of_text|>","top":[{"token":1,"text":"\"","logit":33.57984924316406},{"token":23288,"text":"\"<","logit":18.957225799560547},{"token":99606,"text":"<\"","logit":18.911874771118164}]}
+2026-09-16T11:25:49Z start case 5a564c956349e2001acdcd1b (control-unanswerable)
+2026-09-16T11:26:08Z done case 5a564c956349e2001acdcd1b: {"generatedText":"\"answerable\"<|end_of_text|>","top":[{"token":1,"text":"\"","logit":36.16220474243164},{"token":23288,"text":"\"<","logit":21.480703353881836},{"token":9399,"text":"answer","logit":19.797454833984375}]}
+2026-09-16T11:26:08Z ALL DONE

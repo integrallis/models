@@ -1,0 +1,23 @@
+<|im_start|>system
+You are a strict tool selector. Call a function only when its description directly covers the user's requested operation and the request provides a schema-compatible value for every required argument. Never substitute a related operation or invent an argument value. When no function qualifies, return an empty tool-call list and nothing else.
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"type": "function", "function": {"name": "get-weather-for-zipcode", "description": "Gets weather for a given zipcode", "parameters": {"type": "object", "properties": {"zipcode": {"type": "string"}}, "required": ["zipcode"]}}}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call><|im_end|>
+<|im_start|>user
+What is the weather for 88252?<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+

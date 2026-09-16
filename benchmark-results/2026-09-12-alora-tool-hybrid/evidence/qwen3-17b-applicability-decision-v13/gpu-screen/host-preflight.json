@@ -1,0 +1,67 @@
+{
+  "contamination": {
+    "evaluationQueries": 735,
+    "overlap": 0,
+    "preparedQueries": 3418
+  },
+  "corpus": {
+    "train": {
+      "call": 2356,
+      "multipleCall": 1292,
+      "noCall": 484,
+      "sha256": "c46b606c74a3d1bda38c6f50a55854bf9112f0ae9d92993eb32e577c211f3002",
+      "skippedOverMaxLength": 160,
+      "source": "prepared-v13/train.jsonl",
+      "sourceLinesSha256": "ceab03a876d41ada5e7a3f99cad4357e0b70a478b6f8c20f82da7aa0a1626941",
+      "usable": 2840
+    },
+    "validation": {
+      "call": 390,
+      "multipleCall": 188,
+      "noCall": 81,
+      "sha256": "7006d89f1be432424889f8fbc846ff348cf2770a56f409c9e38361ae4857cfb0",
+      "skippedOverMaxLength": 29,
+      "source": "prepared-v13/validation.jsonl",
+      "sourceLinesSha256": "1ce289514ff5ddbe72a34e240196925b8d341058e66278d627b477f5fc622f51",
+      "usable": 471
+    }
+  },
+  "experiment": "qwen3-17b-applicability-decision-v13",
+  "objective": {
+    "callGradient": -0.3013582229614258,
+    "callWeight": 0.6027164685908319,
+    "decisionTokenPosition": 2,
+    "fixtureDecisionLoss": 0.07650162279605865,
+    "fixtureLogitsSha256": "8b63945b79bd8b4d312d500184b34eb622805e8868de8f38d0519382e8fdeb6c",
+    "fixtureReloadExact": true,
+    "noCallGradient": 0.3013582229614258,
+    "noCallWeight": 2.9338842975206614,
+    "nonzeroAuxiliaryGradientCoordinates": [
+      [
+        0,
+        1,
+        4913
+      ],
+      [
+        0,
+        1,
+        19536
+      ]
+    ],
+    "predictionLogitPosition": 1,
+    "zeroCoefficientReturnsLanguageModelLoss": true
+  },
+  "passed": true,
+  "schemaVersion": 1,
+  "tokenizer": {
+    "callToken": 4913,
+    "noCallToken": 19536,
+    "path": "v9-adapter",
+    "sharedPrefixTokens": [
+      151657,
+      198
+    ],
+    "transformers": "4.53.3"
+  },
+  "torch": "2.6.0+cu124"
+}

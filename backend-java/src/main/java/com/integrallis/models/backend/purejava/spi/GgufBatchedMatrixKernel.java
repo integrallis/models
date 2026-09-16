@@ -240,4 +240,40 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
       throw new UnsupportedOperationException("no injected GGUF batched matrix kernel");
     }
   }
+
+  /** Whether {@link #groupedAttention} is backed by a native kernel. */
+  default boolean supportsGroupedAttention() {
+    return false;
+  }
+
+  /**
+   * Grouped-query attention for one query row over up to two cached key/value spans (the second may
+   * have zero positions), writing every head's output. Only valid when {@link
+   * #supportsGroupedAttention()} is true.
+   */
+  default void groupedAttention(
+      float[] query,
+      int queryOffset,
+      float[] keysA,
+      int keysAOffset,
+      float[] valuesA,
+      int valuesAOffset,
+      int positionsA,
+      float[] keysB,
+      int keysBOffset,
+      float[] valuesB,
+      int valuesBOffset,
+      int positionsB,
+      float[] output,
+      int outputOffset,
+      float[] scores,
+      int keyDim,
+      int valueDim,
+      int keyLength,
+      int valueLength,
+      int numHeads,
+      int numKvHeads,
+      float scale) {
+    throw new UnsupportedOperationException("no grouped attention kernel");
+  }
 }

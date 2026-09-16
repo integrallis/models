@@ -1,0 +1,81 @@
+Downloading https://services.gradle.org/distributions/gradle-9.4.1-all.zip
+......................10%.......................20%.......................30%......................40%.......................50%.......................60%......................70%.......................80%.......................90%.......................100%
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Welcome to Gradle 9.4.1!
+
+Here are the highlights of this release:
+ - Java 26 support
+ - Non-class-based JVM tests
+ - Enhanced console progress bar
+
+For more details see https://docs.gradle.org/9.4.1/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava
+> Task :backend-java:compileJava
+> Task :backend-native:compileJava
+> Task :models-runtime:compileJava
+> Task :models-router:compileJava
+> Task :models-bench:compileJava
+> Task :models-bench:processResources
+> Task :models-bench:classes
+> Task :models-bench:compileTestJava
+> Task :models-bench:processTestResources NO-SOURCE
+> Task :models-bench:testClasses
+> Task :models-bench:compileJmhJava
+> Task :models-bench:processJmhResources NO-SOURCE
+> Task :models-bench:jmhClasses
+> Task :models-bench:spotbugsTest SKIPPED
+> Task :spotlessInternalRegisterDependencies
+> Task :models-bench:spotlessJava
+> Task :models-bench:spotlessJavaCheck
+> Task :models-bench:spotlessCheck
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :backend-native:processResources NO-SOURCE
+> Task :backend-native:classes
+> Task :backend-native:jar
+> Task :models-bench:spotbugsJmh
+
+> Task :backend-native:cargoBuildRelease
+info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu
+info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+info: downloading 5 components
+
+> Task :models-bench:spotbugsMain
+
+> Task :backend-native:cargoBuildRelease
+warn: the missing active toolchain `1.96.0-x86_64-unknown-linux-gnu` has been auto-installed
+warn: this might cause rustup commands to take longer time to finish than expected
+info: you may opt out with `RUSTUP_AUTO_INSTALL=0` or `rustup set auto-install disable`
+   Compiling jmodels-kernels v0.3.37 (/opt/modeljars-v18/models/backend-native/src/main/rust/model-kernels)
+    Finished `release` profile [optimized] target(s) in 5.37s
+
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources
+> Task :backend-native:nativePlatformJar
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes
+> Task :models-api:jar
+> Task :models-router:processResources
+> Task :models-router:classes
+> Task :models-router:jar
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes
+> Task :models-runtime:jar
+
+> Task :models-bench:test
+WARNING: Using incubator modules: jdk.incubator.vector
+
+> Task :models-bench:check
+
+BUILD SUCCESSFUL in 1m 30s
+25 actionable tasks: 25 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html

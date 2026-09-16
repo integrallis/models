@@ -35,7 +35,7 @@ import java.util.Set;
 
 /** Evaluates Needle 2 output against the versioned upstream playground conformance suite. */
 final class Needle2ToolQualification {
-  static final String SUITE_RESOURCE = "tool-qualification/needle2-playground-v1.json";
+  static final String SUITE_RESOURCE = "tool-qualification/needle2-playground-v2.json";
   static final String POLICY_VERSION = "needle2-tool-conformance-v2";
   static final double MINIMUM_STRUCTURED_OUTPUT_RATE = 1.0;
   static final double MINIMUM_TOOL_SELECTION_EXACT_RATE = 1.0;

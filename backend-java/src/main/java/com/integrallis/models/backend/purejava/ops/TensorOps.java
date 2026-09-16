@@ -19,12 +19,20 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
+import com.integrallis.vectors.core.PanamaConstants;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.util.Objects;
+import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.VectorShape;
+import jdk.incubator.vector.VectorSpecies;
 
 /** Core tensor operations for transformer inference. */
 public final class TensorOps {
+  private static final VectorSpecies<Float> NORM_SPECIES =
+      FloatVector.SPECIES_PREFERRED.vectorBitSize() <= PanamaConstants.MAX_BITS
+          ? FloatVector.SPECIES_PREFERRED
+          : VectorSpecies.of(float.class, VectorShape.forBitSize(PanamaConstants.MAX_BITS));
 
   private static final float TANH_TABLE_LIMIT = 10.0f;
   private static final int TANH_TABLE_SIZE = 1 << 16;
@@ -53,7 +61,19 @@ public final class TensorOps {
     float sumSq = VectorUtil.dotProduct(x, xOffset, x, xOffset, size);
     float rms = (float) Math.sqrt(sumSq / size + eps);
     float scale = 1.0f / rms;
-    for (int i = 0; i < size; i++) {
+    // (x * scale) * weight lanewise, the same two roundings in the same order as the scalar
+    // loop, so the vector and tail paths and the pre-vectorization results are bit-identical.
+    int lanes = NORM_SPECIES.length();
+    int vectorLimit = NORM_SPECIES.loopBound(size);
+    FloatVector scaleVector = FloatVector.broadcast(NORM_SPECIES, scale);
+    int i = 0;
+    for (; i < vectorLimit; i += lanes) {
+      FloatVector.fromArray(NORM_SPECIES, x, xOffset + i)
+          .mul(scaleVector)
+          .mul(FloatVector.fromArray(NORM_SPECIES, weight, i))
+          .intoArray(out, outOffset + i);
+    }
+    for (; i < size; i++) {
       out[outOffset + i] = x[xOffset + i] * scale * weight[i];
     }
   }

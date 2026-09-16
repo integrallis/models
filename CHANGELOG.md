@@ -4,6 +4,55 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.38] - 2026-09-16
+
+### Fixed
+- Native worker pool: a worker counted out of one generation that had not yet reached the idle wait when the active worker count grew again treated the finished generation as new, ran it against the grown count, and decremented the completion counter of the generation published after it, so the caller could return before every partition of the next job was written (rows of a projection left unwritten). Reproduced on two pinned CPUs at about 6% of runs with the pool's own toggling test; the published job word now carries the partition count the job was published with, and workers judge their membership against that count. 0/400 failures after the fix on the same pinned loop.
+- Activated LoRA on Llama-family GGUF graphs: llama.cpp's converter stores the query and key projection rows in the interleaved (adjacent-pair) rotary layout, but the adapter loader added the `q_proj` / `k_proj` low-rank updates in Hugging Face row order, so on Granite (and any other non-NeoX graph) those two updates landed on the wrong rows within each head while the value, output and FFN updates were right. `ActivatedLoraAdapter.Architecture` now carries the head counts and an `interleavedRotaryRows` flag, and the loader permutes the query and key `lora_B` rows into the GGUF layout at load time. Found with IBM's PEFT reference on the dequantised Q4_K_M weights: on a SQuAD case whose base answer is "kick back", the runtime produced that span instead of the label; it now produces the reference's `"answerable"` and its hidden states track the reference to within the activation-quantisation regime. Qwen adapters (NeoX layout) were never affected.
+- Fused grouped-query attention is Granite-only; every other architecture keeps the head-by-head attention loop its pinned greedy oracles were recorded on (the fused kernel's lane reductions and vector exponential flipped a near-tie Qwen3 0.6B token on the Rust arm).
+
+### Added
+- `granite` RAG prompt template in `models-rag-bench` so Granite 4.x artifacts can run the controlled RAG qualification harness with the byte-exact Transformers envelope.
+- `granite-documents` RAG prompt template: evidence in the Granite 4.x `<documents>` system block, bare question as the user turn, byte-exact with the Transformers chat template; `GraniteDocumentsPrompt` moved to `models-runtime` (public, Jackson-free, Jackson-parity tested) so both bench modules share one renderer.
+
+- Added the Granite decoder graph (embedding, attention, residual, and logit scalars) and the
+  activated-adapter runtime: a fail-closed Safetensors activated-LoRA loader, exact activation
+  boundaries at the adapter's invocation tokens, physically shared immutable KV prefixes between
+  the base and activated branches, `ActivatedToolCallingModel` with shared and recomputed prefix
+  strategies, Rust/FFM activated loaders, and Spring AI and LangChain4j tool loops over one base
+  cache lineage. The runtime is a capability; it qualifies no adapter by itself.
+- Routed single-session prompt prefill through the ragged session-batch path, so shared-prefix
+  preparation and every `TextGenerationSession` prompt batch their matrix products. Identity was
+  proven on a nano model, on the pinned Granite 4.1 3B GGUF against llama.cpp b9960, and by the
+  full backend-java suite; the activated path's per-case time fell by roughly 7x on the Rust arm.
+- Added the answerability qualification runners for an upstream RAG specialist: the frozen
+  two-dataset window runner with a Transformers prompt-byte oracle, the 4,096-token long-context
+  retention gate, a Granite documents template for the prefix-sharing crossover, the fail-closed
+  upstream adapter packager, and the ModelJars component report assembler.
+
+### Changed
+- Attention in the Llama-family forward pass is partitioned over the GGUF worker pool: single-token decode over query heads, batched and independent-session prefill over batch rows. Same arithmetic and order; Granite 4.1 3B (40 heads of 64) had been bounded by the serial loops. Granite also uses the vector swiGlu and a vector FMA for its residual multiplier.
+- Fused grouped-query attention: `GroupedQueryAttentionKernel` scores and accumulates every query head of a KV group in one pass over the cached keys and values, bit-identical to the head-by-head vectors-core kernels; the forward pass attends per KV-head group with one thread-local score buffer per head.
+- `models.native.kernels.decodeThreads` limits the native workers that take rows on single-token projections while batched prefill keeps the whole pool (new additive kernel export `jmodels_kernels_context_set_active_threads`, capability bit 19, ABI unchanged).
+- Native grouped-query attention for single-token decode on Granite: the Rust kernel computes one query row over up to two cached key/value spans through a zero-copy critical downcall (`jmodels_grouped_attention_f32_with_context`, capability bit 20), partitioned over KV heads on the native pool; `models.native.groupedAttention=false` disables it. Idle native workers now sleep on a separate condition so a smaller decode partition wakes only the workers that take rows. Granite's rmsNorm scale loop and swiGlu are vectorised with tier-stable arithmetic.
+
+### Fixed
+
+- Mapped the `dbrx` GGUF pre-tokenizer to the Llama-3 split pattern with ordinary merge ranking;
+  an unmapped name previously skipped pre-tokenization entirely for Granite 4.x. Every BPE
+  pre-tokenizer pattern now treats U+00A0 as whitespace, as the published Rust regexes and
+  llama.cpp do. All 620 rendered Granite 4.1 documents prompts became byte- and token-identical
+  to Transformers 4.57.1.
+- Rendered Granite's `<documents>` and `</documents>` template markers as control tokens; they
+  are special tokens in Granite 4.1 and had been placed inside a text segment.
+
+### Experiment
+
+- Opened the Granite 4.1 3B answerability hybrid candidate: the catalog base plus IBM's upstream
+  Apache-2.0 Granite RAG Library activated adapter, sharing the base prefix by physical array
+  identity. Gates 1 and 2 passed on real weights; the identity precondition and the 310-case
+  window are running on a bounded host. No hybrid is qualified by this release.
+
 ### Corrected
 
 - Withdrew the projected Qwen router's hybrid qualification. Its measured latency and correctness

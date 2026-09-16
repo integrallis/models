@@ -54,6 +54,42 @@ class BpePreTokenizerTest {
   }
 
   @Test
+  void appliesDbrxLlama3BoundariesWithoutIgnoringMerges() {
+    BpePreTokenizer dbrx = BpePreTokenizer.forName("dbrx");
+
+    assertThat(dbrx.split("1850s \"Islamist\" won 75% in 2024"))
+        .as("Granite 4.1 splits digits in groups of three and keeps a space with punctuation")
+        .containsExactly(
+            "185",
+            "0",
+            "s",
+            " \"",
+            "Islamist",
+            "\"",
+            " won",
+            " ",
+            "75",
+            "%",
+            " in",
+            " ",
+            "202",
+            "4");
+    assertThat(dbrx.ignoresMerges()).isFalse();
+    assertThat(dbrx.split("2024 code::foo"))
+        .isEqualTo(BpePreTokenizer.forName("smaug-bpe").split("2024 code::foo"));
+  }
+
+  @Test
+  void treatsNoBreakSpaceAsWhitespaceLikeTheRustRegex() {
+    assertThat(BpePreTokenizer.forName("dbrx").split("risk \u00a0at \u00a0\u00a0home"))
+        .as("U+00A0 is Unicode White_Space, so it never joins a punctuation run")
+        .containsExactly("risk", " ", "\u00a0at", " \u00a0", "\u00a0home");
+    assertThat(BpePreTokenizer.forName("llama-bpe").split("a\u00a0b \u00a0"))
+        .as("a lone U+00A0 may prefix a letter run, and a trailing one is a whitespace run")
+        .containsExactly("a", "\u00a0b", " \u00a0");
+  }
+
+  @Test
   void leavesUnknownPreTokenizerTextWhole() {
     assertThat(BpePreTokenizer.forName("vendor-specific").split("2024 code::foo"))
         .containsExactly("2024 code::foo");

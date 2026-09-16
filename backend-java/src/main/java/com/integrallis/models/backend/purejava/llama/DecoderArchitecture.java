@@ -31,6 +31,7 @@ public enum DecoderArchitecture {
   LLAMA("llama"),
   QWEN2("qwen2"),
   QWEN3("qwen3"),
+  GRANITE("granite"),
   SMOLLM3("smollm3"),
   GEMMA3("gemma3"),
   GEMMA_EMBEDDING("gemma-embedding");

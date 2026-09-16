@@ -1,0 +1,124 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava UP-TO-DATE
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes UP-TO-DATE
+> Task :backend-java:jar UP-TO-DATE
+> Task :backend-native:compileJava UP-TO-DATE
+> Task :backend-native:processResources NO-SOURCE
+> Task :backend-native:classes UP-TO-DATE
+> Task :backend-native:jar UP-TO-DATE
+> Task :backend-native:cargoBuildRelease UP-TO-DATE
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources UP-TO-DATE
+> Task :backend-native:nativePlatformJar UP-TO-DATE
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-router:compileJava UP-TO-DATE
+> Task :models-bench:compileJava UP-TO-DATE
+> Task :models-bench:processResources UP-TO-DATE
+> Task :models-bench:classes UP-TO-DATE
+> Task :models-router:processResources UP-TO-DATE
+> Task :models-router:classes UP-TO-DATE
+> Task :models-router:jar UP-TO-DATE
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 10:51:59 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 10:51:59 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 1/75 irrelevance_126    calibration expected=false base=   29.6935 specialist=    0.3520 shared=true 27005 ms
+ 2/75 irrelevance_165    calibration expected=false base=   41.4994 specialist=    9.1875 shared=true 21184 ms
+ 3/75 irrelevance_169    calibration expected=false base=   26.2443 specialist=   -8.3504 shared=true 24294 ms
+ 4/75 irrelevance_172    calibration expected=false base=   41.1658 specialist=    4.0053 shared=true 21686 ms
+ 5/75 irrelevance_175    calibration expected=false base=   27.3171 specialist=  -10.4108 shared=true 19690 ms
+ 6/75 irrelevance_26     calibration expected=false base=   40.0398 specialist=    3.0312 shared=true 27476 ms
+ 7/75 irrelevance_29     calibration expected=false base=   34.5496 specialist=   -0.8525 shared=true 21075 ms
+ 8/75 irrelevance_56     calibration expected=false base=   25.0667 specialist=   -7.7497 shared=true 21631 ms
+ 9/75 irrelevance_73     calibration expected=false base=   38.7006 specialist=    1.0464 shared=true 23465 ms
+10/75 irrelevance_90     calibration expected=false base=   22.5120 specialist=   -7.8209 shared=true 23098 ms
+11/75 multiple_123       calibration expected=true  base=   38.5914 specialist=    2.7011 shared=true 50743 ms
+12/75 multiple_124       calibration expected=true  base=   37.7581 specialist=    2.8374 shared=true 51114 ms
+13/75 multiple_133       calibration expected=true  base=   49.3549 specialist=    9.9081 shared=true 35490 ms
+14/75 multiple_145       calibration expected=true  base=   47.1938 specialist=    9.4059 shared=true 58407 ms
+15/75 multiple_153       calibration expected=true  base=   38.8032 specialist=    1.6578 shared=true 48585 ms
+16/75 multiple_176       calibration expected=true  base=   45.6665 specialist=   10.8996 shared=true 96085 ms
+17/75 multiple_22        calibration expected=true  base=   45.6263 specialist=    9.3669 shared=true 44160 ms
+18/75 multiple_62        calibration expected=true  base=   48.3691 specialist=   10.7626 shared=true 36645 ms
+19/75 multiple_64        calibration expected=true  base=   49.1003 specialist=    7.2625 shared=true 42006 ms
+20/75 multiple_93        calibration expected=true  base=   49.6336 specialist=   10.9260 shared=true 45682 ms
+21/75 simple_121         calibration expected=true  base=   44.4982 specialist=    8.0854 shared=true 23966 ms
+22/75 simple_161         calibration expected=true  base=   46.7585 specialist=    8.8521 shared=true 24438 ms
+23/75 simple_185         calibration expected=true  base=   46.3710 specialist=    7.2438 shared=true 23696 ms
+24/75 simple_259         calibration expected=true  base=   48.3036 specialist=    9.8824 shared=true 25679 ms
+25/75 simple_273         calibration expected=true  base=   44.5553 specialist=    6.9231 shared=true 22149 ms
+26/75 simple_278         calibration expected=true  base=   40.9612 specialist=    8.2804 shared=true 23487 ms
+27/75 simple_344         calibration expected=true  base=   45.5639 specialist=    5.6307 shared=true 22680 ms
+28/75 simple_40          calibration expected=true  base=   46.1558 specialist=   10.9549 shared=true 25380 ms
+29/75 simple_48          calibration expected=true  base=   47.7393 specialist=   10.7578 shared=true 22760 ms
+30/75 simple_52          calibration expected=true  base=   47.9860 specialist=   12.2766 shared=true 23782 ms
+31/75 irrelevance_100    screen      expected=false base=   28.0731 specialist=   -9.2683 shared=true 24447 ms
+32/75 irrelevance_117    screen      expected=false base=   25.2292 specialist=   -6.2292 shared=true 27502 ms
+33/75 irrelevance_13     screen      expected=false base=   25.6668 specialist=   -9.2040 shared=true 29021 ms
+34/75 irrelevance_145    screen      expected=false base=   31.2257 specialist=   -7.9755 shared=true 21533 ms
+35/75 irrelevance_147    screen      expected=false base=   27.7308 specialist=   -7.2774 shared=true 24818 ms
+36/75 irrelevance_148    screen      expected=false base=   35.9488 specialist=    2.4321 shared=true 21802 ms
+37/75 irrelevance_164    screen      expected=false base=   31.9854 specialist=   -1.3021 shared=true 22037 ms
+38/75 irrelevance_193    screen      expected=false base=   32.1679 specialist=   -5.5330 shared=true 22652 ms
+39/75 irrelevance_202    screen      expected=false base=   26.3752 specialist=   -6.6436 shared=true 23107 ms
+40/75 irrelevance_211    screen      expected=false base=   29.9947 specialist=   -1.0115 shared=true 22636 ms
+41/75 irrelevance_214    screen      expected=false base=   27.4142 specialist=   -8.7904 shared=true 21573 ms
+42/75 irrelevance_22     screen      expected=false base=   33.6620 specialist=    3.7585 shared=true 25712 ms
+43/75 irrelevance_35     screen      expected=false base=   25.7908 specialist=   -6.8400 shared=true 22248 ms
+44/75 irrelevance_54     screen      expected=false base=   25.2902 specialist=   -5.4641 shared=true 21076 ms
+45/75 irrelevance_69     screen      expected=false base=   25.0959 specialist=   -6.0586 shared=true 22748 ms
+46/75 multiple_10        screen      expected=true  base=   44.1412 specialist=    5.2493 shared=true 42716 ms
+47/75 multiple_101       screen      expected=true  base=   44.9296 specialist=   10.2569 shared=true 33390 ms
+48/75 multiple_103       screen      expected=true  base=   46.0703 specialist=   11.8073 shared=true 63711 ms
+49/75 multiple_115       screen      expected=true  base=   46.3486 specialist=    5.2709 shared=true 69864 ms
+50/75 multiple_128       screen      expected=true  base=   42.9245 specialist=   10.6081 shared=true 79755 ms
+51/75 multiple_141       screen      expected=true  base=   49.0737 specialist=   13.8263 shared=true 47666 ms
+52/75 multiple_148       screen      expected=true  base=   44.3705 specialist=   10.4246 shared=true 34318 ms
+53/75 multiple_149       screen      expected=true  base=   49.1708 specialist=   10.3654 shared=true 67242 ms
+54/75 multiple_160       screen      expected=true  base=   46.1328 specialist=   11.5816 shared=true 65434 ms
+55/75 multiple_20        screen      expected=true  base=   50.0085 specialist=   10.0546 shared=true 42677 ms
+56/75 multiple_47        screen      expected=true  base=   49.5222 specialist=    9.6794 shared=true 41549 ms
+57/75 multiple_53        screen      expected=true  base=   43.6913 specialist=    4.8653 shared=true 41194 ms
+58/75 multiple_56        screen      expected=true  base=   45.1171 specialist=    9.1178 shared=true 50456 ms
+59/75 multiple_76        screen      expected=true  base=   34.5372 specialist=    2.4499 shared=true 40165 ms
+60/75 multiple_95        screen      expected=true  base=   48.5405 specialist=    9.7875 shared=true 37734 ms
+61/75 simple_114         screen      expected=true  base=   39.6588 specialist=    7.6825 shared=true 22935 ms
+62/75 simple_120         screen      expected=true  base=   48.6977 specialist=   10.4840 shared=true 27478 ms
+63/75 simple_172         screen      expected=true  base=   45.2357 specialist=    6.9553 shared=true 19559 ms
+64/75 simple_22          screen      expected=true  base=   43.5581 specialist=    9.9912 shared=true 19782 ms
+65/75 simple_226         screen      expected=true  base=   45.9038 specialist=    8.4494 shared=true 22549 ms
+66/75 simple_264         screen      expected=true  base=   45.9450 specialist=    3.9995 shared=true 22293 ms
+67/75 simple_291         screen      expected=true  base=   52.5550 specialist=    8.8561 shared=true 29480 ms
+68/75 simple_296         screen      expected=true  base=   49.4482 specialist=   10.2290 shared=true 26271 ms
+69/75 simple_303         screen      expected=true  base=   48.5419 specialist=    8.5722 shared=true 22899 ms
+70/75 simple_308         screen      expected=true  base=   42.2416 specialist=    7.8691 shared=true 23573 ms
+71/75 simple_326         screen      expected=true  base=   42.8188 specialist=    8.7640 shared=true 24055 ms
+72/75 simple_35          screen      expected=true  base=   48.4912 specialist=    9.5705 shared=true 25144 ms
+73/75 simple_43          screen      expected=true  base=   45.6852 specialist=    8.2815 shared=true 26346 ms
+74/75 simple_83          screen      expected=true  base=   45.7821 specialist=    7.8559 shared=true 28430 ms
+75/75 simple_94          screen      expected=true  base=   46.1598 specialist=    9.3346 shared=true 28006 ms
+score = specialist + 1.00 * base; call when score > 50.940744
+calibration calls=16/20 no-calls=10/10 balanced=0.90000
+screen calls=24/30 no-calls=15/15 balanced=0.90000
+diagnostic report: /root/dual-decision.json
+
+BUILD SUCCESSFUL in 41m 9s
+18 actionable tasks: 2 executed, 16 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html

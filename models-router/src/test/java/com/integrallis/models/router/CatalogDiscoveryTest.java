@@ -77,6 +77,30 @@ class CatalogDiscoveryTest {
   }
 
   @Test
+  void preservesConcreteCapabilitiesInsteadOfDerivingThemFromTaskTags() {
+    DiscoveredModel toolModel =
+        new DiscoveredModel(
+            "tool-model",
+            true,
+            Set.of("tool-use"),
+            Set.of("chat", "text-generation", "tool-calling"),
+            32_768,
+            0.0,
+            0.0,
+            1L,
+            new DiscoveredModel.Performance(180, 42.0),
+            Map.of("tool-use", 0.82),
+            0.99);
+
+    ModelCandidate candidate =
+        CatalogDiscovery.discover(List.of(new FakeCatalog("fake", List.of(toolModel)))).getFirst();
+
+    assertThat(candidate.tags()).containsExactly("tool-use");
+    assertThat(candidate.capabilities())
+        .containsExactlyInAnyOrder("chat", "text-generation", "tool-calling");
+  }
+
+  @Test
   void estimatesRatherThanDroppingModelsWithNoProfile() {
     // A model absent from the fleet cannot be chosen at all, and the usual reason it has no
     // profile is that it was installed recently rather than that it is unusable.

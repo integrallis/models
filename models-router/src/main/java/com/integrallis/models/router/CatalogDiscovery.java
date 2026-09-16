@@ -154,6 +154,7 @@ public final class CatalogDiscovery {
     return ModelCandidate.builder(model.id())
         .local(model.local())
         .tags(model.tags())
+        .capabilities(model.capabilities())
         .costPerMillionTokens(model.costPerMillionInputTokens(), model.costPerMillionOutputTokens())
         .timeToFirstTokenMillis(performance.timeToFirstTokenMillis())
         .tokensPerSecond(performance.tokensPerSecond())

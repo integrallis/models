@@ -34,6 +34,42 @@ public interface BatchInferenceBackend extends InferenceBackend {
     return forward(session, token, position);
   }
 
+  /** Returns whether this loaded model exposes final normalized hidden states for sessions. */
+  default boolean supportsHiddenState() {
+    return false;
+  }
+
+  /** Runs one session step and returns a stable final normalized hidden-state snapshot. */
+  default float[] forwardHiddenState(InferenceSession session, int token, int position) {
+    throw new UnsupportedOperationException("this backend does not expose hidden states");
+  }
+
+  /**
+   * Runs one session hidden-state step whose returned storage may be reused by the next backend
+   * invocation.
+   */
+  default float[] forwardHiddenStateTransient(InferenceSession session, int token, int position) {
+    return forwardHiddenState(session, token, position);
+  }
+
+  /** Processes a contiguous prompt and returns its final normalized hidden state. */
+  default float[] prefillHiddenState(InferenceSession session, int[] tokens, int startPosition) {
+    Objects.requireNonNull(session, "session");
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (startPosition < 0) {
+      throw new IllegalArgumentException("startPosition must be >= 0");
+    }
+    float[] hidden = null;
+    for (int index = 0; index < tokens.length; index++) {
+      hidden =
+          forwardHiddenStateTransient(session, tokens[index], Math.addExact(startPosition, index));
+    }
+    return hidden.clone();
+  }
+
   /** Processes a contiguous prompt for one independent session. */
   default float[] prefill(InferenceSession session, int[] tokens, int startPosition) {
     Objects.requireNonNull(session, "session");

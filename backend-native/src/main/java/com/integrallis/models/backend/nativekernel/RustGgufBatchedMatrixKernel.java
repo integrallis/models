@@ -187,6 +187,70 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return library.threadCount();
   }
 
+  int decodeThreadCount() {
+    return library.decodeThreadCount();
+  }
+
+  private static final String GROUPED_ATTENTION_PROPERTY = "models.native.groupedAttention";
+  private final boolean groupedAttentionEnabled =
+      !"false".equalsIgnoreCase(System.getProperty(GROUPED_ATTENTION_PROPERTY, "true"));
+
+  @Override
+  public boolean supportsGroupedAttention() {
+    return groupedAttentionEnabled
+        && library.supports(NativeKernelCapability.GROUPED_ATTENTION_F32);
+  }
+
+  @Override
+  public synchronized void groupedAttention(
+      float[] query,
+      int queryOffset,
+      float[] keysA,
+      int keysAOffset,
+      float[] valuesA,
+      int valuesAOffset,
+      int positionsA,
+      float[] keysB,
+      int keysBOffset,
+      float[] valuesB,
+      int valuesBOffset,
+      int positionsB,
+      float[] output,
+      int outputOffset,
+      float[] scores,
+      int keyDim,
+      int valueDim,
+      int keyLength,
+      int valueLength,
+      int numHeads,
+      int numKvHeads,
+      float scale) {
+    requireOpen();
+    library.groupedAttentionF32(
+        query,
+        queryOffset,
+        keysA,
+        keysAOffset,
+        valuesA,
+        valuesAOffset,
+        positionsA,
+        keysB,
+        keysBOffset,
+        valuesB,
+        valuesBOffset,
+        positionsB,
+        output,
+        outputOffset,
+        scores,
+        keyDim,
+        valueDim,
+        keyLength,
+        valueLength,
+        numHeads,
+        numKvHeads,
+        scale);
+  }
+
   @Override
   public boolean supports(GgufTensorType type) {
     if (type == null) {

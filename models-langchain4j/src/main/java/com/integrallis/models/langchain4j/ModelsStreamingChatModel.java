@@ -25,8 +25,10 @@ import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.ActivatedToolModel;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
@@ -46,12 +48,13 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** LangChain4j {@link StreamingChatModel} backed by the Models runtime generation loop. */
-public final class ModelsStreamingChatModel implements StreamingChatModel {
+public final class ModelsStreamingChatModel implements StreamingChatModel, AutoCloseable {
 
   private final TextGenerationModel model;
   private final ChatTemplate template;
   private final SamplingOptions defaults;
   private final ToolSpecSelector toolSelector;
+  private final ActivatedTurnRegistry activatedTurns = new ActivatedTurnRegistry();
 
   public ModelsStreamingChatModel(InferenceBackend backend) {
     this(new RuntimeTextGenerationModel(backend));
@@ -103,6 +106,10 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     boolean toolsDeclared = !tools.isEmpty();
     ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template, tools);
     SamplingOptions requested = LangChain4jChatRequestMapper.options(request, defaults);
+    if (model instanceof ActivatedToolModel activatedModel && toolsDeclared) {
+      streamActivatedTurn(request, handler, activatedModel, prompt, requested, tools);
+      return;
+    }
     TokenStream stream =
         new TokenStream() {
           @Override
@@ -156,6 +163,137 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     }
   }
 
+  private void streamActivatedTurn(
+      ChatRequest request,
+      StreamingChatResponseHandler handler,
+      ActivatedToolModel activatedModel,
+      ModelPrompt prompt,
+      SamplingOptions options,
+      List<ToolSpec> tools) {
+    ActivatedTurnRegistry.PendingTurn pending;
+    try {
+      pending = activatedTurns.take(request);
+    } catch (RuntimeException | Error failure) {
+      handler.onError(failure);
+      return;
+    }
+    if (pending != null) {
+      SharedToolTurn previous = pending.turn;
+      SharedToolTurn next;
+      try {
+        next = previous.continueToolSelection(prompt);
+      } catch (RuntimeException | Error failure) {
+        handler.onError(failure);
+        return;
+      } finally {
+        previous.close();
+      }
+      streamActivatedSelection(next, prompt, options, tools, handler);
+      return;
+    }
+
+    streamActivatedSelection(activatedModel.openToolTurn(prompt), prompt, options, tools, handler);
+  }
+
+  private void streamActivatedSelection(
+      SharedToolTurn openedTurn,
+      ModelPrompt prompt,
+      SamplingOptions options,
+      List<ToolSpec> tools,
+      StreamingChatResponseHandler handler) {
+    SharedToolTurn turn = openedTurn;
+    boolean retained = false;
+    try {
+      TokenConstraint constraint = toolConstraint(tools).orElseGet(TokenConstraint::unrestricted);
+      String output = turn.generateToolCall(options, constraint);
+      GenerationUsage usage = turn.toolMetrics().available() ? turn.toolMetrics().usage() : null;
+      ChatResponse response = completed(output, true, usage);
+      if (response.aiMessage().hasToolExecutionRequests()) {
+        List<ToolExecutionRequest> requests =
+            activatedTurns.retain(turn, response.aiMessage().toolExecutionRequests());
+        retained = true;
+        handler.onCompleteResponse(toolResponse(response.aiMessage().text(), requests, usage));
+        return;
+      }
+      SharedToolTurn baseTurn = turn;
+      turn = null;
+      streamActivatedBase(baseTurn, prompt, options, usage, handler);
+    } catch (RuntimeException | Error failure) {
+      handler.onError(failure);
+    } finally {
+      if (!retained && turn != null) {
+        turn.close();
+      }
+    }
+  }
+
+  private void streamActivatedBase(
+      SharedToolTurn turn,
+      ModelPrompt prompt,
+      SamplingOptions options,
+      GenerationUsage selectionUsage,
+      StreamingChatResponseHandler handler) {
+    StringBuilder accumulated = new StringBuilder();
+    AtomicBoolean terminal = new AtomicBoolean();
+    try {
+      turn.generateBaseResponse(
+          prompt,
+          options,
+          new TokenStream() {
+            @Override
+            public void onToken(String token) {
+              if (!terminal.get()) {
+                accumulated.append(token);
+                handler.onPartialResponse(token);
+              }
+            }
+
+            @Override
+            public void onComplete() {
+              complete(null);
+            }
+
+            @Override
+            public void onComplete(GenerationUsage usage) {
+              complete(usage);
+            }
+
+            private void complete(GenerationUsage usage) {
+              if (terminal.compareAndSet(false, true)) {
+                try {
+                  handler.onCompleteResponse(
+                      completed(
+                          accumulated.toString(), false, combineUsage(selectionUsage, usage)));
+                } finally {
+                  turn.close();
+                }
+              }
+            }
+
+            @Override
+            public void onError(Throwable failure) {
+              if (terminal.compareAndSet(false, true)) {
+                try {
+                  handler.onError(failure);
+                } finally {
+                  turn.close();
+                }
+              }
+            }
+          });
+    } catch (RuntimeException | Error failure) {
+      if (terminal.compareAndSet(false, true)) {
+        try {
+          handler.onError(failure);
+        } finally {
+          turn.close();
+        }
+      } else {
+        throw failure;
+      }
+    }
+  }
+
   /** Builds the terminal response, recovering any tool calls the model produced. */
   private ChatResponse completed(String output, boolean toolsDeclared, GenerationUsage usage) {
     ToolCallScanner.Result scan =
@@ -188,6 +326,17 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     return response.build();
   }
 
+  private ChatResponse toolResponse(
+      String content, List<ToolExecutionRequest> requests, GenerationUsage usage) {
+    var response =
+        ChatResponse.builder()
+            .aiMessage(new AiMessage(content, requests))
+            .finishReason(FinishReason.TOOL_EXECUTION)
+            .modelName(model.modelName());
+    addUsage(response, usage);
+    return response.build();
+  }
+
   private static void addUsage(ChatResponse.Builder response, GenerationUsage usage) {
     if (usage != null) {
       response.tokenUsage(
@@ -195,12 +344,29 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
     }
   }
 
+  private static GenerationUsage combineUsage(GenerationUsage first, GenerationUsage second) {
+    if (first == null) {
+      return second;
+    }
+    if (second == null) {
+      return first;
+    }
+    return new GenerationUsage(
+        Math.addExact(first.promptTokens(), second.promptTokens()),
+        Math.addExact(first.completionTokens(), second.completionTokens()));
+  }
+
   private Optional<TokenConstraint> toolConstraint(List<ToolSpec> tools) {
     if (tools.isEmpty() || !(model instanceof ConstrainedTextGenerationModel constrainedModel)) {
       return Optional.empty();
     }
     return LangChain4jToolCallConstraint.compile(
-        constrainedModel.tokenizer(), template.toolSyntax(), tools);
+        constrainedModel.tokenizer(),
+        template.toolSyntax(),
+        tools,
+        model instanceof ActivatedToolModel activatedModel
+            ? activatedModel.toolAbstentionOutputs()
+            : List.of());
   }
 
   private List<ToolSpec> selectedTools(ChatRequest request, List<ToolSpec> tools) {
@@ -208,5 +374,11 @@ public final class ModelsStreamingChatModel implements StreamingChatModel {
       return tools;
     }
     return toolSelector.select(LangChain4jChatRequestMapper.latestUserText(request), tools);
+  }
+
+  @Override
+  public void close() {
+    activatedTurns.close();
+    model.close();
   }
 }

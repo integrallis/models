@@ -1,0 +1,121 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava UP-TO-DATE
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes UP-TO-DATE
+> Task :backend-java:jar UP-TO-DATE
+> Task :backend-native:compileJava UP-TO-DATE
+> Task :backend-native:processResources NO-SOURCE
+> Task :backend-native:classes UP-TO-DATE
+> Task :backend-native:jar UP-TO-DATE
+> Task :backend-native:cargoBuildRelease UP-TO-DATE
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources UP-TO-DATE
+> Task :backend-native:nativePlatformJar UP-TO-DATE
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-router:compileJava UP-TO-DATE
+> Task :models-bench:compileJava UP-TO-DATE
+> Task :models-bench:processResources UP-TO-DATE
+> Task :models-bench:classes UP-TO-DATE
+> Task :models-router:processResources UP-TO-DATE
+> Task :models-router:classes UP-TO-DATE
+> Task :models-router:jar UP-TO-DATE
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 4:45:53 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 4:45:53 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 1/75 irrelevance_126          expected=false score=    1.99130 shared=true 28575 ms
+ 2/75 irrelevance_165          expected=false score=    8.34644 shared=true 21728 ms
+ 3/75 irrelevance_169          expected=false score=  -16.29031 shared=true 25246 ms
+ 4/75 irrelevance_172          expected=false score=    0.40805 shared=true 22388 ms
+ 5/75 irrelevance_175          expected=false score=  -18.86819 shared=true 20310 ms
+ 6/75 irrelevance_26           expected=false score=   -1.35988 shared=true 28451 ms
+ 7/75 irrelevance_29           expected=false score=    1.26514 shared=true 21490 ms
+ 8/75 irrelevance_56           expected=false score=  -11.75374 shared=true 22056 ms
+ 9/75 irrelevance_73           expected=false score=   -0.87088 shared=true 24075 ms
+10/75 irrelevance_90           expected=false score=  -26.85805 shared=true 23903 ms
+11/75 multiple_123             expected=true  score=   11.56045 shared=true 52461 ms
+12/75 multiple_124             expected=true  score=   10.98253 shared=true 53684 ms
+13/75 multiple_133             expected=true  score=   19.27611 shared=true 37090 ms
+14/75 multiple_145             expected=true  score=   16.85989 shared=true 60232 ms
+15/75 multiple_153             expected=true  score=   10.76932 shared=true 50655 ms
+16/75 multiple_176             expected=true  score=   18.01358 shared=true 97376 ms
+17/75 multiple_22              expected=true  score=   17.43732 shared=true 45566 ms
+18/75 multiple_62              expected=true  score=   12.03606 shared=true 37976 ms
+19/75 multiple_64              expected=true  score=    6.34367 shared=true 43553 ms
+20/75 multiple_93              expected=true  score=    4.40946 shared=true 47443 ms
+21/75 simple_121               expected=true  score=   16.79216 shared=true 25121 ms
+22/75 simple_161               expected=true  score=   15.56814 shared=true 25413 ms
+23/75 simple_185               expected=true  score=    3.41103 shared=true 24693 ms
+24/75 simple_259               expected=true  score=    8.57387 shared=true 27109 ms
+25/75 simple_273               expected=true  score=    6.48603 shared=true 23317 ms
+26/75 simple_278               expected=true  score=    6.43654 shared=true 24876 ms
+27/75 simple_344               expected=true  score=    9.01807 shared=true 23834 ms
+28/75 simple_40                expected=true  score=    9.86985 shared=true 26578 ms
+29/75 simple_48                expected=true  score=   11.78365 shared=true 23720 ms
+30/75 simple_52                expected=true  score=   11.77961 shared=true 24671 ms
+31/75 irrelevance_100          expected=false score=  -20.29861 shared=true 24984 ms
+32/75 irrelevance_117          expected=false score=  -14.00693 shared=true 28779 ms
+33/75 irrelevance_13           expected=false score=  -14.96501 shared=true 30415 ms
+34/75 irrelevance_145          expected=false score=   -7.37654 shared=true 22407 ms
+35/75 irrelevance_147          expected=false score=  -16.77260 shared=true 25599 ms
+36/75 irrelevance_148          expected=false score=    1.10381 shared=true 22507 ms
+37/75 irrelevance_164          expected=false score=    2.27231 shared=true 23186 ms
+38/75 irrelevance_193          expected=false score=   -5.64081 shared=true 23144 ms
+39/75 irrelevance_202          expected=false score=  -14.79769 shared=true 24353 ms
+40/75 irrelevance_211          expected=false score=   -8.35402 shared=true 23902 ms
+41/75 irrelevance_214          expected=false score=  -14.49652 shared=true 22665 ms
+42/75 irrelevance_22           expected=false score=   -2.04668 shared=true 26565 ms
+43/75 irrelevance_35           expected=false score=  -10.40378 shared=true 23291 ms
+44/75 irrelevance_54           expected=false score=   -1.91369 shared=true 21791 ms
+45/75 irrelevance_69           expected=false score=  -10.29482 shared=true 23571 ms
+46/75 multiple_10              expected=true  score=    3.50079 shared=true 44358 ms
+47/75 multiple_101             expected=true  score=   24.58173 shared=true 35315 ms
+48/75 multiple_103             expected=true  score=   21.92320 shared=true 65348 ms
+49/75 multiple_115             expected=true  score=    2.72015 shared=true 71556 ms
+50/75 multiple_128             expected=true  score=   21.95884 shared=true 81501 ms
+51/75 multiple_141             expected=true  score=   11.04914 shared=true 48847 ms
+52/75 multiple_148             expected=true  score=   14.82785 shared=true 36084 ms
+53/75 multiple_149             expected=true  score=   12.57932 shared=true 68884 ms
+54/75 multiple_160             expected=true  score=   18.34331 shared=true 68118 ms
+55/75 multiple_20              expected=true  score=   15.24709 shared=true 44285 ms
+56/75 multiple_47              expected=true  score=   20.10463 shared=true 43774 ms
+57/75 multiple_53              expected=true  score=   10.68396 shared=true 43358 ms
+58/75 multiple_56              expected=true  score=   12.16652 shared=true 52754 ms
+59/75 multiple_76              expected=true  score=   -5.04900 shared=true 42202 ms
+60/75 multiple_95              expected=true  score=   12.92735 shared=true 39681 ms
+61/75 simple_114               expected=true  score=   14.15861 shared=true 23852 ms
+62/75 simple_120               expected=true  score=   11.24119 shared=true 29014 ms
+63/75 simple_172               expected=true  score=   10.94757 shared=true 20267 ms
+64/75 simple_22                expected=true  score=   18.18558 shared=true 20220 ms
+65/75 simple_226               expected=true  score=   10.31033 shared=true 23745 ms
+66/75 simple_264               expected=true  score=    6.32658 shared=true 23277 ms
+67/75 simple_291               expected=true  score=   10.08941 shared=true 30882 ms
+68/75 simple_296               expected=true  score=   11.46950 shared=true 27675 ms
+69/75 simple_303               expected=true  score=   10.05536 shared=true 23706 ms
+70/75 simple_308               expected=true  score=    6.56880 shared=true 24824 ms
+71/75 simple_326               expected=true  score=   -1.35086 shared=true 25280 ms
+72/75 simple_35                expected=true  score=    9.83773 shared=true 26328 ms
+73/75 simple_43                expected=true  score=    9.48955 shared=true 27838 ms
+74/75 simple_83                expected=true  score=   10.45461 shared=true 29413 ms
+75/75 simple_94                expected=true  score=    0.14876 shared=true 29105 ms
+PASS threshold=2.49623099 balanced=0.950000 calls=47/50 no-calls=24/25 physical=75/75 report=/opt/modeljars-v18/evidence/calibration.json
+
+BUILD SUCCESSFUL in 42m 44s
+18 actionable tasks: 2 executed, 16 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html

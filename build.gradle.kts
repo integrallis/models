@@ -1896,6 +1896,7 @@ tasks.register<Javadoc>("aggregateJavadoc") {
         splitIndex(true)
         links("https://docs.oracle.com/en/java/javase/25/docs/api/")
         addStringOption("Xdoclint:-missing", "-quiet")
+        addStringOption("-add-modules", "jdk.incubator.vector")
     }
 
     isFailOnError = true
