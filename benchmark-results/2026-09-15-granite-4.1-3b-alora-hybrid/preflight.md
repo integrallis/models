@@ -556,3 +556,13 @@ instance variance moves the ratio by up to 0.1 through the denominator. A robust
 change. Native projections were measured at bandwidth parity with the controls, so the remaining
 Java-side milliseconds per token are the target; a fresh main-thread profile at 7a3f3e7 decides
 which.
+
+**Run-to-run spread, instance 3, Models 7a3f3e7, harness-equivalent settings, no profiler:**
+three consecutive runs gave decode 23.00 (iterations 3), 20.54 (2), 20.48 (3) tok/s, and a JFR
+run 23.67. The Java runtime's own spread is therefore ~12% between runs on one instance, on top
+of the 25–30 tok/s spread of the controls across instances. A pass that survives both needs decode
+in the mid-20s on this class, i.e. +15–20% over the 20.5 floor. The fresh profile still puts
+attention at 41% of the main thread's Java samples (~17% of the token); rmsNorm (8%) and swiGlu
+(6%) are now vectorised and tier-stable (commits e499b63 and the swiGlu commit). The remaining
+lever with that margin is single-token attention in the Rust kernel through the zero-copy critical
+downcall the gated-delta-net path already uses, partitioned over KV heads on the native pool.
