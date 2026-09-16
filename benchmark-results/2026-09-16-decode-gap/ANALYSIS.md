@@ -215,3 +215,37 @@ here either. That points at the kernel's per-thread throughput (nibble decode, p
 scale handling, per-row float conversion) and the dispatch structure, not the pool. The
 c7a confirmation host runs both harnesses on one box to settle whether this is
 host-specific.
+
+### Result 8 — symbolised whole-process profile of the Rust arm (reference host, unstripped library + JIT perf map)
+
+`perf record -F 499` over the run (2,394 prefilled + 220 decoded tokens, decode 21.85 tok/s in
+this run, composite build so the Java executor polls too). Share of all samples:
+
+| where the CPUs are                                             | share  |
+|----------------------------------------------------------------|-------:|
+| Rust workers polling for the next job (`__rust_begin_short_backtrace` loop) | 38.2 % |
+| Java executor workers polling at barriers (`awaitAdvancePolling`) | 33.8 % |
+| `compute_q4_k_batched_row_range_avx2` (prefill Q4_K)           |  8.9 % |
+| `dot_q4_k_q8_k_row_avx2` (decode Q4_K)                         |  4.1 % |
+| `executePublishedPlan` (Java executor stages)                  |  4.3 % |
+| Q6_K prefill + decode kernels                                  |  2.8 % |
+| `WorkerPool::await_workers` (main thread waiting)              |  1.7 % |
+| Java attention (`scoreGroup`/`accumulateGroup`), everything else | <1 % each |
+
+Two conclusions, both measured here rather than believed:
+
+1. **The decode kernels are not the bottleneck on this host.** Decode kernels are 5.2 % of
+   881 CPU-seconds ≈ 46 CPU-s for 220 tokens ≈ 0.21 CPU-s per token: 2.1 GB per token at
+   ~10 GB/s per worker, which is *above* ggml's per-thread rate here (117 GB/s over 16
+   threads). Spread over 8 workers that is ~26 ms of a 45 ms token; the other ~19 ms is
+   serial: main-thread glue (~5 ms from Result 3) and dispatch/barrier/straggler time across
+   201 dispatches (~70 µs each). ggml's 18 ms token on this host is one parallel region with
+   ~300 barriers and no main-thread hand-offs. That serial ~19 ms, not the kernel, is the
+   decode lever — and it is exactly what a shared host inflates and a dedicated c7a shrinks
+   (Result 9 below), which is why the c7a gap is 15 % and this host's is 2×.
+2. **Two polling pools on one box fight.** With the vectors barrier polling (composite build)
+   the Rust arm carries 16 Java executor threads spinning 34 % of all samples beside the 16
+   Rust workers: 32 spinners on 16 vCPUs. The Rust arm still uses the Java executor for the
+   batched attention and other Java-side parallel ops, so in production both defaults would
+   be active at once. Measured next on the c7a (`/opt/c7a-interact.sh`): Rust arm with the
+   Java executor polling 25 ms, parked (0), and the released vectors 0.1.21.
