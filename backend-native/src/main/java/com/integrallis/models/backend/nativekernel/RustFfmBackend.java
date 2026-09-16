@@ -28,6 +28,7 @@ import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
+import com.integrallis.vectors.core.VectorUtil;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -311,6 +312,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
     environment.put(
         "native-kernel-poll-millis",
         kernel.supportsPollBudget() ? Long.toString(kernel.pollMillis()) : "unsupported");
+    environment.put("java-executor-poll-millis", Long.toString(VectorUtil.ggufPollMillis()));
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
     environment.put(
         "native-grouped-attention", Boolean.toString(kernel.supportsGroupedAttention()));

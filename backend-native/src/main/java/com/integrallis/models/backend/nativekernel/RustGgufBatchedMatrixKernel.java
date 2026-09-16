@@ -18,6 +18,7 @@ package com.integrallis.models.backend.nativekernel;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -98,11 +99,21 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   static RustGgufBatchedMatrixKernel open(Path libraryPath, NativeKernelSettings settings) {
     Objects.requireNonNull(settings, "settings");
+    NativeKernelLibrary library = NativeKernelLibrary.open(libraryPath, settings.threadCount());
+    parkJavaExecutor();
     return new RustGgufBatchedMatrixKernel(
-        NativeKernelLibrary.open(libraryPath, settings.threadCount()),
-        settings.nativeDecode(),
-        settings.q5_0Grouped(),
-        settings.gatedDeltaNet());
+        library, settings.nativeDecode(), settings.q5_0Grouped(), settings.gatedDeltaNet());
+  }
+
+  /**
+   * The native worker pool owns this box's compute once it is open; the vectors persistent
+   * executor, which the Java side still uses for its parallel ops, must park at its barriers
+   * instead of polling beside it. Measured on a c7a.4xlarge (2026-09-16): both pools polling cut
+   * prefill from 126 to 40 tok/s and raised context switches from 0.2 M to 24 M per run; parking
+   * the Java executor restored 126 and left decode unchanged.
+   */
+  static void parkJavaExecutor() {
+    VectorUtil.setGgufPollMillis(0);
   }
 
   static RustGgufBatchedMatrixKernel open(Path libraryPath, boolean nativeDecode) {
