@@ -647,3 +647,20 @@ for, which the runner reports as EXECUTION-FAILED for that arm. That is the base
 under the reference contract and is recorded as such; it does not stop the window (window arms
 record the identity summary next to their results instead of refusing). Base Rust arm running;
 then the Rust window on host 1. Reports in `host-evidence/identity-f6252cc/`.
+
+**Gate 4, SQuAD 2.0 specialist arm, pure Java, f6252cc (pure-Java host, 2026-09-16T11:11Z) —
+FAILS the structure clause.** 200/200 cases ran with physical sharing; 199/200 outputs are the
+JSON literal `"answerable"` / `"unanswerable"`; case `57115f0a50c2381900b54aa8` (answerable,
+steam-engine valve-gear paragraph) produced `"kick back"`, an answer span in the adapter's quoted
+format, so the adapter head was active and answered the question instead of labelling it.
+Balanced accuracy 0.805 (answerable 94/100, unanswerable 67/100), above the 0.80 floor; the base
+arm on this suite is still running. The frozen rule (§4: every output exactly one of the two
+labels, 100%) and the ModelJars component gate (`suite.structuredRate !== 1`) both reject this
+arm on structure. Recorded as measured: the pure-Java arm is the deciding arm, so the
+answerability component at f6252cc does not qualify under the frozen policy on this suite. The
+other arms and suites keep running to completion so the report states the whole window; the
+Rust arm's output on the same case will be compared when it lands. Report
+`host-evidence/window-f6252cc/window-squad-v2-dev-specialist-pure-java.json` (sha256
+2e8dfe29ad483b1fc73b476ad657a943ac809e923d4d117678c01c44c11f4760). Next measurement, decided
+before it is run: the IBM reference implementation (Transformers + PEFT activated LoRA) on this
+one case, to separate adapter behaviour from a runtime defect. No threshold is changed.
