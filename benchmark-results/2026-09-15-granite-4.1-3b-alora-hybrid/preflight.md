@@ -585,3 +585,14 @@ for. x86 suites at f6252cc: 616 backend-java and 39 backend-native. **Frozen com
 `f6252cc`**: attempt 9 (official harness run) starts on instance 3 at it; host 1 restarts the
 identity screen and the Rust window at it; the pure-Java window host restarts at it. The partial
 runs at 7a3f3e7 are kept on the hosts under `attempt3-7a3f3e7` / `partial-7a3f3e7`.
+
+**Base run, attempt 9 result (Models f6252cc, instance 3, pool 16 / decode 8, native grouped
+attention):** **QUALIFIED**, absolute tier USABLE. Rust arm decode 25.72 tok/s, prefill ~140,
+p95 TTFT 1039 ms, p95 e2e 2340 ms; Ollama 30.25 / 626 / 1562 (PRODUCTION_READY); llama.cpp 30.62 /
+1000 / 2179 (PRODUCTION_READY). Ratios: decode 0.850 (Ollama) and 0.840 (llama.cpp) against the
+0.8 floor; e2e 1.498 (Ollama) and 1.074 (llama.cpp) against the 1.5 ceiling. Correctness 9/9
+smoke and 27/27 tuned, abstention 1.0, model answer rate 0.78, model answer correct rate 1.0. The
+e2e margin against Ollama is 0.002 and is recorded as such; the decode margin is 0.05. Bundle in
+`host-evidence/base-attempt9/` and published as
+`benchmark-results/certified-20260916/rag/granite-4.1-3b-q4_k_m/` (README rendered from the
+reports, SHA256SUMS). The ModelJars base entry is assembled from that bundle.
