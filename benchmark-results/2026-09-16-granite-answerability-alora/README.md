@@ -19,3 +19,20 @@ direction: fix the adapter rather than reject.
 Protocol: adapter versions are selected on the held-out validation split (QuAC validation is the
 multi-turn proxy) and scored on the frozen qualification window only once, at the end, under the
 pre-registered rule in `../2026-09-15-granite-4.1-3b-alora-hybrid/preflight.md`.
+
+## Pilot 1 (2026-09-16, Vultr A16 8 GB, nf4 base kept bf16)
+
+Measured: 2,400 training records sampled, 1,941 used (459 over 2,048 tokens dropped, mostly long
+QuAC dialogues), rank 16 / alpha 32, 145 optimizer steps (micro-batch 1 × accumulation 8), lr 2e-4
+cosine, 107 minutes. Held-out validation (300 records, strict contract):
+
+| step | balanced | answerable | unanswerable | SQuAD | QuAC | MS MARCO |
+|-----:|---------:|-----------:|-------------:|------:|-----:|---------:|
+| 60   | 0.684    | 122/139    | 79/161       | 0.763 | 0.575| 0.689    |
+| 120  | 0.699    | 70/139     | 144/161      | 0.814 | 0.602| 0.744    |
+| 145  | 0.742    | 94/139     | 130/161      | 0.825 | 0.699| 0.722    |
+
+`pilot1/training-manifest.json`, `pilot1/training-log.jsonl`, and `pilot1/adapter.sha256` bind the
+run; the adapter itself is on the reference host at `/opt/ref/pilot1-adapter` for the window read.
+The validation split is not the qualification window; the window is scored once, on the
+reference host, next.
