@@ -87,3 +87,28 @@ shared vCPUs (the extra eight are SMT siblings of busy cores on this instance); 
 profile keeps 8 workers on single-token projections. Chunk stealing (Difference 2) is measured
 next, then the productised default against the old regime, then the pure-Java executor with the
 same barrier (`vectors.gguf.pollMillis`, branch `perf/gguf-executor-poll-budget` in vectors).
+
+### Result 3 — main-thread JFR profile under the token-sized budget (same host, 24.63 tok/s)
+
+`settings=profile`, context 2048, 1 warm-up + 2 iterations (1,950 prefilled tokens, 440
+decoded), execution and native samples on the main thread combined:
+
+| where the main thread is                                   | samples | ≈ seconds |
+|------------------------------------------------------------|--------:|----------:|
+| native matmul downcalls (`invokeGrouped` + `invokeBatched`) |   2,351 |      47.0 |
+| `swiGlu` (Java, single-threaded, mostly the prefill batch) |     117 |       1.2 |
+| native grouped attention (critical downcall, sampled as Java)|    116 |       1.2 |
+| `MemorySegment.copy` + session release around downcalls    |      73 |       0.7 |
+| `rope` + `rmsNorm` + residual `addScaledInPlace`           |      64 |       0.6 |
+| dispatch glue (`dualBatchedMatmulDispatch`, `multiplyTriple/Dual`, `invokeBatched` Java side) |  89 |  0.9 |
+| bench CLI SHA-256 of the model file (not runtime)          |      97 |       1.0 |
+
+The kernels own 87% of the main thread; everything ggml runs "as graph ops" (Difference 4)
+is about 6% here, and half of that is `swiGlu` over the whole prefill batch on one thread.
+Difference 4 is therefore worth at most a few percent of decode on this host; the remaining
+decode gap is inside the matmul, not around it.
+
+**Prefill is the larger gap.** Certified c7a.4xlarge numbers (same bundle as the decode
+figures above): Models 144.7 prefill tok/s against llama.cpp 280.6 and Ollama 596.4 —
+1.9× and 4.1×. Prefill is compute-bound, so that ratio points at the dot-product ISA, not
+the pool: c7a is Zen 4 (AVX-512, VNNI). Checked next.
