@@ -143,14 +143,14 @@ window() {
 # runs on both backends at one frozen commit: pure Java is the reference the amendment names, Rust
 # FFM is the backend ModelJars ships. This phase records the identity summary next to the arm it
 # runs instead of refusing, and the report states the per-case agreement between the arms.
-window_arm() { # backend
-  local backend="$1"
-  log "window-arm $backend at $MODELS_COMMIT; identity10 summary: $(tail -1 "$EVIDENCE/identity10-summary.txt" 2>/dev/null || echo absent)"
-  for suite in squad-v2-dev mtrag-human-rag; do for arm in specialist base; do
+window_arm() { # backend [suites] [arms]  (space-separated lists; defaults = every suite, every arm)
+  local backend="$1" suites="${2:-squad-v2-dev mtrag-human-rag}" arms="${3:-specialist base}"
+  log "window-arm $backend suites=[$suites] arms=[$arms] at $MODELS_COMMIT; identity10 summary: $(tail -1 "$EVIDENCE/identity10-summary.txt" 2>/dev/null || echo absent)"
+  for suite in $suites; do for arm in $arms; do
     run_arm "$suite" "$arm" "$backend" 0 window
   done; done
   sha256sum "$EVIDENCE"/*.json | tee "$EVIDENCE/SHA256SUMS"
-  log "window-arm $backend complete"
+  log "window-arm $backend suites=[$suites] arms=[$arms] complete"
 }
 
 # Later phases run at a newer Models commit that adds the answerability long-context and
@@ -197,7 +197,7 @@ case "${1:-all}" in
   artifacts) artifacts ;;
   identity) identity ;;
   window) window ;;
-  window-arm) window_arm "${2:?backend}" ;;
+  window-arm) window_arm "${2:?backend}" "${3:-}" "${4:-}" ;;
   all) bootstrap; artifacts; identity; window ;;
   *) echo "unknown phase: $1" >&2; exit 64 ;;
 esac
