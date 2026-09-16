@@ -576,3 +576,12 @@ spans and 1/4 workers, Java test against the Java kernels across two spans and w
 second span. Other architectures keep the Java path. It is measured on instance 3 at the commit
 that carries it, alongside the rmsNorm and swiGlu vectorisations; if the decode gain lands in the
 mid-20s the frozen commit moves there and every window arm restarts.
+
+**Native grouped attention measured (Models f6252cc, instance 3, harness-equivalent settings,
+three iterations, two runs):** decode 25.57 and 25.47 tok/s, prefill ~140, p95 TTFT 1031 and
+970 ms, p95 e2e 2354 and 2308 ms, correct 27/27 both. Against this instance's attempt 8 controls
+(Ollama 28.41 / 1909 ms): decode 0.90, e2e 1.21. That is the margin the spread analysis asked
+for. x86 suites at f6252cc: 616 backend-java and 39 backend-native. **Frozen commit is now
+`f6252cc`**: attempt 9 (official harness run) starts on instance 3 at it; host 1 restarts the
+identity screen and the Rust window at it; the pure-Java window host restarts at it. The partial
+runs at 7a3f3e7 are kept on the hosts under `attempt3-7a3f3e7` / `partial-7a3f3e7`.
