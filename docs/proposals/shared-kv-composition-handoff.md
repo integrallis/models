@@ -83,7 +83,7 @@ stronger invariant over the produced activations is demonstrated. Output-head-on
 may preserve transformer KV, but its usefulness for prose/tool specialization is an experiment, not
 an assumption.
 
-Models 0.3.37 has no released adapter/LoRA loader or swap API. The experimental 2026-09-12 branch
+Models 0.3.38 releases the activated-adapter loader and the shared-prefix runtime API described above; no adapter is qualified by that release. The experimental 2026-09-12 branch
 adds the loader and the narrower activated-adapter contract described above; it is not a published
 capability until its behavioral and performance gates pass. The released runtime does provide one
 high-level `TextGenerationSession` per conversation over the existing low-level `InferenceSession`,

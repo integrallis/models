@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.38] - 2026-09-16
+
 ### Added
 
 - Added the Granite decoder graph (embedding, attention, residual, and logit scalars) and the
