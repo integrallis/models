@@ -228,6 +228,10 @@ val configuredGranite32AloraBase =
     providers.systemProperty("models.fixtures.granite32AloraBase")
 val configuredGranite32AloraAdapter =
     providers.systemProperty("models.fixtures.granite32AloraAdapter")
+val configuredGranite41AloraBase =
+    providers.systemProperty("models.fixtures.granite41AloraBase")
+val configuredGranite41AloraAdapter =
+    providers.systemProperty("models.fixtures.granite41AloraAdapter")
 val configuredDebertaThreads = providers.systemProperty("models.deberta.threads")
 
 tasks.withType<Test>().configureEach {
@@ -282,6 +286,12 @@ tasks.withType<Test>().configureEach {
     }
     configuredGranite32AloraAdapter.orNull?.let {
         systemProperty("models.fixtures.granite32AloraAdapter", it)
+    }
+    configuredGranite41AloraBase.orNull?.let {
+        systemProperty("models.fixtures.granite41AloraBase", it)
+    }
+    configuredGranite41AloraAdapter.orNull?.let {
+        systemProperty("models.fixtures.granite41AloraAdapter", it)
     }
     configuredDebertaThreads.orNull?.let {
         systemProperty("models.deberta.threads", it)
@@ -543,6 +553,37 @@ tasks.named<Test>("integrationTest") {
     // Real-weight inference is correctness/compatibility evidence, not unit coverage. Instrumenting
     // every tensor loop makes these tests several times slower and does not feed the unit JaCoCo
     // gate.
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = false
+    }
+}
+
+tasks.register<Test>("granite41AloraIntegrationTest") {
+    description = "Run the pinned IBM Granite 4.1 3B aLoRA real-artifact conformance and boundary gates"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.Granite41AloraIntegrationTest",
+        )
+    }
+    val configuredBase = configuredGranite41AloraBase.orNull
+    onlyIf("-Dmodels.fixtures.granite41AloraBase points to the pinned Granite 4.1 3B GGUF") {
+        configuredBase != null
+    }
+    configuredBase?.let {
+        systemProperty("models.fixtures.granite41AloraBase", it)
+    }
+    configuredGranite41AloraAdapter.orNull?.let {
+        systemProperty("models.fixtures.granite41AloraAdapter", it)
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
     extensions.configure<JacocoTaskExtension> {
         isEnabled = false
     }
