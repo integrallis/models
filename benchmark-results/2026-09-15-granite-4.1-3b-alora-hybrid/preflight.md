@@ -776,3 +776,13 @@ checked — six unanswerable cases the specialist calls `answerable` (`ddbbbe7e�
 `2b34f5e7…2`); reports in `host-evidence/reference-alora/reference-gguf-mtrag-*.json`. The Rust
 specialist arm finished at balanced accuracy 0.600 (110/110 structured). The behaviour is the
 adapter's on this slice; the runtime is faithful.
+
+### 2026-09-16T17:18Z — MT-RAG base arm, Rust FFM (host 1, window-mtrag-human-rag-base-rust-ffm.json)
+
+Measured: 110 cases, structured 38/110 (0.345), answerable correct 13/55, unanswerable correct
+11/55, balanced accuracy 0.218, `executionPassed=false` (the runner exits non-zero when the
+structured rate is below 1). The base model without the adapter mostly answers the multi-turn
+question instead of emitting the answerability label, unlike on SQuAD where it produced labels
+(0.820). This is the control arm's behaviour, not a runtime failure (no case-level errors). It
+does not change the verdict: the specialist arm already fails MT-RAG (0.600, unanswerable
+recall 14/40) with adapter behaviour confirmed against the PEFT reference 8/8.
