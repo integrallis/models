@@ -186,3 +186,28 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   against about 1.1 on the session path. A session-aware batched prefill is therefore the next
   engineering item before gate 4 can run at any useful cost; it must stay token-identical to the
   per-token path, and the Granite 4.1 integration test's greedy oracle is the check for that.
+- 2026-09-16, batched session prefill (commit `fce92d1`): the single-session prefill now runs
+  through the ragged session-batch path. Identity evidence: nano backend test, the Granite 4.1
+  integration greedy check after a batched prefill (matches llama.cpp), and the full backend-java
+  suite (611 tests). Two-case SQuAD smoke, specialist arm, identical outputs on both backends:
+  Rust 30.0 s and 34.2 s per case (was 220.8 s and 343.7 s), pure Java 133.0 s and 186.8 s (was
+  251.9 s and 343.4 s). The turn's own prefill and decode are seconds; the wall time is the
+  shared-prefix preparation, now batched.
+- 2026-09-16, gate 4 host plan (written before creation): Hetzner `cpx62`, `fsn1`, 16 shared
+  x86-64 vCPU, 32 GiB RAM, Ubuntu 24.04, live gross price EUR 0.2452 per hour (the API refused
+  `cpx51` in `fsn1` as an unsupported location for that type); one host, ceiling 24 hours
+  (EUR 5.89) with `delete-by` 2026-09-17T04-00Z; provider firewall permitting
+  TCP/22 only from the operator workstation's observed /32; SSH key `vectors-bench-v2`
+  (id 114663461, MD5 60:4e:57:38:96:48:c5:45:73:10:9d:37:f7:4f:74:cf). The host runs
+  `host-run.sh` at Models commit `fce92d106a77c34fd4aad4320d2876e9745c2b14`: bootstrap,
+  hash-checked artifacts, the ten-case identity precondition on both backends for both suites
+  and arms, then the full 310-case window on the Rust arm only if identity passes. An unrelated
+  server from another campaign (`modeljars-bench-cantor-cr-20260915-b`) was present in the
+  account at creation time and is not touched by this run.
+- 2026-09-16T03:15:53Z: Hetzner server `166122805` (`modeljars-granite41-hybrid-20260916`,
+  `cpx62`, `fsn1`, IPv4 `167.233.210.176`) created with provider firewall `11630670` applied
+  (TCP/22 from the operator /32 only); host key ED25519
+  `SHA256:R3AvbuQNuiOSTMItK6ms3t9MeTrocBNVKr2640Ug7qI` recorded in this directory's `known_hosts`.
+  Baseline: 16 vCPU, 30 GiB free, 575 GB free disk, no stray inference processes. `host-run.sh all`
+  started under nohup; a local watchdog deletes exactly this server and firewall at the deadline
+  if they still exist.
