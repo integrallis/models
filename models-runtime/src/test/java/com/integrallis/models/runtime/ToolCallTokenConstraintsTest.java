@@ -86,6 +86,32 @@ class ToolCallTokenConstraintsTest {
   }
 
   @Test
+  void finiteQwenGrammarCanPreserveAnExplicitActivatedAdapterAbstention() {
+    var tool =
+        new ToolSpec(
+            "set_mode",
+            "Set the mode",
+            """
+            {"type":"object","properties":{"mode":{"type":"string","enum":["cool"]}},"required":["mode"]}
+            """);
+
+    TokenConstraint refusal =
+        ToolCallTokenConstraints.compile(
+                QWEN_TOKENIZER,
+                ToolSyntax.QWEN,
+                List.of(tool),
+                ignored -> List.of("{\"mode\":\"cool\"}"),
+                List.of("<tool_call>\n[]\n</tool_call>"))
+            .orElseThrow();
+
+    refusal.accept(1);
+    refusal.accept(2);
+    refusal.accept(3);
+    assertThat(refusal.isComplete()).isTrue();
+    assertThat(refusal.allows(4)).isFalse();
+  }
+
+  @Test
   void needle2GrammarAllowsARefusalAndParallelCalls() {
     var tool =
         new ToolSpec(
@@ -209,6 +235,47 @@ class ToolCallTokenConstraintsTest {
 
   private static final Tokenizer NEEDLE_TOKENIZER = new NeedleTokenizer();
   private static final Tokenizer HAMMER_TOKENIZER = new HammerTokenizer();
+  private static final Tokenizer QWEN_TOKENIZER = new QwenTokenizer();
+
+  private static final class QwenTokenizer implements Tokenizer {
+    private static final String[] TOKENS = {
+      "</s>",
+      "<tool_call>\n",
+      "[]\n",
+      "</tool_call>",
+      "<tool_call>{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}</tool_call>"
+    };
+
+    @Override
+    public int[] encode(String text) {
+      throw new AssertionError("not used");
+    }
+
+    @Override
+    public String decode(int[] tokens) {
+      throw new AssertionError("not used");
+    }
+
+    @Override
+    public String decode(int token) {
+      return TOKENS[token];
+    }
+
+    @Override
+    public int vocabSize() {
+      return TOKENS.length;
+    }
+
+    @Override
+    public int bosToken() {
+      return 0;
+    }
+
+    @Override
+    public int eosToken() {
+      return 0;
+    }
+  }
 
   private static final class HammerTokenizer implements Tokenizer {
     private static final String[] TOKENS = {

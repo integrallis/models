@@ -1,0 +1,65 @@
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files:  50%|█████     | 1/2 [00:02<00:02,  2.44s/it]Fetching 2 files: 100%|██████████| 2/2 [00:07<00:00,  3.52s/it]Fetching 2 files: 100%|██████████| 2/2 [00:07<00:00,  3.52s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  3.87it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  6.00it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  5.54it/s]
+Traceback (most recent call last):
+  File "/opt/modeljars-runs/alora-v16/models/benchmark-results/2026-09-12-alora-tool-hybrid/train_hidden_applicability.py", line 692, in <module>
+    main()
+  File "/opt/modeljars-runs/alora-v16/models/benchmark-results/2026-09-12-alora-tool-hybrid/train_hidden_applicability.py", line 686, in main
+    extract_features(args)
+  File "/opt/modeljars-runs/alora-v16/models/benchmark-results/2026-09-12-alora-tool-hybrid/train_hidden_applicability.py", line 326, in extract_features
+    features, labels, source_lines = _extract_split(
+                                     ^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/models/benchmark-results/2026-09-12-alora-tool-hybrid/train_hidden_applicability.py", line 230, in _extract_split
+    output = model(
+             ^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/peft/peft_model.py", line 1923, in forward
+    return self.base_model(
+           ^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/peft/tuners/tuners_utils.py", line 311, in forward
+    return self.model.forward(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/transformers/utils/generic.py", line 943, in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 570, in forward
+    outputs: BaseModelOutputWithPast = self.model(
+                                       ^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/transformers/utils/generic.py", line 943, in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 448, in forward
+    position_embeddings = self.rotary_emb(hidden_states, position_ids)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/transformers/modeling_rope_utils.py", line 87, in wrapper
+    return rope_forward(self, x, position_ids)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-runs/alora-v16/venv/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 344, in forward
+    freqs = (inv_freq_expanded.float() @ position_ids_expanded.float()).transpose(1, 2)
+             ~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RuntimeError: Deterministic behavior was enabled with either `torch.use_deterministic_algorithms(True)` or `at::Context::setDeterministicAlgorithms(true)`, but this operation is not deterministic because it uses CuBLAS and you have CUDA >= 10.2. To enable deterministic behavior in this case, you must set an environment variable before running your PyTorch application: CUBLAS_WORKSPACE_CONFIG=:4096:8 or CUBLAS_WORKSPACE_CONFIG=:16:8. For more information, go to https://docs.nvidia.com/cuda/cublas/index.html#results-reproducibility

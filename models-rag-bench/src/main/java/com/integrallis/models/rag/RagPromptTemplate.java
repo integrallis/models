@@ -16,6 +16,8 @@
 package com.integrallis.models.rag;
 
 import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.runtime.chat.GraniteDocumentsPrompt;
+import java.util.List;
 import java.util.Locale;
 
 /** Explicit prompt envelopes used to keep native and pure-Java requests byte-identical. */
@@ -34,7 +36,9 @@ public enum RagPromptTemplate {
   DEEPSEEK("deepseek"),
   H2O("h2o"),
   H2O_DIRECT("h2o-direct"),
-  MINICPM5_NO_THINK("minicpm5-no-think");
+  MINICPM5_NO_THINK("minicpm5-no-think"),
+  GRANITE("granite"),
+  GRANITE_DOCUMENTS("granite-documents");
 
   private final String id;
 
@@ -131,6 +135,12 @@ public enum RagPromptTemplate {
               .control("<s><|im_start|>user\n")
               .text(prompt)
               .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
+              .build();
+      case GRANITE, GRANITE_DOCUMENTS ->
+          result
+              .control("<|start_of_role|>user<|end_of_role|>")
+              .text(prompt)
+              .control("<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>")
               .build();
     };
   }
@@ -237,7 +247,43 @@ public enum RagPromptTemplate {
               .text(userPrompt)
               .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
               .build();
+      // Granite 4.x: role markers are single tokens, message text is passed through untouched, and
+      // every turn closes with <|end_of_text|> plus a newline (byte-identical to the Transformers
+      // chat template, see ChatTemplate.GRANITE).
+      case GRANITE, GRANITE_DOCUMENTS ->
+          result
+              .control("<|start_of_role|>system<|end_of_role|>")
+              .text(systemPrompt)
+              .control("<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>")
+              .text(userPrompt)
+              .control("<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>")
+              .build();
     };
+  }
+
+  /**
+   * Applies the envelope to a grounded request whose evidence is known separately.
+   *
+   * <p>Every template but {@link #GRANITE_DOCUMENTS} renders the canonical text request, so the
+   * bytes are those of {@link #applyPrompt(String, String)}. {@code granite-documents} instead
+   * places the evidence in the Granite 4.x {@code <documents>} block of the system turn, after the
+   * harness instructions, and sends the bare question as the user turn: the input format the model
+   * was trained on. Each document keeps its citation id and title on the first line of its text so
+   * the citation contract is unchanged.
+   */
+  public ModelPrompt applyGroundedPrompt(
+      String instructions, List<GroundingDocument> evidence, String question, String request) {
+    if (this != GRANITE_DOCUMENTS) {
+      return applyPrompt(instructions, request);
+    }
+    List<String> documents =
+        evidence.stream()
+            .map(document -> "[" + document.id() + "] " + document.title() + "\n" + document.text())
+            .toList();
+    ModelPrompt.Builder builder =
+        GraniteDocumentsPrompt.appendSystem(ModelPrompt.builder(), documents, instructions.strip());
+    GraniteDocumentsPrompt.appendTurn(builder, "user", question);
+    return GraniteDocumentsPrompt.finish(builder);
   }
 
   /** Resolves a CLI identifier. */
@@ -250,6 +296,6 @@ public enum RagPromptTemplate {
     throw new IllegalArgumentException(
         "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
             + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, phi3, deepseek, h2o, "
-            + "h2o-direct, minicpm5-no-think");
+            + "h2o-direct, minicpm5-no-think, granite, granite-documents");
   }
 }

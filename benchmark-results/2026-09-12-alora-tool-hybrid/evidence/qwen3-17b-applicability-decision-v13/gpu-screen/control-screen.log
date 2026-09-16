@@ -1,0 +1,32 @@
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files:  50%|█████     | 1/2 [00:05<00:05,  5.02s/it]Fetching 2 files: 100%|██████████| 2/2 [00:11<00:00,  5.54s/it]Fetching 2 files: 100%|██████████| 2/2 [00:11<00:00,  5.54s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 28.14it/s]
+trainable params: 34,865,152 || all params: 1,755,440,128 || trainable%: 1.9861
+No label_names provided for model class `PeftModelForCausalLM`. Since `PeftModel` hides base models input arguments, if label_names is not given, label_names can't be set automatically within `Trainer`. Note that empty label_names list will be used instead.
+Traceback (most recent call last):
+  File "/opt/modeljars-alora-v13/train_applicability_alora.py", line 750, in <module>
+    main()
+  File "/opt/modeljars-alora-v13/train_applicability_alora.py", line 635, in main
+    initial_logits = initial_logits_sha256(model, validation_examples, collator, torch)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-alora-v13/train_applicability_alora.py", line 433, in initial_logits_sha256
+    outputs = model(**inputs)
+              ^^^^^^^^^^^^^^^
+  File "/opt/modeljars-alora-v13/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-alora-v13/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/modeljars-alora-v13/venv/lib/python3.12/site-packages/peft/peft_model.py", line 1921, in forward
+    with self._enable_peft_forward_hooks(**kwargs):
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/opt/modeljars-alora-v13/venv/lib/python3.12/site-packages/peft/peft_model.py", line 907, in _enable_peft_forward_hooks
+    with self.base_model._enable_peft_forward_hooks(*args, **kwargs):
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/opt/modeljars-alora-v13/venv/lib/python3.12/site-packages/peft/tuners/lora/model.py", line 399, in _enable_peft_forward_hooks
+    raise ValueError(
+ValueError: Multiple invocations of PEFT forward hooks before .backward() with enabled gradient checkpointing. Disable gradient checkpointing or only call forward once per backward.

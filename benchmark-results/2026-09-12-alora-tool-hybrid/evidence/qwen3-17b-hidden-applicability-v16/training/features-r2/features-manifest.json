@@ -1,0 +1,70 @@
+{
+  "adapterSha256": "f1a4a1bc15e3942ed5a3fbe2c4750f39a8b24804e20566242ec740c5ce851c21",
+  "base": {
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+  },
+  "experiment": "qwen3-17b-hidden-applicability-v16",
+  "productionGgufSha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+  "representation": {
+    "decisionPrefix": "<tool_call>\n",
+    "decisionPrefixTokens": [
+      151657,
+      198
+    ],
+    "hiddenDimension": 2048,
+    "maxLength": 1024,
+    "state": "final-rms-normalized-activated-hidden"
+  },
+  "schemaVersion": 1,
+  "splits": {
+    "train": {
+      "calls": 2356,
+      "environment": {
+        "attention": "sdpa",
+        "batchSize": 1,
+        "cublasWorkspaceConfig": ":4096:8",
+        "cuda": "12.4",
+        "dtype": "bfloat16",
+        "gpu": "NVIDIA A16-8Q",
+        "peft": "0.18.1",
+        "python": "3.12.3",
+        "safetensors": "0.5.3",
+        "tf32": false,
+        "torch": "2.6.0+cu124",
+        "transformers": "4.53.3"
+      },
+      "featureFile": "train-features.safetensors",
+      "featureSha256": "b2a385073021edc4fd6a6ba9d229610e2e8bb3e8e6e5a476df39e4624e1b2b29",
+      "noCalls": 484,
+      "rows": 2840,
+      "sourceLinesSha256": "ceab03a876d41ada5e7a3f99cad4357e0b70a478b6f8c20f82da7aa0a1626941",
+      "sourceSha256": "c46b606c74a3d1bda38c6f50a55854bf9112f0ae9d92993eb32e577c211f3002",
+      "split": "train"
+    },
+    "validation": {
+      "calls": 390,
+      "environment": {
+        "attention": "sdpa",
+        "batchSize": 1,
+        "cublasWorkspaceConfig": ":4096:8",
+        "cuda": "12.4",
+        "dtype": "bfloat16",
+        "gpu": "NVIDIA A16-8Q",
+        "peft": "0.18.1",
+        "python": "3.12.3",
+        "safetensors": "0.5.3",
+        "tf32": false,
+        "torch": "2.6.0+cu124",
+        "transformers": "4.53.3"
+      },
+      "featureFile": "validation-features.safetensors",
+      "featureSha256": "dcead1d83a46c3b785eb07b59634c6957178e20ec9d0c6257a42b96a3613eea6",
+      "noCalls": 81,
+      "rows": 471,
+      "sourceLinesSha256": "1ce289514ff5ddbe72a34e240196925b8d341058e66278d627b477f5fc622f51",
+      "sourceSha256": "7006d89f1be432424889f8fbc846ff348cf2770a56f409c9e38361ae4857cfb0",
+      "split": "validation"
+    }
+  }
+}

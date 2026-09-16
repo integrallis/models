@@ -1,0 +1,1375 @@
+time=2026-09-16T09:14:24.624Z level=INFO source=routes.go:1947 msg="server config" env="map[CUDA_VISIBLE_DEVICES: GGML_VK_VISIBLE_DEVICES: GPU_DEVICE_ORDINAL: HIP_VISIBLE_DEVICES: HSA_OVERRIDE_GFX_VERSION: HTTPS_PROXY: HTTP_PROXY: LLAMA_ARG_FIT: LLAMA_ARG_FIT_TARGET: NO_PROXY: OLLAMA_CONTEXT_LENGTH:0 OLLAMA_DEBUG:INFO OLLAMA_DEBUG_LOG_REQUESTS:false OLLAMA_EDITOR: OLLAMA_FLASH_ATTENTION:false OLLAMA_GO_TEMPLATE:true OLLAMA_GPU_OVERHEAD:0 OLLAMA_HOST:http://127.0.0.1:11434 OLLAMA_IGPU_ENABLE: OLLAMA_KEEP_ALIVE:5m0s OLLAMA_KV_CACHE_TYPE: OLLAMA_LLM_LIBRARY: OLLAMA_LOAD_TIMEOUT:5m0s OLLAMA_MAX_LOADED_MODELS:0 OLLAMA_MAX_QUEUE:512 OLLAMA_MAX_TRANSFER_STREAMS:4 OLLAMA_MODELS:/root/.ollama/models OLLAMA_NOHISTORY:false OLLAMA_NOPRUNE:false OLLAMA_NO_CLOUD:false OLLAMA_NUM_PARALLEL:1 OLLAMA_ORIGINS:[http://localhost https://localhost http://localhost:* https://localhost:* http://127.0.0.1 https://127.0.0.1 http://127.0.0.1:* https://127.0.0.1:* http://0.0.0.0 https://0.0.0.0 http://0.0.0.0:* https://0.0.0.0:* app://* file://* tauri://* vscode-webview://* vscode-file://*] OLLAMA_REMOTES:[ollama.com] OLLAMA_SCHED_SPREAD:false OLLAMA_VULKAN:true ROCR_VISIBLE_DEVICES: http_proxy: https_proxy: no_proxy:]"
+time=2026-09-16T09:14:24.624Z level=INFO source=routes.go:1949 msg="Ollama cloud disabled: false"
+time=2026-09-16T09:14:24.624Z level=INFO source=images.go:883 msg="total blobs: 0"
+time=2026-09-16T09:14:24.624Z level=INFO source=images.go:890 msg="total unused blobs removed: 0"
+time=2026-09-16T09:14:24.625Z level=INFO source=routes.go:2004 msg="Listening on 127.0.0.1:11434 (version 0.32.0)"
+time=2026-09-16T09:14:24.626Z level=INFO source=runner.go:60 msg="discovering available GPUs..."
+time=2026-09-16T09:14:24.626Z level=INFO source=model_list_cache.go:112 msg="model list cache hydration complete" models=1 failures=0 elapsed=1.459654ms
+time=2026-09-16T09:14:24.670Z level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h47m38.424777343s consecutive_failures=0
+time=2026-09-16T09:14:24.755Z level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="30.6 GiB" available="28.2 GiB"
+time=2026-09-16T09:14:24.755Z level=INFO source=routes.go:2054 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+[GIN] 2026/09/16 - 09:14:24 | 200 |       49.01µs |       127.0.0.1 | GET      "/api/version"
+[GIN] 2026/09/16 - 09:14:24 | 200 |       14.14µs |       127.0.0.1 | GET      "/api/version"
+[GIN] 2026/09/16 - 09:14:24 | 200 |        33.2µs |       127.0.0.1 | HEAD     "/"
+[GIN] 2026/09/16 - 09:14:26 | 200 |      86.031µs |       127.0.0.1 | POST     "/api/blobs/sha256:662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29"
+time=2026-09-16T09:14:26.342Z level=INFO source=quantization.go:124 msg="quantizing model" type=COPY input=/root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29 output=/root/.ollama/models/blobs/COPY1600227375
+load_backend: loaded CPU backend from /usr/local/lib/ollama/libggml-cpu-zen4.so
+llama_print_build_info: build = 1 (cb295bf59)
+llama_print_build_info: built with GNU 11.2.1 for Linux x86_64
+llama_quantize: quantizing '/root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29' to '/root/.ollama/models/blobs/COPY1600227375' as COPY
+llama_model_loader: loaded meta data with 34 key-value pairs and 362 tensors from /root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29 (version GGUF V3 (latest))
+llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+llama_model_loader: - kv   0:                       general.architecture str              = granite
+llama_model_loader: - kv   1:                               general.type str              = model
+llama_model_loader: - kv   2:                               general.name str              = Granite 4.1 3b
+llama_model_loader: - kv   3:                           general.basename str              = granite-4.1
+llama_model_loader: - kv   4:                         general.size_label str              = 3B
+llama_model_loader: - kv   5:                            general.license str              = apache-2.0
+llama_model_loader: - kv   6:                        granite.block_count u32              = 40
+llama_model_loader: - kv   7:                     granite.context_length u32              = 131072
+llama_model_loader: - kv   8:                   granite.embedding_length u32              = 2560
+llama_model_loader: - kv   9:                granite.feed_forward_length u32              = 8192
+llama_model_loader: - kv  10:               granite.attention.head_count u32              = 40
+llama_model_loader: - kv  11:            granite.attention.head_count_kv u32              = 8
+llama_model_loader: - kv  12:                     granite.rope.freq_base f32              = 10000000.000000
+llama_model_loader: - kv  13:   granite.attention.layer_norm_rms_epsilon f32              = 0.000010
+llama_model_loader: - kv  14:                         granite.vocab_size u32              = 100352
+llama_model_loader: - kv  15:               granite.rope.dimension_count u32              = 64
+llama_model_loader: - kv  16:                    granite.attention.scale f32              = 0.015625
+llama_model_loader: - kv  17:                    granite.embedding_scale f32              = 12.000000
+llama_model_loader: - kv  18:                     granite.residual_scale f32              = 0.220000
+llama_model_loader: - kv  19:                        granite.logit_scale f32              = 10.000000
+llama_model_loader: - kv  20:                       tokenizer.ggml.model str              = gpt2
+llama_model_loader: - kv  21:                         tokenizer.ggml.pre str              = dbrx
+llama_model_loader: - kv  22:                      tokenizer.ggml.tokens arr[str,100352]  = ["!", "\"", "#", "$", "%", "&", "'", ...
+llama_model_loader: - kv  23:                  tokenizer.ggml.token_type arr[i32,100352]  = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+llama_model_loader: - kv  24:                      tokenizer.ggml.merges arr[str,100000]  = ["Ġ Ġ", "ĠĠ ĠĠ", "i n", "Ġ t",...
+llama_model_loader: - kv  25:                tokenizer.ggml.bos_token_id u32              = 100257
+llama_model_loader: - kv  26:                tokenizer.ggml.eos_token_id u32              = 100257
+llama_model_loader: - kv  27:            tokenizer.ggml.unknown_token_id u32              = 100269
+llama_model_loader: - kv  28:            tokenizer.ggml.padding_token_id u32              = 100256
+llama_model_loader: - kv  29:               tokenizer.ggml.add_bos_token bool             = false
+llama_model_loader: - kv  30:                    tokenizer.chat_template str              = {%- set tools_system_message_prefix =...
+llama_model_loader: - kv  31:            tokenizer.ggml.add_space_prefix bool             = false
+llama_model_loader: - kv  32:               general.quantization_version u32              = 2
+llama_model_loader: - kv  33:                          general.file_type u32              = 15
+llama_model_loader: - type  f32:   81 tensors
+llama_model_loader: - type q4_K:  240 tensors
+llama_model_loader: - type q6_K:   41 tensors
+[   1/ 362] output_norm.weight                   - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[   2/ 362] token_embd.weight                    - [  2560, 100352,      1,      1], type =   q6_K, size =  200.977 MiB
+[   3/ 362] blk.0.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[   4/ 362] blk.0.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[   5/ 362] blk.0.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[   6/ 362] blk.0.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[   7/ 362] blk.0.attn_v.weight                  - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[   8/ 362] blk.0.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[   9/ 362] blk.0.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  10/ 362] blk.0.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  11/ 362] blk.0.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  12/ 362] blk.1.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  13/ 362] blk.1.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  14/ 362] blk.1.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  15/ 362] blk.1.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  16/ 362] blk.1.attn_v.weight                  - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[  17/ 362] blk.1.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[  18/ 362] blk.1.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  19/ 362] blk.1.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  20/ 362] blk.1.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  21/ 362] blk.2.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  22/ 362] blk.2.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  23/ 362] blk.2.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  24/ 362] blk.2.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  25/ 362] blk.2.attn_v.weight                  - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[  26/ 362] blk.2.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[  27/ 362] blk.2.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  28/ 362] blk.2.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  29/ 362] blk.2.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  30/ 362] blk.3.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  31/ 362] blk.3.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  32/ 362] blk.3.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  33/ 362] blk.3.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  34/ 362] blk.3.attn_v.weight                  - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[  35/ 362] blk.3.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[  36/ 362] blk.3.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  37/ 362] blk.3.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  38/ 362] blk.3.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  39/ 362] blk.4.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  40/ 362] blk.4.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  41/ 362] blk.4.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  42/ 362] blk.4.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  43/ 362] blk.4.attn_v.weight                  - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[  44/ 362] blk.4.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[  45/ 362] blk.4.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  46/ 362] blk.4.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  47/ 362] blk.4.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  48/ 362] blk.5.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  49/ 362] blk.5.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  50/ 362] blk.5.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  51/ 362] blk.5.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  52/ 362] blk.5.attn_v.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  53/ 362] blk.5.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[  54/ 362] blk.5.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  55/ 362] blk.5.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  56/ 362] blk.5.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  57/ 362] blk.6.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  58/ 362] blk.6.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  59/ 362] blk.6.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  60/ 362] blk.6.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  61/ 362] blk.6.attn_v.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  62/ 362] blk.6.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[  63/ 362] blk.6.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  64/ 362] blk.6.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  65/ 362] blk.6.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  66/ 362] blk.7.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  67/ 362] blk.7.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  68/ 362] blk.7.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  69/ 362] blk.7.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  70/ 362] blk.7.attn_v.weight                  - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[  71/ 362] blk.7.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[  72/ 362] blk.7.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  73/ 362] blk.7.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  74/ 362] blk.7.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  75/ 362] blk.8.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  76/ 362] blk.8.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  77/ 362] blk.8.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  78/ 362] blk.8.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  79/ 362] blk.8.attn_v.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  80/ 362] blk.8.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[  81/ 362] blk.8.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  82/ 362] blk.8.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  83/ 362] blk.8.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  84/ 362] blk.9.attn_k.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  85/ 362] blk.9.attn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  86/ 362] blk.9.attn_output.weight             - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  87/ 362] blk.9.attn_q.weight                  - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  88/ 362] blk.9.attn_v.weight                  - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  89/ 362] blk.9.ffn_down.weight                - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[  90/ 362] blk.9.ffn_gate.weight                - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  91/ 362] blk.9.ffn_norm.weight                - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  92/ 362] blk.9.ffn_up.weight                  - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[  93/ 362] blk.10.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[  94/ 362] blk.10.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[  95/ 362] blk.10.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  96/ 362] blk.10.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[  97/ 362] blk.10.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[  98/ 362] blk.10.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[  99/ 362] blk.10.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 100/ 362] blk.10.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 101/ 362] blk.10.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 102/ 362] blk.11.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 103/ 362] blk.11.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 104/ 362] blk.11.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 105/ 362] blk.11.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 106/ 362] blk.11.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 107/ 362] blk.11.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 108/ 362] blk.11.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 109/ 362] blk.11.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 110/ 362] blk.11.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 111/ 362] blk.12.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 112/ 362] blk.12.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 113/ 362] blk.12.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 114/ 362] blk.12.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 115/ 362] blk.12.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 116/ 362] blk.12.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 117/ 362] blk.12.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 118/ 362] blk.12.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 119/ 362] blk.12.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 120/ 362] blk.13.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 121/ 362] blk.13.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 122/ 362] blk.13.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 123/ 362] blk.13.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 124/ 362] blk.13.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 125/ 362] blk.13.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 126/ 362] blk.13.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 127/ 362] blk.13.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 128/ 362] blk.13.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 129/ 362] blk.14.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 130/ 362] blk.14.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 131/ 362] blk.14.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 132/ 362] blk.14.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 133/ 362] blk.14.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 134/ 362] blk.14.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 135/ 362] blk.14.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 136/ 362] blk.14.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 137/ 362] blk.14.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 138/ 362] blk.15.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 139/ 362] blk.15.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 140/ 362] blk.15.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 141/ 362] blk.15.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 142/ 362] blk.15.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 143/ 362] blk.15.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 144/ 362] blk.15.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 145/ 362] blk.15.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 146/ 362] blk.15.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 147/ 362] blk.16.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 148/ 362] blk.16.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 149/ 362] blk.16.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 150/ 362] blk.16.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 151/ 362] blk.16.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 152/ 362] blk.16.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 153/ 362] blk.16.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 154/ 362] blk.16.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 155/ 362] blk.16.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 156/ 362] blk.17.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 157/ 362] blk.17.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 158/ 362] blk.17.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 159/ 362] blk.17.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 160/ 362] blk.17.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 161/ 362] blk.17.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 162/ 362] blk.17.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 163/ 362] blk.17.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 164/ 362] blk.17.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 165/ 362] blk.18.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 166/ 362] blk.18.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 167/ 362] blk.18.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 168/ 362] blk.18.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 169/ 362] blk.18.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 170/ 362] blk.18.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 171/ 362] blk.18.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 172/ 362] blk.18.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 173/ 362] blk.18.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 174/ 362] blk.19.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 175/ 362] blk.19.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 176/ 362] blk.19.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 177/ 362] blk.19.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 178/ 362] blk.19.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 179/ 362] blk.19.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 180/ 362] blk.19.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 181/ 362] blk.19.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 182/ 362] blk.19.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 183/ 362] blk.20.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 184/ 362] blk.20.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 185/ 362] blk.20.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 186/ 362] blk.20.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 187/ 362] blk.20.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 188/ 362] blk.20.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 189/ 362] blk.20.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 190/ 362] blk.20.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 191/ 362] blk.20.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 192/ 362] blk.21.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 193/ 362] blk.21.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 194/ 362] blk.21.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 195/ 362] blk.21.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 196/ 362] blk.21.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 197/ 362] blk.21.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 198/ 362] blk.21.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 199/ 362] blk.21.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 200/ 362] blk.21.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 201/ 362] blk.22.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 202/ 362] blk.22.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 203/ 362] blk.22.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 204/ 362] blk.22.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 205/ 362] blk.22.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 206/ 362] blk.22.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 207/ 362] blk.22.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 208/ 362] blk.22.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 209/ 362] blk.22.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 210/ 362] blk.23.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 211/ 362] blk.23.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 212/ 362] blk.23.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 213/ 362] blk.23.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 214/ 362] blk.23.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 215/ 362] blk.23.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 216/ 362] blk.23.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 217/ 362] blk.23.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 218/ 362] blk.23.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 219/ 362] blk.24.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 220/ 362] blk.24.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 221/ 362] blk.24.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 222/ 362] blk.24.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 223/ 362] blk.24.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 224/ 362] blk.24.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 225/ 362] blk.24.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 226/ 362] blk.24.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 227/ 362] blk.24.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 228/ 362] blk.25.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 229/ 362] blk.25.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 230/ 362] blk.25.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 231/ 362] blk.25.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 232/ 362] blk.25.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 233/ 362] blk.25.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 234/ 362] blk.25.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 235/ 362] blk.25.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 236/ 362] blk.25.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 237/ 362] blk.26.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 238/ 362] blk.26.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 239/ 362] blk.26.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 240/ 362] blk.26.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 241/ 362] blk.26.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 242/ 362] blk.26.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 243/ 362] blk.26.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 244/ 362] blk.26.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 245/ 362] blk.26.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 246/ 362] blk.27.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 247/ 362] blk.27.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 248/ 362] blk.27.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 249/ 362] blk.27.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 250/ 362] blk.27.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 251/ 362] blk.27.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 252/ 362] blk.27.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 253/ 362] blk.27.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 254/ 362] blk.27.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 255/ 362] blk.28.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 256/ 362] blk.28.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 257/ 362] blk.28.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 258/ 362] blk.28.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 259/ 362] blk.28.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 260/ 362] blk.28.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 261/ 362] blk.28.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 262/ 362] blk.28.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 263/ 362] blk.28.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 264/ 362] blk.29.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 265/ 362] blk.29.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 266/ 362] blk.29.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 267/ 362] blk.29.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 268/ 362] blk.29.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 269/ 362] blk.29.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 270/ 362] blk.29.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 271/ 362] blk.29.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 272/ 362] blk.29.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 273/ 362] blk.30.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 274/ 362] blk.30.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 275/ 362] blk.30.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 276/ 362] blk.30.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 277/ 362] blk.30.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 278/ 362] blk.30.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 279/ 362] blk.30.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 280/ 362] blk.30.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 281/ 362] blk.30.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 282/ 362] blk.31.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 283/ 362] blk.31.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 284/ 362] blk.31.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 285/ 362] blk.31.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 286/ 362] blk.31.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 287/ 362] blk.31.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 288/ 362] blk.31.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 289/ 362] blk.31.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 290/ 362] blk.31.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 291/ 362] blk.32.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 292/ 362] blk.32.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 293/ 362] blk.32.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 294/ 362] blk.32.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 295/ 362] blk.32.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 296/ 362] blk.32.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 297/ 362] blk.32.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 298/ 362] blk.32.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 299/ 362] blk.32.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 300/ 362] blk.33.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 301/ 362] blk.33.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 302/ 362] blk.33.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 303/ 362] blk.33.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 304/ 362] blk.33.attn_v.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 305/ 362] blk.33.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 306/ 362] blk.33.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 307/ 362] blk.33.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 308/ 362] blk.33.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 309/ 362] blk.34.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 310/ 362] blk.34.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 311/ 362] blk.34.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 312/ 362] blk.34.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 313/ 362] blk.34.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 314/ 362] blk.34.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 315/ 362] blk.34.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 316/ 362] blk.34.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 317/ 362] blk.34.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 318/ 362] blk.35.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 319/ 362] blk.35.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 320/ 362] blk.35.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 321/ 362] blk.35.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 322/ 362] blk.35.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 323/ 362] blk.35.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 324/ 362] blk.35.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 325/ 362] blk.35.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 326/ 362] blk.35.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 327/ 362] blk.36.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 328/ 362] blk.36.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 329/ 362] blk.36.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 330/ 362] blk.36.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 331/ 362] blk.36.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 332/ 362] blk.36.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 333/ 362] blk.36.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 334/ 362] blk.36.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 335/ 362] blk.36.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 336/ 362] blk.37.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 337/ 362] blk.37.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 338/ 362] blk.37.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 339/ 362] blk.37.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 340/ 362] blk.37.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 341/ 362] blk.37.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 342/ 362] blk.37.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 343/ 362] blk.37.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 344/ 362] blk.37.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 345/ 362] blk.38.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 346/ 362] blk.38.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 347/ 362] blk.38.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 348/ 362] blk.38.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 349/ 362] blk.38.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 350/ 362] blk.38.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 351/ 362] blk.38.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 352/ 362] blk.38.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 353/ 362] blk.38.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 354/ 362] blk.39.attn_k.weight                 - [  2560,    512,      1,      1], type =   q4_K, size =    0.703 MiB
+[ 355/ 362] blk.39.attn_norm.weight              - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 356/ 362] blk.39.attn_output.weight            - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 357/ 362] blk.39.attn_q.weight                 - [  2560,   2560,      1,      1], type =   q4_K, size =    3.516 MiB
+[ 358/ 362] blk.39.attn_v.weight                 - [  2560,    512,      1,      1], type =   q6_K, size =    1.025 MiB
+[ 359/ 362] blk.39.ffn_down.weight               - [  8192,   2560,      1,      1], type =   q6_K, size =   16.406 MiB
+[ 360/ 362] blk.39.ffn_gate.weight               - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+[ 361/ 362] blk.39.ffn_norm.weight               - [  2560,      1,      1,      1], type =    f32, size =    0.010 MiB
+[ 362/ 362] blk.39.ffn_up.weight                 - [  2560,   8192,      1,      1], type =   q4_K, size =   11.250 MiB
+llama_model_quantize_impl: model size  =  1998.84 MiB (4.93 BPW)
+llama_model_quantize_impl: quant size  =  1998.84 MiB (4.93 BPW)
+[GIN] 2026/09/16 - 09:14:43 | 200 | 17.502275355s |       127.0.0.1 | POST     "/api/create"
+[GIN] 2026/09/16 - 09:14:43 | 200 |      34.751µs |       127.0.0.1 | GET      "/api/version"
+time=2026-09-16T09:14:44.454Z level=INFO source=sched.go:1158 msg="disabling mmap for llama-server load by default" model=/root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29 reason=cpu
+time=2026-09-16T09:14:44.454Z level=INFO source=server.go:109 msg="using llama-server for model" model=/root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29
+time=2026-09-16T09:14:44.454Z level=INFO source=llama_server.go:433 msg="starting llama-server" cmd="/usr/local/lib/ollama/llama-server --model /root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29 --port 33765 --host 127.0.0.1 --no-webui --offline -c 2048 -np 1 --log-verbosity 4 --no-log-prefix --no-log-timestamps --no-mmap --flash-attn auto -b 512 -ub 512 -t 16 --context-shift --keep 4"
+time=2026-09-16T09:14:44.455Z level=INFO source=sched.go:623 msg="system memory" total="30.6 GiB" free="28.1 GiB" free_swap="0 B"
+time=2026-09-16T09:14:44.455Z level=INFO source=llama_server.go:1001 msg="loading model via llama-server" model=/root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29
+time=2026-09-16T09:14:44.455Z level=INFO source=llama_server.go:1248 msg="waiting for llama-server to start responding"
+time=2026-09-16T09:14:44.455Z level=INFO source=llama_server.go:1303 msg="waiting for llama-server to become available" status="llm server not responding"
+cmn  common_param: common_params_print_info: build 1 (cb295bf59) with GNU 11.2.1 for Linux x86_64
+cmn  common_param: common_params_print_info: verbosity = 4 (adjust with the `-lv N` CLI arg)
+cmn  common_param: device_info:
+cmn  common_param:   - CPU     : AMD EPYC 9R14 (31379 MiB, 31379 MiB free)
+cmn  common_param: system_info: n_threads = 16 (n_threads_batch = 16) / 16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | REPACK = 1 | 
+srv          init: using 15 threads for HTTP server
+srv          init: The UI is disabled
+srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+srv         start: binding port with default address family
+srv    load_model: loading model '/root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29'
+srv    load_model: local path '/root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29'
+cmn  common_init_: fitting params to device memory ...
+cmn  common_init_: (for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on)
+common_params_fit_impl: getting device memory data for initial parameters:
+common_memory_breakdown_print: | memory breakdown [MiB] | total   free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - Host               |                  780 =   550 +     160 +      70                |
+common_memory_breakdown_print: |   - CPU_REPACK         |                 1448 =  1448 +       0 +       0                |
+common_params_fit_impl: projected to use 780 MiB of host memory vs. 31379 MiB of total host memory
+common_params_fit_impl: will leave 30599 >= 1024 MiB of system memory, no changes needed
+common_fit_params: successfully fit params to free device memory
+common_fit_params: fitting params to free memory took 0.16 seconds
+llama_model_loader: loaded meta data with 34 key-value pairs and 362 tensors from /root/.ollama/models/blobs/sha256-662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29 (version GGUF V3 (latest))
+llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+llama_model_loader: - kv   0:                       general.architecture str              = granite
+llama_model_loader: - kv   1:                               general.type str              = model
+llama_model_loader: - kv   2:                               general.name str              = Granite 4.1 3b
+llama_model_loader: - kv   3:                           general.basename str              = granite-4.1
+llama_model_loader: - kv   4:                         general.size_label str              = 3B
+llama_model_loader: - kv   5:                            general.license str              = apache-2.0
+llama_model_loader: - kv   6:                        granite.block_count u32              = 40
+llama_model_loader: - kv   7:                     granite.context_length u32              = 131072
+llama_model_loader: - kv   8:                   granite.embedding_length u32              = 2560
+llama_model_loader: - kv   9:                granite.feed_forward_length u32              = 8192
+llama_model_loader: - kv  10:               granite.attention.head_count u32              = 40
+llama_model_loader: - kv  11:            granite.attention.head_count_kv u32              = 8
+llama_model_loader: - kv  12:                     granite.rope.freq_base f32              = 10000000.000000
+llama_model_loader: - kv  13:   granite.attention.layer_norm_rms_epsilon f32              = 0.000010
+llama_model_loader: - kv  14:                         granite.vocab_size u32              = 100352
+llama_model_loader: - kv  15:               granite.rope.dimension_count u32              = 64
+llama_model_loader: - kv  16:                    granite.attention.scale f32              = 0.015625
+llama_model_loader: - kv  17:                    granite.embedding_scale f32              = 12.000000
+llama_model_loader: - kv  18:                     granite.residual_scale f32              = 0.220000
+llama_model_loader: - kv  19:                        granite.logit_scale f32              = 10.000000
+llama_model_loader: - kv  20:                       tokenizer.ggml.model str              = gpt2
+llama_model_loader: - kv  21:                         tokenizer.ggml.pre str              = dbrx
+llama_model_loader: - kv  22:                      tokenizer.ggml.tokens arr[str,100352]  = ["!", "\"", "#", "$", "%", "&", "'", ...
+llama_model_loader: - kv  23:                  tokenizer.ggml.token_type arr[i32,100352]  = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+llama_model_loader: - kv  24:                      tokenizer.ggml.merges arr[str,100000]  = ["Ġ Ġ", "ĠĠ ĠĠ", "i n", "Ġ t",...
+llama_model_loader: - kv  25:                tokenizer.ggml.bos_token_id u32              = 100257
+llama_model_loader: - kv  26:                tokenizer.ggml.eos_token_id u32              = 100257
+llama_model_loader: - kv  27:            tokenizer.ggml.unknown_token_id u32              = 100269
+llama_model_loader: - kv  28:            tokenizer.ggml.padding_token_id u32              = 100256
+llama_model_loader: - kv  29:               tokenizer.ggml.add_bos_token bool             = false
+llama_model_loader: - kv  30:                    tokenizer.chat_template str              = {%- set tools_system_message_prefix =...
+llama_model_loader: - kv  31:            tokenizer.ggml.add_space_prefix bool             = false
+llama_model_loader: - kv  32:               general.quantization_version u32              = 2
+llama_model_loader: - kv  33:                          general.file_type u32              = 15
+llama_model_loader: - type  f32:   81 tensors
+llama_model_loader: - type q4_K:  240 tensors
+llama_model_loader: - type q6_K:   41 tensors
+print_info: file format = GGUF V3 (latest)
+print_info: file type   = Q4_K - Medium
+print_info: file size   = 1.95 GiB (4.93 BPW) 
+load: 69 unused tokens
+time=2026-09-16T09:14:44.706Z level=INFO source=llama_server.go:1303 msg="waiting for llama-server to become available" status="llm server loading model"
+load: printing all EOG tokens:
+load:   - 100257 ('<|end_of_text|>')
+load:   - 100261 ('<|fim_pad|>')
+load: special tokens cache size = 96
+load: token to piece cache size = 0.6152 MB
+print_info: arch                  = granite
+print_info: vocab_only            = 0
+print_info: no_alloc              = 0
+print_info: n_ctx_train           = 131072
+print_info: n_embd_inp            = 2560
+print_info: n_embd                = 2560
+print_info: n_embd_out            = 2560
+print_info: n_layer               = 40
+print_info: n_layer_all           = 40
+print_info: n_head                = 40
+print_info: n_head_kv             = 8
+print_info: n_rot                 = 64
+print_info: n_swa                 = 0
+print_info: is_swa_any            = 0
+print_info: n_embd_head_k         = 64
+print_info: n_embd_head_v         = 64
+print_info: n_gqa                 = 5
+print_info: n_embd_k_gqa          = 512
+print_info: n_embd_v_gqa          = 512
+print_info: f_norm_eps            = 0.0e+00
+print_info: f_norm_rms_eps        = 1.0e-05
+print_info: f_clamp_kqv           = 0.0e+00
+print_info: f_max_alibi_bias      = 0.0e+00
+print_info: f_logit_scale         = 1.0e+01
+print_info: f_attn_scale          = 1.6e-02
+print_info: f_attn_value_scale    = 0.0000
+print_info: n_ff                  = 8192
+print_info: n_expert              = 0
+print_info: n_expert_used         = 0
+print_info: n_expert_groups       = 0
+print_info: n_group_used          = 0
+print_info: causal attn           = 1
+print_info: pooling type          = -1
+print_info: rope type             = 0
+print_info: rope scaling          = linear
+print_info: freq_base_train       = 10000000.0
+print_info: freq_scale_train      = 1
+print_info: n_ctx_orig_yarn       = 131072
+print_info: rope_yarn_log_mul     = 0.0000
+print_info: rope_finetuned        = yes
+print_info: model type            = 3B
+print_info: model params          = 3.40 B
+print_info: general.name          = Granite 4.1 3b
+print_info: f_embedding_scale     = 12.000000
+print_info: f_residual_scale      = 0.220000
+print_info: f_attention_scale     = 0.015625
+print_info: n_ff_shexp            = 0
+print_info: vocab type            = BPE
+print_info: n_vocab               = 100352
+print_info: n_merges              = 100000
+print_info: BOS token             = 100257 '<|end_of_text|>'
+print_info: EOS token             = 100257 '<|end_of_text|>'
+print_info: EOT token             = 100257 '<|end_of_text|>'
+print_info: UNK token             = 100269 '<|unk|>'
+print_info: PAD token             = 100256 '<|pad|>'
+print_info: LF token              = 198 'Ċ'
+print_info: FIM PRE token         = 100258 '<|fim_prefix|>'
+print_info: FIM SUF token         = 100260 '<|fim_suffix|>'
+print_info: FIM MID token         = 100259 '<|fim_middle|>'
+print_info: FIM PAD token         = 100261 '<|fim_pad|>'
+print_info: EOG token             = 100257 '<|end_of_text|>'
+print_info: EOG token             = 100261 '<|fim_pad|>'
+print_info: max token length      = 256
+load_tensors: loading model tensors, this can take a while... (mmap = false, direct_io = false)
+load_tensors:          CPU model buffer size =   550.40 MiB
+load_tensors:   CPU_REPACK model buffer size =  1448.44 MiB
+cmn  common_init_: added <|end_of_text|> logit bias = -inf
+cmn  common_init_: added <|fim_pad|> logit bias = -inf
+llama_context: constructing llama_context
+llama_context: n_seq_max     = 1
+llama_context: n_ctx         = 2048
+llama_context: n_ctx_seq     = 2048
+llama_context: n_batch       = 512
+llama_context: n_ubatch      = 512
+llama_context: causal_attn   = 1
+llama_context: flash_attn    = auto
+llama_context: kv_unified    = false
+llama_context: freq_base     = 10000000.0
+llama_context: freq_scale    = 1
+llama_context: n_rs_seq      = 0
+llama_context: n_outputs_max = 1
+llama_context: n_ctx_seq (2048) < n_ctx_train (131072) -- the full capacity of the model will not be utilized
+llama_context:        CPU  output buffer size =     0.38 MiB
+llama_kv_cache:        CPU KV buffer size =   160.00 MiB
+llama_kv_cache: size =  160.00 MiB (  2048 cells,  40 layers,  1/1 seqs), K (f16):   80.00 MiB, V (f16):   80.00 MiB
+llama_kv_cache: attn_rot_k = 0, n_embd_head_k_all = 64
+llama_kv_cache: attn_rot_v = 0, n_embd_head_k_all = 64
+sched_reserve: reserving ...
+sched_reserve: Flash Attention was auto, set to enabled
+sched_reserve: resolving fused Gated Delta Net support:
+sched_reserve: fused Gated Delta Net (autoregressive) enabled
+sched_reserve: fused Gated Delta Net (chunked) enabled
+sched_reserve:        CPU compute buffer size =    70.01 MiB
+sched_reserve: graph nodes  = 1328
+sched_reserve: graph splits = 1
+sched_reserve: reserve took 2.32 ms, sched copies = 1
+cmn  common_init_: warming up the model with an empty run - please wait ... (--no-warmup to disable)
+srv    load_model: initializing, n_slots = 1, n_ctx_slot = 2048, kv_unified = 'false'
+spec common_specu: no implementations specified for speculative decoding
+slot   load_model: id  0 | task -1 | new slot, n_ctx = 2048
+srv    load_model: prompt cache is enabled, size limit: 8192 MiB
+srv    load_model: use `--cache-ram 0` to disable the prompt cache
+srv    load_model: for more info see https://github.com/ggml-org/llama.cpp/pull/16391
+srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192
+srv          init: idle slots will be saved to prompt cache upon starting a new task
+srv          init: init: chat template, example_format: '<|start_of_role|>system<|end_of_role|>You are a helpful assistant<|end_of_text|>
+<|start_of_role|>user<|end_of_role|>Hello<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>Hi there<|end_of_text|>
+<|start_of_role|>user<|end_of_role|>How are you?<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>'
+srv          init: init: chat template, thinking = 0
+srv  llama_server: model loaded
+srv  llama_server: listening on http://127.0.0.1:33765
+srv  update_slots: all slots are idle
+time=2026-09-16T09:14:46.714Z level=INFO source=llama_server.go:1315 msg="llama-server started in 2.26 seconds"
+time=2026-09-16T09:14:46.734Z level=INFO source=images.go:373 msg="template selection" model=registry.ollama.ai/library/modeljars-rag-ibm_granite_granite_4_1_3b_gguf_q4_k_m:662b0626cd58 selected=gguf_chat_template renderer="" parser="" go_template=null chat_template="[tools completion]" harmony=null renderer_parser=null
+time=2026-09-16T09:14:46.734Z level=INFO source=sched.go:739 msg="loaded runners" count=1
+time=2026-09-16T09:14:46.734Z level=INFO source=llama_server.go:1248 msg="waiting for llama-server to start responding"
+time=2026-09-16T09:14:46.735Z level=INFO source=llama_server.go:1315 msg="llama-server started in 2.28 seconds"
+slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+srv  get_availabl: updating prompt cache
+srv          load:  - looking for better prompt, base f_keep = -1.000, sim = 0.000
+srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 2048 tokens, 8589934592 est)
+srv  get_availabl: prompt cache update took 0.01 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+slot   operator(): id  0 | task 0 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 271
+slot   operator(): id  0 | task 0 | cached n_tokens = 0, memory_seq_rm [0, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 0 | init sampler, took 0.04 ms, tokens: text = 271, total = 271
+slot print_timing: id  0 | task 0 | prompt eval time =    1036.18 ms /   271 tokens (    3.82 ms per token,   261.54 tokens per second)
+slot print_timing: id  0 | task 0 |        eval time =     905.49 ms /    14 tokens (   64.68 ms per token,    15.46 tokens per second)
+slot print_timing: id  0 | task 0 |       total time =    1941.66 ms /   285 tokens
+slot print_timing: id  0 | task 0 |    graphs reused =         13
+slot      release: id  0 | task 0 | stop processing: n_tokens = 284, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:14:48 | 200 |  4.378540214s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.518
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 15 | processing task, is_child = 0
+slot   operator(): id  0 | task 15 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 15 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 15 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 15 | prompt eval time =     458.97 ms /   116 tokens (    3.96 ms per token,   252.74 tokens per second)
+slot print_timing: id  0 | task 15 |        eval time =    1898.48 ms /    31 tokens (   61.24 ms per token,    16.33 tokens per second)
+slot print_timing: id  0 | task 15 |       total time =    2357.45 ms /   147 tokens
+slot print_timing: id  0 | task 15 |    graphs reused =         42
+slot      release: id  0 | task 15 | stop processing: n_tokens = 293, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:14:51 | 200 |  2.483344696s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.498
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 293, total state size = 22.895 MiB (draft: 0.000 MiB)
+srv          load:  - looking for better prompt, base f_keep = 0.498, sim = 0.551
+srv        update:  - cache state: 1 prompts, 22.895 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv  get_availabl: prompt cache update took 10.58 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 47 | processing task, is_child = 0
+slot   operator(): id  0 | task 47 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 47 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 47 | init sampler, took 0.03 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 47 | prompt eval time =     478.55 ms /   119 tokens (    4.02 ms per token,   248.67 tokens per second)
+slot print_timing: id  0 | task 47 |        eval time =    1274.32 ms /    28 tokens (   45.51 ms per token,    21.97 tokens per second)
+slot print_timing: id  0 | task 47 |       total time =    1752.87 ms /   147 tokens
+slot print_timing: id  0 | task 47 |    graphs reused =         68
+slot      release: id  0 | task 47 | stop processing: n_tokens = 292, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:14:53 | 200 |  1.893451403s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.500
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 76 | processing task, is_child = 0
+slot   operator(): id  0 | task 76 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 261
+slot   operator(): id  0 | task 76 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 76 | init sampler, took 0.03 ms, tokens: text = 261, total = 261
+slot print_timing: id  0 | task 76 | prompt eval time =     465.67 ms /   115 tokens (    4.05 ms per token,   246.96 tokens per second)
+slot print_timing: id  0 | task 76 |        eval time =    1666.62 ms /    27 tokens (   61.73 ms per token,    16.20 tokens per second)
+slot print_timing: id  0 | task 76 |       total time =    2132.29 ms /   142 tokens
+slot print_timing: id  0 | task 76 |    graphs reused =         93
+slot      release: id  0 | task 76 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:14:55 | 200 |  2.259191077s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.512
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 104 | processing task, is_child = 0
+slot   operator(): id  0 | task 104 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 104 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 104 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 104 | prompt eval time =     453.28 ms /   116 tokens (    3.91 ms per token,   255.91 tokens per second)
+slot print_timing: id  0 | task 104 |        eval time =    1924.22 ms /    25 tokens (   76.97 ms per token,    12.99 tokens per second)
+slot print_timing: id  0 | task 104 |       total time =    2377.49 ms /   141 tokens
+slot print_timing: id  0 | task 104 |    graphs reused =        116
+slot      release: id  0 | task 104 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:14:57 | 200 |  2.502409507s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.509
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 130 | processing task, is_child = 0
+slot   operator(): id  0 | task 130 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 130 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 130 | init sampler, took 0.03 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 130 | prompt eval time =     472.97 ms /   119 tokens (    3.97 ms per token,   251.60 tokens per second)
+slot print_timing: id  0 | task 130 |        eval time =     673.23 ms /    19 tokens (   35.43 ms per token,    28.22 tokens per second)
+slot print_timing: id  0 | task 130 |       total time =    1146.20 ms /   138 tokens
+slot print_timing: id  0 | task 130 |    graphs reused =        133
+slot      release: id  0 | task 130 | stop processing: n_tokens = 283, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:14:59 | 200 |  1.272062665s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.521 (> 0.100 thold), f_keep = 0.516
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 150 | processing task, is_child = 0
+slot   operator(): id  0 | task 150 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 280
+slot   operator(): id  0 | task 150 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 150 | init sampler, took 0.03 ms, tokens: text = 280, total = 280
+slot print_timing: id  0 | task 150 | prompt eval time =     519.37 ms /   134 tokens (    3.88 ms per token,   258.00 tokens per second)
+slot print_timing: id  0 | task 150 |        eval time =     720.91 ms /    20 tokens (   36.05 ms per token,    27.74 tokens per second)
+slot print_timing: id  0 | task 150 |       total time =    1240.28 ms /   154 tokens
+slot print_timing: id  0 | task 150 |    graphs reused =        151
+slot      release: id  0 | task 150 | stop processing: n_tokens = 299, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:00 | 200 |  1.366591382s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.557 (> 0.100 thold), f_keep = 0.488
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 299, total state size = 23.364 MiB (draft: 0.000 MiB)
+srv          load:  - looking for better prompt, base f_keep = 0.488, sim = 0.557
+srv        update:  - cache state: 2 prompts, 46.259 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv        update:    - prompt 0x312102d0:     299 tokens, checkpoints:  0,    23.364 MiB
+srv  get_availabl: prompt cache update took 10.90 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 171 | processing task, is_child = 0
+slot   operator(): id  0 | task 171 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 262
+slot   operator(): id  0 | task 171 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 171 | init sampler, took 0.03 ms, tokens: text = 262, total = 262
+slot print_timing: id  0 | task 171 | prompt eval time =     465.62 ms /   116 tokens (    4.01 ms per token,   249.13 tokens per second)
+slot print_timing: id  0 | task 171 |        eval time =    1457.32 ms /    27 tokens (   53.97 ms per token,    18.53 tokens per second)
+slot print_timing: id  0 | task 171 |       total time =    1922.94 ms /   143 tokens
+slot print_timing: id  0 | task 171 |    graphs reused =        176
+slot      release: id  0 | task 171 | stop processing: n_tokens = 288, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:02 | 200 |  2.059699255s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.553 (> 0.100 thold), f_keep = 0.507
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 199 | processing task, is_child = 0
+slot   operator(): id  0 | task 199 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 264
+slot   operator(): id  0 | task 199 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 199 | init sampler, took 0.03 ms, tokens: text = 264, total = 264
+slot print_timing: id  0 | task 199 | prompt eval time =     466.43 ms /   118 tokens (    3.95 ms per token,   252.98 tokens per second)
+slot print_timing: id  0 | task 199 |        eval time =     298.06 ms /     5 tokens (   59.61 ms per token,    16.78 tokens per second)
+slot print_timing: id  0 | task 199 |       total time =     764.50 ms /   123 tokens
+slot print_timing: id  0 | task 199 |    graphs reused =        179
+slot      release: id  0 | task 199 | stop processing: n_tokens = 268, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:03 | 200 |  890.592939ms |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.919 (> 0.100 thold), f_keep = 0.929
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 205 | processing task, is_child = 0
+slot   operator(): id  0 | task 205 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 271
+slot   operator(): id  0 | task 205 | cached n_tokens = 249, memory_seq_rm [249, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 205 | init sampler, took 0.03 ms, tokens: text = 271, total = 271
+slot print_timing: id  0 | task 205 | prompt eval time =     110.82 ms /    22 tokens (    5.04 ms per token,   198.52 tokens per second)
+slot print_timing: id  0 | task 205 |        eval time =     556.41 ms /    14 tokens (   39.74 ms per token,    25.16 tokens per second)
+slot print_timing: id  0 | task 205 |       total time =     667.23 ms /    36 tokens
+slot print_timing: id  0 | task 205 |    graphs reused =        191
+slot      release: id  0 | task 205 | stop processing: n_tokens = 284, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:04 | 200 |  790.663168ms |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.518
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 220 | processing task, is_child = 0
+slot   operator(): id  0 | task 220 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 220 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 220 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 220 | prompt eval time =     449.18 ms /   116 tokens (    3.87 ms per token,   258.25 tokens per second)
+slot print_timing: id  0 | task 220 |        eval time =    1698.37 ms /    31 tokens (   54.79 ms per token,    18.25 tokens per second)
+slot print_timing: id  0 | task 220 |       total time =    2147.55 ms /   147 tokens
+slot print_timing: id  0 | task 220 |    graphs reused =        220
+slot      release: id  0 | task 220 | stop processing: n_tokens = 293, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:06 | 200 |  2.270400137s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.498
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 293, total state size = 22.895 MiB (draft: 0.000 MiB)
+srv         alloc:  - prompt is already in the cache, skipping
+srv          load:  - looking for better prompt, base f_keep = 0.498, sim = 0.551
+srv        update:  - cache state: 2 prompts, 46.259 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv        update:    - prompt 0x312102d0:     299 tokens, checkpoints:  0,    23.364 MiB
+srv  get_availabl: prompt cache update took 0.04 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 252 | processing task, is_child = 0
+slot   operator(): id  0 | task 252 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 252 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 252 | init sampler, took 0.03 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 252 | prompt eval time =     473.30 ms /   119 tokens (    3.98 ms per token,   251.43 tokens per second)
+slot print_timing: id  0 | task 252 |        eval time =    1475.40 ms /    28 tokens (   52.69 ms per token,    18.98 tokens per second)
+slot print_timing: id  0 | task 252 |       total time =    1948.70 ms /   147 tokens
+slot print_timing: id  0 | task 252 |    graphs reused =        246
+slot      release: id  0 | task 252 | stop processing: n_tokens = 292, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:08 | 200 |  2.077916435s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.500
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 281 | processing task, is_child = 0
+slot   operator(): id  0 | task 281 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 261
+slot   operator(): id  0 | task 281 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 281 | init sampler, took 0.03 ms, tokens: text = 261, total = 261
+slot print_timing: id  0 | task 281 | prompt eval time =     452.70 ms /   115 tokens (    3.94 ms per token,   254.03 tokens per second)
+slot print_timing: id  0 | task 281 |        eval time =    1011.95 ms /    27 tokens (   37.48 ms per token,    26.68 tokens per second)
+slot print_timing: id  0 | task 281 |       total time =    1464.65 ms /   142 tokens
+slot print_timing: id  0 | task 281 |    graphs reused =        271
+slot      release: id  0 | task 281 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:10 | 200 |  1.587317692s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.512
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 309 | processing task, is_child = 0
+slot   operator(): id  0 | task 309 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 309 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 309 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 309 | prompt eval time =     463.66 ms /   116 tokens (    4.00 ms per token,   250.18 tokens per second)
+slot print_timing: id  0 | task 309 |        eval time =     902.97 ms /    25 tokens (   36.12 ms per token,    27.69 tokens per second)
+slot print_timing: id  0 | task 309 |       total time =    1366.63 ms /   141 tokens
+slot print_timing: id  0 | task 309 |    graphs reused =        294
+slot      release: id  0 | task 309 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:11 | 200 |  1.493621257s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.509
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 335 | processing task, is_child = 0
+slot   operator(): id  0 | task 335 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 335 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 335 | init sampler, took 0.04 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 335 | prompt eval time =     461.05 ms /   119 tokens (    3.87 ms per token,   258.11 tokens per second)
+slot print_timing: id  0 | task 335 |        eval time =     637.45 ms /    19 tokens (   33.55 ms per token,    29.81 tokens per second)
+slot print_timing: id  0 | task 335 |       total time =    1098.50 ms /   138 tokens
+slot print_timing: id  0 | task 335 |    graphs reused =        311
+slot      release: id  0 | task 335 | stop processing: n_tokens = 283, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:12 | 200 |  1.222952502s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.521 (> 0.100 thold), f_keep = 0.516
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 355 | processing task, is_child = 0
+slot   operator(): id  0 | task 355 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 280
+slot   operator(): id  0 | task 355 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 355 | init sampler, took 0.03 ms, tokens: text = 280, total = 280
+slot print_timing: id  0 | task 355 | prompt eval time =     522.72 ms /   134 tokens (    3.90 ms per token,   256.35 tokens per second)
+slot print_timing: id  0 | task 355 |        eval time =     831.05 ms /    20 tokens (   41.55 ms per token,    24.07 tokens per second)
+slot print_timing: id  0 | task 355 |       total time =    1353.77 ms /   154 tokens
+slot print_timing: id  0 | task 355 |    graphs reused =        329
+slot      release: id  0 | task 355 | stop processing: n_tokens = 299, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:14 | 200 |  1.484606723s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.557 (> 0.100 thold), f_keep = 0.488
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 299, total state size = 23.364 MiB (draft: 0.000 MiB)
+srv         alloc:  - prompt is already in the cache, skipping
+srv          load:  - looking for better prompt, base f_keep = 0.488, sim = 0.557
+srv        update:  - cache state: 2 prompts, 46.259 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv        update:    - prompt 0x312102d0:     299 tokens, checkpoints:  0,    23.364 MiB
+srv  get_availabl: prompt cache update took 0.05 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 376 | processing task, is_child = 0
+slot   operator(): id  0 | task 376 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 262
+slot   operator(): id  0 | task 376 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 376 | init sampler, took 0.03 ms, tokens: text = 262, total = 262
+slot print_timing: id  0 | task 376 | prompt eval time =     443.35 ms /   116 tokens (    3.82 ms per token,   261.64 tokens per second)
+slot print_timing: id  0 | task 376 |        eval time =     926.54 ms /    27 tokens (   34.32 ms per token,    29.14 tokens per second)
+slot print_timing: id  0 | task 376 |       total time =    1369.89 ms /   143 tokens
+slot print_timing: id  0 | task 376 |    graphs reused =        354
+slot      release: id  0 | task 376 | stop processing: n_tokens = 288, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:15 | 200 |  1.497784659s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.553 (> 0.100 thold), f_keep = 0.507
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 404 | processing task, is_child = 0
+slot   operator(): id  0 | task 404 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 264
+slot   operator(): id  0 | task 404 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 404 | init sampler, took 0.03 ms, tokens: text = 264, total = 264
+slot print_timing: id  0 | task 404 | prompt eval time =     452.58 ms /   118 tokens (    3.84 ms per token,   260.73 tokens per second)
+slot print_timing: id  0 | task 404 |        eval time =     135.37 ms /     5 tokens (   27.07 ms per token,    36.94 tokens per second)
+slot print_timing: id  0 | task 404 |       total time =     587.95 ms /   123 tokens
+slot print_timing: id  0 | task 404 |    graphs reused =        357
+slot      release: id  0 | task 404 | stop processing: n_tokens = 268, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:16 | 200 |   713.99888ms |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.919 (> 0.100 thold), f_keep = 0.929
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 410 | processing task, is_child = 0
+slot   operator(): id  0 | task 410 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 271
+slot   operator(): id  0 | task 410 | cached n_tokens = 249, memory_seq_rm [249, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 410 | init sampler, took 0.03 ms, tokens: text = 271, total = 271
+slot print_timing: id  0 | task 410 | prompt eval time =     109.03 ms /    22 tokens (    4.96 ms per token,   201.77 tokens per second)
+slot print_timing: id  0 | task 410 |        eval time =     455.18 ms /    14 tokens (   32.51 ms per token,    30.76 tokens per second)
+slot print_timing: id  0 | task 410 |       total time =     564.21 ms /    36 tokens
+slot print_timing: id  0 | task 410 |    graphs reused =        369
+slot      release: id  0 | task 410 | stop processing: n_tokens = 284, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:17 | 200 |  690.650466ms |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.518
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 425 | processing task, is_child = 0
+slot   operator(): id  0 | task 425 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 425 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 425 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 425 | prompt eval time =     454.54 ms /   116 tokens (    3.92 ms per token,   255.21 tokens per second)
+slot print_timing: id  0 | task 425 |        eval time =    1063.22 ms /    31 tokens (   34.30 ms per token,    29.16 tokens per second)
+slot print_timing: id  0 | task 425 |       total time =    1517.76 ms /   147 tokens
+slot print_timing: id  0 | task 425 |    graphs reused =        398
+slot      release: id  0 | task 425 | stop processing: n_tokens = 293, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:19 | 200 |   1.64529905s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.498
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 293, total state size = 22.895 MiB (draft: 0.000 MiB)
+srv         alloc:  - prompt is already in the cache, skipping
+srv          load:  - looking for better prompt, base f_keep = 0.498, sim = 0.551
+srv        update:  - cache state: 2 prompts, 46.259 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv        update:    - prompt 0x312102d0:     299 tokens, checkpoints:  0,    23.364 MiB
+srv  get_availabl: prompt cache update took 0.03 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 457 | processing task, is_child = 0
+slot   operator(): id  0 | task 457 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 457 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 457 | init sampler, took 0.03 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 457 | prompt eval time =     463.65 ms /   119 tokens (    3.90 ms per token,   256.66 tokens per second)
+slot print_timing: id  0 | task 457 |        eval time =    1053.65 ms /    28 tokens (   37.63 ms per token,    26.57 tokens per second)
+slot print_timing: id  0 | task 457 |       total time =    1517.30 ms /   147 tokens
+slot print_timing: id  0 | task 457 |    graphs reused =        424
+slot      release: id  0 | task 457 | stop processing: n_tokens = 292, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:20 | 200 |  1.648738598s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.500
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 486 | processing task, is_child = 0
+slot   operator(): id  0 | task 486 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 261
+slot   operator(): id  0 | task 486 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 486 | init sampler, took 0.03 ms, tokens: text = 261, total = 261
+slot print_timing: id  0 | task 486 | prompt eval time =     460.68 ms /   115 tokens (    4.01 ms per token,   249.63 tokens per second)
+slot print_timing: id  0 | task 486 |        eval time =    1017.39 ms /    27 tokens (   37.68 ms per token,    26.54 tokens per second)
+slot print_timing: id  0 | task 486 |       total time =    1478.07 ms /   142 tokens
+slot print_timing: id  0 | task 486 |    graphs reused =        449
+slot      release: id  0 | task 486 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:22 | 200 |  1.601831771s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.512
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 514 | processing task, is_child = 0
+slot   operator(): id  0 | task 514 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 514 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 514 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 514 | prompt eval time =     475.22 ms /   116 tokens (    4.10 ms per token,   244.10 tokens per second)
+slot print_timing: id  0 | task 514 |        eval time =     937.91 ms /    25 tokens (   37.52 ms per token,    26.65 tokens per second)
+slot print_timing: id  0 | task 514 |       total time =    1413.13 ms /   141 tokens
+slot print_timing: id  0 | task 514 |    graphs reused =        472
+slot      release: id  0 | task 514 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:23 | 200 |  1.543406343s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.509
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 540 | processing task, is_child = 0
+slot   operator(): id  0 | task 540 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 540 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 540 | init sampler, took 0.03 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 540 | prompt eval time =     484.51 ms /   119 tokens (    4.07 ms per token,   245.61 tokens per second)
+slot print_timing: id  0 | task 540 |        eval time =     713.34 ms /    19 tokens (   37.54 ms per token,    26.64 tokens per second)
+slot print_timing: id  0 | task 540 |       total time =    1197.86 ms /   138 tokens
+slot print_timing: id  0 | task 540 |    graphs reused =        489
+slot      release: id  0 | task 540 | stop processing: n_tokens = 283, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:25 | 200 |  1.324886799s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.521 (> 0.100 thold), f_keep = 0.516
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 560 | processing task, is_child = 0
+slot   operator(): id  0 | task 560 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 280
+slot   operator(): id  0 | task 560 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 560 | init sampler, took 0.03 ms, tokens: text = 280, total = 280
+slot print_timing: id  0 | task 560 | prompt eval time =     539.96 ms /   134 tokens (    4.03 ms per token,   248.17 tokens per second)
+slot print_timing: id  0 | task 560 |        eval time =     782.73 ms /    20 tokens (   39.14 ms per token,    25.55 tokens per second)
+slot print_timing: id  0 | task 560 |       total time =    1322.69 ms /   154 tokens
+slot print_timing: id  0 | task 560 |    graphs reused =        507
+slot      release: id  0 | task 560 | stop processing: n_tokens = 299, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:26 | 200 |  1.448240484s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.557 (> 0.100 thold), f_keep = 0.488
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 299, total state size = 23.364 MiB (draft: 0.000 MiB)
+srv         alloc:  - prompt is already in the cache, skipping
+srv          load:  - looking for better prompt, base f_keep = 0.488, sim = 0.557
+srv        update:  - cache state: 2 prompts, 46.259 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv        update:    - prompt 0x312102d0:     299 tokens, checkpoints:  0,    23.364 MiB
+srv  get_availabl: prompt cache update took 0.04 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 581 | processing task, is_child = 0
+slot   operator(): id  0 | task 581 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 262
+slot   operator(): id  0 | task 581 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 581 | init sampler, took 0.03 ms, tokens: text = 262, total = 262
+slot print_timing: id  0 | task 581 | prompt eval time =     472.67 ms /   116 tokens (    4.07 ms per token,   245.41 tokens per second)
+slot print_timing: id  0 | task 581 |        eval time =     898.48 ms /    27 tokens (   33.28 ms per token,    30.05 tokens per second)
+slot print_timing: id  0 | task 581 |       total time =    1371.15 ms /   143 tokens
+slot print_timing: id  0 | task 581 |    graphs reused =        532
+slot      release: id  0 | task 581 | stop processing: n_tokens = 288, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:28 | 200 |  1.501425168s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.553 (> 0.100 thold), f_keep = 0.507
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 609 | processing task, is_child = 0
+slot   operator(): id  0 | task 609 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 264
+slot   operator(): id  0 | task 609 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 609 | init sampler, took 0.03 ms, tokens: text = 264, total = 264
+slot print_timing: id  0 | task 609 | prompt eval time =     470.26 ms /   118 tokens (    3.99 ms per token,   250.92 tokens per second)
+slot print_timing: id  0 | task 609 |        eval time =     158.37 ms /     5 tokens (   31.67 ms per token,    31.57 tokens per second)
+slot print_timing: id  0 | task 609 |       total time =     628.64 ms /   123 tokens
+slot print_timing: id  0 | task 609 |    graphs reused =        535
+slot      release: id  0 | task 609 | stop processing: n_tokens = 268, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:28 | 200 |  762.616169ms |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.919 (> 0.100 thold), f_keep = 0.929
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 615 | processing task, is_child = 0
+slot   operator(): id  0 | task 615 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 271
+slot   operator(): id  0 | task 615 | cached n_tokens = 249, memory_seq_rm [249, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 615 | init sampler, took 0.03 ms, tokens: text = 271, total = 271
+slot print_timing: id  0 | task 615 | prompt eval time =     113.31 ms /    22 tokens (    5.15 ms per token,   194.16 tokens per second)
+slot print_timing: id  0 | task 615 |        eval time =     530.45 ms /    14 tokens (   37.89 ms per token,    26.39 tokens per second)
+slot print_timing: id  0 | task 615 |       total time =     643.75 ms /    36 tokens
+slot print_timing: id  0 | task 615 |    graphs reused =        547
+slot      release: id  0 | task 615 | stop processing: n_tokens = 284, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:29 | 200 |  770.824261ms |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.518
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 630 | processing task, is_child = 0
+slot   operator(): id  0 | task 630 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 630 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 630 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 630 | prompt eval time =     460.83 ms /   116 tokens (    3.97 ms per token,   251.72 tokens per second)
+slot print_timing: id  0 | task 630 |        eval time =    1134.19 ms /    31 tokens (   36.59 ms per token,    27.33 tokens per second)
+slot print_timing: id  0 | task 630 |       total time =    1595.03 ms /   147 tokens
+slot print_timing: id  0 | task 630 |    graphs reused =        576
+slot      release: id  0 | task 630 | stop processing: n_tokens = 293, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:31 | 200 |  1.726821904s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.498
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 293, total state size = 22.895 MiB (draft: 0.000 MiB)
+srv         alloc:  - prompt is already in the cache, skipping
+srv          load:  - looking for better prompt, base f_keep = 0.498, sim = 0.551
+srv        update:  - cache state: 2 prompts, 46.259 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv        update:    - prompt 0x312102d0:     299 tokens, checkpoints:  0,    23.364 MiB
+srv  get_availabl: prompt cache update took 0.03 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 662 | processing task, is_child = 0
+slot   operator(): id  0 | task 662 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 662 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 662 | init sampler, took 0.03 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 662 | prompt eval time =     468.79 ms /   119 tokens (    3.94 ms per token,   253.85 tokens per second)
+slot print_timing: id  0 | task 662 |        eval time =     924.65 ms /    28 tokens (   33.02 ms per token,    30.28 tokens per second)
+slot print_timing: id  0 | task 662 |       total time =    1393.44 ms /   147 tokens
+slot print_timing: id  0 | task 662 |    graphs reused =        602
+slot      release: id  0 | task 662 | stop processing: n_tokens = 292, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:32 | 200 |  1.524570106s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.500
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 691 | processing task, is_child = 0
+slot   operator(): id  0 | task 691 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 261
+slot   operator(): id  0 | task 691 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 691 | init sampler, took 0.03 ms, tokens: text = 261, total = 261
+slot print_timing: id  0 | task 691 | prompt eval time =     455.66 ms /   115 tokens (    3.96 ms per token,   252.38 tokens per second)
+slot print_timing: id  0 | task 691 |        eval time =    1014.36 ms /    27 tokens (   37.57 ms per token,    26.62 tokens per second)
+slot print_timing: id  0 | task 691 |       total time =    1470.03 ms /   142 tokens
+slot print_timing: id  0 | task 691 |    graphs reused =        627
+slot      release: id  0 | task 691 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:34 | 200 |  1.592079379s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.559 (> 0.100 thold), f_keep = 0.512
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 719 | processing task, is_child = 0
+slot   operator(): id  0 | task 719 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 263
+slot   operator(): id  0 | task 719 | cached n_tokens = 147, memory_seq_rm [147, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 719 | init sampler, took 0.03 ms, tokens: text = 263, total = 263
+slot print_timing: id  0 | task 719 | prompt eval time =     450.30 ms /   116 tokens (    3.88 ms per token,   257.61 tokens per second)
+slot print_timing: id  0 | task 719 |        eval time =     940.53 ms /    25 tokens (   37.62 ms per token,    26.58 tokens per second)
+slot print_timing: id  0 | task 719 |       total time =    1390.83 ms /   141 tokens
+slot print_timing: id  0 | task 719 |    graphs reused =        650
+slot      release: id  0 | task 719 | stop processing: n_tokens = 287, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:36 | 200 |  1.519798312s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.551 (> 0.100 thold), f_keep = 0.509
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 745 | processing task, is_child = 0
+slot   operator(): id  0 | task 745 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 265
+slot   operator(): id  0 | task 745 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 745 | init sampler, took 0.03 ms, tokens: text = 265, total = 265
+slot print_timing: id  0 | task 745 | prompt eval time =     474.01 ms /   119 tokens (    3.98 ms per token,   251.05 tokens per second)
+slot print_timing: id  0 | task 745 |        eval time =     698.24 ms /    19 tokens (   36.75 ms per token,    27.21 tokens per second)
+slot print_timing: id  0 | task 745 |       total time =    1172.25 ms /   138 tokens
+slot print_timing: id  0 | task 745 |    graphs reused =        667
+slot      release: id  0 | task 745 | stop processing: n_tokens = 283, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:37 | 200 |  1.299503925s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.521 (> 0.100 thold), f_keep = 0.516
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 765 | processing task, is_child = 0
+slot   operator(): id  0 | task 765 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 280
+slot   operator(): id  0 | task 765 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 765 | init sampler, took 0.03 ms, tokens: text = 280, total = 280
+slot print_timing: id  0 | task 765 | prompt eval time =     516.39 ms /   134 tokens (    3.85 ms per token,   259.49 tokens per second)
+slot print_timing: id  0 | task 765 |        eval time =     653.01 ms /    20 tokens (   32.65 ms per token,    30.63 tokens per second)
+slot print_timing: id  0 | task 765 |       total time =    1169.39 ms /   154 tokens
+slot print_timing: id  0 | task 765 |    graphs reused =        685
+slot      release: id  0 | task 765 | stop processing: n_tokens = 299, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:38 | 200 |  1.299616516s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.557 (> 0.100 thold), f_keep = 0.488
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 299, total state size = 23.364 MiB (draft: 0.000 MiB)
+srv         alloc:  - prompt is already in the cache, skipping
+srv          load:  - looking for better prompt, base f_keep = 0.488, sim = 0.557
+srv        update:  - cache state: 2 prompts, 46.259 MiB (limits: 8192.000 MiB, 2048 tokens, 104837 est)
+srv        update:    - prompt 0x30bf7960:     293 tokens, checkpoints:  0,    22.895 MiB
+srv        update:    - prompt 0x312102d0:     299 tokens, checkpoints:  0,    23.364 MiB
+srv  get_availabl: prompt cache update took 0.04 ms
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 786 | processing task, is_child = 0
+slot   operator(): id  0 | task 786 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 262
+slot   operator(): id  0 | task 786 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 786 | init sampler, took 0.03 ms, tokens: text = 262, total = 262
+slot print_timing: id  0 | task 786 | prompt eval time =     452.12 ms /   116 tokens (    3.90 ms per token,   256.57 tokens per second)
+slot print_timing: id  0 | task 786 |        eval time =     886.99 ms /    27 tokens (   32.85 ms per token,    30.44 tokens per second)
+slot print_timing: id  0 | task 786 |       total time =    1339.11 ms /   143 tokens
+slot print_timing: id  0 | task 786 |    graphs reused =        710
+slot      release: id  0 | task 786 | stop processing: n_tokens = 288, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:40 | 200 |  1.459088228s |       127.0.0.1 | POST     "/api/generate"
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, sim_best = 0.553 (> 0.100 thold), f_keep = 0.507
+slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> ?top-p -> ?min-p -> ?xtc -> temp-ext -> dist 
+slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 2048
+	top_k = 1, top_p = 1.000, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+slot launch_slot_: id  0 | task 814 | processing task, is_child = 0
+slot   operator(): id  0 | task 814 | new prompt, n_ctx_slot = 2048, n_keep = 4, task.n_tokens = 264
+slot   operator(): id  0 | task 814 | cached n_tokens = 146, memory_seq_rm [146, end)
+srv  stream_sessi: conv_id= (empty=1)
+slot init_sampler: id  0 | task 814 | init sampler, took 0.03 ms, tokens: text = 264, total = 264
+slot print_timing: id  0 | task 814 | prompt eval time =     461.54 ms /   118 tokens (    3.91 ms per token,   255.67 tokens per second)
+slot print_timing: id  0 | task 814 |        eval time =     178.14 ms /     5 tokens (   35.63 ms per token,    28.07 tokens per second)
+slot print_timing: id  0 | task 814 |       total time =     639.68 ms /   123 tokens
+slot print_timing: id  0 | task 814 |    graphs reused =        713
+slot      release: id  0 | task 814 | stop processing: n_tokens = 268, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/16 - 09:15:40 | 200 |  765.087195ms |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/09/16 - 09:15:42 | 200 |       23.53µs |       127.0.0.1 | HEAD     "/"
+[GIN] 2026/09/16 - 09:15:42 | 200 |   80.107007ms |       127.0.0.1 | POST     "/api/show"
+[GIN] 2026/09/16 - 09:15:42 | 200 |   17.262727ms |       127.0.0.1 | POST     "/api/generate"
+[GIN] 2026/09/16 - 09:16:53 | 200 |      29.331µs |       127.0.0.1 | HEAD     "/"
+[GIN] 2026/09/16 - 09:16:53 | 200 |     464.612µs |       127.0.0.1 | POST     "/api/show"
+[GIN] 2026/09/16 - 09:16:53 | 200 |   15.784932ms |       127.0.0.1 | POST     "/api/generate"

@@ -18,6 +18,7 @@ package com.integrallis.models.langchain4j;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.AuxiliaryTextGenerationModel;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.GenerationUsage;
@@ -26,11 +27,16 @@ import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.runtime.ActivatedToolModel;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
+import com.integrallis.models.runtime.GenerationMetrics;
+import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
@@ -187,6 +193,69 @@ class ModelsStreamingChatModelTest {
               assertThat(call.name()).isEqualTo("set_mode");
               assertThat(call.arguments()).isEqualTo("{\"mode\":\"cool\"}");
             });
+  }
+
+  @Test
+  void activatedAdapterStreamsItsRetainedBaseBranchAfterTheToolResult() {
+    ActivatedStreamingModel delegate = new ActivatedStreamingModel();
+    ModelsStreamingChatModel model =
+        new ModelsStreamingChatModel(
+            delegate, ChatTemplate.CHATML, SamplingOptions.builder().build());
+    ChatRequest initial =
+        ChatRequest.builder()
+            .messages(UserMessage.from("switch to cooling"))
+            .toolSpecifications(MODE)
+            .build();
+    AtomicReference<ChatResponse> selected = new AtomicReference<>();
+
+    model.doChat(initial, handler(new ArrayList<>(), selected, new AtomicReference<>()));
+
+    ToolExecutionRequest call = selected.get().aiMessage().toolExecutionRequests().getFirst();
+    ChatRequest followUp =
+        ChatRequest.builder()
+            .messages(
+                UserMessage.from("switch to cooling"),
+                selected.get().aiMessage(),
+                ToolExecutionResultMessage.from(call.id(), call.name(), "cooling enabled"))
+            .toolSpecifications(MODE)
+            .build();
+    List<String> partials = new ArrayList<>();
+    AtomicReference<ChatResponse> completed = new AtomicReference<>();
+
+    model.doChat(followUp, handler(partials, completed, new AtomicReference<>()));
+
+    assertThat(partials).containsExactly("Cooling ", "is enabled.");
+    assertThat(completed.get().aiMessage().text()).isEqualTo("Cooling is enabled.");
+    assertThat(delegate.responsePrompt).contains("cooling enabled");
+    assertThat(delegate.openedTurns).isEqualTo(2);
+    assertThat(delegate.extendedTurns).isEqualTo(1);
+    assertThat(delegate.closedTurns).isEqualTo(2);
+    assertThat(delegate.ordinaryGenerations).isZero();
+  }
+
+  @Test
+  void activatedAdapterStreamingFiniteGrammarPreservesItsNoToolSentinel() {
+    String abstention = "<tool_call>\n[]\n</tool_call>";
+    ActivatedStreamingModel delegate = new ActivatedStreamingModel(true);
+    ModelsStreamingChatModel model =
+        new ModelsStreamingChatModel(
+            delegate, ChatTemplate.CHATML, SamplingOptions.builder().build());
+    ChatRequest request =
+        ChatRequest.builder()
+            .messages(UserMessage.from("Hello, how are you?"))
+            .toolSpecifications(MODE)
+            .build();
+    AtomicReference<ChatResponse> completed = new AtomicReference<>();
+
+    model.doChat(request, handler(new ArrayList<>(), completed, new AtomicReference<>()));
+
+    assertThat(completed.get().aiMessage().text()).isEqualTo("Cooling is enabled.");
+    TokenConstraint constraint = delegate.constraints.getFirst();
+    for (int token : abstention.chars().toArray()) {
+      assertThat(constraint.allows(token)).isTrue();
+      constraint.accept(token);
+    }
+    assertThat(constraint.isComplete()).isTrue();
   }
 
   @Test
@@ -436,6 +505,196 @@ class ModelsStreamingChatModelTest {
         stream.onToken(String.valueOf((char) token));
       }
       stream.onComplete();
+    }
+  }
+
+  private static final class ActivatedStreamingModel implements ActivatedToolModel {
+    private final Tokenizer tokenizer = new CharacterTokenizer();
+    private final boolean abstainImmediately;
+    private final List<TokenConstraint> constraints = new ArrayList<>();
+    private int openedTurns;
+    private int extendedTurns;
+    private int closedTurns;
+    private int ordinaryGenerations;
+    private String responsePrompt;
+
+    private ActivatedStreamingModel() {
+      this(false);
+    }
+
+    private ActivatedStreamingModel(boolean abstainImmediately) {
+      this.abstainImmediately = abstainImmediately;
+    }
+
+    @Override
+    public ActivatedAdapterMetadata adapter() {
+      return new ActivatedAdapterMetadata(
+          "test/base",
+          "a".repeat(40),
+          "b".repeat(64),
+          java.util.Map.of("tokenizer.json", "d".repeat(64)),
+          "c".repeat(64),
+          1,
+          1,
+          List.of(1),
+          testProvenance());
+    }
+
+    @Override
+    public List<String> toolAbstentionOutputs() {
+      return List.of("<tool_call>\n[]\n</tool_call>");
+    }
+
+    private static ActivatedAdapterMetadata.TrainingProvenance testProvenance() {
+      return new ActivatedAdapterMetadata.TrainingProvenance(
+          "test/dataset",
+          "e".repeat(40),
+          "train.jsonl",
+          "f".repeat(64),
+          "1".repeat(64),
+          "2".repeat(64),
+          "3".repeat(64),
+          "formatter.java",
+          "4".repeat(64));
+    }
+
+    @Override
+    public SharedToolTurn openToolTurn(ModelPrompt renderedToolPrompt) {
+      int turnIndex = openedTurns++;
+      return new SharedToolTurn() {
+        @Override
+        public String generateToolCall(SamplingOptions options, TokenConstraint constraint) {
+          constraints.add(constraint);
+          return turnIndex == 0 && !abstainImmediately
+              ? "<tool_call>{\"name\":\"set_mode\",\"arguments\":{\"mode\":\"cool\"}}</tool_call>"
+              : "<tool_call>\n[]\n</tool_call>";
+        }
+
+        @Override
+        public void generateToolCall(
+            SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+          throw new AssertionError("streaming adapter may accumulate the tool selection directly");
+        }
+
+        @Override
+        public SharedToolTurn continueToolSelection(ModelPrompt nextToolPrompt) {
+          extendedTurns++;
+          close();
+          return ActivatedStreamingModel.this.openToolTurn(nextToolPrompt);
+        }
+
+        @Override
+        public String generateBaseResponse(ModelPrompt prompt, SamplingOptions options) {
+          throw new AssertionError("streaming adapter must stream the base response");
+        }
+
+        @Override
+        public void generateBaseResponse(
+            ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+          responsePrompt = prompt.text();
+          stream.onToken("Cooling ");
+          stream.onToken("is enabled.");
+          stream.onComplete();
+        }
+
+        @Override
+        public int sharedPrefixTokens() {
+          return 10;
+        }
+
+        @Override
+        public long sharedPrefixBytes() {
+          return 1_024;
+        }
+
+        @Override
+        public boolean physicallySharesPrefix() {
+          return true;
+        }
+
+        @Override
+        public GenerationMetrics toolMetrics() {
+          return GenerationMetrics.unavailable();
+        }
+
+        @Override
+        public GenerationMetrics responseMetrics() {
+          return GenerationMetrics.unavailable();
+        }
+
+        @Override
+        public void close() {
+          if (!closed) {
+            closed = true;
+            closedTurns++;
+          }
+        }
+
+        private boolean closed;
+      };
+    }
+
+    @Override
+    public String modelName() {
+      return "activated-streaming";
+    }
+
+    @Override
+    public BackendDiagnostics diagnostics() {
+      return BackendDiagnostics.unavailable("activated-streaming");
+    }
+
+    @Override
+    public Tokenizer tokenizer() {
+      return tokenizer;
+    }
+
+    @Override
+    public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+      ordinaryGenerations++;
+      stream.onError(new AssertionError("ordinary generation must not serve a tool turn"));
+    }
+
+    @Override
+    public void generate(
+        ModelPrompt prompt,
+        SamplingOptions options,
+        TokenStream stream,
+        TokenConstraint constraint) {
+      ordinaryGenerations++;
+      stream.onError(new AssertionError("ordinary generation must not serve a tool turn"));
+    }
+  }
+
+  private static final class CharacterTokenizer implements Tokenizer {
+    @Override
+    public int[] encode(String text) {
+      return text.chars().toArray();
+    }
+
+    @Override
+    public String decode(int[] tokens) {
+      return "";
+    }
+
+    @Override
+    public String decode(int token) {
+      return String.valueOf((char) token);
+    }
+
+    @Override
+    public int vocabSize() {
+      return Character.MAX_VALUE + 1;
+    }
+
+    @Override
+    public int bosToken() {
+      return 0;
+    }
+
+    @Override
+    public int eosToken() {
+      return 1;
     }
   }
 }

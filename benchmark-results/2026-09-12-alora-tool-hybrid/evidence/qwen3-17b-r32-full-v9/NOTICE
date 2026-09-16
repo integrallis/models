@@ -1,0 +1,24 @@
+Qwen3 1.7B Activated Tool Adapter
+
+This adapter is a modified work trained from the following pinned sources:
+
+- Qwen/Qwen3-1.7B, revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e,
+  licensed under Apache License 2.0.
+- edbuildingstuff/bfcl-ft-data, revision a7ceb3b1e1605f609fda6f2befec704f575290de,
+  licensed under Creative Commons Attribution 4.0. Credit: the dataset author,
+  Salesforce/xLAM (APIGen), and Team-ACE/ToolACE.
+- MadeAgents/xlam-irrelevance-7.5k, revision
+  34323bf09efc7e4a394998a0fa91ff997617c369, licensed under Creative Commons
+  Attribution 4.0. Credit: MadeAgents and Salesforce/xLAM.
+
+Changes: deterministic filtering excluded qualification-query overlap; the positive tool-call and
+no-applicable-tool examples retained their original train/validation boundaries; the unmodified
+Qwen3 base was trained as an activated LoRA whose weights apply only after the pinned assistant
+invocation sequence.
+
+License texts and source details:
+https://www.apache.org/licenses/LICENSE-2.0
+https://creativecommons.org/licenses/by/4.0/
+https://huggingface.co/Qwen/Qwen3-1.7B
+https://huggingface.co/datasets/edbuildingstuff/bfcl-ft-data
+https://huggingface.co/datasets/MadeAgents/xlam-irrelevance-7.5k

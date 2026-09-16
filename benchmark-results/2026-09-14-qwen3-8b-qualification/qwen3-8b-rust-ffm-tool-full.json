@@ -1,0 +1,556 @@
+{
+  "schemaVersion" : 2,
+  "createdAt" : "2026-09-14T22:55:27.541904140Z",
+  "policyVersion" : "small-model-tool-conformance-v1",
+  "modelsRevision" : "7167c870aa6a9934ecc93c873f7f1b3f9b4b49d6",
+  "modelId" : "qwen3_8b_q4_k_m",
+  "model" : "Qwen3 8B GGUF Q4_K_M",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@7167c870aa6a9934ecc93c873f7f1b3f9b4b49d6",
+  "artifactSha256" : "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "artifactSizeBytes" : 5027783488,
+  "suite" : {
+    "id" : "models-tool-conformance-v2",
+    "sha256" : "56931b0dba10c355c7372f773a05267aea48eec15dc2d98057349250da027f55",
+    "sourceRepository" : "https://github.com/cactus-compute/needle",
+    "sourceRevision" : "7bd8a635ebb977489703b3bb916c21412e8a9cdf",
+    "sourcePath" : "needle/playground/app.js"
+  },
+  "generation" : {
+    "temperature" : 0.0,
+    "maxTokens" : 256,
+    "promptTemplate" : "chatml-no-think"
+  },
+  "environment" : {
+    "host" : "modeljars-qwen3-8b-rust-20260914",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-138-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Rome Processor",
+    "processors" : 16,
+    "physicalMemoryBytes" : 32859295744,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "active-vector-bits" : "256",
+      "vector-api" : "true",
+      "preferred-vector-bits" : "256",
+      "sve" : "false",
+      "compiler" : "hotspot-c2",
+      "native-gated-delta-net" : "false",
+      "fast-scalar-fma" : "true",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "projection-layers" : "36",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "gguf-parallel" : "true",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-q5-0-grouped" : "false",
+      "native-kernel-threads" : "16",
+      "java-version" : "25.0.4.1",
+      "architecture" : "amd64",
+      "gguf-executor" : "persistent",
+      "transformer-runtime" : "java",
+      "q4-short-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "kernel-runtime" : "rust-ffm",
+      "gguf-threads" : "16",
+      "native-kernel-abi" : "5",
+      "native-load-warmup" : "false",
+      "fast-vector-fma" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "vm-vendor" : "Eclipse Adoptium",
+      "model-architecture" : "qwen3",
+      "cpu-model" : "AMD EPYC-Rome Processor",
+      "gguf-chunks-per-thread" : "2",
+      "os" : "Linux",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "processors" : "16",
+      "native-quantized-decode" : "false"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v13",
+        "qkv" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "18",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block",
+        "active-vector-bits" : "256",
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "16",
+        "partition" : "batch-rows",
+        "staged-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "load-warmup",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.loadWarmup",
+      "settings" : {
+        "sequence-state" : "reset-after-warmup",
+        "property" : "models.native.loadWarmup"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "5",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "5",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "5",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "5",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "5",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "5",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "5",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "property" : "models.native.gatedDeltaNet",
+        "abi" : "5",
+        "state" : "caller-owned-java-array",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "qualification" : "model-and-platform-specific",
+        "property" : "models.native.q5_0.grouped"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.quantizedDecode",
+      "settings" : {
+        "transformer" : "java",
+        "property" : "models.native.quantizedDecode"
+      }
+    } ]
+  },
+  "activatedAdapter" : null,
+  "plannedAttempts" : 14,
+  "inapplicableCases" : [ ],
+  "complete" : true,
+  "summary" : {
+    "attempts" : 14,
+    "passed" : 14,
+    "structuredOutputRate" : 1.0,
+    "toolSelectionExactRate" : 1.0,
+    "schemaValidityRate" : 1.0,
+    "declaredArgumentsOnlyRate" : 1.0,
+    "expectedArgumentAccuracy" : 1.0,
+    "refusalAccuracy" : 1.0,
+    "p95EndToEndMillis" : 62233.0,
+    "qualified" : true,
+    "verdict" : "PASS"
+  },
+  "followUp" : {
+    "id" : "tool-result-follow-up",
+    "applicable" : true,
+    "endToEndMillis" : 16256,
+    "output" : "The weather for zipcode 88252 is rainy with conditions described as \"Raining cats and dogs,\" and the temperature is 78°F.",
+    "initialToolOutput" : "",
+    "postResultToolOutput" : "",
+    "conversational" : true,
+    "grounded" : true,
+    "repeatedToolCall" : false,
+    "passed" : true,
+    "diagnostics" : [ ]
+  },
+  "qualified" : true,
+  "verdict" : "PASS",
+  "cases" : [ {
+    "id" : "home",
+    "endToEndMillis" : 39797,
+    "output" : "<tool_call>\n{\"name\": \"set_lights\", \"arguments\": {\"room\": \"bedroom\", \"state\": \"on\", \"brightness\": 20}}\n</tool_call>\n<tool_call>\n{\"name\": \"lock_door\", \"arguments\": {\"door\": \"front door\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "robot",
+    "endToEndMillis" : 42472,
+    "output" : "<tool_call>\n{\"name\": \"move\", \"arguments\": {\"direction\": \"forward\", \"distance_m\": 2}}\n</tool_call>\n<tool_call>\n{\"name\": \"rotate\", \"arguments\": {\"direction\": \"left\", \"degrees\": 90}}\n</tool_call>\n<tool_call>\n{\"name\": \"gripper\", \"arguments\": {\"action\": \"close\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 5,
+    "expectedArguments" : 5,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "device",
+    "endToEndMillis" : 37636,
+    "output" : "<tool_call>\n{\"name\": \"set_theme\", \"arguments\": {\"accent_color\": \"green\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"open_website\", \"arguments\": {\"url\": \"https://github.com\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"speak\", \"arguments\": {\"text\": \"hello\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "gallery",
+    "endToEndMillis" : 33648,
+    "output" : "<tool_call>\n{\"name\": \"create_album\", \"arguments\": {\"name\": \"Summer 2026\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"move_photos\", \"arguments\": {\"album\": \"Summer 2026\", \"filter\": \"last weekend\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "email",
+    "endToEndMillis" : 32566,
+    "output" : "<tool_call>\n{\"name\": \"send_email\", \"arguments\": {\"to\": \"finance@cactus.dev\", \"subject\": \"expenses: Blue Bottle Coffee, $14.50, August 4th\", \"body\": \"Please find the receipt for the expenses on August 4th. The amount is $14.50 for Blue Bottle Coffee.\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "currency",
+    "endToEndMillis" : 19614,
+    "output" : "<tool_call>\n{\"name\": \"convert_currency\", \"arguments\": {\"amount\": 250, \"from_currency\": \"USD\", \"to_currency\": \"EUR\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "document",
+    "endToEndMillis" : 55651,
+    "output" : "<tool_call>\n{\"name\": \"record_booking\", \"arguments\": {\"hotel\": \"Harbor Light Hotel\", \"confirmation_number\": \"HL-88213\", \"guest_name\": \"Mr Okafor\", \"room_type\": \"deluxe sea-view room\", \"check_in\": \"2026-09-14\", \"check_out\": \"2026-09-18\", \"total\": 642.50, \"currency\": \"euros\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "sentiment",
+    "endToEndMillis" : 12362,
+    "output" : "<tool_call>\n{\"name\": \"classify_sentiment\", \"arguments\": {\"sentiment\": \"negative\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "crowded",
+    "endToEndMillis" : 62233,
+    "output" : "<tool_call>\n{\"name\": \"open_blinds\", \"arguments\": {\"room\": \"bedroom\", \"position\": \"half\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "repeat",
+    "endToEndMillis" : 26727,
+    "output" : "<tool_call>\n{\"name\": \"add_to_list\", \"arguments\": {\"item\": \"milk\", \"quantity\": 2}}\n</tool_call>\n<tool_call>\n{\"name\": \"add_to_list\", \"arguments\": {\"item\": \"eggs\", \"quantity\": 6}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "array",
+    "endToEndMillis" : 13695,
+    "output" : "<tool_call>\n{\"name\": \"add_items\", \"arguments\": {\"items\": [\"milk\", \"eggs\", \"bread\"]}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "flight",
+    "endToEndMillis" : 30249,
+    "output" : "<tool_call>\n{\"name\": \"search_flights\", \"arguments\": {\"from_city\": \"Lagos\", \"to_city\": \"Nairobi\", \"date\": \"2023-12-03\", \"direct_only\": true, \"passengers\": 2}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "refuse",
+    "endToEndMillis" : 45696,
+    "output" : "The moon, a silver beacon in the night,  \nShines bright with silent, gentle light.  \nIt dances on the waves below,  \nA silent watcher, calm and slow.  \n\nIn its glow, the stars seem near,  \nA dreamer's guide, a poet's cheer.  \nThough distant, it touches all,  \nA symbol of love, a beacon for the soul.",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 0,
+    "refusalExpected" : true,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "spring-weather-zipcode",
+    "endToEndMillis" : 16521,
+    "output" : "<tool_call>\n{\"name\": \"get-weather-for-zipcode\", \"arguments\": {\"zipcode\": \"88252\"}}\n</tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  } ]
+}

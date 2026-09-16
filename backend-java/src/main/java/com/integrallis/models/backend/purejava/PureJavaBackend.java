@@ -15,15 +15,18 @@
  */
 package com.integrallis.models.backend.purejava;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.AuxiliaryInferenceBackend;
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
-import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.HiddenStateInferenceBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.SharedInferencePrefix;
+import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.bert.BertConfig;
@@ -49,6 +52,8 @@ import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaWeights;
+import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter;
+import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter.Architecture;
 import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeForwardPass;
 import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
@@ -71,6 +76,9 @@ import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +93,10 @@ import java.util.Set;
  * any native dependencies.
  */
 public final class PureJavaBackend
-    implements SpeculativeInferenceBackend, BatchInferenceBackend, AuxiliaryInferenceBackend {
+    implements SpeculativeInferenceBackend,
+        AuxiliaryInferenceBackend,
+        HiddenStateInferenceBackend,
+        SharedPrefixInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
   private static final System.Logger LOGGER = System.getLogger(PureJavaBackend.class.getName());
@@ -99,6 +110,8 @@ public final class PureJavaBackend
   private final BackendDiagnostics diagnostics;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
   private final BatchedCausalAttentionKernel batchedAttentionKernel;
+  private final Set<PureJavaInferenceSession> activeSessions =
+      Collections.newSetFromMap(new IdentityHashMap<>());
   private PureJavaDecoder.Session[] sessionBatch = new PureJavaDecoder.Session[0];
   private boolean closed;
 
@@ -110,7 +123,7 @@ public final class PureJavaBackend
 
   private static final class PureJavaInferenceSession implements InferenceSession {
     private final PureJavaBackend owner;
-    private final PureJavaDecoder.Session delegate;
+    private PureJavaDecoder.Session delegate;
     private boolean closed;
 
     private PureJavaInferenceSession(PureJavaBackend owner, PureJavaDecoder.Session delegate) {
@@ -130,8 +143,36 @@ public final class PureJavaBackend
     }
 
     @Override
+    public java.util.OptionalLong allocatedStateBytes() {
+      owner.requireOpen(this);
+      return delegate.allocatedStateBytes();
+    }
+
+    @Override
     public void close() {
       owner.closeSession(this);
+    }
+  }
+
+  private static final class PureJavaSharedPrefix implements SharedInferencePrefix {
+    private final PureJavaBackend owner;
+    private final PureJavaDecoder.SharedPrefix delegate;
+
+    private PureJavaSharedPrefix(PureJavaBackend owner, PureJavaDecoder.SharedPrefix delegate) {
+      this.owner = owner;
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int checkpoint() {
+      owner.checkOpen();
+      return delegate.checkpoint();
+    }
+
+    @Override
+    public long sharedBytes() {
+      owner.checkOpen();
+      return delegate.sharedBytes();
     }
   }
 
@@ -174,6 +215,46 @@ public final class PureJavaBackend
         Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
         GgufBatchedMatrixKernel.none(),
         BatchedCausalAttentionKernel.none());
+  }
+
+  /**
+   * Loads a causal GGUF model and a pinned Activated-LoRA adapter executed entirely in Java.
+   *
+   * <p>The adapter metadata must bind to the SHA-256 of {@code modelPath}, declare every supported
+   * projection, and match the loaded model dimensions. The returned backend can fork base and
+   * activated branches from one physically shared KV-cache prefix.
+   */
+  public static PureJavaBackend loadActivatedAdapter(Path modelPath, Path adapterDirectory) {
+    return loadActivatedAdapter(modelPath, adapterDirectory, BackendConfiguration.empty());
+  }
+
+  /** Loads a pinned Activated-LoRA adapter with registry-neutral backend recommendations. */
+  public static PureJavaBackend loadActivatedAdapter(
+      Path modelPath, Path adapterDirectory, BackendConfiguration backendConfiguration) {
+    return loadActivatedAdapter(
+        modelPath, adapterDirectory, backendConfiguration, GgufBatchedMatrixKernel.none());
+  }
+
+  /**
+   * Loads a pinned Activated-LoRA adapter with an injected batched projection kernel.
+   *
+   * <p>The kernel only replaces the base matrix products. The transformer plan, the adapter delta,
+   * the activation boundary, and the physically shared KV prefix remain the Java implementation, so
+   * a kernel arm must be token-identical to the pure-Java arm to count as the same model. The
+   * returned backend owns and closes {@code batchedMatrixKernel}.
+   */
+  public static PureJavaBackend loadActivatedAdapter(
+      Path modelPath,
+      Path adapterDirectory,
+      BackendConfiguration backendConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    return load(
+        modelPath,
+        ModelMemoryArena.create(),
+        Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"),
+        BatchedCausalAttentionKernel.none(),
+        Objects.requireNonNull(adapterDirectory, "adapterDirectory"));
   }
 
   /**
@@ -281,6 +362,22 @@ public final class PureJavaBackend
       BackendConfiguration backendConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel,
       BatchedCausalAttentionKernel batchedAttentionKernel) {
+    return load(
+        modelPath,
+        arenaOwner,
+        backendConfiguration,
+        batchedMatrixKernel,
+        batchedAttentionKernel,
+        null);
+  }
+
+  private static PureJavaBackend load(
+      Path modelPath,
+      ModelMemoryArena arenaOwner,
+      BackendConfiguration backendConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel,
+      Path activatedAdapterDirectory) {
     Objects.requireNonNull(arenaOwner, "arenaOwner");
     Objects.requireNonNull(backendConfiguration, "backendConfiguration");
     Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
@@ -297,6 +394,7 @@ public final class PureJavaBackend
       Tokenizer tokenizer;
       Arena arena = arenaOwner.arena();
       if (Files.isDirectory(modelPath)) {
+        requireGgufAdapterModel(activatedAdapterDirectory, modelPath);
         Path configPath = modelPath.resolve("config.json");
         if (MobileMoeHuggingFaceConfig.matches(configPath)) {
           MobileMoeHuggingFaceConfig config = MobileMoeHuggingFaceConfig.parse(configPath);
@@ -347,6 +445,7 @@ public final class PureJavaBackend
                   batchedAttentionKernel);
         }
       } else if (CactParser.matches(modelPath)) {
+        requireGgufAdapterModel(activatedAdapterDirectory, modelPath);
         CactFile file = CactParser.parse(modelPath, arena);
         CactNeedle2Layout layout = CactNeedle2Layout.from(file);
         CactTokenizer cactTokenizer = CactTokenizer.from(file);
@@ -359,6 +458,7 @@ public final class PureJavaBackend
         tokenizer = GgufTokenizer.fromMetadata(file.metadata());
         String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
         if ("gemma4".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded =
               loadGemma4(
                   modelPath,
@@ -369,8 +469,10 @@ public final class PureJavaBackend
                   backendConfiguration,
                   batchedMatrixKernel);
         } else if ("qwen35".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadQwen35(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else if ("bert".equals(modelFamily) || "nomic-bert".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadBert(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else {
           loaded =
@@ -381,7 +483,9 @@ public final class PureJavaBackend
                   runtime,
                   planConfiguration,
                   batchedMatrixKernel,
-                  batchedAttentionKernel);
+                  batchedAttentionKernel,
+                  activatedAdapterDirectory,
+                  arena);
         }
       }
 
@@ -606,7 +710,10 @@ public final class PureJavaBackend
       RuntimeFingerprint runtime,
       PureJavaPlanConfiguration planConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel,
-      BatchedCausalAttentionKernel batchedAttentionKernel) {
+      BatchedCausalAttentionKernel batchedAttentionKernel,
+      Path activatedAdapterDirectory,
+      Arena arena)
+      throws IOException {
     LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
     LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
     PureJavaExecutionPlan executionPlan =
@@ -618,6 +725,7 @@ public final class PureJavaBackend
     int contextCapacity = runtimeContextLength(config.contextLength());
     PureJavaDecoder decoder;
     if (config.usesBidirectionalAttention()) {
+      requireLlamaAdapterModel(activatedAdapterDirectory, config.architecture().toString());
       // An encoder holds no KV cache: every position depends on every other, so there is nothing
       // from a previous step to reuse.
       decoder =
@@ -627,17 +735,44 @@ public final class PureJavaBackend
                   weights,
                   DenseProjectionHead.load(file, modelFamily, config.embeddingDim()).orElse(null)));
     } else {
+      ActivatedLoraAdapter activatedAdapter =
+          activatedAdapterDirectory == null
+              ? null
+              : ActivatedLoraAdapter.open(
+                  activatedAdapterDirectory,
+                  arena,
+                  modelPath,
+                  new Architecture(
+                      config.numLayers(),
+                      config.embeddingDim(),
+                      config.queryDim(),
+                      config.keyDim(),
+                      config.valueDim(),
+                      config.attentionOutputDim(),
+                      config.hiddenDim(),
+                      config.numHeads(),
+                      config.numKvHeads(),
+                      !config.usesNeoxRope()));
       KvCache cache =
           new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
-      decoder =
-          new LlamaDecoder(
-              new LlamaForwardPass(
+      LlamaForwardPass forwardPass =
+          activatedAdapter == null
+              ? new LlamaForwardPass(
                   config,
                   weights,
                   cache,
                   executionPlan,
                   batchedMatrixKernel,
-                  batchedAttentionKernel));
+                  batchedAttentionKernel)
+              : new LlamaForwardPass(
+                  config,
+                  weights,
+                  cache,
+                  executionPlan,
+                  batchedMatrixKernel,
+                  batchedAttentionKernel,
+                  activatedAdapter);
+      decoder = new LlamaDecoder(forwardPass);
     }
     ModelMetadata metadata =
         new ModelMetadata(
@@ -650,6 +785,20 @@ public final class PureJavaBackend
             config.numHeads(),
             config.numKvHeads());
     return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static void requireGgufAdapterModel(Path adapterDirectory, Path modelPath) {
+    if (adapterDirectory != null) {
+      throw new IllegalArgumentException(
+          "activated adapters require a causal Llama-family GGUF model, not " + modelPath);
+    }
+  }
+
+  private static void requireLlamaAdapterModel(Path adapterDirectory, String modelFamily) {
+    if (adapterDirectory != null) {
+      throw new IllegalArgumentException(
+          "activated adapters require a causal Llama-family graph; got " + modelFamily);
+    }
   }
 
   private static LoadedDecoder loadGemma4(
@@ -769,6 +918,7 @@ public final class PureJavaBackend
    *
    * <p>The array is backend-owned scratch, valid until the next call. Copy it to keep it.
    */
+  @Override
   public float[] prefillHiddenState(int[] tokens, int startPosition) {
     checkOpen();
     return decoder.prefillHiddenState(tokens, startPosition);
@@ -787,6 +937,7 @@ public final class PureJavaBackend
   }
 
   /** Whether this model's architecture exposes hidden states for embedding. */
+  @Override
   public boolean supportsHiddenState() {
     return decoder.supportsHiddenState();
   }
@@ -841,7 +992,65 @@ public final class PureJavaBackend
   @Override
   public InferenceSession openSession() {
     checkOpen();
-    return new PureJavaInferenceSession(this, decoder.openSession());
+    return registerSession(decoder.openSession());
+  }
+
+  @Override
+  public boolean supportsSharedPrefixes() {
+    checkOpen();
+    return decoder.supportsSharedPrefixes();
+  }
+
+  @Override
+  public boolean supportsActivatedBranch() {
+    checkOpen();
+    return decoder.supportsActivatedBranch();
+  }
+
+  @Override
+  public Optional<ActivatedAdapterMetadata> activatedAdapter() {
+    checkOpen();
+    return decoder.activatedAdapter();
+  }
+
+  @Override
+  public void activateAdapter(InferenceSession session) {
+    PureJavaInferenceSession state = requireOpen(session);
+    if (!decoder.supportsActivatedBranch()) {
+      throw new IllegalStateException("loaded model has no activated adapter");
+    }
+    decoder.activateAdapter(state.delegate);
+  }
+
+  @Override
+  public SharedInferencePrefix freezePrefix(InferenceSession source) {
+    PureJavaInferenceSession session = requireOpen(source);
+    if (!decoder.supportsSharedPrefixes()) {
+      throw new UnsupportedOperationException(
+          "model family " + modelMetadata.modelFamily() + " cannot share KV-cache prefixes");
+    }
+    PureJavaDecoder.SharedPrefix prefix = decoder.freezePrefix(session.delegate);
+    session.closed = true;
+    activeSessions.remove(session);
+    session.delegate = null;
+    return new PureJavaSharedPrefix(this, prefix);
+  }
+
+  @Override
+  public InferenceSession fork(SharedInferencePrefix prefix, Branch branch) {
+    checkOpen();
+    Objects.requireNonNull(branch, "branch");
+    PureJavaSharedPrefix ownedPrefix = requirePrefix(prefix);
+    boolean activated = branch == Branch.ACTIVATED_ADAPTER;
+    if (activated && !decoder.supportsActivatedBranch()) {
+      throw new IllegalStateException("loaded model has no activated adapter");
+    }
+    return registerSession(decoder.fork(ownedPrefix.delegate, activated));
+  }
+
+  @Override
+  public boolean sharesPrefixStorage(InferenceSession first, InferenceSession second) {
+    return decoder.sharesPrefixStorage(requireOpen(first).delegate, requireOpen(second).delegate);
   }
 
   @Override
@@ -860,6 +1069,31 @@ public final class PureJavaBackend
   }
 
   @Override
+  public float[] forwardHiddenState(int token, int position) {
+    return decoder.hiddenState(token, position).clone();
+  }
+
+  @Override
+  public float[] forwardHiddenStateTransient(int token, int position) {
+    return decoder.hiddenState(token, position);
+  }
+
+  @Override
+  public float[] forwardHiddenState(InferenceSession session, int token, int position) {
+    return decoder.hiddenState(requireOpen(session).delegate, token, position);
+  }
+
+  @Override
+  public float[] forwardHiddenStateTransient(InferenceSession session, int token, int position) {
+    return decoder.hiddenStateTransient(requireOpen(session).delegate, token, position);
+  }
+
+  @Override
+  public float[] prefillHiddenState(InferenceSession session, int[] tokens, int startPosition) {
+    return decoder.prefillHiddenState(requireOpen(session).delegate, tokens, startPosition);
+  }
+
+  @Override
   public boolean supportsRaggedPrefillBatch() {
     return decoder.supportsRaggedPrefillBatch();
   }
@@ -867,7 +1101,7 @@ public final class PureJavaBackend
   @Override
   public LogitBatch prefillBatch(InferenceSession[] sessions, int[][] tokenBatches) {
     if (!decoder.supportsRaggedPrefillBatch()) {
-      return BatchInferenceBackend.super.prefillBatch(sessions, tokenBatches);
+      return SharedPrefixInferenceBackend.super.prefillBatch(sessions, tokenBatches);
     }
     return decoder.prefillBatch(unwrapSessions(sessions), tokenBatches);
   }
@@ -875,7 +1109,7 @@ public final class PureJavaBackend
   @Override
   public LogitBatch prefillBatchTransient(InferenceSession[] sessions, int[][] tokenBatches) {
     if (!decoder.supportsRaggedPrefillBatch()) {
-      return BatchInferenceBackend.super.prefillBatchTransient(sessions, tokenBatches);
+      return SharedPrefixInferenceBackend.super.prefillBatchTransient(sessions, tokenBatches);
     }
     return decoder.prefillBatchTransient(unwrapSessions(sessions), tokenBatches);
   }
@@ -936,6 +1170,12 @@ public final class PureJavaBackend
       return;
     }
     closed = true;
+    for (PureJavaInferenceSession session : Set.copyOf(activeSessions)) {
+      session.closed = true;
+      session.delegate = null;
+    }
+    activeSessions.clear();
+    Arrays.fill(sessionBatch, null);
     RuntimeException closeFailure = null;
     try {
       decoder.close();
@@ -985,11 +1225,25 @@ public final class PureJavaBackend
     return requireOpen(pureJavaSession);
   }
 
+  private PureJavaSharedPrefix requirePrefix(SharedInferencePrefix prefix) {
+    Objects.requireNonNull(prefix, "prefix");
+    if (!(prefix instanceof PureJavaSharedPrefix pureJavaPrefix) || pureJavaPrefix.owner != this) {
+      throw new IllegalArgumentException("prefix belongs to a different backend");
+    }
+    return pureJavaPrefix;
+  }
+
   private PureJavaInferenceSession requireOpen(PureJavaInferenceSession session) {
     checkOpen();
-    if (session.closed) {
+    if (session.closed || session.delegate == null) {
       throw new IllegalStateException("session is closed");
     }
+    return session;
+  }
+
+  private PureJavaInferenceSession registerSession(PureJavaDecoder.Session delegate) {
+    PureJavaInferenceSession session = new PureJavaInferenceSession(this, delegate);
+    activeSessions.add(session);
     return session;
   }
 
@@ -997,9 +1251,20 @@ public final class PureJavaBackend
     if (session.closed) {
       return;
     }
+    PureJavaDecoder.Session delegate = session.delegate;
     session.closed = true;
-    if (!closed) {
-      decoder.reset(session.delegate);
+    activeSessions.remove(session);
+    try {
+      if (!closed && delegate != null) {
+        decoder.reset(delegate);
+      }
+    } finally {
+      session.delegate = null;
+      for (int index = 0; index < sessionBatch.length; index++) {
+        if (sessionBatch[index] == delegate) {
+          sessionBatch[index] = null;
+        }
+      }
     }
   }
 

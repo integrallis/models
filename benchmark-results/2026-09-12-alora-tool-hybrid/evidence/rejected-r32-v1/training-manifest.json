@@ -1,0 +1,136 @@
+{
+  "adapter": {
+    "alpha": 64,
+    "dropout": 0.0,
+    "files": [
+      {
+        "bytes": 5184,
+        "name": "README.md",
+        "sha256": "0ed2402979f0ca1e2c8b1227e7bf9364dc7ee9d00347707192209329ceac6508"
+      },
+      {
+        "bytes": 1077,
+        "name": "adapter_config.json",
+        "sha256": "17551ae3a8a3896711588c49c83d419d1e83f1528f8c87c79d5543b6e8112b8f"
+      },
+      {
+        "bytes": 80792456,
+        "name": "adapter_model.safetensors",
+        "sha256": "dec7257a3aaedc7e20b94f996482821d512d957737d9d64bc713802671f7c310"
+      },
+      {
+        "bytes": 707,
+        "name": "added_tokens.json",
+        "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+      },
+      {
+        "bytes": 4168,
+        "name": "chat_template.jinja",
+        "sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      {
+        "bytes": 1671853,
+        "name": "merges.txt",
+        "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+      },
+      {
+        "bytes": 613,
+        "name": "special_tokens_map.json",
+        "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+      },
+      {
+        "bytes": 11422654,
+        "name": "tokenizer.json",
+        "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      {
+        "bytes": 5404,
+        "name": "tokenizer_config.json",
+        "sha256": "443bfa629eb16387a12edbf92a76f6a6f10b2af3b53d87ba1550adfcf45f7fa0"
+      },
+      {
+        "bytes": 2776833,
+        "name": "vocab.json",
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ],
+    "rank": 32,
+    "targetModules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "base": {
+    "model": "Qwen/Qwen3-0.6B",
+    "revision": "c1899de289a04d12100db370d81485cdf75e47ca"
+  },
+  "data": {
+    "preparedManifestSha256": "58df6cca8d9b3a1ceee6ce258a1adc0a3c8198e089e5079ca3aef334e8c28bfc",
+    "train": {
+      "multipleCall": 5844,
+      "noCall": 1036,
+      "sha256": "2f2b2c033d7efde539a8251b67d9ba5d8b61ef697c090c2b53062ccdebf36dc2",
+      "skippedOverMaxLength": 198,
+      "source": "prepared-v1/train.jsonl",
+      "sourceLinesSha256": "2eaf02358d4dffa76a27b2e669831b97fefe0b2374acf7564c0145296a3a2103",
+      "usable": 11802
+    },
+    "validation": {
+      "multipleCall": 463,
+      "noCall": 84,
+      "sha256": "0bc9def7dc21fee9089eb6f0ea9b9036973b226ca87c3298627229d73988cde7",
+      "skippedOverMaxLength": 14,
+      "source": "prepared-v1/validation.jsonl",
+      "sourceLinesSha256": "2afcd9fde7c686a9cbead68bbf36037ebd6e92c24d6fb21005292b640778f5d0",
+      "usable": 986
+    }
+  },
+  "environment": {
+    "accelerate": "1.10.1",
+    "cuda": "12.4",
+    "gpu": "NVIDIA A40-8Q",
+    "peft": "0.18.1",
+    "python": "3.12.3",
+    "safetensors": "0.5.3",
+    "torch": "2.6.0+cu124",
+    "transformers": "4.53.3"
+  },
+  "invocation": {
+    "string": "<|im_start|>assistant\n",
+    "tokens": [
+      151644,
+      77091,
+      198
+    ]
+  },
+  "kind": "activated-lora-tool-specialist",
+  "schemaVersion": 1,
+  "training": {
+    "epochs": 1.0,
+    "evaluation": {
+      "epoch": 1.0,
+      "eval_loss": 0.06191569194197655,
+      "eval_runtime": 153.5229,
+      "eval_samples_per_second": 6.422,
+      "eval_steps_per_second": 6.422
+    },
+    "gradientAccumulation": 16,
+    "learningRate": 0.0002,
+    "maxLength": 1024,
+    "maxSteps": -1,
+    "metrics": {
+      "epoch": 1.0,
+      "total_flos": 1.5504105283780608e+16,
+      "train_loss": 0.08295133750290082,
+      "train_runtime": 5247.3385,
+      "train_samples_per_second": 2.249,
+      "train_steps_per_second": 0.141
+    },
+    "seed": 20260912
+  }
+}

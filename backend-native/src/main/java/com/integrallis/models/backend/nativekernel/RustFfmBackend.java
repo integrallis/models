@@ -101,6 +101,50 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
     }
   }
 
+  /**
+   * Loads a pinned Activated-LoRA adapter over the Java transformer with the bundled native matrix
+   * kernel.
+   *
+   * <p>The result is the Java shared-prefix backend itself: activation, the adapter delta, and the
+   * physically shared KV prefix stay in Java, and only the base matrix products run natively. The
+   * caller records {@link #PLAN_VERSION} beside its evidence and must prove token identity with the
+   * pure-Java arm before treating the two as the same model.
+   */
+  public static PureJavaBackend loadActivatedAdapter(Path modelPath, Path adapterDirectory) {
+    return loadActivatedAdapter(modelPath, adapterDirectory, BackendConfiguration.empty());
+  }
+
+  /** Loads a pinned Activated-LoRA adapter with the native kernel and backend recommendations. */
+  public static PureJavaBackend loadActivatedAdapter(
+      Path modelPath, Path adapterDirectory, BackendConfiguration backendConfiguration) {
+    String configured = System.getProperty(LIBRARY_PATH_PROPERTY);
+    if (configured == null || configured.isBlank()) {
+      configured = System.getenv(LIBRARY_PATH_ENV);
+    }
+    Path libraryPath =
+        configured == null || configured.isBlank()
+            ? BundledNativeKernelLibrary.resolve()
+            : Path.of(configured);
+    return loadActivatedAdapter(modelPath, adapterDirectory, libraryPath, backendConfiguration);
+  }
+
+  /** Loads a pinned Activated-LoRA adapter with an explicit native library. */
+  public static PureJavaBackend loadActivatedAdapter(
+      Path modelPath,
+      Path adapterDirectory,
+      Path libraryPath,
+      BackendConfiguration backendConfiguration) {
+    Objects.requireNonNull(modelPath, "modelPath");
+    Objects.requireNonNull(adapterDirectory, "adapterDirectory");
+    Objects.requireNonNull(libraryPath, "libraryPath");
+    Objects.requireNonNull(backendConfiguration, "backendConfiguration");
+    NativeKernelSettings settings =
+        NativeKernelSettings.fromSystemProperties(backendConfiguration.recommendations());
+    RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath, settings);
+    return PureJavaBackend.loadActivatedAdapter(
+        modelPath, adapterDirectory, backendConfiguration, kernel);
+  }
+
   static void warmup(PureJavaBackend delegate) {
     Objects.requireNonNull(delegate, "delegate");
     Tokenizer tokenizer = delegate.tokenizer();
@@ -263,7 +307,10 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
     environment.put("kernel-implementation", kernel.implementation());
     environment.put("native-kernel-abi", Integer.toString(NativeKernelLibrary.ABI_VERSION));
     environment.put("native-kernel-threads", Integer.toString(kernel.threadCount()));
+    environment.put("native-kernel-decode-threads", Integer.toString(kernel.decodeThreadCount()));
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
+    environment.put(
+        "native-grouped-attention", Boolean.toString(kernel.supportsGroupedAttention()));
     environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
     environment.put("native-gated-delta-net", Boolean.toString(kernel.gatedDeltaNetEnabled()));
     environment.put("native-load-warmup", Boolean.toString(loadWarmup));

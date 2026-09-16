@@ -15,9 +15,14 @@
  */
 package com.integrallis.models.backend.purejava.llama;
 
+import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
+import com.integrallis.models.backend.purejava.cache.KvCache.AttentionView;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter;
+import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter.Projection;
+import com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
@@ -30,11 +35,13 @@ import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
+import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Single-token forward pass for Llama-family models. Implements the full transformer decoder
@@ -52,11 +59,22 @@ public final class LlamaForwardPass {
   public static final class Session {
     private final LlamaForwardPass owner;
     private final KvCache cache;
+    private boolean adapterActive;
+    private int adapterActivationPosition;
+    private int adapterInvocationIndex;
     private int nextPosition;
 
     private Session(LlamaForwardPass owner, KvCache cache) {
+      this(owner, cache, 0, false);
+    }
+
+    private Session(
+        LlamaForwardPass owner, KvCache cache, int nextPosition, boolean adapterActive) {
       this.owner = owner;
       this.cache = cache;
+      this.nextPosition = nextPosition;
+      this.adapterActive = adapterActive;
+      this.adapterActivationPosition = adapterActive ? nextPosition : -1;
     }
 
     /** Returns the next sequence position. */
@@ -64,8 +82,47 @@ public final class LlamaForwardPass {
       return nextPosition;
     }
 
+    /** Returns all KV-cache bytes reachable by this sequence branch. */
+    public long allocatedStateBytes() {
+      return cache.allocatedBytes();
+    }
+
     KvCache cache() {
       return cache;
+    }
+  }
+
+  /** Immutable, physically shared sequence prefix from which divergent sessions can be forked. */
+  public static final class SessionPrefix {
+    private final LlamaForwardPass owner;
+    private final KvCache.SharedPrefix cachePrefix;
+
+    private SessionPrefix(LlamaForwardPass owner, KvCache.SharedPrefix cachePrefix) {
+      this.owner = owner;
+      this.cachePrefix = cachePrefix;
+    }
+
+    /** Opens an independent sequence branch without copying this prefix's KV storage. */
+    public Session fork() {
+      return new Session(owner, cachePrefix.fork(), cachePrefix.length(), false);
+    }
+
+    /** Opens a tool-specialist branch with the forward pass's activated adapter enabled. */
+    public Session forkActivated() {
+      if (owner.activatedAdapter == null) {
+        throw new IllegalStateException("forward pass has no activated LoRA adapter");
+      }
+      return new Session(owner, cachePrefix.fork(), cachePrefix.length(), true);
+    }
+
+    /** Returns the immutable prefix length in tokens. */
+    public int length() {
+      return cachePrefix.length();
+    }
+
+    /** Returns the key/value and occupancy bytes physically shared by every fork. */
+    public long sharedBytes() {
+      return cachePrefix.allocatedBytes();
     }
   }
 
@@ -80,6 +137,7 @@ public final class LlamaForwardPass {
   private final LlamaConfig config;
   private final LlamaWeights weights;
   private final KvCache cache;
+  private final ActivatedLoraAdapter activatedAdapter;
   private final RotaryTable globalRopeTable;
   private final RotaryTable slidingWindowRopeTable;
   private final LayerObserver layerObserver;
@@ -101,6 +159,50 @@ public final class LlamaForwardPass {
   private final boolean parallelQ8FfnPreparation;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
   private final BatchedCausalAttentionKernel batchedAttentionKernel;
+
+  // Attention work is partitioned over the shared GGUF worker publication: single-token decode over
+  // query heads, batched prefill over batch rows. Each work item writes a disjoint output slice and
+  // scores its own thread-local buffer, so the arithmetic and its order are those of the serial
+  // loops; only the wall clock changes. The "active" fields carry the call context to the stages.
+  /**
+   * Below this many attended positions a single query row's heads stay on the calling thread.
+   * Measured on Granite 4.1 3B, AWS c7a.4xlarge, ~300-position RAG turns: partitioning heads cost
+   * 15% of decode throughput while partitioning prefill rows gained 58%.
+   */
+  private static final int PARALLEL_HEAD_ATTENTION_MIN_POSITIONS = 1_024;
+
+  private final GgufStagePlan headAttentionPlan;
+  private final GgufStagePlan rowAttentionPlan;
+  private final GgufStagePlan sessionRowAttentionPlan;
+  private final ThreadLocal<float[]> attentionScratch;
+  private final boolean nativeGroupedAttention;
+
+  /**
+   * Whether attention runs through the fused {@link GroupedQueryAttentionKernel} (grouped score
+   * pass, vector softmax, paired-head value pass). The fused kernel is qualified for Granite only:
+   * its lane reductions and vector exponential differ from the head-by-head path in the last bits,
+   * enough to flip a near-tie greedy token in another architecture's pinned llama.cpp oracle (Qwen3
+   * 0.6B on the Rust arm, measured 2026-09-16). Every other architecture keeps the head-by-head
+   * path its oracles were recorded on.
+   */
+  private final boolean fusedGroupedAttention;
+
+  private float[] nativeAttentionScores;
+  private float[] activeHeadQuery;
+  private int activeHeadQueryOffset;
+  private float[] activeHeadOutput;
+  private int activeHeadOutputOffset;
+  private int activeHeadLayer;
+  private int activeHeadPosition;
+  private KvCache activeHeadCache;
+  private LlamaWeights.LayerWeights activeRowLayerWeights;
+  private int activeRowLayer;
+  private int activeRowStartPosition;
+  private int activeRowBatchSize;
+  private Session[] activeSessionRows;
+  private int[] activeSessionPositions;
+  private int activeSessionLayer;
+  private int activeSessionBatchSize;
   private final QuantizedBatchedLayerPlan stagedQuantizedPlan;
   private final int prefillBatchCapacity;
 
@@ -118,6 +220,8 @@ public final class LlamaForwardPass {
   private final float[] ffnOut;
   private final float[] ffnProjected;
   private final float[] logits;
+  private final Session[] singleSessionBatch = new Session[1];
+  private final int[][] singleSessionTokens = new int[1][];
   private final byte[] quantizedActivation;
   private final float[] quantizedActivationScales;
   private final int[] quantizedActivationZeroPointCorrections;
@@ -156,7 +260,25 @@ public final class LlamaForwardPass {
         null,
         defaultPlan(config, weights),
         GgufBatchedMatrixKernel.none(),
-        BatchedCausalAttentionKernel.none());
+        BatchedCausalAttentionKernel.none(),
+        null);
+  }
+
+  /** Creates a forward pass capable of base and activated-adapter session branches. */
+  public LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      ActivatedLoraAdapter activatedAdapter) {
+    this(
+        config,
+        weights,
+        cache,
+        null,
+        defaultPlan(config, weights),
+        GgufBatchedMatrixKernel.none(),
+        BatchedCausalAttentionKernel.none(),
+        Objects.requireNonNull(activatedAdapter, "activatedAdapter"));
   }
 
   public LlamaForwardPass(
@@ -171,7 +293,8 @@ public final class LlamaForwardPass {
         null,
         executionPlan,
         GgufBatchedMatrixKernel.none(),
-        BatchedCausalAttentionKernel.none());
+        BatchedCausalAttentionKernel.none(),
+        null);
   }
 
   public LlamaForwardPass(
@@ -187,7 +310,8 @@ public final class LlamaForwardPass {
         null,
         executionPlan,
         batchedMatrixKernel,
-        BatchedCausalAttentionKernel.none());
+        BatchedCausalAttentionKernel.none(),
+        null);
   }
 
   public LlamaForwardPass(
@@ -197,7 +321,35 @@ public final class LlamaForwardPass {
       PureJavaExecutionPlan executionPlan,
       GgufBatchedMatrixKernel batchedMatrixKernel,
       BatchedCausalAttentionKernel batchedAttentionKernel) {
-    this(config, weights, cache, null, executionPlan, batchedMatrixKernel, batchedAttentionKernel);
+    this(
+        config,
+        weights,
+        cache,
+        null,
+        executionPlan,
+        batchedMatrixKernel,
+        batchedAttentionKernel,
+        null);
+  }
+
+  /** Creates a planned forward pass capable of base and activated-adapter branches. */
+  public LlamaForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      KvCache cache,
+      PureJavaExecutionPlan executionPlan,
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel,
+      ActivatedLoraAdapter activatedAdapter) {
+    this(
+        config,
+        weights,
+        cache,
+        null,
+        executionPlan,
+        batchedMatrixKernel,
+        batchedAttentionKernel,
+        Objects.requireNonNull(activatedAdapter, "activatedAdapter"));
   }
 
   LlamaForwardPass(
@@ -209,7 +361,8 @@ public final class LlamaForwardPass {
         layerObserver,
         defaultPlan(config, weights),
         GgufBatchedMatrixKernel.none(),
-        BatchedCausalAttentionKernel.none());
+        BatchedCausalAttentionKernel.none(),
+        null);
   }
 
   LlamaForwardPass(
@@ -225,7 +378,8 @@ public final class LlamaForwardPass {
         layerObserver,
         executionPlan,
         GgufBatchedMatrixKernel.none(),
-        BatchedCausalAttentionKernel.none());
+        BatchedCausalAttentionKernel.none(),
+        null);
   }
 
   LlamaForwardPass(
@@ -242,7 +396,8 @@ public final class LlamaForwardPass {
         layerObserver,
         executionPlan,
         batchedMatrixKernel,
-        BatchedCausalAttentionKernel.none());
+        BatchedCausalAttentionKernel.none(),
+        null);
   }
 
   LlamaForwardPass(
@@ -252,10 +407,12 @@ public final class LlamaForwardPass {
       LayerObserver layerObserver,
       PureJavaExecutionPlan executionPlan,
       GgufBatchedMatrixKernel batchedMatrixKernel,
-      BatchedCausalAttentionKernel batchedAttentionKernel) {
+      BatchedCausalAttentionKernel batchedAttentionKernel,
+      ActivatedLoraAdapter activatedAdapter) {
     this.config = config;
     this.weights = weights;
     this.cache = cache;
+    this.activatedAdapter = activatedAdapter;
     this.layerObserver = layerObserver;
     if (config.usesBidirectionalAttention()) {
       // This pass is causal throughout: it walks one token at a time and reads keys from a cache of
@@ -355,6 +512,26 @@ public final class LlamaForwardPass {
     this.batchFfnOut = batchBuffer(prefillBatchCapacity, hiddenDim);
     this.batchFfnProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchSessions = new Session[prefillBatchCapacity];
+    int attentionGroupSize = config.numHeads() / config.numKvHeads();
+    this.attentionScratch =
+        ThreadLocal.withInitial(() -> new float[attentionGroupSize * cache.maxSeqLen()]);
+    // Native grouped attention is wired for Granite only: the Rust kernel's arithmetic differs
+    // from the Java kernels in the last bits, and the pinned greedy expectations of other
+    // architectures stay on the Java path they were recorded with.
+    this.nativeGroupedAttention =
+        config.usesGraniteScaling() && loadedMatrixKernel.supportsGroupedAttention();
+    this.fusedGroupedAttention = config.usesGraniteScaling();
+    this.headAttentionPlan =
+        GgufStagePlan.of(GgufStagePlan.stage(config.numKvHeads(), this::attendKvHeadRange));
+    this.rowAttentionPlan =
+        prefillBatchCapacity > 1
+            ? GgufStagePlan.of(GgufStagePlan.stage(prefillBatchCapacity, this::attendRowRange))
+            : null;
+    this.sessionRowAttentionPlan =
+        prefillBatchCapacity > 1
+            ? GgufStagePlan.of(
+                GgufStagePlan.stage(prefillBatchCapacity, this::attendSessionRowRange))
+            : null;
     this.batchTokens = new int[prefillBatchCapacity];
     this.batchSessionIndexes = new int[prefillBatchCapacity];
     this.batchPromptIndexes = new int[prefillBatchCapacity];
@@ -525,6 +702,67 @@ public final class LlamaForwardPass {
         new KvCache(config.numLayers(), cache.maxSeqLen(), config.keyDim(), config.valueDim()));
   }
 
+  /**
+   * Freezes a fully-prefilled session into immutable storage that can be shared by divergent
+   * branches. The source session cannot be used after this call.
+   */
+  public SessionPrefix freezePrefix(Session session) {
+    requireSession(session);
+    if (session.adapterActive) {
+      throw new IllegalStateException(
+          "cannot freeze adapter-tainted KV storage as a shared base prefix");
+    }
+    if (session.nextPosition == 0) {
+      throw new IllegalArgumentException("cannot freeze an empty session prefix");
+    }
+    return new SessionPrefix(this, session.cache.freezePrefix(session.nextPosition));
+  }
+
+  /** Returns whether two sessions reference the same immutable KV-cache prefix storage. */
+  public boolean sharesPrefixStorage(Session first, Session second) {
+    requireSession(first);
+    requireSession(second);
+    return first.cache.sharesPrefixStorageWith(second.cache);
+  }
+
+  /** Returns whether activated-adapter branches are available on this loaded forward pass. */
+  public boolean supportsActivatedBranch() {
+    return activatedAdapter != null;
+  }
+
+  /** Arms an independently base-prefilled session at the exact adapter invocation boundary. */
+  public void activateAdapter(Session session) {
+    requireSession(session);
+    if (activatedAdapter == null) {
+      throw new IllegalStateException("forward pass has no activated LoRA adapter");
+    }
+    if (session.adapterActive) {
+      throw new IllegalStateException("session adapter is already activated");
+    }
+    session.adapterActive = true;
+    session.adapterActivationPosition = session.nextPosition;
+    session.adapterInvocationIndex = 0;
+  }
+
+  /** Returns the exact activated-adapter provenance and invocation contract, when configured. */
+  public Optional<ActivatedAdapterMetadata> activatedAdapterMetadata() {
+    if (activatedAdapter == null) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new ActivatedAdapterMetadata(
+            activatedAdapter.baseModel(),
+            activatedAdapter.baseRevision(),
+            activatedAdapter.baseArtifactSha256(),
+            activatedAdapter.tokenizerFileSha256(),
+            activatedAdapter.adapterSha256(),
+            activatedAdapter.rank(),
+            activatedAdapter.alpha(),
+            activatedAdapter.invocationText(),
+            java.util.Arrays.stream(activatedAdapter.invocationTokens()).boxed().toList(),
+            activatedAdapter.provenance()));
+  }
+
   /** Returns the largest independent-session batch supported by this execution plan. */
   public int maxSessionBatchSize() {
     return batchedPrefill ? prefillBatchCapacity : 1;
@@ -541,8 +779,71 @@ public final class LlamaForwardPass {
     return forwardSessionInternal(session, token, position, Head.LOGITS);
   }
 
+  /** Runs one independent session step and returns a stable final normalized hidden state. */
+  public float[] hiddenState(Session session, int token, int position) {
+    return hiddenStateTransient(session, token, position).clone();
+  }
+
+  /** Runs one independent session step using reusable hidden-state storage. */
+  public float[] hiddenStateTransient(Session session, int token, int position) {
+    requireSession(session);
+    return forwardSessionInternal(session, token, position, Head.HIDDEN);
+  }
+
   /** Prefills one independent session without changing the default sequence. */
   public float[] prefill(Session session, int[] tokens, int startPosition) {
+    requireSession(session);
+    Objects.requireNonNull(tokens, "tokens");
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("tokens must not be empty");
+    }
+    if (startPosition != session.nextPosition) {
+      throw new IllegalArgumentException(
+          "position must be sequential: expected "
+              + session.nextPosition
+              + ", got "
+              + startPosition);
+    }
+    if (tokens.length > session.cache.maxSeqLen() - startPosition) {
+      throw new IllegalArgumentException(
+          "prompt exceeds context length: " + (startPosition + (long) tokens.length));
+    }
+
+    if (batchedPrefill && tokens.length > 1) {
+      return prefillSessionBatched(session, tokens);
+    }
+
+    int finalIndex = tokens.length - 1;
+    for (int index = 0; index < finalIndex; index++) {
+      forwardSessionInternal(
+          session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
+    }
+    return forwardSessionInternal(
+        session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
+  }
+
+  /**
+   * Prefills one session through the ragged session-batch path so consecutive prompt positions
+   * share physical projection batches. Each row's key/value state is stored before any row of the
+   * same chunk attends, so the causal boundary and the activated-adapter rows are exactly those of
+   * the token-by-token path; only the matrix products are batched.
+   */
+  private float[] prefillSessionBatched(Session session, int[] tokens) {
+    singleSessionBatch[0] = session;
+    singleSessionTokens[0] = tokens;
+    try {
+      prefillBatchTransient(singleSessionBatch, singleSessionTokens);
+    } finally {
+      singleSessionBatch[0] = null;
+      singleSessionTokens[0] = null;
+    }
+    int vocabSize = config.vocabSize();
+    System.arraycopy(sessionBatchLogits, 0, logits, 0, vocabSize);
+    return logits;
+  }
+
+  /** Prefills one independent session and returns its final normalized hidden state. */
+  public float[] prefillHiddenState(Session session, int[] tokens, int startPosition) {
     requireSession(session);
     Objects.requireNonNull(tokens, "tokens");
     if (tokens.length == 0) {
@@ -566,7 +867,8 @@ public final class LlamaForwardPass {
           session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
     }
     return forwardSessionInternal(
-        session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.LOGITS);
+            session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.HIDDEN)
+        .clone();
   }
 
   /**
@@ -585,7 +887,7 @@ public final class LlamaForwardPass {
     validateSessionPrefillBatch(sessions, tokenBatches);
     int sessionCount = sessions.length;
     int vocabSize = config.vocabSize();
-    if (sessionCount == 1) {
+    if (sessionCount == 1 && (!batchedPrefill || tokenBatches[0].length == 1)) {
       ensureSessionBatchLogits(vocabSize);
       float[] row = prefill(sessions[0], tokenBatches[0], sessions[0].nextPosition);
       System.arraycopy(row, 0, sessionBatchLogits, 0, vocabSize);
@@ -637,6 +939,7 @@ public final class LlamaForwardPass {
       }
       for (int sessionIndex = 0; sessionIndex < sessionCount; sessionIndex++) {
         sessions[sessionIndex].nextPosition += chunkCounts[sessionIndex];
+        advanceActivatedInvocation(sessions[sessionIndex], chunkCounts[sessionIndex]);
       }
     }
 
@@ -669,19 +972,39 @@ public final class LlamaForwardPass {
   /** Discards session state at and after {@code checkpoint}. */
   public void rewind(Session session, int checkpoint) {
     requireSession(session);
-    if (checkpoint < 0 || checkpoint > session.nextPosition) {
+    int earliestCheckpoint = session.adapterActive ? session.adapterActivationPosition : 0;
+    if (checkpoint < earliestCheckpoint || checkpoint > session.nextPosition) {
+      String lowerBound =
+          session.adapterActive ? "activation boundary " + session.adapterActivationPosition : "0";
       throw new IllegalArgumentException(
-          "checkpoint must be between 0 and " + session.nextPosition + ": " + checkpoint);
+          "checkpoint must be between "
+              + lowerBound
+              + " and "
+              + session.nextPosition
+              + ": "
+              + checkpoint);
     }
     session.cache.discardFrom(checkpoint);
     session.nextPosition = checkpoint;
+    if (session.adapterActive) {
+      session.adapterInvocationIndex =
+          Math.min(
+              activatedAdapter.invocationTokens().length,
+              checkpoint - session.adapterActivationPosition);
+    }
   }
 
   /** Clears one independent session without changing any other sequence. */
   public void reset(Session session) {
     requireSession(session);
-    session.cache.clear();
-    session.nextPosition = 0;
+    if (session.adapterActive) {
+      session.cache.discardFrom(session.adapterActivationPosition);
+      session.nextPosition = session.adapterActivationPosition;
+    } else {
+      session.cache.clear();
+      session.nextPosition = session.cache.sharedPrefixLength();
+    }
+    session.adapterInvocationIndex = 0;
   }
 
   private float[] prefillBatched(int[] tokens, int startPosition) {
@@ -787,7 +1110,7 @@ public final class LlamaForwardPass {
         stagedQuantizedPlan.executeLayer(lw, layer, startPosition, batchSize);
       } else {
         prepareBatchedAttention(lw, layer, startPosition, 0, batchSize);
-        computeBatchedAttention(lw, layer, startPosition, 0, batchSize);
+        computeBatchedAttentionRows(lw, layer, startPosition, batchSize);
         batchedMatmulDispatch(
             batchAttnProjected,
             batchAttnOut,
@@ -797,7 +1120,7 @@ public final class LlamaForwardPass {
             dim,
             attentionOutputDim);
         normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
-        addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
+        addScaledActiveInPlace(batchX, batchAttnProjected, batchSize * dim, config.residualScale());
 
         if (pruneFinalLayer) {
           if (computeFinalLogits) {
@@ -863,7 +1186,7 @@ public final class LlamaForwardPass {
         }
       }
       normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
-      addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
+      addScaledActiveInPlace(batchX, batchFfnProjected, batchSize * dim, config.residualScale());
       if (layerObserver != null) {
         for (int batch = 0; batch < batchSize; batch++) {
           layerObserver.onLayerComplete(layer, startPosition + batch, batchX, batch * dim, dim);
@@ -879,6 +1202,7 @@ public final class LlamaForwardPass {
             xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
         matmulDispatch(
             logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+        scaleLogits(logits, 0, vocabSize);
         softcapLogits(logits);
         System.arraycopy(logits, 0, batchLogits, batchLogitsOffset + batch * vocabSize, vocabSize);
       }
@@ -888,6 +1212,7 @@ public final class LlamaForwardPass {
           xNorm, 0, batchX, finalOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
       matmulDispatch(
           logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+      scaleLogits(logits, 0, config.vocabSize());
       softcapLogits(logits);
     }
   }
@@ -908,6 +1233,7 @@ public final class LlamaForwardPass {
     advanceIndependentSessionLayers(sessions, batchSize);
     for (int index = 0; index < batchSize; index++) {
       sessions[index].nextPosition++;
+      advanceActivatedInvocation(sessions[index], 1);
     }
   }
 
@@ -947,15 +1273,24 @@ public final class LlamaForwardPass {
     LlamaWeights.LayerWeights lw = weights.layer(layer);
 
     normalizeIndependentSessionBatch(batchXNorm, batchX, batchSize, dim, lw.attentionNorm());
-    projectIndependentSessionQkv(lw, batchSize, dim);
+    projectIndependentSessionQkv(sessions, lw, batchSize, layer, dim);
     attendIndependentSessions(sessions, batchSize, layer, lw);
 
     batchedMatmulDispatch(
         batchAttnProjected, batchAttnOut, batchSize, lw.wo(), lw.woType(), dim, attentionOutputDim);
+    addActivatedAdapters(
+        sessions,
+        batchSize,
+        layer,
+        Projection.ATTENTION_OUTPUT,
+        batchAttnProjected,
+        dim,
+        batchAttnOut,
+        attentionOutputDim);
     normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
-    addActiveInPlace(batchX, batchAttnProjected, batchSize * dim);
+    addScaledActiveInPlace(batchX, batchAttnProjected, batchSize * dim, config.residualScale());
 
-    executeIndependentSessionFfn(lw, batchSize, dim);
+    executeIndependentSessionFfn(sessions, lw, batchSize, layer, dim);
     observeIndependentSessionLayer(sessions, batchSize, layer, dim);
   }
 
@@ -967,7 +1302,8 @@ public final class LlamaForwardPass {
     }
   }
 
-  private void projectIndependentSessionQkv(LlamaWeights.LayerWeights lw, int batchSize, int dim) {
+  private void projectIndependentSessionQkv(
+      Session[] sessions, LlamaWeights.LayerWeights lw, int batchSize, int layer, int dim) {
     int queryDim = config.queryDim();
     int keyDim = config.keyDim();
     int valueDim = config.valueDim();
@@ -988,11 +1324,17 @@ public final class LlamaForwardPass {
           batchXNorm,
           batchSize,
           dim);
-      return;
+    } else {
+      batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
+      batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
+      batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
     }
-    batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
-    batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
-    batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
+    addActivatedAdapters(
+        sessions, batchSize, layer, Projection.QUERY, batchQ, queryDim, batchXNorm, dim);
+    addActivatedAdapters(
+        sessions, batchSize, layer, Projection.KEY, batchK, keyDim, batchXNorm, dim);
+    addActivatedAdapters(
+        sessions, batchSize, layer, Projection.VALUE, batchV, valueDim, batchXNorm, dim);
   }
 
   private void attendIndependentSessions(
@@ -1000,7 +1342,6 @@ public final class LlamaForwardPass {
     int queryDim = config.queryDim();
     int keyDim = config.keyDim();
     int valueDim = config.valueDim();
-    int attentionOutputDim = config.attentionOutputDim();
     boolean usesRope = config.usesRope(layer);
     for (int batch = 0; batch < batchSize; batch++) {
       int queryOffset = batch * queryDim;
@@ -1028,34 +1369,20 @@ public final class LlamaForwardPass {
       int position = batchPositions[batch];
       session.cache.store(layer, position, batchK, keyOffset, batchV, valueOffset);
     }
-    for (int batch = 0; batch < batchSize; batch++) {
-      int queryOffset = batch * queryDim;
-      Session session = sessions[batch];
-      int position = batchPositions[batch];
-      float[] scores = batchAttentionScores.length == 0 ? attentionScores : batchAttentionScores;
-      int scoresOffset = batchAttentionScores.length == 0 ? 0 : batch * session.cache.maxSeqLen();
-      groupedQueryAttention(
-          batchQ,
-          queryOffset,
-          batchAttnOut,
-          batch * attentionOutputDim,
-          layer,
-          position,
-          session.cache,
-          session.cache.keyBuffer(),
-          session.cache.valueBuffer(),
-          scores,
-          scoresOffset);
-    }
+    attendSessionRows(sessions, batchPositions, layer, batchSize);
   }
 
-  private void executeIndependentSessionFfn(LlamaWeights.LayerWeights lw, int batchSize, int dim) {
+  private void executeIndependentSessionFfn(
+      Session[] sessions, LlamaWeights.LayerWeights lw, int batchSize, int layer, int dim) {
     int hiddenDim = config.hiddenDim();
     normalizeIndependentSessionBatch(batchXNorm, batchX, batchSize, dim, lw.ffnNorm());
-    if (stagedQuantizedFfn && stagedQuantizedPlan != null && stagedQuantizedPlan.supportsFfn(lw)) {
+    if (!hasActivatedAdapter(sessions, batchSize)
+        && stagedQuantizedFfn
+        && stagedQuantizedPlan != null
+        && stagedQuantizedPlan.supportsFfn(lw)) {
       stagedQuantizedPlan.executeFfn(lw, batchSize);
     } else {
-      projectIndependentSessionGateUp(lw, batchSize, dim, hiddenDim);
+      projectIndependentSessionGateUp(sessions, lw, batchSize, layer, dim, hiddenDim);
       batchedMatmulDispatch(
           batchFfnProjected,
           batchFfnOut,
@@ -1064,13 +1391,27 @@ public final class LlamaForwardPass {
           lw.ffnDownType(),
           dim,
           hiddenDim);
+      addActivatedAdapters(
+          sessions,
+          batchSize,
+          layer,
+          Projection.FFN_DOWN,
+          batchFfnProjected,
+          dim,
+          batchFfnOut,
+          hiddenDim);
     }
     normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
-    addActiveInPlace(batchX, batchFfnProjected, batchSize * dim);
+    addScaledActiveInPlace(batchX, batchFfnProjected, batchSize * dim, config.residualScale());
   }
 
   private void projectIndependentSessionGateUp(
-      LlamaWeights.LayerWeights lw, int batchSize, int dim, int hiddenDim) {
+      Session[] sessions,
+      LlamaWeights.LayerWeights lw,
+      int batchSize,
+      int layer,
+      int dim,
+      int hiddenDim) {
     if (groupedBatchedPrefill) {
       dualBatchedMatmulDispatch(
           batchFfnGate,
@@ -1090,6 +1431,10 @@ public final class LlamaForwardPass {
       batchedMatmulDispatch(
           batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
     }
+    addActivatedAdapters(
+        sessions, batchSize, layer, Projection.FFN_GATE, batchFfnGate, hiddenDim, batchXNorm, dim);
+    addActivatedAdapters(
+        sessions, batchSize, layer, Projection.FFN_UP, batchFfnUp, hiddenDim, batchXNorm, dim);
     for (int batch = 0; batch < batchSize; batch++) {
       int hiddenOffset = batch * hiddenDim;
       activateFfn(
@@ -1127,6 +1472,7 @@ public final class LlamaForwardPass {
           vocabSize,
           dim);
       for (int batch = 0; batch < batchSize; batch++) {
+        scaleLogits(sessionBatchLogits, batch * vocabSize, vocabSize);
         softcapLogits(sessionBatchLogits, batch * vocabSize, vocabSize);
       }
       return;
@@ -1136,6 +1482,7 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(
           xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
       matmulDispatch(logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+      scaleLogits(logits, 0, vocabSize);
       softcapLogits(logits);
       System.arraycopy(logits, 0, sessionBatchLogits, batch * vocabSize, vocabSize);
     }
@@ -1158,6 +1505,7 @@ public final class LlamaForwardPass {
     }
     for (int index = 0; index < sessions.length; index++) {
       Session session = requireSession(sessions[index]);
+      validateActivatedInvocation(session, tokens[index]);
       if (session.nextPosition >= session.cache.maxSeqLen()) {
         throw new IllegalArgumentException(
             "session " + index + " has reached context length " + session.cache.maxSeqLen());
@@ -1201,6 +1549,7 @@ public final class LlamaForwardPass {
                 + " exceeds context length: "
                 + (session.nextPosition + (long) tokens.length));
       }
+      validateActivatedInvocation(session, tokens);
       for (int prior = 0; prior < index; prior++) {
         if (sessions[prior] == session) {
           throw new IllegalArgumentException("sessions must be distinct");
@@ -1241,20 +1590,71 @@ public final class LlamaForwardPass {
   }
 
   private float[] forwardInternal(int token, int position, Head head) {
-    float[] result = forwardSequenceInternal(token, position, head, cache, nextPosition);
+    float[] result = forwardSequenceInternal(token, position, head, cache, nextPosition, false);
     nextPosition++;
     return result;
   }
 
   private float[] forwardSessionInternal(Session session, int token, int position, Head head) {
+    boolean advancesInvocation = validateActivatedInvocation(session, token);
     float[] result =
-        forwardSequenceInternal(token, position, head, session.cache, session.nextPosition);
+        forwardSequenceInternal(
+            token, position, head, session.cache, session.nextPosition, session.adapterActive);
     session.nextPosition++;
+    if (advancesInvocation) advanceActivatedInvocation(session, 1);
     return result;
   }
 
+  private boolean validateActivatedInvocation(Session session, int token) {
+    if (!session.adapterActive) return false;
+    int[] invocation = activatedAdapter.invocationTokens();
+    if (session.adapterInvocationIndex >= invocation.length) return false;
+    int expected = invocation[session.adapterInvocationIndex];
+    if (token != expected) {
+      throw new IllegalArgumentException(
+          "activated adapter invocation token "
+              + session.adapterInvocationIndex
+              + " must be "
+              + expected
+              + "; got "
+              + token);
+    }
+    return true;
+  }
+
+  private void validateActivatedInvocation(Session session, int[] tokens) {
+    if (!session.adapterActive) return;
+    int[] invocation = activatedAdapter.invocationTokens();
+    int remaining = invocation.length - session.adapterInvocationIndex;
+    int checked = Math.min(remaining, tokens.length);
+    for (int index = 0; index < checked; index++) {
+      int expected = invocation[session.adapterInvocationIndex + index];
+      if (tokens[index] != expected) {
+        throw new IllegalArgumentException(
+            "activated adapter invocation token "
+                + (session.adapterInvocationIndex + index)
+                + " must be "
+                + expected
+                + "; got "
+                + tokens[index]);
+      }
+    }
+  }
+
+  private void advanceActivatedInvocation(Session session, int consumedTokens) {
+    if (!session.adapterActive || consumedTokens == 0) return;
+    int invocationLength = activatedAdapter.invocationTokens().length;
+    session.adapterInvocationIndex =
+        Math.min(invocationLength, session.adapterInvocationIndex + consumedTokens);
+  }
+
   private float[] forwardSequenceInternal(
-      int token, int position, Head head, KvCache sequenceCache, int expectedPosition) {
+      int token,
+      int position,
+      Head head,
+      KvCache sequenceCache,
+      int expectedPosition,
+      boolean adapterActive) {
     if (position != expectedPosition) {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + expectedPosition + ", got " + position);
@@ -1265,7 +1665,6 @@ public final class LlamaForwardPass {
 
     int dim = config.embeddingDim();
     int keyLength = config.keyLength();
-    int valueLength = config.valueLength();
     int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads();
     prepareRope(position);
@@ -1286,7 +1685,8 @@ public final class LlamaForwardPass {
           && head == Head.NONE
           && layerObserver == null
           && layer == config.numLayers() - 1) {
-        finishFinalLayerKvOnlyToken(lw, layer, position, keyLength, numKvHeads, sequenceCache);
+        finishFinalLayerKvOnlyToken(
+            lw, layer, position, keyLength, numKvHeads, sequenceCache, adapterActive);
         return null;
       }
 
@@ -1312,6 +1712,9 @@ public final class LlamaForwardPass {
         matmulDispatch(k, xNorm, lw.wk(), lw.wkType(), config.keyDim(), dim);
         matmulDispatch(v, xNorm, lw.wv(), lw.wvType(), config.valueDim(), dim);
       }
+      addActivatedAdapter(layer, Projection.QUERY, q, xNorm, adapterActive);
+      addActivatedAdapter(layer, Projection.KEY, k, xNorm, adapterActive);
+      addActivatedAdapter(layer, Projection.VALUE, v, xNorm, adapterActive);
       addOptionalBias(q, lw.qBias());
       addOptionalBias(k, lw.kBias());
       addOptionalBias(v, lw.vBias());
@@ -1334,58 +1737,18 @@ public final class LlamaForwardPass {
 
       // Store K,V in cache
       sequenceCache.store(layer, position, k, v);
-      float[] keyCache = sequenceCache.keyBuffer();
-      float[] valueCache = sequenceCache.valueBuffer();
-
-      // Grouped-query attention
-      java.util.Arrays.fill(attnOut, 0.0f);
-      int groupSize = numHeads / numKvHeads;
-      float scale = (float) (1.0 / Math.sqrt(keyLength));
-
-      for (int h = 0; h < numHeads; h++) {
-        int kvHead = h / groupSize;
-        int qOff = h * keyLength;
-        int outputOffset = h * valueLength;
-        int firstPosition = config.attentionStartPosition(layer, position);
-
-        computeAttentionScores(
-            q,
-            qOff,
-            layer,
-            position,
-            kvHead,
-            sequenceCache,
-            keyCache,
-            keyLength,
-            scale,
-            attentionScores,
-            0);
-
-        // Softmax over scores
-        TensorOps.softmax(attentionScores, firstPosition, position - firstPosition + 1);
-
-        accumulateAttentionValues(
-            attnOut,
-            outputOffset,
-            layer,
-            position,
-            kvHead,
-            sequenceCache,
-            valueCache,
-            valueLength,
-            attentionScores,
-            0);
-      }
+      // Grouped-query attention, partitioned over heads
+      attendHeads(q, 0, attnOut, 0, layer, position, sequenceCache);
 
       // Output projection
       matmulDispatch(
           attnProjected, attnOut, lw.wo(), lw.woType(), dim, config.attentionOutputDim());
+      addActivatedAdapter(
+          layer, Projection.ATTENTION_OUTPUT, attnProjected, attnOut, adapterActive);
       normalizeProjection(attnProjected, lw.attentionPostNorm(), dim);
 
       // Residual connection
-      for (int i = 0; i < dim; i++) {
-        x[i] += attnProjected[i];
-      }
+      addScaledActiveInPlace(x, attnProjected, dim, config.residualScale());
 
       // Second pruning shortcut: the last layer's FFN cannot change a discarded activation.
       // HIDDEN consumes that activation, so it must run the FFN.
@@ -1416,16 +1779,17 @@ public final class LlamaForwardPass {
         matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
         matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
       }
+      addActivatedAdapter(layer, Projection.FFN_GATE, ffnGate, xNorm, adapterActive);
+      addActivatedAdapter(layer, Projection.FFN_UP, ffnUp, xNorm, adapterActive);
       activateFfn(ffnOut, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
 
       // Down projection
       matmulDispatch(ffnProjected, ffnOut, lw.ffnDown(), lw.ffnDownType(), dim, config.hiddenDim());
+      addActivatedAdapter(layer, Projection.FFN_DOWN, ffnProjected, ffnOut, adapterActive);
       normalizeProjection(ffnProjected, lw.ffnPostNorm(), dim);
 
       // Residual connection
-      for (int i = 0; i < dim; i++) {
-        x[i] += ffnProjected[i];
-      }
+      addScaledActiveInPlace(x, ffnProjected, dim, config.residualScale());
       if (layerObserver != null) {
         layerObserver.onLayerComplete(layer, position, x, 0, dim);
       }
@@ -1442,6 +1806,7 @@ public final class LlamaForwardPass {
     }
     matmulDispatch(
         logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
+    scaleLogits(logits, 0, config.vocabSize());
     softcapLogits(logits);
     return logits;
   }
@@ -1644,18 +2009,7 @@ public final class LlamaForwardPass {
       }
     }
 
-    groupedQueryAttention(
-        q,
-        0,
-        attnOut,
-        0,
-        layerIndex,
-        startPosition + finalBatch,
-        cache,
-        cache.keyBuffer(),
-        cache.valueBuffer(),
-        attentionScores,
-        0);
+    attendHeads(q, 0, attnOut, 0, layerIndex, startPosition + finalBatch, cache);
     matmulDispatch(
         attnProjected, attnOut, layer.wo(), layer.woType(), dim, config.attentionOutputDim());
     normalizeProjection(attnProjected, layer.attentionPostNorm(), dim);
@@ -1671,7 +2025,8 @@ public final class LlamaForwardPass {
       int position,
       int keyLength,
       int numKvHeads,
-      KvCache sequenceCache) {
+      KvCache sequenceCache,
+      boolean adapterActive) {
     if (groupedProjections) {
       dualMatmulDispatch(
           k,
@@ -1689,6 +2044,8 @@ public final class LlamaForwardPass {
       matmulDispatch(
           v, xNorm, layer.wv(), layer.wvType(), config.valueDim(), config.embeddingDim());
     }
+    addActivatedAdapter(layerIndex, Projection.KEY, k, xNorm, adapterActive);
+    addActivatedAdapter(layerIndex, Projection.VALUE, v, xNorm, adapterActive);
     addOptionalBias(k, layer.kBias());
     addOptionalBias(v, layer.vBias());
     for (int head = 0; head < numKvHeads; head++) {
@@ -1724,7 +2081,7 @@ public final class LlamaForwardPass {
     matmulDispatch(ffnProjected, ffnOut, layer.ffnDown(), layer.ffnDownType(), dim, hiddenDim);
     normalizeProjection(ffnProjected, layer.ffnPostNorm(), dim);
     for (int index = 0; index < dim; index++) {
-      batchX[stateOffset + index] += ffnProjected[index];
+      batchX[stateOffset + index] += config.residualScale() * ffnProjected[index];
     }
   }
 
@@ -1773,7 +2130,8 @@ public final class LlamaForwardPass {
     int batchSize = toBatch - fromBatch;
     int chunkStartPosition = startPosition + fromBatch;
     int slidingWindow = config.usesSlidingWindow(layerIndex) ? config.slidingWindow() : 0;
-    if (fromBatch == 0
+    if (!config.usesGraniteScaling()
+        && fromBatch == 0
         && batchedAttentionKernel.isEligible(
             layerIndex,
             chunkStartPosition,
@@ -1800,13 +2158,7 @@ public final class LlamaForwardPass {
           slidingWindow);
       return;
     }
-    float[] keyCache = cache.keyBuffer();
-    float[] valueCache = cache.valueBuffer();
-    boolean separateScores = batchAttentionScores.length != 0;
-    int scoreStride = cache.maxSeqLen();
     for (int batch = fromBatch; batch < toBatch; batch++) {
-      float[] scores = separateScores ? batchAttentionScores : attentionScores;
-      int scoreOffset = separateScores ? batch * scoreStride : 0;
       groupedQueryAttention(
           batchQ,
           batch * config.queryDim(),
@@ -1814,11 +2166,225 @@ public final class LlamaForwardPass {
           batch * config.attentionOutputDim(),
           layerIndex,
           startPosition + batch,
-          cache,
-          keyCache,
-          valueCache,
+          cache);
+    }
+  }
+
+  /** Runs grouped-query attention for one query row with the heads partitioned over workers. */
+  private void attendHeads(
+      float[] query,
+      int queryOffset,
+      float[] output,
+      int outputOffset,
+      int layer,
+      int position,
+      KvCache sequenceCache) {
+    int firstPosition = config.attentionStartPosition(layer, position);
+    if (nativeGroupedAttention
+        && attendNatively(
+            query,
+            queryOffset,
+            output,
+            outputOffset,
+            layer,
+            firstPosition,
+            position,
+            sequenceCache)) {
+      return;
+    }
+    if (position - firstPosition + 1 < PARALLEL_HEAD_ATTENTION_MIN_POSITIONS) {
+      // Short contexts: one stage publication per layer costs more than the head loop it splits.
+      groupedQueryAttention(
+          query, queryOffset, output, outputOffset, layer, position, sequenceCache);
+      return;
+    }
+    java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
+    activeHeadQuery = query;
+    activeHeadQueryOffset = queryOffset;
+    activeHeadOutput = output;
+    activeHeadOutputOffset = outputOffset;
+    activeHeadLayer = layer;
+    activeHeadPosition = position;
+    activeHeadCache = sequenceCache;
+    try {
+      headAttentionPlan.execute();
+    } finally {
+      activeHeadQuery = null;
+      activeHeadOutput = null;
+      activeHeadCache = null;
+    }
+  }
+
+  /**
+   * One query row through the native grouped attention kernel when the cache view has at most two
+   * spans (a shared prefix segment and the branch's own rows); returns false otherwise.
+   */
+  private boolean attendNatively(
+      float[] query,
+      int queryOffset,
+      float[] output,
+      int outputOffset,
+      int layer,
+      int firstPosition,
+      int position,
+      KvCache sequenceCache) {
+    AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
+    if (view.spanCount() > 2) {
+      return false;
+    }
+    int positions = position - firstPosition + 1;
+    int needed = config.numHeads() * positions;
+    if (nativeAttentionScores == null || nativeAttentionScores.length < needed) {
+      nativeAttentionScores = new float[Math.max(needed, config.numHeads() * 256)];
+    }
+    KvCache.AttentionSpan first = view.span(0);
+    KvCache.AttentionSpan second = view.spanCount() > 1 ? view.span(1) : null;
+    batchedMatrixKernel.groupedAttention(
+        query,
+        queryOffset,
+        first.keyBuffer(),
+        first.keyOffset(),
+        first.valueBuffer(),
+        first.valueOffset(),
+        first.positionCount(),
+        second == null ? null : second.keyBuffer(),
+        second == null ? 0 : second.keyOffset(),
+        second == null ? null : second.valueBuffer(),
+        second == null ? 0 : second.valueOffset(),
+        second == null ? 0 : second.positionCount(),
+        output,
+        outputOffset,
+        nativeAttentionScores,
+        sequenceCache.keyDim(),
+        sequenceCache.valueDim(),
+        config.keyLength(),
+        config.valueLength(),
+        config.numHeads(),
+        config.numKvHeads(),
+        config.attentionScale());
+    return true;
+  }
+
+  private void attendKvHeadRange(int fromKvHead, int toKvHead) {
+    int keyLength = config.keyLength();
+    int valueLength = config.valueLength();
+    int groupSize = config.numHeads() / config.numKvHeads();
+    float scale = config.attentionScale();
+    int layer = activeHeadLayer;
+    int position = activeHeadPosition;
+    KvCache sequenceCache = activeHeadCache;
+    float[] scores = attentionScratch.get();
+    int scoresHeadStride = cache.maxSeqLen();
+    int firstPosition = config.attentionStartPosition(layer, position);
+    AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
+    for (int kvHead = fromKvHead; kvHead < toKvHead; kvHead++) {
+      attendGroup(
+          view,
+          sequenceCache,
+          firstPosition,
+          position,
+          kvHead,
+          groupSize,
+          keyLength,
+          valueLength,
+          scale,
+          activeHeadQuery,
+          activeHeadQueryOffset,
+          activeHeadOutput,
+          activeHeadOutputOffset,
           scores,
-          scoreOffset);
+          scoresHeadStride);
+    }
+  }
+
+  /** Batched-prefill attention with the batch rows partitioned over workers. */
+  private void computeBatchedAttentionRows(
+      LlamaWeights.LayerWeights lw, int layerIndex, int startPosition, int batchSize) {
+    if (rowAttentionPlan == null
+        || batchSize < 2
+        || batchedAttentionKernelEligible(layerIndex, startPosition, batchSize)) {
+      computeBatchedAttention(lw, layerIndex, startPosition, 0, batchSize);
+      return;
+    }
+    activeRowLayerWeights = lw;
+    activeRowLayer = layerIndex;
+    activeRowStartPosition = startPosition;
+    activeRowBatchSize = batchSize;
+    try {
+      rowAttentionPlan.execute();
+    } finally {
+      activeRowLayerWeights = null;
+      activeRowBatchSize = 0;
+    }
+  }
+
+  private void attendRowRange(int fromBatch, int toBatch) {
+    int to = Math.min(toBatch, activeRowBatchSize);
+    if (fromBatch >= to) {
+      return;
+    }
+    computeBatchedAttention(
+        activeRowLayerWeights, activeRowLayer, activeRowStartPosition, fromBatch, to);
+  }
+
+  private boolean batchedAttentionKernelEligible(int layerIndex, int startPosition, int batchSize) {
+    int slidingWindow = config.usesSlidingWindow(layerIndex) ? config.slidingWindow() : 0;
+    return !config.usesGraniteScaling()
+        && batchedAttentionKernel.isEligible(
+            layerIndex,
+            startPosition,
+            batchSize,
+            config.numHeads(),
+            config.numKvHeads(),
+            config.keyLength(),
+            config.valueLength(),
+            cache.maxSeqLen(),
+            slidingWindow);
+  }
+
+  /** Independent-session attention with the session rows partitioned over workers. */
+  private void attendSessionRows(
+      Session[] sessions, int[] batchPositions, int layer, int batchSize) {
+    if (sessionRowAttentionPlan == null || batchSize < 2) {
+      attendSessionRowsSerially(sessions, batchPositions, layer, 0, batchSize);
+      return;
+    }
+    activeSessionRows = sessions;
+    activeSessionPositions = batchPositions;
+    activeSessionLayer = layer;
+    activeSessionBatchSize = batchSize;
+    try {
+      sessionRowAttentionPlan.execute();
+    } finally {
+      activeSessionRows = null;
+      activeSessionPositions = null;
+      activeSessionBatchSize = 0;
+    }
+  }
+
+  private void attendSessionRowRange(int fromBatch, int toBatch) {
+    int to = Math.min(toBatch, activeSessionBatchSize);
+    if (fromBatch >= to) {
+      return;
+    }
+    attendSessionRowsSerially(
+        activeSessionRows, activeSessionPositions, activeSessionLayer, fromBatch, to);
+  }
+
+  private void attendSessionRowsSerially(
+      Session[] sessions, int[] batchPositions, int layer, int fromBatch, int toBatch) {
+    int queryDim = config.queryDim();
+    int attentionOutputDim = config.attentionOutputDim();
+    for (int batch = fromBatch; batch < toBatch; batch++) {
+      Session session = sessions[batch];
+      groupedQueryAttention(
+          batchQ,
+          batch * queryDim,
+          batchAttnOut,
+          batch * attentionOutputDim,
+          layer,
+          batchPositions[batch],
+          session.cache);
     }
   }
 
@@ -1829,125 +2395,155 @@ public final class LlamaForwardPass {
       int outputOffset,
       int layer,
       int position,
-      KvCache sequenceCache,
-      float[] keyCache,
-      float[] valueCache,
-      float[] scores,
-      int scoresOffset) {
+      KvCache sequenceCache) {
     int keyLength = config.keyLength();
     int valueLength = config.valueLength();
-    int numHeads = config.numHeads();
-    int groupSize = numHeads / config.numKvHeads();
-    float scale = (float) (1.0 / Math.sqrt(keyLength));
+    int numKvHeads = config.numKvHeads();
+    int groupSize = config.numHeads() / numKvHeads;
+    float scale = config.attentionScale();
+    float[] scores = attentionScratch.get();
+    int scoresHeadStride = cache.maxSeqLen();
     java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
-
-    for (int head = 0; head < numHeads; head++) {
-      int kvHead = head / groupSize;
-      int qOffset = queryOffset + head * keyLength;
-      int headOutputOffset = outputOffset + head * valueLength;
-      int firstPosition = config.attentionStartPosition(layer, position);
-      computeAttentionScores(
-          query,
-          qOffset,
-          layer,
+    int firstPosition = config.attentionStartPosition(layer, position);
+    AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
+    for (int kvHead = 0; kvHead < numKvHeads; kvHead++) {
+      attendGroup(
+          view,
+          sequenceCache,
+          firstPosition,
           position,
           kvHead,
+          groupSize,
+          keyLength,
+          valueLength,
+          scale,
+          query,
+          queryOffset,
+          output,
+          outputOffset,
+          scores,
+          scoresHeadStride);
+    }
+  }
+
+  /**
+   * One grouped-query group. On Granite ({@link #fusedGroupedAttention}): scores for every head
+   * sharing {@code kvHead} in one pass over the cached keys, a vector softmax per head, then one
+   * pass over the cached values, so the K and V rows are read once instead of {@code groupSize}
+   * times. Elsewhere: the head-by-head loop (per-head scores, scalar softmax, per-head values)
+   * whose numerics the pinned greedy oracles were recorded on.
+   */
+  private void attendGroup(
+      AttentionView view,
+      KvCache sequenceCache,
+      int firstPosition,
+      int position,
+      int kvHead,
+      int groupSize,
+      int keyLength,
+      int valueLength,
+      float scale,
+      float[] query,
+      int queryOffset,
+      float[] output,
+      int outputOffset,
+      float[] scores,
+      int scoresHeadStride) {
+    int firstHead = kvHead * groupSize;
+    if (!fusedGroupedAttention) {
+      attendGroupHeadByHead(
+          view,
           sequenceCache,
-          keyCache,
+          firstPosition,
+          position,
+          firstHead,
+          kvHead,
+          groupSize,
+          keyLength,
+          valueLength,
+          scale,
+          query,
+          queryOffset,
+          output,
+          outputOffset,
+          scores);
+      return;
+    }
+    sequenceCache.writeGroupedAttentionScores(
+        view,
+        firstPosition,
+        position + 1,
+        kvHead * keyLength,
+        query,
+        queryOffset + firstHead * keyLength,
+        keyLength,
+        groupSize,
+        keyLength,
+        scale,
+        scores,
+        0,
+        scoresHeadStride);
+    int count = position - firstPosition + 1;
+    for (int head = 0; head < groupSize; head++) {
+      GroupedQueryAttentionKernel.softmax(scores, head * scoresHeadStride + firstPosition, count);
+    }
+    sequenceCache.addGroupedAttentionValues(
+        view,
+        firstPosition,
+        position + 1,
+        kvHead * valueLength,
+        output,
+        outputOffset + firstHead * valueLength,
+        valueLength,
+        groupSize,
+        valueLength,
+        scores,
+        0,
+        scoresHeadStride);
+  }
+
+  /** The head-by-head attention loop: per-head scores, scalar softmax, per-head values. */
+  private void attendGroupHeadByHead(
+      AttentionView view,
+      KvCache sequenceCache,
+      int firstPosition,
+      int position,
+      int firstHead,
+      int kvHead,
+      int groupSize,
+      int keyLength,
+      int valueLength,
+      float scale,
+      float[] query,
+      int queryOffset,
+      float[] output,
+      int outputOffset,
+      float[] scores) {
+    for (int head = firstHead; head < firstHead + groupSize; head++) {
+      sequenceCache.writeAttentionScores(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * keyLength,
+          query,
+          queryOffset + head * keyLength,
           keyLength,
           scale,
           scores,
-          scoresOffset);
-
-      TensorOps.softmax(scores, scoresOffset + firstPosition, position - firstPosition + 1);
-      accumulateAttentionValues(
+          0,
+          batchedAttentionScores);
+      TensorOps.softmax(scores, firstPosition, position - firstPosition + 1);
+      sequenceCache.addAttentionValues(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * valueLength,
           output,
-          headOutputOffset,
-          layer,
-          position,
-          kvHead,
-          sequenceCache,
-          valueCache,
+          outputOffset + head * valueLength,
           valueLength,
           scores,
-          scoresOffset);
-    }
-  }
-
-  private void computeAttentionScores(
-      float[] query,
-      int queryOffset,
-      int layer,
-      int position,
-      int kvHead,
-      KvCache sequenceCache,
-      float[] keyCache,
-      int keyLength,
-      float scale,
-      float[] scores,
-      int scoresOffset) {
-    int firstPosition = config.attentionStartPosition(layer, position);
-    int visiblePositions = position - firstPosition + 1;
-    int firstKeyOffset = sequenceCache.keyOffset(layer, firstPosition) + kvHead * keyLength;
-    if (batchedAttentionScores) {
-      VectorUtil.batchDotProductExact(
-          query,
-          queryOffset,
-          keyCache,
-          firstKeyOffset,
-          sequenceCache.keyDim(),
-          visiblePositions,
-          keyLength,
-          scores,
-          scoresOffset + firstPosition);
-      for (int cachedPosition = firstPosition; cachedPosition <= position; cachedPosition++) {
-        scores[scoresOffset + cachedPosition] *= scale;
-      }
-      return;
-    }
-    for (int cachedPosition = firstPosition; cachedPosition <= position; cachedPosition++) {
-      int cacheOffset = firstKeyOffset + (cachedPosition - firstPosition) * sequenceCache.keyDim();
-      float dot = VectorUtil.dotProduct(query, queryOffset, keyCache, cacheOffset, keyLength);
-      scores[scoresOffset + cachedPosition] = dot * scale;
-    }
-  }
-
-  private void accumulateAttentionValues(
-      float[] output,
-      int outputOffset,
-      int layer,
-      int position,
-      int kvHead,
-      KvCache sequenceCache,
-      float[] valueCache,
-      int valueLength,
-      float[] scores,
-      int scoresOffset) {
-    int firstPosition = config.attentionStartPosition(layer, position);
-    int visiblePositions = position - firstPosition + 1;
-    if (batchedAttentionValues) {
-      int firstValueOffset = sequenceCache.valueOffset(layer, firstPosition) + kvHead * valueLength;
-      VectorUtil.addWeightedRowsInPlace(
-          output,
-          outputOffset,
-          valueCache,
-          firstValueOffset,
-          sequenceCache.valueDim(),
-          scores,
-          scoresOffset + firstPosition,
-          visiblePositions,
-          valueLength);
-      return;
-    }
-    for (int cachedPosition = firstPosition; cachedPosition <= position; cachedPosition++) {
-      int cacheOffset = sequenceCache.valueOffset(layer, cachedPosition) + kvHead * valueLength;
-      VectorUtil.addScaledInPlace(
-          output,
-          outputOffset,
-          valueCache,
-          cacheOffset,
-          valueLength,
-          scores[scoresOffset + cachedPosition]);
+          0,
+          batchedAttentionValues);
     }
   }
 
@@ -2016,6 +2612,10 @@ public final class LlamaForwardPass {
       int size) {
     if (config.usesGeluFfn()) {
       TensorOps.geluGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+    } else if (config.usesGraniteScaling()) {
+      // Granite: the tier-stable vector sigmoid; vectors-core's swiGlu resolves lanewise EXP to
+      // the vector math library only once compiled and would differ by JIT tier.
+      GroupedQueryAttentionKernel.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else if (usesVectorizedSwiGlu()) {
       VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else {
@@ -2068,6 +2668,53 @@ public final class LlamaForwardPass {
     for (int index = 0; index < length; index++) {
       target[index] += addend[index];
     }
+  }
+
+  private static void addScaledActiveInPlace(
+      float[] target, float[] addend, int length, float scale) {
+    if (scale == 1.0f) {
+      addActiveInPlace(target, addend, length);
+      return;
+    }
+    // Only Granite's residual multiplier reaches this branch; the vector FMA replaces a scalar
+    // loop that was 13% of Java-side samples in the Granite 4.1 3B RAG profile.
+    VectorUtil.addScaledInPlace(target, 0, addend, 0, length, scale);
+  }
+
+  private void scaleLogits(float[] values, int offset, int length) {
+    scaleActive(values, offset, length, 1.0f / config.logitScale());
+  }
+
+  private void addActivatedAdapter(
+      int layer, Projection projection, float[] output, float[] input, boolean active) {
+    if (active) {
+      activatedAdapter.addTo(layer, projection, output, 0, input, 0);
+    }
+  }
+
+  private void addActivatedAdapters(
+      Session[] sessions,
+      int batchSize,
+      int layer,
+      Projection projection,
+      float[] output,
+      int outputStride,
+      float[] input,
+      int inputStride) {
+    if (activatedAdapter == null) return;
+    for (int batch = 0; batch < batchSize; batch++) {
+      if (sessions[batch].adapterActive) {
+        activatedAdapter.addTo(
+            layer, projection, output, batch * outputStride, input, batch * inputStride);
+      }
+    }
+  }
+
+  private static boolean hasActivatedAdapter(Session[] sessions, int batchSize) {
+    for (int batch = 0; batch < batchSize; batch++) {
+      if (sessions[batch].adapterActive) return true;
+    }
+    return false;
   }
 
   private void matmulDispatch(

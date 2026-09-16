@@ -1,0 +1,85 @@
+Downloading https://services.gradle.org/distributions/gradle-9.4.1-all.zip
+......................10%.......................20%.......................30%......................40%.......................50%.......................60%......................70%.......................80%.......................90%.......................100%
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Welcome to Gradle 9.4.1!
+
+Here are the highlights of this release:
+ - Java 26 support
+ - Non-class-based JVM tests
+ - Enhanced console progress bar
+
+For more details see https://docs.gradle.org/9.4.1/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :models-api:compileJava
+> Task :backend-java:compileJava
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes
+> Task :models-api:jar
+> Task :models-runtime:compileJava
+> Task :models-router:compileJava
+> Task :models-bench:compileJava
+> Task :models-bench:processResources
+> Task :models-bench:classes
+> Task :models-router:processResources
+> Task :models-router:classes
+> Task :models-router:jar
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes
+> Task :models-runtime:jar
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 15, 2026 1:17:30 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Sep 15, 2026 1:17:30 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 256 recomputed trial=1 handoff-ttft=211093.9 ms unique-state=251688960 shared=false
+ 256 shared     trial=1 handoff-ttft=119100.7 ms unique-state=131088000 shared=true
+
+The message received from the daemon indicates that the daemon has disappeared.
+Build request sent: Build{id=cc07b2ab-6ddf-4305-a0f7-8aef4632607e, currentDir=/opt/models-granite-alora}
+Attempting to read last messages from the daemon log...
+Daemon pid: 2707
+  log file: /root/.gradle/daemon/9.4.1/daemon-2707.out.log
+----- Last 20 lines from daemon log file - daemon-2707.out.log -----
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 256 recomputed trial=1 handoff-ttft=211093.9 ms unique-state=251688960 shared=false
+ 256 shared     trial=1 handoff-ttft=119100.7 ms unique-state=131088000 shared=true
+Daemon vm is shutting down... The daemon has exited normally or was terminated in response to a user interrupt.
+Remove shutdown hook failed
+java.lang.IllegalStateException: Shutdown in progress
+	at java.base/java.lang.ApplicationShutdownHooks.remove(ApplicationShutdownHooks.java:83)
+	at java.base/java.lang.Runtime.removeShutdownHook(Runtime.java:252)
+	at org.gradle.process.internal.shutdown.ShutdownHooks.removeShutdownHook(ShutdownHooks.java:38)
+	at org.gradle.process.internal.DefaultExecHandle.setEndStateInfo(DefaultExecHandle.java:212)
+	at org.gradle.process.internal.DefaultExecHandle.aborted(DefaultExecHandle.java:408)
+	at org.gradle.process.internal.ExecHandleRunner.completed(ExecHandleRunner.java:211)
+	at org.gradle.process.internal.ExecHandleRunner.lambda$run$2(ExecHandleRunner.java:176)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+	at org.gradle.process.internal.ExecHandleRunner.run(ExecHandleRunner.java:174)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)----- End of the daemon log -----
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Gradle build daemon disappeared unexpectedly (it may have been killed or may have crashed)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.

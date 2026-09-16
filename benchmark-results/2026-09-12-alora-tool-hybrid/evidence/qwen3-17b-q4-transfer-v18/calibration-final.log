@@ -1,0 +1,81 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 8:54:59 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 8:54:59 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 1/75 irrelevance_126          expected=false score=    2.15391 shared=true 26476 ms
+ 2/75 irrelevance_165          expected=false score=    8.34644 shared=true 20226 ms
+ 3/75 irrelevance_169          expected=false score=  -16.29031 shared=true 23176 ms
+ 4/75 irrelevance_172          expected=false score=    0.40805 shared=true 20675 ms
+ 5/75 irrelevance_175          expected=false score=  -18.86819 shared=true 18671 ms
+ 6/75 irrelevance_26           expected=false score=   -1.35988 shared=true 26396 ms
+ 7/75 irrelevance_29           expected=false score=    1.26514 shared=true 20212 ms
+ 8/75 irrelevance_56           expected=false score=  -11.75374 shared=true 20282 ms
+ 9/75 irrelevance_73           expected=false score=   -0.87088 shared=true 22399 ms
+10/75 irrelevance_90           expected=false score=  -26.85805 shared=true 21901 ms
+11/75 multiple_123             expected=true  score=   11.56045 shared=true 48504 ms
+12/75 multiple_124             expected=true  score=   10.98253 shared=true 49359 ms
+13/75 multiple_133             expected=true  score=   19.27611 shared=true 34468 ms
+14/75 multiple_145             expected=true  score=   16.85989 shared=true 55965 ms
+15/75 multiple_153             expected=true  score=   10.76932 shared=true 46841 ms
+16/75 multiple_176             expected=true  score=   18.01358 shared=true 92523 ms
+17/75 multiple_22              expected=true  score=   17.43732 shared=true 42334 ms
+18/75 multiple_62              expected=true  score=   12.03606 shared=true 35305 ms
+19/75 multiple_64              expected=true  score=    6.34367 shared=true 40573 ms
+20/75 multiple_93              expected=true  score=    4.40946 shared=true 44234 ms
+21/75 simple_121               expected=true  score=   16.79216 shared=true 23234 ms
+22/75 simple_161               expected=true  score=   15.56814 shared=true 23378 ms
+23/75 simple_185               expected=true  score=    3.41103 shared=true 22845 ms
+24/75 simple_259               expected=true  score=    8.57387 shared=true 24970 ms
+25/75 simple_273               expected=true  score=    6.48603 shared=true 21438 ms
+26/75 simple_278               expected=true  score=    6.43654 shared=true 22797 ms
+27/75 simple_344               expected=true  score=    9.01807 shared=true 21746 ms
+28/75 simple_40                expected=true  score=    9.86985 shared=true 24380 ms
+29/75 simple_48                expected=true  score=   11.78365 shared=true 21992 ms
+30/75 simple_52                expected=true  score=   11.77961 shared=true 22853 ms
+31/75 irrelevance_100          expected=false score=  -20.29861 shared=true 23336 ms
+32/75 irrelevance_117          expected=false score=  -14.00693 shared=true 26293 ms
+33/75 irrelevance_13           expected=false score=  -14.96501 shared=true 27886 ms
+34/75 irrelevance_145          expected=false score=   -7.37654 shared=true 20789 ms
+35/75 irrelevance_147          expected=false score=  -16.77260 shared=true 23721 ms
+36/75 irrelevance_148          expected=false score=    1.10381 shared=true 20696 ms
+37/75 irrelevance_164          expected=false score=    2.27231 shared=true 21239 ms
+38/75 irrelevance_193          expected=false score=   -5.64081 shared=true 21373 ms
+39/75 irrelevance_202          expected=false score=  -14.79769 shared=true 22389 ms
+40/75 irrelevance_211          expected=false score=   -8.35402 shared=true 21842 ms
+41/75 irrelevance_214          expected=false score=  -14.49652 shared=true 20540 ms
+42/75 irrelevance_22           expected=false score=   -2.04668 shared=true 24595 ms
+43/75 irrelevance_35           expected=false score=  -10.40378 shared=true 21141 ms
+44/75 irrelevance_54           expected=false score=   -1.91369 shared=true 20191 ms
+45/75 irrelevance_69           expected=false score=  -10.29482 shared=true 21700 ms
+46/75 multiple_10              expected=true  score=    3.50079 shared=true 40893 ms
+47/75 multiple_101             expected=true  score=   24.58173 shared=true 32011 ms
+48/75 multiple_103             expected=true  score=   21.92320 shared=true 60931 ms
+49/75 multiple_115             expected=true  score=    2.72015 shared=true 67197 ms
+50/75 multiple_128             expected=true  score=   21.95884 shared=true 76803 ms
+51/75 multiple_141             expected=true  score=   11.04914 shared=true 45410 ms
+52/75 multiple_148             expected=true  score=   14.82785 shared=true 33660 ms
+53/75 multiple_149             expected=true  score=   12.57932 shared=true 64739 ms
+54/75 multiple_160             expected=true  score=   18.34331 shared=true 63583 ms
+55/75 multiple_20              expected=true  score=   15.24709 shared=true 41469 ms
+56/75 multiple_47              expected=true  score=   20.10463 shared=true 40270 ms
+57/75 multiple_53              expected=true  score=   10.68396 shared=true 39905 ms
+58/75 multiple_56              expected=true  score=   12.16652 shared=true 48739 ms
+59/75 multiple_76              expected=true  score=   -5.04900 shared=true 38784 ms
+60/75 multiple_95              expected=true  score=   12.92735 shared=true 36652 ms
+61/75 simple_114               expected=true  score=   14.15861 shared=true 21924 ms
+62/75 simple_120               expected=true  score=   11.24119 shared=true 26868 ms
+63/75 simple_172               expected=true  score=   10.94757 shared=true 18616 ms
+64/75 simple_22                expected=true  score=   18.18558 shared=true 18986 ms
+65/75 simple_226               expected=true  score=   10.31033 shared=true 21946 ms
+66/75 simple_264               expected=true  score=    6.32658 shared=true 21671 ms
+67/75 simple_291               expected=true  score=   10.08941 shared=true 28517 ms
+68/75 simple_296               expected=true  score=   11.46950 shared=true 25526 ms
+69/75 simple_303               expected=true  score=   10.05536 shared=true 21733 ms
+70/75 simple_308               expected=true  score=    6.56880 shared=true 22660 ms
+71/75 simple_326               expected=true  score=   -1.35086 shared=true 23234 ms
+72/75 simple_35                expected=true  score=    9.83773 shared=true 24591 ms
+73/75 simple_43                expected=true  score=    9.48955 shared=true 25629 ms
+74/75 simple_83                expected=true  score=   10.45461 shared=true 27487 ms
+75/75 simple_94                expected=true  score=    0.14876 shared=true 26775 ms
+PASS threshold=2.49623099 balanced=0.950000 calls=47/50 no-calls=24/25 physical=75/75 report=/opt/modeljars-runs/alora-v18-final/evidence/calibration-final.json

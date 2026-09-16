@@ -38,7 +38,8 @@ public record LlamaConfig(
     int slidingWindow,
     int slidingWindowPattern,
     float finalLogitSoftcap,
-    RopeScaling ropeScaling) {
+    RopeScaling ropeScaling,
+    GraniteScalars graniteScalars) {
 
   public LlamaConfig {
     if (architecture == null) throw new IllegalArgumentException("architecture must not be null");
@@ -71,6 +72,7 @@ public record LlamaConfig(
           "finalLogitSoftcap must be finite and >= 0: " + finalLogitSoftcap);
     }
     ropeScaling = Objects.requireNonNull(ropeScaling, "ropeScaling");
+    graniteScalars = Objects.requireNonNull(graniteScalars, "graniteScalars");
     // The structured scaling contract is authoritative. Canonicalizing the legacy scalar also
     // avoids reciprocal float round-trip differences and correctly handles GGUF files that retain
     // an unused factor while explicitly declaring scaling type "none".
@@ -114,7 +116,8 @@ public record LlamaConfig(
         slidingWindow,
         slidingWindowPattern,
         finalLogitSoftcap,
-        RopeScaling.linear(ropeFrequencyScale));
+        RopeScaling.linear(ropeFrequencyScale),
+        GraniteScalars.none());
   }
 
   /** GGUF rotary-scaling algorithms implemented by the pure-Java graph. */
@@ -158,6 +161,21 @@ public record LlamaConfig(
 
     float frequencyScale() {
       return 1.0f / factor;
+    }
+  }
+
+  /** Numerical scales that distinguish Granite's decoder graph from a Llama graph. */
+  public record GraniteScalars(float embedding, float attention, float residual, float logits) {
+
+    public GraniteScalars {
+      requireFinitePositive("Granite embedding scale", embedding);
+      requireFinitePositive("Granite attention scale", attention);
+      requireFinitePositive("Granite residual scale", residual);
+      requireFinitePositive("Granite logit scale", logits);
+    }
+
+    static GraniteScalars none() {
+      return new GraniteScalars(1.0f, 1.0f, 1.0f, 1.0f);
     }
   }
 
@@ -227,7 +245,32 @@ public record LlamaConfig(
 
   /** Model-specific token embedding multiplier. */
   public float embeddingScale() {
+    if (architecture == DecoderArchitecture.GRANITE) return graniteScalars.embedding();
     return isGemmaFamily() ? (float) Math.sqrt(embeddingDim) : 1.0f;
+  }
+
+  /** Scale applied to QK attention scores; Granite persists this rather than deriving it. */
+  public float attentionScale() {
+    return architecture == DecoderArchitecture.GRANITE
+        ? graniteScalars.attention()
+        : (float) (1.0 / Math.sqrt(keyLength));
+  }
+
+  /** Scale applied to Granite's attention and feed-forward residual updates. */
+  public float residualScale() {
+    return architecture == DecoderArchitecture.GRANITE ? graniteScalars.residual() : 1.0f;
+  }
+
+  /** Divisor applied to Granite logits after the vocabulary projection. */
+  public float logitScale() {
+    return architecture == DecoderArchitecture.GRANITE ? graniteScalars.logits() : 1.0f;
+  }
+
+  /**
+   * Whether this graph has Granite-specific arithmetic that generic Llama shortcuts must not use.
+   */
+  public boolean usesGraniteScaling() {
+    return architecture == DecoderArchitecture.GRANITE;
   }
 
   /** Whether this architecture uses GELU-gated rather than SiLU-gated feed-forward layers. */
@@ -334,7 +377,7 @@ public record LlamaConfig(
 
   /** Whether Llama-only staged/pruned layer implementations preserve this architecture. */
   public boolean usesStandardLlamaLayerSemantics() {
-    return !isGemmaFamily();
+    return !isGemmaFamily() && !usesGraniteScaling();
   }
 
   private void requireLayer(int layer) {
@@ -392,6 +435,15 @@ public record LlamaConfig(
     float finalLogitSoftcap =
         getArchFloatKey(metadata, arch, "final_logit_softcapping").orElse(0.0f);
 
+    GraniteScalars graniteScalars =
+        architecture == DecoderArchitecture.GRANITE
+            ? new GraniteScalars(
+                requiredGraniteScale(metadata, arch, "embedding_scale"),
+                requiredGraniteScale(metadata, arch, "attention.scale"),
+                requiredGraniteScale(metadata, arch, "residual_scale"),
+                requiredGraniteScale(metadata, arch, "logit_scale"))
+            : GraniteScalars.none();
+
     return new LlamaConfig(
         architecture,
         embeddingDim,
@@ -410,7 +462,19 @@ public record LlamaConfig(
         slidingWindow,
         slidingWindowPattern,
         finalLogitSoftcap,
-        ropeScaling);
+        ropeScaling,
+        graniteScalars);
+  }
+
+  private static float requiredGraniteScale(GgufMetadata metadata, String arch, String suffix) {
+    return getArchFloatKey(metadata, arch, suffix)
+        .orElseThrow(() -> new IllegalArgumentException("Missing " + arch + "." + suffix));
+  }
+
+  private static void requireFinitePositive(String name, float value) {
+    if (!(value > 0.0f) || !Float.isFinite(value)) {
+      throw new IllegalArgumentException(name + " must be finite and > 0: " + value);
+    }
   }
 
   private static RopeScaling ropeScaling(

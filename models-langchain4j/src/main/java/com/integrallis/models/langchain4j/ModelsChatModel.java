@@ -26,8 +26,10 @@ import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
+import com.integrallis.models.runtime.ActivatedToolModel;
 import com.integrallis.models.runtime.ConstrainedTextGenerationModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
+import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
@@ -46,11 +48,12 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** LangChain4J {@link ChatModel} backed by the models runtime generation loop. */
-public final class ModelsChatModel implements ChatModel {
+public final class ModelsChatModel implements ChatModel, AutoCloseable {
   private final TextGenerationModel model;
   private final ChatTemplate template;
   private final SamplingOptions defaults;
   private final ToolSpecSelector toolSelector;
+  private final ActivatedTurnRegistry activatedTurns = new ActivatedTurnRegistry();
 
   public ModelsChatModel(InferenceBackend backend) {
     this(new RuntimeTextGenerationModel(backend));
@@ -107,6 +110,12 @@ public final class ModelsChatModel implements ChatModel {
     boolean toolsDeclared = !tools.isEmpty();
     ModelPrompt prompt = LangChain4jChatRequestMapper.prompt(request, template, tools);
     SamplingOptions requested = LangChain4jChatRequestMapper.options(request, defaults);
+    if (model instanceof ActivatedToolModel activatedModel && toolsDeclared) {
+      ActivatedTurnRegistry.PendingTurn pending = activatedTurns.take(request);
+      return pending == null
+          ? beginActivatedTurn(activatedModel, prompt, requested, tools)
+          : continueActivatedTurn(pending, prompt, requested, tools);
+    }
     GenerationOutput generated = generate(prompt, requested, tools);
 
     // Without declared tools, output that merely resembles a call is ordinary text.
@@ -141,6 +150,85 @@ public final class ModelsChatModel implements ChatModel {
             .modelName(model.modelName());
     addUsage(response, generated.usage());
     return response.build();
+  }
+
+  private ChatResponse beginActivatedTurn(
+      ActivatedToolModel activatedModel,
+      ModelPrompt prompt,
+      SamplingOptions options,
+      List<ToolSpec> tools) {
+    return selectActivatedTurn(activatedModel.openToolTurn(prompt), prompt, options, tools);
+  }
+
+  private ChatResponse continueActivatedTurn(
+      ActivatedTurnRegistry.PendingTurn pending,
+      ModelPrompt prompt,
+      SamplingOptions options,
+      List<ToolSpec> tools) {
+    SharedToolTurn previous = pending.turn;
+    SharedToolTurn next;
+    try {
+      next = previous.continueToolSelection(prompt);
+    } finally {
+      previous.close();
+    }
+    return selectActivatedTurn(next, prompt, options, tools);
+  }
+
+  private ChatResponse selectActivatedTurn(
+      SharedToolTurn turn, ModelPrompt prompt, SamplingOptions options, List<ToolSpec> tools) {
+    boolean retained = false;
+    try {
+      TokenConstraint constraint = toolConstraint(tools).orElseGet(TokenConstraint::unrestricted);
+      String output = turn.generateToolCall(options, constraint);
+      GenerationUsage usage = turn.toolMetrics().available() ? turn.toolMetrics().usage() : null;
+      ToolCallScanner.Result scan = ToolCallScanner.scan(output, template.toolSyntax(), tools);
+      if (!scan.hasCalls()) {
+        String baseOutput = turn.generateBaseResponse(prompt, options);
+        GenerationUsage baseUsage =
+            turn.responseMetrics().available() ? turn.responseMetrics().usage() : null;
+        return textResponse(baseOutput, combineUsage(usage, baseUsage));
+      }
+
+      List<ToolExecutionRequest> requests = activatedTurns.retain(turn, toolRequests(scan));
+      retained = true;
+      return toolResponse(scan.content(), requests, usage);
+    } finally {
+      if (!retained) {
+        turn.close();
+      }
+    }
+  }
+
+  private ChatResponse textResponse(String text, GenerationUsage usage) {
+    var response =
+        ChatResponse.builder().aiMessage(AiMessage.from(text)).modelName(model.modelName());
+    addUsage(response, usage);
+    return response.build();
+  }
+
+  private ChatResponse toolResponse(
+      String content, List<ToolExecutionRequest> requests, GenerationUsage usage) {
+    var response =
+        ChatResponse.builder()
+            .aiMessage(new AiMessage(content, requests))
+            .finishReason(FinishReason.TOOL_EXECUTION)
+            .modelName(model.modelName());
+    addUsage(response, usage);
+    return response.build();
+  }
+
+  private static List<ToolExecutionRequest> toolRequests(ToolCallScanner.Result scan) {
+    List<ToolExecutionRequest> requests = new ArrayList<>(scan.toolCalls().size());
+    for (ToolCall call : scan.toolCalls()) {
+      requests.add(
+          ToolExecutionRequest.builder()
+              .id(call.id())
+              .name(call.name())
+              .arguments(call.argumentsJson())
+              .build());
+    }
+    return List.copyOf(requests);
   }
 
   private GenerationOutput generate(
@@ -185,6 +273,18 @@ public final class ModelsChatModel implements ChatModel {
     }
   }
 
+  private static GenerationUsage combineUsage(GenerationUsage first, GenerationUsage second) {
+    if (first == null) {
+      return second;
+    }
+    if (second == null) {
+      return first;
+    }
+    return new GenerationUsage(
+        Math.addExact(first.promptTokens(), second.promptTokens()),
+        Math.addExact(first.completionTokens(), second.completionTokens()));
+  }
+
   private static void throwFailure(Throwable failure) {
     if (failure instanceof RuntimeException runtimeFailure) {
       throw runtimeFailure;
@@ -202,7 +302,12 @@ public final class ModelsChatModel implements ChatModel {
       return Optional.empty();
     }
     return LangChain4jToolCallConstraint.compile(
-        constrainedModel.tokenizer(), template.toolSyntax(), tools);
+        constrainedModel.tokenizer(),
+        template.toolSyntax(),
+        tools,
+        model instanceof ActivatedToolModel activatedModel
+            ? activatedModel.toolAbstentionOutputs()
+            : List.of());
   }
 
   private List<ToolSpec> selectedTools(ChatRequest request, List<ToolSpec> tools) {
@@ -213,4 +318,10 @@ public final class ModelsChatModel implements ChatModel {
   }
 
   private record GenerationOutput(String text, GenerationUsage usage) {}
+
+  @Override
+  public void close() {
+    activatedTurns.close();
+    model.close();
+  }
 }

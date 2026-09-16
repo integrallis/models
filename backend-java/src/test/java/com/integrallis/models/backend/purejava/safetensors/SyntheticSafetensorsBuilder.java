@@ -46,6 +46,17 @@ public final class SyntheticSafetensorsBuilder {
     return this;
   }
 
+  public SyntheticSafetensorsBuilder addF32(String name, long[] shape, float... values) {
+    ByteBuffer data =
+        ByteBuffer.allocate(Math.multiplyExact(values.length, Float.BYTES))
+            .order(ByteOrder.LITTLE_ENDIAN);
+    for (float value : values) {
+      data.putFloat(value);
+    }
+    tensors.add(new Tensor(name, "F32", shape.clone(), data.array()));
+    return this;
+  }
+
   public byte[] build() {
     StringBuilder header = new StringBuilder("{");
     boolean comma = false;

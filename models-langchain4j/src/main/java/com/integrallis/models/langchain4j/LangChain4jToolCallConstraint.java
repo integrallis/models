@@ -35,8 +35,20 @@ final class LangChain4jToolCallConstraint {
 
   static Optional<TokenConstraint> compile(
       Tokenizer tokenizer, ToolSyntax syntax, List<ToolSpec> tools) {
+    return compile(tokenizer, syntax, tools, List.of());
+  }
+
+  static Optional<TokenConstraint> compile(
+      Tokenizer tokenizer,
+      ToolSyntax syntax,
+      List<ToolSpec> tools,
+      List<String> noToolAlternatives) {
     return ToolCallTokenConstraints.compile(
-        tokenizer, syntax, tools, tool -> argumentAlternatives(tool.inputSchema()));
+        tokenizer,
+        syntax,
+        tools,
+        tool -> argumentAlternatives(tool.inputSchema()),
+        noToolAlternatives);
   }
 
   private static List<String> argumentAlternatives(String schema) {
