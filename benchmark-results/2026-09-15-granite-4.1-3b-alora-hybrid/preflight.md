@@ -544,3 +544,15 @@ Correctness 9/9 and 27/27. Rust arm p95 TTFT 975 ms, prefill 141 tok/s. Bundle i
 instance of the same class before any conclusion: attempt 8 runs on a new c7a.4xlarge at the same
 commit and settings; whichever way it lands is recorded, and no third roll follows without a code
 change.
+
+**Base run, attempt 8 result (Models 7a3f3e7, fresh instance 3 `i-028f20c0bee6f028b`, key
+SHA256:+pn9DipjAOFmL+LkArnfuPbjX3JeCt7RviydNt50ADY):** FAILED_RELATIVE_GATE, tier USABLE. Rust arm
+decode 20.30 tok/s, p95 TTFT 1072 ms, p95 e2e 2696 ms; Ollama 28.41 / 632 / 1909; llama.cpp 30.47
+/ 986 / 2171. Ratios: decode 0.71 (Ollama) / 0.67 (llama.cpp); e2e 1.41 / 1.24. Correctness 9/9
+and 27/27. Bundle in `host-evidence/base-attempt8/`. Reading attempts 6–8 together: the Java
+runtime is stable at 18.9–20.5 tok/s across three instances while the controls range 25–30, so
+instance variance moves the ratio by up to 0.1 through the denominator. A robust pass needs about
+23 tok/s on this class. That is the one allowed re-roll spent; the next base run follows a code
+change. Native projections were measured at bandwidth parity with the controls, so the remaining
+Java-side milliseconds per token are the target; a fresh main-thread profile at 7a3f3e7 decides
+which.
