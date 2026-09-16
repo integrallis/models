@@ -211,3 +211,13 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   Baseline: 16 vCPU, 30 GiB free, 575 GB free disk, no stray inference processes. `host-run.sh all`
   started under nohup; a local watchdog deletes exactly this server and firewall at the deadline
   if they still exist.
+- 2026-09-16, publication prerequisites identified while the host runs (not blockers for the
+  gates, but for the release): ModelJars downloads a multi-file bundle from one pinned
+  `/resolve/<revision>/` base and, for `hf://` sources, only from huggingface.co, so the packaged
+  adapter bundle (weights, `models-activated-lora.json`, NOTICE, LICENSE) needs a Hugging Face
+  repository under our control at a pinned revision before a component marker can be built. The
+  ModelJars branch cannot compile until a Models release carries the activated runtime, so the
+  chain is: gates pass here, draft PR #180 (which contains #176) merges, Models releases to Maven
+  Central, then the ModelJars component and composition entries publish. The ModelJars component
+  gate now accepts `specialistKind = upstream-rag-specialist` with the answerability evidence
+  shape, and `assemble_component_report.py` produces that report from the raw host evidence.
