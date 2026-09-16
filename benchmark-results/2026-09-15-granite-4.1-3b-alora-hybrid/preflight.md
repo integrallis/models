@@ -692,3 +692,44 @@ pure-Java arm (three unanswerable and one answerable case flipping in both direc
 borderline-flip pattern of the identity screen). Report
 `host-evidence/window-f6252cc/window-squad-v2-dev-specialist-rust-ffm.json` (sha256
 a1d0dee5499e894ea4fc4596547af0e01124cedac0fd96e778ff45643541e1ff).
+
+**Runtime defect located and fixed (2026-09-16T12:15Z, measured):** the activation-path probe
+(`Granite41AloraCaseProbeIntegrationTest`, replaying the dumped prompt of case `57115f0a…`) gave
+identical distributions along the single-token, batched-invocation and shared-fork paths, so the
+fork and batching were not the cause. Per-layer hidden states of our activated branch against
+the reference (same dequantized Q4_K_M weights, adapter on) were already 8.5% off at layer 0 for
+the last invocation token (about 40% of the adapter's own effect, `rel(on,off)` 20%) and 40% off
+by layer 38 — a systematic error in how the adapter was applied, not float noise. Cause: the
+activated LoRA loader added the `q_proj` / `k_proj` low-rank updates in Hugging Face row order,
+but llama.cpp's converter permutes those rows for Llama-family graphs (adjacent-pair rotary
+layout; `permute` in `convert_hf_to_gguf.py`), so on Granite the query and key deltas landed on
+the wrong rows within each head while the value, output and FFN deltas were right. Qwen keeps
+the split-half (NeoX) layout in GGUF, which is why every earlier mechanics test (Qwen3 0.6B /
+1.7B adapters) passed. Fix: `ActivatedLoraAdapter.Architecture` carries the head counts and an
+`interleavedRotaryRows` flag (set from `!config.usesNeoxRope()`), and the loader permutes the
+`lora_B` rows of the query and key projections into the GGUF layout at load time
+(`interleaveRotaryRows`, unit-tested). After the fix the probe outputs `"answerable"` on the
+case; step 1 is `answer` 25.16 over `un` 23.33 with no `kick` in the top 5 (reference: 24.52 /
+21.86); the hidden-state error against the reference falls to 4–6% at early layers and 15–17%
+at layer 38 (from 7–9% and 37–44%), the remaining gap being the numerics regime (our kernels
+quantise activations to Q8 as llama.cpp does; the reference multiplies dequantised weights in
+f32). backend-java unit suite 618/618 with the two new tests.
+
+**Consequence, decided before any further result is read:** every activated-branch result
+produced at f6252cc — the identity screens, both SQuAD specialist window arms, gate 5, gate 6 —
+was measured with the defective adapter application and is void for qualification; it stays in
+`host-evidence/` as the record that led to the defect. The base qualification (no adapter) is
+unaffected by construction but is re-run at the new frozen commit anyway so the chain pins one
+Models revision. The window is not re-selected: no threshold or case changed, the runtime did,
+and the cases were never used to tune anything. The runs on the three hosts were stopped at
+12:05–12:07Z with the reason written into each host log. The Granite 3.2 8B query-rewrite
+rejection of 2026-09-15 ran with the same defect and is downgraded from "rejected" to
+"not measured".
+Numerics floor, measured the same way on the base branch with no adapter (our path D against the
+reference with the adapter disabled): relative hidden-state error 5.1% at layer 0, 3.9–6.0% at
+layers 5–30, 11.6% at layer 38. The fixed activated branch sits at 6.0% / 4–5% / 15–17%, i.e. in
+the same regime as the base-only gap, so no adapter-specific discrepancy remains at the level this
+comparison can see. Three-case re-run with the fix on this machine: both arms structured 3/3 and
+correct 3/3 (`"answerable"`, `"unanswerable"`, `"answerable"`). Regression test
+`Granite41AloraIntegrationTest.matchesThePeftReferenceWhereTheBaseWantsToAnswerInstead` pins the
+reference's `"answerable"` on this case's prompt (270 tokens) under real weights.

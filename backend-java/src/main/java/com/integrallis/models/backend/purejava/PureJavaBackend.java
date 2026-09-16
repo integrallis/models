@@ -749,7 +749,10 @@ public final class PureJavaBackend
                       config.keyDim(),
                       config.valueDim(),
                       config.attentionOutputDim(),
-                      config.hiddenDim()));
+                      config.hiddenDim(),
+                      config.numHeads(),
+                      config.numKvHeads(),
+                      !config.usesNeoxRope()));
       KvCache cache =
           new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
       LlamaForwardPass forwardPass =

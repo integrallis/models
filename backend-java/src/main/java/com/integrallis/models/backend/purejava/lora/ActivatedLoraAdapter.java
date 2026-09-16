@@ -30,6 +30,7 @@ import com.integrallis.models.backend.purejava.safetensors.SafetensorsDtype;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsTensor;
 import java.io.IOException;
 import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -86,7 +87,19 @@ public final class ActivatedLoraAdapter {
     }
   }
 
-  /** Base-model dimensions needed to reject adapters built for a different graph. */
+  /**
+   * The base graph the adapter attaches to; its dimensions reject adapters built for a different
+   * graph.
+   *
+   * <p>{@code interleavedRotaryRows} states that the GGUF base stores its query and key projection
+   * rows in llama.cpp's interleaved rotary layout (the {@code permute} step of {@code
+   * convert_hf_to_gguf.py} for Llama-family graphs, which pairs rotary dimensions as adjacent rows)
+   * rather than the Hugging Face split-half layout the adapter was trained against. When set, the
+   * query and key {@code lora_B} rows are permuted into the same layout at load time so the
+   * low-rank update lands on the rows it was trained for; {@code queryHeads} and {@code
+   * keyValueHeads} define the per-head permutation. Graphs that keep the split-half (NeoX) layout
+   * in GGUF, such as Qwen, pass {@code false}.
+   */
   public record Architecture(
       int layers,
       int embeddingDimension,
@@ -94,7 +107,10 @@ public final class ActivatedLoraAdapter {
       int keyDimension,
       int valueDimension,
       int attentionOutputDimension,
-      int hiddenDimension) {
+      int hiddenDimension,
+      int queryHeads,
+      int keyValueHeads,
+      boolean interleavedRotaryRows) {
 
     public Architecture {
       positive("layers", layers);
@@ -104,6 +120,53 @@ public final class ActivatedLoraAdapter {
       positive("valueDimension", valueDimension);
       positive("attentionOutputDimension", attentionOutputDimension);
       positive("hiddenDimension", hiddenDimension);
+      if (interleavedRotaryRows) {
+        positive("queryHeads", queryHeads);
+        positive("keyValueHeads", keyValueHeads);
+        divisible("queryDimension", queryDimension, queryHeads);
+        divisible("keyDimension", keyDimension, keyValueHeads);
+        if ((queryDimension / queryHeads) % 2 != 0 || (keyDimension / keyValueHeads) % 2 != 0) {
+          throw new IllegalArgumentException("rotary head dimensions must be even");
+        }
+      }
+    }
+
+    /** A base graph whose GGUF query and key rows keep the Hugging Face split-half layout. */
+    public Architecture(
+        int layers,
+        int embeddingDimension,
+        int queryDimension,
+        int keyDimension,
+        int valueDimension,
+        int attentionOutputDimension,
+        int hiddenDimension) {
+      this(
+          layers,
+          embeddingDimension,
+          queryDimension,
+          keyDimension,
+          valueDimension,
+          attentionOutputDimension,
+          hiddenDimension,
+          0,
+          0,
+          false);
+    }
+
+    private static void divisible(String name, int value, int divisor) {
+      if (value % divisor != 0) {
+        throw new IllegalArgumentException(name + " must be divisible by its head count");
+      }
+    }
+
+    /** Head count of the projection whose rows are interleaved, or 0 when none are. */
+    int interleavedHeads(Projection projection) {
+      if (!interleavedRotaryRows) return 0;
+      return switch (projection) {
+        case QUERY -> queryHeads;
+        case KEY -> keyValueHeads;
+        default -> 0;
+      };
     }
 
     int inputDimension(Projection projection) {
@@ -220,9 +283,15 @@ public final class ActivatedLoraAdapter {
         int outputDimension = architecture.outputDimension(projection);
         SafetensorsTensor a = requireTensor(tensors, aName, metadata.rank, inputDimension);
         SafetensorsTensor b = requireTensor(tensors, bName, outputDimension, metadata.rank);
+        int interleavedHeads = architecture.interleavedHeads(projection);
+        MemorySegment bRows =
+            interleavedHeads == 0
+                ? b.data()
+                : interleaveRotaryRows(
+                    b.data(), arena, outputDimension, metadata.rank, interleavedHeads);
         projections[layer][projection.ordinal()] =
             new LoraProjection(
-                a.data(), b.data(), inputDimension, outputDimension, metadata.rank, scale);
+                a.data(), bRows, inputDimension, outputDimension, metadata.rank, scale);
       }
     }
     Set<String> actualNames = Set.copyOf(tensors.tensorNames());
@@ -250,6 +319,29 @@ public final class ActivatedLoraAdapter {
         metadata.provenance,
         architecture,
         projections);
+  }
+
+  /**
+   * Reorders the rows of a {@code [rows, rank]} row-major float tensor from the Hugging Face
+   * split-half rotary layout into llama.cpp's interleaved layout: within each head of {@code d}
+   * rows, source row {@code j * d/2 + i} moves to row {@code 2 * i + j}.
+   */
+  static MemorySegment interleaveRotaryRows(
+      MemorySegment source, Arena arena, int rows, int rank, int heads) {
+    int headDimension = rows / heads;
+    int half = headDimension / 2;
+    long rowBytes = (long) rank * Float.BYTES;
+    MemorySegment target = arena.allocate(rowBytes * rows, Float.BYTES);
+    for (int head = 0; head < heads; head++) {
+      for (int i = 0; i < half; i++) {
+        for (int j = 0; j < 2; j++) {
+          long sourceRow = (long) head * headDimension + (long) j * half + i;
+          long targetRow = (long) head * headDimension + 2L * i + j;
+          MemorySegment.copy(source, sourceRow * rowBytes, target, targetRow * rowBytes, rowBytes);
+        }
+      }
+    }
+    return target;
   }
 
   /** Adds one activated low-rank projection update to an already-computed base projection. */

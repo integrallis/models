@@ -63,6 +63,30 @@ class Granite41AloraIntegrationTest {
   };
 
   private static final int[] DOCUMENTS_MARKER_TOKENS = {100282, 100283};
+
+  /**
+   * SQuAD 2.0 dev case 57115f0a50c2381900b54aa8: the base model wants to answer "kick back" here,
+   * and the answerability adapter must override that from its query and key rows. Before the
+   * rotary-row permutation of the q/k low-rank updates the runtime produced {@code "kick back"};
+   * IBM's reference implementation (Transformers 5.17.0 + PEFT 0.21.0 on the dequantised Q4_K_M
+   * weights, 2026-09-16) produces these tokens, {@code "answerable"<|end_of_text|>}.
+   */
+  private static final String PERMUTATION_CASE_DOCUMENT =
+      "{\"doc_id\": 1, \"text\": \"The simplest valve gears give events of fixed length during "
+          + "the engine cycle and often make the engine rotate in only one direction. Most however "
+          + "have a reversing mechanism which additionally can provide means for saving steam as "
+          + "speed and momentum are gained by gradually \\\"shortening the cutoff\\\" or rather, "
+          + "shortening the admission event; this in turn proportionately lengthens the expansion "
+          + "period. However, as one and the same valve usually controls both steam flows, a short "
+          + "cutoff at admission adversely affects the exhaust and compression periods which "
+          + "should ideally always be kept fairly constant; if the exhaust event is too brief, the "
+          + "totality of the exhaust steam cannot evacuate the cylinder, choking it and giving "
+          + "excessive compression (\\\"kick back\\\").[citation needed]\"}";
+
+  private static final String PERMUTATION_CASE_QUESTION =
+      "What is another term for excessive compression?";
+  private static final int PERMUTATION_CASE_PROMPT_TOKENS = 270;
+  private static final int[] PERMUTATION_CASE_REFERENCE_TOKENS = {1, 9399, 481, 1, 100257};
   private static final String DOCUMENT =
       "{\"doc_id\": 1, \"text\": \"Tim Cook has served as the chief executive officer of Apple "
           + "since August 2011, when he succeeded Steve Jobs.\"}";
@@ -162,6 +186,10 @@ class Granite41AloraIntegrationTest {
 
   /** Mirrors the published documents template: markers are control, everything else is text. */
   static ModelPrompt answerabilityPrompt() {
+    return answerabilityPrompt(DOCUMENT, "Who is the CEO of Apple?");
+  }
+
+  static ModelPrompt answerabilityPrompt(String document, String question) {
     return ModelPrompt.builder()
         .control("<|start_of_role|>system<|end_of_role|>")
         .text(
@@ -171,7 +199,7 @@ class Granite41AloraIntegrationTest {
         .control("<documents></documents>")
         .text(" XML tags:\n")
         .control("<documents>")
-        .text("\n" + DOCUMENT + "\n")
+        .text("\n" + document + "\n")
         .control("</documents>")
         .text(
             "\n\nWrite the response to the user's input by strictly aligning with the facts in "
@@ -180,10 +208,40 @@ class Granite41AloraIntegrationTest {
                 + "answered based on the available data.")
         .control("<|end_of_text|>\n")
         .control("<|start_of_role|>user<|end_of_role|>")
-        .text("Who is the CEO of Apple?")
+        .text(question)
         .control("<|end_of_text|>\n")
         .control(INVOCATION)
         .build();
+  }
+
+  @Test
+  @EnabledIfSystemProperty(named = ADAPTER_PROPERTY, matches = ".+")
+  void matchesThePeftReferenceWhereTheBaseWantsToAnswerInstead() {
+    try (PureJavaBackend backend =
+            PureJavaBackend.loadActivatedAdapter(
+                Path.of(System.getProperty(BASE_PROPERTY)),
+                Path.of(System.getProperty(ADAPTER_PROPERTY)));
+        ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
+      ModelPrompt prompt =
+          answerabilityPrompt(PERMUTATION_CASE_DOCUMENT, PERMUTATION_CASE_QUESTION);
+      int[] promptTokens = backend.tokenizer().encode(prompt);
+      assertThat(promptTokens).hasSize(PERMUTATION_CASE_PROMPT_TOKENS);
+      assertThat(lastIndexOf(promptTokens, INVOCATION_TOKENS))
+          .isEqualTo(promptTokens.length - INVOCATION_TOKENS.length);
+      try (ActivatedToolTurn turn =
+          model.openToolTurn(prompt, ActivatedToolCallingModel.PrefixStrategy.SHARED)) {
+        String output =
+            turn.generateToolCall(
+                com.integrallis.models.api.SamplingOptions.builder()
+                    .temperature(0)
+                    .maxTokens(PERMUTATION_CASE_REFERENCE_TOKENS.length)
+                    .build(),
+                com.integrallis.models.runtime.TokenConstraint.unrestricted());
+        assertThat(turn.physicallySharesPrefix()).isTrue();
+        assertThat(output).isEqualTo("\"answerable\"");
+        assertThat(backend.tokenizer().encode("\"answerable\"")).containsExactly(1, 9399, 481, 1);
+      }
+    }
   }
 
   private static int argmax(float[] values) {

@@ -42,6 +42,38 @@ class ActivatedLoraAdapterTest {
   @TempDir Path temporaryDirectory;
 
   @Test
+  void interleavesRotaryRowsPerHeadIntoTheLlamaCppLayout() {
+    // Two heads of four rows, rank 2: Hugging Face row j * d/2 + i lands on GGUF row 2 * i + j.
+    float[] source = new float[16];
+    for (int index = 0; index < source.length; index++) source[index] = index;
+    try (Arena arena = Arena.ofConfined()) {
+      java.lang.foreign.MemorySegment segment =
+          arena.allocateFrom(java.lang.foreign.ValueLayout.JAVA_FLOAT, source);
+      java.lang.foreign.MemorySegment target =
+          ActivatedLoraAdapter.interleaveRotaryRows(segment, arena, 8, 2, 2);
+      float[] actual = target.toArray(java.lang.foreign.ValueLayout.JAVA_FLOAT);
+      // head 0 rows (hf order 0,1,2,3) -> gguf order 0,2,1,3; head 1 rows 4,5,6,7 -> 4,6,5,7
+      assertThat(actual)
+          .containsExactly(
+              0, 1, 4, 5, 2, 3, 6, 7, //
+              8, 9, 12, 13, 10, 11, 14, 15);
+    }
+  }
+
+  @Test
+  void aSplitHalfArchitectureLeavesRowsAlone() {
+    Architecture architecture = new Architecture(1, 2, 4, 4, 1, 2, 3);
+    assertThat(architecture.interleavedRotaryRows()).isFalse();
+    assertThat(architecture.interleavedHeads(Projection.QUERY)).isZero();
+    Architecture interleaved = new Architecture(1, 2, 4, 4, 1, 2, 3, 1, 1, true);
+    assertThat(interleaved.interleavedHeads(Projection.QUERY)).isEqualTo(1);
+    assertThat(interleaved.interleavedHeads(Projection.KEY)).isEqualTo(1);
+    assertThat(interleaved.interleavedHeads(Projection.VALUE)).isZero();
+    assertThatThrownBy(() -> new Architecture(1, 2, 6, 4, 1, 2, 3, 4, 1, true))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   void loadsAnExactPinnedAdapterAndAppliesEveryDeclaredProjection() throws Exception {
     writeAdapter(false);
 

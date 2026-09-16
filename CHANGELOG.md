@@ -6,6 +6,10 @@ All notable changes to models are documented here.
 
 ## [0.3.38] - 2026-09-16
 
+### Fixed
+- Activated LoRA on Llama-family GGUF graphs: llama.cpp's converter stores the query and key projection rows in the interleaved (adjacent-pair) rotary layout, but the adapter loader added the `q_proj` / `k_proj` low-rank updates in Hugging Face row order, so on Granite (and any other non-NeoX graph) those two updates landed on the wrong rows within each head while the value, output and FFN updates were right. `ActivatedLoraAdapter.Architecture` now carries the head counts and an `interleavedRotaryRows` flag, and the loader permutes the query and key `lora_B` rows into the GGUF layout at load time. Found with IBM's PEFT reference on the dequantised Q4_K_M weights: on a SQuAD case whose base answer is "kick back", the runtime produced that span instead of the label; it now produces the reference's `"answerable"` and its hidden states track the reference to within the activation-quantisation regime. Qwen adapters (NeoX layout) were never affected.
+- Fused grouped-query attention is Granite-only; every other architecture keeps the head-by-head attention loop its pinned greedy oracles were recorded on (the fused kernel's lane reductions and vector exponential flipped a near-tie Qwen3 0.6B token on the Rust arm).
+
 ### Added
 - `granite` RAG prompt template in `models-rag-bench` so Granite 4.x artifacts can run the controlled RAG qualification harness with the byte-exact Transformers envelope.
 - `granite-documents` RAG prompt template: evidence in the Granite 4.x `<documents>` system block, bare question as the user turn, byte-exact with the Transformers chat template; `GraniteDocumentsPrompt` moved to `models-runtime` (public, Jackson-free, Jackson-parity tested) so both bench modules share one renderer.

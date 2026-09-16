@@ -293,6 +293,12 @@ tasks.withType<Test>().configureEach {
     configuredGranite41AloraAdapter.orNull?.let {
         systemProperty("models.fixtures.granite41AloraAdapter", it)
     }
+    providers.systemProperty("models.fixtures.granite41AloraProbeDump").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeDump", it)
+    }
+    providers.systemProperty("models.fixtures.granite41AloraProbeHiddenOutput").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeHiddenOutput", it)
+    }
     configuredDebertaThreads.orNull?.let {
         systemProperty("models.deberta.threads", it)
     }
@@ -580,6 +586,12 @@ tasks.register<Test>("granite41AloraIntegrationTest") {
     }
     configuredGranite41AloraAdapter.orNull?.let {
         systemProperty("models.fixtures.granite41AloraAdapter", it)
+    }
+    providers.systemProperty("models.fixtures.granite41AloraProbeDump").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeDump", it)
+    }
+    providers.systemProperty("models.fixtures.granite41AloraProbeHiddenOutput").orNull?.let {
+        systemProperty("models.fixtures.granite41AloraProbeHiddenOutput", it)
     }
     outputs.upToDateWhen { false }
     maxParallelForks = 1

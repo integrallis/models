@@ -2875,7 +2875,10 @@ class LlamaForwardPassTest {
             config.keyDim(),
             config.valueDim(),
             config.attentionOutputDim(),
-            config.hiddenDim()));
+            config.hiddenDim(),
+            config.numHeads(),
+            config.numKvHeads(),
+            !config.usesNeoxRope()));
   }
 
   private static void addNanoLoraProjection(
