@@ -239,9 +239,17 @@ struct CachePadded<T>(T);
 struct WorkerShared {
     generation: CachePadded<AtomicU64>,
     remaining: CachePadded<AtomicUsize>,
+    /// Workers (including the caller at index 0) that take rows on the published job.
+    partitions: CachePadded<AtomicUsize>,
+    /// Generation that was current when the active count last grew; a worker leaving idleness
+    /// resumes from it so it cannot skip a job published right after its activation.
+    activation_generation: CachePadded<AtomicU64>,
     state: Mutex<WorkerState>,
     work_available: Condvar,
     work_complete: Condvar,
+    /// Idle workers (index >= active) sleep here instead of on the job condvar, so a job on a
+    /// smaller partition count wakes only the workers that will take rows.
+    activation: Condvar,
 }
 
 struct WorkerState {
@@ -307,6 +315,8 @@ impl WorkerPool {
         let shared = Arc::new(WorkerShared {
             generation: CachePadded(AtomicU64::new(0)),
             remaining: CachePadded(AtomicUsize::new(0)),
+            partitions: CachePadded(AtomicUsize::new(total_threads)),
+            activation_generation: CachePadded(AtomicU64::new(0)),
             state: Mutex::new(WorkerState {
                 shutdown: false,
                 job: None,
@@ -314,6 +324,7 @@ impl WorkerPool {
             }),
             work_available: Condvar::new(),
             work_complete: Condvar::new(),
+            activation: Condvar::new(),
         });
         let mut pool = Self {
             shared,
@@ -335,7 +346,20 @@ impl WorkerPool {
 
     fn set_active_threads(&self, requested: usize) -> usize {
         let active = requested.clamp(1, self.total_threads);
-        self.active_threads.store(active, Ordering::Release);
+        let _execution = lock(&self.execution);
+        let previous = self.active_threads.swap(active, Ordering::AcqRel);
+        let state = lock(&self.shared.state);
+        if active > previous {
+            self.shared.activation_generation.0.store(
+                self.shared.generation.0.load(Ordering::Acquire),
+                Ordering::Release,
+            );
+        }
+        self.shared.partitions.0.store(active, Ordering::Release);
+        if active > previous {
+            self.shared.activation.notify_all();
+        }
+        drop(state);
         active
     }
 
@@ -362,9 +386,13 @@ impl WorkerPool {
             state.job = Some(WorkerJob::Matrix(job));
             state.failed = false;
             self.shared
+                .partitions
+                .0
+                .store(partitions, Ordering::Release);
+            self.shared
                 .remaining
                 .0
-                .store(self.workers.len(), Ordering::Relaxed);
+                .store(partitions - 1, Ordering::Relaxed);
             self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
         }
@@ -388,22 +416,37 @@ impl WorkerPool {
             .is_ok();
         }
 
+        let partitions = self
+            .active_threads
+            .load(Ordering::Acquire)
+            .clamp(1, self.total_threads);
+        if partitions == 1 {
+            return catch_unwind(AssertUnwindSafe(|| {
+                // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
+                unsafe { execute_gated_delta_net_partition(job, 0, 1) }
+            }))
+            .is_ok();
+        }
         let _execution = lock(&self.execution);
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::GatedDeltaNet(job));
             state.failed = false;
             self.shared
+                .partitions
+                .0
+                .store(partitions, Ordering::Release);
+            self.shared
                 .remaining
                 .0
-                .store(self.workers.len(), Ordering::Relaxed);
+                .store(partitions - 1, Ordering::Relaxed);
             self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
         }
 
         let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
             // SAFETY: each worker owns disjoint recurrent heads and output rows.
-            unsafe { execute_gated_delta_net_partition(job, 0, self.total_threads) }
+            unsafe { execute_gated_delta_net_partition(job, 0, partitions) }
         }))
         .is_ok();
 
@@ -427,6 +470,7 @@ impl Drop for WorkerPool {
             state.shutdown = true;
             self.shared.generation.0.fetch_add(1, Ordering::Release);
             self.shared.work_available.notify_all();
+            self.shared.activation.notify_all();
         }
         for worker in self.workers.drain(..) {
             let _ = worker.join();
@@ -434,10 +478,26 @@ impl Drop for WorkerPool {
     }
 }
 
-fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: usize) {
+fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: usize) {
     let mut observed_generation = 0;
     loop {
-        let job = {
+        // Idle workers sleep on the activation condvar and resume from the generation that was
+        // current when they were re-activated, so they skip nothing published after that point.
+        {
+            let mut state = lock(&shared.state);
+            let mut was_idle = false;
+            while !state.shutdown && worker_index >= shared.partitions.0.load(Ordering::Acquire) {
+                was_idle = true;
+                state = wait(&shared.activation, state);
+            }
+            if state.shutdown {
+                return;
+            }
+            if was_idle {
+                observed_generation = shared.activation_generation.0.load(Ordering::Acquire);
+            }
+        }
+        let (job, partitions) = {
             let mut next_generation =
                 poll_generation(&shared.generation.0, observed_generation, WORKER_SPIN_ITERS);
             let mut state = lock(&shared.state);
@@ -454,17 +514,21 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
             }
             observed_generation =
                 next_generation.unwrap_or_else(|| shared.generation.0.load(Ordering::Acquire));
-            state.job
+            (state.job, shared.partitions.0.load(Ordering::Acquire))
         };
+        if worker_index >= partitions {
+            // The active count shrank while this worker was spinning; the job counted it out.
+            continue;
+        }
         let succeeded = match job {
             Some(WorkerJob::Matrix(job)) => catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: every worker receives a distinct output range and read-only shared inputs.
-                unsafe { execute_matrix_job_partition(job, worker_index, job.partitions) }
+                unsafe { execute_matrix_job_partition(job, worker_index, partitions) }
             }))
             .is_ok(),
             Some(WorkerJob::GatedDeltaNet(job)) => catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: every worker receives disjoint recurrent heads and output rows.
-                unsafe { execute_gated_delta_net_partition(job, worker_index, total_threads) }
+                unsafe { execute_gated_delta_net_partition(job, worker_index, partitions) }
             }))
             .is_ok(),
             None => false,
@@ -4650,6 +4714,7 @@ mod tests {
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_INDEPENDENT_BATCHED_MATMUL
                 | CAPABILITY_GATED_DELTA_NET_F32
+                | CAPABILITY_ACTIVE_THREADS
         );
     }
 
@@ -4772,6 +4837,53 @@ mod tests {
     }
 
     #[test]
+    fn active_count_changes_keep_every_generation_completing() {
+        // A pool of four toggled between one, two, three, and four active workers around real
+        // jobs: every job must complete (no lost wake-up, no early completion), same output.
+        let rows = 512;
+        let cols = 256;
+        let weights = vec![0x11_u8; rows * cols / QK_0 * Q4_0_BLOCK_BYTES];
+        let quantized = vec![1_i8; cols];
+        let scales = vec![1.0_f32; cols / QK_0];
+        let sums = vec![0_i16; cols / Q8_K_SUM_BLOCK];
+        let mut reference = vec![0.0_f32; rows];
+        let mut output = vec![0.0_f32; rows];
+        let job = |out: &mut Vec<f32>| {
+            let mut matrices: [Option<MatrixJob>; MAX_GROUPED_MATRICES] =
+                [None; MAX_GROUPED_MATRICES];
+            matrices[0] = Some(MatrixJob {
+                weights: weights.as_ptr() as usize,
+                weight_bytes: weights.len(),
+                output: out.as_mut_ptr() as usize,
+                rows,
+                kernel: DotKernel::Q4,
+                quantized: quantized.as_ptr() as usize,
+                quantized_elements: quantized.len(),
+                activation_scales: scales.as_ptr() as usize,
+                scale_elements: scales.len(),
+                activation_sums: sums.as_ptr() as usize,
+                sum_elements: sums.len(),
+                batch_size: 1,
+                cols,
+            });
+            ParallelJob {
+                matrices,
+                matrix_count: 1,
+                output_elements: rows,
+                partitions: 1,
+            }
+        };
+        let pool = WorkerPool::new(4).expect("pool");
+        assert!(pool.execute_matrix(job(&mut reference)));
+        for active in [1, 2, 4, 2, 1, 4, 4, 1, 3, 4] {
+            pool.set_active_threads(active);
+            output.fill(0.0);
+            assert!(pool.execute_matrix(job(&mut output)), "active={active}");
+            assert_eq!(output, reference, "active={active}");
+        }
+    }
+
+    #[test]
     fn worker_poll_observes_a_published_generation_without_parking() {
         let generation = std::sync::atomic::AtomicU64::new(7);
 
@@ -4793,6 +4905,8 @@ mod tests {
         let shared = Arc::new(WorkerShared {
             generation: CachePadded(AtomicU64::new(1)),
             remaining: CachePadded(AtomicUsize::new(1)),
+            partitions: CachePadded(AtomicUsize::new(2)),
+            activation_generation: CachePadded(AtomicU64::new(0)),
             state: Mutex::new(WorkerState {
                 shutdown: false,
                 job: None,
@@ -4800,6 +4914,7 @@ mod tests {
             }),
             work_available: Condvar::new(),
             work_complete: Condvar::new(),
+            activation: Condvar::new(),
         });
         let worker_shared = Arc::clone(&shared);
         let worker = thread::spawn(move || worker_loop(worker_shared, 1, 2));

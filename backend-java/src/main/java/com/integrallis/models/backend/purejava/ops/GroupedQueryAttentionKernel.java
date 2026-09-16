@@ -79,26 +79,56 @@ public final class GroupedQueryAttentionKernel {
     }
     int lanes = SPECIES.length();
     int vectorLimit = SPECIES.loopBound(columns);
-    int pairLimit = vectorLimit - lanes;
-    for (int row = 0; row < rows; row++) {
-      int keyBase = keyOffset + row * keyRowStride;
+    int blockedRows = rows & ~3;
+    // Four rows per head at a time: four independent FMA chains hide the FMA latency that a single
+    // dependent chain over 64 columns exposes, and each query vector load serves four rows.
+    for (int row = 0; row < blockedRows; row += 4) {
+      int key0 = keyOffset + row * keyRowStride;
+      int key1 = key0 + keyRowStride;
+      int key2 = key1 + keyRowStride;
+      int key3 = key2 + keyRowStride;
       for (int head = 0; head < groupSize; head++) {
         int queryBase = queryOffset + head * queryHeadStride;
         FloatVector acc0 = FloatVector.zero(SPECIES);
         FloatVector acc1 = FloatVector.zero(SPECIES);
+        FloatVector acc2 = FloatVector.zero(SPECIES);
+        FloatVector acc3 = FloatVector.zero(SPECIES);
         int column = 0;
-        for (; column < pairLimit; column += 2 * lanes) {
-          acc0 = fma(load(query, queryBase + column), load(keys, keyBase + column), acc0);
-          acc1 =
-              fma(
-                  load(query, queryBase + column + lanes),
-                  load(keys, keyBase + column + lanes),
-                  acc1);
-        }
         for (; column < vectorLimit; column += lanes) {
-          acc0 = fma(load(query, queryBase + column), load(keys, keyBase + column), acc0);
+          FloatVector q = load(query, queryBase + column);
+          acc0 = fma(q, load(keys, key0 + column), acc0);
+          acc1 = fma(q, load(keys, key1 + column), acc1);
+          acc2 = fma(q, load(keys, key2 + column), acc2);
+          acc3 = fma(q, load(keys, key3 + column), acc3);
         }
-        float sum = acc0.add(acc1).reduceLanes(VectorOperators.ADD);
+        float sum0 = acc0.reduceLanes(VectorOperators.ADD);
+        float sum1 = acc1.reduceLanes(VectorOperators.ADD);
+        float sum2 = acc2.reduceLanes(VectorOperators.ADD);
+        float sum3 = acc3.reduceLanes(VectorOperators.ADD);
+        for (; column < columns; column++) {
+          float q = query[queryBase + column];
+          sum0 = MathUtil.fma(q, keys[key0 + column], sum0);
+          sum1 = MathUtil.fma(q, keys[key1 + column], sum1);
+          sum2 = MathUtil.fma(q, keys[key2 + column], sum2);
+          sum3 = MathUtil.fma(q, keys[key3 + column], sum3);
+        }
+        int scoreBase = scoresOffset + head * scoresHeadStride + row;
+        scores[scoreBase] = sum0 * scale;
+        scores[scoreBase + 1] = sum1 * scale;
+        scores[scoreBase + 2] = sum2 * scale;
+        scores[scoreBase + 3] = sum3 * scale;
+      }
+    }
+    for (int row = blockedRows; row < rows; row++) {
+      int keyBase = keyOffset + row * keyRowStride;
+      for (int head = 0; head < groupSize; head++) {
+        int queryBase = queryOffset + head * queryHeadStride;
+        FloatVector acc = FloatVector.zero(SPECIES);
+        int column = 0;
+        for (; column < vectorLimit; column += lanes) {
+          acc = fma(load(query, queryBase + column), load(keys, keyBase + column), acc);
+        }
+        float sum = acc.reduceLanes(VectorOperators.ADD);
         for (; column < columns; column++) {
           sum = MathUtil.fma(query[queryBase + column], keys[keyBase + column], sum);
         }
@@ -202,12 +232,78 @@ public final class GroupedQueryAttentionKernel {
     int lanes = SPECIES.length();
     int vectorLimit = SPECIES.loopBound(columns);
     int quadLimit = vectorLimit - 3 * lanes;
-    for (int head = 0; head < groupSize; head++) {
+    int pairedHeads = groupSize & ~1;
+    // Two heads at a time share every value load; four column vectors per head stay in registers
+    // across all rows. The per-(head, column) FMA chain runs in row order, so results match the
+    // head-by-head kernel bit for bit.
+    for (int head = 0; head < pairedHeads; head += 2) {
+      int outputA = outputOffset + head * outputHeadStride;
+      int outputB = outputA + outputHeadStride;
+      int weightA = weightsOffset + head * weightsHeadStride;
+      int weightB = weightA + weightsHeadStride;
+      int column = 0;
+      for (; column < quadLimit; column += 4 * lanes) {
+        FloatVector a0 = load(output, outputA + column);
+        FloatVector a1 = load(output, outputA + column + lanes);
+        FloatVector a2 = load(output, outputA + column + 2 * lanes);
+        FloatVector a3 = load(output, outputA + column + 3 * lanes);
+        FloatVector b0 = load(output, outputB + column);
+        FloatVector b1 = load(output, outputB + column + lanes);
+        FloatVector b2 = load(output, outputB + column + 2 * lanes);
+        FloatVector b3 = load(output, outputB + column + 3 * lanes);
+        for (int row = 0; row < rows; row++) {
+          int rowBase = valueOffset + row * valueRowStride + column;
+          FloatVector v0 = load(values, rowBase);
+          FloatVector v1 = load(values, rowBase + lanes);
+          FloatVector v2 = load(values, rowBase + 2 * lanes);
+          FloatVector v3 = load(values, rowBase + 3 * lanes);
+          FloatVector wa = FloatVector.broadcast(SPECIES, weights[weightA + row]);
+          FloatVector wb = FloatVector.broadcast(SPECIES, weights[weightB + row]);
+          a0 = fma(v0, wa, a0);
+          a1 = fma(v1, wa, a1);
+          a2 = fma(v2, wa, a2);
+          a3 = fma(v3, wa, a3);
+          b0 = fma(v0, wb, b0);
+          b1 = fma(v1, wb, b1);
+          b2 = fma(v2, wb, b2);
+          b3 = fma(v3, wb, b3);
+        }
+        a0.intoArray(output, outputA + column);
+        a1.intoArray(output, outputA + column + lanes);
+        a2.intoArray(output, outputA + column + 2 * lanes);
+        a3.intoArray(output, outputA + column + 3 * lanes);
+        b0.intoArray(output, outputB + column);
+        b1.intoArray(output, outputB + column + lanes);
+        b2.intoArray(output, outputB + column + 2 * lanes);
+        b3.intoArray(output, outputB + column + 3 * lanes);
+      }
+      for (; column < vectorLimit; column += lanes) {
+        FloatVector a = load(output, outputA + column);
+        FloatVector b = load(output, outputB + column);
+        for (int row = 0; row < rows; row++) {
+          FloatVector v = load(values, valueOffset + row * valueRowStride + column);
+          a = fma(v, FloatVector.broadcast(SPECIES, weights[weightA + row]), a);
+          b = fma(v, FloatVector.broadcast(SPECIES, weights[weightB + row]), b);
+        }
+        a.intoArray(output, outputA + column);
+        b.intoArray(output, outputB + column);
+      }
+      for (; column < columns; column++) {
+        float a = output[outputA + column];
+        float b = output[outputB + column];
+        for (int row = 0; row < rows; row++) {
+          float v = values[valueOffset + row * valueRowStride + column];
+          a = MathUtil.fma(v, weights[weightA + row], a);
+          b = MathUtil.fma(v, weights[weightB + row], b);
+        }
+        output[outputA + column] = a;
+        output[outputB + column] = b;
+      }
+    }
+    for (int head = pairedHeads; head < groupSize; head++) {
       int outputBase = outputOffset + head * outputHeadStride;
       int weightBase = weightsOffset + head * weightsHeadStride;
       int column = 0;
-      // Four column vectors stay in registers across every row: one weight broadcast and four
-      // loads per row, no accumulator traffic to memory until the rows are exhausted.
       for (; column < quadLimit; column += 4 * lanes) {
         FloatVector acc0 = load(output, outputBase + column);
         FloatVector acc1 = load(output, outputBase + column + lanes);
