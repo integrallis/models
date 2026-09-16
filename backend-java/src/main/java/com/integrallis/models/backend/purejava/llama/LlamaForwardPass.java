@@ -176,6 +176,17 @@ public final class LlamaForwardPass {
   private final GgufStagePlan sessionRowAttentionPlan;
   private final ThreadLocal<float[]> attentionScratch;
   private final boolean nativeGroupedAttention;
+
+  /**
+   * Whether attention runs through the fused {@link GroupedQueryAttentionKernel} (grouped score
+   * pass, vector softmax, paired-head value pass). The fused kernel is qualified for Granite only:
+   * its lane reductions and vector exponential differ from the head-by-head path in the last bits,
+   * enough to flip a near-tie greedy token in another architecture's pinned llama.cpp oracle (Qwen3
+   * 0.6B on the Rust arm, measured 2026-09-16). Every other architecture keeps the head-by-head
+   * path its oracles were recorded on.
+   */
+  private final boolean fusedGroupedAttention;
+
   private float[] nativeAttentionScores;
   private float[] activeHeadQuery;
   private int activeHeadQueryOffset;
@@ -509,6 +520,7 @@ public final class LlamaForwardPass {
     // architectures stay on the Java path they were recorded with.
     this.nativeGroupedAttention =
         config.usesGraniteScaling() && loadedMatrixKernel.supportsGroupedAttention();
+    this.fusedGroupedAttention = config.usesGraniteScaling();
     this.headAttentionPlan =
         GgufStagePlan.of(GgufStagePlan.stage(config.numKvHeads(), this::attendKvHeadRange));
     this.rowAttentionPlan =
@@ -2415,9 +2427,11 @@ public final class LlamaForwardPass {
   }
 
   /**
-   * One grouped-query group: scores for every head sharing {@code kvHead} in one pass over the
-   * cached keys, a softmax per head, then one pass over the cached values. Bit-identical to the
-   * former head-by-head loop; the K and V rows are read once instead of {@code groupSize} times.
+   * One grouped-query group. On Granite ({@link #fusedGroupedAttention}): scores for every head
+   * sharing {@code kvHead} in one pass over the cached keys, a vector softmax per head, then one
+   * pass over the cached values, so the K and V rows are read once instead of {@code groupSize}
+   * times. Elsewhere: the head-by-head loop (per-head scores, scalar softmax, per-head values)
+   * whose numerics the pinned greedy oracles were recorded on.
    */
   private void attendGroup(
       AttentionView view,
@@ -2436,6 +2450,25 @@ public final class LlamaForwardPass {
       float[] scores,
       int scoresHeadStride) {
     int firstHead = kvHead * groupSize;
+    if (!fusedGroupedAttention) {
+      attendGroupHeadByHead(
+          view,
+          sequenceCache,
+          firstPosition,
+          position,
+          firstHead,
+          kvHead,
+          groupSize,
+          keyLength,
+          valueLength,
+          scale,
+          query,
+          queryOffset,
+          output,
+          outputOffset,
+          scores);
+      return;
+    }
     sequenceCache.writeGroupedAttentionScores(
         view,
         firstPosition,
@@ -2467,6 +2500,51 @@ public final class LlamaForwardPass {
         scores,
         0,
         scoresHeadStride);
+  }
+
+  /** The head-by-head attention loop: per-head scores, scalar softmax, per-head values. */
+  private void attendGroupHeadByHead(
+      AttentionView view,
+      KvCache sequenceCache,
+      int firstPosition,
+      int position,
+      int firstHead,
+      int kvHead,
+      int groupSize,
+      int keyLength,
+      int valueLength,
+      float scale,
+      float[] query,
+      int queryOffset,
+      float[] output,
+      int outputOffset,
+      float[] scores) {
+    for (int head = firstHead; head < firstHead + groupSize; head++) {
+      sequenceCache.writeAttentionScores(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * keyLength,
+          query,
+          queryOffset + head * keyLength,
+          keyLength,
+          scale,
+          scores,
+          0,
+          batchedAttentionScores);
+      TensorOps.softmax(scores, firstPosition, position - firstPosition + 1);
+      sequenceCache.addAttentionValues(
+          view,
+          firstPosition,
+          position + 1,
+          kvHead * valueLength,
+          output,
+          outputOffset + head * valueLength,
+          valueLength,
+          scores,
+          0,
+          batchedAttentionValues);
+    }
   }
 
   private void normalizeHead(float[] vector, int offset, float[] weight, int headDim) {
