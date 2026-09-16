@@ -74,6 +74,9 @@ dependencies {
             )
         )
     }
+    // JMH sources compile against the native FFM bridge classes even when the benchmark
+    // runtime is not requested; the bridge JAR needs no Cargo build to compile.
+    jmhImplementation(project(":backend-native"))
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.4")
