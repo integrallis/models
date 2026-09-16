@@ -566,3 +566,13 @@ attention at 41% of the main thread's Java samples (~17% of the token); rmsNorm 
 (6%) are now vectorised and tier-stable (commits e499b63 and the swiGlu commit). The remaining
 lever with that margin is single-token attention in the Rust kernel through the zero-copy critical
 downcall the gated-delta-net path already uses, partitioned over KV heads on the native pool.
+
+**Native grouped attention (decision, written before its measurement):** single-token attention
+moves into the Rust kernel for Granite: one query row over up to two cached K/V spans, KV heads
+partitioned on the native pool, heap arrays passed zero-copy through the critical downcall the
+gated-delta-net kernel already uses. Deterministic fixed-order arithmetic (AVX2 FMA dots, libm
+exp, row-ordered accumulation); Rust test against a double-precision naive reference across two
+spans and 1/4 workers, Java test against the Java kernels across two spans and with an empty
+second span. Other architectures keep the Java path. It is measured on instance 3 at the commit
+that carries it, alongside the rmsNorm and swiGlu vectorisations; if the decode gain lands in the
+mid-20s the frozen commit moves there and every window arm restarts.
