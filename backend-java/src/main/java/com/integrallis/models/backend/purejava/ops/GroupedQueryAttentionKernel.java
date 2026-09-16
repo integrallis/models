@@ -139,8 +139,8 @@ public final class GroupedQueryAttentionKernel {
 
   /**
    * In-place stable softmax over {@code x[offset, offset + size)}; the same contract as {@code
-   * TensorOps.softmax} (rejects NaN and +infinity, requires one finite input) with vector
-   * exponentials.
+   * TensorOps.softmax} (rejects NaN and +infinity, requires one finite input) with a vector maximum
+   * and normalisation and a tier-stable scalar exponential.
    */
   public static void softmax(float[] x, int offset, int size) {
     Objects.requireNonNull(x, "x");
@@ -173,16 +173,12 @@ public final class GroupedQueryAttentionKernel {
     if (!Float.isFinite(max)) {
       throw new IllegalArgumentException("softmax requires at least one finite input");
     }
-    FloatVector maxBroadcast = FloatVector.broadcast(SPECIES, max);
-    FloatVector sumVector = FloatVector.zero(SPECIES);
-    index = 0;
-    for (; index < vectorLimit; index += lanes) {
-      FloatVector value = load(x, offset + index).sub(maxBroadcast).lanewise(VectorOperators.EXP);
-      value.intoArray(x, offset + index);
-      sumVector = sumVector.add(value);
-    }
-    float sum = sumVector.reduceLanes(VectorOperators.ADD);
-    for (; index < size; index++) {
+    // The exponential stays scalar Math.exp on purpose: HotSpot gives Math.exp the same result in
+    // the interpreter and in compiled code, whereas lanewise(EXP) switches to the vector math
+    // library once C2 compiles this method and then differs from its pre-compilation fallback in
+    // the last bits. Attention outputs must not depend on JIT tier.
+    float sum = 0.0f;
+    for (index = 0; index < size; index++) {
       float value = (float) Math.exp(x[offset + index] - max);
       x[offset + index] = value;
       sum += value;
