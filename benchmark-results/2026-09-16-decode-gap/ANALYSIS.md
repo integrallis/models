@@ -325,13 +325,13 @@ backend, whose prefill (17 tok/s) is compute-bound in the kernel and gains nothi
 barrier budget. Decode needs neither: it is bandwidth-bound at the kernel and serial at the
 dispatch structure (Result 8).
 
-### Result 9e — two pools on one box (c7a, Rust arm, round 1; rounds 2–3 below when they land)
+### Result 9e — two pools on one box (c7a, Rust arm, interleaved, 3 rounds)
 
-| Java executor (vectors)            | decode | TTFT p50 ms | prefill tok/s | context switches |
-|------------------------------------|-------:|------------:|--------------:|-----------------:|
-| polling 25 ms beside the Rust pool | 25.46  | 2,895       | 40.1          | 24.4 M           |
-| parked (budget 0)                  | 25.81  | 939         | 126.0         | 0.21 M           |
-| released vectors 0.1.21 (parks)    | 25.04  | 943         | 123.0         | 0.21 M           |
+| Java executor (vectors)            | decode tok/s          | TTFT p50 ms          | prefill tok/s         | context switches |
+|------------------------------------|----------------------:|---------------------:|----------------------:|-----------------:|
+| polling 25 ms beside the Rust pool | 25.46 / 25.87 / 25.53 | 2,895 / 2,990 / 2,985| 40.1 / 38.5 / 38.9    | 24 – 45 M        |
+| parked (budget 0)                  | 25.81 / 25.80 / 25.63 | 939 / 1,141 / 956    | 126.0 / 100.7 / 123.3 | 0.20 – 0.24 M    |
+| released vectors 0.1.21 (parks)    | 25.04 / 26.13 / 25.57 | 943 / 1,202 / 940    | 123.0 / 97.9 / 119.9  | 0.21 – 0.24 M    |
 
 The Rust arm drives the Java executor for its Java-side parallel ops; with that executor
 polling, its 16 workers (yielding every 64 rounds) sit on the cores the 16 Rust workers need
