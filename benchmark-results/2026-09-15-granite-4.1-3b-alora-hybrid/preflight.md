@@ -221,3 +221,12 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   Central, then the ModelJars component and composition entries publish. The ModelJars component
   gate now accepts `specialistKind = upstream-rag-specialist` with the answerability evidence
   shape, and `assemble_component_report.py` produces that report from the raw host evidence.
+- 2026-09-16, base public qualification plan (written before creation): ModelJars refuses a
+  component whose base is not itself publicly qualified, and Granite 4.1 3B has no public
+  qualification, so the base runs the controlled RAG qualification harness
+  (`scripts/run-controlled-rag-qualification.sh`, policy `production-rag-model-contribution-v6`,
+  workload `general`, prompt template `granite`, Rust/FFM backend, llama.cpp b10012 and Ollama
+  v0.32.0 as native controls only) on a second bounded Hetzner `cpx62` in `fsn1` at EUR 0.2452
+  per hour, ceiling 12 hours (EUR 2.95), `delete-by` 2026-09-16T18-00Z, provider firewall
+  admitting TCP/22 from the operator /32 only, Models commit `4ce4fd1` (the 0.3.38 release
+  preparation on the candidate branch). The first host keeps running gate 4 undisturbed.
