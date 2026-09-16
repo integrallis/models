@@ -145,6 +145,52 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void decodeThreadCountLimitsSingleTokenWorkersWithoutChangingResults() {
+    int rows = 192; // above the parallel output threshold so the pool is actually consulted
+    int cols = 64;
+    float[] singleInput = inputs(1, cols);
+    float[] pairInput = inputs(2, cols);
+    float[] expectedSingle = new float[rows];
+    float[] expectedPair = new float[2 * rows];
+    float[] actualSingle = new float[rows];
+    float[] actualPair = new float[2 * rows];
+    float[] actualSingleAgain = new float[rows];
+    System.setProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY, "1");
+    try (Arena arena = Arena.ofConfined();
+        NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4)) {
+      assertThat(kernels.threadCount()).isEqualTo(4);
+      assertThat(kernels.decodeThreadCount()).isEqualTo(1);
+      assertThat(kernels.supports(NativeKernelCapability.ACTIVE_THREADS)).isTrue();
+      MemorySegment weights = arena.allocate(rows * cols / 32L * 18L);
+      fillWeights(weights, rows, cols);
+      referenceQ4_0F32BatchedMatmul(weights, singleInput, 1, rows, cols, expectedSingle);
+      referenceQ4_0F32BatchedMatmul(weights, pairInput, 2, rows, cols, expectedPair);
+
+      kernels.q4_0F32BatchedMatmul(weights, singleInput, 1, rows, cols, actualSingle);
+      kernels.q4_0F32BatchedMatmul(weights, pairInput, 2, rows, cols, actualPair);
+      kernels.q4_0F32BatchedMatmul(weights, singleInput, 1, rows, cols, actualSingleAgain);
+
+      assertThat(actualSingle).containsExactly(expectedSingle);
+      assertThat(actualPair).containsExactly(expectedPair);
+      assertThat(actualSingleAgain).containsExactly(expectedSingle);
+    } finally {
+      System.clearProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY);
+    }
+  }
+
+  @Test
+  void decodeThreadCountMustFitThePool() {
+    System.setProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY, "9");
+    try {
+      assertThatThrownBy(() -> NativeKernelLibrary.open(libraryPath(), 4).close())
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("between 1 and the pool size 4");
+    } finally {
+      System.clearProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY);
+    }
+  }
+
+  @Test
   void rejectsInvalidShapesBeforeCrossingTheNativeBoundary() {
     try (Arena arena = Arena.ofConfined();
         NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath())) {

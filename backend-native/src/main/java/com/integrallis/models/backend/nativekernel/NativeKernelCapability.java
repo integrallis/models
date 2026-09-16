@@ -35,7 +35,8 @@ public enum NativeKernelCapability {
   Q4_K_BATCH_VECTOR_ACCUMULATION(1L << 15),
   MANY_GROUPED_BATCHED_MATMUL(1L << 16),
   INDEPENDENT_BATCHED_MATMUL(1L << 17),
-  GATED_DELTA_NET_F32(1L << 18);
+  GATED_DELTA_NET_F32(1L << 18),
+  ACTIVE_THREADS(1L << 19);
 
   private final long mask;
 

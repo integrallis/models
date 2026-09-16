@@ -32,6 +32,13 @@ public final class NativeKernelLibrary implements AutoCloseable {
   public static final int ABI_VERSION = 5;
   public static final String THREAD_COUNT_PROPERTY = "models.native.kernels.threads";
 
+  /**
+   * Workers that take rows on single-token (decode) projections; defaults to the pool size. Batched
+   * prefill keeps the whole pool. Honoured only when the library exports the active-thread setter
+   * ({@link NativeKernelCapability#ACTIVE_THREADS}).
+   */
+  public static final String DECODE_THREAD_COUNT_PROPERTY = "models.native.kernels.decodeThreads";
+
   private static final int STATUS_OK = 0;
   private static final int FORMAT_Q4_0 = 0;
   private static final int FORMAT_Q8_0 = 1;
@@ -46,6 +53,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       FunctionDescriptor.of(ValueLayout.JAVA_LONG);
   private static final FunctionDescriptor CONTEXT_CREATE_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor SET_ACTIVE_THREADS_DESCRIPTOR =
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
   private static final FunctionDescriptor CONTEXT_DESTROY_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
   private static final FunctionDescriptor QUANTIZED_BATCHED_WITH_CONTEXT_DESCRIPTOR =
@@ -124,7 +133,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle quantizedGroupedBatchedHandle;
   private final MethodHandle quantizedIndependentBatchedHandle;
   private final MethodHandle gatedDeltaNetHandle;
+  private final MethodHandle setActiveThreadsHandle;
   private final int threadCount;
+  private final int decodeThreadCount;
+  private int activeThreadCount;
   private boolean closed;
 
   private NativeKernelLibrary(
@@ -136,7 +148,9 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle quantizedGroupedBatchedHandle,
       MethodHandle quantizedIndependentBatchedHandle,
       MethodHandle gatedDeltaNetHandle,
-      int threadCount) {
+      MethodHandle setActiveThreadsHandle,
+      int threadCount,
+      int decodeThreadCount) {
     this.libraryArena = libraryArena;
     this.capabilities = capabilities;
     this.context = context;
@@ -145,7 +159,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.quantizedGroupedBatchedHandle = quantizedGroupedBatchedHandle;
     this.quantizedIndependentBatchedHandle = quantizedIndependentBatchedHandle;
     this.gatedDeltaNetHandle = gatedDeltaNetHandle;
+    this.setActiveThreadsHandle = setActiveThreadsHandle;
     this.threadCount = threadCount;
+    this.decodeThreadCount = decodeThreadCount;
+    this.activeThreadCount = threadCount;
   }
 
   /** Opens a platform library and rejects incompatible ABI versions immediately. */
@@ -202,6 +219,14 @@ public final class NativeKernelLibrary implements AutoCloseable {
               lookup,
               "jmodels_gated_delta_net_f32_with_context",
               GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR);
+      MethodHandle setActiveThreads =
+          (capabilityMask & NativeKernelCapability.ACTIVE_THREADS.mask()) != 0
+              ? downcall(
+                  lookup,
+                  "jmodels_kernels_context_set_active_threads",
+                  SET_ACTIVE_THREADS_DESCRIPTOR)
+              : null;
+      int decodeThreadCount = configuredDecodeThreadCount(threadCount);
       MemorySegment context = invokeAddress(contextCreate, threadCount, "create worker context");
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
@@ -215,7 +240,9 @@ public final class NativeKernelLibrary implements AutoCloseable {
           quantizedGroupedBatched,
           quantizedIndependentBatched,
           gatedDeltaNet,
-          threadCount);
+          setActiveThreads,
+          threadCount,
+          decodeThreadCount);
     } catch (RuntimeException | LinkageError failure) {
       arena.close();
       throw failure;
@@ -620,6 +647,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       throw new UnsupportedOperationException(
           "loaded native library has no independent batched kernel");
     }
+    // Independent batches always carry more than one token in total; use the whole pool.
+    selectWorkers(Integer.MAX_VALUE);
     try {
       int status =
           (int)
@@ -732,6 +761,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       throw new UnsupportedOperationException(
           "loaded native library has no " + type + " batched kernel");
     }
+    selectWorkers(batchSize);
     try {
       int status =
           (int)
@@ -776,6 +806,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       throw new UnsupportedOperationException(
           "loaded native library has no grouped " + type + " batched kernel");
     }
+    selectWorkers(batchSize);
     try {
       int status =
           (int)
@@ -883,6 +914,60 @@ public final class NativeKernelLibrary implements AutoCloseable {
       return (MemorySegment) handle.invokeExact(argument);
     } catch (Throwable failure) {
       throw bridgeFailure(operation, failure);
+    }
+  }
+
+  /**
+   * Rows-taking workers on single-token projections, as configured; equals the pool size by
+   * default.
+   */
+  int decodeThreadCount() {
+    return decodeThreadCount;
+  }
+
+  /**
+   * Points the native pool at the worker count this batch size wants: the configured decode count
+   * for a single token, the whole pool otherwise. No-op when unchanged or unsupported.
+   */
+  private void selectWorkers(int batchSize) {
+    if (setActiveThreadsHandle == null) {
+      return;
+    }
+    int desired = batchSize == 1 ? decodeThreadCount : threadCount;
+    if (desired == activeThreadCount) {
+      return;
+    }
+    try {
+      int inEffect = (int) setActiveThreadsHandle.invokeExact(context, desired);
+      if (inEffect < 0) {
+        throw new IllegalStateException(
+            "native kernel refused active thread count " + desired + ": status " + (-inEffect));
+      }
+      activeThreadCount = inEffect;
+    } catch (Throwable failure) {
+      throw bridgeFailure("set active worker count", failure);
+    }
+  }
+
+  private static int configuredDecodeThreadCount(int threadCount) {
+    String configured = System.getProperty(DECODE_THREAD_COUNT_PROPERTY);
+    if (configured == null || configured.isBlank()) {
+      return threadCount;
+    }
+    try {
+      int decodeThreads = Integer.parseInt(configured);
+      if (decodeThreads < 1 || decodeThreads > threadCount) {
+        throw new IllegalArgumentException(
+            DECODE_THREAD_COUNT_PROPERTY
+                + " must be between 1 and the pool size "
+                + threadCount
+                + ": "
+                + configured);
+      }
+      return decodeThreads;
+    } catch (NumberFormatException failure) {
+      throw new IllegalArgumentException(
+          DECODE_THREAD_COUNT_PROPERTY + " must be an integer: " + configured, failure);
     }
   }
 

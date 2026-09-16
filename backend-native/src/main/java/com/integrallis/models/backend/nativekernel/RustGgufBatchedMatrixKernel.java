@@ -187,6 +187,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return library.threadCount();
   }
 
+  int decodeThreadCount() {
+    return library.decodeThreadCount();
+  }
+
   @Override
   public boolean supports(GgufTensorType type) {
     if (type == null) {

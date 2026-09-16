@@ -78,6 +78,7 @@ const CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION: u64 = 1 << 15;
 const CAPABILITY_MANY_GROUPED_BATCHED_MATMUL: u64 = 1 << 16;
 const CAPABILITY_INDEPENDENT_BATCHED_MATMUL: u64 = 1 << 17;
 const CAPABILITY_GATED_DELTA_NET_F32: u64 = 1 << 18;
+const CAPABILITY_ACTIVE_THREADS: u64 = 1 << 19;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -226,6 +227,9 @@ struct WorkerPool {
     shared: Arc<WorkerShared>,
     workers: Vec<JoinHandle<()>>,
     total_threads: usize,
+    /// Threads that take rows on the next matrix job, 1..=total_threads. Single-token decode
+    /// wants fewer partitions than batched prefill on the same pool.
+    active_threads: AtomicUsize,
     execution: Mutex<()>,
 }
 
@@ -277,6 +281,8 @@ struct ParallelJob {
     matrices: [Option<MatrixJob>; MAX_GROUPED_MATRICES],
     matrix_count: usize,
     output_elements: usize,
+    /// Workers that receive rows for this job; set by the pool from its active thread count.
+    partitions: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -313,6 +319,7 @@ impl WorkerPool {
             shared,
             workers: Vec::with_capacity(total_threads.saturating_sub(1)),
             total_threads,
+            active_threads: AtomicUsize::new(total_threads),
             execution: Mutex::new(()),
         };
         for worker_index in 1..total_threads {
@@ -326,8 +333,22 @@ impl WorkerPool {
         Ok(pool)
     }
 
-    fn execute_matrix(&self, job: ParallelJob) -> bool {
-        if self.workers.is_empty() || job.output_elements < PARALLEL_OUTPUT_THRESHOLD {
+    fn set_active_threads(&self, requested: usize) -> usize {
+        let active = requested.clamp(1, self.total_threads);
+        self.active_threads.store(active, Ordering::Release);
+        active
+    }
+
+    fn execute_matrix(&self, mut job: ParallelJob) -> bool {
+        let partitions = self
+            .active_threads
+            .load(Ordering::Acquire)
+            .clamp(1, self.total_threads);
+        job.partitions = partitions;
+        if self.workers.is_empty()
+            || partitions == 1
+            || job.output_elements < PARALLEL_OUTPUT_THRESHOLD
+        {
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all matrix buffers for this synchronous execution.
                 unsafe { execute_matrix_job_partition(job, 0, 1) }
@@ -350,7 +371,7 @@ impl WorkerPool {
 
         let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
             // SAFETY: worker zero receives matrix rows disjoint from every persistent worker.
-            unsafe { execute_matrix_job_partition(job, 0, self.total_threads) }
+            unsafe { execute_matrix_job_partition(job, 0, job.partitions) }
         }))
         .is_ok();
 
@@ -438,7 +459,7 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, total_threads: us
         let succeeded = match job {
             Some(WorkerJob::Matrix(job)) => catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: every worker receives a distinct output range and read-only shared inputs.
-                unsafe { execute_matrix_job_partition(job, worker_index, total_threads) }
+                unsafe { execute_matrix_job_partition(job, worker_index, job.partitions) }
             }))
             .is_ok(),
             Some(WorkerJob::GatedDeltaNet(job)) => catch_unwind(AssertUnwindSafe(|| {
@@ -490,6 +511,9 @@ unsafe fn execute_matrix_job_partition(
     worker_index: usize,
     total_threads: usize,
 ) {
+    if worker_index >= total_threads {
+        return;
+    }
     for matrix in job.matrices[..job.matrix_count].iter().flatten() {
         let quantized = unsafe {
             slice::from_raw_parts(matrix.quantized as *const i8, matrix.quantized_elements)
@@ -811,6 +835,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
         | CAPABILITY_INDEPENDENT_BATCHED_MATMUL
         | CAPABILITY_GATED_DELTA_NET_F32
+        | CAPABILITY_ACTIVE_THREADS
 }
 
 #[unsafe(no_mangle)]
@@ -833,6 +858,30 @@ pub extern "C" fn jmodels_kernels_context_create(thread_count: u32) -> *mut Kern
         Ok(context) => context,
         Err(_) => std::ptr::null_mut(),
     }
+}
+
+#[unsafe(no_mangle)]
+/// Limits the workers that take rows on subsequent matrix jobs to `thread_count` (clamped to
+/// 1..=pool size; 0 restores the full pool). Returns the count in effect, or a negative status.
+///
+/// # Safety
+///
+/// `context` must be a live pointer returned by `jmodels_kernels_context_create`.
+pub unsafe extern "C" fn jmodels_kernels_context_set_active_threads(
+    context: *const KernelContext,
+    thread_count: u32,
+) -> i32 {
+    if context.is_null() {
+        return -STATUS_NULL_POINTER;
+    }
+    // SAFETY: Java owns the context for the duration of this synchronous call.
+    let context = unsafe { &*context };
+    let requested = if thread_count == 0 {
+        context.workers.total_threads
+    } else {
+        thread_count as usize
+    };
+    context.workers.set_active_threads(requested) as i32
 }
 
 #[unsafe(no_mangle)]
@@ -1904,6 +1953,7 @@ fn compute_independent_with_scratch(
         matrices,
         matrix_count: formats.len(),
         output_elements: output.len(),
+        partitions: 1,
     })
 }
 
@@ -1961,6 +2011,7 @@ fn compute_grouped_with_scratch(
             matrices,
             matrix_count: formats.len(),
             output_elements: output.len(),
+            partitions: 1,
         });
     }
 
@@ -2027,6 +2078,7 @@ fn compute_outputs(
             matrices,
             matrix_count: 1,
             output_elements: output.len(),
+            partitions: 1,
         });
     }
 
@@ -4702,6 +4754,24 @@ mod tests {
     }
 
     #[test]
+    fn partition_count_bounds_the_rows_a_worker_takes() {
+        let job = ParallelJob {
+            matrices: [None; MAX_GROUPED_MATRICES],
+            matrix_count: 0,
+            output_elements: 0,
+            partitions: 2,
+        };
+        // Workers at or beyond the partition count take nothing, even on an empty job.
+        unsafe { execute_matrix_job_partition(job, 2, job.partitions) };
+        unsafe { execute_matrix_job_partition(job, 0, job.partitions) };
+        let pool = WorkerPool::new(4).expect("pool");
+        assert_eq!(pool.set_active_threads(0), 1);
+        assert_eq!(pool.set_active_threads(2), 2);
+        assert_eq!(pool.set_active_threads(99), 4);
+        assert_eq!(pool.active_threads.load(Ordering::Acquire), 4);
+    }
+
+    #[test]
     fn worker_poll_observes_a_published_generation_without_parking() {
         let generation = std::sync::atomic::AtomicU64::new(7);
 
@@ -5610,13 +5680,7 @@ mod tests {
         );
         // SAFETY: AVX2 was detected and all buffers cover the requested complete Q8 blocks.
         unsafe {
-            quantize_q8_0_batch_avx2(
-                &input,
-                BATCH_SIZE,
-                COLS,
-                &mut avx2_quants,
-                &mut avx2_scales,
-            );
+            quantize_q8_0_batch_avx2(&input, BATCH_SIZE, COLS, &mut avx2_quants, &mut avx2_scales);
         }
 
         assert_eq!(avx2_quants, scalar_quants);
