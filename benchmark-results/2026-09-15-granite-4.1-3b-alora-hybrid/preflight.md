@@ -296,3 +296,32 @@ clears every threshold. The frozen commit must be one at which the base performa
 because ModelJars requires a single `modelsRevision` across the base, component, and composition
 evidence, so the window is not started until that commit exists.
 
+**Where the base performance gap comes from (host 2 scratch runs, 2026-09-16T04:45–05:08Z, all
+measured, none publishable):**
+- Vectorized swiGlu and residual FMA for Granite (Models be61bd8): decode 11.7 → 11.7 tok/s,
+  prefill 37 → 39, p95 TTFT 3672 → 3258 ms. The JFR Java-side percentages were real but the wall
+  clock is elsewhere; kept because the oracle tests pass and it removes a scalar loop.
+- `models.purejava.batchedAttentionScores/Values=true` (exact two-row scoring, four-row FMA value
+  accumulation, same float order as the per-row path): decode 13.8, prefill 48, p95 TTFT 2877 ms.
+- Threads 8 instead of 16 on this 16-vCPU shared host: decode 16.0, prefill 34; threads 4: 12.6 / 27.
+- Qwen2.5 3B Instruct Q4_K_M on this host, same harness: ours 16.7 tok/s decode and 63.5 prefill;
+  llama.cpp b10012 64.0 and 298. Ratio 0.26, the same as Granite's 0.24–0.33. Its certified run
+  (AWS EPYC 9R14, 16 dedicated vCPU) had ratio 0.88 against Ollama.
+Conclusion: on this shared-vCPU cpx62 the Java runtime trails llama.cpp by roughly 4× for both
+models, so the gap is host-shaped, not Granite-shaped; Granite is not an outlier on our path.
+The qualification protocol compares candidate and controls on the same host, so the host class
+decides the verdict. Next: repeat the base qualification on a dedicated-vCPU host of the class the
+certified entries used, with the two batched-attention properties passed as recorded tuning for
+the performance phase (the library-default smoke stays untuned), and read the ratio there before
+any kernel work is considered.
+
+
+**Base run, attempt 4 plan (written before the host exists):** dedicated-vCPU host of the class the
+certified entries used: Hetzner `ccx43` (16 dedicated AMD vCPU, 64 GiB), Ubuntu 24.04 x86-64,
+`fsn1`, provider firewall reused from host 2 (TCP/22 from the operator /32 only), SSH key
+`vectors-bench-v2`, label `delete-by` 2026-09-16T20-00Z with a local watchdog. Runs
+`base-host-run.sh` at Models `be61bd8` with `RAG_TUNED_JAVA_OPTS` =
+`-Dmodels.purejava.batchedAttentionScores=true -Dmodels.purejava.batchedAttentionValues=true` for
+the performance phase only; the library-default smoke stays untuned as the harness enforces. The
+verdict is read from `qualification.json` on that host and copied into `host-evidence/` whatever
+it says.
