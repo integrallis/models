@@ -398,3 +398,19 @@ prefill 90, p95 TTFT 1501 ms, p95 e2e 3103 ms, tier USABLE. Against attempt 5's 
 18.9 → 10.9, prefill 41 → 59 — the same shape, which fixed the threshold. Next scratch: native
 worker count {8, 12, 16} × `vectors.maxBits` {256, 512}; the runtime caps Panama at 256 bits on
 this AVX-512 host by default and the attention arithmetic runs on the Java side.
+
+**AWS tuning sweep (scratch, Models 8b1e15b, one iteration, 27 requests):**
+
+| native workers | vectors.maxBits | decode tok/s | prefill tok/s | p95 TTFT ms | p95 e2e ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 8 | 256 | 21.3 | 88 | 1469 | 2934 |
+| 8 | 512 | 20.4 | 89 | 1434 | 3023 |
+| 12 | 256 | 20.4 | 117 | 1098 | 2673 |
+| 12 | 512 | 19.7 | 125 | 1037 | 2715 |
+| 16 | 512 | 19.1 | 135 | 980 | 2703 |
+
+Prefill scales with native workers (TTFT reaches the PRODUCTION_READY bound at 16); decode does
+not move above ~21 tok/s under any setting, and 512-bit Panama lanes change nothing. Against
+attempt 5's controls the best configuration gives decode 0.72–0.75 (floor 0.8) and e2e 1.63–1.79
+(ceiling 1.5). The per-token floor of ~47 ms is the target; next measurement is a main-thread
+Java-versus-native split under JFR to attribute it before any kernel is written.
