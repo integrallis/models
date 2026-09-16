@@ -29,6 +29,7 @@ All notable changes to models are documented here.
 - Attention in the Llama-family forward pass is partitioned over the GGUF worker pool: single-token decode over query heads, batched and independent-session prefill over batch rows. Same arithmetic and order; Granite 4.1 3B (40 heads of 64) had been bounded by the serial loops. Granite also uses the vector swiGlu and a vector FMA for its residual multiplier.
 - Fused grouped-query attention: `GroupedQueryAttentionKernel` scores and accumulates every query head of a KV group in one pass over the cached keys and values, bit-identical to the head-by-head vectors-core kernels; the forward pass attends per KV-head group with one thread-local score buffer per head.
 - `models.native.kernels.decodeThreads` limits the native workers that take rows on single-token projections while batched prefill keeps the whole pool (new additive kernel export `jmodels_kernels_context_set_active_threads`, capability bit 19, ABI unchanged).
+- Native grouped-query attention for single-token decode on Granite: the Rust kernel computes one query row over up to two cached key/value spans through a zero-copy critical downcall (`jmodels_grouped_attention_f32_with_context`, capability bit 20), partitioned over KV heads on the native pool; `models.native.groupedAttention=false` disables it. Idle native workers now sleep on a separate condition so a smaller decode partition wakes only the workers that take rows. Granite's rmsNorm scale loop and swiGlu are vectorised with tier-stable arithmetic.
 
 ### Fixed
 
