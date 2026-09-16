@@ -308,7 +308,9 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
     environment.put("native-kernel-abi", Integer.toString(NativeKernelLibrary.ABI_VERSION));
     environment.put("native-kernel-threads", Integer.toString(kernel.threadCount()));
     environment.put("native-kernel-decode-threads", Integer.toString(kernel.decodeThreadCount()));
-    environment.put("native-kernel-poll-millis", Long.toString(kernel.pollMillis()));
+    environment.put(
+        "native-kernel-poll-millis",
+        kernel.supportsPollBudget() ? Long.toString(kernel.pollMillis()) : "unsupported");
     environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
     environment.put(
         "native-grouped-attention", Boolean.toString(kernel.supportsGroupedAttention()));
