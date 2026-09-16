@@ -340,3 +340,23 @@ single-token path barely uses the Java executor. Parking it restores the release
 exactly. Consequence: the budget belongs to whoever owns the box's compute pool —
 `VectorUtil.setGgufPollMillis(long)` (vectors #72) and the Models native backend sets 0 at
 load. Two unbounded spinners never coexisted in ggml because ggml has one pool.
+
+### Result 9f — the prefill flag from 9a, isolated (c7a, prefill tok/s, 3 rounds each)
+
+| arm                                         | r1    | r2    | r3    |
+|---------------------------------------------|------:|------:|------:|
+| new library, 16 workers, 25 ms              | 123.4 | 122.0 | 120.7 |
+| new library, 15 workers, 25 ms              | 120.7 | 120.9 | 109.9 |
+| old library (51cfbd4), 16 workers           | 133.6 | 122.7 | 139.3 |
+| old library, 15 workers                     | 129.3 | 120.1 | 129.5 |
+| new, caller parks after 4,000 rounds, 5 ms  | 120.0 |  93.6 | 125.6 |
+| new, caller spins 5 ms                      | 118.9 | 117.5 | 117.4 |
+| new, caller spins 25 ms                     | 102.4 | 120.6 | 123.6 |
+| old library (same session)                  | 123.9 | 122.8 | 120.4 |
+
+Neither the worker count nor the caller's completion wait (the only behavioural change in the
+library diff) moves prefill outside the host's own spread; the old library's lead is present
+in some rounds (134, 139) and absent in others (123, 120). Prefill on this instance swings
+±10 % within one configuration, and decode stays at 25.4–26.3 in every arm. Verdict: no
+reproducible regression; the completion-wait knob was not kept. Prefill's real lever remains
+the tiled GEMM (Result 9d).
