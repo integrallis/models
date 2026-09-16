@@ -798,3 +798,21 @@ tokens; 4K improvement 0.500; token-exact across strategies at every tier; peak 
 (the tuned 16-worker pool). Report `host-evidence/gates-fcd38d3/gate6-crossover-rust-ffm.json`.
 The instance-3 chain is complete (base attempt 10, gate 5, gate 6 on both arms); the instance
 is terminated.
+
+**Early determination on gate 4, MT-RAG (2026-09-16T16:10Z, measured on the Rust arm mid-run):**
+at 95/110 cases the Rust specialist arm has balanced accuracy 0.575 (answerable 44/55,
+unanswerable 14/40), structure 95/95; the last 15 cases cannot lift it above ~0.62 against the
+0.80 floor. Rust tracked pure Java 199/200 on SQuAD, so the pure-Java arm is expected to land
+in the same place. IBM's reference implementation on the dequantised Q4_K_M weights returns
+`answerable` on flipped case `ddbbbe7e…<::>4` as well (further cases in
+`host-evidence/reference-alora/`), so the runtime is faithful and the behaviour is the adapter's
+on this slice. The slice: all 55 UNANSWERABLE human turns of `mtrag-human/generation_tasks/RAG.jsonl`
+(every one has `No. References = 0`; 39 follow-up, 9 clarification, 7 N/A) shown with the five
+ELSER-retrieved passages of that file (`Collection mt-rag-ibmcloud-elser-512-100-20240502`),
+plus 55 answerable turns. IBM's card reports 92.0 unanswerable F1 / 91.3 accuracy for this
+adapter on an answerability set IBM built from the MT-RAG Government corpus (human plus
+synthetic conversations, Mixtral-filtered labels); that set is not this slice, so the two numbers
+are different measurements. Under the frozen policy (two suites, ≥0.80 each) the component does
+not qualify; the decision on how to proceed (reject; freeze a different second suite before
+re-running; or a recorded post-hoc scope change) is the user's and is not taken here. Runs
+continue so the window is complete either way.
