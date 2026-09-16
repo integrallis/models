@@ -184,3 +184,34 @@ token, so the pure-Java executor paid 2 M context switches per run. 3/3 rounds, 
 (+36 % to +80 %) and prefill (TTFT −25 % to −34 %). The 25 ms default stands in vectors
 (PR #72); confirmation on dedicated cores (c7a) is the remaining step before the number
 changes anything certified.
+
+### Result 7 — llama.cpp b10012 build matrix on the reference host (ISA × repack), llama-bench
+
+Same GGUF, `-p 512 -n 64 -r 2`, two rounds; tok/s (round 1 / round 2). Reference host is a
+shared 16-vCPU EPYC Genoa (AVX-512, VNNI, DDR5), so absolute numbers do not transfer to the
+c7a; the ratios between builds are the measurement.
+
+| build                          | pp512 t16     | pp512 t8      | tg64 t16      | tg64 t8       |
+|--------------------------------|--------------:|--------------:|--------------:|--------------:|
+| native (AVX-512+VNNI) + repack | 232.5 / 232.1 | 130.0 / 122.8 | 50.5 / 57.6   | 39.3 / 38.5   |
+| AVX2 + repack                  | 180.2 / 183.1 | 99.5 / 100.8  | 56.7 / 47.9   | 42.8 / 36.1   |
+| native, no repack              | 154.6 / 145.5 | 81.0 / 82.0   | 57.2 / 48.2   | 43.7 / 38.6   |
+| AVX2, no repack                | 145.8 / 140.5 | 77.6 / 73.8   | 55.3 / 41.3   | 43.2 / 32.6   |
+
+Prefill: the repacked register-tiled GEMM (Difference 6) is worth +26 % on AVX2 alone
+(143 → 181), the ISA alone (Difference 7) only +5 % without tiling (143 → 150), and the
+two together +62 % (143 → 232): the 512-bit tile body pays only once the data layout lets
+it. Decode (tg64) is flat across all four builds — bandwidth-bound, as expected — so neither
+difference is a decode lever for ggml.
+
+**What this exposes about our decode.** On this host llama.cpp decodes at 50–57 tok/s with
+16 threads and 39–43 with 8; our Rust arm sits at 22–27 (Results 1, 4, 5) — 2× — while on
+the c7a the same comparison is 30.4 against 26.0. Our per-token time is ~40 ms on both hosts;
+llama.cpp's follows the host's memory bandwidth (33 ms on c7a, 18 ms here). 2.1 GB of weights
+per token at 40 ms is ~55 GB/s, which the c7a's 16-vCPU slice roughly caps but the Genoa
+host does not. So our single-token projections are not bandwidth-bound: they are limited
+per thread (8 decode workers at ~7 GB/s each), and Result 2 said 16 workers did not help
+here either. That points at the kernel's per-thread throughput (nibble decode, per-block
+scale handling, per-row float conversion) and the dispatch structure, not the pool. The
+c7a confirmation host runs both harnesses on one box to settle whether this is
+host-specific.
