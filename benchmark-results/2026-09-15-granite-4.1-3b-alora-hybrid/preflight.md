@@ -749,3 +749,22 @@ loader fix touches adapter loads only; the fused-attention gate leaves Granite o
 kernel), and the run confirms it inside the instance's own spread. Bundle in
 `host-evidence/base-attempt10/`; it replaces attempt 9 as the certified bundle so that the base,
 component and composition evidence pin one Models revision.
+
+**Gate 5 PASS at fcd38d3 (instance 3, Rust arm, 2026-09-16T13:42Z):** specialist 8/8, base 7/8,
+retained 7/7, exact 8/8, shared 8/8 — the same case-level result as the voided f6252cc run.
+Report `host-evidence/gates-fcd38d3/gate5-long-context-rust-ffm.json` (sha256
+9362382aa9ed4e36d59f786e4ff9ace467f22e00f362375c3733f8f999316273). Gate 6 started at 13:42Z.
+
+**Native worker pool race fixed (Models 3d086c8, measured):** CI at 1a51657 failed the pool's
+own toggling test with rows 128–255 of a 512-row projection unwritten. Reproduced on the
+reference host with the test pinned to two CPUs (2/32, then a traced run): a worker counted out
+of one generation that had not yet reached the idle wait when the active count grew again
+treated the finished generation as new, validated itself against the grown current count, ran
+the stale job and decremented the completion counter of the generation published after it, so
+the caller returned early. The published job word now carries the partition count the job was
+published with; 400/400 pinned runs pass after the fix (Rust 23/23, backend-native Java 39/39).
+Consequence for the evidence: the pure-Java arm, which decides qualification, does not use the
+pool; the Rust arm at fcd38d3 ran on a pool with this rare race, whose symptom would be a
+malformed output rather than a borderline flip, and no malformed output appears in any Rust
+report. The Rust identity screen is re-run at the release commit before the Rust arm is
+published; the pure-Java window stands.
