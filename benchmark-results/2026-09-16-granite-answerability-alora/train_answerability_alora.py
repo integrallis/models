@@ -41,6 +41,10 @@ def strict_label(text: str) -> str | None:
 
 def evaluate(model, tokenizer, records: list[dict], device, max_new_tokens: int = 6) -> dict:
     import torch
+    # PEFT's activated-LoRA hooks refuse several forwards per backward while gradient
+    # checkpointing is on, and generate() is many forwards: checkpointing off for the pass.
+    base = model.base_model.model if hasattr(model, "base_model") else model
+    base.gradient_checkpointing_disable(); base.config.use_cache = True
     model.eval(); correct = {l: 0 for l in LABELS}; total = {l: 0 for l in LABELS}; structured = 0; by_source = {}
     with torch.no_grad():
         for r in records:
@@ -51,6 +55,7 @@ def evaluate(model, tokenizer, records: list[dict], device, max_new_tokens: int 
             pred = strict_label(gen); structured += pred is not None
             total[r["label"]] += 1; hit = pred == r["label"]; correct[r["label"]] += hit
             s = by_source.setdefault(r["source"], {"n": 0, "hit": 0}); s["n"] += 1; s["hit"] += hit
+    base.gradient_checkpointing_enable(); base.config.use_cache = False
     model.train()
     bal = 0.5 * sum(correct[l] / max(total[l], 1) for l in LABELS)
     return {"balancedAccuracy": bal, "structuredRate": structured / max(len(records), 1),
@@ -111,6 +116,7 @@ def main() -> None:
     warmup = max(1, total_steps // 20)
     def lr_at(step): return a.learning_rate * (step / warmup if step < warmup else 0.5 * (1 + math.cos(math.pi * (step - warmup) / max(1, total_steps - warmup))))
     pad = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+    tokenizer.padding_side = "left"
     log = (a.out / "training-log.jsonl"); a.out.mkdir(parents=True, exist_ok=True); logf = log.open("w")
     step, micro, t0, best = 0, 0, time.time(), None
     print(f"batches/epoch {len(batches)} optimizer steps {total_steps} warmup {warmup}", flush=True)
@@ -120,12 +126,21 @@ def main() -> None:
         random.shuffle(batches)
         for batch in batches:
             if step >= total_steps: break
+            # Left-pad so every completion ends at the last position, then ask the model for the
+            # logits of the last K positions only: the loss covers completion tokens alone, and the
+            # full-vocabulary logits over the prompt (the dominant activation on a small GPU) are
+            # never materialised. RoPE is relative, so the left shift does not change attention.
             L = max(len(examples[i]["input_ids"]) for i in batch)
+            K = max(sum(1 for t in examples[i]["labels"] if t != -100) for i in batch) + 1
             ids = torch.full((len(batch), L), pad, dtype=torch.long); labels = torch.full((len(batch), L), -100, dtype=torch.long); mask = torch.zeros((len(batch), L), dtype=torch.long)
             for row, i in enumerate(batch):
-                e = examples[i]; n = len(e["input_ids"]); ids[row, :n] = torch.tensor(e["input_ids"]); labels[row, :n] = torch.tensor(e["labels"]); mask[row, :n] = 1
-            out = model(input_ids=ids.to(device), attention_mask=mask.to(device), labels=labels.to(device))
-            (out.loss / a.gradient_accumulation).backward(); micro += 1
+                e = examples[i]; n = len(e["input_ids"]); ids[row, L - n:] = torch.tensor(e["input_ids"]); labels[row, L - n:] = torch.tensor(e["labels"]); mask[row, L - n:] = 1
+            out = model(input_ids=ids.to(device), attention_mask=mask.to(device), logits_to_keep=K)
+            logits = out.logits[:, :-1, :].float()                      # positions L-K .. L-2 predict tokens L-K+1 .. L-1
+            targets = labels[:, L - K + 1:].to(device)
+            loss = torch.nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-100)
+            out.loss = loss
+            (loss / a.gradient_accumulation).backward(); micro += 1
             if micro % a.gradient_accumulation == 0:
                 for g in optimizer.param_groups: g["lr"] = lr_at(step)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); optimizer.step(); optimizer.zero_grad(set_to_none=True); step += 1
