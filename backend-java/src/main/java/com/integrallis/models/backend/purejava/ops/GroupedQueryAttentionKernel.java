@@ -154,34 +154,58 @@ public final class GroupedQueryAttentionKernel {
     }
     int lanes = SPECIES.length();
     int vectorLimit = SPECIES.loopBound(columns);
-    for (int column = 0; column < vectorLimit; column += lanes) {
+    // Stream the value rows in blocks of four, exactly as addWeightedRowsInPlace does, and let
+    // every head of the group consume each block while it is hot. The per-head chain
+    // result = fma(row_k, w_k, result) runs in row order through memory, so results are
+    // bit-identical to the head-by-head kernel.
+    int blockedRows = rows & ~3;
+    for (int row = 0; row < blockedRows; row += 4) {
+      int row0 = valueOffset + row * valueRowStride;
+      int row1 = row0 + valueRowStride;
+      int row2 = row1 + valueRowStride;
+      int row3 = row2 + valueRowStride;
       for (int head = 0; head < groupSize; head++) {
-        int outputBase = outputOffset + head * outputHeadStride + column;
-        int weightBase = weightsOffset + head * weightsHeadStride;
-        FloatVector result = load(output, outputBase);
-        for (int row = 0; row < rows; row++) {
-          result =
-              fma(
-                  load(values, valueOffset + row * valueRowStride + column),
-                  FloatVector.broadcast(SPECIES, weights[weightBase + row]),
-                  result);
+        int outputBase = outputOffset + head * outputHeadStride;
+        int weightBase = weightsOffset + head * weightsHeadStride + row;
+        FloatVector weight0 = FloatVector.broadcast(SPECIES, weights[weightBase]);
+        FloatVector weight1 = FloatVector.broadcast(SPECIES, weights[weightBase + 1]);
+        FloatVector weight2 = FloatVector.broadcast(SPECIES, weights[weightBase + 2]);
+        FloatVector weight3 = FloatVector.broadcast(SPECIES, weights[weightBase + 3]);
+        int column = 0;
+        for (; column < vectorLimit; column += lanes) {
+          FloatVector result = load(output, outputBase + column);
+          result = fma(load(values, row0 + column), weight0, result);
+          result = fma(load(values, row1 + column), weight1, result);
+          result = fma(load(values, row2 + column), weight2, result);
+          result = fma(load(values, row3 + column), weight3, result);
+          result.intoArray(output, outputBase + column);
         }
-        result.intoArray(output, outputBase);
+        for (; column < columns; column++) {
+          int outputIndex = outputBase + column;
+          float result = output[outputIndex];
+          result = MathUtil.fma(values[row0 + column], weights[weightBase], result);
+          result = MathUtil.fma(values[row1 + column], weights[weightBase + 1], result);
+          result = MathUtil.fma(values[row2 + column], weights[weightBase + 2], result);
+          result = MathUtil.fma(values[row3 + column], weights[weightBase + 3], result);
+          output[outputIndex] = result;
+        }
       }
     }
-    for (int column = vectorLimit; column < columns; column++) {
+    for (int row = blockedRows; row < rows; row++) {
+      int rowBase = valueOffset + row * valueRowStride;
       for (int head = 0; head < groupSize; head++) {
-        int outputIndex = outputOffset + head * outputHeadStride + column;
-        int weightBase = weightsOffset + head * weightsHeadStride;
-        float result = output[outputIndex];
-        for (int row = 0; row < rows; row++) {
-          result =
-              MathUtil.fma(
-                  values[valueOffset + row * valueRowStride + column],
-                  weights[weightBase + row],
-                  result);
+        int outputBase = outputOffset + head * outputHeadStride;
+        float weight = weights[weightsOffset + head * weightsHeadStride + row];
+        FloatVector weightVector = FloatVector.broadcast(SPECIES, weight);
+        int column = 0;
+        for (; column < vectorLimit; column += lanes) {
+          fma(load(values, rowBase + column), weightVector, load(output, outputBase + column))
+              .intoArray(output, outputBase + column);
         }
-        output[outputIndex] = result;
+        for (; column < columns; column++) {
+          output[outputBase + column] =
+              MathUtil.fma(values[rowBase + column], weight, output[outputBase + column]);
+        }
       }
     }
   }
