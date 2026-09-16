@@ -84,10 +84,13 @@ def main() -> None:
     eos = tokenizer.eos_token
     if a.load_in_4bit:
         from transformers import BitsAndBytesConfig
-        from peft import prepare_model_for_kbit_training
         quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16)
-        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, quantization_config=quant, device_map={"": 0}, attn_implementation="sdpa")
-        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, quantization_config=quant, device_map={"": 0}, attn_implementation="sdpa", torch_dtype=torch.bfloat16)
+        # not prepare_model_for_kbit_training: it upcasts the embeddings and head to fp32
+        # (~2 GB on this vocabulary), which an 8 GB card cannot spare; bf16 is fine for LoRA.
+        for param in model.parameters():
+            param.requires_grad_(False)
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False}); model.enable_input_require_grads()
     else:
         model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, torch_dtype=torch.bfloat16, attn_implementation="sdpa").to(device)
         model.gradient_checkpointing_enable(); model.enable_input_require_grads()
