@@ -75,6 +75,7 @@ class ModelsStreamingChatModelTest {
             .topK(20)
             .maxTokens(100)
             .repetitionPenalty(1.2f)
+            .minP(0.05f)
             .seed(42L)
             .stopSequences(List.of("DEFAULT_STOP"))
             .build();
@@ -114,6 +115,7 @@ class ModelsStreamingChatModelTest {
     assertThat(delegate.options.topK()).isEqualTo(7);
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
+    assertThat(delegate.options.minP()).isEqualTo(0.05f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
     assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(model.diagnostics().backend()).isEqualTo("stream-recording");

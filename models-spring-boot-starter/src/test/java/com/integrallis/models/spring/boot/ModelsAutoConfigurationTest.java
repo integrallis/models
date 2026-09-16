@@ -222,7 +222,9 @@ class ModelsAutoConfigurationTest {
           assertThat(properties.sampling().maxTokens()).isEqualTo(256);
           assertThat(properties.sampling().seed()).isNull();
           assertThat(properties.sampling().repetitionPenalty()).isEqualTo(1.0f);
+          assertThat(properties.sampling().minP()).isZero();
           assertThat(properties.sampling().stopSequences()).isEmpty();
+          assertThat(properties.samplingOptions()).isEqualTo(SamplingOptions.builder().build());
         });
   }
 
@@ -237,6 +239,7 @@ class ModelsAutoConfigurationTest {
             "integrallis.models.sampling.max-tokens=17",
             "integrallis.models.sampling.seed=42",
             "integrallis.models.sampling.repetition-penalty=1.2",
+            "integrallis.models.sampling.min-p=0.05",
             "integrallis.models.sampling.stop-sequences[0]=END",
             "integrallis.models.sampling.stop-sequences[1]=STOP")
         .run(
@@ -250,7 +253,9 @@ class ModelsAutoConfigurationTest {
               assertThat(properties.sampling().maxTokens()).isEqualTo(17);
               assertThat(properties.sampling().seed()).isEqualTo(42L);
               assertThat(properties.sampling().repetitionPenalty()).isEqualTo(1.2f);
+              assertThat(properties.sampling().minP()).isEqualTo(0.05f);
               assertThat(properties.sampling().stopSequences()).containsExactly("END", "STOP");
+              assertThat(properties.samplingOptions().minP()).isEqualTo(0.05f);
             });
   }
 

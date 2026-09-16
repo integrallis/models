@@ -149,6 +149,38 @@ class SamplingOptionsTest {
     }
 
     @Test
+    void minPDefaultsToDisabled() {
+      assertThat(SamplingOptions.builder().build().minP()).isZero();
+    }
+
+    @Test
+    void minPAcceptsTheClosedUnitInterval() {
+      assertThat(SamplingOptions.builder().minP(0.0f).build().minP()).isZero();
+      assertThat(SamplingOptions.builder().minP(0.05f).build().minP()).isEqualTo(0.05f);
+      assertThat(SamplingOptions.builder().minP(1.0f).build().minP()).isEqualTo(1.0f);
+    }
+
+    @Test
+    void minPOutsideTheUnitIntervalOrNonFiniteRejected() {
+      for (float invalid :
+          new float[] {
+            -0.01f, 1.01f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY
+          }) {
+        assertThatThrownBy(() -> SamplingOptions.builder().minP(invalid).build())
+            .as("minP %s", invalid)
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("minP");
+      }
+    }
+
+    @Test
+    void legacyCanonicalConstructorKeepsMinPDisabled() {
+      SamplingOptions options = new SamplingOptions(0.7f, 0.9f, 40, 16, 1L, 1.0f, List.of());
+
+      assertThat(options.minP()).isZero();
+    }
+
+    @Test
     void emptyStopSequenceRejected() {
       assertThatThrownBy(() -> SamplingOptions.builder().stopSequence("").build())
           .isInstanceOf(IllegalArgumentException.class)

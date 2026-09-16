@@ -680,6 +680,7 @@ public final class ModelsSpringAiChatModel implements ChatModel {
             .topK(defaults.topK())
             .maxTokens(defaults.maxTokens())
             .repetitionPenalty(defaults.repetitionPenalty())
+            .minP(defaults.minP())
             .stopSequences(defaults.stopSequences());
     if (defaults.seed() != null) {
       builder.seed(defaults.seed());

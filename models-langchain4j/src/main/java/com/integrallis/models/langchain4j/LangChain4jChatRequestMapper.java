@@ -89,6 +89,7 @@ final class LangChain4jChatRequestMapper {
             .topK(defaults.topK())
             .maxTokens(defaults.maxTokens())
             .repetitionPenalty(defaults.repetitionPenalty())
+            .minP(defaults.minP())
             .stopSequences(defaults.stopSequences());
     if (defaults.seed() != null) {
       builder.seed(defaults.seed());

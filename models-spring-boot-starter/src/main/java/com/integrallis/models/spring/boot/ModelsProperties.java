@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /** Configuration for the auto-configured Models Spring AI chat model. */
@@ -42,7 +43,11 @@ public record ModelsProperties(
     return sampling.toOptions();
   }
 
-  /** Sampling properties for local generation. */
+  /**
+   * Sampling properties for local generation.
+   *
+   * <p>{@code min-p} defaults to zero, which disables min-p filtering.
+   */
   public record Sampling(
       @DefaultValue("1.0") float temperature,
       @DefaultValue("0.9") float topP,
@@ -50,10 +55,23 @@ public record ModelsProperties(
       @DefaultValue("256") int maxTokens,
       Long seed,
       @DefaultValue("1.0") float repetitionPenalty,
-      List<String> stopSequences) {
+      List<String> stopSequences,
+      @DefaultValue("0.0") float minP) {
 
+    @ConstructorBinding
     public Sampling {
       stopSequences = stopSequences == null ? List.of() : List.copyOf(stopSequences);
+    }
+
+    public Sampling(
+        float temperature,
+        float topP,
+        int topK,
+        int maxTokens,
+        Long seed,
+        float repetitionPenalty,
+        List<String> stopSequences) {
+      this(temperature, topP, topK, maxTokens, seed, repetitionPenalty, stopSequences, 0.0f);
     }
 
     SamplingOptions toOptions() {
@@ -64,6 +82,7 @@ public record ModelsProperties(
               .topK(topK)
               .maxTokens(maxTokens)
               .repetitionPenalty(repetitionPenalty)
+              .minP(minP)
               .stopSequences(stopSequences);
       if (seed != null) {
         builder.seed(seed);

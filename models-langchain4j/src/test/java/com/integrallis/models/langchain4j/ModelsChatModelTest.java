@@ -81,6 +81,7 @@ class ModelsChatModelTest {
                 .topK(40)
                 .maxTokens(200)
                 .repetitionPenalty(1.2f)
+                .minP(0.05f)
                 .seed(42L)
                 .stopSequences(List.of("DEFAULT_STOP"))
                 .build());
@@ -125,6 +126,7 @@ class ModelsChatModelTest {
     assertThat(delegate.options.topK()).isEqualTo(7);
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
+    assertThat(delegate.options.minP()).isEqualTo(0.05f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
     assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(response.aiMessage().text()).isEqualTo("mapped answer");
@@ -141,6 +143,7 @@ class ModelsChatModelTest {
             .topK(12)
             .maxTokens(31)
             .repetitionPenalty(1.1f)
+            .minP(0.1f)
             .stopSequences(List.of("END"))
             .build();
     ModelsChatModel model = new ModelsChatModel(delegate, defaults);
