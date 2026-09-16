@@ -77,8 +77,7 @@ class ActivatedAdapterMetadataTest {
                 "f".repeat(64),
                 "Apache-2.0"));
 
-    assertThat(metadata.invocationText())
-        .isEqualTo("<|start_of_role|>rewrite<|end_of_role|>");
+    assertThat(metadata.invocationText()).isEqualTo("<|start_of_role|>rewrite<|end_of_role|>");
   }
 
   @Test
