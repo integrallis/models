@@ -249,3 +249,32 @@ Two conclusions, both measured here rather than believed:
    batched attention and other Java-side parallel ops, so in production both defaults would
    be active at once. Measured next on the c7a (`/opt/c7a-interact.sh`): Rust arm with the
    Java executor polling 25 ms, parked (0), and the released vectors 0.1.21.
+
+## Confirmation on dedicated cores (AWS c7a.4xlarge, EPYC 9R14, 16 vCPU, interleaved, 3 rounds)
+
+### Result 9a — Rust poll budget: old regime (library at 51cfbd4, 4,000-round spin) vs 1 / 5 / 25 ms
+
+| budget          | decode tok/s          | TTFT p50 ms       | prefill tok/s         | context switches |
+|-----------------|----------------------:|------------------:|----------------------:|-----------------:|
+| old (spin 4,000)| 25.44 / 25.39 / 25.81 | 868 / 897 / 848   | 133.8 / 131.2 / 137.8 | ≈490 k           |
+| 1 ms            | 25.88 / 25.76 / 25.86 | 1007 / 1019 / 1148| 114.3 / 113.9 / 101.8 | ≈300 k           |
+| 5 ms            | 26.15 / 25.90 / 25.74 | 944 / 976 / 970   | 122.8 / 118.0 / 119.0 | ≈214 k           |
+| 25 ms           | 26.44 / 25.93 / 26.06 | 932 / 973 / 943   | 124.2 / 120.6 / 123.7 | ≈210 k           |
+
+On dedicated cores the budget is worth about +2 % decode (25.5 → 26.1 mean) — the shared
+host's third was the cost of *losing the core* when a worker parked, which a dedicated core
+does not pay. Prefill is slightly slower with any budget than with the old library
+(134 → 123 tok/s at 25 ms, 109 at 1 ms): the old library is the pre-productisation build, so
+this row also carries whatever else changed between 51cfbd4 and 6e075d7 (the ABI setter, the
+chunk cursor field); it is flagged, not explained, and is the first thing to isolate.
+
+### Result 9b — chunk stealing at 25 ms (dedicated cores)
+
+| config   | decode tok/s          | TTFT p50 ms        | prefill tok/s         |
+|----------|----------------------:|-------------------:|----------------------:|
+| chunk 0  | 25.94 / 25.72 / 25.98 | 955 / 992 / 917    | 122.5 / 117.6 / 122.5 |
+| chunk 16 | 23.24 / 23.03 / 23.46 | 1318 / 1289 / 1015 | 88.0 / 91.1 / 115.5   |
+
+3/3 rounds against: −10 % decode, −25 % prefill. The atomic cursor costs more than the
+stragglers it rescues on 8–16 threads with these matrix sizes. Chunk stealing stays off and
+should be removed rather than kept behind the env knob.
