@@ -835,3 +835,19 @@ pre-registered rule this rejects IBM's `granitelib-rag-r1.0` answerability aLoRA
 specialist. The user's direction is to fix the adapter, not to stop: Track B trains our own
 answerability aLoRA (`../2026-09-16-granite-answerability-alora/`) on multi-passage and
 multi-turn training data and re-qualifies it under the same window and rule.
+
+### 2026-09-16T20:50Z — IBM adapter, whole window through the PEFT reference (bf16 base, CPU)
+
+Reference-side baselines for the adapter itself, independent of our runtime (reports in
+`host-evidence/reference-alora/*-ibm-alora-peft.json`, window ea9e4a0c, structured 1.0 on all):
+
+| suite                     | reference balanced | Java runtime (Rust FFM, Q4_K_M) |
+|---------------------------|-------------------:|--------------------------------:|
+| squad-v2-dev              | 0.795 (96/100, 63/100) | 0.825                        |
+| mtrag-human-rag           | 0.582 (40/55, 24/55)   | 0.600                        |
+| msmarco-v2.1-validation   | 0.720 (86/100, 58/100) | (running)                    |
+
+The runtime tracks the reference within a few points on both finished suites, so the numbers are
+the adapter's: it sits at the gate on single-document SQuAD and well under it once a query
+carries several documents or turns, failing on the unanswerable side every time. These are the
+bars Track B's adapter has to clear on the same reference path before any Java run.
