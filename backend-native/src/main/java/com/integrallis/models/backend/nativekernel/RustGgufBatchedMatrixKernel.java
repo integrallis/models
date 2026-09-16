@@ -191,6 +191,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return library.decodeThreadCount();
   }
 
+  long pollMillis() {
+    return library.pollMillis();
+  }
+
   private static final String GROUPED_ATTENTION_PROPERTY = "models.native.groupedAttention";
   private final boolean groupedAttentionEnabled =
       !"false".equalsIgnoreCase(System.getProperty(GROUPED_ATTENTION_PROPERTY, "true"));

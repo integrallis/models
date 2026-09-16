@@ -72,3 +72,10 @@ shared-vCPU host. Difference 1 is real and is the first thing to productise: a p
 non-parking regime (poll budget sized to a token, park between requests), on the Java stage
 pool as well as the Rust pool. Remaining rounds and the decode-thread and chunk-stealing A/Bs
 follow.
+
+Rounds 2 and 3 (same protocol): 15.61 → 26.02 and 16.60 → 24.99 tok/s; context switches
+773k → 183k and 823k → 185k. Three of three rounds agree: **+55% decode on the shared host from
+the poll budget alone.** Productised as a time-based budget (`DEFAULT_POLL_NANOS` = 25 ms in the
+Rust pool, `jmodels_kernels_context_set_poll_nanos` behind capability bit 21, Java property
+`models.native.kernels.pollMillis`); the pure-Java executor in vectors-core gets the same
+spin-then-park barrier. Confirmation on a c7a.4xlarge follows before any certified number moves.
