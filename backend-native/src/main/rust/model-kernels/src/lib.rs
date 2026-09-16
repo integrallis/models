@@ -707,7 +707,7 @@ fn poll_generation(
         }
         round += 1;
         if round >= WORKER_SPIN_ITERS as u64
-            && round % 64 == 0
+            && round.is_multiple_of(64)
             && start.elapsed().as_nanos() as u64 >= poll_nanos
         {
             return None;
@@ -727,7 +727,7 @@ fn poll_completion(remaining: &AtomicUsize, poll_nanos: u64) -> bool {
         }
         round += 1;
         if round >= COMPLETION_SPIN_ITERS as u64
-            && round % 64 == 0
+            && round.is_multiple_of(64)
             && start.elapsed().as_nanos() as u64 >= poll_nanos
         {
             return false;
