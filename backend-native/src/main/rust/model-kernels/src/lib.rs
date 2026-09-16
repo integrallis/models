@@ -103,6 +103,16 @@ const WORKER_SPIN_ITERS: usize = 4_000;
 /// Read once per pool from `JMODELS_KERNELS_WORKER_SPIN` (experiment knob; default 4,000). For
 /// comparison, ggml's CPU backend polls `1024 * 128 * poll` rounds with `poll = 50` by default
 /// before a worker sleeps, so its threads effectively never park inside one token.
+/// Rows per work-stealing chunk for matrix jobs, read once from `JMODELS_KERNELS_CHUNK_ROWS`;
+/// 0 (the default) keeps the static per-worker row ranges. ggml's CPU backend hands out 16- or
+/// 64-row chunks through an atomic counter so a delayed thread only loses its last chunk.
+fn chunk_rows() -> usize {
+    std::env::var("JMODELS_KERNELS_CHUNK_ROWS")
+        .ok()
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .unwrap_or(0)
+}
+
 fn worker_spin_iters() -> usize {
     std::env::var("JMODELS_KERNELS_WORKER_SPIN")
         .ok()
@@ -265,6 +275,8 @@ struct WorkerPool {
     active_threads: AtomicUsize,
     /// Spin budget the caller polls for completion before parking; same knob as the workers'.
     completion_spin_iters: usize,
+    /// Rows per stolen chunk on matrix jobs, 0 for static per-worker ranges.
+    chunk_rows: usize,
     execution: Mutex<()>,
 }
 
@@ -279,6 +291,8 @@ struct WorkerShared {
     /// Generation that was current when the active count last grew; a worker leaving idleness
     /// resumes from it so it cannot skip a job published right after its activation.
     activation_generation: CachePadded<AtomicU64>,
+    /// Next unclaimed row chunk of the published matrix job when chunk stealing is on.
+    chunk_cursor: CachePadded<AtomicUsize>,
     state: Mutex<WorkerState>,
     work_available: Condvar,
     work_complete: Condvar,
@@ -377,6 +391,7 @@ impl WorkerPool {
             remaining: CachePadded(AtomicUsize::new(0)),
             partitions: CachePadded(AtomicUsize::new(total_threads)),
             activation_generation: CachePadded(AtomicU64::new(0)),
+            chunk_cursor: CachePadded(AtomicUsize::new(0)),
             state: Mutex::new(WorkerState {
                 shutdown: false,
                 job: None,
@@ -392,6 +407,7 @@ impl WorkerPool {
             total_threads,
             active_threads: AtomicUsize::new(total_threads),
             completion_spin_iters: worker_spin_iters().max(COMPLETION_SPIN_ITERS),
+            chunk_rows: chunk_rows(),
             execution: Mutex::new(()),
         };
         for worker_index in 1..total_threads {
@@ -446,6 +462,7 @@ impl WorkerPool {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Matrix(job));
             state.failed = false;
+            self.shared.chunk_cursor.0.store(0, Ordering::Release);
             self.shared
                 .partitions
                 .0
@@ -462,9 +479,14 @@ impl WorkerPool {
             self.shared.work_available.notify_all();
         }
 
+        let chunk = self.chunk_rows;
         let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
             // SAFETY: worker zero receives matrix rows disjoint from every persistent worker.
-            unsafe { execute_matrix_job_partition(job, 0, job.partitions) }
+            if chunk > 0 {
+                unsafe { execute_matrix_job_chunked(job, &self.shared.chunk_cursor.0, chunk) }
+            } else {
+                unsafe { execute_matrix_job_partition(job, 0, job.partitions) }
+            }
         }))
         .is_ok();
 
@@ -604,6 +626,7 @@ impl Drop for WorkerPool {
 
 fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: usize) {
     let spin_iters = worker_spin_iters();
+    let chunk = chunk_rows();
     let mut observed_generation = 0;
     loop {
         // Idle workers sleep on the activation condvar and resume from the generation that was
@@ -649,7 +672,11 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
         let succeeded = match job {
             Some(WorkerJob::Matrix(job)) => catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: every worker receives a distinct output range and read-only shared inputs.
-                unsafe { execute_matrix_job_partition(job, worker_index, partitions) }
+                if chunk > 0 {
+                    unsafe { execute_matrix_job_chunked(job, &shared.chunk_cursor.0, chunk) }
+                } else {
+                    unsafe { execute_matrix_job_partition(job, worker_index, partitions) }
+                }
             }))
             .is_ok(),
             Some(WorkerJob::GatedDeltaNet(job)) => catch_unwind(AssertUnwindSafe(|| {
@@ -731,6 +758,68 @@ unsafe fn execute_matrix_job_partition(
         // SAFETY: KernelContext::execute is synchronous and partitions every output matrix by row.
         let weights =
             unsafe { slice::from_raw_parts(matrix.weights as *const u8, matrix.weight_bytes) };
+        unsafe {
+            compute_batched_row_range(
+                weights,
+                quantized,
+                activation_scales,
+                activation_sums,
+                matrix.output as *mut f32,
+                matrix.batch_size,
+                matrix.rows,
+                matrix.cols,
+                start_row,
+                end_row,
+                matrix.kernel,
+            );
+        }
+    }
+}
+
+/// Executes a matrix job by claiming `chunk_rows`-row chunks through `cursor` until every chunk of
+/// every matrix in the job is taken. Chunks are numbered across the job's matrices in order, so
+/// the caller and the workers balance each other dynamically; each chunk is a disjoint row range,
+/// so the results are the same as the static partition.
+unsafe fn execute_matrix_job_chunked(job: ParallelJob, cursor: &AtomicUsize, chunk_rows: usize) {
+    let chunk_rows = chunk_rows.max(1);
+    let mut chunk_counts = [0usize; MAX_GROUPED_MATRICES];
+    let mut total = 0usize;
+    for (index, matrix) in job.matrices[..job.matrix_count].iter().enumerate() {
+        if let Some(matrix) = matrix {
+            chunk_counts[index] = matrix.rows.div_ceil(chunk_rows);
+            total += chunk_counts[index];
+        }
+    }
+    loop {
+        let claimed = cursor.fetch_add(1, Ordering::AcqRel);
+        if claimed >= total {
+            return;
+        }
+        let mut offset = claimed;
+        let mut index = 0;
+        while offset >= chunk_counts[index] {
+            offset -= chunk_counts[index];
+            index += 1;
+        }
+        let matrix = job.matrices[index].expect("counted matrix");
+        let start_row = offset * chunk_rows;
+        let end_row = (start_row + chunk_rows).min(matrix.rows);
+        let quantized = unsafe {
+            slice::from_raw_parts(matrix.quantized as *const i8, matrix.quantized_elements)
+        };
+        let activation_scales = unsafe {
+            slice::from_raw_parts(
+                matrix.activation_scales as *const f32,
+                matrix.scale_elements,
+            )
+        };
+        let activation_sums = unsafe {
+            slice::from_raw_parts(matrix.activation_sums as *const i16, matrix.sum_elements)
+        };
+        let weights =
+            unsafe { slice::from_raw_parts(matrix.weights as *const u8, matrix.weight_bytes) };
+        // SAFETY: each claimed chunk is a disjoint row range of one output matrix; inputs are
+        // read-only for the duration of the synchronous job.
         unsafe {
             compute_batched_row_range(
                 weights,
@@ -5509,6 +5598,7 @@ mod tests {
             remaining: CachePadded(AtomicUsize::new(1)),
             partitions: CachePadded(AtomicUsize::new(2)),
             activation_generation: CachePadded(AtomicU64::new(0)),
+            chunk_cursor: CachePadded(AtomicUsize::new(0)),
             state: Mutex::new(WorkerState {
                 shutdown: false,
                 job: None,
