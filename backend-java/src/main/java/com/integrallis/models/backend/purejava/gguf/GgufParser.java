@@ -154,7 +154,6 @@ public final class GgufParser {
       }
       try {
         starts[index] = Math.addExact(tensorDataOffset, tensor.offset());
-        Math.addExact(starts[index], expectedBytes[index]);
       } catch (ArithmeticException overflow) {
         throw new MalformedGgufException(
             "tensor '" + tensor.name() + "' range overflows a 64-bit offset", overflow);
