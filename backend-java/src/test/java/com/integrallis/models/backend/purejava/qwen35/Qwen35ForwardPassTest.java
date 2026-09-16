@@ -20,6 +20,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffRecording;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
@@ -270,6 +273,162 @@ class Qwen35ForwardPassTest {
       assertThat(maximumBatchSize).hasValueGreaterThanOrEqualTo(1);
       assertThat(actual).containsExactly(expected);
     }
+  }
+
+  @Test
+  void injectedKernelWithoutGatedDeltaNetReportsTheCliffOncePerProcess(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+    GgufBatchedMatrixKernel kernel = f32Kernel(false);
+
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start();
+        PureJavaBackend accelerated = PureJavaBackend.load(model, kernel)) {
+      for (int request = 0; request < 3; request++) {
+        accelerated.prefill(new int[] {1, 2, 3, 4}, 0);
+        accelerated.forward(5, 4);
+        accelerated.reset();
+      }
+
+      assertThat(recording.count(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE)).isEqualTo(1);
+      assertThat(recording.count(PerformanceCliff.ROW_BY_ROW_PROJECTION)).isZero();
+      assertThat(accelerated.diagnostics().environment())
+          .containsKey("performance-cliff.native-gated-delta-net-unavailable");
+    }
+  }
+
+  @Test
+  void injectedKernelWithGatedDeltaNetAndBatchedProjectionsReportsNeitherCliff(
+      @TempDir Path directory) throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start();
+        PureJavaBackend accelerated = PureJavaBackend.load(model, f32Kernel(true))) {
+      accelerated.prefill(new int[] {1, 2, 3, 4}, 0);
+      accelerated.forward(5, 4);
+
+      assertThat(recording.count(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE)).isZero();
+      assertThat(recording.count(PerformanceCliff.ROW_BY_ROW_PROJECTION)).isZero();
+    }
+  }
+
+  @Test
+  void pureJavaBackendPlansF32QwenPrefillOneTokenAtATimeAndReportsItOnce(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      for (int load = 0; load < 2; load++) {
+        try (PureJavaBackend baseline = PureJavaBackend.load(model)) {
+          baseline.prefill(new int[] {1, 2, 3, 4}, 0);
+          assertThat(baseline.diagnostics().environment())
+              .containsEntry(
+                  "performance-cliff.batched-prefill-unsupported-tensor-type",
+                  "architecture=qwen35, tensor-types=[F32]");
+        }
+      }
+
+      assertThat(recording.count(PerformanceCliff.BATCHED_PREFILL_UNSUPPORTED_TENSOR_TYPE))
+          .isEqualTo(1);
+      // No kernel was injected, so the Java recurrence is the chosen path, not a fallback.
+      assertThat(recording.count(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE)).isZero();
+    }
+  }
+
+  @Test
+  void directGraphWithBatchedPrefillRunsF32ProjectionsRowByRowAndReportsItOnce(
+      @TempDir Path directory) throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined();
+        PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(GgufParser.parse(model, arena));
+      for (int request = 0; request < 3; request++) {
+        graph.forward(new int[] {1, 2, 3, 4});
+      }
+
+      assertThat(recording.count(PerformanceCliff.ROW_BY_ROW_PROJECTION)).isEqualTo(1);
+      assertThat(PerformanceCliffs.reported().get(PerformanceCliff.ROW_BY_ROW_PROJECTION))
+          .contains("tensor-type=F32");
+    }
+  }
+
+  @Test
+  void directGraphWithoutBatchingDoesNotReportRowByRowProjection(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined();
+        PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(GgufParser.parse(model, arena), 1);
+      graph.forward(new int[] {1, 2, 3, 4});
+
+      assertThat(recording.count(PerformanceCliff.ROW_BY_ROW_PROJECTION)).isZero();
+    }
+  }
+
+  private static GgufBatchedMatrixKernel f32Kernel(boolean gatedDeltaNet) {
+    return new GgufBatchedMatrixKernel() {
+      @Override
+      public boolean supports(GgufTensorType type) {
+        return type == GgufTensorType.F32;
+      }
+
+      @Override
+      public boolean supportsGatedDeltaNet() {
+        return gatedDeltaNet;
+      }
+
+      @Override
+      public void gatedDeltaNet(
+          float[] query,
+          float[] key,
+          float[] value,
+          float[] logDecay,
+          float[] beta,
+          float[] state,
+          float[] output,
+          int tokenCount,
+          int keyHeadCount,
+          int valueHeadCount,
+          int keyDimension,
+          int valueDimension) {
+        GatedDeltaNetRecurrence.forwardPrefixInPlace(
+            query,
+            key,
+            value,
+            logDecay,
+            beta,
+            state,
+            output,
+            new float[keyDimension],
+            new float[keyDimension],
+            new float[valueDimension],
+            new float[valueDimension],
+            tokenCount,
+            keyHeadCount,
+            valueHeadCount,
+            keyDimension,
+            valueDimension);
+      }
+
+      @Override
+      public void multiply(
+          float[] output,
+          float[] input,
+          MemorySegment weights,
+          GgufTensorType type,
+          int batchSize,
+          int rows,
+          int cols) {
+        float[] rowInput = new float[cols];
+        float[] rowOutput = new float[rows];
+        for (int batch = 0; batch < batchSize; batch++) {
+          System.arraycopy(input, batch * cols, rowInput, 0, cols);
+          TensorOps.ggufMatmul(rowOutput, rowInput, weights, type, rows, cols);
+          System.arraycopy(rowOutput, 0, output, batch * rows, rows);
+        }
+      }
+    };
   }
 
   @Test
