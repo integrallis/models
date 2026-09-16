@@ -414,3 +414,22 @@ not move above ~21 tok/s under any setting, and 512-bit Panama lanes change noth
 attempt 5's controls the best configuration gives decode 0.72–0.75 (floor 0.8) and e2e 1.63–1.79
 (ceiling 1.5). The per-token floor of ~47 ms is the target; next measurement is a main-thread
 Java-versus-native split under JFR to attribute it before any kernel is written.
+
+**Main-thread split under JFR (AWS, Models 8b1e15b, certified profile, one iteration):** 1644
+native-method samples (the thread inside the Rust matmul downcalls) against 820 Java samples. Of
+the Java samples 480 are attention (`matVecDotExact` 220, `addWeightedRowsInPlace` 130, `softmax`
+97, single dots 30), 90 are the harness hashing the artifact, 54 swiGlu, the rest norms, rope, and
+dispatch glue. Per ~47 ms token that is roughly 31 ms native, 9 ms Java attention, 5 ms other Java.
+llama.cpp's whole token is ~34 ms on this host, so the native projections are at parity; the
+deficit is the Java-side attention and glue. Closing it needs (a) a grouped-query fused attention
+kernel that reads each K and V row once for the five query heads that share it (a vectors-core
+addition — backend-java has no direct Panama code and pins vectors-core 0.1.7), and (b) per-phase
+native worker counts (16 for prefill, 8 for decode; today one count serves both, and the sweep
+shows the two phases want different values), which is a native ABI change. Both are runtime
+engineering across two projects, outside what this campaign can land as a shim. The base stands at
+USABLE with decode 0.75× and e2e 1.63–1.89× the controls on the certified host class.
+
+**State at hand-off (2026-09-16T06:10Z):** Models candidate branch at `daa2e12` (+ this note) carries
+every fix; hosts 2, 3 and the AWS instance are deleted after their evidence was copied; host 1
+(`166122805`) is stopped and kept with its artifact store until its 2026-09-17T04:00Z watchdog.
+Nothing is published or claimed qualified.
