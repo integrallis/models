@@ -527,3 +527,10 @@ stability in f4d53f2 cost the margin the vector exponential had given (20.2 in t
 scratch). Bundle in `host-evidence/base-attempt6/`. Next commit: a tier-stable vector
 exponential built from lanewise arithmetic only (range reduction and polynomial; local probe 29 →
 7 µs per five 300-row rows); attempt 7 follows once the x86 suites and the Granite oracle pass.
+
+**Attempt 7 plan (written before it runs):** Models `7a3f3e7` (attempt 6 code plus the tier-stable
+vector exponential; x86 suites 615 + 38 pass on the instance, Granite oracle run locally before
+launch). Same instance, same harness invocation and recorded tuning as attempt 6 (pool 16, decode
+8, batched attention properties). If it passes, `7a3f3e7` is the frozen commit for every remaining
+gate; the identity screen and both window arms restart at it (host 1 Rust, host `166144162`
+pure Java), and attempt 6's bundle stays on record as the failed run it was.
