@@ -325,3 +325,25 @@ certified entries used: Hetzner `ccx43` (16 dedicated AMD vCPU, 64 GiB), Ubuntu 
 the performance phase only; the library-default smoke stays untuned as the harness enforces. The
 verdict is read from `qualification.json` on that host and copied into `host-evidence/` whatever
 it says.
+
+**Base run, attempt 4 result (host 3, ccx33 8 dedicated Milan vCPU, Models be61bd8,
+`granite-documents`, tuned batched attention):** FAILED_ABSOLUTE_GATE, every arm OFFLINE.
+Correctness: smoke 9/9 correct 1.0; performance phase 27/27 correct 1.0, abstention 1.0, model
+answer rate 0.78. Rust arm p50 decode 12.1 tok/s, p95 TTFT 3579 ms, p95 e2e 6218 ms. Ollama
+13.4 tok/s, p95 TTFT 2209 ms, OFFLINE. llama.cpp 14.8 tok/s, p95 TTFT 4235 ms, OFFLINE. So on this
+host the Java runtime is at parity with both native controls (decode 0.91× Ollama, 0.82×
+llama.cpp; TTFT better than llama.cpp), and the absolute tier fails for all three because the host
+cannot serve a 3B model under 2 s TTFT. Bundle in `host-evidence/base-attempt4/`.
+
+Reading attempts 3 and 4 together: llama.cpp is 3.2× faster on the 16-vCPU Genoa host than on the
+8-core Milan host, while our runtime is essentially unchanged between them (11.7–13.8 vs 12.1
+tok/s). Our decode is bound by per-token latency that extra cores, AVX-512, and memory bandwidth
+do not shorten: roughly 280 native projection dispatches per token plus single-threaded Java
+attention over 40 heads. The batched prefill kernel likewise streams each weight block once per
+batch row group and does not tile across the batch the way a GEMM does, which is what the 37–48
+tok/s prefill against llama.cpp's 240 says. These are runtime engineering items, not shims: (1)
+parallel per-head attention on the existing worker pool, (2) one fused native dispatch per layer
+for single-token decode, (3) batch-tiled K-quant GEMM for prefill. Until at least (1) and (2)
+land, the base cannot clear the comparator gate on a host where the controls clear the absolute
+gate, and ModelJars refuses the component without a qualified base.
+
