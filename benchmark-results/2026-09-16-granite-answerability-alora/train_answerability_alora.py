@@ -86,10 +86,10 @@ def main() -> None:
         from transformers import BitsAndBytesConfig
         from peft import prepare_model_for_kbit_training
         quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16)
-        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, quantization_config=quant, device_map={"": 0})
+        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, quantization_config=quant, device_map={"": 0}, attn_implementation="sdpa")
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
     else:
-        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, torch_dtype=torch.bfloat16).to(device)
+        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, torch_dtype=torch.bfloat16, attn_implementation="sdpa").to(device)
         model.gradient_checkpointing_enable(); model.enable_input_require_grads()
     config = LoraConfig(r=a.rank, lora_alpha=a.alpha, lora_dropout=a.dropout, target_modules=TARGET_MODULES, task_type="CAUSAL_LM",
                         alora_invocation_tokens=INVOCATION_TOKENS)
@@ -147,7 +147,9 @@ def main() -> None:
                 rec = {"step": step, "loss": round(out.loss.item(), 4), "lr": lr_at(step), "elapsed": round(time.time() - t0)}
                 if step % 10 == 0: print(json.dumps(rec), flush=True)
                 if step % a.eval_every == 0 or step == total_steps:
+                    if torch.cuda.is_available(): torch.cuda.empty_cache()
                     rec["validation"] = evaluate(model, tokenizer, validation_records, device); print(json.dumps(rec), flush=True)
+                    if torch.cuda.is_available(): torch.cuda.empty_cache()
                     if best is None or rec["validation"]["balancedAccuracy"] >= best["validation"]["balancedAccuracy"]:
                         best = rec; model.save_pretrained(str(a.out / "adapter"))
                 logf.write(json.dumps(rec) + "\n"); logf.flush()
