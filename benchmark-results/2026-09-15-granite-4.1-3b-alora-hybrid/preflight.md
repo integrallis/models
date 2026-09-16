@@ -517,3 +517,13 @@ decide it, and a FAIL is re-run once on a fresh instance of the same class befor
 Attempt 6 runs at Models `82a7433` (kernel v4, selective wake, tier-stable exponential and
 fixed-tree lane reduction, nano test corrected to different tokens). Confirmed on the x86 host 1
 before launch: 614 backend-java, 38 backend-native, and 4 embedding-adapter tests pass.
+
+**Base run, attempt 6 result (Models 82a7433, instance 2, pool 16 / decode 8):**
+FAILED_RELATIVE_GATE. Correctness 9/9 and 27/27, abstention 1.0. Rust arm USABLE: decode 18.9
+tok/s, prefill 132, p95 TTFT 1052 ms, p95 e2e 2846 ms. Ollama 25.4 / 674 / 2122
+(PRODUCTION_READY); llama.cpp 25.8 / 1028 / 2410 (USABLE). End-to-end passes against both (1.34,
+1.18); decode fails against both (0.75, 0.73). The scalar exponential restored for tier
+stability in f4d53f2 cost the margin the vector exponential had given (20.2 in the fe3bbbe
+scratch). Bundle in `host-evidence/base-attempt6/`. Next commit: a tier-stable vector
+exponential built from lanewise arithmetic only (range reduction and polynomial; local probe 29 →
+7 µs per five 300-row rows); attempt 7 follows once the x86 suites and the Granite oracle pass.
