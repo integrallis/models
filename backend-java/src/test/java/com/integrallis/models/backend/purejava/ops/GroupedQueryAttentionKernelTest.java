@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Random;
@@ -73,9 +74,12 @@ class GroupedQueryAttentionKernelTest {
               0);
         }
         for (int row = 0; row < rows; row++) {
+          float expected = reference[row] * scale;
           assertThat(fused[2 + head * stride + row])
               .as("columns=%d head=%d row=%d", columns, head, row)
-              .isEqualTo(reference[row] * scale);
+              .isCloseTo(
+                  expected,
+                  org.assertj.core.data.Offset.offset(2e-6f + Math.abs(expected) * 2e-6f));
         }
       }
     }
@@ -126,6 +130,32 @@ class GroupedQueryAttentionKernelTest {
           .as("columns=%d group=%d rows=%d", columns, groupSize, rows)
           .isEqualTo(reference);
     }
+  }
+
+  @Test
+  void softmaxMatchesTheScalarReferenceWithinLastBits() {
+    for (int size : new int[] {1, 5, 8, 37, 301}) {
+      Random random = new Random(size);
+      float[] scalar = randomArray(random, size + 3);
+      for (int index = 0; index < scalar.length; index++) {
+        scalar[index] *= 6.0f;
+      }
+      float[] vector = scalar.clone();
+      TensorOps.softmax(scalar, 2, size);
+      GroupedQueryAttentionKernel.softmax(vector, 2, size);
+      float total = 0.0f;
+      for (int index = 0; index < size; index++) {
+        assertThat(vector[2 + index])
+            .as("size=%d index=%d", size, index)
+            .isCloseTo(scalar[2 + index], org.assertj.core.data.Offset.offset(2e-6f));
+        total += vector[2 + index];
+      }
+      assertThat(total).isCloseTo(1.0f, org.assertj.core.data.Offset.offset(1e-4f));
+      assertThat(vector[0]).isEqualTo(scalar[0]);
+      assertThat(vector[size + 2]).isEqualTo(scalar[size + 2]);
+    }
+    assertThatThrownBy(() -> GroupedQueryAttentionKernel.softmax(new float[] {1f, Float.NaN}, 0, 2))
+        .hasMessageContaining("NaN");
   }
 
   private static float[] randomArray(Random random, int length) {

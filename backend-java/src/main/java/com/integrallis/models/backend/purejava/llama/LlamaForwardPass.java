@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.cache.KvCache.AttentionView;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter.Projection;
+import com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.ExecutionPlanner;
@@ -2384,7 +2385,7 @@ public final class LlamaForwardPass {
         scoresHeadStride);
     int count = position - firstPosition + 1;
     for (int head = 0; head < groupSize; head++) {
-      TensorOps.softmax(scores, head * scoresHeadStride + firstPosition, count);
+      GroupedQueryAttentionKernel.softmax(scores, head * scoresHeadStride + firstPosition, count);
     }
     sequenceCache.addGroupedAttentionValues(
         view,

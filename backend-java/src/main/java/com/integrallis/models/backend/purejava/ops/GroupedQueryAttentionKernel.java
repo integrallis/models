@@ -19,6 +19,7 @@ import com.integrallis.vectors.core.MathUtil;
 import com.integrallis.vectors.core.PanamaConstants;
 import java.util.Objects;
 import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorShape;
 import jdk.incubator.vector.VectorSpecies;
 
@@ -77,43 +78,27 @@ public final class GroupedQueryAttentionKernel {
           scoresOffset, (groupSize - 1) * scoresHeadStride + rows, scores.length);
     }
     int lanes = SPECIES.length();
-    boolean vectorized = columns > 2 * lanes;
-    int vectorLimit = vectorized ? SPECIES.loopBound(columns) : 0;
-    int unrolledLimit = vectorLimit - 3 * lanes;
+    int vectorLimit = SPECIES.loopBound(columns);
+    int pairLimit = vectorLimit - lanes;
     for (int row = 0; row < rows; row++) {
       int keyBase = keyOffset + row * keyRowStride;
       for (int head = 0; head < groupSize; head++) {
         int queryBase = queryOffset + head * queryHeadStride;
-        float sum = 0.0f;
+        FloatVector acc0 = FloatVector.zero(SPECIES);
+        FloatVector acc1 = FloatVector.zero(SPECIES);
         int column = 0;
-        if (vectorized) {
-          FloatVector acc0 = FloatVector.zero(SPECIES);
-          FloatVector acc1 = FloatVector.zero(SPECIES);
-          FloatVector acc2 = FloatVector.zero(SPECIES);
-          FloatVector acc3 = FloatVector.zero(SPECIES);
-          for (; column < unrolledLimit; column += 4 * lanes) {
-            acc0 = fma(load(query, queryBase + column), load(keys, keyBase + column), acc0);
-            acc1 =
-                fma(
-                    load(query, queryBase + column + lanes),
-                    load(keys, keyBase + column + lanes),
-                    acc1);
-            acc2 =
-                fma(
-                    load(query, queryBase + column + 2 * lanes),
-                    load(keys, keyBase + column + 2 * lanes),
-                    acc2);
-            acc3 =
-                fma(
-                    load(query, queryBase + column + 3 * lanes),
-                    load(keys, keyBase + column + 3 * lanes),
-                    acc3);
-          }
-          for (; column < vectorLimit; column += lanes) {
-            acc0 = fma(load(query, queryBase + column), load(keys, keyBase + column), acc0);
-          }
-          sum += reduceAdd(acc0.add(acc1).add(acc2.add(acc3)));
+        for (; column < pairLimit; column += 2 * lanes) {
+          acc0 = fma(load(query, queryBase + column), load(keys, keyBase + column), acc0);
+          acc1 =
+              fma(
+                  load(query, queryBase + column + lanes),
+                  load(keys, keyBase + column + lanes),
+                  acc1);
         }
+        for (; column < vectorLimit; column += lanes) {
+          acc0 = fma(load(query, queryBase + column), load(keys, keyBase + column), acc0);
+        }
+        float sum = acc0.add(acc1).reduceLanes(VectorOperators.ADD);
         for (; column < columns; column++) {
           sum = MathUtil.fma(query[queryBase + column], keys[keyBase + column], sum);
         }
@@ -123,8 +108,70 @@ public final class GroupedQueryAttentionKernel {
   }
 
   /**
+   * In-place stable softmax over {@code x[offset, offset + size)}; the same contract as {@code
+   * TensorOps.softmax} (rejects NaN and +infinity, requires one finite input) with vector
+   * exponentials.
+   */
+  public static void softmax(float[] x, int offset, int size) {
+    Objects.requireNonNull(x, "x");
+    if (size <= 0) {
+      throw new IllegalArgumentException("size must be positive: " + size);
+    }
+    Objects.checkFromIndexSize(offset, size, x.length);
+    int lanes = SPECIES.length();
+    int vectorLimit = SPECIES.loopBound(size);
+    FloatVector maxVector = FloatVector.broadcast(SPECIES, Float.NEGATIVE_INFINITY);
+    int index = 0;
+    for (; index < vectorLimit; index += lanes) {
+      maxVector = maxVector.max(load(x, offset + index));
+    }
+    float max = maxVector.reduceLanes(VectorOperators.MAX);
+    for (; index < size; index++) {
+      max = Math.max(max, x[offset + index]);
+    }
+    for (int probe = 0; probe < size; probe++) {
+      float value = x[offset + probe];
+      if (Float.isNaN(value)) {
+        throw new IllegalArgumentException(
+            "softmax input contains NaN at index " + (offset + probe));
+      }
+      if (value == Float.POSITIVE_INFINITY) {
+        throw new IllegalArgumentException(
+            "softmax input contains positive infinity at index " + (offset + probe));
+      }
+    }
+    if (!Float.isFinite(max)) {
+      throw new IllegalArgumentException("softmax requires at least one finite input");
+    }
+    FloatVector maxBroadcast = FloatVector.broadcast(SPECIES, max);
+    FloatVector sumVector = FloatVector.zero(SPECIES);
+    index = 0;
+    for (; index < vectorLimit; index += lanes) {
+      FloatVector value = load(x, offset + index).sub(maxBroadcast).lanewise(VectorOperators.EXP);
+      value.intoArray(x, offset + index);
+      sumVector = sumVector.add(value);
+    }
+    float sum = sumVector.reduceLanes(VectorOperators.ADD);
+    for (; index < size; index++) {
+      float value = (float) Math.exp(x[offset + index] - max);
+      x[offset + index] = value;
+      sum += value;
+    }
+    float inverseSum = 1.0f / sum;
+    FloatVector inverse = FloatVector.broadcast(SPECIES, inverseSum);
+    index = 0;
+    for (; index < vectorLimit; index += lanes) {
+      load(x, offset + index).mul(inverse).intoArray(x, offset + index);
+    }
+    for (; index < size; index++) {
+      x[offset + index] *= inverseSum;
+    }
+  }
+
+  /**
    * Adds {@code weights_h[row] * value_row} into {@code output[outputOffset + h * outputHeadStride
-   * ..]} for every head of the group, row by row in order.
+   * ..]} for every head of the group, row by row in order. The per-column FMA chain runs in row
+   * order, so results match {@code VectorUtil.addWeightedRowsInPlace} bit for bit.
    */
   public static void accumulateGroup(
       float[] output,
@@ -154,58 +201,52 @@ public final class GroupedQueryAttentionKernel {
     }
     int lanes = SPECIES.length();
     int vectorLimit = SPECIES.loopBound(columns);
-    // Stream the value rows in blocks of four, exactly as addWeightedRowsInPlace does, and let
-    // every head of the group consume each block while it is hot. The per-head chain
-    // result = fma(row_k, w_k, result) runs in row order through memory, so results are
-    // bit-identical to the head-by-head kernel.
-    int blockedRows = rows & ~3;
-    for (int row = 0; row < blockedRows; row += 4) {
-      int row0 = valueOffset + row * valueRowStride;
-      int row1 = row0 + valueRowStride;
-      int row2 = row1 + valueRowStride;
-      int row3 = row2 + valueRowStride;
-      for (int head = 0; head < groupSize; head++) {
-        int outputBase = outputOffset + head * outputHeadStride;
-        int weightBase = weightsOffset + head * weightsHeadStride + row;
-        FloatVector weight0 = FloatVector.broadcast(SPECIES, weights[weightBase]);
-        FloatVector weight1 = FloatVector.broadcast(SPECIES, weights[weightBase + 1]);
-        FloatVector weight2 = FloatVector.broadcast(SPECIES, weights[weightBase + 2]);
-        FloatVector weight3 = FloatVector.broadcast(SPECIES, weights[weightBase + 3]);
-        int column = 0;
-        for (; column < vectorLimit; column += lanes) {
-          FloatVector result = load(output, outputBase + column);
-          result = fma(load(values, row0 + column), weight0, result);
-          result = fma(load(values, row1 + column), weight1, result);
-          result = fma(load(values, row2 + column), weight2, result);
-          result = fma(load(values, row3 + column), weight3, result);
-          result.intoArray(output, outputBase + column);
+    int quadLimit = vectorLimit - 3 * lanes;
+    for (int head = 0; head < groupSize; head++) {
+      int outputBase = outputOffset + head * outputHeadStride;
+      int weightBase = weightsOffset + head * weightsHeadStride;
+      int column = 0;
+      // Four column vectors stay in registers across every row: one weight broadcast and four
+      // loads per row, no accumulator traffic to memory until the rows are exhausted.
+      for (; column < quadLimit; column += 4 * lanes) {
+        FloatVector acc0 = load(output, outputBase + column);
+        FloatVector acc1 = load(output, outputBase + column + lanes);
+        FloatVector acc2 = load(output, outputBase + column + 2 * lanes);
+        FloatVector acc3 = load(output, outputBase + column + 3 * lanes);
+        for (int row = 0; row < rows; row++) {
+          int rowBase = valueOffset + row * valueRowStride + column;
+          FloatVector weight = FloatVector.broadcast(SPECIES, weights[weightBase + row]);
+          acc0 = fma(load(values, rowBase), weight, acc0);
+          acc1 = fma(load(values, rowBase + lanes), weight, acc1);
+          acc2 = fma(load(values, rowBase + 2 * lanes), weight, acc2);
+          acc3 = fma(load(values, rowBase + 3 * lanes), weight, acc3);
         }
-        for (; column < columns; column++) {
-          int outputIndex = outputBase + column;
-          float result = output[outputIndex];
-          result = MathUtil.fma(values[row0 + column], weights[weightBase], result);
-          result = MathUtil.fma(values[row1 + column], weights[weightBase + 1], result);
-          result = MathUtil.fma(values[row2 + column], weights[weightBase + 2], result);
-          result = MathUtil.fma(values[row3 + column], weights[weightBase + 3], result);
-          output[outputIndex] = result;
-        }
+        acc0.intoArray(output, outputBase + column);
+        acc1.intoArray(output, outputBase + column + lanes);
+        acc2.intoArray(output, outputBase + column + 2 * lanes);
+        acc3.intoArray(output, outputBase + column + 3 * lanes);
       }
-    }
-    for (int row = blockedRows; row < rows; row++) {
-      int rowBase = valueOffset + row * valueRowStride;
-      for (int head = 0; head < groupSize; head++) {
-        int outputBase = outputOffset + head * outputHeadStride;
-        float weight = weights[weightsOffset + head * weightsHeadStride + row];
-        FloatVector weightVector = FloatVector.broadcast(SPECIES, weight);
-        int column = 0;
-        for (; column < vectorLimit; column += lanes) {
-          fma(load(values, rowBase + column), weightVector, load(output, outputBase + column))
-              .intoArray(output, outputBase + column);
+      for (; column < vectorLimit; column += lanes) {
+        FloatVector acc = load(output, outputBase + column);
+        for (int row = 0; row < rows; row++) {
+          acc =
+              fma(
+                  load(values, valueOffset + row * valueRowStride + column),
+                  FloatVector.broadcast(SPECIES, weights[weightBase + row]),
+                  acc);
         }
-        for (; column < columns; column++) {
-          output[outputBase + column] =
-              MathUtil.fma(values[rowBase + column], weight, output[outputBase + column]);
+        acc.intoArray(output, outputBase + column);
+      }
+      for (; column < columns; column++) {
+        float result = output[outputBase + column];
+        for (int row = 0; row < rows; row++) {
+          result =
+              MathUtil.fma(
+                  values[valueOffset + row * valueRowStride + column],
+                  weights[weightBase + row],
+                  result);
         }
+        output[outputBase + column] = result;
       }
     }
   }
@@ -216,33 +257,5 @@ public final class GroupedQueryAttentionKernel {
 
   private static FloatVector fma(FloatVector a, FloatVector b, FloatVector c) {
     return PanamaConstants.HAS_FAST_VECTOR_FMA ? a.fma(b, c) : a.mul(b).add(c);
-  }
-
-  /** The fixed reduction order vectors-core uses, so sums match lane for lane. */
-  static float reduceAdd(FloatVector vector) {
-    return switch (vector.length()) {
-      case 1 -> vector.lane(0);
-      case 2 -> vector.lane(1) + vector.lane(0);
-      case 4 -> (vector.lane(2) + vector.lane(0)) + (vector.lane(3) + vector.lane(1));
-      case 8 -> {
-        float even = (vector.lane(4) + vector.lane(0)) + (vector.lane(6) + vector.lane(2));
-        float odd = (vector.lane(5) + vector.lane(1)) + (vector.lane(7) + vector.lane(3));
-        yield even + odd;
-      }
-      case 16 -> {
-        float lane0 = vector.lane(8) + vector.lane(0);
-        float lane1 = vector.lane(9) + vector.lane(1);
-        float lane2 = vector.lane(10) + vector.lane(2);
-        float lane3 = vector.lane(11) + vector.lane(3);
-        float lane4 = vector.lane(12) + vector.lane(4);
-        float lane5 = vector.lane(13) + vector.lane(5);
-        float lane6 = vector.lane(14) + vector.lane(6);
-        float lane7 = vector.lane(15) + vector.lane(7);
-        float even = (lane4 + lane0) + (lane6 + lane2);
-        float odd = (lane5 + lane1) + (lane7 + lane3);
-        yield even + odd;
-      }
-      default -> throw new AssertionError("unsupported float vector length: " + vector.length());
-    };
   }
 }
