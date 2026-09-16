@@ -79,3 +79,11 @@ the poll budget alone.** Productised as a time-based budget (`DEFAULT_POLL_NANOS
 Rust pool, `jmodels_kernels_context_set_poll_nanos` behind capability bit 21, Java property
 `models.native.kernels.pollMillis`); the pure-Java executor in vectors-core gets the same
 spin-then-park barrier. Confirmation on a c7a.4xlarge follows before any certified number moves.
+
+### Result 2 — decode workers 8 vs 16 under the token-sized budget (same host)
+
+dt8: 25.12 / 25.87 / 22.92 tok/s; dt16: 25.03 / 20.45 / 26.78. No consistent direction on 16
+shared vCPUs (the extra eight are SMT siblings of busy cores on this instance); the tuned
+profile keeps 8 workers on single-token projections. Chunk stealing (Difference 2) is measured
+next, then the productised default against the old regime, then the pure-Java executor with the
+same barrier (`vectors.gguf.pollMillis`, branch `perf/gguf-executor-poll-budget` in vectors).
