@@ -98,6 +98,18 @@ const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 const WORKER_SPIN_ITERS: usize = 4_000;
+
+/// Spin budget a worker polls for the next generation before parking, in `spin_loop` rounds.
+/// Read once per pool from `JMODELS_KERNELS_WORKER_SPIN` (experiment knob; default 4,000). For
+/// comparison, ggml's CPU backend polls `1024 * 128 * poll` rounds with `poll = 50` by default
+/// before a worker sleeps, so its threads effectively never park inside one token.
+fn worker_spin_iters() -> usize {
+    std::env::var("JMODELS_KERNELS_WORKER_SPIN")
+        .ok()
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(WORKER_SPIN_ITERS)
+}
 /// Low bits of a published job word that carry the partition count the job was published with.
 const JOB_PARTITION_BITS: u32 = 16;
 
@@ -251,6 +263,8 @@ struct WorkerPool {
     /// Threads that take rows on the next matrix job, 1..=total_threads. Single-token decode
     /// wants fewer partitions than batched prefill on the same pool.
     active_threads: AtomicUsize,
+    /// Spin budget the caller polls for completion before parking; same knob as the workers'.
+    completion_spin_iters: usize,
     execution: Mutex<()>,
 }
 
@@ -377,6 +391,7 @@ impl WorkerPool {
             workers: Vec::with_capacity(total_threads.saturating_sub(1)),
             total_threads,
             active_threads: AtomicUsize::new(total_threads),
+            completion_spin_iters: worker_spin_iters().max(COMPLETION_SPIN_ITERS),
             execution: Mutex::new(()),
         };
         for worker_index in 1..total_threads {
@@ -559,7 +574,7 @@ impl WorkerPool {
     }
 
     fn await_workers(&self, caller_succeeded: bool) -> bool {
-        let completed = poll_completion(&self.shared.remaining.0, COMPLETION_SPIN_ITERS);
+        let completed = poll_completion(&self.shared.remaining.0, self.completion_spin_iters);
         let mut state = lock(&self.shared.state);
         while !completed && self.shared.remaining.0.load(Ordering::Acquire) != 0 {
             state = wait(&self.shared.work_complete, state);
@@ -588,6 +603,7 @@ impl Drop for WorkerPool {
 }
 
 fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: usize) {
+    let spin_iters = worker_spin_iters();
     let mut observed_generation = 0;
     loop {
         // Idle workers sleep on the activation condvar and resume from the generation that was
@@ -608,7 +624,7 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
         }
         let (job, partitions) = {
             let mut next_generation =
-                poll_generation(&shared.generation.0, observed_generation, WORKER_SPIN_ITERS);
+                poll_generation(&shared.generation.0, observed_generation, spin_iters);
             let mut state = lock(&shared.state);
             while !state.shutdown && next_generation.is_none() {
                 let published_generation = shared.generation.0.load(Ordering::Acquire);
