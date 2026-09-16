@@ -2467,6 +2467,10 @@ public final class LlamaForwardPass {
       int size) {
     if (config.usesGeluFfn()) {
       TensorOps.geluGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+    } else if (config.usesGraniteScaling()) {
+      // Granite: the tier-stable vector sigmoid; vectors-core's swiGlu resolves lanewise EXP to
+      // the vector math library only once compiled and would differ by JIT tier.
+      GroupedQueryAttentionKernel.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else if (usesVectorizedSwiGlu()) {
       VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else {
@@ -2475,11 +2479,8 @@ public final class LlamaForwardPass {
   }
 
   private boolean usesVectorizedSwiGlu() {
-    // Granite joins the Qwen families: its greedy oracle tests hold with the vector EXP, and the
-    // scalar Math.exp loop was 14% of Java-side samples in the Granite 4.1 3B RAG profile.
     return config.architecture() == DecoderArchitecture.QWEN2
-        || config.architecture() == DecoderArchitecture.QWEN3
-        || config.architecture() == DecoderArchitecture.GRANITE;
+        || config.architecture() == DecoderArchitecture.QWEN3;
   }
 
   private static void scaleActive(float[] values, int offset, int length, float scale) {

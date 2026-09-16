@@ -441,6 +441,42 @@ public final class GroupedQueryAttentionKernel {
     return p * Float.intBitsToFloat(((int) n + 127) << 23);
   }
 
+  /**
+   * SwiGLU {@code out = gate * sigmoid(gate) * up} from the tier-stable exponential: {@code gate /
+   * (1 + exp(-gate)) * up} lanewise, with a scalar tail performing the same operations. Inputs are
+   * clamped through the exponential's own range, so {@code -gate <= 88} keeps the division finite.
+   */
+  public static void swiGlu(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size) {
+    Objects.requireNonNull(out, "out");
+    Objects.requireNonNull(gate, "gate");
+    Objects.requireNonNull(up, "up");
+    Objects.checkFromIndexSize(outOffset, size, out.length);
+    Objects.checkFromIndexSize(gateOffset, size, gate.length);
+    Objects.checkFromIndexSize(upOffset, size, up.length);
+    int lanes = SPECIES.length();
+    int vectorLimit = SPECIES.loopBound(size);
+    FloatVector one = FloatVector.broadcast(SPECIES, 1.0f);
+    int index = 0;
+    for (; index < vectorLimit; index += lanes) {
+      FloatVector value = load(gate, gateOffset + index);
+      value
+          .div(one.add(expVector(value.neg())))
+          .mul(load(up, upOffset + index))
+          .intoArray(out, outOffset + index);
+    }
+    for (; index < size; index++) {
+      float value = gate[gateOffset + index];
+      out[outOffset + index] = value / (1.0f + expScalar(-value)) * up[upOffset + index];
+    }
+  }
+
   private static FloatVector load(float[] array, int offset) {
     return FloatVector.fromArray(SPECIES, array, offset);
   }

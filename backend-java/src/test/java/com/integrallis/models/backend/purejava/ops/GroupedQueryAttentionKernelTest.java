@@ -190,6 +190,29 @@ class GroupedQueryAttentionKernelTest {
     }
   }
 
+  @Test
+  void swiGluMatchesTheScalarReferenceWithinLastBits() {
+    for (int size : new int[] {1, 7, 8, 33, 8192}) {
+      Random random = new Random(size);
+      float[] gate = randomArray(random, size + 2);
+      float[] up = randomArray(random, size + 1);
+      for (int index = 0; index < gate.length; index++) {
+        gate[index] *= 5.0f;
+      }
+      float[] expected = new float[size + 3];
+      float[] actual = new float[size + 3];
+      TensorOps.swiGlu(expected, 3, gate, 2, up, 1, size);
+      GroupedQueryAttentionKernel.swiGlu(actual, 3, gate, 2, up, 1, size);
+      for (int index = 0; index < size; index++) {
+        assertThat(actual[3 + index])
+            .as("size=%d index=%d", size, index)
+            .isCloseTo(
+                expected[3 + index],
+                org.assertj.core.data.Offset.offset(1e-6f + Math.abs(expected[3 + index]) * 1e-6f));
+      }
+    }
+  }
+
   private static float[] randomArray(Random random, int length) {
     float[] values = new float[length];
     for (int index = 0; index < length; index++) {
