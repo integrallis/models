@@ -117,6 +117,8 @@ final class ActivatedAnswerabilityQualificationCli {
       boolean physicallyShared,
       int sharedPrefixTokens,
       long millis,
+      long prefillMillis,
+      long decodeMillis,
       String output) {}
 
   record Summary(
@@ -314,12 +316,19 @@ final class ActivatedAnswerabilityQualificationCli {
         String output;
         boolean shared = false;
         int sharedTokens = 0;
+        long prefillMillis = -1;
+        long decodeMillis = -1;
         if (configuration.arm() == Arm.SPECIALIST) {
           try (ActivatedToolTurn turn =
               model.openToolTurn(prompt, ActivatedToolCallingModel.PrefixStrategy.SHARED)) {
             output = turn.generateToolCall(options, TokenConstraint.unrestricted());
             shared = turn.physicallySharesPrefix();
             sharedTokens = turn.sharedPrefixTokens();
+            var metrics = turn.toolMetrics();
+            if (metrics.available()) {
+              prefillMillis = metrics.prefill().toMillis();
+              decodeMillis = metrics.decode().toMillis();
+            }
           }
         } else {
           output = model.generate(prompt, options);
@@ -338,15 +347,19 @@ final class ActivatedAnswerabilityQualificationCli {
                 shared,
                 sharedTokens,
                 millis,
+                prefillMillis,
+                decodeMillis,
                 output));
         System.out.printf(
-            "%s label=%s prediction=%s structured=%s shared=%s millis=%d%n",
+            "%s label=%s prediction=%s structured=%s shared=%s millis=%d prefill=%d decode=%d%n",
             item.id(),
             item.label(),
             predicted.isEmpty() ? "-" : predicted,
             structured,
             shared,
-            millis);
+            millis,
+            prefillMillis,
+            decodeMillis);
       }
     }
     Summary summary = summarize(results, configuration.arm());

@@ -131,10 +131,13 @@ class ActivatedAnswerabilityQualificationCliTest {
   void summarizesBalancedAccuracyAndRequiresSharingOnlyForTheSpecialistArm() {
     List<CaseResult> results =
         List.of(
-            new CaseResult("a1", "answerable", "answerable", true, true, true, 10, 1, "answerable"),
-            new CaseResult("a2", "answerable", "unanswerable", true, false, true, 10, 1, "x"),
-            new CaseResult("u1", "unanswerable", "unanswerable", true, true, false, 10, 1, "y"),
-            new CaseResult("u2", "unanswerable", "unanswerable", true, true, true, 10, 1, "z"));
+            new CaseResult(
+                "a1", "answerable", "answerable", true, true, true, 10, 1, 1, 0, "answerable"),
+            new CaseResult("a2", "answerable", "unanswerable", true, false, true, 10, 1, 1, 0, "x"),
+            new CaseResult(
+                "u1", "unanswerable", "unanswerable", true, true, false, 10, 1, 1, 0, "y"),
+            new CaseResult(
+                "u2", "unanswerable", "unanswerable", true, true, true, 10, 1, 1, 0, "z"));
 
     Summary specialist = ActivatedAnswerabilityQualificationCli.summarize(results, Arm.SPECIALIST);
     Summary base = ActivatedAnswerabilityQualificationCli.summarize(results, Arm.BASE);

@@ -173,3 +173,16 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   changes how outputs are read, not any threshold; the two exposed cases stay in the frozen
   window because excluding them would bias it. The Rust-arm timings from that smoke are
   discarded because the host was shared with the unit suite.
+- 2026-09-15, Rust/FFM versus pure-Java identity smoke, first two SQuAD cases in hash order,
+  specialist arm, operator workstation: both arms produced the identical completions
+  (`"unanswerable"` then `"answerable"`, both correct), the identical shared-prefix counts (269 and
+  386 tokens), and `physicallySharesPrefix=true` on every case. Clean wall times were 220.8 s and
+  343.7 s on the Rust arm against 251.9 s and 343.4 s on pure Java. Two cases are not the ten per
+  suite the amendment requires; the amendment stays unsatisfied.
+- 2026-09-15, why both arms are this slow: the shared-prefix path prepares the base prefix through
+  the session prefill, which walks the prompt one token at a time, so neither arm batches the
+  prefill and the native matrix kernel has nothing to accelerate. The plain sessionless path on
+  the same host measured 2.08 prefill tokens per second batched (132-token prompt, pure Java)
+  against about 1.1 on the session path. A session-aware batched prefill is therefore the next
+  engineering item before gate 4 can run at any useful cost; it must stay token-identical to the
+  per-token path, and the Granite 4.1 integration test's greedy oracle is the check for that.
