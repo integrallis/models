@@ -821,3 +821,17 @@ built or any arm runs, and the rule below is not revisited after the numbers lan
   with the scope stated as single-turn answerability, and `mtrag-human-rag` is reported in the
   component report's evidence as the failing, out-of-scope multi-turn suite (0.600, unanswerable
   recall 14/40). Fail → the candidate is rejected; no third suite is tried.
+
+### 2026-09-16T20:15Z — EARLY DETERMINATION: IBM adapter on the pre-registered MS MARCO suite (PEFT reference, CPU)
+
+Measured before the Java windows finish, on the reference host with IBM's PEFT implementation
+(bf16, greedy, 200 cases of `msmarco-v2.1-validation`, window ea9e4a0c; report
+`host-evidence/reference-alora/msmarco-v2.1-validation-ibm-alora-peft.json`): structured 1.0,
+answerable 86/100, unanswerable 58/100, **balanced 0.72**. Below the 0.8 gate, with the MT-RAG
+failure shape (it answers "answerable" when a query with many passages has no answer in them).
+The Java runtime tracked this reference 8/8 on MT-RAG, so the Java arms (running on host 1 and
+the pure-Java host) are expected to land here too; they complete for the record. Under the
+pre-registered rule this rejects IBM's `granitelib-rag-r1.0` answerability aLoRA as the hybrid's
+specialist. The user's direction is to fix the adapter, not to stop: Track B trains our own
+answerability aLoRA (`../2026-09-16-granite-answerability-alora/`) on multi-passage and
+multi-turn training data and re-qualifies it under the same window and rule.
