@@ -168,3 +168,19 @@ old regime — it already outlasts the intra-token glue — which is why it sits
 default; the 4,000-round regime is the 15.6–16.6 tok/s row of Result 1. The remaining
 context-switch halving comes from the inter-token gaps (sampling, tokenizer, harness) that
 1 ms does not cover.
+
+### Result 6 — pure-Java executor barrier (vectors `perf/gguf-executor-poll-budget`, same host)
+
+Pure-Java backend (`--backend pure-java`, composite build against the vectors branch, jar
+verified to carry `awaitAdvancePolling`), interleaved, 3 rounds, `vectors.gguf.pollMillis`:
+
+| budget  | decode tok/s        | TTFT p50 ms           | context switches |
+|---------|--------------------:|----------------------:|-----------------:|
+| 25 ms   | 6.32 / 9.01 / 7.25  | 8,015 / 7,969 / 8,453 | 83 k – 243 k     |
+| 0 (park)| 4.64 / 5.00 / 4.73  | 12,037 / 11,144 / 10,647 | 2.0 M – 2.2 M |
+
+Same mechanism, larger effect: the Phaser parked at every one of the ~200 stage barriers per
+token, so the pure-Java executor paid 2 M context switches per run. 3/3 rounds, both decode
+(+36 % to +80 %) and prefill (TTFT −25 % to −34 %). The 25 ms default stands in vectors
+(PR #72); confirmation on dedicated cores (c7a) is the remaining step before the number
+changes anything certified.
