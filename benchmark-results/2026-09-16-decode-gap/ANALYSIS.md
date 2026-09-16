@@ -57,3 +57,18 @@ vCPUs make absolute numbers noisy; interleaving makes the comparison usable. Any
 here is confirmed on a c7a.4xlarge before it changes a certified number.
 
 (Results appended below as they land.)
+
+### Result 1 — worker spin budget (reference host, interleaved, 2026-09-16T16:20Z)
+
+| run | spin rounds | decode tok/s | p50 TTFT | p50 e2e | context switches (process) |
+|---|---:|---:|---:|---:|---:|
+| r1 | 4,000 | 15.92 | 1,623 ms | 3,073 ms | 760,841 |
+| r1 | 6,553,600 | 23.98 | 1,269 ms | 2,248 ms | 177,340 |
+| r2 | 4,000 | 15.61 | 1,658 ms | 3,143 ms | 773,128 |
+
+Same binary, same model, same 16/8 worker profile; only `JMODELS_KERNELS_WORKER_SPIN` differs.
+The parking workers cost ~4.3× the context switches and a third of the decode rate on this
+shared-vCPU host. Difference 1 is real and is the first thing to productise: a per-token
+non-parking regime (poll budget sized to a token, park between requests), on the Java stage
+pool as well as the Rust pool. Remaining rounds and the decode-thread and chunk-stealing A/Bs
+follow.
