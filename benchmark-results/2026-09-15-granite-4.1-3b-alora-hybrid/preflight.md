@@ -786,3 +786,12 @@ question instead of emitting the answerability label, unlike on SQuAD where it p
 (0.820). This is the control arm's behaviour, not a runtime failure (no case-level errors). It
 does not change the verdict: the specialist arm already fails MT-RAG (0.600, unanswerable
 recall 14/40) with adapter behaviour confirmed against the PEFT reference 8/8.
+
+### 2026-09-16T19:12Z — SQuAD base arm, both backends (control consistency)
+
+Measured at fcd38d3: Rust FFM base 200 cases, structured 151 (0.755), answerable 27/100,
+unanswerable 80/100, balanced 0.535; pure-Java base structured 156 (0.780), answerable 34/100,
+unanswerable 79/100, balanced 0.565. Same top outputs on both (`unanswerable` 115/111,
+`answerable` 36/45). The two backends agree on the control within 3 points, so the specialist's
+SQuAD margin over base (0.825 vs 0.535) is not a backend artefact. The pure-Java MT-RAG
+specialist window is still running on the pure-Java host; the Rust windows are complete.
