@@ -298,3 +298,29 @@ barriers).
 does on every host measured and burns a fifth of the idle tail (workers × budget per call)
 that a sporadic caller — an embedding server, one search a second — would otherwise pay.
 Both remain settable (`models.native.kernels.pollMillis`, `vectors.gguf.pollMillis`).
+
+### Result 9d — llama.cpp b10012 build matrix on the c7a (dedicated Zen 4), llama-bench, 2 rounds
+
+| build                          | pp512 t16     | pp512 t8      | tg64 t16    | tg64 t8     |
+|--------------------------------|--------------:|--------------:|------------:|------------:|
+| native (AVX-512+VNNI) + repack | 269.5 / 270.9 | 146.1 / 143.7 | 32.2 / 32.4 | 31.9 / 31.9 |
+| AVX2 + repack                  | 224.4 / 223.7 | 118.2 / 118.5 | 32.2 / 31.9 | 31.5 / 31.5 |
+| native, no repack              | 164.5 / 165.5 | 87.2 / 87.3   | 31.1 / 33.1 | 32.3 / 32.2 |
+| AVX2, no repack                | 161.7 / 161.9 | 85.1 / 85.1   | 32.8 / 33.2 | 31.9 / 32.1 |
+
+Cleaner than the shared host and the same shape: on prefill the repacked register-tiled GEMM
+is +38 % on AVX2 (162 → 224), the ISA alone +2 % (162 → 165), both together +67 %
+(162 → 270). Decode is pinned at ~32 tok/s by the 16-vCPU slice's memory bandwidth
+(2.1 GB per token ≈ 66 GB/s) in every build. Our Rust arm on the same box: decode 26
+(81 % of that ceiling), prefill 123–134 tok/s — 76–83 % of ggml's *untiled* AVX2 rate and
+under half of its tiled AVX-512 rate.
+
+**Prefill plan, in order of measured value:** (1) a register-tiled Q4_K×Q8_K GEMM in the
+Rust kernel — several activation rows × several weight rows per tile with accumulators
+held across K — which does not need ggml's load-time repack if the tile decodes each
+weight row's nibbles once per block and reuses them across the tile's activation rows;
+(2) an AVX-512/VNNI body for that tile, worth ~+20 % on top of the tiling on Zen 4 and
+nothing before it; (3) the same tile shape in the Java Vector API path for the pure-Java
+backend, whose prefill (17 tok/s) is compute-bound in the kernel and gains nothing from the
+barrier budget. Decode needs neither: it is bandwidth-bound at the kernel and serial at the
+dispatch structure (Result 8).
