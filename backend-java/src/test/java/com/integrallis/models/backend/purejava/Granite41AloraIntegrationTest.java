@@ -46,6 +46,22 @@ class Granite41AloraIntegrationTest {
   private static final int[] ORACLE_PROMPT_TOKENS = {791, 4062, 14198, 39935};
   private static final int[] ORACLE_GREEDY_TOKENS = {35308, 927, 279, 16053, 5679, 1210, 578, 734};
 
+  /**
+   * A second oracle prompt with digits, quotes, a percent sign, and a thousands separator. The
+   * first prompt cannot expose a missing pre-tokenizer; this one splits digits in groups of three
+   * and keeps a space attached to punctuation exactly as the dbrx pattern requires.
+   */
+  private static final String ORACLE_PUNCTUATION_PROMPT =
+      "In the 1850s, \"Islamist\" parties won 75% of 1,024 seats.";
+
+  private static final int[] ORACLE_PUNCTUATION_PROMPT_TOKENS = {
+    644, 279, 220, 9741, 15, 82, 11, 330, 94893, 380, 1, 9875, 2834, 220, 2075, 4, 315, 220, 16, 11,
+    19592, 16712, 13
+  };
+  private static final int[] ORACLE_PUNCTUATION_GREEDY_TOKENS = {
+    763, 279, 220, 1049, 15, 82, 11, 330
+  };
+
   private static final int[] DOCUMENTS_MARKER_TOKENS = {100282, 100283};
   private static final String DOCUMENT =
       "{\"doc_id\": 1, \"text\": \"Tim Cook has served as the chief executive officer of Apple "
@@ -67,6 +83,14 @@ class Granite41AloraIntegrationTest {
       assertThat(ModelOracleTestSupport.greedyTokens(backend, promptTokens, 8))
           .as("greedy token IDs must match llama.cpp b9960 for the pinned Granite 4.1 3B GGUF")
           .containsExactly(ORACLE_GREEDY_TOKENS);
+
+      int[] punctuationTokens = tokenizer.encode(ORACLE_PUNCTUATION_PROMPT);
+      assertThat(punctuationTokens)
+          .as("the dbrx pre-tokenizer must split digits by three and keep space-punctuation runs")
+          .containsExactly(ORACLE_PUNCTUATION_PROMPT_TOKENS);
+      assertThat(ModelOracleTestSupport.greedyTokens(backend, punctuationTokens, 8))
+          .as("greedy IDs after a digit-heavy prompt must match llama.cpp b9960")
+          .containsExactly(ORACLE_PUNCTUATION_GREEDY_TOKENS);
 
       int[] invocationTokens = tokenizer.encodeControl(INVOCATION);
       assertThat(invocationTokens).containsExactly(INVOCATION_TOKENS);

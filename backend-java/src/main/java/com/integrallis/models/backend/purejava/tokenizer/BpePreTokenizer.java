@@ -21,7 +21,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Selects and applies the byte-level BPE pre-tokenization declared by GGUF metadata. */
+/**
+ * Selects and applies the byte-level BPE pre-tokenization declared by GGUF metadata.
+ *
+ * <p>Every pattern compiles with {@link Pattern#UNICODE_CHARACTER_CLASS} because the published Rust
+ * regexes treat {@code \s} as Unicode White_Space: a no-break space is whitespace, not punctuation,
+ * and llama.cpp agrees.
+ */
 final class BpePreTokenizer {
 
   private static final Pattern LLAMA3_PATTERN =
@@ -32,7 +38,8 @@ final class BpePreTokenizer {
               + "| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*"
               + "|\\s*[\\r\\n]+"
               + "|\\s+(?!\\S)"
-              + "|\\s+");
+              + "|\\s+",
+          Pattern.UNICODE_CHARACTER_CLASS);
   private static final Pattern QWEN2_PATTERN =
       Pattern.compile(
           "(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])"
@@ -41,7 +48,8 @@ final class BpePreTokenizer {
               + "| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*"
               + "|\\s*[\\r\\n]+"
               + "|\\s+(?!\\S)"
-              + "|\\s+");
+              + "|\\s+",
+          Pattern.UNICODE_CHARACTER_CLASS);
   private static final Pattern QWEN35_PATTERN =
       Pattern.compile(
           "(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])"
@@ -50,7 +58,8 @@ final class BpePreTokenizer {
               + "| ?[^\\s\\p{L}\\p{M}\\p{N}]+[\\r\\n]*"
               + "|\\s*[\\r\\n]+"
               + "|\\s+(?!\\S)"
-              + "|\\s+");
+              + "|\\s+",
+          Pattern.UNICODE_CHARACTER_CLASS);
   private static final Pattern GPT_OSS_PATTERN =
       Pattern.compile(
           "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]*"
@@ -61,7 +70,8 @@ final class BpePreTokenizer {
               + "| ?[^\\s\\p{L}\\p{N}]+[\\r\\n/]*"
               + "|\\s*[\\r\\n]+"
               + "|\\s+(?!\\S)"
-              + "|\\s+");
+              + "|\\s+",
+          Pattern.UNICODE_CHARACTER_CLASS);
   private static final Pattern GPT2_PATTERN =
       Pattern.compile(
           "'s|'t|'re|'ve|'m|'ll|'d"
@@ -69,7 +79,8 @@ final class BpePreTokenizer {
               + "| ?\\p{N}+"
               + "| ?[^\\s\\p{L}\\p{N}]+"
               + "|\\s+(?!\\S)"
-              + "|\\s+");
+              + "|\\s+",
+          Pattern.UNICODE_CHARACTER_CLASS);
   private static final Pattern SINGLE_DIGIT_GPT2_PATTERN =
       Pattern.compile(
           "\\p{N}"
@@ -78,10 +89,12 @@ final class BpePreTokenizer {
               + "| ?\\p{N}+"
               + "| ?[^\\s\\p{L}\\p{N}]+"
               + "|\\s+(?!\\S)"
-              + "|\\s+");
+              + "|\\s+",
+          Pattern.UNICODE_CHARACTER_CLASS);
   private static final Pattern DEEPSEEK_CODER_PATTERN =
       Pattern.compile(
-          "[\\r\\n]" + "|\\s?\\p{L}+" + "|\\s?\\p{P}+" + "|[一-龥ࠀ-一가-퟿]+" + "|\\p{N}" + "|\\s+");
+          "[\\r\\n]" + "|\\s?\\p{L}+" + "|\\s?\\p{P}+" + "|[一-龥ࠀ-一가-퟿]+" + "|\\p{N}" + "|\\s+",
+          Pattern.UNICODE_CHARACTER_CLASS);
 
   private static final Set<String> LLAMA3_IGNORE_MERGES_NAMES =
       Set.of(
@@ -95,6 +108,14 @@ final class BpePreTokenizer {
           "lfm2",
           "jina-v5-nano",
           "minicpm5");
+
+  /**
+   * Llama-3 word boundaries with ordinary merge ranking. Granite 4.x GGUFs declare {@code dbrx};
+   * their published tokenizer.json carries exactly this split regex with {@code ignore_merges}
+   * false, and an unmapped name would otherwise skip pre-tokenization entirely.
+   */
+  private static final Set<String> LLAMA3_KEEP_MERGES_NAMES = Set.of("smaug-bpe", "dbrx");
+
   private static final Set<String> QWEN2_NAMES =
       Set.of("qwen2", "deepseek-r1-qwen", "kormo", "f2llmv2", "megrez");
   private static final Set<String> GPT2_NAMES =
@@ -145,7 +166,7 @@ final class BpePreTokenizer {
     if (LLAMA3_IGNORE_MERGES_NAMES.contains(name)) {
       return LLAMA3;
     }
-    if ("smaug-bpe".equals(name)) {
+    if (LLAMA3_KEEP_MERGES_NAMES.contains(name)) {
       return SMAUG;
     }
     if (QWEN2_NAMES.contains(name)) {

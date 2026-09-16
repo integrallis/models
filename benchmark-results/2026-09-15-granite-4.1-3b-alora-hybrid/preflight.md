@@ -143,3 +143,24 @@ pre-marker prefix is shared, exactly as the runtime already enforces.
   injected kernel, `RustFfmBackend.loadActivatedAdapter`) and the runner gained `--backend`; the
   macOS x86_64 kernel library built locally with SHA-256
   `53a8233ee8202b085f72de41552868cecc8b55fe634a29529a455c7548b741e3`. No Rust result exists yet.
+- 2026-09-15, full-window prompt oracle after the marker fix: only 2 of 110 MT-RAG and 135 of 200
+  SQuAD prompts were token-identical. Decoded spans showed two classes: digits split as
+  `18|50` instead of `185|0`, and ` \"I` merged across the space. Cause: the GGUF declares
+  `tokenizer.ggml.pre = dbrx`, a name absent from the Java pre-tokenizer table, whose fallback
+  is no pre-tokenization at all. The published tokenizer.json carries exactly the Llama-3 split
+  regex with `ignore_merges` false. Correction: `dbrx` now maps to that pattern beside
+  `smaug-bpe`, with a unit test on `1850s "Islamist" won 75% in 2024`. Gate 1 had passed because
+  its oracle prompt held no digits or punctuation; a second oracle prompt with digits, quotes, a
+  percent sign, and a thousands separator (23 tokens, eight greedy IDs from llama.cpp b9960) is
+  now part of gate 1. This defect predates the candidate and affected every Granite 4.x prompt on
+  the Java path.
+- 2026-09-15, third class after the dbrx mapping: 13 MT-RAG prompts still differed on no-break
+  spaces, because Java's `\s` is ASCII-only unless `UNICODE_CHARACTER_CLASS` is set while the
+  published Rust regex and llama.cpp treat U+00A0 as whitespace. Every BPE pre-tokenizer pattern
+  now compiles with that flag; a unit test covers `risk  at   home`. The full
+  backend-java unit suite passed afterwards (610 tests, 0 failures).
+- 2026-09-15, prompt-byte oracle, complete: with the marker, dbrx, and whitespace corrections the
+  Java runner is byte- and token-identical to Transformers 4.57.1 for all 110 MT-RAG and all 200
+  SQuAD 2.0 cases in both arms (620 prompts). The machine-readable comparisons are in
+  `prompt-oracle/`. Gate 4's prompt precondition is therefore satisfied for every case, not only
+  the first.
