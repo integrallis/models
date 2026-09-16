@@ -68,6 +68,7 @@ def main() -> None:
     p.add_argument("--batch-tokens", type=int, default=12000, help="tokens per micro-batch (length-bucketed)")
     p.add_argument("--gradient-accumulation", type=int, default=4); p.add_argument("--train-limit", type=int); p.add_argument("--validation-limit", type=int)
     p.add_argument("--eval-every", type=int, default=200); p.add_argument("--seed", type=int, default=20260916)
+    p.add_argument("--load-in-4bit", action="store_true", help="QLoRA: nf4 base weights (bitsandbytes) for small GPUs; the adapter still applies to the full base")
     a = p.parse_args()
     import torch
     from peft import LoraConfig, get_peft_model
@@ -76,8 +77,15 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = AutoTokenizer.from_pretrained(BASE, revision=BASE_REVISION)
     eos = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, torch_dtype=torch.bfloat16).to(device)
-    model.gradient_checkpointing_enable(); model.enable_input_require_grads()
+    if a.load_in_4bit:
+        from transformers import BitsAndBytesConfig
+        from peft import prepare_model_for_kbit_training
+        quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16)
+        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, quantization_config=quant, device_map={"": 0})
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REVISION, torch_dtype=torch.bfloat16).to(device)
+        model.gradient_checkpointing_enable(); model.enable_input_require_grads()
     config = LoraConfig(r=a.rank, lora_alpha=a.alpha, lora_dropout=a.dropout, target_modules=TARGET_MODULES, task_type="CAUSAL_LM",
                         alora_invocation_tokens=INVOCATION_TOKENS)
     model = get_peft_model(model, config); model.print_trainable_parameters()
@@ -131,7 +139,7 @@ def main() -> None:
         epoch += 1
     manifest = {"base": BASE, "baseRevision": BASE_REVISION, "invocation": {"tokens": INVOCATION_TOKENS, "text": "<|start_of_role|>assistant<|end_of_role|>"},
                 "config": {"rank": a.rank, "alpha": a.alpha, "dropout": a.dropout, "targetModules": TARGET_MODULES, "maxLength": a.max_length, "epochs": a.epochs,
-                           "learningRate": a.learning_rate, "batchTokens": a.batch_tokens, "gradientAccumulation": a.gradient_accumulation, "seed": a.seed},
+                           "learningRate": a.learning_rate, "batchTokens": a.batch_tokens, "gradientAccumulation": a.gradient_accumulation, "seed": a.seed, "loadIn4bit": a.load_in_4bit},
                 "prepared": json.loads((a.prepared / "manifest.json").read_text()), "trainExamples": len(examples), "droppedOverLength": dropped,
                 "steps": total_steps, "best": best, "seconds": round(time.time() - t0),
                 "versions": {"python": platform.python_version(), "torch": torch.__version__, "peft": __import__("peft").__version__, "transformers": __import__("transformers").__version__,
