@@ -1,0 +1,79 @@
+Downloading https://services.gradle.org/distributions/gradle-9.4.1-all.zip
+......................10%.......................20%.......................30%......................40%.......................50%.......................60%......................70%.......................80%.......................90%.......................100%
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Welcome to Gradle 9.4.1!
+
+Here are the highlights of this release:
+ - Java 26 support
+ - Non-class-based JVM tests
+ - Enhanced console progress bar
+
+For more details see https://docs.gradle.org/9.4.1/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :models-api:compileJava
+> Task :backend-java:compileJava
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes
+> Task :models-api:jar
+> Task :models-runtime:compileJava
+> Task :models-router:compileJava
+> Task :models-bench:compileJava
+> Task :models-bench:processResources
+> Task :models-bench:classes
+> Task :models-router:processResources
+> Task :models-router:classes
+> Task :models-router:jar
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes
+> Task :models-runtime:jar
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 8:48:32 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 8:48:32 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+loaded qwen3_8b_q4_k_m in 357.6 ms
+home                     prompt=370 tools=[set_lights, set_thermostat, lock_door]
+home                     PASS 108999 ms selection=true schema=true arguments=4/4
+robot                    prompt=349 tools=[move, rotate, gripper]
+robot                    PASS  98970 ms selection=true schema=true arguments=5/5
+device                   prompt=306 tools=[open_website, set_theme, speak]
+device                   PASS  84669 ms selection=true schema=true arguments=3/3
+gallery                  prompt=309 tools=[create_album, move_photos, delete_photos]
+gallery                  PASS  80486 ms selection=true schema=true arguments=3/3
+email                    prompt=207 tools=[send_email]
+email                    PASS  64261 ms selection=true schema=true arguments=2/2
+currency                 prompt=213 tools=[convert_currency]
+currency                 PASS  48044 ms selection=true schema=true arguments=3/3
+document                 prompt=363 tools=[record_booking]
+document                 PASS 114275 ms selection=true schema=true arguments=4/4
+sentiment                prompt=196 tools=[classify_sentiment]
+sentiment                PASS  39862 ms selection=true schema=true arguments=1/1
+crowded                  prompt=813 tools=[set_lights, set_thermostat, lock_door, play_music, set_timer, send_message, create_note, start_vacuum, water_plants, open_blinds, preheat_oven, charge_car]
+crowded                  PASS 207915 ms selection=true schema=true arguments=2/2
+repeat                   prompt=174 tools=[add_to_list]
+repeat                   PASS  48484 ms selection=true schema=true arguments=4/4
+array                    prompt=171 tools=[add_items]
+array                    PASS  36539 ms selection=true schema=true arguments=1/1
+flight                   prompt=222 tools=[search_flights]
+flight                   PASS  64114 ms selection=true schema=true arguments=4/4
+refuse                   prompt=339 tools=[move, rotate, gripper]
+refuse                   PASS  96339 ms selection=true schema=true arguments=0/0
+spring-weather-zipcode   prompt=179 tools=[get-weather-for-zipcode]
+spring-weather-zipcode   PASS  37664 ms selection=true schema=true arguments=1/1
+tool-result-follow-up    PASS  28485 ms conversational=true grounded=true repeated-call=false
+PASS selection=1.000 schema=1.000 arguments=1.000 refusal=1.000 follow-up=true report=/opt/models/benchmark-results/2026-09-14-qwen3-8b-qualification/qwen3-8b-v2-full.json
+
+BUILD SUCCESSFUL in 20m 40s
+12 actionable tasks: 12 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
