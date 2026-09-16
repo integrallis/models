@@ -851,3 +851,11 @@ The runtime tracks the reference within a few points on both finished suites, so
 the adapter's: it sits at the gate on single-document SQuAD and well under it once a query
 carries several documents or turns, failing on the unanswerable side every time. These are the
 bars Track B's adapter has to clear on the same reference path before any Java run.
+
+### 2026-09-16T21:25Z — MS MARCO specialist arm, Rust FFM (host 1, window v2, Models fcd38d3)
+
+Measured: 200 cases, structured 1.0, balanced **0.700**, all 200 physically shared
+(`host-evidence/window-v2-fcd38d3/window-msmarco-v2.1-validation-specialist-rust-ffm.json`).
+The PEFT reference read of 0.720 two hours earlier predicted this within two points. Under
+the pre-registered rule the IBM adapter fails the second suite on the runtime it ships with;
+the base arm and the pure-Java arms complete for the record. Track B continues.
