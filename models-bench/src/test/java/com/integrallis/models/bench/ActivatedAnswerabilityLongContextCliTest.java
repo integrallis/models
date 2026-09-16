@@ -23,6 +23,7 @@ import com.integrallis.models.bench.ActivatedAnswerabilityLongContextCli.Case;
 import com.integrallis.models.bench.ActivatedAnswerabilityLongContextCli.CaseResult;
 import com.integrallis.models.bench.ActivatedAnswerabilityLongContextCli.Suite;
 import com.integrallis.models.bench.ActivatedAnswerabilityLongContextCli.Summary;
+import com.integrallis.models.runtime.chat.GraniteDocumentsPrompt;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;

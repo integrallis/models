@@ -67,7 +67,7 @@ log "gguf verified $GGUF_SHA"
 export RAG_MODELS_BACKEND=rust-ffm
 log "start controlled RAG qualification"
 ( cd "$MODELS" && bash scripts/run-controlled-rag-qualification.sh \
-    "$STORE/granite-4.1-3b-Q4_K_M.gguf" ibm_granite_granite_4_1_3b_gguf_q4_k_m general granite "$EVIDENCE/rag" ) \
+    "$STORE/granite-4.1-3b-Q4_K_M.gguf" ibm_granite_granite_4_1_3b_gguf_q4_k_m general "${RAG_PROMPT_TEMPLATE:-granite-documents}" "$EVIDENCE/rag" ) \
   > "$EVIDENCE/rag-harness.log" 2>&1 || log "NONZERO exit from the RAG harness"
 log "done controlled RAG qualification: $(tail -1 "$EVIDENCE/rag-harness.log")"
 ls "$EVIDENCE/rag" 2>/dev/null | tee -a "$EVIDENCE/host-run.log"

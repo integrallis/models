@@ -29,6 +29,26 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 class RagPromptRendererTest {
+  private static final String GRANITE_DOCUMENTS_ORACLE =
+      "<|start_of_role|>system<|end_of_role|>You answer questions using only the suppli"
+          + "ed context.\nRules:\n- If the context does not contain the answer, reply exactly"
+          + " INSUFFICIENT_CONTEXT.\n- Otherwise answer in one short sentence.\n- Copy each s"
+          + "upporting source ID exactly from the square brackets at the start of its CONTEXT"
+          + " entry, and put those citations at the end of the sentence.\n- Only IDs present "
+          + "in CONTEXT are valid citations; do not invent or substitute one.\n- Do not use p"
+          + "rior knowledge.\n\nYou are a helpful assistant with access to the following docu"
+          + "ments. You may use one or more documents to assist with the user query.\n\nYou a"
+          + "re given a list of documents within <documents></documents> XML tags:\n<document"
+          + "s>\n{\"doc_id\": 1, \"text\": \"[claims-auto-glass] Auto glass claims\\nNorthsta"
+          + "r Mutual auto glass claims must be reported through the Aurora portal within 30 "
+          + "calendar days. Windshield repair has a 75 dollar deductible. A police report is "
+          + "not required.\"}\n</documents>\n\nWrite the response to the user's input by stri"
+          + "ctly aligning with the facts in the provided documents. If the information neede"
+          + "d to answer the question is not available in the documents, inform the user that"
+          + " the question cannot be answered based on the available data.<|end_of_text|>\n<|"
+          + "start_of_role|>user<|end_of_role|>How long do I have to report an auto glass cla"
+          + "im and what is the deductible?<|end_of_text|>\n<|start_of_role|>assistant<|end_o"
+          + "f_role|>";
 
   @Test
   @Tag("integration")
@@ -357,5 +377,36 @@ class RagPromptRendererTest {
             "CONTROL:<|start_of_role|>user<|end_of_role|>",
             "TEXT:hi",
             "CONTROL:<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>");
+  }
+
+  /**
+   * Expected bytes were rendered by Transformers 4.57.1 through the Granite 4.1 3B tokenizer's
+   * chat_template.jinja (revision c0650403e44e78ec0262dab1c90914c65b196c4e) with the harness
+   * instructions as the system message, the evidence as {@code documents}, and the bare question.
+   */
+  @Test
+  void graniteDocumentsProfilePlacesEvidenceInTheDocumentsBlockByteExactWithTheOracle() {
+    RagDocument document =
+        new RagDocument(
+            "claims-auto-glass",
+            "Auto glass claims",
+            "Northstar Mutual auto glass claims must be reported through the Aurora portal within"
+                + " 30 calendar days. Windshield repair has a 75 dollar deductible. A police"
+                + " report is not required.");
+
+    ModelPrompt prompt =
+        RagPromptRenderer.renderPrompt(
+            "How long do I have to report an auto glass claim and what is the deductible?",
+            List.of(new RetrievedDocument(document, 4.44f, 1)),
+            RagPromptTemplate.parse("granite-documents"));
+
+    assertThat(prompt.text()).isEqualTo(GRANITE_DOCUMENTS_ORACLE);
+    assertThat(
+            prompt.segments().stream()
+                .filter(segment -> segment.kind() == ModelPrompt.SegmentKind.CONTROL)
+                .map(ModelPrompt.Segment::text))
+        .as("documents markers are single special tokens and document text never is")
+        .contains("<documents>", "</documents>")
+        .doesNotContain("[claims-auto-glass]");
   }
 }

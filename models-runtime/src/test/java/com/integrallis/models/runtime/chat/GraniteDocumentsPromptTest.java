@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.bench;
+package com.integrallis.models.runtime.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,6 +65,19 @@ class GraniteDocumentsPromptTest {
 
     assertThat(prompt.segments().get(1).text())
         .isEqualTo("Do X\n\n" + GraniteDocumentsPrompt.INTRO);
+  }
+
+  @Test
+  void jsonStringEscapesLikePythonJsonDumpsWithoutAsciiEscaping() {
+    assertThat(GraniteDocumentsPrompt.jsonString("plain")).isEqualTo("\"plain\"");
+    assertThat(GraniteDocumentsPrompt.jsonString("a \"q\" b\\c"))
+        .isEqualTo("\"a \\\"q\\\" b\\\\c\"");
+    assertThat(GraniteDocumentsPrompt.jsonString("l1\nl2\tt\rr\bb\ff\u0001x"))
+        .isEqualTo("\"l1\\nl2\\tt\\rr\\bb\\ff\\u0001x\"");
+    assertThat(
+            GraniteDocumentsPrompt.jsonString("caf\u00e9 \u2014 \u65e5\u672c / <tag> & 'q' \u007f"))
+        .as("non-ASCII, slash, angle brackets, ampersand, apostrophe and DEL pass through")
+        .isEqualTo("\"caf\u00e9 \u2014 \u65e5\u672c / <tag> & 'q' \u007f\"");
   }
 
   @Test

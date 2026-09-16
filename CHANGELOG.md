@@ -8,6 +8,7 @@ All notable changes to models are documented here.
 
 ### Added
 - `granite` RAG prompt template in `models-rag-bench` so Granite 4.x artifacts can run the controlled RAG qualification harness with the byte-exact Transformers envelope.
+- `granite-documents` RAG prompt template: evidence in the Granite 4.x `<documents>` system block, bare question as the user turn, byte-exact with the Transformers chat template; `GraniteDocumentsPrompt` moved to `models-runtime` (public, Jackson-free, Jackson-parity tested) so both bench modules share one renderer.
 
 - Added the Granite decoder graph (embedding, attention, residual, and logit scalars) and the
   activated-adapter runtime: a fail-closed Safetensors activated-LoRA loader, exact activation

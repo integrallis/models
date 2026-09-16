@@ -23,6 +23,7 @@ import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.ActivatedToolCallingModel;
 import com.integrallis.models.runtime.ActivatedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
+import com.integrallis.models.runtime.chat.GraniteDocumentsPrompt;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

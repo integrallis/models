@@ -70,6 +70,18 @@ Granite 4.x uses `--prompt-template granite`: single-token role markers
 through untouched, and every turn closed by `<|end_of_text|>` plus a newline,
 byte-identical to the model's Transformers chat template.
 
+`--prompt-template granite-documents` keeps the same role markers but places
+the retrieved evidence in the Granite `<documents>` block of the system turn
+(after the harness instructions, each document prefixed by its `[id] title`
+line) and sends the bare question as the user turn. This is the input format
+Granite 4.x is trained on for grounded answering. Measured 2026-09-16 on
+Granite 4.1 3B Q4_K_M: under `granite` both llama.cpp b10012 and the Java
+runtime abstain with INSUFFICIENT_CONTEXT on the `auto-glass-deadline` case
+whose single retrieved document contains the answer; under
+`granite-documents` the same engines answer with both facts and the citation.
+Framework adapters (LangChain4j, Spring AI) cannot express the documents block
+and keep the generic system/user envelope.
+
 Gemma 4 uses a different envelope: `--prompt-template gemma4` emits role-aware
 `<|turn>` messages and opens the model's `thought` channel. Do not substitute
 the older `gemma` template; the two model-facing byte sequences are not

@@ -27,6 +27,7 @@ import com.integrallis.models.runtime.ActivatedToolCallingModel;
 import com.integrallis.models.runtime.ActivatedToolTurn;
 import com.integrallis.models.runtime.GenerationMetrics;
 import com.integrallis.models.runtime.TokenConstraint;
+import com.integrallis.models.runtime.chat.GraniteDocumentsPrompt;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;

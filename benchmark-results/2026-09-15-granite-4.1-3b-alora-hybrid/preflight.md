@@ -237,3 +237,23 @@ template but the RAG bench had never rendered it. Added `GRANITE` (single-token 
 passed through, `<|end_of_text|>\n` after every turn, same bytes as `ChatTemplate.GRANITE`) with a
 renderer test. Attempt 2 runs at the commit that carries it; the base entry's `backendVersion` pins
 that commit, not 4ce4fd1.
+
+**Base run, attempt 2 (2026-09-16T04:21Z, Models 5a0e376, `--prompt-template granite`):** the
+library-default correctness smoke FAILED on quality: 9/9 attempts generated, 8/9 correct,
+abstention accuracy 1.0. The miss is `auto-glass-deadline`: retrieval recall 1.0 (the single
+retrieved document contains both required facts) and the model replied `INSUFFICIENT_CONTEXT`. A
+llama.cpp b10012 control on the identical raw prompts (scratch run, same host, not evidence)
+reproduced the abstention on the same case and matched 8/9 elsewhere, so this is the model's
+behaviour under the generic CONTEXT/QUESTION/ANSWER envelope, not a Java-path defect. Probe on the
+failing case through llama.cpp with prompts rendered by the Transformers oracle: generic envelope
+→ `INSUFFICIENT_CONTEXT`; Granite documents envelope with the harness instructions leading the
+system turn → `30 calendar days, 75 dollars [claims-auto-glass]`; documents envelope without the
+instructions → correct facts, no citation. Decision, made before the next run: add
+`granite-documents` as a declared template (evidence in the trained `<documents>` block, bare
+question as the user turn, instructions unchanged), pin its bytes to the oracle in a unit test,
+and run attempt 3 under it. The generic-envelope failure stays on record; the ModelJars base entry
+names `promptTemplate: granite-documents`. Also measured in attempt 2: Rust arm default-smoke
+decode 5.7 tok/s and 38 tok/s prefill on 16 threads versus 54 tok/s decode on the llama.cpp
+control; the performance phase enables `models.native.quantizedDecode` itself, but the base may
+still miss the 0.8 decode-throughput ratio. That is a measurement to take, not a reason to skip it.
+
