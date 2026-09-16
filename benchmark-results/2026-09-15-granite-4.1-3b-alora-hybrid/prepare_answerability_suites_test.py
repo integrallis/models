@@ -119,5 +119,39 @@ class PrepareAnswerabilitySuitesTest(unittest.TestCase):
             prepare(self.mtrag, self.squad, "a" * 40)
 
 
+
+class MsMarcoSuiteTest(unittest.TestCase):
+    def test_msmarco_rows_become_single_turn_cases_with_every_passage(self):
+        try:
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+        except ImportError:  # pragma: no cover - the MS MARCO source needs pyarrow
+            self.skipTest("pyarrow is not installed")
+        from prepare_answerability_suites import msmarco_cases
+
+        rows = [
+            {"query_id": 1, "query": "answerable?", "answers": ["yes"],
+             "passages": {"passage_text": ["p1", "p2"], "is_selected": [1, 0], "url": ["u", "u"]}},
+            {"query_id": 2, "query": "no answer", "answers": ["No Answer Present."],
+             "passages": {"passage_text": ["p1"], "is_selected": [0], "url": ["u"]}},
+            {"query_id": 3, "query": "mixed", "answers": ["No Answer Present.", "x"],
+             "passages": {"passage_text": ["p1"], "is_selected": [0], "url": ["u"]}},
+            {"query_id": 4, "query": "no passages", "answers": ["x"],
+             "passages": {"passage_text": [], "is_selected": [], "url": []}},
+            {"query_id": 5, "query": "no answers", "answers": [],
+             "passages": {"passage_text": ["p1"], "is_selected": [0], "url": ["u"]}},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "validation.parquet"
+            pq.write_table(pa.Table.from_pylist(rows), path)
+            cases = msmarco_cases(path)
+        self.assertEqual([c["id"] for c in cases], ["1", "2"])
+        self.assertEqual(cases[0]["label"], "answerable")
+        self.assertEqual(cases[1]["label"], "unanswerable")
+        self.assertEqual(cases[0]["messages"], [{"role": "user", "text": "answerable?"}])
+        self.assertEqual(
+            cases[0]["documents"], [{"doc_id": 1, "text": "p1"}, {"doc_id": 2, "text": "p2"}]
+        )
+
 if __name__ == "__main__":
     unittest.main()
