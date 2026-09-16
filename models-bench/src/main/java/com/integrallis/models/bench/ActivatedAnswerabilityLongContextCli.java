@@ -238,7 +238,10 @@ final class ActivatedAnswerabilityLongContextCli {
               List.copyOf(results),
               summary,
               summary.qualified());
-      Files.createDirectories(configuration.report().toAbsolutePath().getParent());
+      Path parent = configuration.report().toAbsolutePath().getParent();
+      if (parent != null) {
+        Files.createDirectories(parent);
+      }
       new ObjectMapper()
           .writerWithDefaultPrettyPrinter()
           .writeValue(configuration.report().toFile(), report);
@@ -419,9 +422,7 @@ final class ActivatedAnswerabilityLongContextCli {
 
   private static InputStream resource() throws IOException {
     InputStream input =
-        ActivatedAnswerabilityLongContextCli.class
-            .getClassLoader()
-            .getResourceAsStream(SUITE_RESOURCE);
+        ActivatedAnswerabilityLongContextCli.class.getResourceAsStream("/" + SUITE_RESOURCE);
     if (input == null) {
       throw new IOException("missing answerability long-context suite: " + SUITE_RESOURCE);
     }
