@@ -792,3 +792,9 @@ deciding arm; the base arms and the MT-RAG arms are still running. Reports in
 strategies at every tier; memory accounting complete; peak RSS 6.71 GB. Report
 `host-evidence/gates-fcd38d3/gate6-crossover-pure-java.json` (sha256 7e126f29…). Rust arm
 started 14:54Z.
+
+**Gate 6 crossover, Rust, fcd38d3 (instance 3, 2026-09-16T15:53Z): PASS** — crossover at 256
+tokens; 4K improvement 0.500; token-exact across strategies at every tier; peak RSS 10.5 GB
+(the tuned 16-worker pool). Report `host-evidence/gates-fcd38d3/gate6-crossover-rust-ffm.json`.
+The instance-3 chain is complete (base attempt 10, gate 5, gate 6 on both arms); the instance
+is terminated.
