@@ -768,3 +768,12 @@ pool; the Rust arm at fcd38d3 ran on a pool with this rare race, whose symptom w
 malformed output rather than a borderline flip, and no malformed output appears in any Rust
 report. The Rust identity screen is re-run at the release commit before the Rust arm is
 published; the pure-Java window stands.
+
+**Identity screen at fcd38d3 (host 1, 2026-09-16T12:36–14:24Z):** specialist arms identical
+between pure Java and Rust on all 10 MT-RAG and all 10 SQuAD cases (the one-case MT-RAG flip
+seen at 7a3f3e7 and f6252cc is gone with the adapter fix); the base arms diverge on 1/10 MT-RAG
+and 2/10 SQuAD cases, all of them free-text answers the unadapted base writes instead of the
+one-word label (borderline generations, no adapter involved). The summary therefore reads
+IDENTITY10 FAIL by the all-four-arms rule, and the window still runs on both arms; the specialist
+identity, which is what the component gate's `kernelIdentity` requires, holds 20/20. Reports and
+hashes in `host-evidence/identity-fcd38d3/`. The Rust window started on host 1 at 14:24Z.
