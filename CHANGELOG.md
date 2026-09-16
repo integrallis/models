@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Mapped the `dbrx` GGUF pre-tokenizer to the Llama-3 split pattern with ordinary merge ranking.
+  Granite 4.x GGUFs declare it, and an unmapped name previously skipped pre-tokenization entirely,
+  so digits merged as `18|50` instead of `185|0` and punctuation merged across spaces. Every BPE
+  pre-tokenizer pattern now also treats U+00A0 as whitespace, as the published Rust regexes and
+  llama.cpp do. Measured on the pinned Granite 4.1 3B Q4_K_M artifact through the Granite
+  decoder on the activated-adapter branch: 620 rendered documents prompts became byte- and
+  token-identical to Transformers 4.57.1, and the greedy continuation after a digit-heavy prompt
+  matches llama.cpp b9960. The Granite decoder itself is not yet on this branch, so no released
+  artifact declares `dbrx`; the whitespace correction applies to every BPE model here.
+
 ### Corrected
 
 - Withdrew the projected Qwen router's hybrid qualification. Its measured latency and correctness
