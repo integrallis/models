@@ -77,6 +77,24 @@ class RotaryTableTest {
   }
 
   @Test
+  void inverseRestoresStandardAndNeoxVectors() {
+    RotaryTable table = new RotaryTable(4, 10_000.0f, 0.25f);
+    float[] standard = {99.0f, 1.0f, 2.0f, 3.0f, 4.0f, 98.0f};
+    float[] originalStandard = standard.clone();
+    float[] neox = {97.0f, 5.0f, 6.0f, 7.0f, 8.0f, 96.0f};
+    float[] originalNeox = neox.clone();
+
+    table.prepare(9);
+    table.apply(standard, 1, false);
+    table.apply(neox, 1, true);
+    table.applyInverse(standard, 1, false);
+    table.applyInverse(neox, 1, true);
+
+    assertThat(standard).containsExactly(originalStandard, offset(1.0e-5f));
+    assertThat(neox).containsExactly(originalNeox, offset(1.0e-5f));
+  }
+
+  @Test
   void ggufFrequencyFactorsPreserveGemma4ProportionalRopeLayout() {
     RotaryTable table =
         new RotaryTable(8, 1_000_000.0f, 1.0f, new float[] {1.0f, 1.0e30f, 1.0e30f, 1.0e30f});

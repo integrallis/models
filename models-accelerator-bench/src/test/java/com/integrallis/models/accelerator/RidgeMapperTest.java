@@ -17,6 +17,7 @@ package com.integrallis.models.accelerator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import java.util.SplittableRandom;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,49 @@ class RidgeMapperTest {
     float[][] expected = transform(heldOut, transform);
 
     assertThat(RidgeMapper.relativeL2(expected, mapper.predict(heldOut))).isLessThan(1.0e-6);
+  }
+
+  @Test
+  void recoversHeldOutAffineTransformationAfterCentering() {
+    double[][] transform = {
+      {1.5, -0.25},
+      {-0.5, 2.0},
+      {0.25, 0.5}
+    };
+    double[] bias = {17.0, -31.0};
+    float[][] training = randomSamples(128, 3, 113L);
+    float[][] targets = transform(training, transform, bias);
+    RidgeMapper mapper = RidgeMapper.fit(training, targets, 1.0e-8);
+
+    float[][] heldOut = randomSamples(32, 3, 127L);
+    float[][] expected = transform(heldOut, transform, bias);
+
+    assertThat(RidgeMapper.relativeL2(expected, mapper.predict(heldOut))).isLessThan(1.0e-6);
+  }
+
+  @Test
+  void weightedFitCanExcludeAnIrrelevantOutlier() {
+    float[][] inputs = {{-2.0f}, {-1.0f}, {0.0f}, {1.0f}, {2.0f}};
+    float[][] targets = {{-3.0f}, {-1.0f}, {1.0f}, {3.0f}, {100.0f}};
+
+    RidgeMapper mapper =
+        RidgeMapper.fit(inputs, targets, new double[] {1.0, 1.0, 1.0, 1.0, 0.0}, 1.0e-8);
+
+    assertThat(mapper.predict(new float[][] {{3.0f}})[0][0]).isCloseTo(7.0f, within(1.0e-5f));
+  }
+
+  @Test
+  void weightedFitRejectsInvalidWeights() {
+    float[][] inputs = {{1.0f}, {2.0f}};
+    float[][] targets = {{2.0f}, {4.0f}};
+
+    assertThatThrownBy(() -> RidgeMapper.fit(inputs, targets, new double[] {1.0}, 0.1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("weight count");
+    assertThatThrownBy(
+            () -> RidgeMapper.fit(inputs, targets, new double[] {1.0, -1.0}, 0.1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("nonnegative");
   }
 
   @Test
@@ -63,10 +107,15 @@ class RidgeMapperTest {
   }
 
   private static float[][] transform(float[][] inputs, double[][] transform) {
+    return transform(inputs, transform, new double[transform[0].length]);
+  }
+
+  private static float[][] transform(
+      float[][] inputs, double[][] transform, double[] bias) {
     float[][] outputs = new float[inputs.length][transform[0].length];
     for (int sample = 0; sample < inputs.length; sample++) {
       for (int output = 0; output < outputs[sample].length; output++) {
-        double value = 0.0;
+        double value = bias[output];
         for (int input = 0; input < inputs[sample].length; input++) {
           value += inputs[sample][input] * transform[input][output];
         }

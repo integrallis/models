@@ -38,7 +38,8 @@ tasks.named("spotbugsTest") {
 }
 
 application {
-    mainClass = "com.integrallis.models.accelerator.Q8ProjectionExperiment"
+    mainClass = providers.gradleProperty("experimentMain")
+        .getOrElse("com.integrallis.models.accelerator.Q8ProjectionExperiment")
 }
 
 dependencies {

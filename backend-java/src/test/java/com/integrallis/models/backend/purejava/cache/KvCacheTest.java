@@ -27,6 +27,21 @@ import org.junit.jupiter.api.Test;
 class KvCacheTest {
 
   @Test
+  void validatesThatEveryLayerContainsAnImportedPrefix() {
+    KvCache cache = new KvCache(2, 4, 2, 2);
+    for (int layer = 0; layer < 2; layer++) {
+      for (int position = 0; position < 2; position++) {
+        cache.store(layer, position, new float[] {1, 2}, new float[] {3, 4});
+      }
+    }
+
+    assertThat(cache.hasCompletePrefix(2)).isTrue();
+    assertThat(cache.hasCompletePrefix(3)).isFalse();
+    cache.discardFrom(1);
+    assertThat(cache.hasCompletePrefix(2)).isFalse();
+  }
+
+  @Test
   void doesNotExposeEqualWidthCompatibilityApi() {
     assertThatThrownBy(() -> KvCache.class.getConstructor(int.class, int.class, int.class))
         .isInstanceOf(NoSuchMethodException.class);

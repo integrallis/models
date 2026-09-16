@@ -215,6 +215,28 @@ public final class RotaryTable {
     }
   }
 
+  /** Removes the prepared rotary transform from one head at the supplied vector offset. */
+  public void applyInverse(float[] vector, int offset, boolean neox) {
+    if (preparedPosition < 0) {
+      throw new IllegalStateException("rotary factors have not been prepared");
+    }
+    if (neox) {
+      for (int pair = 0; pair < cosine.length; pair++) {
+        rotateInverse(
+            vector,
+            offset + pair,
+            offset + cosine.length + pair,
+            cosine[pair],
+            sine[pair]);
+      }
+    } else {
+      for (int pair = 0; pair < cosine.length; pair++) {
+        int first = offset + pair * 2;
+        rotateInverse(vector, first, first + 1, cosine[pair], sine[pair]);
+      }
+    }
+  }
+
   /** Prepares factors for consecutive positions in a prefill batch. */
   public void prepareBatch(int startPosition, int batchSize) {
     if (startPosition < 0) {
@@ -299,6 +321,15 @@ public final class RotaryTable {
       cosineDestination[destinationOffset + pair] = attentionFactor * (float) Math.cos(angle);
       sineDestination[destinationOffset + pair] = attentionFactor * (float) Math.sin(angle);
     }
+  }
+
+  private static void rotateInverse(
+      float[] vector, int first, int second, float cos, float sin) {
+    float firstValue = vector[first];
+    float secondValue = vector[second];
+    float scaleSquared = cos * cos + sin * sin;
+    vector[first] = (firstValue * cos + secondValue * sin) / scaleSquared;
+    vector[second] = (-firstValue * sin + secondValue * cos) / scaleSquared;
   }
 
   private static void finitePositive(String name, float value) {

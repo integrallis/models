@@ -1,0 +1,108 @@
+{
+  "mapper": {
+    "path": "mapper-cachebridge-v3-head-local-k8-n500/mapper.safetensors",
+    "sha256": "cab1cc1e71025f0a4586bfe82e4d63833af1f51d3deaa05d2b42db24558ae3bb"
+  },
+  "qualified": false,
+  "referenceTasks": {
+    "commit": "fdc11d31f005d7d4cec949b72e9032f2093dd6b8",
+    "path": "kvbridge-tasks-fdc11d31.py",
+    "repository": "https://github.com/spotta85/kvbridge.git",
+    "sha256": "9ec47dc05599594fdd10d1e6430d64df841326d704be4b4bb833ed002acf0a0c"
+  },
+  "results": [
+    {
+      "depths": 8,
+      "elapsedSeconds": 38.97133946418762,
+      "gate": {
+        "nativeCorrect": 8,
+        "pass": false,
+        "retainedNativeCorrect": 2,
+        "retention": 0.25
+      },
+      "records": [
+        {
+          "contextTokens": 4071,
+          "depth": 0.0,
+          "gold": 1,
+          "mappedWinner": 1,
+          "nativeWinner": 1,
+          "sample": 0
+        },
+        {
+          "contextTokens": 4069,
+          "depth": 0.143,
+          "gold": 0,
+          "mappedWinner": 1,
+          "nativeWinner": 0,
+          "sample": 1
+        },
+        {
+          "contextTokens": 4082,
+          "depth": 0.286,
+          "gold": 2,
+          "mappedWinner": 1,
+          "nativeWinner": 2,
+          "sample": 2
+        },
+        {
+          "contextTokens": 4079,
+          "depth": 0.429,
+          "gold": 0,
+          "mappedWinner": 3,
+          "nativeWinner": 0,
+          "sample": 3
+        },
+        {
+          "contextTokens": 4093,
+          "depth": 0.571,
+          "gold": 1,
+          "mappedWinner": 2,
+          "nativeWinner": 1,
+          "sample": 4
+        },
+        {
+          "contextTokens": 4068,
+          "depth": 0.714,
+          "gold": 2,
+          "mappedWinner": 0,
+          "nativeWinner": 2,
+          "sample": 5
+        },
+        {
+          "contextTokens": 4105,
+          "depth": 0.857,
+          "gold": 3,
+          "mappedWinner": 0,
+          "nativeWinner": 3,
+          "sample": 6
+        },
+        {
+          "contextTokens": 4036,
+          "depth": 1.0,
+          "gold": 2,
+          "mappedWinner": 2,
+          "nativeWinner": 2,
+          "sample": 7
+        }
+      ],
+      "requestedContextTokens": 4096,
+      "samples": 8,
+      "task": "kvr"
+    }
+  ],
+  "schemaVersion": 1,
+  "source": {
+    "model": "Qwen/Qwen3-0.6B",
+    "revision": "c1899de289a04d12100db370d81485cdf75e47ca"
+  },
+  "strategy": {
+    "mappingTokenChunk": 128,
+    "nativeTargetSinkTokens": 4,
+    "recomputedTargetTailTokens": 512
+  },
+  "target": {
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+  }
+}

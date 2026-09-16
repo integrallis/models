@@ -1503,6 +1503,25 @@ public final class LlamaForwardPass {
     return nextPosition;
   }
 
+  /**
+   * Advances the sequence cursor over a completely populated externally produced prefix.
+   *
+   * <p>Package-private by design: cache import must remain behind a compatibility and quality gate
+   * until a transfer implementation is qualified.
+   */
+  void resumeFromImportedPrefix(int prefixLength) {
+    if (nextPosition != 0) {
+      throw new IllegalStateException(
+          "an imported prefix can only initialize a fresh forward pass; current position="
+              + nextPosition);
+    }
+    if (!cache.hasCompletePrefix(prefixLength)) {
+      throw new IllegalArgumentException(
+          "imported KV cache does not contain a complete " + prefixLength + "-token prefix");
+    }
+    nextPosition = prefixLength;
+  }
+
   /** Discards speculative cache entries at and after {@code checkpoint}. */
   public void rewind(int checkpoint) {
     if (checkpoint < 0 || checkpoint > nextPosition) {

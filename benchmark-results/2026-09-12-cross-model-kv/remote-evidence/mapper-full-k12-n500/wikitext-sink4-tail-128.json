@@ -1,0 +1,79 @@
+{
+  "gates": {
+    "wikitextPplRatio": {
+      "maximum": 1.1,
+      "pass": false,
+      "value": 1.2588203222606482
+    }
+  },
+  "mapper": {
+    "path": "mapper-full-k12-n500/mapper.safetensors",
+    "sha256": "37a231af96485682a02f866298777e420addb04ab8e90eee398dd5e673c6965b"
+  },
+  "method": "paired Hugging Face target continuation scoring after mapped versus native prefix",
+  "nativeTargetSinkTokens": 4,
+  "qualified": false,
+  "recomputedTargetTailTokens": 128,
+  "schemaVersion": 1,
+  "source": {
+    "model": "Qwen/Qwen3-0.6B",
+    "revision": "c1899de289a04d12100db370d81485cdf75e47ca"
+  },
+  "target": {
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+  },
+  "wikitext": {
+    "count": 10,
+    "dataset": {
+      "configuration": "wikitext-2-raw-v1",
+      "id": "Salesforce/wikitext",
+      "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "split": "test"
+    },
+    "elapsedSeconds": 3.1325411796569824,
+    "gate": {
+      "maximum": 1.1,
+      "pass": false,
+      "value": 1.2588203222606482
+    },
+    "mapped": {
+      "meanNll": 2.5570321798324587,
+      "ppl": 12.897483048772601,
+      "totalNll": 818.2502975463867
+    },
+    "mappedNll": [
+      74.24462890625,
+      98.61795043945312,
+      67.15864562988281,
+      104.15052795410156,
+      61.947998046875,
+      112.71345520019531,
+      93.89501953125,
+      54.58465576171875,
+      86.53929901123047,
+      64.39811706542969
+    ],
+    "native": {
+      "meanNll": 2.3268571496009827,
+      "ppl": 10.245690207487833,
+      "totalNll": 744.5942878723145
+    },
+    "nativeNll": [
+      39.889076232910156,
+      95.36457824707031,
+      68.66018676757812,
+      94.78861999511719,
+      51.67948913574219,
+      101.92044830322266,
+      85.77206420898438,
+      55.147274017333984,
+      87.48976135253906,
+      63.882789611816406
+    ],
+    "pplRatio": 1.2588203222606482,
+    "prefixTokens": 1024,
+    "tailTokensPerChunk": 32,
+    "tokens": 320
+  }
+}

@@ -193,6 +193,25 @@ public final class KvCache {
     return numLayers;
   }
 
+  /** Returns whether every layer contains every position in {@code [0, prefixLength)}. */
+  public boolean hasCompletePrefix(int prefixLength) {
+    if (prefixLength < 0 || prefixLength > maxSeqLen) {
+      throw new IllegalArgumentException(
+          "prefixLength must be between 0 and " + maxSeqLen + ": " + prefixLength);
+    }
+    if (prefixLength > allocatedSequenceCapacity) {
+      return false;
+    }
+    for (int layer = 0; layer < numLayers; layer++) {
+      for (int position = 0; position < prefixLength; position++) {
+        if (!populated[slotIndex(layer, position)]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   /** Ensures physical storage exists for the requested number of sequence positions. */
   public void reserveSequenceCapacity(int requiredSequenceCapacity) {
     if (requiredSequenceCapacity < 0 || requiredSequenceCapacity > maxSeqLen) {

@@ -20,30 +20,42 @@ import java.util.Objects;
 /** Small Java-only ridge-regression utility for unpublished cache-transfer experiments. */
 public final class RidgeMapper {
   private final double[][] coefficients;
+  private final double[] bias;
   private final int inputDimensions;
   private final int outputDimensions;
 
-  private RidgeMapper(double[][] coefficients) {
+  private RidgeMapper(double[][] coefficients, double[] bias) {
     this.coefficients = coefficients;
+    this.bias = bias;
     this.inputDimensions = coefficients.length;
     this.outputDimensions = coefficients[0].length;
   }
 
-  /** Fits {@code Y = XW} using {@code W = (X'X + lambda I)^-1 X'Y}. */
+  /** Fits {@code Y = XW + b} after centering X and Y. */
   public static RidgeMapper fit(float[][] inputs, float[][] targets, double regularization) {
+    return fit(inputs, targets, null, regularization);
+  }
+
+  /** Fits weighted {@code Y = XW + b} after rescaling weights to mean one and centering. */
+  public static RidgeMapper fit(
+      float[][] inputs, float[][] targets, double[] weights, double regularization) {
     Dimensions dimensions = validate(inputs, targets, regularization);
+    double[] normalizedWeights = normalizedWeights(weights, inputs.length);
+    double[] inputMeans = means(inputs, dimensions.inputs(), normalizedWeights);
+    double[] targetMeans = means(targets, dimensions.outputs(), normalizedWeights);
     double[][] gram = new double[dimensions.inputs()][dimensions.inputs()];
     double[][] cross = new double[dimensions.inputs()][dimensions.outputs()];
     for (int sample = 0; sample < inputs.length; sample++) {
       float[] input = inputs[sample];
       float[] target = targets[sample];
+      double weight = normalizedWeights[sample];
       for (int row = 0; row < dimensions.inputs(); row++) {
-        double x = input[row];
+        double x = input[row] - inputMeans[row];
         for (int column = 0; column <= row; column++) {
-          gram[row][column] += x * input[column];
+          gram[row][column] += weight * x * (input[column] - inputMeans[column]);
         }
         for (int output = 0; output < dimensions.outputs(); output++) {
-          cross[row][output] += x * target[output];
+          cross[row][output] += weight * x * (target[output] - targetMeans[output]);
         }
       }
     }
@@ -53,7 +65,14 @@ public final class RidgeMapper {
       }
       gram[row][row] += regularization;
     }
-    return new RidgeMapper(solveCholesky(gram, cross));
+    double[][] coefficients = solveCholesky(gram, cross);
+    double[] bias = targetMeans.clone();
+    for (int input = 0; input < dimensions.inputs(); input++) {
+      for (int output = 0; output < dimensions.outputs(); output++) {
+        bias[output] -= inputMeans[input] * coefficients[input][output];
+      }
+    }
+    return new RidgeMapper(coefficients, bias);
   }
 
   /** Applies the fitted mapping to one matrix of row-major samples. */
@@ -67,7 +86,7 @@ public final class RidgeMapper {
             "inputs[" + sample + "] length must be " + inputDimensions + ": " + input.length);
       }
       for (int output = 0; output < outputDimensions; output++) {
-        double value = 0.0;
+        double value = bias[output];
         for (int inputIndex = 0; inputIndex < inputDimensions; inputIndex++) {
           value += input[inputIndex] * coefficients[inputIndex][output];
         }
@@ -75,6 +94,50 @@ public final class RidgeMapper {
       }
     }
     return outputs;
+  }
+
+  private static double[] means(float[][] samples, int dimensions, double[] weights) {
+    double[] means = new double[dimensions];
+    for (int index = 0; index < samples.length; index++) {
+      float[] sample = samples[index];
+      for (int dimension = 0; dimension < dimensions; dimension++) {
+        means[dimension] += weights[index] * sample[dimension];
+      }
+    }
+    for (int dimension = 0; dimension < dimensions; dimension++) {
+      means[dimension] /= samples.length;
+    }
+    return means;
+  }
+
+  private static double[] normalizedWeights(double[] weights, int samples) {
+    if (weights == null) {
+      double[] uniform = new double[samples];
+      java.util.Arrays.fill(uniform, 1.0);
+      return uniform;
+    }
+    if (weights.length != samples) {
+      throw new IllegalArgumentException(
+          "weight count must match training samples: " + weights.length + " != " + samples);
+    }
+    double sum = 0.0;
+    for (int sample = 0; sample < weights.length; sample++) {
+      double weight = weights[sample];
+      if (!(weight >= 0.0) || !Double.isFinite(weight)) {
+        throw new IllegalArgumentException(
+            "weights must be finite and nonnegative; weights[" + sample + "]=" + weight);
+      }
+      sum += weight;
+    }
+    if (!(sum > 0.0) || !Double.isFinite(sum)) {
+      throw new IllegalArgumentException("at least one finite positive weight is required");
+    }
+    double scale = samples / sum;
+    double[] normalized = new double[samples];
+    for (int sample = 0; sample < samples; sample++) {
+      normalized[sample] = weights[sample] * scale;
+    }
+    return normalized;
   }
 
   /** Relative L2 error across two equally shaped sample matrices. */
