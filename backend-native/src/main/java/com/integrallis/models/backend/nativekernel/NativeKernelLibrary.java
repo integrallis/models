@@ -41,14 +41,16 @@ public final class NativeKernelLibrary implements AutoCloseable {
 
   /**
    * Milliseconds the native workers keep polling for the next dispatch before they park. The
-   * default (25 ms) is longer than any gap between two dispatches of one token, so the pool stays
+   * default (5 ms) is longer than any gap between two dispatches of one token, so the pool stays
    * hot for a whole generation and parks shortly after it ends; ggml's CPU backend runs the same
-   * regime. Measured 2026-09-16 on a 16-vCPU host: 4,000 spin rounds then park gave 15.6-16.6 tok/s
-   * with ~800k context switches per run, a token-sized budget 24.0-26.0 tok/s with ~180k.
+   * regime unbounded. Measured 2026-09-16: on a shared 16-vCPU host 4,000 spin rounds then park
+   * gave 15.6-16.6 tok/s with ~800k context switches per run and a token-sized budget 24.0-26.0
+   * tok/s with ~180k; on dedicated cores (c7a.4xlarge) 1 / 5 / 25 ms gave 25.8 / 25.9 / 26.1 tok/s
+   * against 25.5. Five milliseconds keeps the whole gain and a fifth of the idle tail.
    */
   public static final String POLL_MILLIS_PROPERTY = "models.native.kernels.pollMillis";
 
-  static final long DEFAULT_POLL_MILLIS = 25;
+  static final long DEFAULT_POLL_MILLIS = 5;
 
   private static final int STATUS_OK = 0;
   private static final int FORMAT_Q4_0 = 0;

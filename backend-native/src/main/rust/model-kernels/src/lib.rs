@@ -101,13 +101,17 @@ const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
 const WORKER_SPIN_ITERS: usize = 4_000;
 
-/// Default poll budget before a worker parks: 25 ms, longer than any gap between two dispatches
+/// Default poll budget before a worker parks: 5 ms, longer than any gap between two dispatches
 /// of one token (Java-side norms, RoPE, residuals, sampling are all far shorter), so the pool
-/// stays hot for the whole generation and parks a few tens of milliseconds after it ends. ggml's
-/// CPU backend polls `1024 * 128 * poll` relax rounds with `poll = 50` before sleeping, which is
-/// the same regime. `JMODELS_KERNELS_POLL_NANOS` overrides the default for experiments; the
-/// Java side sets it per context through `jmodels_kernels_context_set_poll_nanos`.
-const DEFAULT_POLL_NANOS: u64 = 25_000_000;
+/// stays hot for the whole generation and parks a few milliseconds after it ends. ggml's CPU
+/// backend polls `1024 * 128 * poll` relax rounds with `poll = 50` before sleeping, which is the
+/// same regime unbounded; the bound keeps a sporadic caller's idle tail (workers × budget per
+/// call) small. Measured on dedicated cores (c7a.4xlarge, 3 rounds): 1 / 5 / 25 ms decode
+/// 25.8 / 25.9 / 26.1 tok/s against 25.5 for the old 4,000-round spin; on a shared 16-vCPU
+/// host the old regime lost a third of decode. `JMODELS_KERNELS_POLL_NANOS` overrides the
+/// default for experiments; the Java side sets it per context through
+/// `jmodels_kernels_context_set_poll_nanos`.
+const DEFAULT_POLL_NANOS: u64 = 5_000_000;
 
 /// Rows per work-stealing chunk for matrix jobs, read once from `JMODELS_KERNELS_CHUNK_ROWS`;
 /// 0 (the default) keeps the static per-worker row ranges. ggml's CPU backend hands out 16- or
