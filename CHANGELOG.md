@@ -4,6 +4,40 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added the Granite decoder graph (embedding, attention, residual, and logit scalars) and the
+  activated-adapter runtime: a fail-closed Safetensors activated-LoRA loader, exact activation
+  boundaries at the adapter's invocation tokens, physically shared immutable KV prefixes between
+  the base and activated branches, `ActivatedToolCallingModel` with shared and recomputed prefix
+  strategies, Rust/FFM activated loaders, and Spring AI and LangChain4j tool loops over one base
+  cache lineage. The runtime is a capability; it qualifies no adapter by itself.
+- Routed single-session prompt prefill through the ragged session-batch path, so shared-prefix
+  preparation and every `TextGenerationSession` prompt batch their matrix products. Identity was
+  proven on a nano model, on the pinned Granite 4.1 3B GGUF against llama.cpp b9960, and by the
+  full backend-java suite; the activated path's per-case time fell by roughly 7x on the Rust arm.
+- Added the answerability qualification runners for an upstream RAG specialist: the frozen
+  two-dataset window runner with a Transformers prompt-byte oracle, the 4,096-token long-context
+  retention gate, a Granite documents template for the prefix-sharing crossover, the fail-closed
+  upstream adapter packager, and the ModelJars component report assembler.
+
+### Fixed
+
+- Mapped the `dbrx` GGUF pre-tokenizer to the Llama-3 split pattern with ordinary merge ranking;
+  an unmapped name previously skipped pre-tokenization entirely for Granite 4.x. Every BPE
+  pre-tokenizer pattern now treats U+00A0 as whitespace, as the published Rust regexes and
+  llama.cpp do. All 620 rendered Granite 4.1 documents prompts became byte- and token-identical
+  to Transformers 4.57.1.
+- Rendered Granite's `<documents>` and `</documents>` template markers as control tokens; they
+  are special tokens in Granite 4.1 and had been placed inside a text segment.
+
+### Experiment
+
+- Opened the Granite 4.1 3B answerability hybrid candidate: the catalog base plus IBM's upstream
+  Apache-2.0 Granite RAG Library activated adapter, sharing the base prefix by physical array
+  identity. Gates 1 and 2 passed on real weights; the identity precondition and the 310-case
+  window are running on a bounded host. No hybrid is qualified by this release.
+
 ### Corrected
 
 - Withdrew the projected Qwen router's hybrid qualification. Its measured latency and correctness
