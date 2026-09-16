@@ -47,7 +47,14 @@ public enum ChatTemplate {
   DEEPSEEK("deepseek", ToolSyntax.NONE),
   H2O("h2o", ToolSyntax.NONE),
   H2O_DIRECT("h2o-direct", ToolSyntax.NONE),
-  MINICPM5_NO_THINK("minicpm5-no-think", ToolSyntax.MINICPM5);
+  MINICPM5_NO_THINK("minicpm5-no-think", ToolSyntax.MINICPM5),
+  /**
+   * IBM Granite 4.x: {@code <|start_of_role|>role<|end_of_role|>} turns closed by {@code
+   * <|end_of_text|>}, tool schemas inside the special {@code <tools>} pair, Hermes-style {@code
+   * <tool_call>} JSON, and tool results grouped into one user turn of {@code <tool_response>}
+   * blocks. Rendered byte for byte as the published chat template renders the same request.
+   */
+  GRANITE("granite", ToolSyntax.QWEN);
 
   // Verbatim from Qwen's published chat template; the wording is part of what the model was
   // trained on, so it is reproduced exactly rather than paraphrased.
@@ -180,6 +187,7 @@ public enum ChatTemplate {
       case H2O -> renderH2o(conversation, "");
       case H2O_DIRECT -> renderH2o(conversation, "The context states that ");
       case MINICPM5_NO_THINK -> renderChatMl(conversation, "<s>", "<think>\n\n</think>\n\n");
+      case GRANITE -> renderGranite(conversation, List.of());
     };
   }
 
@@ -225,6 +233,7 @@ public enum ChatTemplate {
       case NEEDLE2 -> renderNeedle2(conversation, declared);
       case HAMMER -> renderHammer(conversation, declared);
       case MINICPM5_NO_THINK -> renderMiniCpm5WithTools(conversation, declared);
+      case GRANITE -> renderGranite(conversation, declared);
       default ->
           throw new IllegalArgumentException(
               "chat template "
@@ -841,6 +850,99 @@ public enum ChatTemplate {
    * published templates' {@code tojson} filter, while string contents and member order remain
    * unchanged.
    */
+  private static final String GRANITE_TOOLS_PREAMBLE =
+      "You are a helpful assistant with access to the following tools. You may call one or more "
+          + "tools to assist with the user query.\n\n"
+          + "You are provided with function signatures within ";
+
+  private static final String GRANITE_TOOLS_EPILOGUE =
+      "\n\nFor each tool call, return a json object with function name and arguments within ";
+  private static final String GRANITE_TOOLS_INSTRUCTION =
+      ". If a tool does not exist in the provided list of tools, notify the user that you do not "
+          + "have the ability to fulfill the request.";
+
+  /**
+   * Granite 4.x. The {@code <tools>} pair and the role delimiters are special tokens; {@code
+   * <tool_call>} and {@code <tool_response>} are added tokens the model was trained on as single
+   * ids, so all of them are control. Caller text, schemas, arguments, and results stay text.
+   */
+  private static ModelPrompt renderGranite(List<ChatMessage> messages, List<ToolSpec> tools) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    int start = 0;
+    boolean callerSystem = messages.get(0).role() == ChatRole.SYSTEM;
+    if (callerSystem || !tools.isEmpty()) {
+      prompt.control("<|start_of_role|>system<|end_of_role|>");
+      if (callerSystem) {
+        prompt.text(messages.get(0).text());
+        start = 1;
+      }
+      if (!tools.isEmpty()) {
+        if (callerSystem) {
+          prompt.text("\n\n");
+        }
+        prompt.text(GRANITE_TOOLS_PREAMBLE).control("<tools></tools>").text(" XML tags:\n");
+        prompt.control("<tools>");
+        for (ToolSpec tool : tools) {
+          prompt.text("\n");
+          appendToolJson(prompt, tool);
+        }
+        prompt.text("\n").control("</tools>");
+        prompt
+            .text(GRANITE_TOOLS_EPILOGUE)
+            .control("<tool_call></tool_call>")
+            .text(" XML tags:\n")
+            .control("<tool_call>")
+            .text("\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n")
+            .control("</tool_call>")
+            .text(GRANITE_TOOLS_INSTRUCTION);
+      }
+      prompt.control("<|end_of_text|>\n");
+    }
+    for (int index = start; index < messages.size(); index++) {
+      ChatMessage message = messages.get(index);
+      if (message.role() == ChatRole.TOOL) {
+        boolean firstOfRun = index == start || messages.get(index - 1).role() != ChatRole.TOOL;
+        boolean lastOfRun =
+            index == messages.size() - 1 || messages.get(index + 1).role() != ChatRole.TOOL;
+        if (firstOfRun) {
+          prompt.control("<|start_of_role|>user<|end_of_role|>");
+        }
+        prompt.text("\n").control("<tool_response>").text("\n" + message.text() + "\n");
+        prompt.control("</tool_response>");
+        if (lastOfRun) {
+          prompt.control("<|end_of_text|>\n");
+        }
+        continue;
+      }
+      if (message.role() == ChatRole.SYSTEM) {
+        prompt.control("<|start_of_role|>system<|end_of_role|>").text(message.text());
+        prompt.control("<|end_of_text|>\n");
+        continue;
+      }
+      prompt.control("<|start_of_role|>" + message.role().templateName() + "<|end_of_role|>");
+      if (!message.text().isEmpty()) {
+        prompt.text(message.text());
+      }
+      boolean firstCall = true;
+      for (ToolCall call : message.toolCalls()) {
+        if (!firstCall || !message.text().isEmpty()) {
+          prompt.text("\n");
+        }
+        firstCall = false;
+        prompt
+            .control("<tool_call>")
+            .text("\n{\"name\": \"")
+            .text(escapeJson(call.name()))
+            .text("\", \"arguments\": ")
+            .text(call.argumentsJson())
+            .text("}\n")
+            .control("</tool_call>");
+      }
+      prompt.control("<|end_of_text|>\n");
+    }
+    return prompt.control("<|start_of_role|>assistant<|end_of_role|>").build();
+  }
+
   private static void appendToolJson(ModelPrompt.Builder prompt, ToolSpec tool) {
     prompt
         .control("{\"type\": \"function\", \"function\": {\"name\": \"")
