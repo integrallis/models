@@ -48,23 +48,14 @@ import java.util.Set;
  * exact two-label contract in the adapter's published {@code io.yaml}.
  */
 final class ActivatedAnswerabilityQualificationCli {
-  static final String INVOCATION = "<|start_of_role|>assistant<|end_of_role|>";
+  static final String INVOCATION = GraniteDocumentsPrompt.ASSISTANT_MARKER;
   static final String BASE_INSTRUCTION = "Answer with exactly one word: answerable or unanswerable";
 
-  /** Granite 4.1 declares these template markers as special tokens (ids 100282 and 100283). */
-  static final String DOCUMENTS_OPEN = "<documents>";
-
-  static final String DOCUMENTS_CLOSE = "</documents>";
-  static final String DOCUMENTS_INTRO =
-      "You are a helpful assistant with access to the following documents. You may use one or "
-          + "more documents to assist with the user query.\n\n"
-          + "You are given a list of documents within ";
-  static final String DOCUMENTS_TAGS_SUFFIX = " XML tags:\n";
-  static final String DOCUMENTS_OUTRO =
-      "\n\nWrite the response to the user's input by strictly aligning with the facts in the "
-          + "provided documents. If the information needed to answer the question is not "
-          + "available in the documents, inform the user that the question cannot be answered "
-          + "based on the available data.";
+  static final String DOCUMENTS_OPEN = GraniteDocumentsPrompt.DOCUMENTS_OPEN;
+  static final String DOCUMENTS_CLOSE = GraniteDocumentsPrompt.DOCUMENTS_CLOSE;
+  static final String DOCUMENTS_INTRO = GraniteDocumentsPrompt.INTRO;
+  static final String DOCUMENTS_TAGS_SUFFIX = GraniteDocumentsPrompt.TAGS_SUFFIX;
+  static final String DOCUMENTS_OUTRO = GraniteDocumentsPrompt.OUTRO;
   static final Set<String> LABELS = Set.of("answerable", "unanswerable");
   private static final int MAX_COMPLETION_TOKENS = 6;
   private static final Set<String> OPTIONS =
@@ -186,67 +177,28 @@ final class ActivatedAnswerabilityQualificationCli {
 
   /** Renders one document exactly as Transformers' {@code tojson} filter renders the mapping. */
   static String documentJson(Document document) {
-    try {
-      return "{\"doc_id\": "
-          + document.docId()
-          + ", \"text\": "
-          + JSON.writeValueAsString(document.text())
-          + "}";
-    } catch (IOException failure) {
-      throw new IllegalStateException(failure);
-    }
+    return GraniteDocumentsPrompt.documentJson(document.docId(), document.text());
   }
 
   /** The document block rendered between the two {@code <documents>} markers. */
   static String documentsBlock(List<Document> documents) {
-    StringBuilder block = new StringBuilder();
-    for (Document document : documents) {
-      block.append('\n').append(documentJson(document));
-    }
-    return block.append('\n').toString();
+    return GraniteDocumentsPrompt.documentsBlock(documents.stream().map(Document::text).toList());
   }
 
   /**
-   * Appends the documents system message exactly as the published template renders it. The two
-   * {@code <documents>} markers are special tokens in the Granite 4.1 tokenizer, so they are
-   * control segments; the surrounding instruction text and every document body are text segments,
-   * so caller data can never be interpreted as a control token even when it spells one.
-   */
-  static ModelPrompt.Builder appendDocumentsSystemMessage(
-      ModelPrompt.Builder prompt, List<Document> documents, String leadingInstruction) {
-    prompt.control("<|start_of_role|>system<|end_of_role|>");
-    String intro =
-        leadingInstruction == null
-            ? DOCUMENTS_INTRO
-            : leadingInstruction + "\n\n" + DOCUMENTS_INTRO;
-    return prompt
-        .text(intro)
-        .control(DOCUMENTS_OPEN)
-        .control(DOCUMENTS_CLOSE)
-        .text(DOCUMENTS_TAGS_SUFFIX)
-        .control(DOCUMENTS_OPEN)
-        .text(documentsBlock(documents))
-        .control(DOCUMENTS_CLOSE)
-        .text(DOCUMENTS_OUTRO)
-        .control("<|end_of_text|>\n");
-  }
-
-  /**
-   * Renders the prompt for one arm. Document and conversation content are text segments so caller
-   * data can never be interpreted as Granite control tokens; only the role delimiters, the two
-   * documents markers, and the assistant marker are control.
+   * Renders the prompt for one arm through the shared Granite documents renderer: only the role
+   * delimiters, the two documents markers, and the assistant marker are control.
    */
   static ModelPrompt prompt(Case item, Arm arm) {
     ModelPrompt.Builder prompt =
-        appendDocumentsSystemMessage(
-            ModelPrompt.builder(), item.documents(), arm == Arm.BASE ? BASE_INSTRUCTION : null);
+        GraniteDocumentsPrompt.appendSystem(
+            ModelPrompt.builder(),
+            item.documents().stream().map(Document::text).toList(),
+            arm == Arm.BASE ? BASE_INSTRUCTION : null);
     for (Message message : item.messages()) {
-      prompt
-          .control("<|start_of_role|>" + message.role() + "<|end_of_role|>")
-          .text(message.text())
-          .control("<|end_of_text|>\n");
+      GraniteDocumentsPrompt.appendTurn(prompt, message.role(), message.text());
     }
-    return prompt.control(INVOCATION).build();
+    return GraniteDocumentsPrompt.finish(prompt);
   }
 
   /**

@@ -141,6 +141,22 @@ class Granite41AloraIntegrationTest {
       assertThat(model.adapter().rank()).isEqualTo(16);
       assertThat(turn.physicallySharesPrefix()).isTrue();
       assertThat(turn.sharedPrefixTokens()).isGreaterThan(0);
+
+      try (var base = backend.openSession()) {
+        int[] promptTokens = backend.tokenizer().encode(ORACLE_PUNCTUATION_PROMPT);
+        float[] logits = backend.prefill(base, promptTokens, 0);
+        int[] generated = new int[8];
+        int position = promptTokens.length;
+        for (int index = 0; index < generated.length; index++) {
+          generated[index] = argmax(logits);
+          if (index + 1 < generated.length) {
+            logits = backend.forward(base, generated[index], position++);
+          }
+        }
+        assertThat(generated)
+            .as("a loaded but unactivated adapter must be a true no-op for the base branch")
+            .containsExactly(ORACLE_PUNCTUATION_GREEDY_TOKENS);
+      }
     }
   }
 

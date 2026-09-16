@@ -47,12 +47,19 @@ final class ActivatedPrefixSharingBenchmarkCli {
   private static final int EXACT_OUTPUT_TOKENS = 8;
   private static final double MINIMUM_FOUR_K_IMPROVEMENT = 0.20;
   private static final Set<String> OPTIONS =
-      Set.of("model", "adapter", "report", "models-revision", "warmups", "trials");
+      Set.of("model", "adapter", "report", "models-revision", "warmups", "trials", "template");
+  private static final Set<String> TEMPLATES = Set.of("chatml", "granite-documents");
 
   private ActivatedPrefixSharingBenchmarkCli() {}
 
   record Configuration(
-      Path model, Path adapter, Path report, String modelsRevision, int warmups, int trials) {}
+      Path model,
+      Path adapter,
+      Path report,
+      String modelsRevision,
+      int warmups,
+      int trials,
+      String template) {}
 
   record Measurement(
       int prefixTokens,
@@ -129,7 +136,11 @@ final class ActivatedPrefixSharingBenchmarkCli {
         Path.of(
             values.getOrDefault(
                 "report", "build/reports/activated-prefix-sharing/comparison.json"));
-    return new Configuration(model, adapter, report, modelsRevision, warmups, trials);
+    String template = values.getOrDefault("template", "chatml");
+    if (!TEMPLATES.contains(template)) {
+      throw new IllegalArgumentException("--template must be chatml or granite-documents");
+    }
+    return new Configuration(model, adapter, report, modelsRevision, warmups, trials, template);
   }
 
   static int run(String[] args) throws IOException {
@@ -146,7 +157,9 @@ final class ActivatedPrefixSharingBenchmarkCli {
         ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
       adapter = model.adapter();
       for (int prefixTokens : PREFIX_TIERS) {
-        prompts.add(promptWithExactPrefix(model.tokenizer(), adapter, prefixTokens));
+        prompts.add(
+            promptWithExactPrefix(
+                model.tokenizer(), adapter, prefixTokens, configuration.template()));
       }
       SamplingOptions options =
           SamplingOptions.builder().temperature(0).maxTokens(EXACT_OUTPUT_TOKENS).build();
@@ -362,7 +375,13 @@ final class ActivatedPrefixSharingBenchmarkCli {
   }
 
   private static ModelPrompt promptWithExactPrefix(
-      Tokenizer tokenizer, ActivatedAdapterMetadata adapter, int targetPrefixTokens) {
+      Tokenizer tokenizer,
+      ActivatedAdapterMetadata adapter,
+      int targetPrefixTokens,
+      String template) {
+    if ("granite-documents".equals(template)) {
+      return graniteDocumentsPromptWithExactPrefix(tokenizer, adapter, targetPrefixTokens);
+    }
     String leading = "<|im_start|>system\nYou are a tool selector.<|im_end|>\n<|im_start|>user\n";
     String trailing = "<|im_end|>\n<|im_start|>assistant\n";
     String invocationText = adapter.invocationText();
@@ -392,6 +411,46 @@ final class ActivatedPrefixSharingBenchmarkCli {
     }
     throw new IllegalStateException(
         "could not construct an exact " + targetPrefixTokens + "-token activation prefix");
+  }
+
+  /**
+   * The Granite documents shape: the filler is a document body, the question is a user turn, and
+   * the adapter's own marker closes the prompt. Rendering goes through the shared renderer so the
+   * measured prefix is the same prompt shape gates 4 and 5 use.
+   */
+  private static ModelPrompt graniteDocumentsPromptWithExactPrefix(
+      Tokenizer tokenizer, ActivatedAdapterMetadata adapter, int targetPrefixTokens) {
+    if (!GraniteDocumentsPrompt.ASSISTANT_MARKER.equals(adapter.invocationText())) {
+      throw new IllegalArgumentException(
+          "granite-documents template requires the assistant marker as the adapter invocation");
+    }
+    String unit =
+        List.of(" transit", " context", " data", " x").stream()
+            .filter(candidate -> tokenizer.encode(candidate).length == 1)
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no stable one-token filler was found"));
+    int low = 0;
+    int high = targetPrefixTokens * 2;
+    while (low <= high) {
+      int count = (low + high) >>> 1;
+      ModelPrompt.Builder builder =
+          GraniteDocumentsPrompt.appendSystem(
+              ModelPrompt.builder(), List.of("Background records:" + unit.repeat(count)), null);
+      GraniteDocumentsPrompt.appendTurn(
+          builder, "user", "Is the archive code for route Blue Line 17 in the documents?");
+      ModelPrompt candidate = GraniteDocumentsPrompt.finish(builder);
+      int prefix = activationBoundary(tokenizer.encode(candidate), adapter);
+      if (prefix == targetPrefixTokens) {
+        return candidate;
+      }
+      if (prefix < targetPrefixTokens) {
+        low = count + 1;
+      } else {
+        high = count - 1;
+      }
+    }
+    throw new IllegalStateException(
+        "could not construct an exact " + targetPrefixTokens + "-token documents prefix");
   }
 
   private static int activationBoundary(int[] promptTokens, ActivatedAdapterMetadata adapter) {
