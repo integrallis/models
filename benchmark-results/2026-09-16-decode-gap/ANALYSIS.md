@@ -278,3 +278,23 @@ chunk cursor field); it is flagged, not explained, and is the first thing to iso
 3/3 rounds against: −10 % decode, −25 % prefill. The atomic cursor costs more than the
 stragglers it rescues on 8–16 threads with these matrix sizes. Chunk stealing stays off and
 should be removed rather than kept behind the env knob.
+
+### Result 9c — pure-Java executor barrier budget (dedicated cores, composite build, 3 rounds)
+
+| `vectors.gguf.pollMillis` | decode tok/s          | mean | TTFT p50 ms          | context switches |
+|---------------------------|----------------------:|-----:|---------------------:|-----------------:|
+| 0 (park, previous)        | 6.32 / 5.98 / 6.96    | 6.42 | 6754 / 6536 / 6332   | 1.4 – 1.7 M      |
+| 1                         | 6.16 / 8.77 / 6.27    | 7.07 | 6346 / 6747 / 6879   | 0.83 – 0.98 M    |
+| 5                         | 8.29 / 10.99 / 8.98   | 9.42 | 6722 / 6681 / 6756   | 0.14 – 0.55 M    |
+| 25                        | 8.53 / 10.57 / 8.85   | 9.32 | 6717 / 6584 / 6663   | 0.17 – 0.71 M    |
+
+Unlike the Rust pool (9a), the Java executor gains +45 % decode on dedicated cores: its
+~200 Phaser barriers per token each parked and woke 16 threads. 1 ms is bimodal (it covers
+some inter-stage gaps and misses others); 5 ms and 25 ms are indistinguishable. Prefill is
+unchanged (17–18 tok/s: the pure-Java prefill is compute-bound in the kernels, not the
+barriers).
+
+**Defaults decided by 9a + 9c: 5 ms for both executors.** It captures everything 25 ms
+does on every host measured and burns a fifth of the idle tail (workers × budget per call)
+that a sporadic caller — an embedding server, one search a second — would otherwise pay.
+Both remain settable (`models.native.kernels.pollMillis`, `vectors.gguf.pollMillis`).
