@@ -733,3 +733,19 @@ comparison can see. Three-case re-run with the fix on this machine: both arms st
 correct 3/3 (`"answerable"`, `"unanswerable"`, `"answerable"`). Regression test
 `Granite41AloraIntegrationTest.matchesThePeftReferenceWhereTheBaseWantsToAnswerInstead` pins the
 reference's `"answerable"` on this case's prompt (270 tokens) under real weights.
+
+**New frozen commit `fcd38d3` (fcd38d31efc54cbd00747f1c2f732208c7f98b5b); every host restarted
+at it (2026-09-16T12:36–12:40Z):** host 1 runs the identity screen then the Rust window; the
+pure-Java host runs the pure-Java window; instance 3 ran the base harness again and continues
+with gates 5 and 6. The f6252cc results on each host were moved into `void-f6252cc/`.
+
+**Base run, attempt 10 (Models fcd38d3, instance 3, same tuning profile as attempt 9,
+12:36–12:40Z):** **QUALIFIED**, absolute tier PRODUCTION_READY. Rust arm decode 26.02 tok/s,
+prefill 145 tok/s, p95 TTFT 961 ms, p95 e2e 2282 ms, 27/27 correct; Ollama 29.55 / 627 / 1632;
+llama.cpp 30.42 / 1008 / 2183. Ratios: decode 0.881 (Ollama) and 0.856 (llama.cpp) against the
+0.8 floor; e2e 1.398 (Ollama) and 1.045 (llama.cpp) against the 1.5 ceiling; model answer rate
+0.444 (floor 0.333), answer correct rate 1.0. The base code path is identical to f6252cc (the
+loader fix touches adapter loads only; the fused-attention gate leaves Granite on the same
+kernel), and the run confirms it inside the instance's own spread. Bundle in
+`host-evidence/base-attempt10/`; it replaces attempt 9 as the certified bundle so that the base,
+component and composition evidence pin one Models revision.
