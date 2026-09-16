@@ -768,3 +768,11 @@ pool; the Rust arm at fcd38d3 ran on a pool with this rare race, whose symptom w
 malformed output rather than a borderline flip, and no malformed output appears in any Rust
 report. The Rust identity screen is re-run at the release commit before the Rust arm is
 published; the pure-Java window stands.
+
+**MT-RAG, reference agreement (2026-09-16T16:30Z):** IBM's reference implementation on the
+dequantised Q4_K_M weights returns the same label as our runtime on all eight MT-RAG cases
+checked — six unanswerable cases the specialist calls `answerable` (`ddbbbe7e…4`, `f5a8ca2f…4`,
+`535ebd30…2`, `8040ccdf…4`, `5b2404d7…6`, `d44c3196…4`) and two it gets right (`535ebd30…6`,
+`2b34f5e7…2`); reports in `host-evidence/reference-alora/reference-gguf-mtrag-*.json`. The Rust
+specialist arm finished at balanced accuracy 0.600 (110/110 structured). The behaviour is the
+adapter's on this slice; the runtime is faithful.
