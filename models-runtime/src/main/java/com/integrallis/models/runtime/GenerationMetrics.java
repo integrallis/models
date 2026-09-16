@@ -16,11 +16,26 @@
 package com.integrallis.models.runtime;
 
 import com.integrallis.models.api.GenerationUsage;
+import com.integrallis.models.api.StopReason;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Runtime-owned phase measurements for one text-generation request. */
+/**
+ * Runtime-owned phase measurements for one text-generation request.
+ *
+ * @param available whether a request has completed and been measured
+ * @param successful whether that request completed without failure
+ * @param tokenization prompt tokenization time
+ * @param promptPreparation prompt-cache preparation time
+ * @param prefill prompt prefill time
+ * @param timeToFirstToken time from request start to the first generated token, when one was
+ * @param decode time from the first generated token to completion
+ * @param total request wall time
+ * @param usage prompt and completion token counts
+ * @param promptCache prompt-prefix cache measurements
+ * @param stopReason why a successful generation ended; empty when unavailable or failed
+ */
 public record GenerationMetrics(
     boolean available,
     boolean successful,
@@ -31,7 +46,8 @@ public record GenerationMetrics(
     Duration decode,
     Duration total,
     GenerationUsage usage,
-    PromptCacheMetrics promptCache) {
+    PromptCacheMetrics promptCache,
+    Optional<StopReason> stopReason) {
 
   public GenerationMetrics {
     tokenization = requireDuration(tokenization, "tokenization");
@@ -43,9 +59,52 @@ public record GenerationMetrics(
     total = requireDuration(total, "total");
     usage = Objects.requireNonNull(usage, "usage");
     promptCache = Objects.requireNonNull(promptCache, "promptCache");
+    stopReason = Objects.requireNonNull(stopReason, "stopReason");
+    if (stopReason.isPresent() && !successful) {
+      throw new IllegalArgumentException("only a successful generation has a stop reason");
+    }
     if (!available && successful) {
       throw new IllegalArgumentException("unavailable metrics cannot report success");
     }
+  }
+
+  /**
+   * Creates metrics without a stop reason, preserving the original canonical signature.
+   *
+   * @param available whether a request has completed and been measured
+   * @param successful whether that request completed without failure
+   * @param tokenization prompt tokenization time
+   * @param promptPreparation prompt-cache preparation time
+   * @param prefill prompt prefill time
+   * @param timeToFirstToken time to the first generated token, when one was
+   * @param decode decode time
+   * @param total request wall time
+   * @param usage prompt and completion token counts
+   * @param promptCache prompt-prefix cache measurements
+   */
+  public GenerationMetrics(
+      boolean available,
+      boolean successful,
+      Duration tokenization,
+      Duration promptPreparation,
+      Duration prefill,
+      Optional<Duration> timeToFirstToken,
+      Duration decode,
+      Duration total,
+      GenerationUsage usage,
+      PromptCacheMetrics promptCache) {
+    this(
+        available,
+        successful,
+        tokenization,
+        promptPreparation,
+        prefill,
+        timeToFirstToken,
+        decode,
+        total,
+        usage,
+        promptCache,
+        Optional.empty());
   }
 
   /** Returns an empty snapshot for a runtime that has not completed a request. */

@@ -23,6 +23,7 @@ import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
@@ -371,6 +372,7 @@ public final class GenerationLoop {
           new MutableGenerationMetrics(
               requestStarted, tokenizationNanos, promptPreparationNanos, nanoTime);
       boolean successful = false;
+      StopReason stopReason = null;
 
       try {
         long prefillStarted = nanoTime.getAsLong();
@@ -386,35 +388,40 @@ public final class GenerationLoop {
         int position = promptTokens.length;
 
         if (speculativeActive) {
-          generateSpeculatively(
-              (SpeculativeInferenceBackend) backend,
-              tokenizer,
-              sampler,
-              emitter,
-              allTokens,
-              logits,
-              position,
-              options.maxTokens(),
-              speculativeMetrics,
-              generationMetrics);
+          stopReason =
+              generateSpeculatively(
+                  (SpeculativeInferenceBackend) backend,
+                  tokenizer,
+                  sampler,
+                  emitter,
+                  stream,
+                  allTokens,
+                  logits,
+                  position,
+                  options.maxTokens(),
+                  speculativeMetrics,
+                  generationMetrics);
         } else {
-          generateSequentially(
-              tokenizer,
-              sampler,
-              emitter,
-              allTokens,
-              logits,
-              position,
-              options.maxTokens(),
-              constraint,
-              generationMetrics);
+          stopReason =
+              generateSequentially(
+                  tokenizer,
+                  sampler,
+                  emitter,
+                  stream,
+                  allTokens,
+                  logits,
+                  position,
+                  options.maxTokens(),
+                  constraint,
+                  generationMetrics);
         }
 
         emitter.finish();
         cachedPromptTokens =
             backend instanceof RewindableInferenceBackend ? promptTokens.clone() : null;
         stream.onComplete(
-            new GenerationUsage(promptTokens.length, allTokens.size() - promptTokens.length));
+            new GenerationUsage(promptTokens.length, allTokens.size() - promptTokens.length),
+            stopReason);
         successful = true;
       } catch (Exception e) {
         cachedPromptTokens = null;
@@ -428,7 +435,8 @@ public final class GenerationLoop {
                 new GenerationUsage(
                     promptTokens.length, Math.max(0, allTokens.size() - promptTokens.length)),
                 promptPrefill.metrics(),
-                nanoTime.getAsLong());
+                nanoTime.getAsLong(),
+                successful ? Optional.of(stopReason) : Optional.empty());
       }
     }
   }
@@ -490,10 +498,12 @@ public final class GenerationLoop {
     return Math.min(shared, promptTokens.length - 1);
   }
 
-  private void generateSequentially(
+  /** Decodes one token per forward pass and returns why decoding ended. */
+  private StopReason generateSequentially(
       Tokenizer tokenizer,
       Sampler sampler,
       StopSequenceEmitter emitter,
+      TokenStream stream,
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
@@ -505,28 +515,34 @@ public final class GenerationLoop {
     for (int generated = 0; generated < maxTokens; generated++) {
       int nextToken = sampler.sample(logits, allTokens, constraint::allows);
       if (tokenizer.isEndOfGeneration(nextToken)) {
-        return;
+        return StopReason.EOS;
       }
       if (emit(tokenizer, emitter, allTokens, nextToken, metrics)) {
-        return;
+        return StopReason.STOP_SEQUENCE;
       }
       constraint.accept(nextToken);
       if (constraint.isComplete()) {
-        return;
+        return StopReason.CONSTRAINT_COMPLETE;
+      }
+      if (stream.isCancelled()) {
+        return StopReason.CANCELLED;
       }
       if (generated + 1 == maxTokens) {
-        return;
+        return StopReason.MAX_TOKENS;
       }
       logits = backend.forwardTransient(nextToken, position);
       position++;
     }
+    return StopReason.MAX_TOKENS;
   }
 
-  private void generateSpeculatively(
+  /** Decodes with n-gram drafts verified in batches and returns why decoding ended. */
+  private StopReason generateSpeculatively(
       SpeculativeInferenceBackend speculativeBackend,
       Tokenizer tokenizer,
       Sampler sampler,
       StopSequenceEmitter emitter,
+      TokenStream stream,
       List<Integer> allTokens,
       float[] initialLogits,
       int initialPosition,
@@ -554,7 +570,7 @@ public final class GenerationLoop {
       carriedLogits = null;
       carriedLogitRow = -1;
       if (tokenizer.isEndOfGeneration(nextToken)) {
-        return;
+        return StopReason.EOS;
       }
 
       int remainingAfterPending = maxTokens - generated - 1;
@@ -569,11 +585,14 @@ public final class GenerationLoop {
       }
 
       if (emit(tokenizer, emitter, allTokens, nextToken, generationMetrics)) {
-        return;
+        return StopReason.STOP_SEQUENCE;
       }
       generated++;
+      if (stream.isCancelled()) {
+        return StopReason.CANCELLED;
+      }
       if (generated == maxTokens) {
-        return;
+        return StopReason.MAX_TOKENS;
       }
 
       if (draft.length == 0) {
@@ -610,6 +629,7 @@ public final class GenerationLoop {
       int accepted = 0;
       boolean reachedEos = false;
       boolean reachedStopSequence = false;
+      boolean cancelled = false;
       while (accepted < draft.length && generated < maxTokens) {
         int targetToken = sampler.sample(verification, accepted, allTokens);
         if (tokenizer.isEndOfGeneration(targetToken)) {
@@ -626,6 +646,10 @@ public final class GenerationLoop {
         if (reachedStopSequence) {
           break;
         }
+        if (stream.isCancelled()) {
+          cancelled = true;
+          break;
+        }
       }
       metrics.acceptedTokens += accepted;
       for (int acceptedPosition = 0; acceptedPosition < accepted; acceptedPosition++) {
@@ -640,14 +664,24 @@ public final class GenerationLoop {
       }
       position = retainedCheckpoint;
 
-      if (reachedEos || reachedStopSequence || generated == maxTokens) {
-        return;
+      if (reachedEos) {
+        return StopReason.EOS;
+      }
+      if (reachedStopSequence) {
+        return StopReason.STOP_SEQUENCE;
+      }
+      if (cancelled) {
+        return StopReason.CANCELLED;
+      }
+      if (generated == maxTokens) {
+        return StopReason.MAX_TOKENS;
       }
       if (accepted == draft.length) {
         carriedLogits = verification;
         carriedLogitRow = draft.length;
       }
     }
+    return StopReason.MAX_TOKENS;
   }
 
   private static boolean emit(
@@ -698,7 +732,8 @@ public final class GenerationLoop {
         boolean successful,
         GenerationUsage usage,
         PromptCacheMetrics promptCache,
-        long completedAt) {
+        long completedAt,
+        Optional<StopReason> stopReason) {
       long totalNanos = elapsed(requestStarted, completedAt);
       Optional<java.time.Duration> timeToFirstToken =
           firstTokenAt < 0
@@ -715,7 +750,8 @@ public final class GenerationLoop {
           java.time.Duration.ofNanos(decodeNanos),
           java.time.Duration.ofNanos(totalNanos),
           usage,
-          promptCache);
+          promptCache,
+          stopReason);
     }
   }
 

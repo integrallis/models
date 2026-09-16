@@ -21,6 +21,7 @@ import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TokenStream;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -436,7 +437,7 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
 
   private void acceptToken(Request request, int next) {
     if (backend.tokenizer().isEndOfGeneration(next)) {
-      completeGeneration(request);
+      completeGeneration(request, StopReason.EOS);
       return;
     }
     request.generatedTokens++;
@@ -446,25 +447,35 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
     boolean stopped = request.emitter.emit(backend.tokenizer().decode(next));
     request.allTokens.add(next);
     request.constraint.accept(next);
-    if (stopped
-        || request.constraint.isComplete()
-        || request.generatedTokens == request.options.maxTokens()) {
-      completeGeneration(request);
+    StopReason stopReason;
+    if (stopped) {
+      stopReason = StopReason.STOP_SEQUENCE;
+    } else if (request.constraint.isComplete()) {
+      stopReason = StopReason.CONSTRAINT_COMPLETE;
+    } else if (request.stream.isCancelled()) {
+      stopReason = StopReason.CANCELLED;
+    } else if (request.generatedTokens == request.options.maxTokens()) {
+      stopReason = StopReason.MAX_TOKENS;
+    } else {
+      stopReason = null;
+    }
+    if (stopReason != null) {
+      completeGeneration(request, stopReason);
     } else {
       request.pendingToken = next;
     }
   }
 
-  private void completeGeneration(Request request) {
+  private void completeGeneration(Request request, StopReason stopReason) {
     request.emitter.finish();
     request.state.cachedPromptTokens = request.promptTokens.clone();
     long completedAt = System.nanoTime();
     GenerationUsage usage =
         new GenerationUsage(request.promptTokens.length, request.generatedTokens);
-    GenerationMetrics metrics = request.generationMetrics(completedAt, usage);
+    GenerationMetrics metrics = request.generationMetrics(completedAt, usage, stopReason);
     request.state.lastGenerationMetrics = metrics;
     try {
-      request.stream.onComplete(usage);
+      request.stream.onComplete(usage, stopReason);
       completedRequests.incrementAndGet();
       request.generationResult.complete(metrics);
     } catch (RuntimeException | Error failure) {
@@ -502,7 +513,8 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
     if (request.prefillOnly) {
       request.prefillResult.completeExceptionally(failure);
     } else {
-      request.state.lastGenerationMetrics = request.generationMetrics(System.nanoTime(), null);
+      request.state.lastGenerationMetrics =
+          request.generationMetrics(System.nanoTime(), null, null);
       signalError(request.stream, failure);
       request.generationResult.complete(request.state.lastGenerationMetrics);
     }
@@ -661,7 +673,8 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
       return prefillOnly ? prefillResult.isDone() : generationResult.isDone();
     }
 
-    GenerationMetrics generationMetrics(long completedAt, GenerationUsage usage) {
+    GenerationMetrics generationMetrics(
+        long completedAt, GenerationUsage usage, StopReason stopReason) {
       GenerationUsage measuredUsage =
           usage == null ? new GenerationUsage(promptTokens.length, generatedTokens) : usage;
       return new GenerationMetrics(
@@ -676,7 +689,8 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
           firstTokenAt < 0 ? Duration.ZERO : Duration.ofNanos(elapsed(firstTokenAt, completedAt)),
           Duration.ofNanos(elapsed(submittedAt, completedAt)),
           measuredUsage,
-          promptCache);
+          promptCache,
+          Optional.ofNullable(usage == null ? null : stopReason));
     }
   }
 }

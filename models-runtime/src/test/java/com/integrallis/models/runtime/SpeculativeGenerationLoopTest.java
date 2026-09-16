@@ -22,6 +22,7 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +57,7 @@ class SpeculativeGenerationLoopTest {
     assertThat(loop.lastSpeculativeMetrics().acceptedByPosition()).containsExactly(1, 1, 1);
     assertThat(loop.lastSpeculativeMetrics().verificationBatchHistogram())
         .containsExactly(0, 0, 0, 0, 1);
+    assertThat(loop.lastGenerationMetrics().stopReason()).contains(StopReason.EOS);
   }
 
   @Test
@@ -76,6 +78,46 @@ class SpeculativeGenerationLoopTest {
     assertThat(result).isEqualTo("[5][2]");
     assertThat(backend.verifiedBatches).containsExactly(new int[] {5, 2, 3, 4});
     assertThat(backend.forwardTokens).isEmpty();
+    assertThat(loop.lastGenerationMetrics().stopReason()).contains(StopReason.EOS);
+  }
+
+  @Test
+  void reportsAStopSequenceReachedInsideAVerifiedDraft() {
+    int[] promptTokens = {2, 3, 4, 5, 2, 3, 4};
+    SequenceBackend backend = new SequenceBackend(promptTokens, new int[] {5, 2, 3, 4, 1});
+    GenerationLoop loop = new GenerationLoop(backend, threeTokenDraftOptions());
+
+    String result =
+        loop.generate(
+            "prompt",
+            SamplingOptions.builder()
+                .temperature(0.0f)
+                .repetitionPenalty(1.0f)
+                .maxTokens(8)
+                .stopSequence("[3]")
+                .build());
+
+    assertThat(result).isEqualTo("[5][2]");
+    assertThat(loop.lastGenerationMetrics().stopReason()).contains(StopReason.STOP_SEQUENCE);
+  }
+
+  @Test
+  void reportsMaxTokensWhenTheLimitFallsInsideAVerifiedDraft() {
+    int[] promptTokens = {2, 3, 4, 5, 2, 3, 4};
+    SequenceBackend backend = new SequenceBackend(promptTokens, new int[] {5, 2, 3, 4, 1});
+    GenerationLoop loop = new GenerationLoop(backend, threeTokenDraftOptions());
+
+    String result =
+        loop.generate(
+            "prompt",
+            SamplingOptions.builder()
+                .temperature(0.0f)
+                .repetitionPenalty(1.0f)
+                .maxTokens(3)
+                .build());
+
+    assertThat(result).isEqualTo("[5][2][3]");
+    assertThat(loop.lastGenerationMetrics().stopReason()).contains(StopReason.MAX_TOKENS);
   }
 
   @Test
@@ -158,6 +200,7 @@ class SpeculativeGenerationLoopTest {
     assertThat(result).isEqualTo("[5][5][5]");
     assertThat(backend.verifiedBatches).isEmpty();
     assertThat(backend.forwardTokens).containsExactly(5, 5);
+    assertThat(loop.lastGenerationMetrics().stopReason()).contains(StopReason.MAX_TOKENS);
   }
 
   private static SpeculativeGenerationOptions threeTokenDraftOptions() {

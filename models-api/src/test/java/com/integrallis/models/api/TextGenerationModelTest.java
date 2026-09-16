@@ -33,6 +33,32 @@ class TextGenerationModelTest {
   }
 
   @Test
+  void stopReasonCompletionDefaultsToTheUsageCallbackAndStreamsAreNotCancelledByDefault() {
+    java.util.List<GenerationUsage> usages = new java.util.ArrayList<>();
+    TokenStream legacy =
+        new TokenStream() {
+          @Override
+          public void onToken(String token) {}
+
+          @Override
+          public void onComplete() {}
+
+          @Override
+          public void onComplete(GenerationUsage usage) {
+            usages.add(usage);
+          }
+
+          @Override
+          public void onError(Throwable failure) {}
+        };
+
+    legacy.onComplete(new GenerationUsage(3, 4), StopReason.MAX_TOKENS);
+
+    assertThat(usages).containsExactly(new GenerationUsage(3, 4));
+    assertThat(legacy.isCancelled()).isFalse();
+  }
+
+  @Test
   void defaultCollectorPropagatesStreamFailure() {
     IllegalArgumentException failure = new IllegalArgumentException("bad generation");
     TextGenerationModel model =
