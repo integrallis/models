@@ -447,3 +447,17 @@ native workers 8 → decode 16.5, prefill 90, TTFT 1519, e2e 3588; workers 12 �
 3424. Slower than the control on decode: the value pass walked column chunks outermost and rows
 innermost, revisiting each V row per chunk per head. Second version (cbb00e6) streams rows in
 blocks of four; its measurement follows.
+
+Fused attention, second version (cbb00e6, rows streamed in blocks): workers 8 → decode 16.5,
+prefill 90, TTFT 1481, e2e 3567; workers 12 → 16.1 / 107 / 1270 / 3495. Same as the first
+version, so the value-loop order was not the cause of the decode drop. A local probe (Apple
+Silicon, 128-bit lanes, 300 rows × 64 × 5 heads) times the fused pair at 63–68 µs against 69–75 µs
+for the head-by-head kernels, so the kernel itself is not slower; an interleaved A/B of the
+pre-fusion and current commits on the same instance decides whether the 18.6 → 16.5 is real.
+
+Per-phase native workers (987211a; pool 16, decode 8): decode 15.1, prefill 130, TTFT 1082, e2e
+3359; pool 12 / decode 8: 15.1 / 111 / 1225 / 3473; pool 16 / decode 6: 14.7 / 122 / 1121 / 3438.
+Prefill and TTFT gain as expected from the larger pool; decode loses against a pool of 8 because
+every job still wakes all workers (the generation broadcast is pool-wide) and the idle ones cost
+their wake and their decrement. Keeping a pool of 8 for the qualification profile; the per-phase
+switch stays available but is not part of the recorded tuning until the wake path is selective.
