@@ -49,7 +49,7 @@ def evaluate(model, tokenizer, records: list[dict], device, max_new_tokens: int 
     with torch.no_grad():
         for r in records:
             ids = tokenizer(render(tokenizer, r), add_special_tokens=False, return_tensors="pt").to(device)
-            out = model.generate(**ids, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1, pad_token_id=tokenizer.eos_token_id)
+            out = model.generate(**ids, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1, pad_token_id=tokenizer.eos_token_id, logits_to_keep=1)
             gen = tokenizer.decode(out[0, ids["input_ids"].shape[1]:].tolist(), skip_special_tokens=False)
             gen = gen.split(tokenizer.eos_token)[0] if tokenizer.eos_token else gen
             pred = strict_label(gen); structured += pred is not None
@@ -139,12 +139,12 @@ def main() -> None:
             logits = out.logits[:, :-1, :].float()                      # positions L-K .. L-2 predict tokens L-K+1 .. L-1
             targets = labels[:, L - K + 1:].to(device)
             loss = torch.nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-100)
-            out.loss = loss
             (loss / a.gradient_accumulation).backward(); micro += 1
+            loss_value = loss.item(); del out, logits, loss  # drop the graph before any validation pass
             if micro % a.gradient_accumulation == 0:
                 for g in optimizer.param_groups: g["lr"] = lr_at(step)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); optimizer.step(); optimizer.zero_grad(set_to_none=True); step += 1
-                rec = {"step": step, "loss": round(out.loss.item(), 4), "lr": lr_at(step), "elapsed": round(time.time() - t0)}
+                rec = {"step": step, "loss": round(loss_value, 4), "lr": lr_at(step), "elapsed": round(time.time() - t0)}
                 if step % 10 == 0: print(json.dumps(rec), flush=True)
                 if step % a.eval_every == 0 or step == total_steps:
                     if torch.cuda.is_available(): torch.cuda.empty_cache()
