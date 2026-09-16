@@ -5,6 +5,7 @@
 # Usage: MODELS_COMMIT=<sha> bash base-host-run.sh
 set -euo pipefail
 MODELS_COMMIT="${MODELS_COMMIT:?MODELS_COMMIT is required}"
+case "$MODELS_COMMIT" in [0-9a-f]??????????????????????????????????????? ) ;; *) echo "MODELS_COMMIT must be a full 40-hex commit" >&2; exit 2;; esac
 RUN_ROOT=/opt/modeljars-runs/granite41-base-20260916
 EVIDENCE="$RUN_ROOT/evidence"
 MODELS="$RUN_ROOT/models"
