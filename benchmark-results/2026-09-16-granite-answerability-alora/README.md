@@ -102,3 +102,25 @@ pilot 2 (mix and cut); that confound is accepted because the gate turns on MS MA
 window read decides. Validation uses all 900 held-out records (same ids as pilots 1–2, different
 order in the file), so its held-out numbers are not directly comparable with the 300-record numbers
 above; the window numbers are.
+
+## Pilot 4 (2026-09-17, MS MARCO-weighted mix, 3,072-token cut, 376 steps)
+
+Held-out validation (all 900 records, final step only): balanced 0.796; by source SQuAD 0.830,
+MS MARCO 0.787, QuAC 0.770. Adapter sha256 in `pilot4/adapter.sha256`
+(`adapter_model.safetensors` b17e8424…).
+
+### Pilot 4 on the frozen window (PEFT reference, bf16 base, CPU; window ea9e4a0c)
+
+| suite | answerable | unanswerable | balanced | pilot 2 | IBM adapter |
+|---|---|---|---|---|---|
+| SQuAD v2 dev | 95/100 | 70/100 | **0.825** | 0.860 | 0.795 |
+| MS MARCO v2.1 validation | 87/100 | 61/100 | **0.740** | 0.750 | 0.720 |
+| MT-RAG human | 30/55 | 41/55 | 0.645 | 0.673 | 0.582 |
+
+Strict and lenient agree; structured rate 1.0 on every suite. **Gate (≥ 0.80 on SQuAD and MS MARCO):
+not met — MS MARCO 0.740.** Tripling MS MARCO's share of training moved its held-out training
+split but not the window's validation split (0.750 → 0.740, within noise at n=200), and cost SQuAD
+and MT-RAG a few points. Measured conclusion: data re-weighting is not the lever for MS MARCO.
+Believed, to be tested next: MS MARCO's "No Answer Present." label is noisy (annotators could mark
+no answer while a passage does answer), which would cap any model's unanswerable recall on that
+suite below the gate.
