@@ -7,12 +7,22 @@ the hybrid opens and runs through the *public* ModelJars API, producing outputs 
 the rust-ffm component qualification, physically sharing the prefix on every composite case and on
 no control case.
 
-**Not established here:** the numbers the composition catalog entry and the composition evidence
-report bind. `assemble_composition_report.py` takes `controlMedianMillis`,
-`compositeMedianMillis` and `improvement` from the **4,096-token tier of the crossover report**
-(`../evidence/main/gate6-crossover-pure-java.json`), not from this run. The medians this run
-records are a second, independent measurement at the frozen window's own prefix lengths
-(~250–1,300 tokens), and they are reported as such.
+**Not established here:**
+
+* The numbers the composition catalog entry and the composition evidence report bind.
+  `assemble_composition_report.py` takes `controlMedianMillis`, `compositeMedianMillis` and
+  `improvement` from the **4,096-token tier of the crossover report**
+  (`../evidence/main/gate6-crossover-pure-java.json`), not from this run. The medians this run
+  records are a second, independent measurement at the frozen window's own prefix lengths
+  (~250–1,300 tokens), and they are reported as such.
+* `peakRssBytes` and `modelsRevision`, two of the eight fields
+  `GraniteAnswerability.Qualification` takes. This run records `modelsVersion` (`0.3.42`), not the
+  Models git revision the published artifacts were built from, and it does not sample resident
+  memory at all. `casesPerArm`, both medians and both `uniqueInferenceStateBytes` medians it does
+  supply. Whoever fills the recipe module's `QUALIFICATION` after this run needs those two from
+  somewhere else, or the program needs extending first.
+* Anything about the control arm's prefix length — see §2.
+* The `compositionSha256` convention — see §8.
 
 ## 0. Why this run uses the core API, not the recipe module
 
