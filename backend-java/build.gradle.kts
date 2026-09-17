@@ -396,6 +396,36 @@ tasks.register<JavaExec>("qwen35LinearStateSnapshotExperiment") {
     maxHeapSize = "4g"
 }
 
+tasks.register<JavaExec>("generationSafetyLoopExperiment") {
+    description =
+        "Run the repetition-loop detector over greedy outputs of locally available GGUF fixtures"
+    group = "verification"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.backend.purejava.GenerationSafetyLoopExperiment")
+    jvmArgs("--add-modules", "jdk.incubator.vector")
+    val modelDirectory =
+        providers.gradleProperty("generationSafety.modelDirectory")
+            .getOrElse(Path.of(System.getProperty("user.home"), ".jvllm", "models").toString())
+    val models =
+        providers.gradleProperty("generationSafety.models")
+            .getOrElse(
+                "Qwen3-0.6B-Q4_0.gguf,smollm2-360m-instruct-q8_0.gguf," +
+                    "qwen2.5-coder-0.5b-instruct-q4_0.gguf,tinyllama-1.1b-chat-v1.0.Q4_0.gguf",
+            )
+    args(
+        listOf(
+            providers.gradleProperty("generationSafety.maxTokens").getOrElse("200"),
+            providers.gradleProperty("generationSafety.contextLength").getOrElse("512"),
+            providers.gradleProperty("generationSafety.report")
+                .getOrElse(
+                    rootProject.file("benchmark-results/2026-09-16-generation-safety/raw-report.md")
+                        .path,
+                ),
+        ) + models.split(',').map { Path.of(modelDirectory, it.trim()).toString() },
+    )
+    maxHeapSize = "4g"
+}
+
 tasks.register<Test>("needle2CactCompatibilityTest") {
     description = "Verify the pinned official Needle 2 .cact artifact and tokenizer"
     group = "verification"

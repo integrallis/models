@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.integrallis.models.backend.purejava.huggingface.HuggingFaceEndOfGeneration;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -138,7 +139,10 @@ public record GptOssHuggingFaceConfig(
         switch (name) {
           case "architectures" -> fields.architectures = readStringArray(parser, value, name);
           case "attention_bias" -> fields.attentionBias = readBoolean(parser, value, name);
-          case "eos_token_id" -> fields.eosTokenId = readInt(parser, value, name);
+          case "eos_token_id" -> {
+            List<Integer> ids = HuggingFaceEndOfGeneration.readTokenIds(parser, value, name);
+            fields.eosTokenId = ids.isEmpty() ? null : ids.getFirst();
+          }
           case "experts_per_token" -> fields.legacyExpertsPerToken = readInt(parser, value, name);
           case "head_dim" -> fields.headDim = readInt(parser, value, name);
           case "hidden_act" -> fields.hiddenActivation = readString(parser, value, name);

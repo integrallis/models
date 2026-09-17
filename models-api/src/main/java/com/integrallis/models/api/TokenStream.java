@@ -19,10 +19,10 @@ package com.integrallis.models.api;
  * Push callback for one generation.
  *
  * <p>The producer invokes callbacks serially and in token order. It invokes exactly one terminal
- * callback, either {@link #onComplete()}, {@link #onComplete(GenerationUsage)}, or {@link
- * #onError(Throwable)}, and invokes nothing afterward. The callback thread is
- * implementation-specific; consumers should return promptly and must not reenter the same
- * non-thread-safe model.
+ * callback, either {@link #onComplete()}, {@link #onComplete(GenerationUsage)}, {@link
+ * #onComplete(GenerationUsage, StopReason)}, or {@link #onError(Throwable)}, and invokes nothing
+ * afterward. The callback thread is implementation-specific; consumers should return promptly and
+ * must not reenter the same non-thread-safe model.
  */
 public interface TokenStream {
 
@@ -41,6 +41,33 @@ public interface TokenStream {
    */
   default void onComplete(GenerationUsage usage) {
     onComplete();
+  }
+
+  /**
+   * Called when generation is complete with exact token counts and the reason it ended.
+   *
+   * <p>The default forwards to {@link #onComplete(GenerationUsage)}, so consumers written before
+   * stop reasons existed keep receiving usage. Producers that know why generation ended should
+   * invoke this method; this is the only completion callback they invoke.
+   *
+   * @param usage exact token counts for the completed generation
+   * @param stopReason why generation ended
+   */
+  default void onComplete(GenerationUsage usage, StopReason stopReason) {
+    onComplete(usage);
+  }
+
+  /**
+   * Returns whether the consumer wants generation to stop.
+   *
+   * <p>Producers that support cancellation poll this after each emitted token and then finish
+   * normally with {@link StopReason#CANCELLED}. The default never cancels. Implementations must be
+   * cheap and safe to call from the producer's thread.
+   *
+   * @return {@code true} to request that generation stop
+   */
+  default boolean isCancelled() {
+    return false;
   }
 
   /** Called with the non-null failure that ended generation. */

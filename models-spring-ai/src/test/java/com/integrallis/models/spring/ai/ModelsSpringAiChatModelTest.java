@@ -141,6 +141,7 @@ class ModelsSpringAiChatModelTest {
             .topK(40)
             .maxTokens(200)
             .repetitionPenalty(1.2f)
+            .minP(0.05f)
             .seed(42L)
             .stopSequences(List.of("DEFAULT_STOP"))
             .build();
@@ -186,6 +187,7 @@ class ModelsSpringAiChatModelTest {
     assertThat(delegate.options.topK()).isEqualTo(7);
     assertThat(delegate.options.maxTokens()).isEqualTo(19);
     assertThat(delegate.options.repetitionPenalty()).isEqualTo(1.2f);
+    assertThat(delegate.options.minP()).isEqualTo(0.05f);
     assertThat(delegate.options.seed()).isEqualTo(42L);
     assertThat(delegate.options.stopSequences()).containsExactly("REQUEST_STOP");
     assertThat(response.getResult().getOutput().getText()).isEqualTo("mapped answer");
@@ -206,6 +208,9 @@ class ModelsSpringAiChatModelTest {
             .topK(11)
             .maxTokens(32)
             .repetitionPenalty(1.1f)
+            .minP(0.1f)
+            .repetitionLoopDetection(
+                new com.integrallis.models.api.RepetitionLoopDetection(32, 4, 16))
             .stopSequences(List.of("END"))
             .build();
     ModelsSpringAiChatModel model = new ModelsSpringAiChatModel(delegate, defaults);

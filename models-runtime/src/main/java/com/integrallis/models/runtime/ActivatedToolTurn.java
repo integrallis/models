@@ -19,6 +19,7 @@ import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SharedPrefixInferenceBackend;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TokenStream;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -457,6 +458,17 @@ public final class ActivatedToolTurn implements SharedToolTurn {
     public void onComplete(GenerationUsage usage) {
       completed = true;
       delegate.onComplete(usage);
+    }
+
+    @Override
+    public void onComplete(GenerationUsage usage, StopReason stopReason) {
+      completed = true;
+      delegate.onComplete(usage, stopReason);
+    }
+
+    @Override
+    public boolean isCancelled() {
+      return delegate.isCancelled();
     }
 
     @Override

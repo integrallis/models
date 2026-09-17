@@ -332,7 +332,40 @@ public final class GgufTokenizer implements Tokenizer {
       int unknownTokenId,
       boolean normalizeNfc,
       String preTokenizerName) {
+    return fromByteLevelBpe(
+        vocab,
+        merges,
+        controlTokenIds,
+        bosTokenId,
+        eosTokenId,
+        addBosToken,
+        addEosToken,
+        unknownTokenId,
+        normalizeNfc,
+        preTokenizerName,
+        Set.of());
+  }
+
+  /**
+   * Builds a byte-level BPE tokenizer that also ends generation on explicitly declared IDs.
+   *
+   * <p>Declared IDs are applied after the vocabulary heuristics, including the Harmony and Solar
+   * message-boundary exclusions, because a checkpoint's own declaration is authoritative.
+   */
+  static GgufTokenizer fromByteLevelBpe(
+      String[] vocab,
+      List<String> merges,
+      Set<Integer> controlTokenIds,
+      int bosTokenId,
+      int eosTokenId,
+      boolean addBosToken,
+      boolean addEosToken,
+      int unknownTokenId,
+      boolean normalizeNfc,
+      String preTokenizerName,
+      Set<Integer> declaredEndOfGenerationTokenIds) {
     Objects.requireNonNull(vocab, "vocab");
+    Objects.requireNonNull(declaredEndOfGenerationTokenIds, "declaredEndOfGenerationTokenIds");
     Objects.requireNonNull(merges, "merges");
     Objects.requireNonNull(controlTokenIds, "controlTokenIds");
     String[] copiedVocab = vocab.clone();
@@ -360,6 +393,16 @@ public final class GgufTokenizer implements Tokenizer {
       }
     }
     clearMessageBoundaryEndTokens(endOfGenerationTokens, tokenToId);
+    for (int token : declaredEndOfGenerationTokenIds) {
+      if (token < 0 || token >= copiedVocab.length) {
+        throw new IllegalArgumentException(
+            "declared end-of-generation token id is outside vocabulary of size "
+                + copiedVocab.length
+                + ": "
+                + token);
+      }
+      endOfGenerationTokens[token] = true;
+    }
     List<SpecialToken> controlTokens =
         controlTokenIds.stream()
             .map(
@@ -1365,5 +1408,23 @@ public final class GgufTokenizer implements Tokenizer {
   @Override
   public boolean isEndOfGeneration(int token) {
     return token >= 0 && token < endOfGenerationTokens.length && endOfGenerationTokens[token];
+  }
+
+  @Override
+  public int[] endOfGenerationTokenIds() {
+    int count = 0;
+    for (boolean terminal : endOfGenerationTokens) {
+      if (terminal) {
+        count++;
+      }
+    }
+    int[] ids = new int[count];
+    int next = 0;
+    for (int token = 0; token < endOfGenerationTokens.length; token++) {
+      if (endOfGenerationTokens[token]) {
+        ids[next++] = token;
+      }
+    }
+    return ids;
   }
 }

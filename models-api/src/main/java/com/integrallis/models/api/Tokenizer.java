@@ -109,4 +109,19 @@ public interface Tokenizer {
   default boolean isEndOfGeneration(int token) {
     return token == eosToken();
   }
+
+  /**
+   * Returns every token ID that ends generation, in ascending order.
+   *
+   * <p>This is the resolved set {@link #isEndOfGeneration(int)} answers from, exposed so the
+   * terminal tokens a loaded model will actually stop on can be inspected and logged. The default
+   * scans the vocabulary; it is intended for diagnostics, not for the decode loop.
+   *
+   * @return ascending end-of-generation token IDs
+   */
+  default int[] endOfGenerationTokenIds() {
+    return java.util.stream.IntStream.range(0, vocabSize())
+        .filter(this::isEndOfGeneration)
+        .toArray();
+  }
 }

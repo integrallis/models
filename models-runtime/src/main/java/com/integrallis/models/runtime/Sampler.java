@@ -121,10 +121,24 @@ public final class Sampler {
       topKMass += adjusted[candidate];
     }
 
-    // Top-P (nucleus) filtering
+    // Min-P filtering. Each weight is already p / p_max, so the rule p >= minP * p_max is a
+    // comparison against minP. Candidates are sorted by descending weight, so survivors form a
+    // prefix. Skipped entirely at the default of zero so disabled min-p cannot perturb the mass.
+    int survivors = candidates.length;
+    float minP = options.minP();
+    if (minP > 0.0f) {
+      survivors = 0;
+      topKMass = 0;
+      while (survivors < candidates.length && adjusted[candidates[survivors]] >= minP) {
+        topKMass += adjusted[candidates[survivors]];
+        survivors++;
+      }
+    }
+
+    // Top-P (nucleus) filtering over the min-p survivors
     float cumulative = 0;
-    int cutoff = candidates.length;
-    for (int i = 0; i < candidates.length; i++) {
+    int cutoff = survivors;
+    for (int i = 0; i < survivors; i++) {
       cumulative += adjusted[candidates[i]] / topKMass;
       if (cumulative >= options.topP()) {
         cutoff = i + 1;

@@ -21,6 +21,7 @@ import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.ToolCall;
@@ -110,37 +111,50 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
       streamActivatedTurn(request, handler, activatedModel, prompt, requested, tools);
       return;
     }
+    LangChain4jPartialResponses.Channel cancellation = LangChain4jPartialResponses.open(handler);
     TokenStream stream =
         new TokenStream() {
           @Override
           public void onToken(String token) {
-            if (!terminalSignalSent.get()) {
+            if (!terminalSignalSent.get() && !cancellation.isCancelled()) {
               accumulated.append(token);
               if (!toolsDeclared) {
-                handler.onPartialResponse(token);
+                cancellation.emit(token);
               }
             }
           }
 
           @Override
+          public boolean isCancelled() {
+            return cancellation.isCancelled();
+          }
+
+          @Override
           public void onComplete() {
-            complete(null);
+            complete(null, null);
           }
 
           @Override
           public void onComplete(GenerationUsage usage) {
-            complete(usage);
+            complete(usage, null);
           }
 
-          private void complete(GenerationUsage usage) {
-            if (terminalSignalSent.compareAndSet(false, true)) {
-              handler.onCompleteResponse(completed(accumulated.toString(), toolsDeclared, usage));
+          @Override
+          public void onComplete(GenerationUsage usage, StopReason stopReason) {
+            complete(usage, stopReason);
+          }
+
+          private void complete(GenerationUsage usage, StopReason stopReason) {
+            // LangChain4j's contract is that a cancelled stream receives no further callbacks.
+            if (terminalSignalSent.compareAndSet(false, true) && !cancellation.isCancelled()) {
+              handler.onCompleteResponse(
+                  completed(accumulated.toString(), toolsDeclared, usage, stopReason));
             }
           }
 
           @Override
           public void onError(Throwable failure) {
-            if (terminalSignalSent.compareAndSet(false, true)) {
+            if (terminalSignalSent.compareAndSet(false, true) && !cancellation.isCancelled()) {
               handler.onError(failure);
             }
           }
@@ -207,7 +221,8 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
       TokenConstraint constraint = toolConstraint(tools).orElseGet(TokenConstraint::unrestricted);
       String output = turn.generateToolCall(options, constraint);
       GenerationUsage usage = turn.toolMetrics().available() ? turn.toolMetrics().usage() : null;
-      ChatResponse response = completed(output, true, usage);
+      ChatResponse response =
+          completed(output, true, usage, turn.toolMetrics().stopReason().orElse(null));
       if (response.aiMessage().hasToolExecutionRequests()) {
         List<ToolExecutionRequest> requests =
             activatedTurns.retain(turn, response.aiMessage().toolExecutionRequests());
@@ -250,20 +265,28 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
 
             @Override
             public void onComplete() {
-              complete(null);
+              complete(null, null);
             }
 
             @Override
             public void onComplete(GenerationUsage usage) {
-              complete(usage);
+              complete(usage, null);
             }
 
-            private void complete(GenerationUsage usage) {
+            @Override
+            public void onComplete(GenerationUsage usage, StopReason stopReason) {
+              complete(usage, stopReason);
+            }
+
+            private void complete(GenerationUsage usage, StopReason stopReason) {
               if (terminal.compareAndSet(false, true)) {
                 try {
                   handler.onCompleteResponse(
                       completed(
-                          accumulated.toString(), false, combineUsage(selectionUsage, usage)));
+                          accumulated.toString(),
+                          false,
+                          combineUsage(selectionUsage, usage),
+                          stopReason));
                 } finally {
                   turn.close();
                 }
@@ -295,7 +318,8 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
   }
 
   /** Builds the terminal response, recovering any tool calls the model produced. */
-  private ChatResponse completed(String output, boolean toolsDeclared, GenerationUsage usage) {
+  private ChatResponse completed(
+      String output, boolean toolsDeclared, GenerationUsage usage, StopReason stopReason) {
     ToolCallScanner.Result scan =
         toolsDeclared
             ? ToolCallScanner.scan(output, template.toolSyntax())
@@ -304,6 +328,7 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
       var response =
           ChatResponse.builder()
               .aiMessage(AiMessage.from(scan.content()))
+              .finishReason(LangChain4jFinishReasons.of(stopReason))
               .modelName(model.modelName());
       addUsage(response, usage);
       return response.build();

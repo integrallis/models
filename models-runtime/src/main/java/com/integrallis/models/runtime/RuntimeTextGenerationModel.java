@@ -56,6 +56,15 @@ public final class RuntimeTextGenerationModel
     return generationLoop.lastGenerationMetrics();
   }
 
+  /**
+   * Returns how many generations the repetition-loop detector has stopped on this model.
+   *
+   * @return lifetime repetition-loop stops; always zero unless requests enable detection
+   */
+  public long repetitionLoopStops() {
+    return generationLoop.repetitionLoopStops();
+  }
+
   @Override
   public String generate(String prompt, SamplingOptions options) {
     return generationLoop.generate(prompt, options);

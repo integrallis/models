@@ -94,6 +94,29 @@ class Qwen2HuggingFaceConfigTest {
   }
 
   @Test
+  void acceptsAListOfEosIdsAndKeepsTheFirstAsThePrimaryEos(@TempDir Path directory)
+      throws IOException {
+    Path config = directory.resolve("config.json");
+    Files.writeString(
+        config,
+        """
+        {
+          "hidden_act": "silu",
+          "hidden_size": 16,
+          "intermediate_size": 48,
+          "max_position_embeddings": 2048,
+          "num_attention_heads": 4,
+          "num_hidden_layers": 2,
+          "rms_norm_eps": 0.00001,
+          "vocab_size": 32,
+          "eos_token_id": [7, 3]
+        }
+        """);
+
+    assertThat(Qwen2HuggingFaceConfig.parse(config).eosTokenId()).isEqualTo(7);
+  }
+
+  @Test
   void explicitHeadAndRopeValuesTakePrecedence(@TempDir Path directory) throws IOException {
     Path config = directory.resolve("config.json");
     Files.writeString(

@@ -182,6 +182,70 @@ class HuggingFaceTokenizerTest {
   }
 
   @Test
+  void declaredEndOfGenerationIdsExtendTheResolvedSet(@TempDir Path directory) throws IOException {
+    Path config = writeSyntheticConfig(directory);
+    Path tokenizer = writeTinyQwenTokenizer(directory);
+    Path tokenizerConfig = directory.resolve("tokenizer_config.json");
+    Files.writeString(
+        tokenizerConfig,
+        """
+        {"bos_token":null,"eos_token":"<|im_end|>","unk_token":null,
+         "add_bos_token":false,"add_eos_token":false}
+        """);
+    Qwen2HuggingFaceConfig modelConfig = Qwen2HuggingFaceConfig.parse(config);
+
+    Tokenizer withoutDeclaration =
+        HuggingFaceTokenizer.fromQwen2(tokenizer, tokenizerConfig, modelConfig);
+    Tokenizer withDeclaration =
+        HuggingFaceTokenizer.fromQwen2(
+            tokenizer, tokenizerConfig, modelConfig, java.util.Set.of(7, 2));
+
+    assertThat(withoutDeclaration.endOfGenerationTokenIds()).containsExactly(6);
+    assertThat(withDeclaration.endOfGenerationTokenIds()).containsExactly(2, 6, 7);
+    assertThat(withDeclaration.isEndOfGeneration(7)).isTrue();
+    assertThat(withDeclaration.isEndOfGeneration(5)).isFalse();
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                HuggingFaceTokenizer.fromQwen2(
+                    tokenizer, tokenizerConfig, modelConfig, java.util.Set.of(8)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("end-of-generation");
+  }
+
+  private static Path writeTinyQwenTokenizer(Path directory) throws IOException {
+    String qwenPattern =
+        "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}|"
+            + " ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+";
+    Path tokenizer = directory.resolve("tokenizer.json");
+    Files.writeString(
+        tokenizer,
+        """
+        {
+          "version":"1.0",
+          "normalizer":{"type":"NFC"},
+          "pre_tokenizer":{
+            "type":"Sequence",
+            "pretokenizers":[
+              {"type":"Split","pattern":{"Regex":"%s"},"behavior":"Isolated","invert":false},
+              {"type":"ByteLevel","add_prefix_space":false,"trim_offsets":false,"use_regex":false}
+            ]
+          },
+          "decoder":{"type":"ByteLevel","add_prefix_space":false,"trim_offsets":false,
+                     "use_regex":false},
+          "model":{"type":"BPE","unk_token":null,
+                   "vocab":{"a":0,"b":1,"ab":2,"Ġ":3,"Ġa":4,"Ġab":5},
+                   "merges":["Ġ a","Ġa b","a b"]},
+          "added_tokens":[
+            {"id":6,"content":"<|im_end|>","special":true},
+            {"id":7,"content":"<|im_start|>","special":true}
+          ]
+        }
+        """
+            .formatted(qwenPattern.replace("\\", "\\\\")));
+    return tokenizer;
+  }
+
+  @Test
   void matchesPinnedOfficialQwen25Tokenizer() throws Exception {
     String configured = System.getProperty("models.fixtures.qwen25HuggingFaceDirectory");
     assumeTrue(configured != null, "set models.fixtures.qwen25HuggingFaceDirectory");

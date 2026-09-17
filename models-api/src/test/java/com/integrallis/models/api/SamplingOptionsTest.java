@@ -149,6 +149,77 @@ class SamplingOptionsTest {
     }
 
     @Test
+    void minPDefaultsToDisabled() {
+      assertThat(SamplingOptions.builder().build().minP()).isZero();
+    }
+
+    @Test
+    void minPAcceptsTheClosedUnitInterval() {
+      assertThat(SamplingOptions.builder().minP(0.0f).build().minP()).isZero();
+      assertThat(SamplingOptions.builder().minP(0.05f).build().minP()).isEqualTo(0.05f);
+      assertThat(SamplingOptions.builder().minP(1.0f).build().minP()).isEqualTo(1.0f);
+    }
+
+    @Test
+    void minPOutsideTheUnitIntervalOrNonFiniteRejected() {
+      for (float invalid :
+          new float[] {
+            -0.01f, 1.01f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY
+          }) {
+        assertThatThrownBy(() -> SamplingOptions.builder().minP(invalid).build())
+            .as("minP %s", invalid)
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("minP");
+      }
+    }
+
+    @Test
+    void legacyCanonicalConstructorKeepsMinPDisabled() {
+      SamplingOptions options = new SamplingOptions(0.7f, 0.9f, 40, 16, 1L, 1.0f, List.of());
+
+      assertThat(options.minP()).isZero();
+    }
+
+    @Test
+    void repetitionLoopDetectionIsDisabledByDefault() {
+      SamplingOptions options = SamplingOptions.builder().build();
+
+      assertThat(options.repetitionLoopDetection()).isEqualTo(RepetitionLoopDetection.disabled());
+      assertThat(options.repetitionLoopDetection().enabled()).isFalse();
+      assertThat(
+              new SamplingOptions(0.7f, 0.9f, 40, 16, 1L, 1.0f, List.of())
+                  .repetitionLoopDetection())
+          .isEqualTo(RepetitionLoopDetection.disabled());
+    }
+
+    @Test
+    void repetitionLoopDetectionIsCarriedByTheBuilder() {
+      RepetitionLoopDetection detection = new RepetitionLoopDetection(32, 4, 16);
+
+      assertThat(
+              SamplingOptions.builder()
+                  .repetitionLoopDetection(detection)
+                  .build()
+                  .repetitionLoopDetection())
+          .isEqualTo(detection);
+      assertThatThrownBy(() -> SamplingOptions.builder().repetitionLoopDetection(null).build())
+          .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void repetitionLoopDetectionRejectsInvalidThresholds() {
+      assertThatThrownBy(() -> new RepetitionLoopDetection(-1, 3, 0))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> new RepetitionLoopDetection(8, 1, 0))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("minRepeats");
+      assertThatThrownBy(() -> new RepetitionLoopDetection(8, 3, -1))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThat(new RepetitionLoopDetection(0, 0, 0).enabled()).isFalse();
+      assertThat(new RepetitionLoopDetection(1, 2, 0).enabled()).isTrue();
+    }
+
+    @Test
     void emptyStopSequenceRejected() {
       assertThatThrownBy(() -> SamplingOptions.builder().stopSequence("").build())
           .isInstanceOf(IllegalArgumentException.class)
