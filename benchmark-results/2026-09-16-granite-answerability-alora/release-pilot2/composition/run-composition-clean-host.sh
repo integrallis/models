@@ -3,6 +3,12 @@
 # markers resolved from Maven Central and opened through the public ModelJars API, producing the
 # record the composition evidence needs.
 #
+# The run deliberately uses the CORE public API (org.modeljars:modeljars, ModelJars
+# .openActivatedToolRuntime with ModelBackend.NATIVE) rather than the recipe module
+# org.modeljars.composite:granite-answerability. That module is the intended supported facade, but
+# it is not on Maven Central: its publication is gated on `graniteAnswerabilityQualified`, which is
+# the composition catalog entry this very run exists to qualify. See REPRODUCE.md section 0.
+#
 # Target: a freshly provisioned Ubuntu 24.04 host (x86_64 or aarch64), run as root, with this
 # directory's CompositionCleanHost.java and write_composition_clean_host_run.py next to this script.
 #
@@ -21,14 +27,16 @@
 #                            timestamps, so it is not a property of the resolution. Its hash is in
 #                            program-sha256.txt together with the source hashes.
 #                            resolvedClasspathSha256 = sha256 of this file's bytes.
-#                            It must contain BOTH member marker JARs; the wrapper fails closed if a
-#                            marker is missing, because then nothing was resolved from Central.
+#                            It must contain BOTH member marker JARs, the ModelJars public-API jar
+#                            and the native backend; the wrapper fails closed if any is missing,
+#                            because then the run would not be the run this record describes.
 #   program-sha256.txt       sha256 of the script source, the writer and the compiled script jar
 #   composition-program-report.json  the program's own measurements and artifact resolution record
 #   published-artifacts.json the bare list assemble_composition_report.py --published-artifacts reads
 #   composition-clean-host-output.log  stdout+stderr of the program run (this is outputLog)
 #   composition-clean-host-run.json    the composition record; outputLog.uri carries the placeholder
 #                            <EVIDENCE_REVISION>, to be replaced by the commit containing the log
+#   SHA256SUMS               checksums of every other file in the output directory
 #   wrapper.log              this script's own progress lines
 #
 # Configuration (environment, all recorded in the run JSON):
@@ -50,7 +58,7 @@ ARM_ORDER="${ARM_ORDER:-composite-first}"
 LOG_REPO_PATH="benchmark-results/2026-09-16-granite-answerability-alora/release-pilot2/composition/evidence/composition-clean-host-output.log"
 
 BASE_MARKER='org.modeljars.huggingface:ibm-granite.granite-4.1-3b-gguf.q4_k_m:4.1.0-q4_k_m.2'
-SPECIALIST_MARKER='org.modeljars.github:modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32:1.0.0-f32.1'
+SPECIALIST_MARKER='org.modeljars.github:modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32:1.0.0-f32.2'
 
 JDK_RELEASE='jdk-25.0.4.1+1'
 JBANG_VERSION=0.141.0
@@ -81,8 +89,24 @@ log "start; fresh-check: $(tr '\n' ';' < "$OUT/fresh-check.txt")"
 for f in CompositionCleanHost.java write_composition_clean_host_run.py; do
   [ -f "$HERE/$f" ] || { log "missing $HERE/$f"; exit 64; }
 done
-grep -q "org.modeljars:modeljars:$MODELJARS_VERSION" "$HERE/CompositionCleanHost.java" || {
-  log "CompositionCleanHost.java does not pin ModelJars $MODELJARS_VERSION"; exit 64; }
+
+# The program is the thing under test, so what it pins is checked before anything is downloaded.
+# A //DEPS that drifted from this script's versions would produce a record naming the wrong run.
+for required in \
+  "//DEPS org.modeljars:modeljars:$MODELJARS_VERSION" \
+  "//DEPS com.integrallis:models-runtime:$MODELS_VERSION" \
+  "//DEPS com.integrallis:backend-native:$MODELS_VERSION" \
+  "//DEPS $BASE_MARKER" \
+  "//DEPS $SPECIALIST_MARKER" \
+  "--enable-native-access=ALL-UNNAMED"
+do
+  grep -Fq -- "$required" "$HERE/CompositionCleanHost.java" || {
+    log "CompositionCleanHost.java does not declare: $required"; exit 64; }
+done
+# The recipe module is not published; depending on it would make this run unresolvable. Only //DEPS
+# lines count: the module is named in the program's comments on purpose, to say why it is not used.
+! grep -Eq '^//DEPS[[:space:]]+org\.modeljars\.composite:' "$HERE/CompositionCleanHost.java" || {
+  log "CompositionCleanHost.java depends on the unpublished recipe module"; exit 64; }
 
 # 2. Host baseline.
 {
@@ -146,15 +170,24 @@ LC_ALL=C sort "$OUT/resolved-classpath.unsorted" > "$OUT/resolved-classpath.txt"
 rm -f "$OUT/resolved-classpath.unsorted"
 [ -s "$OUT/resolved-classpath.txt" ] || { log "empty resolved classpath"; exit 2; }
 
-# Both member markers must actually be on the resolved classpath, or nothing came from Central.
+# Both member markers, the public-API jar and the native backend must actually be on the resolved
+# classpath. A missing member marker means nothing was resolved from Central; a missing
+# backend-native means the rust-ffm backend the base is qualified on cannot load at all.
 marker_jar() { # group:artifact:version -> artifact-version.jar
   local coordinate="$1"
   printf '%s-%s.jar' "$(echo "$coordinate" | cut -d: -f2)" "$(echo "$coordinate" | cut -d: -f3)"
 }
-for coordinate in "$BASE_MARKER" "$SPECIALIST_MARKER"; do
+for coordinate in \
+  "$BASE_MARKER" \
+  "$SPECIALIST_MARKER" \
+  "org.modeljars:modeljars:$MODELJARS_VERSION" \
+  "com.integrallis:models-runtime:$MODELS_VERSION" \
+  "com.integrallis:backend-native:$MODELS_VERSION"
+do
   jar="$(marker_jar "$coordinate")"
   grep -Fq "  $jar" "$OUT/resolved-classpath.txt" || {
-    log "member marker $coordinate ($jar) is not on the resolved classpath"; exit 2; }
+    log "$coordinate ($jar) is not on the resolved classpath"; exit 2; }
+  log "on classpath: $jar sha256 $(grep -F "  $jar" "$OUT/resolved-classpath.txt" | head -1 | cut -d' ' -f1)"
 done
 
 {
@@ -203,8 +236,8 @@ WRITER_EXIT=$?
 set -e
 log "composition-clean-host-run.json written; pass=$([ "$WRITER_EXIT" = 0 ] && echo true || echo false)"
 
-# 7. Checksums of everything committed as evidence.
+# 7. Checksums of everything committed as evidence. Last, and it logs nothing afterwards: any
+# further wrapper.log line would make the checksum of wrapper.log wrong the moment it is written.
 ( cd "$OUT" && LC_ALL=C ls -1 | grep -v '^SHA256SUMS$' | sort | xargs -r sha256sum > SHA256SUMS )
-log "wrote $OUT/SHA256SUMS"
 
 exit "$WRITER_EXIT"
