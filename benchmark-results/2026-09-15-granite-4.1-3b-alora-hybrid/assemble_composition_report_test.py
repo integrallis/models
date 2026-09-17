@@ -1,8 +1,14 @@
 import json
 import unittest
 
-from assemble_component_report_test import AssembleComponentReportTest
+from assemble_component_report_test import (
+    AssembleComponentReportTest,
+    clean_host_run,
+    confirmed_labels,
+    models_artifact,
+)
 from assemble_composition_report import assemble
+from assemble_composition_report import main as composition_main
 
 
 class AssembleCompositionReportTest(AssembleComponentReportTest):
@@ -83,6 +89,54 @@ class AssembleCompositionReportTest(AssembleComponentReportTest):
     def test_refuses_an_artifact_record_that_does_not_cover_every_member(self):
         with self.assertRaises(ValueError):
             assemble(**self.composition_inputs(published_artifacts_path=self.artifacts(members=("base",), name="a2.json")))
+
+    def test_confirmed_labels_and_release_evidence_pass_through_to_the_composition(self):
+        inputs, dataset, confirmed = self.squad_window_with_disputed_labels()
+        composition = self.composition_inputs(window_reports=inputs["window_reports"])
+        with self.assertRaises(SystemExit):
+            assemble(**composition)
+        composition.update(
+            labels={"squad-v2-dev": self.write("c-labels.json", confirmed_labels("squad-v2-dev", confirmed, dataset))},
+            models_artifact=self.write("c-ma.json", models_artifact()),
+            clean_host_run=self.write("c-ch.json", clean_host_run()),
+        )
+        report = assemble(**composition)
+        gates = report["evaluation"]["gates"]
+        suite = next(s for s in gates["taskCorrectness"]["suites"] if s["name"] == "squad-v2-dev")
+        self.assertEqual("confirmed", suite["labelSource"])
+        self.assertAlmostEqual(0.75, suite["originalBalancedAccuracy"])
+        self.assertEqual(models_artifact(), gates["modelsArtifact"])
+        self.assertEqual(clean_host_run(), gates["cleanHostRun"])
+        self.assertEqual("integrallis_granite_4_1_3b_answerability_alora", report["evaluation"]["artifact"]["modelId"])
+
+    def test_composition_command_line_defaults_the_model_id_to_the_specialist_member(self):
+        inputs, dataset, confirmed = self.squad_window_with_disputed_labels()
+        output = self.root / "composition.json"
+        argv = [
+            "--composition-id", "hybrid",
+            "--base-member-id", "base",
+            "--specialist-member-id", "specialist",
+            "--published-artifacts", str(self.artifacts(name="cli-artifacts.json")),
+            "--adapter-directory", str(inputs["adapter_directory"]),
+            "--base-model-id", inputs["base_model_id"],
+            "--base-revision", inputs["base_revision"],
+            "--base-artifact", str(inputs["base_artifact"]),
+            "--junit-xml", str(inputs["junit_xml"]),
+            "--long-context-report", str(inputs["long_context_report"]),
+            "--crossover-report", str(self.crossover_with_medians(name="cli-gate6.json")),
+            "--models-revision", inputs["models_revision"],
+            "--labels", f"squad-v2-dev={self.write('cli-c-labels.json', confirmed_labels('squad-v2-dev', confirmed, dataset))}",
+            "--output", str(output),
+        ]
+        for key, path in inputs["window_reports"].items():
+            argv += ["--window", f"{key}={path}"]
+        for key, (java, kernel) in inputs["identity_reports"].items():
+            argv += ["--identity", f"{key}={java},{kernel}"]
+        composition_main(argv)
+        report = json.loads(output.read_text())
+        self.assertEqual("specialist", report["evaluation"]["artifact"]["modelId"])
+        self.assertNotIn("modelsArtifact", report["evaluation"]["gates"])
+        self.assertIn("confirmed", [s["labelSource"] for s in report["evaluation"]["gates"]["taskCorrectness"]["suites"]])
 
     def test_refuses_a_failing_crossover_through_the_component_gates(self):
         with self.assertRaises(SystemExit):

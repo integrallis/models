@@ -116,6 +116,11 @@ def assemble(
             "recomputedUniqueStateBytes": tier["recomputedMedianUniqueStateBytes"],
         },
     }
+    # The composition gate does not read these today; they are carried so a composition report
+    # binds the same released artifacts and clean-host run as its component report.
+    for release_gate in ("modelsArtifact", "cleanHostRun"):
+        if release_gate in gates:
+            composition_gates[release_gate] = gates[release_gate]
     correctness = composition_gates["taskCorrectness"]["pass"] and composition_gates["longContextRetrieval"]["pass"]
     sharing = (
         composition_gates["performanceCrossover"]["pass"]
@@ -155,11 +160,13 @@ def assemble(
     }
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--composition-id", required=True)
     parser.add_argument("--base-member-id", required=True)
     parser.add_argument("--specialist-member-id", required=True)
+    parser.add_argument("--model-id", help="evaluation.artifact.modelId; defaults to --specialist-member-id")
+    component.add_release_arguments(parser)
     parser.add_argument("--published-artifacts", type=Path, required=True)
     parser.add_argument("--adapter-directory", type=Path, required=True)
     parser.add_argument("--base-model-id", required=True)
@@ -172,7 +179,7 @@ def main() -> None:
     parser.add_argument("--crossover-report", type=Path, required=True)
     parser.add_argument("--models-revision", required=True)
     parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     window_reports = {}
     for spec in args.window:
         key, path = spec.split("=", 1)
@@ -197,6 +204,10 @@ def main() -> None:
         long_context_report=args.long_context_report,
         crossover_report=args.crossover_report,
         models_revision=args.models_revision,
+        model_id=args.model_id or args.specialist_member_id,
+        labels=component.label_paths(args.labels),
+        models_artifact=args.models_artifact,
+        clean_host_run=args.clean_host_run,
     )
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     evaluation = report["evaluation"]

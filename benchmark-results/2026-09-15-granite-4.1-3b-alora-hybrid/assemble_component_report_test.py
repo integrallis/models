@@ -4,7 +4,115 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from assemble_component_report import assemble, bundle_identity, kernel_identity, window_suites
+from assemble_component_report import (
+    assemble,
+    bundle_identity,
+    kernel_identity,
+    main,
+    validate_clean_host_run,
+    validate_models_artifact,
+    window_suites,
+)
+
+MODULES = ["backend-java", "models-runtime", "models-spring-ai", "models-langchain4j"]
+
+
+def labeled_window(backend, predictions, dataset_labels):
+    """A complete window report whose summary is scored from its own per-case predictions."""
+    ids = sorted(dataset_labels)
+    counts = {label: [0, 0] for label in ("answerable", "unanswerable")}
+    for cid in ids:
+        counts[dataset_labels[cid]][1] += 1
+        counts[dataset_labels[cid]][0] += predictions[cid] == dataset_labels[cid]
+    balanced = 0.5 * sum(correct / total for correct, total in counts.values())
+    return {
+        "backend": backend,
+        "complete": True,
+        "limit": 0,
+        "windowSha256": "9" * 64,
+        "summary": {
+            "cases": len(ids),
+            "structuredRate": 1.0,
+            "balancedAccuracy": balanced,
+            "physicallyShared": len(ids),
+            "answerableCorrect": counts["answerable"][0],
+            "answerableCases": counts["answerable"][1],
+            "unanswerableCorrect": counts["unanswerable"][0],
+            "unanswerableCases": counts["unanswerable"][1],
+        },
+        "cases": [
+            {
+                "id": cid,
+                "label": dataset_labels[cid],
+                "prediction": predictions[cid],
+                "structured": True,
+                "physicallyShared": True,
+                "output": f'"{predictions[cid]}"',
+                "sharedPrefixTokens": 100,
+            }
+            for cid in ids
+        ],
+    }
+
+
+def confirmed_labels(suite, labels, dataset_labels):
+    """A label file in the shape confirm_disputed_labels.py writes."""
+    cases = sorted(
+        (
+            {
+                "id": cid,
+                "label": labels[cid],
+                "datasetLabel": dataset_labels[cid],
+                "source": "audit-kept" if labels[cid] == dataset_labels[cid] else "evidence-confirmed",
+            }
+            for cid in labels
+        ),
+        key=lambda case: case["id"],
+    )
+    canon = json.dumps(cases, sort_keys=True, separators=(",", ":"))
+    return {"suite": suite, "cases": cases, "casesSha256": hashlib.sha256(canon.encode()).hexdigest()}
+
+
+def models_artifact(version="0.3.42"):
+    return {
+        "pass": True,
+        "version": version,
+        "artifacts": [
+            {
+                "module": module,
+                "coordinate": f"com.integrallis:{module}:{version}",
+                **{
+                    kind: {
+                        "uri": f"https://repo1.maven.org/maven2/com/integrallis/{module}/{version}/{module}-{version}.{kind}",
+                        "sha256": "c" * 64,
+                        "sizeBytes": 1234,
+                    }
+                    for kind in ("jar", "pom")
+                },
+            }
+            for module in MODULES
+        ],
+    }
+
+
+def clean_host_run(version="0.3.42"):
+    return {
+        "pass": True,
+        "freshMachine": True,
+        "externalInference": False,
+        "javaMajor": 25,
+        "exitCode": 0,
+        "modelsVersion": version,
+        "startedAt": "2026-09-17T10:00:00Z",
+        "completedAt": "2026-09-17T10:30:00Z",
+        "command": ["java", "-jar", "qualify.jar"],
+        "resolvedClasspathSha256": "d" * 64,
+        "outputLog": {
+            "uri": "https://raw.githubusercontent.com/integrallis/models/" + "e" * 40 + "/benchmark-results/run.log",
+            "sha256": "f" * 64,
+            "sizeBytes": 4096,
+        },
+    }
 
 
 def window_report(backend, balanced, structured=1.0, shared=None, cases=110, complete=True):
@@ -142,6 +250,7 @@ class AssembleComponentReportTest(unittest.TestCase):
             long_context_report=self.long_context(),
             crossover_report=self.crossover(),
             models_revision="f" * 40,
+            model_id="integrallis_granite_4_1_3b_answerability_alora",
         )
         arguments.update(overrides)
         return arguments
@@ -210,6 +319,179 @@ class AssembleComponentReportTest(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "backend differs"):
             window_suites(reports)
+
+    def squad_window_with_disputed_labels(self):
+        """200 cases; the dataset calls c100-c139 unanswerable but confirmation says answerable.
+
+        The specialist answers c000-c089 and c100-c139: 0.75 on dataset labels (below the floor),
+        (130/140 + 60/60) / 2 on confirmed labels. The base answers everything: 0.50 either way.
+        """
+        dataset = {f"c{i:03d}": "answerable" if i < 100 else "unanswerable" for i in range(200)}
+        confirmed = {cid: ("answerable" if 100 <= int(cid[1:]) < 140 else label) for cid, label in dataset.items()}
+        specialist = {
+            cid: ("answerable" if int(cid[1:]) < 90 or 100 <= int(cid[1:]) < 140 else "unanswerable") for cid in dataset
+        }
+        base = {cid: "answerable" for cid in dataset}
+        inputs = self.inputs()
+        inputs["window_reports"]["squad-v2-dev|specialist"] = self.write("ls.json", labeled_window("rust-ffm", specialist, dataset))
+        inputs["window_reports"]["squad-v2-dev|base"] = self.write("lb.json", labeled_window("rust-ffm", base, dataset))
+        return inputs, dataset, confirmed
+
+    def test_dataset_labels_are_recorded_as_the_label_source_without_confirmed_labels(self):
+        report = assemble(**self.inputs())
+        suites = report["evaluation"]["gates"]["taskCorrectness"]["suites"]
+        self.assertEqual(["dataset", "dataset"], [s["labelSource"] for s in suites])
+        self.assertNotIn("labelsSha256", suites[0])
+        self.assertEqual("integrallis_granite_4_1_3b_answerability_alora", report["evaluation"]["artifact"]["modelId"])
+        self.assertNotIn("modelsArtifact", report["evaluation"]["gates"])
+        self.assertNotIn("cleanHostRun", report["evaluation"]["gates"])
+
+    def test_confirmed_labels_rescore_both_arms_from_per_case_predictions(self):
+        inputs, dataset, confirmed = self.squad_window_with_disputed_labels()
+        with self.assertRaisesRegex(SystemExit, "taskCorrectness"):
+            assemble(**inputs)
+        document = confirmed_labels("squad-v2-dev", confirmed, dataset)
+        inputs["labels"] = {"squad-v2-dev": self.write("confirmed.json", document)}
+
+        report = assemble(**inputs)
+
+        suites = report["evaluation"]["gates"]["taskCorrectness"]["suites"]
+        suite = next(s for s in suites if s["name"] == "squad-v2-dev")
+        self.assertEqual("confirmed", suite["labelSource"])
+        self.assertEqual(document["casesSha256"], suite["labelsSha256"])
+        self.assertAlmostEqual(0.5 * (130 / 140 + 1.0), suite["balancedAccuracy"])
+        self.assertAlmostEqual(0.5, suite["baseBalancedAccuracy"])
+        self.assertAlmostEqual(0.75, suite["originalBalancedAccuracy"])
+        self.assertAlmostEqual(0.5, suite["originalBaseBalancedAccuracy"])
+        low, high = suite["balancedInterval95"]
+        self.assertLess(low, suite["balancedAccuracy"])
+        self.assertGreater(high, suite["balancedAccuracy"])
+        self.assertEqual(
+            (130, 140, 60, 60),
+            (suite["answerableCorrect"], suite["answerableCases"], suite["unanswerableCorrect"], suite["unanswerableCases"]),
+        )
+        self.assertEqual((1.0, 200, 200), (suite["structuredRate"], suite["cases"], suite["physicallySharedCases"]))
+        other = next(s for s in suites if s["name"] != "squad-v2-dev")
+        self.assertEqual("dataset", other["labelSource"])
+
+    def test_confirmed_labels_fail_closed_on_case_set_hash_or_suite_mismatch(self):
+        inputs, dataset, confirmed = self.squad_window_with_disputed_labels()
+        missing = dict(confirmed)
+        missing.pop("c000")
+        inputs["labels"] = {"squad-v2-dev": self.write("missing.json", confirmed_labels("squad-v2-dev", missing, dataset))}
+        with self.assertRaisesRegex(ValueError, "case ids"):
+            assemble(**inputs)
+        tampered = confirmed_labels("squad-v2-dev", confirmed, dataset)
+        tampered["cases"][0]["label"] = "unanswerable"
+        inputs["labels"] = {"squad-v2-dev": self.write("tampered.json", tampered)}
+        with self.assertRaisesRegex(ValueError, "casesSha256"):
+            assemble(**inputs)
+        inputs["labels"] = {"squad-v2-dev": self.write("other.json", confirmed_labels("msmarco-v2.1-validation", confirmed, dataset))}
+        with self.assertRaisesRegex(ValueError, "suite"):
+            assemble(**inputs)
+        inputs["labels"] = {"no-such-suite": self.write("nosuite.json", confirmed_labels("no-such-suite", confirmed, dataset))}
+        with self.assertRaisesRegex(ValueError, "no-such-suite"):
+            assemble(**inputs)
+
+    def test_confirmed_labels_still_apply_the_floor(self):
+        inputs, dataset, _ = self.squad_window_with_disputed_labels()
+        # Confirmed labels that agree with the dataset leave the specialist at 0.75: still refused.
+        inputs["labels"] = {"squad-v2-dev": self.write("same.json", confirmed_labels("squad-v2-dev", dataset, dataset))}
+        with self.assertRaisesRegex(SystemExit, "taskCorrectness"):
+            assemble(**inputs)
+
+    def test_models_artifact_and_clean_host_run_are_validated_and_copied(self):
+        report = assemble(
+            **self.inputs(
+                models_artifact=self.write("ma.json", models_artifact()),
+                clean_host_run=self.write("ch.json", clean_host_run()),
+            )
+        )
+        self.assertEqual(models_artifact(), report["evaluation"]["gates"]["modelsArtifact"])
+        self.assertEqual(clean_host_run(), report["evaluation"]["gates"]["cleanHostRun"])
+        with self.assertRaisesRegex(ValueError, "cleanHostRun"):
+            assemble(
+                **self.inputs(
+                    models_artifact=self.write("ma2.json", models_artifact()),
+                    clean_host_run=self.write("ch2.json", clean_host_run("0.3.41")),
+                )
+            )
+        with self.assertRaisesRegex(ValueError, "modelsArtifact"):
+            assemble(**self.inputs(clean_host_run=self.write("ch3.json", clean_host_run())))
+
+    def test_models_artifact_validation_mirrors_the_gate(self):
+        validate_models_artifact(models_artifact())
+        mutations = [
+            lambda g: g.pop("pass"),
+            lambda g: g.update(version="0.3"),
+            lambda g: g["artifacts"].pop(),
+            lambda g: g["artifacts"][1].update(module="backend-java", coordinate="com.integrallis:backend-java:0.3.42"),
+            lambda g: g["artifacts"][0].update(coordinate="com.integrallis:backend-java:0.3.41"),
+            lambda g: g["artifacts"][0]["jar"].update(uri="https://example.com/backend-java-0.3.42.jar"),
+            lambda g: g["artifacts"][0]["pom"].update(sha256="C" * 64),
+            lambda g: g["artifacts"][0]["jar"].update(sizeBytes=0),
+            lambda g: g["artifacts"][0]["jar"].update(sizeBytes=True),
+            lambda g: g["artifacts"][0].pop("pom"),
+        ]
+        for index, mutate in enumerate(mutations):
+            gate = models_artifact()
+            mutate(gate)
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "modelsArtifact"):
+                validate_models_artifact(gate)
+
+    def test_clean_host_run_validation_mirrors_the_gate(self):
+        validate_clean_host_run(clean_host_run(), "0.3.42")
+        mutations = [
+            lambda r: r.pop("pass"),
+            lambda r: r.update(freshMachine=False),
+            lambda r: r.update(externalInference=None),
+            lambda r: r.update(javaMajor=21),
+            lambda r: r.update(exitCode=1),
+            lambda r: r.update(exitCode=False),
+            lambda r: r.update(completedAt="2026-09-17T09:00:00Z"),
+            lambda r: r.update(startedAt="2026-09-17 10:00:00"),
+            lambda r: r.update(command=[]),
+            lambda r: r.update(command=["java", ""]),
+            lambda r: r.update(resolvedClasspathSha256="d" * 63),
+            lambda r: r["outputLog"].update(uri="https://raw.githubusercontent.com/integrallis/models/main/run.log"),
+            lambda r: r["outputLog"].update(sizeBytes=-1),
+        ]
+        for index, mutate in enumerate(mutations):
+            run = clean_host_run()
+            mutate(run)
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "cleanHostRun"):
+                validate_clean_host_run(run, "0.3.42")
+
+    def test_command_line_passes_labels_model_id_and_release_evidence_through(self):
+        inputs, dataset, confirmed = self.squad_window_with_disputed_labels()
+        labels = self.write("cli-labels.json", confirmed_labels("squad-v2-dev", confirmed, dataset))
+        output = self.root / "report.json"
+        argv = [
+            "--adapter-directory", str(inputs["adapter_directory"]),
+            "--base-model-id", inputs["base_model_id"],
+            "--base-revision", inputs["base_revision"],
+            "--base-artifact", str(inputs["base_artifact"]),
+            "--junit-xml", str(inputs["junit_xml"]),
+            "--long-context-report", str(inputs["long_context_report"]),
+            "--crossover-report", str(inputs["crossover_report"]),
+            "--models-revision", inputs["models_revision"],
+            "--model-id", "integrallis_answerability",
+            "--labels", f"squad-v2-dev={labels}",
+            "--models-artifact", str(self.write("cli-ma.json", models_artifact())),
+            "--clean-host-run", str(self.write("cli-ch.json", clean_host_run())),
+            "--output", str(output),
+        ]
+        for key, path in inputs["window_reports"].items():
+            argv += ["--window", f"{key}={path}"]
+        for key, (java, kernel) in inputs["identity_reports"].items():
+            argv += ["--identity", f"{key}={java},{kernel}"]
+        main(argv)
+        report = json.loads(output.read_text())
+        gates = report["evaluation"]["gates"]
+        self.assertEqual("integrallis_answerability", report["evaluation"]["artifact"]["modelId"])
+        self.assertIn("confirmed", [s["labelSource"] for s in gates["taskCorrectness"]["suites"]])
+        self.assertEqual("0.3.42", gates["modelsArtifact"]["version"])
+        self.assertTrue(gates["cleanHostRun"]["pass"])
 
 
 if __name__ == "__main__":
