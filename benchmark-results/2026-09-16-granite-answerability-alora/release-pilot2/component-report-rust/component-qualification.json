@@ -1,0 +1,327 @@
+{
+  "evaluation": {
+    "artifact": {
+      "bundleSha256": "c3e388797c3a7cfda2cf9e05f8c63e42d52b12d0095e2930dec66eb6cfd20101",
+      "bundleSizeBytes": 124606919,
+      "files": [
+        {
+          "path": "adapter_model.safetensors",
+          "role": "adapter-weights",
+          "sha256": "67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6",
+          "sizeBytes": 124593064
+        },
+        {
+          "path": "models-activated-lora.json",
+          "role": "adapter-configuration",
+          "sha256": "27de22cf55ca941832bb3d5d6e0ce46de570edfc85f00ea33a11c30b2d33ccd3",
+          "sizeBytes": 1976
+        },
+        {
+          "path": "NOTICE",
+          "role": "attribution-notice",
+          "sha256": "4d3b1f70e77411b1d51ba33215dfe2bd7d1f4090d384725b7f1820df7a8937b1",
+          "sizeBytes": 1095
+        },
+        {
+          "path": "LICENSE",
+          "role": "license",
+          "sha256": "f3b8149a65f7ae0e2fe55de40d52b98dd8965e6b213b7c441a9596ba670c2e64",
+          "sizeBytes": 10784
+        }
+      ],
+      "modelId": "modeljars_granite_4_1_3b_answerability_alora_integrallis_f32",
+      "sha256": "67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6",
+      "sizeBytes": 124593064
+    },
+    "base": {
+      "modelId": "ibm_granite_granite_4_1_3b_gguf_q4_k_m",
+      "revision": "ab4701481089b58a082ef63cc1cee738887293ff",
+      "sha256": "662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29",
+      "sizeBytes": 2099501664
+    },
+    "gates": {
+      "cleanHostRun": {
+        "backend": "rust-ffm",
+        "command": [
+          "jbang",
+          "--deps",
+          "com.integrallis:backend-native:0.3.42",
+          "AnswerabilityCleanHost.java",
+          "--backend",
+          "rust-ffm",
+          "--store",
+          "/opt/modeljars-clean-host/store"
+        ],
+        "completedAt": "2026-09-17T20:11:35Z",
+        "exitCode": 0,
+        "externalInference": false,
+        "freshMachine": true,
+        "javaMajor": 25,
+        "modelsVersion": "0.3.42",
+        "nativeLibrary": {
+          "abi": 5,
+          "kernelPlan": "rust-ffm-v13",
+          "library": "libjmodels_kernels.so",
+          "platform": "linux-x86_64",
+          "sha256": "b74d6e386d8494455b10698c1042e8d9e746cc60c8dce3b936b7cb5c203589d8",
+          "source": "bundled-classpath"
+        },
+        "outputLog": {
+          "sha256": "d0bcf5b2d9398459e8078de088ec8c69d776fcf66a5f82751498f1124ad56c1f",
+          "sizeBytes": 4596,
+          "uri": "https://raw.githubusercontent.com/integrallis/models/21e310b938cd49f0e982826d6fe7f290ef249cc6/benchmark-results/2026-09-16-granite-answerability-alora/release-pilot2/clean-host/evidence-rust-ffm/clean-host-output.log"
+        },
+        "pass": true,
+        "resolvedClasspathSha256": "6c4649cb093f6fdaa0e6b8327dad12ce29f0501ef1a0a9c70180dd91f2807667",
+        "startedAt": "2026-09-17T20:09:58Z"
+      },
+      "jvmMechanics": {
+        "batchedPrefillIdentity": true,
+        "disabledAdapterNoOp": true,
+        "exactBaseContinuation": true,
+        "junit": "TEST-com.integrallis.models.backend.purejava.Granite41AloraIntegrationTest.xml",
+        "pass": true,
+        "physicalStorageIdentity": true,
+        "realWeights": true
+      },
+      "kernelIdentity": {
+        "backend": "rust-ffm",
+        "casesPerSuitePerArm": 10,
+        "comparisons": 2,
+        "identicalOutputs": true,
+        "pass": true
+      },
+      "longContext": {
+        "cases": 8,
+        "exactBaseOutput": true,
+        "nativeCorrectCases": 7,
+        "pass": true,
+        "physicalStorageIdentity": true,
+        "policyVersion": "activated-answerability-long-context-retention-v1",
+        "prefixTokens": 4096,
+        "retainedNativeCorrectCases": 7,
+        "specialistCorrectCases": 8
+      },
+      "modelsArtifact": {
+        "artifacts": [
+          {
+            "coordinate": "com.integrallis:backend-java:0.3.42",
+            "jar": {
+              "sha256": "531326e385b2c39700f04859719e3b9b7f2a842edb61c28afb25f15995f8a979",
+              "sizeBytes": 817298,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/backend-java/0.3.42/backend-java-0.3.42.jar"
+            },
+            "module": "backend-java",
+            "pom": {
+              "sha256": "4cb611207985d2f57e03e6a0b82d223641e7776705c668feb5b6a815cdc04bca",
+              "sizeBytes": 2223,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/backend-java/0.3.42/backend-java-0.3.42.pom"
+            }
+          },
+          {
+            "coordinate": "com.integrallis:models-runtime:0.3.42",
+            "jar": {
+              "sha256": "b520e8fdb643709493cd7b9b3024d12a3b195e64e54347c087070feb940cc652",
+              "sizeBytes": 225690,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/models-runtime/0.3.42/models-runtime-0.3.42.jar"
+            },
+            "module": "models-runtime",
+            "pom": {
+              "sha256": "e04b960eea6936f40d731f515dbdc36701d2dba9439eb69d6fcf3bc488efb31c",
+              "sizeBytes": 1856,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/models-runtime/0.3.42/models-runtime-0.3.42.pom"
+            }
+          },
+          {
+            "coordinate": "com.integrallis:models-spring-ai:0.3.42",
+            "jar": {
+              "sha256": "09c34407d2689d1bee182640e177da6c64e9f71c54561fb717b42bccd8fc9e00",
+              "sizeBytes": 45089,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/models-spring-ai/0.3.42/models-spring-ai-0.3.42.jar"
+            },
+            "module": "models-spring-ai",
+            "pom": {
+              "sha256": "b0ca75a5ba48a2c19d008c018b966c7d88d5cd4bf4b5b724cafefc33138de1d7",
+              "sizeBytes": 2244,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/models-spring-ai/0.3.42/models-spring-ai-0.3.42.pom"
+            }
+          },
+          {
+            "coordinate": "com.integrallis:models-langchain4j:0.3.42",
+            "jar": {
+              "sha256": "a7c1376126720c1af37eb5b6a826b295ebd4048c97a4cbe55f02d157309adfb3",
+              "sizeBytes": 56590,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/models-langchain4j/0.3.42/models-langchain4j-0.3.42.jar"
+            },
+            "module": "models-langchain4j",
+            "pom": {
+              "sha256": "db7d23824bbc00587bbe9a03269856f986f504266ed5ccc9de05b1c3741567c5",
+              "sizeBytes": 2250,
+              "uri": "https://repo1.maven.org/maven2/com/integrallis/models-langchain4j/0.3.42/models-langchain4j-0.3.42.pom"
+            }
+          }
+        ],
+        "pass": true,
+        "version": "0.3.42"
+      },
+      "performanceAndMemory": {
+        "crossoverPrefixTokens": 256,
+        "fourKImprovement": 0.5017724956792532,
+        "jvmNativeMemoryAvailable": true,
+        "memoryComplete": true,
+        "pass": true,
+        "peakRssBytes": 10477772800,
+        "physicalSharing": true,
+        "policyVersion": "activated-prefix-sharing-crossover-v3",
+        "prefixTiers": [
+          256,
+          1024,
+          4096
+        ],
+        "recomputedIndependence": true,
+        "tokenExactAtAllTiers": true
+      },
+      "plainJava": {
+        "conformanceOracle": "llama.cpp b9960-a935fbffe",
+        "greedyOracles": 2,
+        "junit": "TEST-com.integrallis.models.backend.purejava.Granite41AloraIntegrationTest.xml",
+        "markerRoundTrip": true,
+        "pass": true,
+        "realWeights": true
+      },
+      "provenance": {
+        "adapterConfigSha256": "7b559cf39b86084d92363ad6bce1ed92a9ef3c2de78e512c65b693dd6e1f7209",
+        "adapterSha256": "67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6",
+        "invocationTokens": [
+          100264,
+          78191,
+          100265
+        ],
+        "license": "Apache-2.0",
+        "modelCardSha256": "e1f2dc74d2e3157119ed63df2e60766501bfdfd83380604400fbb2b51ebe6d14",
+        "pass": true,
+        "preparedDataManifest": {
+          "sha256": "2af216a3c95dfbe7dc30e9013d42359523c6729034cdee141b650ee70684aac4",
+          "sizeBytes": 1015,
+          "uri": "https://raw.githubusercontent.com/integrallis/models/ec56bc99a04457df8274c84c1f4ff72dc4167d9d/benchmark-results/2026-09-16-granite-answerability-alora/prepared-manifest.json"
+        },
+        "publisher": "Integrallis",
+        "tokenizerFiles": [
+          {
+            "name": "chat_template.jinja",
+            "sha256": "fed2756d2d24e127b951dcf139d0b03ab7db8ef23a456128ebc9c2db4901d476"
+          },
+          {
+            "name": "merges.txt",
+            "sha256": "b6fe424e334903f7fb84d3a106d9730455f4744b9fe3c21ee136d97a00e72502"
+          },
+          {
+            "name": "special_tokens_map.json",
+            "sha256": "c08676c49fd7969a3130f72be6d4bf34da66aa484a6e21dffe359893a1bd5f2e"
+          },
+          {
+            "name": "tokenizer.json",
+            "sha256": "e2bad66439538cb4d5a7580680932432ed9ece9d3b8577e675512bdf11599253"
+          },
+          {
+            "name": "tokenizer_config.json",
+            "sha256": "a5ec5daab12ba090a90f3dd169c8f9c275557013a87b9c1258dc7cb497a35c86"
+          },
+          {
+            "name": "vocab.json",
+            "sha256": "8af71076de8b0b626eed0f4c984faf0a7c062479164b2a31308a948524d4f69c"
+          }
+        ],
+        "trainingDataLicenses": [
+          {
+            "dataset": "SQuAD 2.0",
+            "license": "CC-BY-SA-4.0"
+          },
+          {
+            "dataset": "QuAC",
+            "license": "CC-BY-SA-4.0"
+          },
+          {
+            "dataset": "MS MARCO v2.1",
+            "license": "Microsoft MS MARCO terms (use approved by publisher)"
+          }
+        ],
+        "trainingManifest": {
+          "sha256": "223f423f1d9629c03b8a93b20581b2327bec37fc1fdc94a6fd9137bc118a72a4",
+          "sizeBytes": 2864,
+          "uri": "https://raw.githubusercontent.com/integrallis/models/ec56bc99a04457df8274c84c1f4ff72dc4167d9d/benchmark-results/2026-09-16-granite-answerability-alora/pilot2/training-manifest.json"
+        },
+        "trainingRepository": "integrallis/models",
+        "trainingRevision": "ec56bc99a04457df8274c84c1f4ff72dc4167d9d",
+        "upstream": false
+      },
+      "taskCorrectness": {
+        "backend": "rust-ffm",
+        "pass": true,
+        "promptOracleIdentical": true,
+        "suites": [
+          {
+            "answerableCases": 120,
+            "answerableCorrect": 107,
+            "balancedAccuracy": 0.8333333333333334,
+            "balancedInterval95": [
+              0.7477874833497844,
+              0.8941291496805519
+            ],
+            "baseBalancedAccuracy": 0.5145833333333334,
+            "baseBalancedInterval95": [
+              0.41661851057413396,
+              0.6107184316111944
+            ],
+            "baseStructuredRate": 0.705,
+            "cases": 200,
+            "labelSource": "confirmed",
+            "labelsSha256": "e8425109790687d096a59659107d907bd2b1fbe6c5ae723de180bb7508d596ff",
+            "name": "msmarco-v2.1-validation",
+            "originalBalancedAccuracy": 0.725,
+            "originalBaseBalancedAccuracy": 0.435,
+            "physicallySharedCases": 200,
+            "structuredRate": 1.0,
+            "unanswerableCases": 80,
+            "unanswerableCorrect": 62
+          },
+          {
+            "answerableCases": 105,
+            "answerableCorrect": 96,
+            "balancedAccuracy": 0.8781954887218044,
+            "balancedInterval95": [
+              0.8003889157220367,
+              0.9280833708447651
+            ],
+            "baseBalancedAccuracy": 0.5285714285714286,
+            "baseBalancedInterval95": [
+              0.44589131318050934,
+              0.6081633986291418
+            ],
+            "baseStructuredRate": 0.755,
+            "cases": 200,
+            "labelSource": "confirmed",
+            "labelsSha256": "2f4f78977fbacf355a9c06e681426212bcb5a8890e0f65c38f5d3f31762aa7a5",
+            "name": "squad-v2-dev",
+            "originalBalancedAccuracy": 0.865,
+            "originalBaseBalancedAccuracy": 0.535,
+            "physicallySharedCases": 200,
+            "structuredRate": 1.0,
+            "unanswerableCases": 95,
+            "unanswerableCorrect": 80
+          }
+        ],
+        "windowSha256": "ea9e4a0c80ad4d9e19db7fe6a6274d0ef949d14f73300869111452c49ada268c"
+      }
+    },
+    "qualified": true
+  },
+  "implementation": {
+    "externalInference": false,
+    "modelsRevision": "6063076e476ba7a477e3f6dd966a77b571352d29",
+    "publicApiExercised": true,
+    "runtime": "java"
+  },
+  "schemaVersion": 1,
+  "specialistKind": "first-party-rag-specialist"
+}
