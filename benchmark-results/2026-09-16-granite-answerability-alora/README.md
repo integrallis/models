@@ -199,7 +199,7 @@ the count of flipped and excluded cases.
 - If the adjudicated suite excludes more than 25 % of cases, it is reported as unusable and no
   pass is claimed from it.
 
-## Pilot 5: no MS MARCO training data (pre-registered 2026-09-17T12:20Z, at launch, before any result)
+## Pilot 5: no MS MARCO training data (pre-registered 2026-09-17T12:10Z, at launch, before any result)
 
 **Why.** Pilots 1–4 all trained on MS MARCO v2.1 train records. MS MARCO's terms
 (microsoft.github.io/msmarco, read 2026-09-17) state: "The MS MARCO datasets are intended for
