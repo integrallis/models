@@ -74,3 +74,15 @@ comparable across runs: pilot 2 0.775 against pilot 1 0.742, with the multi-turn
 A 3,072-token smoke run on the same 8 GB card started after pilot 2 (records over the cut in
 its 300-record sample: 6, against about 20 % at 2,048 tokens) to check whether longer sequences
 fit before committing a full run to them.
+
+### Pilot 2 on the frozen window (PEFT reference, bf16 base, CPU; window ea9e4a0c)
+
+| suite                   | pilot 2 | answerable | unanswerable | pilot 1 | IBM adapter | gate |
+|-------------------------|--------:|-----------:|-------------:|--------:|------------:|-----:|
+| squad-v2-dev            | **0.860** | 92/100   | 80/100       | 0.840   | 0.795       | 0.8 ✓ |
+| msmarco-v2.1-validation | 0.750   | 82/100     | 68/100       | 0.730   | 0.720       | 0.8 ✗ |
+| mtrag-human-rag         | 0.673   | 27/55      | 47/55        | 0.682   | 0.582       | (out of scope, reported) |
+
+2.5× the data moved both single-turn suites up two points and left multi-turn flat; the held-out
+QuAC gain (0.70 → 0.73) did not transfer to MT-RAG, whose answerable recall stays at half. MS MARCO
+is still the blocking suite. Pilot 3 (same records, 3,072-token cut) tests the length lever next.
