@@ -859,3 +859,41 @@ Measured: 200 cases, structured 1.0, balanced **0.700**, all 200 physically shar
 The PEFT reference read of 0.720 two hours earlier predicted this within two points. Under
 the pre-registered rule the IBM adapter fails the second suite on the runtime it ships with;
 the base arm and the pure-Java arms complete for the record. Track B continues.
+
+### 2026-09-17T12:40Z — HARNESS FIX: label audit is a required stage before a suite can gate (pre-registered before any SQuAD or MT-RAG audit)
+
+**What went wrong.** The MS MARCO v2.1 suite was frozen and gated on without checking its labels.
+- A blind audit with two judges found its "No Answer Present." labels unreliable. Of 100
+  unanswerable labels, 40 were kept, 35 were contradicted by both judges, and 25 were disputed
+  (`../2026-09-16-granite-answerability-alora/msmarco-label-audit/`).
+- Four adapter pilots were trained against that instrument.
+- Every arm's MS MARCO shortfall fits a label defect, not a model defect. Re-scored on the
+  adjudicated suite, every adapter arm clears 0.80, including IBM's own. That re-score is
+  post-hoc in origin and decides nothing on its own.
+
+**Rule from now on.**
+- **Blind audit.** Every suite used as a gate passes `audit_suite_labels.py`: two blind judges
+  (`export`), then `adjudicate`.
+- **Admission.** The admission rule in that file decides which labels may gate:
+  - `ORIGINAL_ADMISSIBLE`: flipped + excluded ≤ 10 % per label; the original labels gate.
+  - `ADJUDICATED_ONLY`: exclusions ≤ 25 % and ≥ 30 cases per label; only adjudicated labels gate.
+  - `UNUSABLE`: neither holds; the suite may not gate.
+- **Intervals.** Rescored results carry Wilson 95 % intervals. The 0.80 floor is unchanged and
+  applies to the point estimate, as originally frozen. The interval is reported beside it, so a
+  pass or fail inside the noise is visible as such.
+- **Training data.** Training sources get the same audit before a pilot is launched. MS MARCO
+  "No Answer Present." records are not used as unanswerable training examples until an audited
+  sample admits them. Pilot 4 used 4,500 of them.
+
+**Applied now.**
+- SQuAD v2 dev (window v2, 200 cases) is audited under this rule: parts exported with seed
+  20260918, same judge prompt, Claude Opus = A, Claude Sonnet = B.
+- MS MARCO is already adjudicated: `ADJUDICATED_ONLY`, 171 cases, casesSha256 `6e3a19c0…`, by
+  the tool (identical labels to the hand-built file `18bc2d8b…`, which hashed cases in window
+  order).
+- **Gate re-evaluation.** Unchanged component gate (structured 1.0, ≥ 0.80, ≥ base, both Java
+  backends), read on each suite's admitted labels.
+  - Existing Java evidence is re-scored; no model is re-run.
+  - The candidate is IBM's answerability adapter, whose Java arms were recorded under window v2.
+  - Our pilots are PEFT-reference only, so they cannot pass the Java gate without Java runs.
+- MT-RAG stays out of the gate as before.
