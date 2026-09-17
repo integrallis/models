@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.41] - 2026-09-17
+
 ### Added
 - Min-p sampling: `SamplingOptions.minP` (default 0 = disabled, validated to [0, 1]) keeps tokens with p >= minP * p_max on the temperature-scaled distribution, applied before top-p (it commutes with top-k). Skipped entirely at 0, so default sampling is byte-identical. Exposed as `integrallis.models.sampling.min-p` and carried from defaults by the LangChain4j and Spring AI adapters.
 - Typed stop reasons: `StopReason` (`EOS`, `STOP_SEQUENCE`, `CONSTRAINT_COMPLETE`, `REPETITION_LOOP`, `CANCELLED`, `MAX_TOKENS`) is delivered through the new `TokenStream.onComplete(GenerationUsage, StopReason)` (its default forwards to `onComplete(GenerationUsage)`) and recorded in `GenerationMetrics.stopReason()` on the sequential, speculative and continuous-batching paths. Model-chosen ends win over truncation on the same token.
