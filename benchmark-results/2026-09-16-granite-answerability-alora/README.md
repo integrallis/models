@@ -162,3 +162,39 @@ pilot 4 still misses unanswerables the judges agree are unanswerable.
 **Not done.** The gate is not re-scored on relabelled cases. Changing the instrument after
 seeing results is post-hoc; any relabelled or replacement suite must be pre-registered and applied
 to every arm (IBM, pilot 2, pilot 4) unchanged.
+
+## Pre-registration: adjudicated MS MARCO suite (written 2026-09-17T12:05Z, before any adjudication of the remaining cases)
+
+**Flag.** This instrument change is motivated by the audit above, which saw adapter results. It
+is post-hoc in origin, and it is reported as such beside the original gate result. The original
+result stands: all three adapters fail the pre-registered MS MARCO suite.
+
+**Labelling.**
+- The remaining 133 MS MARCO window cases are judged blind, exactly as in the audit: same prompt,
+  same two judges, shuffled, no labels or predictions.
+- The 67 audit judgements are reused unchanged.
+
+**Adjudicated label** for each case:
+- the dataset label, if at least one judge agrees with it;
+- the opposite label, if both judges contradict the dataset label with a definite judgement;
+- otherwise (ambiguous from both, or one ambiguous and one contradicting) the case is **excluded**.
+
+The adjudicated suite is fixed before any arm is re-scored. Its case ids, labels and sha256 are
+committed first.
+
+**Scoring.**
+- No model is re-run: the existing window predictions are re-scored for every arm (IBM adapter,
+  pilot 1, pilot 2, pilot 4 PEFT reference).
+- The adjudicated suite also re-scores the Java arms already recorded (Rust and pure-Java
+  specialist/base).
+
+**Rule, unchanged.** A candidate passes if balanced accuracy is ≥ 0.80 on SQuAD v2 dev and on the
+adjudicated MS MARCO suite. The report shows original and adjudicated numbers side by side, with
+the count of flipped and excluded cases.
+
+**Stated in advance.**
+- Model judges are not ground truth. They can share systematic biases with model-based adapters.
+- The audit's controls (20/20 answerables, 1/20 caught unanswerables) bound but do not remove that
+  risk.
+- If the adjudicated suite excludes more than 25 % of cases, it is reported as unusable and no
+  pass is claimed from it.
