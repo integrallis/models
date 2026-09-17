@@ -153,10 +153,11 @@ of 27 (for example, "A simple majority — that is, one more in favor than oppos
 
 **Reading (believed; model judges are not ground truth).** At least ~19 of the window's 100
 MS MARCO unanswerable labels appear to be wrong. That caps a correct model's strict unanswerable
-recall near 0.81, and its balanced accuracy on this suite near the 0.80 gate itself. The suite as
-pre-registered cannot tell a faithful answerability model from one that is a few points worse. Its
-0.72–0.75 readings for all three adapters are consistent with label noise, not with a shared model
-defect.
+recall near 0.81. With pilot 4's measured answerable recall (0.87), even perfect unanswerable
+judgement would score about 0.84 balanced, so label noise alone eats most of the margin above the
+0.80 gate. Correcting only those 19 labels would move pilot 4 from 0.740 to roughly 0.83 on the
+remaining cases (arithmetic, not a measurement). The noise explains most, not all, of the shortfall:
+pilot 4 still misses unanswerables the judges agree are unanswerable.
 
 **Not done.** The gate is not re-scored on relabelled cases. Changing the instrument after
 seeing results is post-hoc; any relabelled or replacement suite must be pre-registered and applied
