@@ -16,10 +16,10 @@ adjudicate applies the pre-registered rule and the admission rule, and writes th
            (original or adjudicated labels), and 3 when it is unusable.
 rescore    re-scores recorded arm outputs on the adjudicated labels, with Wilson 95 % intervals.
 
-Adjudication (pre-registered 2026-09-17T12:05Z):
+Adjudication (pre-registered 2026-09-17T11:28Z):
   keep the dataset label if at least one judge agrees with it; flip it if both judges contradict
   it definitely; otherwise exclude the case.
-Admission (pre-registered 2026-09-17T12:40Z, before any audit other than MS MARCO's):
+Admission (pre-registered 2026-09-17T11:34Z, before any audit other than MS MARCO's):
   ORIGINAL_ADMISSIBLE if, for every label, flipped + excluded <= 10 % of that label's cases;
   ADJUDICATED_ONLY if total exclusions <= 25 % and every label keeps >= 30 cases;
   UNUSABLE otherwise.

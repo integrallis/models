@@ -860,7 +860,7 @@ The PEFT reference read of 0.720 two hours earlier predicted this within two poi
 the pre-registered rule the IBM adapter fails the second suite on the runtime it ships with;
 the base arm and the pure-Java arms complete for the record. Track B continues.
 
-### 2026-09-17T12:40Z — HARNESS FIX: label audit is a required stage before a suite can gate (pre-registered before any SQuAD or MT-RAG audit)
+### 2026-09-17T11:34Z — HARNESS FIX: label audit is a required stage before a suite can gate (pre-registered before any SQuAD or MT-RAG audit)
 
 **What went wrong.** The MS MARCO v2.1 suite was frozen and gated on without checking its labels.
 - A blind audit with two judges found its "No Answer Present." labels unreliable. Of 100
@@ -898,7 +898,7 @@ the base arm and the pure-Java arms complete for the record. Track B continues.
   - Our pilots are PEFT-reference only, so they cannot pass the Java gate without Java runs.
 - MT-RAG stays out of the gate as before.
 
-### 2026-09-17T13:10Z — Gate re-read on admitted labels (harness rule above; no model re-run)
+### 2026-09-17T11:39Z — Gate re-read on admitted labels (harness rule above; no model re-run)
 
 **Audits** (`audit_suite_labels.py adjudicate`, committed before any re-score):
 
@@ -939,7 +939,7 @@ admitted labels). MT-RAG is reported failing and out of scope, as pre-registered
 Pilots 1–4 (our adapters) score as high or higher on the reference path. They have no Java arms
 and are not qualified.
 
-### 2026-09-17T13:45Z — Pre-registration: evidence-confirmed labels for the disputed cases (written before any extraction)
+### 2026-09-17T11:59Z — Pre-registration: evidence-confirmed labels for the disputed cases (written before any extraction)
 
 **Why.** The admitted-label pass is fragile. On MS MARCO, pure Java drops below 0.80 if 4 of the
 flips that favour the adapter are wrong. Model-judge disagreement alone is too weak to publish an
@@ -969,7 +969,7 @@ protocol's label. Suite files and sha256 values are committed before any re-scor
   The evidence carries the original, admitted and confirmed numbers.
 - **FAIL:** no release, and no further instrument change for this adapter.
 
-### 2026-09-17T14:30Z — Evidence-confirmed labels: protocol admissible; IBM adapter FAILS; pilots pass on the reference path
+### 2026-09-17T12:06Z — Evidence-confirmed labels: protocol admissible; IBM adapter FAILS; pilots pass on the reference path
 
 **Protocol controls:** 0 of 20 control unanswerables called answerable, and 20 of 20 control
 answerables called answerable, so the protocol is admissible. 70 quotes were claimed and 70

@@ -125,7 +125,7 @@ Believed, to be tested next: MS MARCO's "No Answer Present." label is noisy (ann
 no answer while a passage does answer), which would cap any model's unanswerable recall on that
 suite below the gate.
 
-## MS MARCO label audit (2026-09-17T11:50Z; diagnostic, not a gate)
+## MS MARCO label audit (2026-09-17T11:27Z; diagnostic, not a gate)
 
 **Question.** Are the MS MARCO window's "unanswerable" misses model errors or label errors?
 
@@ -163,7 +163,7 @@ pilot 4 still misses unanswerables the judges agree are unanswerable.
 seeing results is post-hoc; any relabelled or replacement suite must be pre-registered and applied
 to every arm (IBM, pilot 2, pilot 4) unchanged.
 
-## Pre-registration: adjudicated MS MARCO suite (written 2026-09-17T12:05Z, before any adjudication of the remaining cases)
+## Pre-registration: adjudicated MS MARCO suite (written 2026-09-17T11:28Z, before any adjudication of the remaining cases)
 
 **Flag.** This instrument change is motivated by the audit above, which saw adapter results. It
 is post-hoc in origin, and it is reported as such beside the original gate result. The original
