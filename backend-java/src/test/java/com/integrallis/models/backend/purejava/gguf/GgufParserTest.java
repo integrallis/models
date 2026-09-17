@@ -156,6 +156,67 @@ class GgufParserTest {
   }
 
   @Nested
+  class TensorOffsetAlignment {
+
+    @Test
+    void rejectsTensorOffsetThatIsNotAMultipleOfTheDefaultAlignment() {
+      byte[] data =
+          new SyntheticGgufBuilder()
+              .addTensor("a", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .addTensor("blk.0.attn_q.weight", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .tensorOffset("blk.0.attn_q.weight", 40)
+              .build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data)))
+          .isInstanceOf(MalformedGgufException.class)
+          .hasMessageContaining("'blk.0.attn_q.weight'")
+          .hasMessageContaining("offset 40")
+          .hasMessageContaining("alignment 32");
+    }
+
+    @Test
+    void validatesAgainstTheDeclaredAlignmentNotTheDefault() {
+      byte[] misaligned =
+          new SyntheticGgufBuilder()
+              .addUint32("general.alignment", 64)
+              .addTensor("a", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .addTensor("b", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .tensorOffset("b", 32)
+              .build();
+      byte[] aligned =
+          new SyntheticGgufBuilder()
+              .addUint32("general.alignment", 64)
+              .addTensor("a", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .addTensor("b", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(misaligned)))
+          .isInstanceOf(MalformedGgufException.class)
+          .hasMessageContaining("'b'")
+          .hasMessageContaining("offset 32")
+          .hasMessageContaining("alignment 64");
+      GgufFile file = GgufParser.parseSegment(MemorySegment.ofArray(aligned));
+      assertThat(file.getTensor("b").info().offset()).isEqualTo(64);
+    }
+
+    @Test
+    void acceptsEveryTensorAtAnAlignmentBoundaryWithOddSizedData() {
+      byte[] data =
+          new SyntheticGgufBuilder()
+              .addTensor("q8", GgufTensorType.Q8_0, new long[] {32}, new byte[34])
+              .addTensor("f16", GgufTensorType.F16, new long[] {3}, new byte[6])
+              .addTensor("f32", GgufTensorType.F32, new long[] {1}, new byte[4])
+              .build();
+
+      GgufFile file = GgufParser.parseSegment(MemorySegment.ofArray(data));
+
+      assertThat(file.tensorInfos())
+          .extracting(GgufTensorInfo::offset)
+          .containsExactly(0L, 64L, 96L);
+    }
+  }
+
+  @Nested
   class MalformedInput {
 
     @Test
