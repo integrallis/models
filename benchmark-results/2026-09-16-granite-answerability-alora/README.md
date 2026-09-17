@@ -198,3 +198,28 @@ the count of flipped and excluded cases.
   risk.
 - If the adjudicated suite excludes more than 25 % of cases, it is reported as unusable and no
   pass is claimed from it.
+
+## Pilot 5: no MS MARCO training data (pre-registered 2026-09-17T12:20Z, at launch, before any result)
+
+**Why.** Pilots 1–4 all trained on MS MARCO v2.1 train records. MS MARCO's terms
+(microsoft.github.io/msmarco, read 2026-09-17) state: "The MS MARCO datasets are intended for
+non-commercial research purposes only." Publishing those adapters on ModelJars needs a licensing
+decision. Pilot 5 removes the question: MS MARCO is used only as an evaluation window, never as
+training data.
+
+**Recipe.** Identical to pilot 2 except for the data:
+- Data: the same prepared set with every `msmarco-v2.1-train` record removed from train, leaving
+  SQuAD v2 train and QuAC train, 4,000 per label each (`prepared-nomsm/train.jsonl`, sha256
+  2000c773…). Validation is unchanged.
+- Training: 6,000 sampled, 4,378 used at ≤ 2,048 tokens, 318 steps, lr 1.5e-4, nf4 base, final
+  validation only.
+
+**Licences of what remains.** SQuAD v2.0 and QuAC are CC BY-SA 4.0 (believed from their project
+pages; to be recorded with pinned citations before any publication). Attribution and share-alike
+implications for adapter weights need the same licensing review, but neither is non-commercial.
+
+**Rule.** Unchanged:
+- **Reference path:** confirmed-label window through the PEFT reference, with ≥ 0.80 on
+  confirmed SQuAD and confirmed MS MARCO.
+- **Java path, only if the reference path passes:** the unchanged Java gate at the Models
+  release commit v0.3.42 (6063076e), pure Java deciding.
