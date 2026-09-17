@@ -155,8 +155,8 @@ of 27 (for example, "A simple majority — that is, one more in favor than oppos
 MS MARCO unanswerable labels appear to be wrong. That caps a correct model's strict unanswerable
 recall near 0.81. With pilot 4's measured answerable recall (0.87), even perfect unanswerable
 judgement would score about 0.84 balanced, so label noise alone eats most of the margin above the
-0.80 gate. Correcting only those 19 labels would move pilot 4 from 0.740 on the
-corrected suite: 0.81 if they are dropped, 0.82 if relabelled answerable (arithmetic, not a measurement). The noise explains most, not all, of the shortfall:
+0.80 gate. Correcting only those 19 labels would move pilot 4 from 0.740 to 0.81 if
+they are dropped, or 0.82 if they are relabelled answerable (arithmetic, not a measurement). The noise explains most, not all, of the shortfall:
 pilot 4 still misses unanswerables the judges agree are unanswerable.
 
 **Not done.** The gate is not re-scored on relabelled cases. Changing the instrument after
