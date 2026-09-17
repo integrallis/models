@@ -968,3 +968,41 @@ protocol's label. Suite files and sha256 values are committed before any re-scor
 - **PASS:** the release proceeds (component report, composition report, ModelJars publication).
   The evidence carries the original, admitted and confirmed numbers.
 - **FAIL:** no release, and no further instrument change for this adapter.
+
+### 2026-09-17T14:30Z — Evidence-confirmed labels: protocol admissible; IBM adapter FAILS; pilots pass on the reference path
+
+**Protocol controls:** 0 of 20 control unanswerables called answerable, and 20 of 20 control
+answerables called answerable, so the protocol is admissible. 70 quotes were claimed and 70
+verified verbatim. The verifiers said yes 66/70 (Sonnet) and 57/70 (Opus).
+
+**Disputed-case outcomes:**
+- MS MARCO: of 40 audit flips, 31 were confirmed and 9 reverted to the dataset label. The 29
+  exclusions were decided as 22 unanswerable-kept, 3 unanswerable→answerable and 4
+  answerable→unanswerable.
+- SQuAD: of 5 flips, 4 were confirmed and 1 reverted; 12 exclusions were decided.
+
+Confirmed suites (committed before the re-score, aaba954c):
+- `confirmed-msmarco-v2.1-validation.json`: 120 answerable / 80 unanswerable, sha256 e8425109…
+- `confirmed-squad-v2-dev.json`: 105 / 95, sha256 2f4f7897…
+
+| arm | SQuAD confirmed | MS MARCO confirmed |
+|---|---|---|
+| IBM specialist, pure Java (deciding) | 0.836 [0.754, 0.892] | **0.777** [0.689, 0.846] |
+| IBM specialist, Rust FFM | 0.830 | **0.779** |
+| base, pure Java | 0.567 | 0.515 |
+| IBM, PEFT reference | 0.813 | 0.783 |
+| pilot 1, PEFT reference | 0.861 | 0.819 |
+| pilot 2, PEFT reference | 0.873 [0.794, 0.924] | 0.829 [0.742, 0.891] |
+| pilot 4, PEFT reference | 0.845 | 0.827 |
+
+**Verdict: IBM `granitelib-rag-r1.0` answerability FAILS** on confirmed MS MARCO (0.777 < 0.80).
+As pre-registered, it is not released and no further instrument change is made for it. The
+admitted-label pass (0.840) did not survive evidence confirmation. The confirmation step was
+necessary, not a formality.
+
+**Next candidate: pilot 2** (our adapter). It has the highest confirmed score on both suites
+(0.873 / 0.829) among the three pilots. Choosing the best of three on the same window biases its
+reference-path number upward. The Java arms are a fresh measurement on the runtime, not a
+re-selection. Pilot 2 goes through the unchanged Java gate on the confirmed suites:
+- structured rate 1.0, balanced ≥ 0.80 and ≥ base, on pure Java (deciding);
+- identity on the first 10 cases if Rust is also published.
