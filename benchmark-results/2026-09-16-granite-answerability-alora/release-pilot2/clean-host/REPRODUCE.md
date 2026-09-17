@@ -160,7 +160,25 @@ Everything the wrapper writes under `evidence/` (pure-java) or `evidence-rust-ff
 Then replace the literal `<EVIDENCE_REVISION>` in `clean-host-run.json`'s `outputLog.uri` with the
 `integrallis/models` commit that contains the log.
 
-## 5. Unit tests
+## 5. The already-committed pure-java evidence is now older than the sources
+
+`evidence/` was produced by the program as it stood before the backend switch existed. It still
+satisfies the gate — every field `requireCleanHostRun` reads is present and unchanged, and the gate
+ignores keys it does not know — but two things about it are now stale and should not be mistaken for
+a mismatch found on a host:
+
+* `evidence/program-sha256.txt` records `AnswerabilityCleanHost.java`
+  `7f730564f49f03e6291179d884f6902e501d0aa5318f5fb2eafc4caa2ef48d8f`; the file in the tree is
+  `0a15f489535a9fb31d42c2191c3c99b8e90d9a66b3f1713dd84011024c193148`.
+* `evidence/clean-host-run.json` predates the `backend` and `nativeLibrary` fields, and
+  `evidence/clean-host-output.log` predates the enriched `loaded` and `CASE` lines.
+
+`resolvedClasspathSha256` is *not* stale: it is still `880b4f45...`, which is exactly why
+`backend-native` is added with `--deps` instead of `//DEPS`. Re-running `sudo bash run-clean-host.sh`
+on a fresh host regenerates `evidence/` against the current sources; the outputs it must match are
+unchanged.
+
+## 6. Unit tests
 
 ```
 python3 -m unittest write_clean_host_run_test -v   # from this directory, 22 tests
@@ -169,7 +187,7 @@ python3 -m unittest write_clean_host_run_test -v   # from this directory, 22 tes
 The last test re-runs a passing record through `assemble_component_report.validate_clean_host_run`
 as fetched from `origin/main`, for both backends, and skips if that file is unreachable.
 
-## 6. Local verification already done (dev machine, not a clean host)
+## 7. Local verification already done (dev machine, not a clean host)
 
 On 2026-09-17 both arms were run end to end on a developer macOS host against the same pinned
 inputs, resolving `backend-native:0.3.42` from Central. All six cases passed on each arm,
