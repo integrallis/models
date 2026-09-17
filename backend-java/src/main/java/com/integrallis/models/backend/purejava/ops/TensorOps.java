@@ -41,6 +41,8 @@ public final class TensorOps {
   private static final int TANH_TABLE_SIZE = 1 << 16;
   private static final float TANH_TABLE_SCALE = TANH_TABLE_SIZE / (2.0f * TANH_TABLE_LIMIT);
   private static final float[] TANH_TABLE = createTanhTable();
+  private static final ValueLayout.OfFloat LITTLE_ENDIAN_FLOAT =
+      ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
   private static final ValueLayout.OfShort LITTLE_ENDIAN_SHORT =
       ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
@@ -198,6 +200,43 @@ public final class TensorOps {
         GgufQ4Kernel.WIDENED);
   }
 
+  /**
+   * F32 projection with one float reduction order in every JIT tier.
+   *
+   * <p>Each mapped weight row is copied to a reused heap row and scored with {@link
+   * VectorUtil#dotProduct(float[], int, float[], int, int)}, whose lane sums are written out in a
+   * fixed order. vectors-core's mapped F32 GEMV ({@code VectorUtil.ggufF32BatchDotProduct}) reduces
+   * with {@code reduceLanes(ADD)}, whose float order differs between the interpreted/C1 fallback
+   * and the C2 intrinsic: the same projection changed its low bits once C2 compiled it, which made
+   * logits depend on warm-up and broke exact prefill comparisons (measured in
+   * benchmark-results/2026-09-16-flaky-injected-attention).
+   */
+  private static void f32Matmul(float[] out, float[] x, MemorySegment weight, int rows, int cols) {
+    Objects.requireNonNull(out, "out");
+    Objects.requireNonNull(x, "x");
+    Objects.requireNonNull(weight, "weight");
+    if (x.length < cols
+        || out.length < rows
+        || weight.byteSize() < (long) rows * cols * Float.BYTES) {
+      throw new IllegalArgumentException(
+          "F32 projection dimensions do not match: rows="
+              + rows
+              + ", cols="
+              + cols
+              + ", input="
+              + x.length
+              + ", output="
+              + out.length
+              + ", weightBytes="
+              + weight.byteSize());
+    }
+    float[] row = new float[cols];
+    for (int r = 0; r < rows; r++) {
+      MemorySegment.copy(weight, LITTLE_ENDIAN_FLOAT, (long) r * cols * Float.BYTES, row, 0, cols);
+      out[r] = VectorUtil.dotProduct(x, 0, row, 0, cols);
+    }
+  }
+
   /** Matrix-vector multiplication with caller-owned scratch and an explicit Q4 policy. */
   public static void ggufMatmul(
       float[] out,
@@ -213,7 +252,7 @@ public final class TensorOps {
       GgufQ4Kernel q4Kernel) {
     Objects.requireNonNull(q4Kernel, "q4Kernel");
     switch (type) {
-      case F32 -> VectorUtil.ggufF32BatchDotProduct(x, qWeight, rows, cols, out);
+      case F32 -> f32Matmul(out, x, qWeight, rows, cols);
       case BF16 -> BFloat16Matrix.of(qWeight, rows, cols).multiply(x, out);
       case Q4_0 ->
           VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
