@@ -54,3 +54,23 @@ training gap: the 2,048-token cut removed 459 of 2,400 sampled records, mostly l
 and MS MARCO queries with many passages, which are exactly the long-context cases the window tests.
 Pilot 2 (4,924 records, same cut) is running; the next lever after it is the length cut itself
 (3k-token sequences, which need a 24 GB GPU).
+
+## Pilot 2 (2026-09-17, same host and settings as pilot 1, lr 1.5e-4)
+
+Measured: 6,000 records sampled, 4,924 used (1,076 over 2,048 tokens dropped), 364 optimizer steps,
+238 minutes. Held-out validation (300 records, strict contract):
+
+| step | balanced | answerable | unanswerable | SQuAD | QuAC | MS MARCO |
+|-----:|---------:|-----------:|-------------:|------:|-----:|---------:|
+| 150  | 0.699    | 127/139    | 78/161       | 0.794 | 0.540| 0.744    |
+| 300  | 0.684    | 127/139    | 73/161       | 0.763 | 0.566| 0.689    |
+| 364  | **0.775** | 105/139   | 128/161      | 0.835 | 0.735| 0.767    |
+
+The balance between the two labels swings by step in both pilots (under-calling unanswerable at
+the mid-run checks, recovering at the final low-learning-rate steps), so only the final step is
+comparable across runs: pilot 2 0.775 against pilot 1 0.742, with the multi-turn QuAC slice
+0.735 against 0.699. The window read on the reference host follows.
+
+A 3,072-token smoke run on the same 8 GB card started after pilot 2 (records over the cut in
+its 300-record sample: 6, against about 20 % at 2,048 tokens) to check whether longer sequences
+fit before committing a full run to them.
