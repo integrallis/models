@@ -33,6 +33,7 @@ public final class SyntheticGgufBuilder {
   private final List<MetadataEntry> metadataEntries = new ArrayList<>();
   private final List<TensorEntry> tensorEntries = new ArrayList<>();
   private int alignment = GgufConstants.DEFAULT_ALIGNMENT;
+  private final java.util.Map<String, Long> offsetOverrides = new java.util.HashMap<>();
 
   public SyntheticGgufBuilder version(int version) {
     this.version = version;
@@ -112,6 +113,16 @@ public final class SyntheticGgufBuilder {
     return this;
   }
 
+  /**
+   * Declares {@code offset} as the data offset of the named tensor instead of the sequential
+   * offset, so tests can write deliberately overlapping or out-of-range tensor tables. The tensor
+   * bytes are still written sequentially.
+   */
+  public SyntheticGgufBuilder tensorOffset(String name, long offset) {
+    offsetOverrides.put(name, offset);
+    return this;
+  }
+
   /** Builds the synthetic GGUF binary data. */
   public byte[] build() {
     try {
@@ -138,7 +149,7 @@ public final class SyntheticGgufBuilder {
           writeU64(out, dim);
         }
         writeU32(out, tensor.type.id());
-        writeU64(out, dataOffset);
+        writeU64(out, offsetOverrides.getOrDefault(tensor.name, dataOffset));
         dataOffset += tensor.data.length;
       }
 

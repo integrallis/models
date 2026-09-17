@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.backend.purejava.qwen35;
 
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
@@ -34,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /** Stateful pure-Java hybrid graph for dense Qwen3.5. */
 public final class Qwen35ForwardPass {
@@ -154,6 +157,12 @@ public final class Qwen35ForwardPass {
   /** Returns a graph sharing the same weights and honoring the selected execution plan. */
   public Qwen35ForwardPass withExecutionPlan(PureJavaExecutionPlan plan) {
     Objects.requireNonNull(plan, "plan");
+    Set<GgufTensorType> unbatched = plan.topology().unbatchedProjectionTypes();
+    if (!unbatched.isEmpty()) {
+      PerformanceCliffs.report(
+          PerformanceCliff.BATCHED_PREFILL_UNSUPPORTED_TENSOR_TYPE,
+          "architecture=" + plan.topology().architecture() + ", tensor-types=" + unbatched);
+    }
     return new Qwen35ForwardPass(
         config,
         weights,
@@ -961,6 +970,11 @@ public final class Qwen35ForwardPass {
           valueDimension);
       return;
     }
+    if (batchedMatrixKernel != GgufBatchedMatrixKernel.none()) {
+      PerformanceCliffs.report(
+          PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE,
+          "architecture=qwen35, kernel=" + batchedMatrixKernel.implementation());
+    }
     if (tokenCount == 1) {
       GatedDeltaNetRecurrence.forwardInPlace(
           query,
@@ -1321,6 +1335,12 @@ public final class Qwen35ForwardPass {
       return;
     }
     if (!TensorOps.supportsBatchedMatmul(weights.type())) {
+      PerformanceCliffs.report(
+          PerformanceCliff.ROW_BY_ROW_PROJECTION,
+          "architecture=qwen35, tensor-type="
+              + weights.type()
+              + ", kernel="
+              + batchedMatrixKernel.implementation());
       float[] rowInput = new float[weights.columns()];
       float[] rowOutput = new float[weights.rows()];
       for (int batch = 0; batch < batchSize; batch++) {

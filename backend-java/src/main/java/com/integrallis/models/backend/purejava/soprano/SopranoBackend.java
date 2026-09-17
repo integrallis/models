@@ -19,6 +19,7 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.cache.KvCache;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufEmbeddedFiles;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
@@ -228,7 +229,7 @@ public final class SopranoBackend implements AutoCloseable {
 
   /** Returns the selected Java execution plan and runtime environment. */
   public BackendDiagnostics diagnostics() {
-    return diagnostics;
+    return PerformanceCliffs.enrich(diagnostics);
   }
 
   @Override

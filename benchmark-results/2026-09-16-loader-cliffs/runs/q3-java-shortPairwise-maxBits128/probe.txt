@@ -1,0 +1,16 @@
+PROBE backend=pure-java plan=pure-java-v20
+PROBE env model-architecture=qwen3
+PROBE env vector-provider=PanamaVectorUtilSupport
+PROBE env vector-api=true
+PROBE env preferred-vector-bits=256
+PROBE env active-vector-bits=128
+PROBE env gguf-executor=persistent
+PROBE env gguf-parallel=true
+PROBE cliff performance-cliff.fused-grouped-attention-not-wired=architecture=qwen3, group-size=2
+PROBE cliff performance-cliff.q4-pairwise-kernel-unsupported=requested=short-pairwise, selected=widened, active-vector-bits=128, architecture=x86_64
+PROBE cliff performance-cliff.vector-width-capped=active-vector-bits=128, preferred-vector-bits=256, vector-provider=PanamaVectorUtilSupport
+PROBE cliff performance-cliffs=vector-width-capped,q4-pairwise-kernel-unsupported,fused-grouped-attention-not-wired
+PROBE q4-kernel UNSUPPORTED the active Vector API shape cannot execute the measured pairwise kernel
+PROBE prompt-tokens=10 decode=4 load-ms=2333 run-ms=14266
+PROBE greedy-tokens=1052 374 264 2874
+exit=0

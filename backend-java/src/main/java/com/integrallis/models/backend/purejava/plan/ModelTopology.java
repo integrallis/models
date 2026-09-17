@@ -22,8 +22,10 @@ import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /** Tensor topology relevant to deterministic execution planning. */
 public record ModelTopology(
@@ -191,6 +193,39 @@ public record ModelTopology(
         valueRows,
         java.util.Collections.nCopies(layerCount, neutral),
         true);
+  }
+
+  /**
+   * Returns the projection tensor types that have no retained batched kernel, in declaration order.
+   * Empty for architectures whose projections are not routed through the Llama-style batched
+   * prefill (Gemma 4, Needle 2).
+   */
+  public Set<GgufTensorType> unbatchedProjectionTypes() {
+    Set<GgufTensorType> unbatched = EnumSet.noneOf(GgufTensorType.class);
+    if (!supportsLlamaProjectionRouting()) {
+      return unbatched;
+    }
+    for (LayerTopology layer : layers) {
+      for (GgufTensorType type :
+          List.of(
+              layer.query(),
+              layer.key(),
+              layer.value(),
+              layer.attentionOutput(),
+              layer.gate(),
+              layer.up(),
+              layer.down())) {
+        if (!TensorOps.supportsBatchedMatmul(type)) {
+          unbatched.add(type);
+        }
+      }
+      for (GgufTensorType type : layer.auxiliaryProjections()) {
+        if (!TensorOps.supportsBatchedMatmul(type)) {
+          unbatched.add(type);
+        }
+      }
+    }
+    return unbatched;
   }
 
   boolean supportsBatchedPrefill() {

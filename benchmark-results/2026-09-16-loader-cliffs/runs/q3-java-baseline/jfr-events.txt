@@ -1,0 +1,15 @@
+com.integrallis.models.PerformanceCliff {
+  startTime = 16:55:54.398 (2026-09-16)
+  reason = "fused-grouped-attention-not-wired"
+  detail = "architecture=qwen3, group-size=2"
+  eventThread = "main" (javaThreadId = 3)
+  stackTrace = [
+    com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs.report(PerformanceCliff, String) line: 73
+    com.integrallis.models.backend.purejava.llama.LlamaForwardPass.reportAttentionCliffs(LlamaConfig, GgufBatchedMatrixKernel, int) line: 3068
+    com.integrallis.models.backend.purejava.llama.LlamaForwardPass.<init>(LlamaConfig, LlamaWeights, KvCache, LlamaForwardPass$LayerObserver, PureJavaExecutionPlan, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel, ActivatedLoraAdapter) line: 527
+    com.integrallis.models.backend.purejava.llama.LlamaForwardPass.<init>(LlamaConfig, LlamaWeights, KvCache, PureJavaExecutionPlan, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel) line: 327
+    com.integrallis.models.backend.purejava.PureJavaBackend.loadLlama(Path, GgufFile, String, RuntimeFingerprint, PureJavaPlanConfiguration, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel, Path, Arena) line: 761
+    ...
+  ]
+}
+

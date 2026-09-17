@@ -38,6 +38,7 @@ import com.integrallis.models.backend.purejava.cact.CactNeedle2Layout;
 import com.integrallis.models.backend.purejava.cact.CactParser;
 import com.integrallis.models.backend.purejava.cact.CactTokenizer;
 import com.integrallis.models.backend.purejava.cact.Needle2Weights;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Config;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
@@ -878,7 +879,7 @@ public final class PureJavaBackend
 
   @Override
   public BackendDiagnostics diagnostics() {
-    return diagnostics;
+    return PerformanceCliffs.enrich(diagnostics);
   }
 
   @Override

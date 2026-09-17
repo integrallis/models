@@ -27,6 +27,7 @@ import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import com.integrallis.vectors.core.VectorUtil;
 import java.nio.file.Path;
@@ -182,7 +183,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
 
   @Override
   public BackendDiagnostics diagnostics() {
-    return diagnostics;
+    return PerformanceCliffs.enrich(diagnostics);
   }
 
   @Override

@@ -18,6 +18,8 @@ package com.integrallis.models.backend.purejava.plan;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
@@ -106,6 +108,7 @@ public final class ExecutionPlanner {
                 "needle2".equals(topology.architecture()) ? "cact" : "gguf")));
     decisions.add(vectorFma(runtime));
     decisions.add(persistentExecutor(runtime));
+    reportVectorWidthCliffs(runtime);
 
     Map<String, String> environment = new LinkedHashMap<>(runtime.asEnvironment());
     environment.put("model-architecture", topology.architecture());
@@ -582,6 +585,7 @@ public final class ExecutionPlanner {
       return requested;
     }
     if (requested == GgufQ4Kernel.SHORT_PAIRWISE && !runtime.q4ShortPairwiseSupported()) {
+      reportQ4Fallback(runtime, requested);
       decisions.add(
           new OptimizationDecision(
               "q4-kernel",
@@ -591,6 +595,7 @@ public final class ExecutionPlanner {
       return GgufQ4Kernel.WIDENED;
     }
     if (requested == GgufQ4Kernel.UNSIGNED_PAIRWISE && !runtime.q4UnsignedPairwiseSupported()) {
+      reportQ4Fallback(runtime, requested);
       decisions.add(
           new OptimizationDecision(
               "q4-kernel",
@@ -606,6 +611,17 @@ public final class ExecutionPlanner {
             "the model-scoped execution plan selected the measured pairwise Q4 kernel",
             settings));
     return requested;
+  }
+
+  private static void reportQ4Fallback(RuntimeFingerprint runtime, GgufQ4Kernel requested) {
+    PerformanceCliffs.report(
+        PerformanceCliff.Q4_PAIRWISE_KERNEL_UNSUPPORTED,
+        "requested="
+            + kernelName(requested)
+            + ", selected=widened, active-vector-bits="
+            + runtime.vectorBits()
+            + ", architecture="
+            + runtime.architecture());
   }
 
   private static String kernelName(GgufQ4Kernel kernel) {
@@ -813,8 +829,38 @@ public final class ExecutionPlanner {
         Map.of("fast-scalar-fma", Boolean.toString(runtime.fastScalarFma())));
   }
 
+  private static void reportVectorWidthCliffs(RuntimeFingerprint runtime) {
+    if (!runtime.vectorApi()) {
+      PerformanceCliffs.report(
+          PerformanceCliff.VECTOR_API_UNAVAILABLE,
+          "vector-provider="
+              + runtime.vectorProvider()
+              + ", preferred-vector-bits="
+              + runtime.preferredVectorBits());
+    } else if (runtime.vectorBits() < runtime.preferredVectorBits()) {
+      PerformanceCliffs.report(
+          PerformanceCliff.VECTOR_WIDTH_CAPPED,
+          "active-vector-bits="
+              + runtime.vectorBits()
+              + ", preferred-vector-bits="
+              + runtime.preferredVectorBits()
+              + ", vector-provider="
+              + runtime.vectorProvider());
+    }
+  }
+
   private static OptimizationDecision persistentExecutor(RuntimeFingerprint runtime) {
     boolean enabled = "persistent".equals(runtime.ggufExecutor());
+    if (!enabled) {
+      PerformanceCliffs.report(
+          PerformanceCliff.PERSISTENT_EXECUTOR_NOT_USED,
+          "executor="
+              + runtime.ggufExecutor()
+              + ", gguf-parallel="
+              + runtime.ggufParallel()
+              + ", gguf-threads="
+              + runtime.ggufThreads());
+    }
     return new OptimizationDecision(
         "persistent-row-executor",
         enabled ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,

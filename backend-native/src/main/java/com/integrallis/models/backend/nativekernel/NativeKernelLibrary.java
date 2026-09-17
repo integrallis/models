@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.backend.nativekernel;
 
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -298,16 +300,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
       }
-      if (setPollNanos != null) {
-        try {
-          long applied = (long) setPollNanos.invokeExact(context, pollMillis * 1_000_000L);
-          if (applied <= 0) {
-            throw new IllegalStateException("native kernel poll budget was not applied");
-          }
-        } catch (Throwable failure) {
-          throw new IllegalStateException("native kernel poll budget could not be set", failure);
-        }
-      }
+      applyPollBudget(setPollNanos, context, pollMillis);
       return new NativeKernelLibrary(
           arena,
           capabilityMask,
@@ -1122,6 +1115,28 @@ public final class NativeKernelLibrary implements AutoCloseable {
   }
 
   private static final float[] EMPTY = new float[0];
+
+  /**
+   * Applies the configured worker poll budget, or reports {@link
+   * PerformanceCliff#NATIVE_POLL_BUDGET_UNSUPPORTED} when the loaded library has no poll-budget
+   * entry point ({@code setPollNanos == null}) and its workers keep their built-in behaviour.
+   */
+  static void applyPollBudget(MethodHandle setPollNanos, MemorySegment context, long pollMillis) {
+    if (setPollNanos == null) {
+      PerformanceCliffs.report(
+          PerformanceCliff.NATIVE_POLL_BUDGET_UNSUPPORTED,
+          "abi=" + ABI_VERSION + ", poll-millis=" + pollMillis);
+      return;
+    }
+    try {
+      long applied = (long) setPollNanos.invokeExact(context, pollMillis * 1_000_000L);
+      if (applied <= 0) {
+        throw new IllegalStateException("native kernel poll budget was not applied");
+      }
+    } catch (Throwable failure) {
+      throw new IllegalStateException("native kernel poll budget could not be set", failure);
+    }
+  }
 
   static long configuredPollMillis() {
     String configured = System.getProperty(POLL_MILLIS_PROPERTY);

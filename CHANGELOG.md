@@ -4,6 +4,13 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+- Named performance cliffs: `PerformanceCliff` names the reasons a fast path was not taken, and each is reported from the branch that takes the slower path, at most once per process, as a `com.integrallis.models.PerformanceCliff` JFR event (category `Models`, with stack trace) and as `performance-cliffs` / `performance-cliff.<id>` entries in `PureJavaBackend`, `SopranoBackend` and `RustFfmBackend` diagnostics. Reasons: `vector-api-unavailable`, `vector-width-capped`, `persistent-executor-not-used`, `q4-pairwise-kernel-unsupported`, `batched-prefill-unsupported-tensor-type`, `row-by-row-projection`, `fused-grouped-attention-not-wired`, `native-grouped-attention-unavailable`, `native-gated-delta-net-unavailable`, `native-poll-budget-unsupported`. Diagnostics are unchanged when no cliff has been reported. Provocation and observed event counts per reason: `benchmark-results/2026-09-16-loader-cliffs/README.md`.
+- Structural test that fails when a Vector API `VectorSpecies` is a method, constructor or lambda parameter, or a field that is not `static final`. backend-java has no violations; the pinned vectors-core 0.1.22 has one (`PanamaConstants#preferredSpecies`, called only from a static initializer), recorded in an explicit allow-list as a vectors follow-up.
+
+### Fixed
+- GGUF and Safetensors loaders assert every tensor's size: the byte length implied by the type's block layout (or dtype width) and the shape must fit between the tensor's start and the next tensor in offset order, or the end of the file. Short, overlapping and overrunning regions now fail with the tensor name, the expected byte count and the bytes available. Previously a GGUF tensor whose range overlapped the next tensor but stayed inside the file was accepted and read its neighbour's bytes. All 36 GGUF and 20 Safetensors files on the development host still parse.
+
 ## [0.3.40] - 2026-09-16
 
 ### Changed
