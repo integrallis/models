@@ -1034,3 +1034,23 @@ re-selection. Pilot 2 goes through the unchanged Java gate on the confirmed suit
 - Rust FFM is published only if its window arms (running) also pass.
 - Every lower interval bound is below 0.80, so the pass sits inside sampling noise at n = 200.
 - Pilot 2 was chosen as the best of three pilots on the reference path of the same window, a selection effect recorded when it was chosen. The Java arms were a fresh measurement.
+
+### 2026-09-17T17:57Z — Rust FFM arms complete (record), and what was published
+
+Measured at Models v0.3.42 on the main host (evidence `release-pilot2/evidence/main/`), confirmed labels:
+
+| suite | Rust specialist | Rust base | pure-Java specialist |
+|---|---|---|---|
+| squad-v2-dev | 0.878 [0.800, 0.928] | 0.529 | 0.868 |
+| msmarco-v2.1-validation | 0.833 [0.748, 0.894] | 0.515 | 0.825 |
+
+Both Rust specialist arms are structured 200/200 and physically shared 200/200, and both clear the
+0.80 floor and their base. The component published on 2026-09-17 declares `backends: {pure-java: true}`
+and its report binds the pure-Java arms only, because the base arms diverge between backends
+(identity 8/10 and 7/10) and the pre-registered rule makes pure Java the deciding arm. Publishing
+the Rust backend would need a re-assembled report binding these arms and a new marker version; the
+component marker is immutable.
+
+**Published:** ModelJars 0.1.46 (runtime support for `first-party-rag-specialist`) and marker
+`org.modeljars.github:modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32:1.0.0-f32.1`,
+both resolvable from Maven Central; catalog PR ModelJars/modeljars#162 merged.
