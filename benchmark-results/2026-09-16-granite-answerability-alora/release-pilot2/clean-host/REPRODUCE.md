@@ -209,12 +209,25 @@ That is a *correctness* check of the program, not the clean-host proof: the mach
 `~/.m2` and `~/.jbang`, so `freshMachine` is false there by construction and no
 `clean-host-run.json` from it can pass. The fresh Ubuntu 24.04 run is still required.
 
-`injectedGroupedProjections=true` on the Rust arm is measured on `macos-x86_64` only. It is
-*expected* on Linux — same model, same planner, same ABI 5 kernel, only a different build target —
-but it is not measured there. If it turned out false on the fresh host the run fails loudly rather
-than passing with an inert kernel, which is the direction that error should take.
+## 8. The fresh-host rust-ffm run (this is the proof)
 
-## 8. What this run does not, and cannot, establish for the gate
+Run on a fresh Ubuntu 24.04 host on 2026-09-17; evidence committed at
+`21e310b938cd49f0e982826d6fe7f290ef249cc6` under `evidence-rust-ffm/`. `PASS cases=6 passed=6`,
+`freshMachine: true`, exit 0, Temurin 25.0.4.1, `Linux/amd64`, 16 processors.
+
+Everything predicted from the dev host reproduced exactly:
+
+| | Predicted here | Recorded on the fresh host |
+| --- | --- | --- |
+| `resolvedClasspathSha256` | `6c4649cb093f6fdaa0e6b8327dad12ce29f0501ef1a0a9c70180dd91f2807667` | same |
+| native library | `linux-x86_64`, ABI 5, `b74d6e386d8494455b10698c1042e8d9e746cc60c8dce3b936b7cb5c203589d8` | same |
+| all seven jar digests | see §1 | same |
+
+And the one thing that was *expected but unmeasured* on Linux is now measured: the fresh host logged
+`injectedGroupedProjections=true matrixKernel=rust-ffm-quantized-v13`. The Rust kernel is routed on
+Linux, not merely loaded.
+
+## 9. What this run does not, and cannot, establish for the gate — and how it was closed
 
 * **The evidence revision.** `outputLog.uri` carries `<EVIDENCE_REVISION>` until the log is
   committed; the gate then fetches the bytes and checks size and sha256 against the record.
@@ -241,3 +254,18 @@ than passing with an inert kernel, which is the direction that error should take
   dataset labels. The pure-java report clears the bar only through `--labels`, which re-scores both
   arms against confirmed labels (msmarco 0.735 → 0.825). The same `--labels` files must be applied
   to the rust-ffm arms, and the result re-derived rather than assumed to carry over.
+
+**How each was closed**, in `component-report-rust/component-qualification.json` (assembled at
+`bbd0903f`):
+
+| Gap | Resolution |
+| --- | --- |
+| evidence revision | `outputLog.uri` pinned to `21e310b938cd49f0e982826d6fe7f290ef249cc6` |
+| rust-ffm binding | `taskCorrectness.backend: "rust-ffm"`, from the rust-ffm `--window` arms |
+| `kernelIdentity` | `pass: true`, `casesPerSuitePerArm: 10`, `comparisons: 2` — the two **specialist** pairs only, as the base pairs would have failed it |
+| msmarco below 0.8 | `--labels` rescoring lifted it 0.725 → **0.8333**; squad 0.865 → 0.8782 |
+
+The raw-vs-confirmed gap is worth keeping in view: msmarco clears the 0.8 bar only after label
+confirmation, by 0.033. That is a property of the disputed labels in that suite, not of the kernel —
+squad moves far less (0.865 → 0.878) — but it means the suite has no margin to spare and should not
+be reported as if it passed on the dataset labels.
