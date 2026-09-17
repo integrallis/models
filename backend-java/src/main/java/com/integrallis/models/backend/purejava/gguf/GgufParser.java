@@ -104,7 +104,14 @@ public final class GgufParser {
       throw new MalformedGgufException(
           "general.alignment must be a positive power of two, but was " + alignment);
     }
+    validateTensorAlignment(tensorInfos, alignment);
     long tensorDataOffset = alignUp(cursor.offset(), alignment);
+    if (tensorInfos.isEmpty()) {
+      // A vocabulary-only file (llama.cpp's models/ggml-vocab-*.gguf) has no data section and need
+      // not be padded after its metadata; llama.cpp only seeks to the aligned start when tensors
+      // exist.
+      tensorDataOffset = Math.min(tensorDataOffset, segment.byteSize());
+    }
     if (tensorDataOffset > segment.byteSize()) {
       throw new MalformedGgufException(
           "aligned tensor data offset "
@@ -115,6 +122,26 @@ public final class GgufParser {
     validateTensorRanges(tensorInfos, tensorDataOffset, segment.byteSize());
 
     return new GgufFile(header, metadata, tensorInfos, tensorDataOffset, segment);
+  }
+
+  /**
+   * Asserts that every tensor starts at a multiple of the file's alignment ({@code
+   * general.alignment}, 32 when absent). GGUF writers pad tensor data to that boundary, and a
+   * mapped reader that honours it can address the data in place; an offset off the boundary means
+   * the tensor table and the data section disagree.
+   */
+  private static void validateTensorAlignment(List<GgufTensorInfo> tensors, long alignment) {
+    for (GgufTensorInfo tensor : tensors) {
+      if ((tensor.offset() & (alignment - 1)) != 0) {
+        throw new MalformedGgufException(
+            "tensor '"
+                + tensor.name()
+                + "' has data offset "
+                + tensor.offset()
+                + ", which is not a multiple of the file's alignment "
+                + alignment);
+      }
+    }
   }
 
   private static long alignUp(long value, long alignment) {

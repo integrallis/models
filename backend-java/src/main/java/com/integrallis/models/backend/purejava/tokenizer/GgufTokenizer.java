@@ -82,6 +82,30 @@ public final class GgufTokenizer implements Tokenizer {
           "<turn|>",
           "<|tool_response>",
           "<｜end▁of▁sentence｜>");
+
+  /** Provenance of a terminator matched by its vocabulary text. */
+  public static final String SOURCE_VOCABULARY_TEXT = "vocabulary-text";
+
+  /** Provenance of a terminator resolved from the GGUF chat template's assistant end of turn. */
+  public static final String SOURCE_CHAT_TEMPLATE = "chat-template-end-of-turn";
+
+  /** Provenance of the fallback end-of-sequence id used when a GGUF declares none. */
+  public static final String SOURCE_DEFAULT_EOS = "default-eos";
+
+  /** Provenance of an end-of-sequence id taken from a GGUF separator token id. */
+  public static final String SOURCE_SEPARATOR_EOS = "separator-token-id";
+
+  /** Provenance of the end-of-sequence id passed to a tokenizer.json tokenizer. */
+  public static final String SOURCE_EOS_TOKEN = "eos-token";
+
+  /** Provenance of an id a checkpoint declares beside a tokenizer.json vocabulary. */
+  public static final String SOURCE_DECLARED = "declared";
+
+  private static final int TOKEN_TYPE_UNKNOWN = -1;
+  private static final int TOKEN_TYPE_NORMAL = 1;
+  private static final int TOKEN_TYPE_CONTROL = 3;
+  private static final String CLOSING_STRIKETHROUGH_TAG = "</s>";
+
   private static final List<String> END_OF_GENERATION_METADATA_KEYS =
       List.of(
           "tokenizer.ggml.eos_token_id",
@@ -98,6 +122,8 @@ public final class GgufTokenizer implements Tokenizer {
   private final int bosTokenId;
   private final int eosTokenId;
   private final boolean[] endOfGenerationTokens;
+  private final Map<Integer, List<String>> endOfGenerationSources;
+  private final String chatTemplateEndOfTurnResolution;
   private final List<SpecialToken> specialTokens;
   private final boolean useByteLevel;
   private final boolean useSentencePiece;
@@ -120,7 +146,7 @@ public final class GgufTokenizer implements Tokenizer {
       Map<String, Integer> mergeRanks,
       int bosTokenId,
       int eosTokenId,
-      boolean[] endOfGenerationTokens,
+      Terminators terminators,
       List<SpecialToken> specialTokens,
       boolean useByteLevel,
       boolean useSentencePiece,
@@ -139,7 +165,10 @@ public final class GgufTokenizer implements Tokenizer {
     this.mergeRanks = mergeRanks;
     this.bosTokenId = bosTokenId;
     this.eosTokenId = eosTokenId;
-    this.endOfGenerationTokens = endOfGenerationTokens;
+    this.endOfGenerationTokens = terminators.ids;
+    this.endOfGenerationSources =
+        java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(terminators.sources()));
+    this.chatTemplateEndOfTurnResolution = terminators.chatTemplateResolution;
     this.specialTokens = specialTokens;
     this.useByteLevel = useByteLevel;
     this.useSentencePiece = useSentencePiece;
@@ -237,8 +266,12 @@ public final class GgufTokenizer implements Tokenizer {
                 metadata
                     .getUint32("tokenizer.ggml.seperator_token_id")
                     .orElse(metadata.getUint32("tokenizer.ggml.separator_token_id").orElse(2)));
-    boolean[] endOfGenerationTokens =
-        buildEndOfGenerationTokens(metadata, vocab, tokenToId, eosTokenId);
+    boolean eosDeclared =
+        metadata.getUint32("tokenizer.ggml.eos_token_id").isPresent()
+            || metadata.getUint32("tokenizer.ggml.seperator_token_id").isPresent()
+            || metadata.getUint32("tokenizer.ggml.separator_token_id").isPresent();
+    Terminators endOfGenerationTokens =
+        buildEndOfGenerationTokens(metadata, vocab, tokenToId, eosTokenId, eosDeclared);
     List<SpecialToken> specialTokens = buildSpecialTokens(metadata, vocab);
 
     // Detect GPT-2 style byte-level BPE: check if the model uses "gpt2" or "bpe" tokenizer type,
@@ -385,11 +418,17 @@ public final class GgufTokenizer implements Tokenizer {
     for (int rank = 0; rank < merges.size(); rank++) {
       mergeRanks.put(merges.get(rank), rank);
     }
-    boolean[] endOfGenerationTokens = new boolean[copiedVocab.length];
-    markEndOfGeneration(endOfGenerationTokens, eosTokenId);
+    Terminators endOfGenerationTokens = new Terminators(copiedVocab.length);
+    endOfGenerationTokens.mark(eosTokenId, SOURCE_EOS_TOKEN);
+    // A tokenizer.json vocabulary has no token types; its added tokens are the control set. When
+    // there are added tokens, an entry outside them is ordinary BPE text (Qwen2's "</s>").
     for (int token = 0; token < copiedVocab.length; token++) {
-      if (END_OF_GENERATION_TOKEN_TEXTS.contains(copiedVocab[token])) {
-        endOfGenerationTokens[token] = true;
+      int tokenType =
+          controlTokenIds.isEmpty()
+              ? TOKEN_TYPE_UNKNOWN
+              : controlTokenIds.contains(token) ? TOKEN_TYPE_CONTROL : TOKEN_TYPE_NORMAL;
+      if (isVocabularyTerminator(copiedVocab[token], tokenType)) {
+        endOfGenerationTokens.mark(token, SOURCE_VOCABULARY_TEXT);
       }
     }
     clearMessageBoundaryEndTokens(endOfGenerationTokens, tokenToId);
@@ -401,7 +440,7 @@ public final class GgufTokenizer implements Tokenizer {
                 + ": "
                 + token);
       }
-      endOfGenerationTokens[token] = true;
+      endOfGenerationTokens.mark(token, SOURCE_DECLARED);
     }
     List<SpecialToken> controlTokens =
         controlTokenIds.stream()
@@ -442,40 +481,87 @@ public final class GgufTokenizer implements Tokenizer {
         normalizeNfc);
   }
 
-  private static boolean[] buildEndOfGenerationTokens(
-      GgufMetadata metadata, String[] vocab, Map<String, Integer> tokenToId, int eosTokenId) {
-    boolean[] result = new boolean[vocab.length];
-    markEndOfGeneration(result, eosTokenId);
-    for (String key : END_OF_GENERATION_METADATA_KEYS) {
-      metadata.getUint32(key).ifPresent(token -> markEndOfGeneration(result, token));
+  private static Terminators buildEndOfGenerationTokens(
+      GgufMetadata metadata,
+      String[] vocab,
+      Map<String, Integer> tokenToId,
+      int eosTokenId,
+      boolean eosDeclared) {
+    Terminators result = new Terminators(vocab.length);
+    if (!eosDeclared) {
+      result.mark(eosTokenId, SOURCE_DEFAULT_EOS);
     }
+    for (String key : END_OF_GENERATION_METADATA_KEYS) {
+      metadata.getUint32(key).ifPresent(token -> result.mark(token, key));
+    }
+    if (eosDeclared && metadata.getUint32("tokenizer.ggml.eos_token_id").isEmpty()) {
+      result.mark(eosTokenId, SOURCE_SEPARATOR_EOS);
+    }
+    List<Integer> tokenTypes =
+        metadata.getInt32Array("tokenizer.ggml.token_type").orElse(List.of());
     for (int token = 0; token < vocab.length; token++) {
-      if (END_OF_GENERATION_TOKEN_TEXTS.contains(vocab[token])) {
-        result[token] = true;
+      if (isVocabularyTerminator(vocab[token], tokenType(tokenTypes, token))) {
+        result.mark(token, SOURCE_VOCABULARY_TEXT);
       }
     }
+    ChatTemplateEndOfTurn.Resolution endOfTurn =
+        ChatTemplateEndOfTurn.resolve(
+            metadata.getString("tokenizer.chat_template").orElse(null),
+            vocab,
+            tokenTypes,
+            eosTokenId);
+    result.chatTemplateResolution = endOfTurn.description();
+    if (endOfTurn.isResolved()) {
+      result.mark(endOfTurn.tokenId(), SOURCE_CHAT_TEMPLATE);
+    }
 
+    // Exclusions run last so no marking rule, the chat template included, can undo them.
     clearMessageBoundaryEndTokens(result, tokenToId);
     if (tokenToId.containsKey("<|tool_response>")) {
-      clearEndOfGeneration(result, tokenToId.get("</s>"));
+      result.clear(tokenToId.get("</s>"));
     }
     return result;
   }
 
   private static void clearMessageBoundaryEndTokens(
-      boolean[] endOfGenerationTokens, Map<String, Integer> tokenToId) {
+      Terminators endOfGenerationTokens, Map<String, Integer> tokenToId) {
     boolean harmonyOrSolar =
         (tokenToId.containsKey("<|return|>") && tokenToId.containsKey("<|call|>"))
             || (tokenToId.containsKey("<|calls|>") && tokenToId.containsKey("<|flush|>"));
     if (harmonyOrSolar) {
-      clearEndOfGeneration(endOfGenerationTokens, tokenToId.get("<|end|>"));
+      endOfGenerationTokens.clear(tokenToId.get("<|end|>"));
     }
+  }
+
+  /**
+   * Whether a vocabulary entry is a terminator by its text alone, given its GGUF token type ({@link
+   * #TOKEN_TYPE_UNKNOWN} when the file declares none).
+   *
+   * <p>The text list mirrors llama.cpp's. Two guards keep it from promoting ordinary text: an entry
+   * the file types NORMAL is never a terminator (Qwen2 vocabularies carry {@code </s>} as an
+   * ordinary BPE merge, id 128247), and {@code </s>}, which is also the HTML strikethrough close
+   * tag, must be typed CONTROL (Gemma 3 types it USER_DEFINED among {@code <b>}, {@code </code>}
+   * and other tags). Ids declared in metadata are not subject to either guard.
+   */
+  private static boolean isVocabularyTerminator(String text, int tokenType) {
+    if (!END_OF_GENERATION_TOKEN_TEXTS.contains(text) || tokenType == TOKEN_TYPE_NORMAL) {
+      return false;
+    }
+    return !CLOSING_STRIKETHROUGH_TAG.equals(text)
+        || tokenType == TOKEN_TYPE_UNKNOWN
+        || tokenType == TOKEN_TYPE_CONTROL;
+  }
+
+  private static int tokenType(List<Integer> tokenTypes, int token) {
+    return token < tokenTypes.size() ? tokenTypes.get(token) : TOKEN_TYPE_UNKNOWN;
   }
 
   private static List<SpecialToken> buildSpecialTokens(GgufMetadata metadata, String[] vocab) {
     boolean[] special = new boolean[vocab.length];
+    List<Integer> declaredTypes =
+        metadata.getInt32Array("tokenizer.ggml.token_type").orElse(List.of());
     for (int token = 0; token < vocab.length; token++) {
-      special[token] = END_OF_GENERATION_TOKEN_TEXTS.contains(vocab[token]);
+      special[token] = isVocabularyTerminator(vocab[token], tokenType(declaredTypes, token));
     }
     metadata
         .getInt32Array("tokenizer.ggml.token_type")
@@ -500,15 +586,34 @@ public final class GgufTokenizer implements Tokenizer {
     return List.copyOf(result);
   }
 
-  private static void markEndOfGeneration(boolean[] tokens, int token) {
-    if (token >= 0 && token < tokens.length) {
-      tokens[token] = true;
-    }
-  }
+  /** The end-of-generation set under construction, with the rules that marked each id. */
+  private static final class Terminators {
+    private final boolean[] ids;
+    private final Map<Integer, java.util.LinkedHashSet<String>> sources = new java.util.TreeMap<>();
+    private String chatTemplateResolution = ChatTemplateEndOfTurn.ABSENT;
 
-  private static void clearEndOfGeneration(boolean[] tokens, Integer token) {
-    if (token != null && token >= 0 && token < tokens.length) {
-      tokens[token] = false;
+    private Terminators(int vocabularySize) {
+      this.ids = new boolean[vocabularySize];
+    }
+
+    private void mark(int token, String source) {
+      if (token >= 0 && token < ids.length) {
+        ids[token] = true;
+        sources.computeIfAbsent(token, ignored -> new java.util.LinkedHashSet<>()).add(source);
+      }
+    }
+
+    private void clear(Integer token) {
+      if (token != null && token >= 0 && token < ids.length) {
+        ids[token] = false;
+        sources.remove(token);
+      }
+    }
+
+    private Map<Integer, List<String>> sources() {
+      Map<Integer, List<String>> copy = new java.util.LinkedHashMap<>();
+      sources.forEach((token, rules) -> copy.put(token, List.copyOf(rules)));
+      return java.util.Collections.unmodifiableMap(copy);
     }
   }
 
@@ -1408,6 +1513,26 @@ public final class GgufTokenizer implements Tokenizer {
   @Override
   public boolean isEndOfGeneration(int token) {
     return token >= 0 && token < endOfGenerationTokens.length && endOfGenerationTokens[token];
+  }
+
+  /**
+   * Returns, for every end-of-generation id in ascending order, the rules that marked it: a
+   * metadata key such as {@code tokenizer.ggml.eos_token_id}, {@value #SOURCE_VOCABULARY_TEXT},
+   * {@value #SOURCE_CHAT_TEMPLATE}, {@value #SOURCE_DEFAULT_EOS} or {@value #SOURCE_DECLARED}, in
+   * the order they were applied.
+   *
+   * @return immutable provenance per terminator
+   */
+  public Map<Integer, List<String>> endOfGenerationSources() {
+    return endOfGenerationSources;
+  }
+
+  /**
+   * Describes how the GGUF chat template's assistant end-of-turn marker was resolved: {@code
+   * resolved:<id>}, {@code unresolved:<reason>}, or {@code absent} when there is no template.
+   */
+  public String chatTemplateEndOfTurnResolution() {
+    return chatTemplateEndOfTurnResolution;
   }
 
   @Override

@@ -38,6 +38,13 @@ public enum PerformanceCliff {
    */
   VECTOR_WIDTH_CAPPED(
       "vector-width-capped", "the active vector species is narrower than the hardware preference"),
+  /**
+   * GGUF row parallelism is off ({@code -Dvectors.gguf.parallel=false}) on a host with more than
+   * one processor, so projection rows run on the calling thread.
+   */
+  GGUF_PARALLEL_DISABLED(
+      "gguf-parallel-disabled",
+      "GGUF projection rows run serially although more than one processor is available"),
   /** vectors-core selected a GGUF row executor other than its persistent reusable workers. */
   PERSISTENT_EXECUTOR_NOT_USED(
       "persistent-executor-not-used", "GGUF rows do not run on persistent reusable workers"),
@@ -76,6 +83,14 @@ public enum PerformanceCliff {
   NATIVE_GROUPED_ATTENTION_UNAVAILABLE(
       "native-grouped-attention-unavailable",
       "the injected kernel has no native grouped attention; attention stays in Java"),
+  /**
+   * Native grouped attention is wired and available, but the sequence's KV cache view has more than
+   * the two spans the kernel accepts (a prefix frozen from an already-forked branch), so that
+   * attention row runs in Java.
+   */
+  NATIVE_GROUPED_ATTENTION_SPAN_LIMIT(
+      "native-grouped-attention-span-limit",
+      "the KV cache view has more than two spans; native grouped attention falls back to Java"),
   /**
    * An injected native kernel does not provide the Gated DeltaNet recurrence, so it runs in Java.
    */

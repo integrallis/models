@@ -169,6 +169,48 @@ class TensorOpsTest {
       }
     }
 
+    /**
+     * The F32 projection must not depend on JIT state. vectors-core's mapped F32 GEMV reduces its
+     * lanes with {@code reduceLanes(ADD)}, whose float order differs between the interpreted/C1
+     * fallback and the C2 intrinsic, so the same projection changed its last bits once C2 compiled
+     * it (see benchmark-results/2026-09-16-flaky-injected-attention). Requiring equality with the
+     * order-defined {@link VectorUtil#dotProduct(float[], int, float[], int, int)} pins the
+     * arithmetic to one reduction order in every tier.
+     */
+    @Test
+    void ggufF32MatrixIsBitIdenticalToTheOrderDefinedRowDotProduct() {
+      int rows = 7;
+      int cols = 67;
+      java.util.Random random = new java.util.Random(20260916L);
+      float[] x = new float[cols];
+      float[] weights = new float[rows * cols];
+      for (int col = 0; col < cols; col++) {
+        x[col] = (float) (random.nextGaussian() * Math.pow(10, random.nextInt(7) - 3));
+      }
+      for (int index = 0; index < weights.length; index++) {
+        weights[index] = (float) (random.nextGaussian() * Math.pow(10, random.nextInt(7) - 3));
+      }
+      ByteBuffer bytes =
+          ByteBuffer.allocate(weights.length * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+      for (float value : weights) {
+        bytes.putFloat(value);
+      }
+      float[] expected = new float[rows];
+      for (int row = 0; row < rows; row++) {
+        expected[row] = VectorUtil.dotProduct(x, 0, weights, row * cols, cols);
+      }
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment weight = arena.allocate(bytes.capacity());
+        MemorySegment.copy(bytes.array(), 0, weight, ValueLayout.JAVA_BYTE, 0, bytes.capacity());
+        float[] actual = new float[rows];
+
+        TensorOps.ggufMatmul(actual, x, weight, GgufTensorType.F32, rows, cols);
+
+        assertThat(actual).containsExactly(expected);
+      }
+    }
+
     @Test
     void bf16MatrixUsesMappedVectorsKernelForSingleAndBatchedActivations() {
       float[] singleInput = {1.0f, 2.0f};

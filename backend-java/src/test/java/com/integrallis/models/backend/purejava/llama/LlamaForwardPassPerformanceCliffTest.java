@@ -127,6 +127,111 @@ class LlamaForwardPassPerformanceCliffTest {
     }
   }
 
+  /** A kernel that claims native grouped attention and counts calls; output is left at zero. */
+  private static final class CountingGroupedAttentionKernel implements GgufBatchedMatrixKernel {
+    private final java.util.concurrent.atomic.AtomicInteger calls =
+        new java.util.concurrent.atomic.AtomicInteger();
+
+    @Override
+    public String implementation() {
+      return "test-kernel-with-grouped-attention";
+    }
+
+    @Override
+    public boolean supports(GgufTensorType type) {
+      return false;
+    }
+
+    @Override
+    public void multiply(
+        float[] output,
+        float[] input,
+        MemorySegment weights,
+        GgufTensorType type,
+        int batchSize,
+        int rows,
+        int cols) {
+      throw new AssertionError("no tensor type is supported");
+    }
+
+    @Override
+    public boolean supportsGroupedAttention() {
+      return true;
+    }
+
+    @Override
+    public void groupedAttention(
+        float[] query,
+        int queryOffset,
+        float[] keysA,
+        int keysAOffset,
+        float[] valuesA,
+        int valuesAOffset,
+        int positionsA,
+        float[] keysB,
+        int keysBOffset,
+        float[] valuesB,
+        int valuesBOffset,
+        int positionsB,
+        float[] output,
+        int outputOffset,
+        float[] scores,
+        int keyDim,
+        int valueDim,
+        int keyLength,
+        int valueLength,
+        int numHeads,
+        int numKvHeads,
+        float scale) {
+      calls.incrementAndGet();
+    }
+  }
+
+  @Test
+  void graniteNativeAttentionOverTwoCacheSpansReportsNoSpanCliff() {
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      CountingGroupedAttentionKernel kernel = new CountingGroupedAttentionKernel();
+      LlamaForwardPass forwardPass = forwardPass("granite", 2, 1, kernel);
+      LlamaForwardPass.Session source = forwardPass.openSession();
+      forwardPass.forward(source, 1, 0);
+      forwardPass.forward(source, 2, 1);
+      LlamaForwardPass.Session branch = forwardPass.freezePrefix(source).fork();
+      int before = kernel.calls.get();
+      forwardPass.forward(branch, 3, 2);
+
+      assertThat(kernel.calls.get()).isEqualTo(before + 1);
+      assertThat(recording.count(PerformanceCliff.NATIVE_GROUPED_ATTENTION_SPAN_LIMIT)).isZero();
+    }
+  }
+
+  @Test
+  void graniteNativeAttentionOverMoreThanTwoCacheSpansFallsBackAndReportsOnce() {
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      CountingGroupedAttentionKernel kernel = new CountingGroupedAttentionKernel();
+      LlamaForwardPass forwardPass = forwardPass("granite", 2, 1, kernel);
+      LlamaForwardPass.Session source = forwardPass.openSession();
+      forwardPass.forward(source, 1, 0);
+      LlamaForwardPass.Session middle = forwardPass.freezePrefix(source).fork();
+      forwardPass.forward(middle, 2, 1);
+      LlamaForwardPass.Session leaf = forwardPass.freezePrefix(middle).fork();
+      int before = kernel.calls.get();
+      forwardPass.forward(leaf, 3, 2);
+      forwardPass.forward(leaf, 4, 3);
+
+      assertThat(kernel.calls.get())
+          .as("three spans never reach the native kernel")
+          .isEqualTo(before);
+      assertThat(recording.count(PerformanceCliff.NATIVE_GROUPED_ATTENTION_SPAN_LIMIT))
+          .isEqualTo(1);
+      assertThat(
+              PerformanceCliffs.reported()
+                  .get(PerformanceCliff.NATIVE_GROUPED_ATTENTION_SPAN_LIMIT))
+          .contains("architecture=granite")
+          .contains("spans=3")
+          .contains("kernel=test-kernel-with-grouped-attention");
+    }
+  }
+
   @Test
   void projectionTypeWithoutBatchedKernelReportsBatchedPrefillCliffOnce() {
     try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {

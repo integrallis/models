@@ -1,0 +1,42 @@
+LlamaForwardPassPerformanceCliffTest > projectionTypeWithoutBatchedKernelReportsBatchedPrefillCliffOnce() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteWithAnInjectedKernelLackingGroupedAttentionReportsOnce() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteNativeAttentionOverTwoCacheSpansReportsNoSpanCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteNativeAttentionOverMoreThanTwoCacheSpansFallsBackAndReportsOnce() FAILED
+    org.opentest4j.AssertionFailedError: 
+    expected: 1L
+     but was: 0L
+LlamaForwardPassPerformanceCliffTest > batchedProjectionTypesReportNoBatchedPrefillCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > groupedQueryLlamaReportsFusedGroupedAttentionNotWiredOnceAcrossPasses() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteTakesTheFusedPathAndThePureJavaBackendReportsNoNativeCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > multiHeadLlamaHasNoGroupsAndReportsNoAttentionCliff() PASSED
+
+ExecutionPlannerPerformanceCliffTest > explicitlyWidenedQ4KernelIsAChoiceNotACliff() PASSED
+
+ExecutionPlannerPerformanceCliffTest > serialGgufRowsOnOneProcessorAreNotACliff() PASSED
+
+ExecutionPlannerPerformanceCliffTest > plannerLeavesBatchedPrefillCliffToTheForwardPassThatOwnsTheActualTopology() PASSED
+
+ExecutionPlannerPerformanceCliffTest > unsupportedPairwiseQ4KernelReportsFallbackOnce() PASSED
+
+ExecutionPlannerPerformanceCliffTest > nonPersistentExecutorReportsOnce() PASSED
+
+ExecutionPlannerPerformanceCliffTest > fastPlanReportsNoCliff() PASSED
+
+ExecutionPlannerPerformanceCliffTest > serialGgufRowsOnAMultiProcessorHostReportOnce() FAILED
+    org.opentest4j.AssertionFailedError: 
+    expected: 1L
+     but was: 0L
+ExecutionPlannerPerformanceCliffTest > scalarVectorProviderReportsVectorApiUnavailableOnce() PASSED
+
+ExecutionPlannerPerformanceCliffTest > activeWidthBelowPreferredReportsVectorWidthCappedOnce() PASSED
+
+17 tests completed, 2 failed
+
+BUILD FAILED in 43s
+8 actionable tasks: 3 executed, 5 up-to-date

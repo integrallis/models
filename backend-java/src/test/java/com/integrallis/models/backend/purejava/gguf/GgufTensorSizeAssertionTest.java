@@ -69,6 +69,7 @@ class GgufTensorSizeAssertionTest {
     // file, so a file-bounds check alone accepts this and "a" silently reads b's bytes.
     byte[] data =
         new SyntheticGgufBuilder()
+            .addUint32("general.alignment", 4)
             .addTensor(
                 "blk.0.ffn_gate_exps.weight", GgufTensorType.F32, new long[] {2}, new byte[8])
             .addTensor("blk.0.ffn_up_exps.weight", GgufTensorType.F32, new long[] {2}, new byte[8])
@@ -88,6 +89,7 @@ class GgufTensorSizeAssertionTest {
   void overlapIsDetectedRegardlessOfTensorTableOrder() {
     byte[] data =
         new SyntheticGgufBuilder()
+            .addUint32("general.alignment", 4)
             .addTensor("late", GgufTensorType.F32, new long[] {2}, new byte[8])
             .addTensor("early", GgufTensorType.F32, new long[] {3}, new byte[12])
             .tensorOffset("late", 8)

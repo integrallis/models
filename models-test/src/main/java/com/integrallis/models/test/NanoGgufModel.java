@@ -201,12 +201,19 @@ public final class NanoGgufModel {
         }
         writeInt(output, GGUF_TENSOR_F32);
         writeLong(output, tensorOffset);
-        tensorOffset = Math.addExact(tensorOffset, tensor.data().length);
+        tensorOffset = align(Math.toIntExact(tensorOffset + tensor.data().length), GGUF_ALIGNMENT);
       }
 
       int padding = align(output.size(), GGUF_ALIGNMENT) - output.size();
       output.writeBytes(new byte[padding]);
-      tensors.forEach(tensor -> output.writeBytes(tensor.data()));
+      // Every tensor starts at a multiple of the alignment, as GGUF readers require.
+      for (int index = 0; index < tensors.size(); index++) {
+        byte[] data = tensors.get(index).data();
+        output.writeBytes(data);
+        if (index + 1 < tensors.size()) {
+          output.writeBytes(new byte[align(data.length, GGUF_ALIGNMENT) - data.length]);
+        }
+      }
       return output.toByteArray();
     }
 

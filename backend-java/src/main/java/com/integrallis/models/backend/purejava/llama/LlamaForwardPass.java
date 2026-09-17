@@ -2235,6 +2235,14 @@ public final class LlamaForwardPass {
       KvCache sequenceCache) {
     AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
     if (view.spanCount() > 2) {
+      PerformanceCliffs.report(
+          PerformanceCliff.NATIVE_GROUPED_ATTENTION_SPAN_LIMIT,
+          "architecture="
+              + config.architecture().metadataId()
+              + ", kernel="
+              + batchedMatrixKernel.implementation()
+              + ", spans="
+              + view.spanCount());
       return false;
     }
     int positions = position - firstPosition + 1;

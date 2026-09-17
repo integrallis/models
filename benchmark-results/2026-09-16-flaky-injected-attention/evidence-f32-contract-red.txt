@@ -1,0 +1,24 @@
+suite=com.integrallis.models.backend.purejava.ops.TensorOpsTest$Matmul tests=2 failures=1 timestamp=2026-09-17T03:41:15.831Z
+FAILED ggufF32MatrixIsBitIdenticalToTheOrderDefinedRowDotProduct()
+org.opentest4j.AssertionFailedError: 
+Expecting actual:
+  [-1450038.1f, 703531.06f, -36355.973f, -2124784.8f, 14687.132f, 1149598.6f, -1430439.5f]
+to contain exactly (and in same order):
+  [-1450037.9f,
+    703531.06f,
+    -36355.973f,
+    -2124784.8f,
+    14687.131f,
+    1149598.4f,
+    -1430439.5f]
+but some elements were not found:
+  [-1450037.9f, 14687.131f, 1149598.4f]
+and others were not expected:
+  [-1450038.1f, 14687.132f, 1149598.6f]
+
+	at com.integrallis.models.backend.purejava.ops.TensorOpsTest$Matmul.ggufF32MatrixIsBitIdenticalToTheOrderDefinedRowDotProduct(TensorOpsTest.java:210)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+PASSED ggufF32MatrixUsesMappedVectorsKernel()

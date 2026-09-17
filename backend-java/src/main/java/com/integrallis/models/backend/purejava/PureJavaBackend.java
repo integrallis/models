@@ -495,8 +495,10 @@ public final class PureJavaBackend
       }
 
       BackendDiagnostics diagnostics =
-          backendConfiguration.enrich(
-              architectureDiagnostics(loaded.executionPlan().diagnostics(), loaded.decoder()));
+          endOfGenerationDiagnostics(
+              backendConfiguration.enrich(
+                  architectureDiagnostics(loaded.executionPlan().diagnostics(), loaded.decoder())),
+              tokenizer);
 
       return new PureJavaBackend(
           arenaOwner,
@@ -1320,6 +1322,30 @@ public final class PureJavaBackend
       valueRows = Math.max(valueRows, config.valueDim(layer));
     }
     return new ModelTopology("gemma4", queryRows, keyRows, valueRows, layers, true);
+  }
+
+  /**
+   * Adds the resolved end-of-generation set ({@code end-of-generation-token-ids}) and, for GGUF
+   * tokenizers, the rules behind each id ({@code end-of-generation.<id>}) and the chat template's
+   * end-of-turn resolution ({@code end-of-generation.chat-template}).
+   */
+  private static BackendDiagnostics endOfGenerationDiagnostics(
+      BackendDiagnostics diagnostics, Tokenizer tokenizer) {
+    Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
+    environment.put(
+        "end-of-generation-token-ids",
+        java.util.Arrays.stream(tokenizer.endOfGenerationTokenIds())
+            .mapToObj(Integer::toString)
+            .collect(java.util.stream.Collectors.joining(",")));
+    if (tokenizer instanceof GgufTokenizer gguf) {
+      gguf.endOfGenerationSources()
+          .forEach(
+              (token, sources) ->
+                  environment.put("end-of-generation." + token, String.join(",", sources)));
+      environment.put("end-of-generation.chat-template", gguf.chatTemplateEndOfTurnResolution());
+    }
+    return new BackendDiagnostics(
+        diagnostics.backend(), diagnostics.planVersion(), environment, diagnostics.optimizations());
   }
 
   private static BackendDiagnostics architectureDiagnostics(

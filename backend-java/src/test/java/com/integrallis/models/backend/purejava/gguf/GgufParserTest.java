@@ -156,6 +156,107 @@ class GgufParserTest {
   }
 
   @Nested
+  class TensorOffsetAlignment {
+
+    @Test
+    void rejectsTensorOffsetThatIsNotAMultipleOfTheDefaultAlignment() {
+      byte[] data =
+          new SyntheticGgufBuilder()
+              .addTensor("a", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .addTensor("blk.0.attn_q.weight", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .tensorOffset("blk.0.attn_q.weight", 40)
+              .build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(data)))
+          .isInstanceOf(MalformedGgufException.class)
+          .hasMessageContaining("'blk.0.attn_q.weight'")
+          .hasMessageContaining("offset 40")
+          .hasMessageContaining("alignment 32");
+    }
+
+    @Test
+    void validatesAgainstTheDeclaredAlignmentNotTheDefault() {
+      byte[] misaligned =
+          new SyntheticGgufBuilder()
+              .addUint32("general.alignment", 64)
+              .addTensor("a", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .addTensor("b", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .tensorOffset("b", 32)
+              .build();
+      byte[] aligned =
+          new SyntheticGgufBuilder()
+              .addUint32("general.alignment", 64)
+              .addTensor("a", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .addTensor("b", GgufTensorType.F32, new long[] {2}, new byte[8])
+              .build();
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(misaligned)))
+          .isInstanceOf(MalformedGgufException.class)
+          .hasMessageContaining("'b'")
+          .hasMessageContaining("offset 32")
+          .hasMessageContaining("alignment 64");
+      GgufFile file = GgufParser.parseSegment(MemorySegment.ofArray(aligned));
+      assertThat(file.getTensor("b").info().offset()).isEqualTo(64);
+    }
+
+    @Test
+    void acceptsEveryTensorAtAnAlignmentBoundaryWithOddSizedData() {
+      byte[] data =
+          new SyntheticGgufBuilder()
+              .addTensor("q8", GgufTensorType.Q8_0, new long[] {32}, new byte[34])
+              .addTensor("f16", GgufTensorType.F16, new long[] {3}, new byte[6])
+              .addTensor("f32", GgufTensorType.F32, new long[] {1}, new byte[4])
+              .build();
+
+      GgufFile file = GgufParser.parseSegment(MemorySegment.ofArray(data));
+
+      assertThat(file.tensorInfos())
+          .extracting(GgufTensorInfo::offset)
+          .containsExactly(0L, 64L, 96L);
+    }
+  }
+
+  @Nested
+  class VocabularyOnlyFiles {
+
+    @Test
+    void parsesAFileWithNoTensorsWhoseMetadataEndsOffTheAlignmentBoundary() {
+      // llama.cpp's vocabulary fixtures (models/ggml-vocab-*.gguf) have no tensors and no padding
+      // after the metadata; llama.cpp only seeks to the aligned data section when tensors exist.
+      byte[] padded =
+          new SyntheticGgufBuilder()
+              .addStringArray("tokenizer.ggml.tokens", java.util.List.of("a", "b"))
+              .addString("general.name", "vocab-only")
+              .build();
+      int unpaddedLength = padded.length;
+      while (padded[unpaddedLength - 1] == 0) {
+        unpaddedLength--;
+      }
+      byte[] unpadded = java.util.Arrays.copyOf(padded, unpaddedLength);
+      assertThat(unpadded.length % GgufConstants.DEFAULT_ALIGNMENT).isNotZero();
+
+      GgufFile file = GgufParser.parseSegment(MemorySegment.ofArray(unpadded));
+
+      assertThat(file.tensorInfos()).isEmpty();
+      assertThat(file.metadata().getStringArray("tokenizer.ggml.tokens"))
+          .contains(java.util.List.of("a", "b"));
+    }
+
+    @Test
+    void stillRejectsAFileWithTensorsWhoseDataSectionStartsPastTheEnd() {
+      byte[] valid =
+          new SyntheticGgufBuilder()
+              .addTensor("x", GgufTensorType.F32, new long[] {1}, new byte[4])
+              .addString("general.name", "z")
+              .build();
+      byte[] truncated = java.util.Arrays.copyOf(valid, valid.length - 5);
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(truncated)))
+          .isInstanceOf(MalformedGgufException.class);
+    }
+  }
+
+  @Nested
   class MalformedInput {
 
     @Test

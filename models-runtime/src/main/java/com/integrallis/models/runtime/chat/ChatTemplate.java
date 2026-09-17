@@ -16,11 +16,14 @@
 package com.integrallis.models.runtime.chat;
 
 import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.api.ToolCall;
 import com.integrallis.models.api.ToolSpec;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * Model-facing chat envelopes used by qualified ModelJars artifacts.
@@ -140,6 +143,74 @@ public enum ChatTemplate {
    */
   public ToolSyntax toolSyntax() {
     return toolSyntax;
+  }
+
+  /**
+   * The token text that terminates an assistant turn in this family, when it has one.
+   *
+   * <p>For every family but GPT-OSS this is the marker the renderer writes after an assistant
+   * message. GPT-OSS histories close a turn with {@code <|end|>}, but a final answer ends with
+   * {@code <|return|>}, which is the marker generation has to stop on; {@code <|end|>} must not
+   * stop it. {@link #RAW} has no envelope and so no marker.
+   *
+   * @return the marker text, as it appears in the model's vocabulary
+   */
+  public Optional<String> endOfTurnMarker() {
+    return Optional.ofNullable(
+        switch (this) {
+          case RAW -> null;
+          case CHATML,
+              CHATML_DIRECT,
+              CHATML_ANSWER,
+              CHATML_NO_THINK,
+              SMOLLM3_NO_THINK,
+              NEEDLE2,
+              HAMMER,
+              MINICPM5_NO_THINK ->
+              "<|im_end|>";
+          case ZEPHYR, H2O, H2O_DIRECT -> "</s>";
+          case LLAMA3 -> "<|eot_id|>";
+          case MOBILE_MOE -> "<|eot|>";
+          case GPT_OSS -> "<|return|>";
+          case GEMMA -> "<end_of_turn>";
+          case GEMMA4 -> "<turn|>";
+          case PHI3 -> "<|end|>";
+          case DEEPSEEK -> "<|EOT|>";
+          case GRANITE -> "<|end_of_text|>";
+        });
+  }
+
+  /**
+   * Resolves {@link #endOfTurnMarker()} against a loaded vocabulary.
+   *
+   * @param tokenizer the model's tokenizer
+   * @return the marker's token id, or empty when the family has no marker or the vocabulary does
+   *     not define it as a single token
+   */
+  public OptionalInt endOfTurnTokenId(Tokenizer tokenizer) {
+    Objects.requireNonNull(tokenizer, "tokenizer");
+    Optional<String> marker = endOfTurnMarker();
+    if (marker.isEmpty()) {
+      return OptionalInt.empty();
+    }
+    int token = tokenizer.tokenId(marker.get());
+    return token < 0 ? OptionalInt.empty() : OptionalInt.of(token);
+  }
+
+  /**
+   * Whether generation with {@code tokenizer} stops where this family ends an assistant turn.
+   *
+   * <p>A template whose end-of-turn token is not in the tokenizer's end-of-generation set lets a
+   * model run past the end of its answer into an invented next turn. This check lets a host verify
+   * a template and model pairing before serving it. It is {@code true} for {@link #RAW}, which has
+   * no marker, and {@code false} when the vocabulary lacks the marker.
+   */
+  public boolean endOfTurnStopsGeneration(Tokenizer tokenizer) {
+    if (endOfTurnMarker().isEmpty()) {
+      return true;
+    }
+    OptionalInt token = endOfTurnTokenId(tokenizer);
+    return token.isPresent() && tokenizer.isEndOfGeneration(token.getAsInt());
   }
 
   /** Whether this family has a trained tool-call format at all. */
