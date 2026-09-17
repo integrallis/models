@@ -21,6 +21,7 @@
  */
 
 import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.runtime.ActivatedToolCallingModel;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -45,6 +47,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 /**
  * Clean-host Java 25 run of the Integrallis Granite 4.1 3B answerability activated LoRA, using only
@@ -53,18 +56,62 @@ import java.util.Map;
  *
  * <p>Downloads the pinned base GGUF, the pinned adapter bundle (ModelJars GitHub release) and the
  * frozen qualification window, each hash-checked and failing closed. Runs the first three cases of
- * squad-v2-dev and msmarco-v2.1-validation through the pure-Java backend with a physically shared
+ * squad-v2-dev and msmarco-v2.1-validation through the selected backend with a physically shared
  * prefix, rendering the prompt exactly as {@code ActivatedAnswerabilityQualificationCli} (models-bench,
  * v0.3.42) renders the specialist arm, and compares every output byte-for-byte, and its shared-prefix
- * token count, with the committed qualification evidence.
+ * token count, with the committed qualification evidence for <em>that</em> backend.
  *
- * <p>Usage: {@code jbang AnswerabilityCleanHost.java [--store <dir>]} (default store: {@code ./store}).
- * Exit 0 only if all six cases are structured, physically shared, byte-identical to the
- * qualification output and report the same shared-prefix token count; 1 on any mismatch; 2 when a
- * download or hash check fails. The only network access is the pinned downloads below.
+ * <p>Two kernel runtimes are selectable, exactly as the qualification CLI selects them:
+ *
+ * <ul>
+ *   <li>{@code pure-java} (default) — {@link PureJavaBackend#loadActivatedAdapter}, the Vector API
+ *       transformer, resolving only backend-java and models-runtime.
+ *   <li>{@code rust-ffm} — the Models-owned Rust/FFM backend, loaded reflectively from
+ *       {@code com.integrallis.models.backend.nativekernel.RustFfmBackend#loadActivatedAdapter},
+ *       which needs the optional {@code com.integrallis:backend-native} artifact on the classpath
+ *       ({@code jbang --deps com.integrallis:backend-native:0.3.42 ...}). Only the base matrix
+ *       products move to the native kernel; the transformer, the adapter delta and the physically
+ *       shared KV prefix stay in Java, which is why both arms must produce the same tokens.
+ * </ul>
+ *
+ * <p>The backend choice is recorded on every line the program prints, and the Rust arm additionally
+ * prints the identity of the native library it loaded (platform, ABI, filename, sha256 measured
+ * here over the classpath resource, and the kernel plan version). A selected-but-inert native
+ * kernel is a failure, not a passing measurement: the program refuses to report PASS unless the
+ * loaded execution plan itself says the injected kernel is routed on the Rust arm and absent on the
+ * pure-Java arm.
+ *
+ * <p>Usage: {@code jbang AnswerabilityCleanHost.java [--backend pure-java|rust-ffm] [--store <dir>]}
+ * (defaults: {@code pure-java}, {@code ./store}; the backend may also be set with the {@code BACKEND}
+ * environment variable, which the explicit flag overrides). Exit 0 only if all six cases are
+ * structured, physically shared, byte-identical to the qualification output and report the same
+ * shared-prefix token count; 1 on any mismatch; 2 when a download or hash check fails. The only
+ * network access is the pinned downloads below.
  */
 public final class AnswerabilityCleanHost {
   static final String MODELS_VERSION = "0.3.42";
+
+  static final String PURE_JAVA = "pure-java";
+  static final String RUST_FFM = "rust-ffm";
+
+  /**
+   * The Models-owned Rust/FFM entry points, named exactly as {@code
+   * ActivatedAnswerabilityQualificationCli} (models-bench, v0.3.42) names them. They are reached
+   * reflectively so the pure-Java arm resolves and runs without the optional native artifact.
+   */
+  static final String RUST_BACKEND_CLASS =
+      "com.integrallis.models.backend.nativekernel.RustFfmBackend";
+
+  static final String NATIVE_PLATFORM_CLASS =
+      "com.integrallis.models.backend.nativekernel.NativeKernelPlatform";
+
+  static final String NATIVE_LIBRARY_CLASS =
+      "com.integrallis.models.backend.nativekernel.NativeKernelLibrary";
+
+  /** Classpath layout of the platform payloads inside com.integrallis:backend-native. */
+  static final String NATIVE_RESOURCE_ROOT = "META-INF/models/native/";
+
+  static final String NATIVE_METADATA_FILE = "native.properties";
 
   static final String BASE_URL =
       "https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/"
@@ -103,11 +150,11 @@ public final class AnswerabilityCleanHost {
   record Expected(String suite, String id, String output, int sharedPrefixTokens) {}
 
   /**
-   * The first three cases of each suite from the committed pilot-2 qualification evidence
-   * (release-pilot2/evidence/pj1/window-squad-v2-dev-specialist-pure-java.json and
+   * The first three cases of each suite from the committed pilot-2 <em>pure-Java</em> qualification
+   * evidence (release-pilot2/evidence/pj1/window-squad-v2-dev-specialist-pure-java.json and
    * release-pilot2/evidence/pj3/window-msmarco-v2.1-validation-specialist-pure-java.json).
    */
-  static final List<Expected> EXPECTED =
+  static final List<Expected> EXPECTED_PURE_JAVA =
       List.of(
           new Expected("squad-v2-dev", "5ad247b0d7d075001a428b45", "\"unanswerable\"", 269),
           new Expected("squad-v2-dev", "57267640f1498d1400e8e074", "\"answerable\"", 386),
@@ -115,6 +162,33 @@ public final class AnswerabilityCleanHost {
           new Expected("msmarco-v2.1-validation", "95542", "\"unanswerable\"", 776),
           new Expected("msmarco-v2.1-validation", "851555", "\"answerable\"", 1082),
           new Expected("msmarco-v2.1-validation", "1067349", "\"answerable\"", 853));
+
+  /**
+   * The same six cases from the committed pilot-2 <em>rust-ffm</em> qualification evidence
+   * (release-pilot2/evidence/main/window-squad-v2-dev-specialist-rust-ffm.json and
+   * release-pilot2/evidence/main/window-msmarco-v2.1-validation-specialist-rust-ffm.json, both
+   * modelsRevision 6063076e476ba7a477e3f6dd966a77b571352d29, kernelPlan rust-ffm-v13).
+   *
+   * <p>These values are transcribed from that arm's own evidence, not copied from the pure-Java
+   * table. That they currently agree entry-for-entry is the measured result the identity gate
+   * asserts, so the two tables are kept apart: if a future kernel ever diverged, this run has to
+   * notice rather than compare the Rust arm against pure-Java expectations.
+   */
+  static final List<Expected> EXPECTED_RUST_FFM =
+      List.of(
+          new Expected("squad-v2-dev", "5ad247b0d7d075001a428b45", "\"unanswerable\"", 269),
+          new Expected("squad-v2-dev", "57267640f1498d1400e8e074", "\"answerable\"", 386),
+          new Expected("squad-v2-dev", "5737432bc3c5551400e51e9b", "\"answerable\"", 357),
+          new Expected("msmarco-v2.1-validation", "95542", "\"unanswerable\"", 776),
+          new Expected("msmarco-v2.1-validation", "851555", "\"answerable\"", 1082),
+          new Expected("msmarco-v2.1-validation", "1067349", "\"answerable\"", 853));
+
+  static final Map<String, List<Expected>> EXPECTED =
+      Map.of(PURE_JAVA, EXPECTED_PURE_JAVA, RUST_FFM, EXPECTED_RUST_FFM);
+
+  /** Identity of the native kernel a rust-ffm run loaded; null on the pure-Java arm. */
+  record NativeLibrary(
+      String platform, int abi, String library, String sha256, String source, String kernelPlan) {}
 
   static final class DownloadFailure extends RuntimeException {
     DownloadFailure(String message) {
@@ -124,17 +198,27 @@ public final class AnswerabilityCleanHost {
 
   public static void main(String[] args) throws Exception {
     Path store = Path.of("store");
+    String environmentBackend = System.getenv("BACKEND");
+    String backend =
+        environmentBackend == null || environmentBackend.isBlank() ? PURE_JAVA : environmentBackend;
     for (int i = 0; i < args.length; i++) {
       if ("--store".equals(args[i]) && i + 1 < args.length) {
         store = Path.of(args[++i]);
+      } else if ("--backend".equals(args[i]) && i + 1 < args.length) {
+        backend = args[++i];
       } else {
-        System.err.println("usage: AnswerabilityCleanHost [--store <dir>]");
+        System.err.println(
+            "usage: AnswerabilityCleanHost [--backend pure-java|rust-ffm] [--store <dir>]");
         System.exit(64);
       }
     }
+    if (!EXPECTED.containsKey(backend)) {
+      System.err.println("--backend must be " + PURE_JAVA + " or " + RUST_FFM + ", not " + backend);
+      System.exit(64);
+    }
     int exit;
     try {
-      exit = run(store.toAbsolutePath().normalize());
+      exit = run(store.toAbsolutePath().normalize(), backend);
     } catch (DownloadFailure failure) {
       System.out.println("FAIL download: " + failure.getMessage());
       exit = 2;
@@ -143,10 +227,12 @@ public final class AnswerabilityCleanHost {
     System.exit(exit);
   }
 
-  static int run(Path store) throws Exception {
+  static int run(Path store, String backendName) throws Exception {
+    List<Expected> expectedCases = EXPECTED.get(backendName);
     System.out.printf(
-        "clean-host modelsVersion=%s java=%s vendor=%s os=%s/%s processors=%d%n",
+        "clean-host modelsVersion=%s backend=%s java=%s vendor=%s os=%s/%s processors=%d%n",
         MODELS_VERSION,
+        backendName,
         System.getProperty("java.version"),
         System.getProperty("java.vendor"),
         System.getProperty("os.name"),
@@ -182,28 +268,59 @@ public final class AnswerabilityCleanHost {
     for (String suite : List.of("squad-v2-dev", "msmarco-v2.1-validation")) {
       cases.addAll(firstCases(window, suite, CASES_PER_SUITE));
     }
-    if (cases.size() != EXPECTED.size()) {
-      throw new IllegalStateException("expected " + EXPECTED.size() + " cases, got " + cases.size());
+    if (cases.size() != expectedCases.size()) {
+      throw new IllegalStateException(
+          "expected " + expectedCases.size() + " cases, got " + cases.size());
+    }
+
+    // Printed before the backend opens, so a failed load still leaves the identity in the log.
+    NativeLibrary nativeLibrary = RUST_FFM.equals(backendName) ? nativeLibrary() : null;
+    if (nativeLibrary != null) {
+      System.out.printf(
+          "native-library backend=%s platform=%s abi=%d file=%s sha256=%s source=%s kernelPlan=%s%n",
+          RUST_FFM,
+          nativeLibrary.platform(),
+          nativeLibrary.abi(),
+          nativeLibrary.library(),
+          nativeLibrary.sha256(),
+          nativeLibrary.source(),
+          nativeLibrary.kernelPlan());
     }
 
     SamplingOptions options =
         SamplingOptions.builder().temperature(0).maxTokens(MAX_COMPLETION_TOKENS).build();
     int passed = 0;
     long loadStarted = System.nanoTime();
-    try (PureJavaBackend backend = PureJavaBackend.loadActivatedAdapter(base, adapterDir);
+    try (PureJavaBackend backend = loadBackend(backendName, base, adapterDir);
         ActivatedToolCallingModel model = new ActivatedToolCallingModel(backend, 1)) {
+      boolean injected = backend.executionPlan().injectedGroupedProjections();
+      String matrixKernel = matrixKernel(backend);
       System.out.printf(
-          "loaded backend=pure-java adapterSha256=%s invocation=%s millis=%d%n",
+          "loaded backend=%s adapterSha256=%s invocation=%s injectedGroupedProjections=%s"
+              + " matrixKernel=%s millis=%d%n",
+          backendName,
           model.adapter().adapterSha256(),
           jsonString(model.adapter().invocationText()),
+          injected,
+          matrixKernel,
           (System.nanoTime() - loadStarted) / 1_000_000L);
       if (!GraniteDocumentsPrompt.ASSISTANT_MARKER.equals(model.adapter().invocationText())) {
         System.out.println("FAIL adapter marker differs from the Granite assistant marker");
         return 1;
       }
+      // A backend switch that silently changes nothing would make this run measure the wrong
+      // thing while still printing PASS, so the selection has to be visible in the loaded plan.
+      boolean nativeKernel = matrixKernel.startsWith("rust-ffm-");
+      if (RUST_FFM.equals(backendName) != (injected && nativeKernel)) {
+        System.out.printf(
+            "FAIL backend=%s did not change the execution plan:"
+                + " injectedGroupedProjections=%s matrixKernel=%s%n",
+            backendName, injected, matrixKernel);
+        return 1;
+      }
       for (int index = 0; index < cases.size(); index++) {
         Case item = cases.get(index);
-        Expected expected = EXPECTED.get(index);
+        Expected expected = expectedCases.get(index);
         if (!expected.suite().equals(item.suite()) || !expected.id().equals(item.id())) {
           System.out.printf(
               "FAIL window case %d is %s/%s, expected %s/%s%n",
@@ -232,10 +349,13 @@ public final class AnswerabilityCleanHost {
         boolean ok = structured && shared && identical && sameShared;
         if (ok) passed++;
         System.out.printf(
-            "CASE %s suite=%s id=%s promptSha256=%s output=%s structured=%s physicallySharesPrefix=%s"
+            "CASE %s backend=%s nativeLibrarySha256=%s suite=%s id=%s promptSha256=%s output=%s"
+                + " structured=%s physicallySharesPrefix=%s"
                 + " sharedPrefixTokens=%d expectedOutput=%s expectedSharedPrefixTokens=%d"
                 + " byteIdentical=%s millis=%d%n",
             ok ? "PASS" : "FAIL",
+            backendName,
+            nativeLibrary == null ? "none" : nativeLibrary.sha256(),
             item.suite(),
             item.id(),
             sha256(text.toString().getBytes(StandardCharsets.UTF_8)),
@@ -249,9 +369,154 @@ public final class AnswerabilityCleanHost {
             millis);
       }
     }
-    boolean pass = passed == EXPECTED.size();
-    System.out.printf("%s cases=%d passed=%d%n", pass ? "PASS" : "FAIL", EXPECTED.size(), passed);
+    boolean pass = passed == expectedCases.size();
+    // The final verdict line is byte-for-byte the one the pure-Java evidence already carries, so
+    // the gate's log check is unchanged; the backend is stated on every other line instead.
+    System.out.printf(
+        "%s cases=%d passed=%d%n", pass ? "PASS" : "FAIL", expectedCases.size(), passed);
     return pass ? 0 : 1;
+  }
+
+  /**
+   * Loads the activated backend for the requested kernel runtime, exactly as {@code
+   * ActivatedAnswerabilityQualificationCli.loadBackend} (models-bench, v0.3.42) does: the Rust arm
+   * is the same Java shared-prefix backend with the native matrix kernel injected, reached
+   * reflectively so the pure-Java arm needs no native artifact on the classpath.
+   */
+  static PureJavaBackend loadBackend(String backendName, Path model, Path adapterDirectory) {
+    if (PURE_JAVA.equals(backendName)) {
+      return PureJavaBackend.loadActivatedAdapter(model, adapterDirectory);
+    }
+    try {
+      Class<?> backendClass = Class.forName(RUST_BACKEND_CLASS);
+      return (PureJavaBackend)
+          backendClass
+              .getMethod("loadActivatedAdapter", Path.class, Path.class)
+              .invoke(null, model, adapterDirectory);
+    } catch (ClassNotFoundException failure) {
+      throw new IllegalStateException(
+          "rust-ffm qualification requires the optional backend-native runtime; "
+              + "rerun with jbang --deps com.integrallis:backend-native:"
+              + MODELS_VERSION,
+          failure);
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("Could not load the Models-owned Rust/FFM backend", failure);
+    }
+  }
+
+  /**
+   * Reads the identity of the native kernel the Rust arm will load.
+   *
+   * <p>The bundled path is the one {@code RustFfmBackend} itself takes: the {@code
+   * META-INF/models/native/<platform>/native.properties} resource of com.integrallis:backend-native
+   * names the library file and its digest. The digest recorded here is measured over the resource
+   * bytes on this host rather than copied out of the properties file, so the record says what was
+   * actually loaded; a mismatch fails the run before any inference happens, the same way the
+   * backend's own integrity check does. When {@code models.native.kernels.library} or {@code
+   * MODELS_NATIVE_KERNELS_LIBRARY} points at a library instead, that file is hashed directly and
+   * the source is recorded as an explicit path, because then no bundled resource was used.
+   */
+  static NativeLibrary nativeLibrary() throws Exception {
+    Class<?> backendClass;
+    try {
+      backendClass = Class.forName(RUST_BACKEND_CLASS);
+    } catch (ClassNotFoundException failure) {
+      throw new IllegalStateException(
+          "rust-ffm qualification requires the optional backend-native runtime; "
+              + "rerun with jbang --deps com.integrallis:backend-native:"
+              + MODELS_VERSION,
+          failure);
+    }
+    String kernelPlan = (String) backendClass.getField("PLAN_VERSION").get(null);
+    Class<?> libraryClass = Class.forName(NATIVE_LIBRARY_CLASS);
+    int abi = (int) libraryClass.getField("ABI_VERSION").get(null);
+    Class<?> platformClass = Class.forName(NATIVE_PLATFORM_CLASS);
+    Object platform = platformClass.getMethod("current").invoke(null);
+    String platformId = (String) platformClass.getMethod("id").invoke(platform);
+
+    String configured = System.getProperty((String) backendClass.getField("LIBRARY_PATH_PROPERTY").get(null));
+    if (configured == null || configured.isBlank()) {
+      configured = System.getenv((String) backendClass.getField("LIBRARY_PATH_ENV").get(null));
+    }
+    if (configured != null && !configured.isBlank()) {
+      Path library = Path.of(configured);
+      return new NativeLibrary(
+          platformId,
+          abi,
+          library.getFileName().toString(),
+          sha256(library),
+          "explicit-path",
+          kernelPlan);
+    }
+
+    String directory = NATIVE_RESOURCE_ROOT + platformId + "/";
+    ClassLoader loader = backendClass.getClassLoader();
+    Properties metadata = new Properties();
+    URL metadataUrl = loader.getResource(directory + NATIVE_METADATA_FILE);
+    if (metadataUrl == null) {
+      throw new IllegalStateException(
+          "no Models native-kernel payload for "
+              + platformId
+              + " on the classpath; expected resource "
+              + directory
+              + NATIVE_METADATA_FILE);
+    }
+    try (InputStream in = metadataUrl.openStream()) {
+      metadata.load(in);
+    }
+    String declaredPlatform = metadata.getProperty("platform");
+    String declaredAbi = metadata.getProperty("abi");
+    String libraryName = metadata.getProperty("library");
+    String declaredSha256 = metadata.getProperty("sha256");
+    if (!platformId.equals(declaredPlatform) || !Integer.toString(abi).equals(declaredAbi)) {
+      throw new IllegalStateException(
+          "native payload declares platform="
+              + declaredPlatform
+              + " abi="
+              + declaredAbi
+              + ", this JVM needs platform="
+              + platformId
+              + " abi="
+              + abi);
+    }
+    URL libraryUrl = loader.getResource(directory + libraryName);
+    if (libraryUrl == null) {
+      throw new IllegalStateException("native payload names a missing library: " + libraryName);
+    }
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    try (InputStream in = libraryUrl.openStream()) {
+      byte[] buffer = new byte[1 << 20];
+      for (int n; (n = in.read(buffer)) >= 0; ) digest.update(buffer, 0, n);
+    }
+    String measured = HexFormat.of().formatHex(digest.digest());
+    if (!measured.equals(declaredSha256)) {
+      throw new IllegalStateException(
+          "native kernel SHA-256 mismatch for "
+              + platformId
+              + ": payload declares "
+              + declaredSha256
+              + " but the classpath resource hashes to "
+              + measured);
+    }
+    return new NativeLibrary(
+        platformId, abi, libraryName, measured, "bundled-classpath", kernelPlan);
+  }
+
+  /**
+   * Reports which batched projection kernel the loaded plan routed grouped projections through:
+   * {@code rust-ffm-quantized-vNN} when the native kernel was injected, {@code vector-api} or
+   * {@code none} otherwise. This is the observable side of the backend switch.
+   */
+  static String matrixKernel(PureJavaBackend backend) {
+    for (OptimizationDecision decision : backend.executionPlan().diagnostics().optimizations()) {
+      if ("grouped-projections".equals(decision.id())) {
+        String implementation = decision.settings().get("implementation");
+        if (implementation != null && !implementation.isBlank()) {
+          return implementation;
+        }
+      }
+    }
+    return "unknown";
   }
 
   /** The adapter's io.yaml contract, as in the qualification runner: a JSON string of one label. */
