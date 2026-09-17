@@ -250,6 +250,8 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
       StreamingChatResponseHandler handler) {
     StringBuilder accumulated = new StringBuilder();
     AtomicBoolean terminal = new AtomicBoolean();
+    // Same delivery channel as the ordinary branch, so StreamingHandle.cancel() stops this one too.
+    LangChain4jPartialResponses.Channel cancellation = LangChain4jPartialResponses.open(handler);
     try {
       turn.generateBaseResponse(
           prompt,
@@ -257,10 +259,15 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
           new TokenStream() {
             @Override
             public void onToken(String token) {
-              if (!terminal.get()) {
+              if (!terminal.get() && !cancellation.isCancelled()) {
                 accumulated.append(token);
-                handler.onPartialResponse(token);
+                cancellation.emit(token);
               }
+            }
+
+            @Override
+            public boolean isCancelled() {
+              return cancellation.isCancelled();
             }
 
             @Override
@@ -281,12 +288,16 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
             private void complete(GenerationUsage usage, StopReason stopReason) {
               if (terminal.compareAndSet(false, true)) {
                 try {
-                  handler.onCompleteResponse(
-                      completed(
-                          accumulated.toString(),
-                          false,
-                          combineUsage(selectionUsage, usage),
-                          stopReason));
+                  // LangChain4j's contract is that a cancelled stream receives no further
+                  // callbacks.
+                  if (!cancellation.isCancelled()) {
+                    handler.onCompleteResponse(
+                        completed(
+                            accumulated.toString(),
+                            false,
+                            combineUsage(selectionUsage, usage),
+                            stopReason));
+                  }
                 } finally {
                   turn.close();
                 }
@@ -297,13 +308,19 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
             public void onError(Throwable failure) {
               if (terminal.compareAndSet(false, true)) {
                 try {
-                  handler.onError(failure);
+                  if (!cancellation.isCancelled()) {
+                    handler.onError(failure);
+                  }
                 } finally {
                   turn.close();
                 }
               }
             }
           });
+      // A backend that returns after cancellation without a terminal callback still frees the turn.
+      if (cancellation.isCancelled() && terminal.compareAndSet(false, true)) {
+        turn.close();
+      }
     } catch (RuntimeException | Error failure) {
       if (terminal.compareAndSet(false, true)) {
         try {

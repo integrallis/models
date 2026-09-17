@@ -24,6 +24,7 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.GenerationUsage;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.SamplingOptions;
+import com.integrallis.models.api.StopReason;
 import com.integrallis.models.api.TextGenerationModel;
 import com.integrallis.models.api.TokenStream;
 import com.integrallis.models.api.Tokenizer;
@@ -44,6 +45,8 @@ import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -239,6 +242,43 @@ class ModelsStreamingChatModelTest {
     assertThat(delegate.ordinaryGenerations).isZero();
   }
 
+  /**
+   * The activated-tool base branch must honour {@code StreamingHandle.cancel()} exactly like the
+   * ordinary branch: no further fragments, no terminal callback, the generation told to stop, and
+   * the shared turn still released. On LangChain4j 1.0.0 (no handle) it streams to completion.
+   */
+  @Test
+  void activatedAdapterBaseBranchCancelsThroughTheHandleWhereAvailable() {
+    ActivatedStreamingModel delegate = new ActivatedStreamingModel(true);
+    ModelsStreamingChatModel model =
+        new ModelsStreamingChatModel(
+            delegate, ChatTemplate.CHATML, SamplingOptions.builder().build());
+    ChatRequest request =
+        ChatRequest.builder()
+            .messages(UserMessage.from("Hello, how are you?"))
+            .toolSpecifications(MODE)
+            .build();
+    List<String> partials = new ArrayList<>();
+    AtomicReference<ChatResponse> completed = new AtomicReference<>();
+    AtomicReference<Throwable> failed = new AtomicReference<>();
+
+    model.doChat(request, cancellingHandler(partials, completed, failed));
+
+    assertThat(failed.get()).isNull();
+    assertThat(delegate.closedTurns).isEqualTo(1);
+    if (LangChain4jPartialResponses.cancellationSupported()) {
+      assertThat(partials).containsExactly("Cooling ");
+      assertThat(delegate.baseTokensEmitted).isEqualTo(1);
+      assertThat(delegate.baseStopReason).isEqualTo(StopReason.CANCELLED);
+      assertThat(completed.get()).isNull();
+    } else {
+      assertThat(partials).containsExactly("Cooling ", "is enabled.");
+      assertThat(delegate.baseTokensEmitted).isEqualTo(2);
+      assertThat(delegate.baseStopReason).isEqualTo(StopReason.EOS);
+      assertThat(completed.get().aiMessage().text()).isEqualTo("Cooling is enabled.");
+    }
+  }
+
   @Test
   void activatedAdapterStreamingFiniteGrammarPreservesItsNoToolSentinel() {
     String abstention = "<tool_call>\n[]\n</tool_call>";
@@ -337,6 +377,52 @@ class ModelsStreamingChatModelTest {
         failed.set(error);
       }
     };
+  }
+
+  /**
+   * A handler that cancels through the streaming handle on its first fragment where LangChain4j has
+   * one. A dynamic proxy keeps this compiling against every framework-compat version.
+   */
+  private static StreamingChatResponseHandler cancellingHandler(
+      List<String> partials,
+      AtomicReference<ChatResponse> completed,
+      AtomicReference<Throwable> failed) {
+    return (StreamingChatResponseHandler)
+        Proxy.newProxyInstance(
+            StreamingChatResponseHandler.class.getClassLoader(),
+            new Class<?>[] {StreamingChatResponseHandler.class},
+            (proxy, method, args) -> {
+              switch (method.getName()) {
+                case "onPartialResponse" -> {
+                  if (args.length == 1) {
+                    partials.add((String) args[0]);
+                  } else {
+                    partials.add((String) args[0].getClass().getMethod("text").invoke(args[0]));
+                    Object handle = args[1].getClass().getMethod("streamingHandle").invoke(args[1]);
+                    Method cancel =
+                        method
+                            .getDeclaringClass()
+                            .getClassLoader()
+                            .loadClass("dev.langchain4j.model.chat.response.StreamingHandle")
+                            .getMethod("cancel");
+                    cancel.invoke(handle);
+                  }
+                }
+                case "onCompleteResponse" -> completed.set((ChatResponse) args[0]);
+                case "onError" -> failed.set((Throwable) args[0]);
+                case "hashCode" -> {
+                  return System.identityHashCode(proxy);
+                }
+                case "equals" -> {
+                  return proxy == args[0];
+                }
+                case "toString" -> {
+                  return "cancelling-handler";
+                }
+                default -> {}
+              }
+              return null;
+            });
   }
 
   private static class RecordingStreamingModel implements TextGenerationModel {
@@ -522,6 +608,8 @@ class ModelsStreamingChatModelTest {
     private int extendedTurns;
     private int closedTurns;
     private int ordinaryGenerations;
+    private int baseTokensEmitted;
+    private StopReason baseStopReason;
     private String responsePrompt;
 
     private ActivatedStreamingModel() {
@@ -598,9 +686,17 @@ class ModelsStreamingChatModelTest {
         public void generateBaseResponse(
             ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
           responsePrompt = prompt.text();
-          stream.onToken("Cooling ");
-          stream.onToken("is enabled.");
-          stream.onComplete();
+          for (String token : List.of("Cooling ", "is enabled.")) {
+            stream.onToken(token);
+            baseTokensEmitted++;
+            if (stream.isCancelled()) {
+              baseStopReason = StopReason.CANCELLED;
+              stream.onComplete(new GenerationUsage(1, baseTokensEmitted), StopReason.CANCELLED);
+              return;
+            }
+          }
+          baseStopReason = StopReason.EOS;
+          stream.onComplete(new GenerationUsage(1, baseTokensEmitted), StopReason.EOS);
         }
 
         @Override
