@@ -223,3 +223,22 @@ implications for adapter weights need the same licensing review, but neither is 
   confirmed SQuAD and confirmed MS MARCO.
 - **Java path, only if the reference path passes:** the unchanged Java gate at the Models
   release commit v0.3.42 (6063076e), pure Java deciding.
+
+### Pilot 5 result (measured, 2026-09-17)
+
+- **Held-out validation (300):** balanced 0.745. By source: SQuAD 0.825, QuAC 0.735, MS MARCO 0.656.
+- **Adapter:** `adapter_model.safetensors` sha256 68c0c31d…
+
+| suite | original labels | confirmed labels | pilot 2 confirmed |
+|---|---|---|---|
+| SQuAD v2 dev | 0.840 | 0.860 [0.784, 0.909] | 0.873 |
+| MS MARCO v2.1 validation | 0.680 | **0.754** [0.670, 0.822] | 0.829 |
+
+**Rule: not met.** MS MARCO on confirmed labels is 0.754, below 0.80.
+
+**Measured conclusion.** Removing MS MARCO training records costs 7.5 points on the confirmed MS MARCO
+suite (0.829 → 0.754) and 1.3 points on SQuAD. It is a single paired pilot at n = 200, with
+overlapping intervals.
+- Multi-passage web negatives are what the MS MARCO suite measures, and the other two sources do
+  not teach them.
+- With MS MARCO use approved for release, pilot 2 remains the candidate. Pilot 5 is not pursued.
