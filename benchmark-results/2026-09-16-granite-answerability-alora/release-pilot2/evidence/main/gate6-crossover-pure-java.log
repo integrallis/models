@@ -1,0 +1,29 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 17, 2026 2:37:13 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Sep 17, 2026 2:37:13 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+ 256 recomputed trial=1 handoff-ttft=36614.1 ms unique-state=125859840 shared=false
+ 256 shared     trial=1 handoff-ttft=19110.6 ms unique-state=47197440 shared=true
+ 256 shared     trial=2 handoff-ttft=18379.2 ms unique-state=47197440 shared=true
+ 256 recomputed trial=2 handoff-ttft=35839.9 ms unique-state=125859840 shared=false
+ 256 recomputed trial=3 handoff-ttft=36199.8 ms unique-state=125859840 shared=false
+ 256 shared     trial=3 handoff-ttft=18075.2 ms unique-state=47197440 shared=true
+1024 recomputed trial=1 handoff-ttft=164535.8 ms unique-state=503439360 shared=false
+1024 shared     trial=1 handoff-ttft=67010.2 ms unique-state=173057280 shared=true
+1024 shared     trial=2 handoff-ttft=69693.2 ms unique-state=173057280 shared=true
+1024 recomputed trial=2 handoff-ttft=148027.6 ms unique-state=503439360 shared=false
+1024 recomputed trial=3 handoff-ttft=162257.6 ms unique-state=503439360 shared=false
+1024 shared     trial=3 handoff-ttft=76684.8 ms unique-state=173057280 shared=true
+4096 recomputed trial=1 handoff-ttft=600227.8 ms unique-state=2013757440 shared=false
+4096 shared     trial=1 handoff-ttft=272443.4 ms unique-state=676496640 shared=true
+4096 shared     trial=2 handoff-ttft=289346.7 ms unique-state=676496640 shared=true
+4096 recomputed trial=2 handoff-ttft=900602.5 ms unique-state=2013757440 shared=false
+4096 recomputed trial=3 handoff-ttft=823087.3 ms unique-state=2013757440 shared=false
+4096 shared     trial=3 handoff-ttft=340778.7 ms unique-state=676496640 shared=true
+PASS crossover=256 4k-improvement=64.8% peak-rss=6630875136 report=/opt/modeljars-runs/granite41-answerability-pilot2/evidence/gate6-crossover-pure-java.json

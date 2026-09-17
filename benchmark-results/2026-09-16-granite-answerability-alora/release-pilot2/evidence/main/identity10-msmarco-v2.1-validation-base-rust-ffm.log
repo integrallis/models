@@ -1,0 +1,35 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 17, 2026 1:05:37 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Sep 17, 2026 1:05:37 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+95542 label=unanswerable prediction=answerable structured=true shared=false millis=12580 prefill=-1 decode=-1
+851555 label=answerable prediction=answerable structured=true shared=false millis=15652 prefill=-1 decode=-1
+1067349 label=answerable prediction=- structured=false shared=false millis=10809 prefill=-1 decode=-1
+480961 label=unanswerable prediction=unanswerable structured=true shared=false millis=11856 prefill=-1 decode=-1
+1030759 label=unanswerable prediction=unanswerable structured=true shared=false millis=14832 prefill=-1 decode=-1
+806703 label=unanswerable prediction=unanswerable structured=true shared=false millis=18980 prefill=-1 decode=-1
+32374 label=unanswerable prediction=unanswerable structured=true shared=false millis=23067 prefill=-1 decode=-1
+1089048 label=answerable prediction=answerable structured=true shared=false millis=12838 prefill=-1 decode=-1
+1097383 label=answerable prediction=- structured=false shared=false millis=13696 prefill=-1 decode=-1
+1084281 label=unanswerable prediction=unanswerable structured=true shared=false millis=13602 prefill=-1 decode=-1
+EXECUTION-FAILED backend=rust-ffm arm=base suite=msmarco-v2.1-validation cases=10 structured=0.8000 balancedAccuracy=0.6667 shared=0 complete=false
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':models-bench:run'.
+> Process 'command '/opt/java/jdk-25.0.4.1+1/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2m 31s
