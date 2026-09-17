@@ -305,3 +305,35 @@ Sources: the verification report on the Towards AI article; the LLM ensemble sur
 2502.18036; DeePEn arXiv 2404.12715; token-level ensembling across vocabularies arXiv 2502.21265;
 "When to Ensemble" arXiv 2510.15346. Local references: Models `InferencePipeline`, `Sampler` and
 `docs/proposals/models-composite.md`.
+
+## Amendment 1 (written before any study output; no gate, pilot or test-set run has happened)
+
+Decisions on the open points in REPRODUCE.md §18 and the model pins. None changes a threshold.
+
+1. **MATH-500 scorer.**
+   - Primary: the Java normaliser, a Hendrycks `strip_string` port plus exact rational equality (G4 = 100% on gold). The decision rules use it.
+   - Secondary column: a sympy re-scoring of the saved outputs by a small pinned Python script, reported beside the primary score and never used in a rule.
+   - Symbolic equivalence the normaliser misses scores wrong in every arm alike.
+2. **Rerank.**
+   - RERANK-think takes candidates from thinking-mode outputs and scores them with the non-thinking prompt.
+   - The primary score is the summed log-likelihood of the answer continuation. The mean is reported as a secondary column.
+3. **Scoring details.**
+   - ARC log-likelihood option scoring uses the prompt in `prompts-v1.json`: an `Answer:` prefix, scoring ` <label>`.
+   - Vote ties go to the tied answer that contains the best member's vote, then member order. SC-k ties go to the earliest sample.
+4. **Pilot best member.**
+   - The S2 stop rule uses the best member on the 50 pilot items.
+   - Every test-set comparison uses the best member chosen on the development split at S3, as the protocol states.
+5. **Memory-matched control.**
+   - Measured sizes: the members (A, B, C at Q8_0) total 6.75 GB. Qwen3 8B Q4_K_M is 5.03 GB (74% of that), and Qwen3 8B Q8_0 is larger than the members.
+   - H4 is read against BIG = 8B Q4_K_M, as pre-registered. BIG-Q8 is reported alongside, so the memory comparison is bracketed.
+   - The practical claim additionally requires F-tuned to be no worse than 2 points below BIG-Q8 on at least two of three datasets.
+6. **Q4 members (H6).**
+   - Qwen publishes no official Q4_K_M GGUF for 0.6B or 1.7B. The unsloth substitutes are not used.
+   - A and B at Q4_K_M are produced from the official Qwen3 safetensors at pinned revisions with a pinned llama.cpp release (`convert_hf_to_gguf.py` then `llama-quantize Q4_K_M`). This is a data-preparation tool only, never in the measured path.
+   - The resulting files are pinned by sha256 in `models.json` before use.
+   - Until then, the H6 arms (F-tuned-Q4 and the Q4 members) are excluded from the pilot.
+7. **Pilot scope.**
+   - The pilot rewrites `tuned` to `uniform`, so F-tuned would be identical to F-uniform. F-tuned is therefore not run separately in the pilot.
+   - F-mix, RERANK and RERANK-think run with uniform weights.
+   - SC-k runs with k = 2 as a cost probe only. Its test-set k is set from the pilot's measured core-seconds, per the protocol.
+8. **Weight tuning (S3).** The grid step and the size of the dev subset are decided from the pilot's measured cost, in Amendment 2, written before S3 starts.
