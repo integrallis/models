@@ -897,3 +897,44 @@ the base arm and the pure-Java arms complete for the record. Track B continues.
   - The candidate is IBM's answerability adapter, whose Java arms were recorded under window v2.
   - Our pilots are PEFT-reference only, so they cannot pass the Java gate without Java runs.
 - MT-RAG stays out of the gate as before.
+
+### 2026-09-17T13:10Z — Gate re-read on admitted labels (harness rule above; no model re-run)
+
+**Audits** (`audit_suite_labels.py adjudicate`, committed before any re-score):
+
+| suite | answerable kept / flipped / excluded | unanswerable kept / flipped / excluded | admission | casesSha256 |
+|---|---|---|---|---|
+| squad-v2-dev | 99 / 0 / 1 | 84 / 5 / 11 | ADJUDICATED_ONLY | 10929ef9… |
+| msmarco-v2.1-validation | 91 / 5 / 4 | 40 / 35 / 25 | ADJUDICATED_ONLY | 6e3a19c0… |
+
+**IBM `granitelib-rag-r1.0` answerability, Java runtime (window v2, Models fcd38d3), admitted labels**
+(`rescore-gate.json` in each audit folder; Wilson-based 95 % interval):
+
+| suite | arm | original | admitted | interval | base (same backend) |
+|---|---|---|---|---|---|
+| squad-v2-dev | pure-Java (deciding) | 0.825 | **0.866** | 0.784–0.920 | 0.597 |
+| squad-v2-dev | Rust FFM | 0.820 | **0.860** | 0.778–0.915 | 0.564 |
+| msmarco-v2.1-validation | pure-Java (deciding) | 0.690 | **0.840** | 0.737–0.909 | 0.594 |
+| msmarco-v2.1-validation | Rust FFM | 0.700 | **0.852** | 0.750–0.917 | 0.583 |
+
+**Gate conditions.**
+- Structured rate is 1.0 on all four specialist arms.
+- The point estimate is ≥ 0.80 and above base on both backends and both suites.
+- **Identity.** The specialist's first 10 cases are byte-identical between pure-Java and Rust on
+  MS MARCO (`compare_identity_arms.py`: IDENTICAL) and on SQuAD. Predictions agree on 199/200
+  SQuAD cases. The base arm is not identical on MS MARCO (3 of 10 differ), so the base Rust arm is
+  not admitted. The deciding pure-Java base arm is the comparison.
+
+**Verdict under the harness rule: PASS on single-turn answerability** (SQuAD v2 + MS MARCO,
+admitted labels). MT-RAG is reported failing and out of scope, as pre-registered.
+
+**Flags, stated with the verdict.**
+- The label-audit rule was introduced after the original MS MARCO rejection (2026-09-16T20:15Z)
+  and is post-hoc in origin. The original-label result (fail) stays on record.
+- Labels were adjudicated by model judges, not humans.
+- Every interval's lower bound is below 0.80, so the pass sits inside sampling noise at n = 171–188.
+- Publication needs the component report to carry admitted labels. `assemble_component_report.py`
+  and the ModelJars component evidence gate currently score original labels only.
+
+Pilots 1–4 (our adapters) score as high or higher on the reference path. They have no Java arms
+and are not qualified.
