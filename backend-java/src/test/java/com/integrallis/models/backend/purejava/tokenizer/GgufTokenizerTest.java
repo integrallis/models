@@ -829,6 +829,161 @@ class GgufTokenizerTest {
     }
   }
 
+  /**
+   * The assistant end-of-turn marker of a GGUF's own {@code tokenizer.chat_template}: the last
+   * CONTROL token (or {@code eos_token} reference) before the generation prompt, accepted only when
+   * it also closes message content somewhere in the template.
+   */
+  @Nested
+  class ChatTemplateEndOfTurn {
+
+    private static final String CHATML_LIKE =
+        "{% for message in messages %}{{'<|turn|>' + message['role'] + '\\n' + message['content']"
+            + " + '<|over|>' + '\\n'}}{% endfor %}{% if add_generation_prompt %}"
+            + "{{ '<|turn|>assistant\\n' }}{% endif %}";
+
+    @Test
+    void addsTheTemplatesEndOfTurnMarkerWhenNoOtherRuleKnowsIt() {
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              templateMetadata(
+                  List.of("<unk>", "<eos>", "<|turn|>", "<|over|>", "answer"),
+                  List.of(2, 3, 3, 3, 1),
+                  1,
+                  CHATML_LIKE));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(1, 3);
+      assertThat(tokenizer.endOfGenerationSources())
+          .containsEntry(1, List.of("tokenizer.ggml.eos_token_id", "vocabulary-text"))
+          .containsEntry(3, List.of("chat-template-end-of-turn"));
+      assertThat(tokenizer.chatTemplateEndOfTurnResolution()).isEqualTo("resolved:3");
+    }
+
+    @Test
+    void recordsEveryRuleThatMarksAnAlreadyKnownTerminator() {
+      String gemmaLike =
+          "{{ bos_token }}{%- for message in messages -%}{{ '<start_of_turn>' + role + '\\n' }}"
+              + "{{ message['content'] | trim }}{{ '<end_of_turn>\\n' }}{%- endfor -%}"
+              + "{%- if add_generation_prompt -%}{{'<start_of_turn>model\\n'}}{%- endif -%}";
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              templateMetadata(
+                  List.of("<pad>", "<eos>", "<bos>", "<start_of_turn>", "<end_of_turn>"),
+                  List.of(3, 3, 3, 3, 3),
+                  1,
+                  gemmaLike));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(1, 4);
+      assertThat(tokenizer.endOfGenerationSources())
+          .containsEntry(4, List.of("vocabulary-text", "chat-template-end-of-turn"));
+    }
+
+    @Test
+    void resolvesAnEosTokenReferenceToTheDeclaredEos() {
+      String zephyrLike =
+          "{% for message in messages %}{{ '<|user|>\\n' + message['content'] + eos_token }}"
+              + "{% endfor %}{% if add_generation_prompt %}{{ '<|assistant|>' }}{% endif %}";
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              templateMetadata(List.of("<unk>", "<s>", "</s>"), List.of(2, 3, 3), 2, zephyrLike));
+
+      assertThat(tokenizer.endOfGenerationSources())
+          .containsEntry(
+              2,
+              List.of(
+                  "tokenizer.ggml.eos_token_id", "vocabulary-text", "chat-template-end-of-turn"));
+      assertThat(tokenizer.chatTemplateEndOfTurnResolution()).isEqualTo("resolved:2");
+    }
+
+    @Test
+    void leavesTheSetUnchangedAndSaysWhyWhenTheTemplateHasNoGenerationPrompt() {
+      String noGenerationPrompt =
+          "{% for message in messages %}{{'<|turn|>' + message['content'] + '<|over|>'}}"
+              + "{% endfor %}";
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              templateMetadata(
+                  List.of("<unk>", "<eos>", "<|turn|>", "<|over|>"),
+                  List.of(2, 3, 3, 3),
+                  1,
+                  noGenerationPrompt));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(1);
+      assertThat(tokenizer.chatTemplateEndOfTurnResolution())
+          .isEqualTo("unresolved:no add_generation_prompt block");
+    }
+
+    @Test
+    void rejectsACandidateThatNeverClosesMessageContent() {
+      // The last control token before the generation prompt only closes a fixed header.
+      String headerLast =
+          "{% for message in messages %}{{'<|turn|>' + message['content']}}{% endfor %}"
+              + "{{ '<|header|>tools<|done|>' }}{% if add_generation_prompt %}"
+              + "{{ '<|turn|>' }}{% endif %}";
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              templateMetadata(
+                  List.of("<unk>", "<eos>", "<|turn|>", "<|header|>", "<|done|>"),
+                  List.of(2, 3, 3, 3, 3),
+                  1,
+                  headerLast));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(1);
+      assertThat(tokenizer.chatTemplateEndOfTurnResolution())
+          .isEqualTo("unresolved:<|done|> does not close message content");
+    }
+
+    @Test
+    void ignoresUserDefinedTokensSuchAsReasoningDelimiters() {
+      String thinking =
+          "{% for message in messages %}{{'<|turn|>' + message['content'] + '<|over|>'}}"
+              + "{% endfor %}{{ '<think>' + message['content'] + '</think>' }}"
+              + "{% if add_generation_prompt %}{{ '<|turn|>' }}{% endif %}";
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              templateMetadata(
+                  List.of("<unk>", "<eos>", "<|turn|>", "<|over|>", "<think>", "</think>"),
+                  List.of(2, 3, 3, 3, 4, 4),
+                  1,
+                  thinking));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(1, 3);
+    }
+
+    @Test
+    void neverOverridesTheHarmonyMessageBoundaryExclusion() {
+      String harmonyLike =
+          "{% for message in messages %}{{'<|start|>' + message['content'] + '<|end|>'}}"
+              + "{% endfor %}{% if add_generation_prompt %}{{ '<|start|>assistant' }}{% endif %}";
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              templateMetadata(
+                  List.of("<unk>", "<|return|>", "<|start|>", "<|end|>", "<|call|>"),
+                  List.of(2, 3, 3, 3, 3),
+                  1,
+                  harmonyLike));
+
+      assertThat(tokenizer.isEndOfGeneration(3)).isFalse();
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(1, 4);
+    }
+
+    @Test
+    void reportsAnAbsentTemplate() {
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(typedMetadata(List.of("<unk>", "<eos>"), List.of(2, 3), 1));
+
+      assertThat(tokenizer.chatTemplateEndOfTurnResolution()).isEqualTo("absent");
+    }
+
+    private static GgufMetadata templateMetadata(
+        List<String> tokens, List<Integer> tokenTypes, int eosTokenId, String template) {
+      Map<String, GgufMetadataValue> entries =
+          new LinkedHashMap<>(typedMetadata(tokens, tokenTypes, eosTokenId).entries());
+      entries.put("tokenizer.chat_template", new GgufMetadataValue.StringValue(template));
+      return new GgufMetadata(entries);
+    }
+  }
+
   private static GgufMetadata typedMetadata(
       List<String> tokens, List<Integer> tokenTypes, int eosTokenId) {
     Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();

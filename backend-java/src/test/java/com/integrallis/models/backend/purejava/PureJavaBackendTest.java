@@ -177,6 +177,19 @@ class PureJavaBackendTest {
     }
 
     @Test
+    void reportsTheEndOfGenerationSetAndItsProvenanceInDiagnostics(@TempDir Path dir)
+        throws IOException {
+      Path modelPath = buildNanoModelFile(dir, new Random(42));
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertThat(backend.diagnostics().environment())
+            .containsEntry("end-of-generation-token-ids", "1")
+            .containsEntry("end-of-generation.1", "tokenizer.ggml.eos_token_id")
+            .containsEntry("end-of-generation.chat-template", "absent");
+      }
+    }
+
+    @Test
     void automaticLoadingFallsBackToTheVectorApiWithoutAnInstalledProvider(@TempDir Path dir)
         throws IOException {
       Path modelPath = buildNanoModelFile(dir, new Random(43));

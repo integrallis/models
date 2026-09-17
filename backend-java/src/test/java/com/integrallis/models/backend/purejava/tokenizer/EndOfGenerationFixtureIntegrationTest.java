@@ -20,11 +20,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * End-of-generation sets resolved from pinned real GGUF fixtures, checked against the upstream
@@ -67,11 +71,69 @@ class EndOfGenerationFixtureIntegrationTest {
     assertThat(tokenizer.isEndOfGeneration(212)).isFalse();
   }
 
+  @Test
+  void gemma3AndMiniCpm5RecordTheirTemplatesEndOfTurnMarker() throws IOException {
+    GgufTokenizer gemma = load(GEMMA3_1B_Q4_K_M);
+    GgufTokenizer miniCpm =
+        load(
+            ModelFixtureRequirement.of("hf://openbmb/MiniCPM5-1B-GGUF")
+                .version("[5.0.0,6.0.0)")
+                .variant("q4_k_m")
+                .backend("pure-java")
+                .capability("text-generation"));
+
+    // Both headers declare only id 1 as EOS; the turn ends on a different token.
+    assertThat(gemma.chatTemplateEndOfTurnResolution()).isEqualTo("resolved:106");
+    assertThat(gemma.endOfGenerationSources())
+        .containsEntry(1, List.of("tokenizer.ggml.eos_token_id", "vocabulary-text"))
+        .containsEntry(106, List.of("vocabulary-text", "chat-template-end-of-turn"));
+    assertThat(miniCpm.chatTemplateEndOfTurnResolution()).isEqualTo("resolved:130073");
+    assertThat(miniCpm.endOfGenerationSources())
+        .containsEntry(130073, List.of("vocabulary-text", "chat-template-end-of-turn"));
+  }
+
+  /**
+   * Every pinned GGUF fixture paired with the native template ModelJars serves it with stops where
+   * that template ends an assistant turn.
+   */
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "hf://Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF | [2.5.0,3.0.0) | q4_0 | pure-java | code-completion | CHATML",
+        "hf://ggml-org/Qwen3-0.6B-GGUF | [3.0.0,4.0.0) | q4_0 | pure-java | text-generation | CHATML_NO_THINK",
+        "hf://HuggingFaceTB/SmolLM2-360M-Instruct-GGUF | [2.0.0,3.0.0) | q8_0 | pure-java | chat | CHATML",
+        "hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF | [1.0.0,2.0.0) | q4_0 | pure-java | chat | ZEPHYR",
+        "hf://bartowski/google_gemma-3-1b-it-GGUF | [3.0.0,4.0.0) | q4_k_m | rust-ffm | chat | GEMMA",
+        "hf://openbmb/MiniCPM5-1B-GGUF | [5.0.0,6.0.0) | q4_k_m | pure-java | text-generation | MINICPM5_NO_THINK",
+        "hf://TheBloke/deepseek-coder-1.3b-instruct-GGUF | [1.3.0,2.0.0) | q4_k_m | pure-java | code-completion | DEEPSEEK",
+        "hf://mradermacher/EuroLLM-1.7B-Instruct-GGUF | [1.0.0,2.0.0) | q4_k_m | pure-java | translation | CHATML"
+      })
+  void nativeTemplateEndOfTurnIsInTheStopSet(
+      String coordinate,
+      String versions,
+      String variant,
+      String backend,
+      String capability,
+      ChatTemplate template)
+      throws IOException {
+    GgufTokenizer tokenizer =
+        load(
+            ModelFixtureRequirement.of(coordinate)
+                .version(versions)
+                .variant(variant)
+                .backend(backend)
+                .capability(capability));
+
+    assertThat(template.endOfTurnTokenId(tokenizer)).isPresent();
+    assertThat(template.endOfTurnStopsGeneration(tokenizer)).isTrue();
+  }
+
   private static GgufTokenizer load(ModelFixtureRequirement requirement) throws IOException {
     Path path =
         ModelFixtureRegistry.fromClasspath()
             .resolve(requirement)
-            .orElseThrow()
+            .orElseThrow(() -> new IllegalStateException("no fixture for " + requirement))
             .localPath()
             .orElseThrow();
     try (Arena arena = Arena.ofConfined()) {
