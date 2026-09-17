@@ -1,0 +1,45 @@
+com.integrallis.models.PerformanceCliff {
+  startTime = 16:57:22.834 (2026-09-16)
+  reason = "q4-pairwise-kernel-unsupported"
+  detail = "requested=short-pairwise, selected=widened, active-vector-bits=128, architecture=x86_64"
+  eventThread = "main" (javaThreadId = 3)
+  stackTrace = [
+    com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs.report(PerformanceCliff, String) line: 73
+    com.integrallis.models.backend.purejava.plan.ExecutionPlanner.reportQ4Fallback(RuntimeFingerprint, GgufQ4Kernel) line: 617
+    com.integrallis.models.backend.purejava.plan.ExecutionPlanner.q4Kernel(RuntimeFingerprint, ModelTopology, PureJavaPlanConfiguration, List) line: 588
+    com.integrallis.models.backend.purejava.plan.ExecutionPlanner.plan(RuntimeFingerprint, ModelTopology, PureJavaPlanConfiguration, GgufBatchedMatrixKernel) line: 62
+    com.integrallis.models.backend.purejava.PureJavaBackend.loadLlama(Path, GgufFile, String, RuntimeFingerprint, PureJavaPlanConfiguration, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel, Path, Arena) line: 721
+    ...
+  ]
+}
+
+com.integrallis.models.PerformanceCliff {
+  startTime = 16:57:22.858 (2026-09-16)
+  reason = "vector-width-capped"
+  detail = "active-vector-bits=128, preferred-vector-bits=256, vector-provider=PanamaVectorUtilSupport"
+  eventThread = "main" (javaThreadId = 3)
+  stackTrace = [
+    com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs.report(PerformanceCliff, String) line: 73
+    com.integrallis.models.backend.purejava.plan.ExecutionPlanner.reportVectorWidthCliffs(RuntimeFingerprint) line: 841
+    com.integrallis.models.backend.purejava.plan.ExecutionPlanner.plan(RuntimeFingerprint, ModelTopology, PureJavaPlanConfiguration, GgufBatchedMatrixKernel) line: 111
+    com.integrallis.models.backend.purejava.PureJavaBackend.loadLlama(Path, GgufFile, String, RuntimeFingerprint, PureJavaPlanConfiguration, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel, Path, Arena) line: 721
+    com.integrallis.models.backend.purejava.PureJavaBackend.load(Path, ModelMemoryArena, BackendConfiguration, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel, Path) line: 480
+    ...
+  ]
+}
+
+com.integrallis.models.PerformanceCliff {
+  startTime = 16:57:23.001 (2026-09-16)
+  reason = "fused-grouped-attention-not-wired"
+  detail = "architecture=qwen3, group-size=2"
+  eventThread = "main" (javaThreadId = 3)
+  stackTrace = [
+    com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs.report(PerformanceCliff, String) line: 73
+    com.integrallis.models.backend.purejava.llama.LlamaForwardPass.reportAttentionCliffs(LlamaConfig, GgufBatchedMatrixKernel, int) line: 3068
+    com.integrallis.models.backend.purejava.llama.LlamaForwardPass.<init>(LlamaConfig, LlamaWeights, KvCache, LlamaForwardPass$LayerObserver, PureJavaExecutionPlan, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel, ActivatedLoraAdapter) line: 527
+    com.integrallis.models.backend.purejava.llama.LlamaForwardPass.<init>(LlamaConfig, LlamaWeights, KvCache, PureJavaExecutionPlan, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel) line: 327
+    com.integrallis.models.backend.purejava.PureJavaBackend.loadLlama(Path, GgufFile, String, RuntimeFingerprint, PureJavaPlanConfiguration, GgufBatchedMatrixKernel, BatchedCausalAttentionKernel, Path, Arena) line: 761
+    ...
+  ]
+}
+

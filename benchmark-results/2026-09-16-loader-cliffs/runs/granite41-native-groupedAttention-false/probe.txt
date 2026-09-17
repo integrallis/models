@@ -1,0 +1,17 @@
+PROBE backend=rust-ffm plan=rust-ffm-v13
+PROBE env model-architecture=granite
+PROBE env vector-provider=PanamaVectorUtilSupport
+PROBE env vector-api=true
+PROBE env preferred-vector-bits=256
+PROBE env active-vector-bits=256
+PROBE env gguf-executor=persistent
+PROBE env gguf-parallel=true
+PROBE env native-grouped-attention=false
+PROBE env native-gated-delta-net=false
+PROBE env native-kernel-poll-millis=5
+PROBE cliff performance-cliff.native-grouped-attention-unavailable=architecture=granite, kernel=rust-ffm-quantized-v13
+PROBE cliff performance-cliffs=native-grouped-attention-unavailable
+PROBE q4-kernel UNSUPPORTED the loaded model has no Q4_0 projection tensors
+PROBE prompt-tokens=10 decode=4 load-ms=1717 run-ms=14730
+PROBE greedy-tokens=433 374 264 4279
+exit=0

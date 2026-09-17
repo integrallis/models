@@ -1,0 +1,12 @@
+PROBE backend=pure-java plan=pure-java-v20
+PROBE env model-architecture=qwen35
+PROBE env vector-provider=PanamaVectorUtilSupport
+PROBE env vector-api=true
+PROBE env preferred-vector-bits=256
+PROBE env active-vector-bits=256
+PROBE env gguf-executor=persistent
+PROBE env gguf-parallel=true
+PROBE q4-kernel UNSUPPORTED the loaded model has no Q4_0 projection tensors
+PROBE prompt-tokens=10 decode=4 load-ms=10968 run-ms=19150
+PROBE greedy-tokens=279 15217 5388 369
+exit=0
