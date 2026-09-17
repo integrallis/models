@@ -98,6 +98,36 @@ class ExecutionPlannerPerformanceCliffTest {
   }
 
   @Test
+  void serialGgufRowsOnAMultiProcessorHostReportOnce() {
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      for (int plan = 0; plan < 3; plan++) {
+        ExecutionPlanner.plan(
+            runtime(true, 256, 256, "persistent", false, 8),
+            uniformTopology(GgufTensorType.Q4_0),
+            PureJavaPlanConfiguration.defaults());
+      }
+
+      assertThat(recording.count(PerformanceCliff.GGUF_PARALLEL_DISABLED)).isEqualTo(1);
+      assertThat(recording.count(PerformanceCliff.PERSISTENT_EXECUTOR_NOT_USED)).isZero();
+      assertThat(PerformanceCliffs.reported().get(PerformanceCliff.GGUF_PARALLEL_DISABLED))
+          .contains("gguf-parallel=false")
+          .contains("processors=8");
+    }
+  }
+
+  @Test
+  void serialGgufRowsOnOneProcessorAreNotACliff() {
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      ExecutionPlanner.plan(
+          runtime(true, 256, 256, "persistent", false, 1),
+          uniformTopology(GgufTensorType.Q4_0),
+          PureJavaPlanConfiguration.defaults());
+
+      assertThat(recording.count(PerformanceCliff.GGUF_PARALLEL_DISABLED)).isZero();
+    }
+  }
+
+  @Test
   void unsupportedPairwiseQ4KernelReportsFallbackOnce() {
     try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
       for (int plan = 0; plan < 3; plan++) {
@@ -141,6 +171,16 @@ class ExecutionPlannerPerformanceCliffTest {
 
   private static RuntimeFingerprint runtime(
       boolean vectorApi, int preferredBits, int activeBits, String executor) {
+    return runtime(vectorApi, preferredBits, activeBits, executor, true, 8);
+  }
+
+  private static RuntimeFingerprint runtime(
+      boolean vectorApi,
+      int preferredBits,
+      int activeBits,
+      String executor,
+      boolean ggufParallel,
+      int processors) {
     return new RuntimeFingerprint(
         "25.0.3",
         "OpenJDK 64-Bit Server VM",
@@ -159,11 +199,11 @@ class ExecutionPlannerPerformanceCliffTest {
         false,
         activeBits >= 256,
         activeBits >= 256,
-        true,
+        ggufParallel,
         executor,
         8,
         2,
-        8);
+        processors);
   }
 
   private static PureJavaPlanConfiguration configuration(GgufQ4Kernel q4Kernel, int batchSize) {

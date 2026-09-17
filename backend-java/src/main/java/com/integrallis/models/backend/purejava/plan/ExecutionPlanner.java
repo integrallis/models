@@ -850,6 +850,16 @@ public final class ExecutionPlanner {
   }
 
   private static OptimizationDecision persistentExecutor(RuntimeFingerprint runtime) {
+    if (!runtime.ggufParallel() && runtime.processors() > 1) {
+      // vectors-core runs every GGUF projection row on the calling thread; the executor name
+      // still reads "persistent", so this is not covered by PERSISTENT_EXECUTOR_NOT_USED.
+      PerformanceCliffs.report(
+          PerformanceCliff.GGUF_PARALLEL_DISABLED,
+          "gguf-parallel=false, executor="
+              + runtime.ggufExecutor()
+              + ", processors="
+              + runtime.processors());
+    }
     boolean enabled = "persistent".equals(runtime.ggufExecutor());
     if (!enabled) {
       PerformanceCliffs.report(
