@@ -36,3 +36,21 @@ cosine, 107 minutes. Held-out validation (300 records, strict contract):
 run; the adapter itself is on the reference host at `/opt/ref/pilot1-adapter` for the window read.
 The validation split is not the qualification window; the window is scored once, on the
 reference host, next.
+
+### Pilot 1 on the frozen window (PEFT reference, bf16 base, CPU; window ea9e4a0c)
+
+Measured once, after training finished; reports in `pilot1/window-*-peft.json`.
+
+| suite                   | pilot 1 | answerable | unanswerable | IBM adapter (same path) | gate |
+|-------------------------|--------:|-----------:|-------------:|------------------------:|-----:|
+| squad-v2-dev            | **0.840** | 93/100   | 75/100       | 0.795                   | 0.8 ✓ |
+| msmarco-v2.1-validation | 0.730   | 85/100     | 61/100       | 0.720                   | 0.8 ✗ |
+| mtrag-human-rag         | 0.682   | 26/55      | 49/55        | 0.582                   | (out of scope, reported) |
+
+Better than IBM's adapter on all three suites, above the gate on SQuAD, below it on MS MARCO.
+The failure shape differs by suite: on MS MARCO the pilot still misses unanswerable queries
+(61/100), on MT-RAG it now over-calls unanswerable (answerable 26/55). Both point at the same
+training gap: the 2,048-token cut removed 459 of 2,400 sampled records, mostly long QuAC dialogues
+and MS MARCO queries with many passages, which are exactly the long-context cases the window tests.
+Pilot 2 (4,924 records, same cut) is running; the next lever after it is the length cut itself
+(3k-token sequences, which need a 24 GB GPU).
