@@ -4,6 +4,17 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+- Min-p sampling: `SamplingOptions.minP` (default 0 = disabled, validated to [0, 1]) keeps tokens with p >= minP * p_max on the temperature-scaled distribution, applied before top-p (it commutes with top-k). Skipped entirely at 0, so default sampling is byte-identical. Exposed as `integrallis.models.sampling.min-p` and carried from defaults by the LangChain4j and Spring AI adapters.
+- Typed stop reasons: `StopReason` (`EOS`, `STOP_SEQUENCE`, `CONSTRAINT_COMPLETE`, `REPETITION_LOOP`, `CANCELLED`, `MAX_TOKENS`) is delivered through the new `TokenStream.onComplete(GenerationUsage, StopReason)` (its default forwards to `onComplete(GenerationUsage)`) and recorded in `GenerationMetrics.stopReason()` on the sequential, speculative and continuous-batching paths. Model-chosen ends win over truncation on the same token.
+- Cancellation: `TokenStream.isCancelled()` (default false) is polled after every emitted token. The LangChain4j streaming model hands handlers a `StreamingHandle` backed by it, and disposing a Spring AI streaming subscription cancels generation.
+- Finish reasons in adapters: LangChain4j maps EOS/stop sequence/constraint to `STOP`, the token limit to `LENGTH`, and repetition loops and cancellation to `OTHER` (tool calls keep `TOOL_EXECUTION`); Spring AI generation metadata carries `STOP` / `LENGTH` / `REPETITION_LOOP` / `CANCELLED` plus the exact reason under `stopReason`. Engines that report no reason still produce no finish reason.
+- Opt-in repetition-loop detector: `SamplingOptions.repetitionLoopDetection(new RepetitionLoopDetection(maxSpan, minRepeats, minLoopTokens))` stops generation with `REPETITION_LOOP` once the generated tokens end in an exactly periodic run (period <= maxSpan, >= minRepeats copies, >= minLoopTokens tokens). At most maxSpan comparisons per token, independent of generation length. Stops are counted in `GenerationLoop` / `RuntimeTextGenerationModel.repetitionLoopStops()` and `ContinuousBatchingMetrics.repetitionLoopStops()`. Off by default; Spring Boot `integrallis.models.sampling.repetition-loop.*`.
+- `Tokenizer.endOfGenerationTokenIds()` exposes the resolved end-of-generation set for diagnostics.
+
+### Fixed
+- Hugging Face checkpoints now stop on every `eos_token_id` declared in `config.json` and `generation_config.json` (integer or list), not only the tokenizer's single EOS plus vocabulary heuristics; a list-valued `eos_token_id` in a Qwen 2 or GPT-OSS `config.json` no longer fails to parse.
+
 ## [0.3.40] - 2026-09-16
 
 ### Changed
