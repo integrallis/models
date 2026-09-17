@@ -197,9 +197,10 @@ against the same pinned inputs, resolving `backend-native:0.3.42` from Maven Cen
   library resolved from the bundled `macos-x86_64` payload (sha256
   `80375639bd0379a91c684492ebc061a244ea4b72013661d54f1b6fe80a9b25ea`, ABI 5, plan `rust-ffm-v13`),
   `injectedGroupedProjections=true matrixKernel=rust-ffm-quantized-v13`.
-* **pure-java** — same run on the default path, `injectedGroupedProjections=false
-  matrixKernel=vector-api`, no `native-library` line. This is the negative half of the ablation: the
-  switch is visible in the loaded plan in both directions.
+* **pure-java** — same six cases on the default path, also all PASS and byte-identical, with
+  `injectedGroupedProjections=false matrixKernel=vector-api` and no `native-library` line. This is
+  the negative half of the ablation: the switch is visible in the loaded plan in both directions,
+  and the default path is unchanged by the addition of the Rust arm.
 * **negative paths** — `--backend rust-ffm` without `backend-native` on the classpath fails with the
   mirrored "rust-ffm qualification requires the optional backend-native runtime" message;
   `--backend <anything else>` exits 64.
