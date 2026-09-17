@@ -166,7 +166,8 @@ public final class GgufTokenizer implements Tokenizer {
     this.bosTokenId = bosTokenId;
     this.eosTokenId = eosTokenId;
     this.endOfGenerationTokens = terminators.ids;
-    this.endOfGenerationSources = terminators.sources();
+    this.endOfGenerationSources =
+        java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(terminators.sources()));
     this.chatTemplateEndOfTurnResolution = terminators.chatTemplateResolution;
     this.specialTokens = specialTokens;
     this.useByteLevel = useByteLevel;
