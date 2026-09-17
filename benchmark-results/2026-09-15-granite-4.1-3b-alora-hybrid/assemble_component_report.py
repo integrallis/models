@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
-"""Assemble the ModelJars component report for an upstream RAG specialist from raw evidence.
+"""Assemble the ModelJars component report for a RAG specialist from raw evidence.
 
 The report is the single document the ModelJars component evidence gate reads
-(``tools/component-evidence-gate.mjs``, ``specialistKind = upstream-rag-specialist``). Every
+(``tools/component-evidence-gate.mjs``). Two specialist kinds are supported:
+
+* ``upstream-rag-specialist`` (default): a publisher-trained adapter run unchanged; provenance is
+  the upstream block of the packaged ``models-activated-lora.json``.
+* ``first-party-rag-specialist``: an adapter we trained. Provenance is ``upstream: false`` plus the
+  publisher, the training repository and the commit holding the trainer, data preparation and
+  manifests, the training and prepared-data manifests pinned as raw GitHub URIs at that commit
+  (``--training-manifest`` / ``--prepared-data-manifest``: local files whose bytes must equal
+  ``git show <revision>:<path>`` when the checkout has the revision), and the license of every
+  training dataset (``--training-data-license dataset=license``). The adapter weights and
+  configuration must be the ones the training manifest recorded, and every suite must strictly
+  beat its base.
+
+Every
 number in it is copied from a raw evidence file that stays beside it; nothing is typed in by
 hand. The assembler refuses to write a report whose gates do not all pass, so a partial or failed
 campaign cannot be mistaken for a qualification.
@@ -23,6 +36,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +54,11 @@ UTC_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 IMMUTABLE_MODELS_REPORT = re.compile(r"https://raw\.githubusercontent\.com/integrallis/models/([0-9a-f]{40})/.+")
 MAVEN_CENTRAL = "https://repo1.maven.org/maven2"
 REQUIRED_MODELS_MODULES = ["backend-java", "models-runtime", "models-spring-ai", "models-langchain4j"]
+UPSTREAM_RAG_SPECIALIST = "upstream-rag-specialist"
+FIRST_PARTY_RAG_SPECIALIST = "first-party-rag-specialist"
+SPECIALIST_KINDS = (UPSTREAM_RAG_SPECIALIST, FIRST_PARTY_RAG_SPECIALIST)
+COMMIT = re.compile(r"[0-9a-f]{40}")
+GITHUB_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
 def sha256(path: Path) -> str:
@@ -359,6 +378,140 @@ def performance_gate(report: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _git(directory: Path, *args: str) -> bytes | None:
+    """Runs git in ``directory``; ``None`` when git fails or the directory is not a checkout."""
+    try:
+        completed = subprocess.run(["git", "-C", str(directory), *args], capture_output=True, check=False)
+    except OSError:
+        return None
+    return completed.stdout if completed.returncode == 0 else None
+
+
+def repository_relative_path(value: str, label: str) -> str:
+    parts = value.split("/")
+    if not value or value.startswith("/") or any(part in ("", ".", "..") for part in parts):
+        raise ValueError(f"{label}: {value!r} must be a repository-relative path")
+    return value
+
+
+def pinned_training_file(
+    path: Path, *, repository: str, revision: str, repo_path: str | None, label: str
+) -> dict[str, Any]:
+    """Pins a local training evidence file as a raw GitHub URI at the training commit.
+
+    When ``path`` sits in a git checkout that has ``revision``, the repository path defaults to the
+    file's path in that checkout and the bytes must equal ``git show <revision>:<path>``: a file
+    edited after the commit, or one that only landed later, fails closed. Outside such a checkout
+    the repository path must be given explicitly, and the ModelJars gate byte-verifies the URI.
+    """
+    if not isinstance(path, Path) or not path.is_file():
+        raise ValueError(f"{label}: {path} is not a file")
+    data = path.read_bytes()
+    toplevel_output = _git(path.resolve().parent, "rev-parse", "--show-toplevel")
+    toplevel = Path(toplevel_output.decode().strip()) if toplevel_output else None
+    has_revision = toplevel is not None and _git(toplevel, "cat-file", "-e", f"{revision}^{{commit}}") is not None
+    flag = "--" + label.replace(" ", "-") + "-repo-path"
+    if repo_path is None:
+        if not has_revision:
+            raise ValueError(
+                f"{label}: {path} is not in a checkout that has {revision}; pass {flag} to name its repository path"
+            )
+        repo_path = path.resolve().relative_to(toplevel.resolve()).as_posix()
+    repo_path = repository_relative_path(repo_path, label)
+    if has_revision:
+        committed = _git(toplevel, "show", f"{revision}:{repo_path}")
+        if committed is None:
+            raise ValueError(f"{label}: {repo_path} does not exist at {revision}")
+        if committed != data:
+            raise ValueError(f"{label}: local bytes of {path} differ from git show {revision}:{repo_path}")
+    return {
+        "uri": f"https://raw.githubusercontent.com/{repository}/{revision}/{repo_path}",
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "sizeBytes": len(data),
+    }
+
+
+def first_party_provenance(
+    metadata: dict[str, Any],
+    weights_sha256: str,
+    *,
+    publisher: Any,
+    training_repository: Any,
+    training_revision: Any,
+    training_manifest: Any,
+    training_manifest_repo_path: str | None,
+    prepared_data_manifest: Any,
+    prepared_data_manifest_repo_path: str | None,
+    training_data_licenses: Any,
+) -> dict[str, Any]:
+    """Provenance in exactly the shape ModelJars' first-party-rag-specialist gate requires."""
+    if not isinstance(publisher, str) or not publisher.strip():
+        raise ValueError("publisher must be a nonblank first-party publisher")
+    if not isinstance(training_repository, str) or GITHUB_REPOSITORY.fullmatch(training_repository) is None:
+        raise ValueError("training_repository must be owner/repository")
+    if not isinstance(training_revision, str) or COMMIT.fullmatch(training_revision) is None:
+        raise ValueError("training_revision must be a 40-character lowercase commit hash")
+    for value, name in ((training_manifest, "training_manifest"), (prepared_data_manifest, "prepared_data_manifest")):
+        if not isinstance(value, Path):
+            raise ValueError(f"{name} must be the path of a local manifest file")
+    licenses = list(training_data_licenses or [])
+    if not licenses or any(
+        not isinstance(item, (tuple, list))
+        or len(item) != 2
+        or not all(isinstance(part, str) and part.strip() for part in item)
+        for item in licenses
+    ):
+        raise ValueError("training_data_licenses must name a nonblank dataset and license for every training dataset")
+    source = metadata.get("upstream") or {}
+    for field, expected in (
+        ("publisher", publisher),
+        ("repository", training_repository),
+        ("revision", training_revision),
+    ):
+        if source.get(field) != expected:
+            raise ValueError(
+                f"packaged models-activated-lora.json names {field} {source.get(field)!r}, not {expected!r}"
+            )
+    trained = pinned_training_file(
+        training_manifest,
+        repository=training_repository,
+        revision=training_revision,
+        repo_path=training_manifest_repo_path,
+        label="training manifest",
+    )
+    prepared = pinned_training_file(
+        prepared_data_manifest,
+        repository=training_repository,
+        revision=training_revision,
+        repo_path=prepared_data_manifest_repo_path,
+        label="prepared-data manifest",
+    )
+    recorded = load(training_manifest).get("adapterFiles") or {}
+    adapter_sha = metadata["adapter"]["sha256"]
+    if adapter_sha != weights_sha256:
+        raise ValueError("packaged adapter metadata sha256 differs from the packaged weights file")
+    if (recorded.get("adapter_model.safetensors") or {}).get("sha256") != adapter_sha:
+        raise ValueError("adapter weights are not the ones the training manifest recorded")
+    if (recorded.get("adapter_config.json") or {}).get("sha256") != source.get("adapterConfigSha256"):
+        raise ValueError("adapter configuration is not the one the training manifest recorded")
+    return {
+        "pass": True,
+        "upstream": False,
+        "publisher": publisher,
+        "trainingRepository": training_repository,
+        "trainingRevision": training_revision,
+        "trainingManifest": trained,
+        "preparedDataManifest": prepared,
+        "adapterSha256": adapter_sha,
+        "adapterConfigSha256": source["adapterConfigSha256"],
+        "modelCardSha256": source["modelCardSha256"],
+        "license": source["license"],
+        "trainingDataLicenses": [{"dataset": dataset, "license": license} for dataset, license in licenses],
+        "tokenizerFiles": metadata["tokenizer"]["files"],
+        "invocationTokens": metadata["invocation"]["tokens"],
+    }
+
+
 def assemble(
     *,
     adapter_directory: Path,
@@ -375,9 +528,32 @@ def assemble(
     labels: dict[str, Path] | None = None,
     models_artifact: Path | None = None,
     clean_host_run: Path | None = None,
+    specialist_kind: str = UPSTREAM_RAG_SPECIALIST,
+    publisher: str | None = None,
+    training_repository: str | None = None,
+    training_revision: str | None = None,
+    training_manifest: Path | None = None,
+    training_manifest_repo_path: str | None = None,
+    prepared_data_manifest: Path | None = None,
+    prepared_data_manifest_repo_path: str | None = None,
+    training_data_licenses: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(model_id, str) or not model_id:
         raise ValueError("model_id must be a nonempty catalog model id")
+    if specialist_kind not in SPECIALIST_KINDS:
+        raise ValueError(f"specialist_kind must be one of {SPECIALIST_KINDS}, got {specialist_kind!r}")
+    first_party_options = (
+        publisher,
+        training_repository,
+        training_revision,
+        training_manifest,
+        training_manifest_repo_path,
+        prepared_data_manifest,
+        prepared_data_manifest_repo_path,
+        training_data_licenses,
+    )
+    if specialist_kind == UPSTREAM_RAG_SPECIALIST and any(option is not None for option in first_party_options):
+        raise ValueError("training provenance options apply only to a first-party-rag-specialist report")
     release = validate_models_artifact(load(models_artifact)) if models_artifact is not None else None
     clean_host = None
     if clean_host_run is not None:
@@ -396,11 +572,13 @@ def assemble(
     plain_java, mechanics = integration_gates(junit_xml)
     long_context = long_context_gate(load(long_context_report))
     performance = performance_gate(load(crossover_report))
+    first_party = specialist_kind == FIRST_PARTY_RAG_SPECIALIST
     task = {
         "pass": all(
             s["structuredRate"] == 1
             and s["balancedAccuracy"] >= MINIMUM_BALANCED_ACCURACY
             and s["balancedAccuracy"] >= s["baseBalancedAccuracy"]
+            and (not first_party or s["balancedAccuracy"] > s["baseBalancedAccuracy"])
             and s["physicallySharedCases"] == s["cases"]
             for s in suites
         )
@@ -410,19 +588,39 @@ def assemble(
         "backend": backend,
         "suites": suites,
     }
-    upstream = metadata["upstream"]
-    provenance = {
-        "pass": True,
-        "upstream": True,
-        "upstreamRepository": upstream["repository"],
-        "upstreamRevision": upstream["revision"],
-        "adapterSha256": metadata["adapter"]["sha256"],
-        "adapterConfigSha256": upstream["adapterConfigSha256"],
-        "modelCardSha256": upstream["modelCardSha256"],
-        "license": upstream["license"],
-        "tokenizerFiles": metadata["tokenizer"]["files"],
-        "invocationTokens": metadata["invocation"]["tokens"],
-    }
+    if first_party:
+        not_better = [s["name"] for s in suites if not s["balancedAccuracy"] > s["baseBalancedAccuracy"]]
+        if not_better:
+            raise SystemExit(
+                "refusing to assemble a first-party component report: suites "
+                f"{not_better} do not strictly beat the base balanced accuracy (taskCorrectness)"
+            )
+        provenance = first_party_provenance(
+            metadata,
+            weights["sha256"],
+            publisher=publisher,
+            training_repository=training_repository,
+            training_revision=training_revision,
+            training_manifest=training_manifest,
+            training_manifest_repo_path=training_manifest_repo_path,
+            prepared_data_manifest=prepared_data_manifest,
+            prepared_data_manifest_repo_path=prepared_data_manifest_repo_path,
+            training_data_licenses=training_data_licenses,
+        )
+    else:
+        upstream = metadata["upstream"]
+        provenance = {
+            "pass": True,
+            "upstream": True,
+            "upstreamRepository": upstream["repository"],
+            "upstreamRevision": upstream["revision"],
+            "adapterSha256": metadata["adapter"]["sha256"],
+            "adapterConfigSha256": upstream["adapterConfigSha256"],
+            "modelCardSha256": upstream["modelCardSha256"],
+            "license": upstream["license"],
+            "tokenizerFiles": metadata["tokenizer"]["files"],
+            "invocationTokens": metadata["invocation"]["tokens"],
+        }
     gates = {
         "provenance": provenance,
         "taskCorrectness": task,
@@ -444,7 +642,7 @@ def assemble(
         gates["cleanHostRun"] = clean_host
     return {
         "schemaVersion": 1,
-        "specialistKind": "upstream-rag-specialist",
+        "specialistKind": specialist_kind,
         "implementation": {
             "runtime": "java",
             "publicApiExercised": True,
@@ -479,6 +677,51 @@ def add_release_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--models-artifact", type=Path, help="gates.modelsArtifact JSON (collect_models_artifact.py)")
     parser.add_argument("--clean-host-run", type=Path, help="gates.cleanHostRun JSON; requires --models-artifact")
+    parser.add_argument("--specialist-kind", choices=SPECIALIST_KINDS, default=UPSTREAM_RAG_SPECIALIST)
+    parser.add_argument("--publisher", help="first-party: the publisher that trained the adapter")
+    parser.add_argument("--training-repository", help="first-party: owner/repository holding the training commit")
+    parser.add_argument("--training-revision", help="first-party: 40-hex commit holding trainer, data prep, manifests")
+    parser.add_argument("--training-manifest", type=Path, help="first-party: local training manifest file")
+    parser.add_argument(
+        "--training-manifest-repo-path", help="first-party: its path in the training repository (default: from git)"
+    )
+    parser.add_argument("--prepared-data-manifest", type=Path, help="first-party: local prepared-data manifest file")
+    parser.add_argument(
+        "--prepared-data-manifest-repo-path", help="first-party: its path in the training repository (default: from git)"
+    )
+    parser.add_argument(
+        "--training-data-license",
+        action="append",
+        default=None,
+        help="first-party: dataset=license, once per training dataset",
+    )
+
+
+def training_data_licenses(items: list[str] | None) -> list[tuple[str, str]] | None:
+    if items is None:
+        return None
+    licenses = []
+    for item in items:
+        dataset, separator, license_name = item.partition("=")
+        if not separator or not dataset.strip() or not license_name.strip():
+            raise SystemExit(f"--training-data-license must be dataset=license, got {item!r}")
+        licenses.append((dataset, license_name))
+    return licenses
+
+
+def specialist_options(args: argparse.Namespace) -> dict[str, Any]:
+    """The assemble() keyword arguments for the specialist kind and its first-party provenance."""
+    return {
+        "specialist_kind": args.specialist_kind,
+        "publisher": args.publisher,
+        "training_repository": args.training_repository,
+        "training_revision": args.training_revision,
+        "training_manifest": args.training_manifest,
+        "training_manifest_repo_path": args.training_manifest_repo_path,
+        "prepared_data_manifest": args.prepared_data_manifest,
+        "prepared_data_manifest_repo_path": args.prepared_data_manifest_repo_path,
+        "training_data_licenses": training_data_licenses(args.training_data_license),
+    }
 
 
 def label_paths(items: list[str]) -> dict[str, Path]:
@@ -535,6 +778,7 @@ def main(argv: list[str] | None = None) -> None:
         labels=label_paths(args.labels),
         models_artifact=args.models_artifact,
         clean_host_run=args.clean_host_run,
+        **specialist_options(args),
     )
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print("assembled", args.output, "sha256", sha256(args.output))

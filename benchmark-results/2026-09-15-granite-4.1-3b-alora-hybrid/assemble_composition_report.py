@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Assemble the ModelJars composition report for the hybrid (base + upstream RAG specialist).
+"""Assemble the ModelJars composition report for the hybrid (base + RAG specialist).
 
 The composition report is the document ``tools/composition-evidence-gate.mjs`` reads for a
-composition that declares ``specialistKind = upstream-rag-specialist`` (schemaVersion 2). It is
+composition that declares ``specialistKind`` ``upstream-rag-specialist`` or
+``first-party-rag-specialist`` (schemaVersion 2; the kind and its provenance options are those of
+:mod:`assemble_component_report`). It is
 built on top of the component report: the same raw window, identity, JUnit, long-context and
 crossover evidence goes through :mod:`assemble_component_report` first (which refuses any failing
 gate), and this module reshapes the result into the composition gate's field names and adds the
@@ -132,7 +134,7 @@ def assemble(
         raise SystemExit("refusing to assemble a composition report whose gates do not all pass")
     return {
         "schemaVersion": 2,
-        "specialistKind": "upstream-rag-specialist",
+        "specialistKind": report["specialistKind"],
         "compositionId": composition_id,
         "implementation": {
             "runtime": "java",
@@ -208,6 +210,7 @@ def main(argv: list[str] | None = None) -> None:
         labels=component.label_paths(args.labels),
         models_artifact=args.models_artifact,
         clean_host_run=args.clean_host_run,
+        **component.specialist_options(args),
     )
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     evaluation = report["evaluation"]
