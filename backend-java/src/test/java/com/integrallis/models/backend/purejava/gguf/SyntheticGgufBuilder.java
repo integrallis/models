@@ -123,7 +123,10 @@ public final class SyntheticGgufBuilder {
     return this;
   }
 
-  /** Builds the synthetic GGUF binary data. */
+  /**
+   * Builds the synthetic GGUF binary data. Tensor data offsets are multiples of the effective
+   * alignment unless overridden with {@link #tensorOffset(String, long)}.
+   */
   public byte[] build() {
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -140,7 +143,9 @@ public final class SyntheticGgufBuilder {
         writeMetadataValue(out, entry);
       }
 
-      // Tensor infos
+      // Tensor infos. Like llama.cpp's writer, every tensor starts at a multiple of the file's
+      // alignment: the data of each tensor but the last is zero-padded up to the next boundary.
+      int effectiveAlignment = effectiveAlignment();
       long dataOffset = 0;
       for (TensorEntry tensor : tensorEntries) {
         writeString(out, tensor.name);
@@ -150,19 +155,24 @@ public final class SyntheticGgufBuilder {
         }
         writeU32(out, tensor.type.id());
         writeU64(out, offsetOverrides.getOrDefault(tensor.name, dataOffset));
-        dataOffset += tensor.data.length;
+        dataOffset = alignUp(dataOffset + tensor.data.length, effectiveAlignment);
       }
 
       // Alignment padding before tensor data
       int currentSize = out.size();
-      int aligned = alignUp(currentSize, alignment);
+      int aligned = (int) alignUp(currentSize, effectiveAlignment);
       for (int i = currentSize; i < aligned; i++) {
         out.write(0);
       }
 
       // Tensor data
-      for (TensorEntry tensor : tensorEntries) {
-        out.write(tensor.data);
+      for (int index = 0; index < tensorEntries.size(); index++) {
+        byte[] tensorData = tensorEntries.get(index).data;
+        out.write(tensorData);
+        if (index + 1 < tensorEntries.size()) {
+          out.write(
+              new byte[(int) (alignUp(tensorData.length, effectiveAlignment) - tensorData.length)]);
+        }
       }
 
       return out.toByteArray();
@@ -250,8 +260,26 @@ public final class SyntheticGgufBuilder {
     out.write(bytes);
   }
 
-  private static int alignUp(int value, int alignment) {
-    return (value + alignment - 1) & ~(alignment - 1);
+  private static long alignUp(long value, int alignment) {
+    return (value + alignment - 1) & -(long) alignment;
+  }
+
+  /**
+   * The alignment a parser will apply: a declared {@code general.alignment} when it is a positive
+   * power of two, otherwise the builder's alignment. Invalid declared values are left for the
+   * parser to reject; the layout then falls back to the builder's alignment.
+   */
+  private int effectiveAlignment() {
+    for (MetadataEntry entry : metadataEntries) {
+      if (entry.key.equals("general.alignment")
+          && entry.type == GgufValueType.UINT32
+          && entry.value instanceof Integer declared
+          && declared > 0
+          && (declared & (declared - 1)) == 0) {
+        return declared;
+      }
+    }
+    return alignment;
   }
 
   private record MetadataEntry(String key, GgufValueType type, Object value) {}
