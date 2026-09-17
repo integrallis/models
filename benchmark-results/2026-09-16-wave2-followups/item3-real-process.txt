@@ -1,0 +1,25 @@
+== flags: ''
+  end-of-generation-token-ids=151643,151645
+  end-of-generation.151643=vocabulary-text
+  end-of-generation.151645=tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn
+  end-of-generation.chat-template=resolved:151645
+  gguf-chunks-per-thread=2
+  gguf-executor=persistent
+  gguf-parallel=true
+  gguf-threads=12
+  performance-cliff.fused-grouped-attention-not-wired=architecture=qwen3, group-size=2
+  performance-cliffs=fused-grouped-attention-not-wired
+  processors=12
+== flags: '-Dvectors.gguf.parallel=false'
+  end-of-generation-token-ids=151643,151645
+  end-of-generation.151643=vocabulary-text
+  end-of-generation.151645=tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn
+  end-of-generation.chat-template=resolved:151645
+  gguf-chunks-per-thread=2
+  gguf-executor=persistent
+  gguf-parallel=false
+  gguf-threads=12
+  performance-cliff.fused-grouped-attention-not-wired=architecture=qwen3, group-size=2
+  performance-cliff.gguf-parallel-disabled=gguf-parallel=false, executor=persistent, processors=12
+  performance-cliffs=gguf-parallel-disabled,fused-grouped-attention-not-wired
+  processors=12

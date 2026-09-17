@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+- GGUF chat-template end-of-turn resolution: `GgufTokenizer` reads `tokenizer.chat_template` and adds the token that closes an assistant turn to the end-of-generation set. That token is the last CONTROL token or `eos_token` reference before the generation prompt, and it must also close message content somewhere in the template. Otherwise the result is reported unresolved and the set is unchanged. Of the 55 GGUF vocabularies on the development host, 26 templates resolve, 5 are unresolved (no generation prompt), and no stop set changes, because every resolved marker was already present.
+- End-of-generation provenance: `GgufTokenizer.endOfGenerationSources()` lists the rules behind each terminator (metadata key, `vocabulary-text`, `chat-template-end-of-turn`, ...). `chatTemplateEndOfTurnResolution()` returns `resolved:<id>`, `unresolved:<reason>` or `absent`. `PureJavaBackend` and `RustFfmBackend` diagnostics carry `end-of-generation-token-ids`, `end-of-generation.<id>` and `end-of-generation.chat-template`.
+- `ChatTemplate.endOfTurnMarker()`, `endOfTurnTokenId(Tokenizer)` and `endOfTurnStopsGeneration(Tokenizer)`: each native template's assistant terminator, pinned by test to what the renderer writes. The one exception is GPT-OSS, where the marker is `<|return|>`. A fixture test checks that eight pinned GGUF and template pairings stop on it. Runtime injection of a native template's marker into the stop set is not wired.
+- Performance cliffs `gguf-parallel-disabled` (`-Dvectors.gguf.parallel=false` with more than one processor) and `native-grouped-attention-span-limit` (Granite native grouped attention over a KV cache view with more than two spans falls back to Java).
+
+### Fixed
+- Stop sets no longer include ordinary `</s>` vocabulary entries. A vocabulary-text match now requires a token that the GGUF does not type NORMAL, and `</s>` must be typed CONTROL. Metadata-declared ids are unaffected. On `tokenizer.json` vocabularies with added tokens, only added tokens can match by text. This removes id 128247 from every Qwen2-vocabulary GGUF (NORMAL, reachable only through the BPE merge `</s` + `>`) and id 212 from Gemma 3 (the HTML strikethrough close tag). Neither is in the upstream `generation_config.json`. Both ids are now decoded as text. Pinned integration oracles are unchanged.
+- `GgufParser` rejects tensor data offsets that are not a multiple of `general.alignment` (default 32) with `MalformedGgufException`. Vocabulary-only GGUFs with no tensors, such as llama.cpp's `models/ggml-vocab-*.gguf`, now parse even when their metadata ends off the alignment boundary. Previously all 38 such files on the development host were rejected. All 74 GGUF files there now parse. Evidence: `benchmark-results/2026-09-16-wave2-followups/README.md`.
+- LangChain4j: cancelling through `StreamingHandle` now stops the activated-tool streaming branch. No fragment, completion or error follows a cancel, and the shared turn is still closed. LangChain4j 1.0.0 streams as before.
+- Flaky `LlamaForwardPassTest` injected-attention test: vectors-core's F32 matrix-vector kernel sums with `reduceLanes(ADD)`, whose float order changes once C2 compiles it, so identical prefills could differ in the last bit within one JVM. `TensorOps.ggufMatmul` now scores F32 rows with the order-defined `VectorUtil.dotProduct`. The speed of that path was not measured, and among local models only the MS MARCO rerankers use it. Analysis: `benchmark-results/2026-09-16-flaky-injected-attention/README.md`.
+
 ## [0.3.41] - 2026-09-17
 
 ### Added

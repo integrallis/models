@@ -1,0 +1,42 @@
+GgufTokenizerTest > ChatTemplateEndOfTurn > reportsAnAbsentTemplate() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > addsTheTemplatesEndOfTurnMarkerWhenNoOtherRuleKnowsIt() FAILED
+    org.opentest4j.AssertionFailedError: 
+    Expecting actual:
+      [1]
+GgufTokenizerTest > ChatTemplateEndOfTurn > neverOverridesTheHarmonyMessageBoundaryExclusion() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > ignoresUserDefinedTokensSuchAsReasoningDelimiters() FAILED
+    org.opentest4j.AssertionFailedError: 
+    Expecting actual:
+      [1]
+GgufTokenizerTest > ChatTemplateEndOfTurn > recordsEveryRuleThatMarksAnAlreadyKnownTerminator() FAILED
+    java.lang.AssertionError: 
+    Expecting map:
+      {}
+GgufTokenizerTest > ChatTemplateEndOfTurn > leavesTheSetUnchangedAndSaysWhyWhenTheTemplateHasNoGenerationPrompt() FAILED
+    org.opentest4j.AssertionFailedError: 
+    expected: "unresolved:no add_generation_prompt block"
+     but was: "absent"
+GgufTokenizerTest > ChatTemplateEndOfTurn > rejectsACandidateThatNeverClosesMessageContent() FAILED
+    org.opentest4j.AssertionFailedError: 
+    expected: "unresolved:<|done|> does not close message content"
+     but was: "absent"
+GgufTokenizerTest > ChatTemplateEndOfTurn > resolvesAnEosTokenReferenceToTheDeclaredEos() FAILED
+    java.lang.AssertionError: 
+    Expecting map:
+      {}
+BUILD FAILED in 51s
+8 actionable tasks: 3 executed, 5 up-to-date
+PureJavaBackendTest > LoadAndInfer > reportsTheEndOfGenerationSetAndItsProvenanceInDiagnostics(Path) FAILED
+    java.lang.AssertionError: 
+    Expecting map:
+      {"active-vector-bits"="256", "architecture"="x86_64", "compiler"="hotspot-c2", "cpu-model"="unknown", "fast-scalar-fma"="true", "fast-vector-fma"="true", "gguf-chunks-per-thread"="2", "gguf-executor"="persistent", "gguf-parallel"="true", "gguf-threads"="12", "java-feature"="25", "java-version"="25.0.3", "model-architecture"="llama", "os"="Mac OS X", "performance-cliff.batched-prefill-unsupported-tensor-type"="architecture=llama, tensor-types=[F32]", "performance-cliff.fused-grouped-attention-not-wired"="architecture=llama, group-size=2", "performance-cliffs"="batched-prefill-unsupported-tensor-type,fused-grouped-attention-not-wired", "preferred-vector-bits"="256", "processors"="12", "projection-layers"="2", "q4-short-pairwise-supported"="true", "q4-unsigned-pairwise-supported"="true", "sve"="false", "vector-api"="true", "vector-provider"="PanamaVectorUtilSupport", "vm-name"="OpenJDK 64-Bit Server VM", "vm-vendor"="Eclipse Adoptium", "vm-version"="25.0.3+9-LTS"}
+    to contain entries:
+--
+
+1 test completed, 1 failed
+
+> Task :backend-java:test FAILED
+--
+BUILD FAILED in 20s
