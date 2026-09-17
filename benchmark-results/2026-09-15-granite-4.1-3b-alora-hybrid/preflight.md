@@ -938,3 +938,33 @@ admitted labels). MT-RAG is reported failing and out of scope, as pre-registered
 
 Pilots 1–4 (our adapters) score as high or higher on the reference path. They have no Java arms
 and are not qualified.
+
+### 2026-09-17T13:45Z — Pre-registration: evidence-confirmed labels for the disputed cases (written before any extraction)
+
+**Why.** The admitted-label pass is fragile. On MS MARCO, pure Java drops below 0.80 if 4 of the
+flips that favour the adapter are wrong. Model-judge disagreement alone is too weak to publish an
+immutable marker on. The user asked for the confirmation to be automated rather than done by hand.
+
+**Protocol** (`confirm_disputed_labels.py`, 12 tests):
+- **Cases:** all 86 disputed cases, meaning every flipped or excluded case in both suites (MS
+  MARCO 69, SQuAD 17). Mixed in blind are 40 SQuAD controls: 20 answerable and 20 unanswerable, on
+  which both audit judges agreed with the dataset label. Seed 20260919.
+- **Extract:** an extractor (Claude Opus) returns the shortest verbatim answering quote and its
+  passage, or null. It sees no label or group.
+- **Verify:** code checks the quote verbatim, normalising whitespace, case and edge punctuation,
+  with a minimum of 4 characters. An unverifiable quote counts as none.
+- **Judge:** two verifiers (Claude Sonnet, and a fresh Claude Opus) see only the question, the
+  passage and the quote, and answer yes or no.
+- **Label:** answerable iff the quote verified and both verifiers answer yes; otherwise
+  unanswerable. No case is excluded.
+- **Protocol admission:** at most 2 of 20 control unanswerables called answerable, and at least 18
+  of 20 control answerables called answerable. Otherwise the protocol is inadmissible and no label
+  from it is used.
+
+**Confirmed suites.** Cases the audit kept keep their label. Every disputed case takes the
+protocol's label. Suite files and sha256 values are committed before any re-score.
+
+**Gate:** unchanged, read on the confirmed suites. Deciding arm is pure Java; Rust is published if it also passes.
+- **PASS:** the release proceeds (component report, composition report, ModelJars publication).
+  The evidence carries the original, admitted and confirmed numbers.
+- **FAIL:** no release, and no further instrument change for this adapter.
