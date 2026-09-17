@@ -1006,3 +1006,31 @@ reference-path number upward. The Java arms are a fresh measurement on the runti
 re-selection. Pilot 2 goes through the unchanged Java gate on the confirmed suites:
 - structured rate 1.0, balanced ≥ 0.80 and ≥ base, on pure Java (deciding);
 - identity on the first 10 cases if Rust is also published.
+
+### 2026-09-17T16:21Z — Pilot 2 (Integrallis answerability aLoRA) Java qualification at Models v0.3.42: PASS
+
+**Runner and evidence.**
+- Runner: `../2026-09-16-granite-answerability-alora/release-pilot2/host-run-pilot2.sh`, Models `6063076e`, window v2.
+- Evidence: `../2026-09-16-granite-answerability-alora/release-pilot2/evidence/{pj1,pj2,pj3,pj4,main}`.
+- Reproduction guide: `../2026-09-16-granite-answerability-alora/REPRODUCE.md`.
+- Labels: the evidence-confirmed suites (aaba954c), unchanged since before these runs.
+- Bundle: byte-identical on all five hosts (`adapter_model.safetensors` 67533dff…, `models-activated-lora.json` 27de22cf…).
+
+| suite | arm (pure Java, deciding) | structured | shared | confirmed balanced [95%] | original labels | base (pure Java, confirmed) |
+|---|---|---|---|---|---|---|
+| squad-v2-dev | specialist | 200/200 | 200/200 | **0.868** [0.789, 0.920] | 0.855 | 0.567 |
+| msmarco-v2.1-validation | specialist | 200/200 | 200/200 | **0.825** [0.738, 0.888] | 0.735 | 0.515 |
+
+**Other gates (measured):**
+- Identity, first 10 cases, pure Java vs Rust: specialist outputs byte-identical on both suites (10/10). Base 8/10 and 7/10, the known base-arm divergence; pure Java decides.
+- Gates 1–3: JUnit 2/2 deciding tests passed; the IBM-pinned case also passed (record only).
+- Gate 5, long context (Rust): PASS, specialist 8/8, exact 8/8, shared 8/8.
+- Gate 6, crossover (pure Java): PASS, crossover at 256 tokens, 64.8% improvement at 4k.
+- MS MARCO agreement with the PEFT reference: 187/200 cases.
+
+**Verdict: PASS**, single-turn answerability, on the pure-Java backend.
+- The rule is unchanged: structured 1.0, ≥ 0.80 and ≥ base on both suites.
+- MT-RAG is out of scope and reported as not qualified (reference path 0.673).
+- Rust FFM is published only if its window arms (running) also pass.
+- Every lower interval bound is below 0.80, so the pass sits inside sampling noise at n = 200.
+- Pilot 2 was chosen as the best of three pilots on the reference path of the same window, a selection effect recorded when it was chosen. The Java arms were a fresh measurement.
