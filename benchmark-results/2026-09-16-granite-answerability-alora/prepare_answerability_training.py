@@ -108,14 +108,24 @@ def main() -> None:
     p.add_argument("--msmarco-train", type=Path, required=True); p.add_argument("--output", type=Path, required=True)
     p.add_argument("--per-source-per-label", type=int, default=4000); p.add_argument("--validation-per-source-per-label", type=int, default=150)
     p.add_argument("--max-distractors", type=int, default=4); p.add_argument("--seed", type=int, default=20260916)
+    p.add_argument("--source-per-label", action="append", default=[],
+                   help="override training records per label for one source, e.g. msmarco-v2.1-train=8000")
     a = p.parse_args(); rng = random.Random(a.seed)
     a.output.mkdir(parents=True, exist_ok=True)
     sources = {"quac-train": quac_records(a.quac_train, rng, a.max_distractors),
                "squad-v2-train": squad_records(a.squad_train, rng, a.max_distractors),
                "msmarco-v2.1-train": msmarco_records(a.msmarco_train)}
     train, validation, manifest = [], [], {"salt": SALT, "seed": a.seed, "sources": {}}
+    overrides = {}
+    for spec in a.source_per_label:
+        name, count = spec.split("=", 1)
+        overrides[name] = int(count)
+    unknown = set(overrides) - set(sources)
+    if unknown:
+        raise SystemExit(f"unknown sources in --source-per-label: {sorted(unknown)}")
+    manifest["perLabel"] = {name: overrides.get(name, a.per_source_per_label) for name in sources}
     for name, records in sources.items():
-        tr, va = split_and_balance(records, a.per_source_per_label, a.validation_per_source_per_label, rng)
+        tr, va = split_and_balance(records, overrides.get(name, a.per_source_per_label), a.validation_per_source_per_label, rng)
         train += tr; validation += va
         manifest["sources"][name] = {"records": len(records), "train": len(tr), "validation": len(va)}
     rng.shuffle(train); rng.shuffle(validation)

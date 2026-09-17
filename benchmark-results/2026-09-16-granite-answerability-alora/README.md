@@ -86,3 +86,19 @@ fit before committing a full run to them.
 2.5× the data moved both single-turn suites up two points and left multi-turn flat; the held-out
 QuAC gain (0.70 → 0.73) did not transfer to MT-RAG, whose answerable recall stays at half. MS MARCO
 is still the blocking suite. Pilot 3 (same records, 3,072-token cut) tests the length lever next.
+
+### Why pilot 3 was stopped and pilot 4 is MS MARCO-weighted (2026-09-17T05:35Z)
+
+Measured on pilot 2's MS MARCO window report: the 32 unanswerable cases it misses average 938
+prompt tokens and 10 passages, the 68 it catches 979 tokens and 10 passages. MS MARCO prompts are
+far below the 2,048-token cut, so raising the cut (pilot 3) changes no MS MARCO training record; it
+only restores long QuAC dialogues, which bear on MT-RAG, and MT-RAG is outside the gate. Pilot 3 was
+stopped after ~40 minutes; no result is claimed for it.
+
+Pilot 4 changes the mix toward the blocking suite: per label, QuAC 1,500 / SQuAD 1,500 / MS MARCO
+4,500 (`prepared-mm-manifest.json`, train sha256 3edcf3dc…), 7,000 records sampled, 3,072-token
+cut kept, same seed, learning rate 1.5e-4. It therefore changes two things at once relative to
+pilot 2 (mix and cut); that confound is accepted because the gate turns on MS MARCO and the frozen
+window read decides. Validation uses all 900 held-out records (same ids as pilots 1–2, different
+order in the file), so its held-out numbers are not directly comparable with the 300-record numbers
+above; the window numbers are.
