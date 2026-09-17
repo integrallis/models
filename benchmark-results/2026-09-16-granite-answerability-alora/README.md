@@ -124,3 +124,40 @@ and MT-RAG a few points. Measured conclusion: data re-weighting is not the lever
 Believed, to be tested next: MS MARCO's "No Answer Present." label is noisy (annotators could mark
 no answer while a passage does answer), which would cap any model's unanswerable recall on that
 suite below the gate.
+
+## MS MARCO label audit (2026-09-17T11:50Z; diagnostic, not a gate)
+
+**Question.** Are the MS MARCO window's "unanswerable" misses model errors or label errors?
+
+**Groups.** Every window case was grouped by the three adapters' predictions (pilot 2, pilot 4, IBM):
+- 27 unanswerable-labelled cases missed by all three;
+- 51 caught by all three;
+- 22 mixed.
+
+**Sample.** All 27 shared misses, plus 20 random caught-by-all unanswerables and 20 random
+correct-by-all answerables (seed 20260917). The 67 cases were shuffled and stripped of labels and
+predictions (`msmarco-label-audit/msm-audit-blind.json`; key in `msm-audit-key.json`).
+
+**Judges.** Two independent model judges (Claude Opus, Claude Sonnet) read each query and its
+passages and labelled it answerable, unanswerable or ambiguous, quoting evidence.
+
+| group (by adapters) | n | both judges "answerable" | both "unanswerable" | judges agree |
+|---|---|---|---|---|
+| labelled unanswerable, missed by all 3 adapters | 27 | **19** | 3 | 23 |
+| labelled unanswerable, caught by all 3 | 20 | 1 | 11 | 15 |
+| labelled answerable, correct for all 3 | 20 | 20 | 0 | 20 |
+
+The controls show that the judges separate the classes: 20/20 on answerables, and 1/20 answerable
+among caught unanswerables. Yet on the shared misses both judges found an answering passage in 19
+of 27 (for example, "A simple majority — that is, one more in favor than opposed", labelled no-answer).
+
+**Reading (believed; model judges are not ground truth).** At least ~19 of the window's 100
+MS MARCO unanswerable labels appear to be wrong. That caps a correct model's strict unanswerable
+recall near 0.81, and its balanced accuracy on this suite near the 0.80 gate itself. The suite as
+pre-registered cannot tell a faithful answerability model from one that is a few points worse. Its
+0.72–0.75 readings for all three adapters are consistent with label noise, not with a shared model
+defect.
+
+**Not done.** The gate is not re-scored on relabelled cases. Changing the instrument after
+seeing results is post-hoc; any relabelled or replacement suite must be pre-registered and applied
+to every arm (IBM, pilot 2, pilot 4) unchanged.
