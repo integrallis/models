@@ -1,0 +1,68 @@
+{
+  "adapter": {
+    "alpha": 32,
+    "file": "adapter_model.safetensors",
+    "rank": 16,
+    "sha256": "67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6",
+    "targetModules": [
+      "q_proj",
+      "down_proj",
+      "gate_proj",
+      "o_proj",
+      "up_proj",
+      "v_proj",
+      "k_proj"
+    ]
+  },
+  "base": {
+    "artifactSha256": "662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29",
+    "model": "ibm-granite/granite-4.1-3b",
+    "revision": "ab4701481089b58a082ef63cc1cee738887293ff"
+  },
+  "invocation": {
+    "text": "<|start_of_role|>assistant<|end_of_role|>",
+    "tokens": [
+      100264,
+      78191,
+      100265
+    ]
+  },
+  "kind": "activated-lora-specialist",
+  "schemaVersion": 5,
+  "tokenizer": {
+    "files": [
+      {
+        "name": "chat_template.jinja",
+        "sha256": "fed2756d2d24e127b951dcf139d0b03ab7db8ef23a456128ebc9c2db4901d476"
+      },
+      {
+        "name": "merges.txt",
+        "sha256": "b6fe424e334903f7fb84d3a106d9730455f4744b9fe3c21ee136d97a00e72502"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "sha256": "c08676c49fd7969a3130f72be6d4bf34da66aa484a6e21dffe359893a1bd5f2e"
+      },
+      {
+        "name": "tokenizer.json",
+        "sha256": "e2bad66439538cb4d5a7580680932432ed9ece9d3b8577e675512bdf11599253"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "sha256": "a5ec5daab12ba090a90f3dd169c8f9c275557013a87b9c1258dc7cb497a35c86"
+      },
+      {
+        "name": "vocab.json",
+        "sha256": "8af71076de8b0b626eed0f4c984faf0a7c062479164b2a31308a948524d4f69c"
+      }
+    ]
+  },
+  "upstream": {
+    "adapterConfigSha256": "7b559cf39b86084d92363ad6bce1ed92a9ef3c2de78e512c65b693dd6e1f7209",
+    "license": "Apache-2.0",
+    "modelCardSha256": "e1f2dc74d2e3157119ed63df2e60766501bfdfd83380604400fbb2b51ebe6d14",
+    "publisher": "Integrallis",
+    "repository": "integrallis/models",
+    "revision": "ec56bc99a04457df8274c84c1f4ff72dc4167d9d"
+  }
+}
