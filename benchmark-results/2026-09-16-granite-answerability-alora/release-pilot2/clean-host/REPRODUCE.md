@@ -189,12 +189,54 @@ as fetched from `origin/main`, for both backends, and skips if that file is unre
 
 ## 7. Local verification already done (dev machine, not a clean host)
 
-On 2026-09-17 both arms were run end to end on a developer macOS host against the same pinned
-inputs, resolving `backend-native:0.3.42` from Central. All six cases passed on each arm,
-byte-identical to the corresponding committed qualification evidence, with the native library
-resolved from the bundled `macos-x86_64` payload (sha256
-`80375639bd0379a91c684492ebc061a244ea4b72013661d54f1b6fe80a9b25ea`, ABI 5, plan `rust-ffm-v13`).
+Measured on 2026-09-17 on a developer macOS host (Intel i7-9750H, `os.arch=x86_64`, Temurin 25.0.3),
+against the same pinned inputs, resolving `backend-native:0.3.42` from Maven Central:
+
+* **rust-ffm** — all six cases PASS, byte-identical to
+  `../evidence/main/window-*-specialist-rust-ffm.json` with the same `sharedPrefixTokens`, native
+  library resolved from the bundled `macos-x86_64` payload (sha256
+  `80375639bd0379a91c684492ebc061a244ea4b72013661d54f1b6fe80a9b25ea`, ABI 5, plan `rust-ffm-v13`),
+  `injectedGroupedProjections=true matrixKernel=rust-ffm-quantized-v13`.
+* **pure-java** — same run on the default path, `injectedGroupedProjections=false
+  matrixKernel=vector-api`, no `native-library` line. This is the negative half of the ablation: the
+  switch is visible in the loaded plan in both directions.
+* **negative paths** — `--backend rust-ffm` without `backend-native` on the classpath fails with the
+  mirrored "rust-ffm qualification requires the optional backend-native runtime" message;
+  `--backend <anything else>` exits 64.
 
 That is a *correctness* check of the program, not the clean-host proof: the machine has a populated
 `~/.m2` and `~/.jbang`, so `freshMachine` is false there by construction and no
 `clean-host-run.json` from it can pass. The fresh Ubuntu 24.04 run is still required.
+
+`injectedGroupedProjections=true` on the Rust arm is measured on `macos-x86_64` only. It is
+*expected* on Linux — same model, same planner, same ABI 5 kernel, only a different build target —
+but it is not measured there. If it turned out false on the fresh host the run fails loudly rather
+than passing with an inert kernel, which is the direction that error should take.
+
+## 8. What this run does not, and cannot, establish for the gate
+
+* **The evidence revision.** `outputLog.uri` carries `<EVIDENCE_REVISION>` until the log is
+  committed; the gate then fetches the bytes and checks size and sha256 against the record.
+* **That the report is rust-ffm-bound.** `requireCleanHostRun` never looks at a backend — the new
+  `backend` and `nativeLibrary` fields are carried through untouched and nothing downstream
+  cross-checks them against `taskCorrectness.backend`. What makes a report rust-ffm is the
+  `--window` arms handed to `assemble_component_report.py`; the clean-host record follows, it does
+  not decide.
+* **`kernelIdentity`, which becomes required the moment `taskCorrectness.backend != "pure-java"`**
+  (≥10 cases per suite per arm, `identicalOutputs` true). Measured over the committed
+  `../evidence/main/identity10-*` pairs: the two **specialist** pairs are identical 10/10, and the
+  two **base** pairs are not (squad-v2-dev 2/10 differ, msmarco-v2.1-validation 3/10). Since
+  `kernel_identity()` fails if *any* supplied pair differs, only the specialist pairs can be passed
+  as `--identity`. The already-assembled `component-report/component-qualification.json` has
+  `kernelIdentity.pass: false` with `casesPerSuitePerArm: 0` — harmless while the backend is
+  pure-java, fatal once it is not.
+* **That the two backends agree beyond those ten cases.** They do not, and nobody should assume it:
+  over the full 200-case windows the outputs differ on 2/200 (squad specialist), 6/200 (msmarco
+  specialist), 17/200 and 25/200 (the base arms). `sharedPrefixTokens` agrees everywhere. This is
+  why a rust-ffm report has to be assembled from the rust-ffm window arms, and why the six-case
+  identity check here is pinned to the rust-ffm evidence rather than the pure-java table.
+* **`taskCorrectness` on the raw window numbers.** The gate needs `balancedAccuracy >= 0.8` per
+  suite; the rust-ffm window arms report 0.865 (squad) and **0.725** (msmarco) as scored against the
+  dataset labels. The pure-java report clears the bar only through `--labels`, which re-scores both
+  arms against confirmed labels (msmarco 0.735 → 0.825). The same `--labels` files must be applied
+  to the rust-ffm arms, and the result re-derived rather than assumed to carry over.
