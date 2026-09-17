@@ -1,0 +1,17 @@
+PROBE backend=rust-ffm plan=rust-ffm-v13
+PROBE env model-architecture=qwen35
+PROBE env vector-provider=PanamaVectorUtilSupport
+PROBE env vector-api=true
+PROBE env preferred-vector-bits=256
+PROBE env active-vector-bits=256
+PROBE env gguf-executor=persistent
+PROBE env gguf-parallel=true
+PROBE env native-grouped-attention=true
+PROBE env native-gated-delta-net=false
+PROBE env native-kernel-poll-millis=5
+PROBE cliff performance-cliff.native-gated-delta-net-unavailable=architecture=qwen35, kernel=rust-ffm-quantized-v13
+PROBE cliff performance-cliffs=native-gated-delta-net-unavailable
+PROBE q4-kernel UNSUPPORTED the loaded model has no Q4_0 projection tensors
+PROBE prompt-tokens=10 decode=4 load-ms=12747 run-ms=8793
+PROBE greedy-tokens=551 369 10281 1056
+exit=0

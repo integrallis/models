@@ -1,0 +1,15 @@
+com.integrallis.models.PerformanceCliff {
+  startTime = 16:59:53.326 (2026-09-16)
+  reason = "native-gated-delta-net-unavailable"
+  detail = "architecture=qwen35, kernel=rust-ffm-quantized-v13"
+  eventThread = "main" (javaThreadId = 3)
+  stackTrace = [
+    com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs.report(PerformanceCliff, String) line: 73
+    com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass.applyGatedDeltaNetRecurrence(float[], float[], float[], float[], float[], float[], float[], float[], float[], float[], float[], int, int, int, int, int) line: 974
+    com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass.gatedDeltaNetBatched(float[], float[], Qwen35Weights$GatedDeltaNet, int, int, Qwen35ForwardPass$SessionState, Qwen35ForwardPass$BatchScratch) line: 702
+    com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass.executePrefillBatch(Qwen35ForwardPass$Session, int[], int, int) line: 490
+    com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass.prefill(Qwen35ForwardPass$Session, int[], int) line: 273
+    ...
+  ]
+}
+

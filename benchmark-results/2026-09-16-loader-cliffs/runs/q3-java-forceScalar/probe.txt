@@ -1,0 +1,15 @@
+PROBE backend=pure-java plan=pure-java-v20
+PROBE env model-architecture=qwen3
+PROBE env vector-provider=ScalarVectorUtilSupport
+PROBE env vector-api=false
+PROBE env preferred-vector-bits=256
+PROBE env active-vector-bits=0
+PROBE env gguf-executor=persistent
+PROBE env gguf-parallel=true
+PROBE cliff performance-cliff.fused-grouped-attention-not-wired=architecture=qwen3, group-size=2
+PROBE cliff performance-cliff.vector-api-unavailable=vector-provider=ScalarVectorUtilSupport, preferred-vector-bits=256
+PROBE cliff performance-cliffs=vector-api-unavailable,fused-grouped-attention-not-wired
+PROBE q4-kernel DISABLED the stable widened Q4 kernel was selected
+PROBE prompt-tokens=10 decode=4 load-ms=1570 run-ms=16703
+PROBE greedy-tokens=1052 374 264 2874
+exit=0

@@ -28,6 +28,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -193,6 +194,12 @@ public final class SafetensorsParser {
     return result;
   }
 
+  /**
+   * Asserts that the tensors tile the data buffer exactly: each range holds {@code dtype width x
+   * shape} bytes, starts where the previous one ends, and ends inside the buffer. A short,
+   * overlapping or overrunning range is rejected with the tensor name, the expected byte count, and
+   * the bytes actually available; nothing is skipped or zero-filled.
+   */
   private static void validateLayout(Map<String, SafetensorsTensorInfo> tensors, long dataBytes) {
     List<SafetensorsTensorInfo> byOffset =
         tensors.values().stream()
@@ -201,8 +208,35 @@ public final class SafetensorsParser {
                     .thenComparingLong(SafetensorsTensorInfo::dataEnd))
             .toList();
     long expectedBegin = 0;
+    SafetensorsTensorInfo previous = null;
     for (SafetensorsTensorInfo tensor : byOffset) {
-      if (tensor.dataBegin() != expectedBegin || tensor.dataEnd() < tensor.dataBegin()) {
+      if (tensor.dataEnd() < tensor.dataBegin()) {
+        throw new MalformedSafetensorsException(
+            "tensor "
+                + tensor.name()
+                + " has invalid data offset range ["
+                + tensor.dataBegin()
+                + ", "
+                + tensor.dataEnd()
+                + ")");
+      }
+      long expectedBytes = tensor.expectedByteCount();
+      if (tensor.dataBegin() < expectedBegin) {
+        throw new MalformedSafetensorsException(
+            "tensor "
+                + tensor.name()
+                + " overlaps tensor "
+                + previous.name()
+                + ": data offset range ["
+                + tensor.dataBegin()
+                + ", "
+                + tensor.dataEnd()
+                + ") begins before "
+                + previous.name()
+                + " ends at "
+                + expectedBegin);
+      }
+      if (tensor.dataBegin() != expectedBegin) {
         throw new MalformedSafetensorsException(
             "tensor "
                 + tensor.name()
@@ -213,17 +247,28 @@ public final class SafetensorsParser {
                 + "); expected begin "
                 + expectedBegin);
       }
-      long expectedBytes = tensor.expectedByteCount();
+      if (tensor.dataEnd() > dataBytes) {
+        throw new MalformedSafetensorsException(
+            sizeDescription(tensor, expectedBytes, Math.max(0, dataBytes - tensor.dataBegin()))
+                + ": data offset range ["
+                + tensor.dataBegin()
+                + ", "
+                + tensor.dataEnd()
+                + ") runs past the end of the "
+                + dataBytes
+                + "-byte data buffer");
+      }
       if (tensor.byteCount() != expectedBytes) {
         throw new MalformedSafetensorsException(
-            "tensor "
-                + tensor.name()
-                + " byte count must be "
+            sizeDescription(tensor, expectedBytes, tensor.byteCount())
+                + " (byte count must be "
                 + expectedBytes
                 + "; got "
-                + tensor.byteCount());
+                + tensor.byteCount()
+                + ")");
       }
       expectedBegin = tensor.dataEnd();
+      previous = tensor;
     }
     if (expectedBegin != dataBytes) {
       throw new MalformedSafetensorsException(
@@ -233,6 +278,20 @@ public final class SafetensorsParser {
               + dataBytes
               + " bytes");
     }
+  }
+
+  private static String sizeDescription(
+      SafetensorsTensorInfo tensor, long expectedBytes, long availableBytes) {
+    return "tensor "
+        + tensor.name()
+        + " ("
+        + tensor.dtype().code()
+        + ", shape "
+        + Arrays.toString(tensor.shape())
+        + ") expected "
+        + expectedBytes
+        + " bytes, available "
+        + availableBytes;
   }
 
   private static void require(JsonToken actual, JsonToken expected, String description) {

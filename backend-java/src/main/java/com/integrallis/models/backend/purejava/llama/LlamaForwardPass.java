@@ -19,6 +19,8 @@ import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.cache.KvCache.AttentionView;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
+import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter.Projection;
@@ -42,6 +44,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Single-token forward pass for Llama-family models. Implements the full transformer decoder
@@ -521,6 +524,8 @@ public final class LlamaForwardPass {
     this.nativeGroupedAttention =
         config.usesGraniteScaling() && loadedMatrixKernel.supportsGroupedAttention();
     this.fusedGroupedAttention = config.usesGraniteScaling();
+    reportAttentionCliffs(config, loadedMatrixKernel, attentionGroupSize);
+    reportBatchedPrefillCliff(config, actualTopology);
     this.headAttentionPlan =
         GgufStagePlan.of(GgufStagePlan.stage(config.numKvHeads(), this::attendKvHeadRange));
     this.rowAttentionPlan =
@@ -3055,6 +3060,37 @@ public final class LlamaForwardPass {
 
   private static float[] batchBuffer(int batchCapacity, int width) {
     return new float[Math.multiplyExact(batchCapacity, width)];
+  }
+
+  private void reportAttentionCliffs(
+      LlamaConfig config, GgufBatchedMatrixKernel loadedMatrixKernel, int attentionGroupSize) {
+    if (attentionGroupSize > 1 && !fusedGroupedAttention) {
+      PerformanceCliffs.report(
+          PerformanceCliff.FUSED_GROUPED_ATTENTION_NOT_WIRED,
+          "architecture="
+              + config.architecture().metadataId()
+              + ", group-size="
+              + attentionGroupSize);
+    }
+    if (config.usesGraniteScaling()
+        && !nativeGroupedAttention
+        && loadedMatrixKernel != GgufBatchedMatrixKernel.none()) {
+      PerformanceCliffs.report(
+          PerformanceCliff.NATIVE_GROUPED_ATTENTION_UNAVAILABLE,
+          "architecture="
+              + config.architecture().metadataId()
+              + ", kernel="
+              + loadedMatrixKernel.implementation());
+    }
+  }
+
+  private static void reportBatchedPrefillCliff(LlamaConfig config, ModelTopology topology) {
+    Set<GgufTensorType> unbatched = topology.unbatchedProjectionTypes();
+    if (!unbatched.isEmpty()) {
+      PerformanceCliffs.report(
+          PerformanceCliff.BATCHED_PREFILL_UNSUPPORTED_TENSOR_TYPE,
+          "architecture=" + config.architecture().metadataId() + ", tensor-types=" + unbatched);
+    }
   }
 
   private static PureJavaExecutionPlan defaultPlan(LlamaConfig config, LlamaWeights weights) {

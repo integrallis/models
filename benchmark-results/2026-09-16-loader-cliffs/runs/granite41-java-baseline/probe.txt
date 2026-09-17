@@ -1,0 +1,12 @@
+PROBE backend=pure-java plan=pure-java-v20
+PROBE env model-architecture=granite
+PROBE env vector-provider=PanamaVectorUtilSupport
+PROBE env vector-api=true
+PROBE env preferred-vector-bits=256
+PROBE env active-vector-bits=256
+PROBE env gguf-executor=persistent
+PROBE env gguf-parallel=true
+PROBE q4-kernel UNSUPPORTED the loaded model has no Q4_0 projection tensors
+PROBE prompt-tokens=10 decode=4 load-ms=1749 run-ms=26810
+PROBE greedy-tokens=433 374 264 11670
+exit=0

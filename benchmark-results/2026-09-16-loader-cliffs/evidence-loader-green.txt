@@ -1,0 +1,36 @@
+GgufParserTest > TensorNotFound > throwsForNonExistentTensor() PASSED
+GgufParserTest > FileParsing > nonExistentFileThrows(Path) PASSED
+GgufParserTest > FileParsing > parsesFromDisk(Path) PASSED
+GgufParserTest > MalformedInput > rejectsTensorCountBeyondJavaCollectionLimits() PASSED
+GgufParserTest > MalformedInput > rejectsMetadataArrayBeyondJavaCollectionLimits() PASSED
+GgufParserTest > MalformedInput > rejectsTensorDataThatExtendsPastTheFile() PASSED
+GgufParserTest > MalformedInput > rejectsPartialQuantizationBlocks() PASSED
+GgufParserTest > MalformedInput > rejectsTruncatedHeaderWithAStableParserException() PASSED
+GgufParserTest > Alignment > rejectsNonPowerOfTwoAlignmentAsMalformedGguf() PASSED
+GgufParserTest > Alignment > rejectsZeroAlignmentAsMalformedGguf() PASSED
+GgufParserTest > Alignment > tensorDataIsAlignedToDefaultAlignment() PASSED
+GgufParserTest > MultipleTensors > parsesTwoTensorsOfDifferentTypes() PASSED
+SafetensorsTensorSizeAssertionTest > shortDataRangeNamesTheTensorDtypeShapeExpectedAndAvailableBytes() PASSED
+SafetensorsTensorSizeAssertionTest > rangeRunningPastTheDataBufferNamesTheTensor() PASSED
+SafetensorsTensorSizeAssertionTest > overlappingRangesNameBothTensors() PASSED
+GgufParserTest > SingleTensor > parsesOneF32Tensor() PASSED
+SafetensorsTensorSizeAssertionTest > validAdjacentTensorsStillParse() PASSED
+LlamaWeightsSafetensorsTest > requiresAnLmHeadWhenTheConfigDoesNotTieWordEmbeddings(Path) PASSED
+LlamaWeightsSafetensorsTest > loadsOfficialQwen2NamesAsMappedBfloat16Weights(Path) PASSED
+LlamaWeightsSafetensorsTest > rejectsAProjectionWhoseHuggingFaceShapeDoesNotMatchTheConfig(Path) PASSED
+SafetensorsBundleTest > resolvesEveryNvfp4PartThroughTheIndexAcrossShardBoundaries(Path) PASSED
+SafetensorsBundleTest > rejectsUnsafeShardPathsAndIndexShardDisagreement(Path) PASSED
+SafetensorsBundleTest > opensAStandardSingleFileBundle(Path) PASSED
+TensorSourceTest > ggufAndSafetensorsExposeTheSameLogicalF32Matrix(Path) PASSED
+GgufTensorSizeAssertionTest > validAdjacentTensorsStillParseAndSliceToTheirExactLength() PASSED
+GgufTensorSizeAssertionTest > twoTensorsSharingOneOffsetAreRejected() PASSED
+GgufTensorSizeAssertionTest > tensorOverlappingTheNextTensorIsRejectedEvenWhenBothEndInsideTheFile() PASSED
+GgufTensorSizeAssertionTest > overlapIsDetectedRegardlessOfTensorTableOrder() PASSED
+GgufTensorSizeAssertionTest > truncatedLastTensorNamesTheTensorExpectedAndAvailableBytes() PASSED
+GgufTensorSizeAssertionTest > tensorStartingPastTheEndOfTheFileIsRejected() PASSED
+GgufTensorSizeAssertionTest > quantizedTensorShorterThanItsBlockLayoutIsRejectedWithBlockArithmetic() PASSED
+SafetensorsParserTest > acceptsEmptyTensorWithoutAllocatingData() PASSED
+SafetensorsParserTest > parsesMetadataDenseTypesScalarsAndMappedTensorViews(Path) PASSED
+SafetensorsParserTest > rejectsMalformedHeadersTensorLayoutsAndIncompleteBuffers() PASSED
+SafetensorsParserTest > recognizesEveryDtypeInTheCurrentOfficialFormat() PASSED
+BUILD SUCCESSFUL in 26s
