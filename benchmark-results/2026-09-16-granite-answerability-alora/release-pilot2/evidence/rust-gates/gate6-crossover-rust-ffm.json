@@ -1,0 +1,4699 @@
+{
+  "schemaVersion" : 3,
+  "createdAt" : "2026-09-17T19:41:28.695424900Z",
+  "policyVersion" : "activated-prefix-sharing-crossover-v3",
+  "modelsRevision" : "6063076e476ba7a477e3f6dd966a77b571352d29",
+  "modelSha256" : "662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29",
+  "modelSizeBytes" : 2099501664,
+  "adapter" : {
+    "baseModel" : "ibm-granite/granite-4.1-3b",
+    "baseRevision" : "ab4701481089b58a082ef63cc1cee738887293ff",
+    "baseArtifactSha256" : "662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29",
+    "tokenizerFileSha256" : {
+      "chat_template.jinja" : "fed2756d2d24e127b951dcf139d0b03ab7db8ef23a456128ebc9c2db4901d476",
+      "merges.txt" : "b6fe424e334903f7fb84d3a106d9730455f4744b9fe3c21ee136d97a00e72502",
+      "special_tokens_map.json" : "c08676c49fd7969a3130f72be6d4bf34da66aa484a6e21dffe359893a1bd5f2e",
+      "tokenizer.json" : "e2bad66439538cb4d5a7580680932432ed9ece9d3b8577e675512bdf11599253",
+      "tokenizer_config.json" : "a5ec5daab12ba090a90f3dd169c8f9c275557013a87b9c1258dc7cb497a35c86",
+      "vocab.json" : "8af71076de8b0b626eed0f4c984faf0a7c062479164b2a31308a948524d4f69c"
+    },
+    "adapterSha256" : "67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6",
+    "rank" : 16,
+    "alpha" : 32,
+    "invocationText" : "<|start_of_role|>assistant<|end_of_role|>",
+    "invocationTokens" : [ 100264, 78191, 100265 ],
+    "provenance" : {
+      "publisher" : "Integrallis",
+      "repository" : "integrallis/models",
+      "revision" : "ec56bc99a04457df8274c84c1f4ff72dc4167d9d",
+      "modelCardSha256" : "e1f2dc74d2e3157119ed63df2e60766501bfdfd83380604400fbb2b51ebe6d14",
+      "adapterConfigSha256" : "7b559cf39b86084d92363ad6bce1ed92a9ef3c2de78e512c65b693dd6e1f7209",
+      "license" : "Apache-2.0"
+    }
+  },
+  "adapterDirectoryBytes" : 124606919,
+  "environment" : {
+    "host" : "modeljars-granite41-pilot2-rustgates",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-138-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Genoa Processor",
+    "processors" : 16,
+    "physicalMemoryBytes" : 32853520384,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "warmups" : 1,
+  "trials" : 3,
+  "prefixTiers" : [ 256, 1024, 4096 ],
+  "measurements" : [ {
+    "prefixTokens" : 256,
+    "strategy" : "recomputed",
+    "trial" : 0,
+    "openNanos" : 31915458140,
+    "generationTimeToFirstTokenNanos" : 329331000,
+    "handoffTimeToFirstTokenNanos" : 32244789140,
+    "totalNanos" : 32993798680,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 41953280,
+    "toolInferenceStateBytes" : 83906560,
+    "uniqueInferenceStateBytes" : 125859840,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\"answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 9399, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 2983940096,
+      "residentBytes" : 2983940096,
+      "anonymousResidentBytes" : 732119040,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3197431808,
+      "residentBytes" : 3197431808,
+      "anonymousResidentBytes" : 945610752,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 565059512,
+      "heapCommittedBytes" : 620756992,
+      "nonHeapUsedBytes" : 25622208,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9917752320,
+        "totalCommittedBytes" : 762127360,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1129472,
+            "committedBytes" : 1129472
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2855936,
+            "committedBytes" : 2855936
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 4096,
+            "committedBytes" : 4096
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223670272,
+            "committedBytes" : 75313152
+          },
+          "Code" : {
+            "reservedBytes" : 257668096,
+            "committedBytes" : 19231744
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074094080,
+            "committedBytes" : 1925120
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 620756992
+          },
+          "Thread" : {
+            "reservedBytes" : 47337472,
+            "committedBytes" : 2961408
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 14336,
+            "committedBytes" : 14336
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 40960,
+            "committedBytes" : 40960
+          },
+          "Compiler" : {
+            "reservedBytes" : 1316864,
+            "committedBytes" : 1316864
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 472064,
+            "committedBytes" : 472064
+          },
+          "Internal" : {
+            "reservedBytes" : 364544,
+            "committedBytes" : 364544
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 862855096,
+      "heapCommittedBytes" : 872415232,
+      "nonHeapUsedBytes" : 25674992,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918782464,
+        "totalCommittedBytes" : 1019730944,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1156096,
+            "committedBytes" : 1156096
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2855936,
+            "committedBytes" : 2855936
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223740928,
+            "committedBytes" : 80299008
+          },
+          "Code" : {
+            "reservedBytes" : 257698816,
+            "committedBytes" : 19262464
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074095104,
+            "committedBytes" : 1926144
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 872415232
+          },
+          "Thread" : {
+            "reservedBytes" : 47337472,
+            "committedBytes" : 2961408
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 1758208,
+            "committedBytes" : 1758208
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 48128,
+            "committedBytes" : 48128
+          },
+          "Compiler" : {
+            "reservedBytes" : 460800,
+            "committedBytes" : 460800
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 481280,
+            "committedBytes" : 481280
+          },
+          "Internal" : {
+            "reservedBytes" : 367616,
+            "committedBytes" : 367616
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 256,
+    "strategy" : "shared",
+    "trial" : 0,
+    "openNanos" : 16229478806,
+    "generationTimeToFirstTokenNanos" : 340531188,
+    "handoffTimeToFirstTokenNanos" : 16570009994,
+    "totalNanos" : 17395710871,
+    "sharedPrefixTokens" : 256,
+    "sharedPrefixBytes" : 41953280,
+    "baseInferenceStateBytes" : 44575360,
+    "toolInferenceStateBytes" : 44575360,
+    "uniqueInferenceStateBytes" : 47197440,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\"answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 9399, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 3197448192,
+      "residentBytes" : 3197448192,
+      "anonymousResidentBytes" : 945627136,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3202039808,
+      "residentBytes" : 3202039808,
+      "anonymousResidentBytes" : 950218752,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 862855096,
+      "heapCommittedBytes" : 872415232,
+      "nonHeapUsedBytes" : 25698128,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918786560,
+        "totalCommittedBytes" : 1019735040,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1157120,
+            "committedBytes" : 1157120
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2855936,
+            "committedBytes" : 2855936
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223740928,
+            "committedBytes" : 80299008
+          },
+          "Code" : {
+            "reservedBytes" : 257700864,
+            "committedBytes" : 19264512
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074095104,
+            "committedBytes" : 1926144
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 872415232
+          },
+          "Thread" : {
+            "reservedBytes" : 47337472,
+            "committedBytes" : 2961408
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 1459200,
+            "committedBytes" : 1459200
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 48128,
+            "committedBytes" : 48128
+          },
+          "Compiler" : {
+            "reservedBytes" : 759808,
+            "committedBytes" : 759808
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 481280,
+            "committedBytes" : 481280
+          },
+          "Internal" : {
+            "reservedBytes" : 367616,
+            "committedBytes" : 367616
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 457544984,
+      "heapCommittedBytes" : 876609536,
+      "nonHeapUsedBytes" : 25728456,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918757888,
+        "totalCommittedBytes" : 1022946304,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1156096,
+            "committedBytes" : 1156096
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223676416,
+            "committedBytes" : 80316416
+          },
+          "Code" : {
+            "reservedBytes" : 257716224,
+            "committedBytes" : 19279872
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 876609536
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 740352,
+            "committedBytes" : 740352
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 37888,
+            "committedBytes" : 37888
+          },
+          "Compiler" : {
+            "reservedBytes" : 460800,
+            "committedBytes" : 460800
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 479232,
+            "committedBytes" : 479232
+          },
+          "Internal" : {
+            "reservedBytes" : 366592,
+            "committedBytes" : 366592
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 256,
+    "strategy" : "shared",
+    "trial" : 1,
+    "openNanos" : 16040621116,
+    "generationTimeToFirstTokenNanos" : 346514571,
+    "handoffTimeToFirstTokenNanos" : 16387135687,
+    "totalNanos" : 17213432093,
+    "sharedPrefixTokens" : 256,
+    "sharedPrefixBytes" : 41953280,
+    "baseInferenceStateBytes" : 44575360,
+    "toolInferenceStateBytes" : 44575360,
+    "uniqueInferenceStateBytes" : 47197440,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\"answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 9399, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 3202084864,
+      "residentBytes" : 3202084864,
+      "anonymousResidentBytes" : 950263808,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3203219456,
+      "residentBytes" : 3203219456,
+      "anonymousResidentBytes" : 951398400,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 457544984,
+      "heapCommittedBytes" : 876609536,
+      "nonHeapUsedBytes" : 25731960,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918758912,
+        "totalCommittedBytes" : 1022947328,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1157120,
+            "committedBytes" : 1157120
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223676416,
+            "committedBytes" : 80316416
+          },
+          "Code" : {
+            "reservedBytes" : 257717248,
+            "committedBytes" : 19280896
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 876609536
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 740352,
+            "committedBytes" : 740352
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 37888,
+            "committedBytes" : 37888
+          },
+          "Compiler" : {
+            "reservedBytes" : 460800,
+            "committedBytes" : 460800
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 479232,
+            "committedBytes" : 479232
+          },
+          "Internal" : {
+            "reservedBytes" : 366592,
+            "committedBytes" : 366592
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 570791192,
+      "heapCommittedBytes" : 876609536,
+      "nonHeapUsedBytes" : 25827424,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920083968,
+        "totalCommittedBytes" : 1024272384,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1160192,
+            "committedBytes" : 1160192
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223696896,
+            "committedBytes" : 80336896
+          },
+          "Code" : {
+            "reservedBytes" : 257764352,
+            "committedBytes" : 19328000
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 876609536
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 1986560,
+            "committedBytes" : 1986560
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 40960,
+            "committedBytes" : 40960
+          },
+          "Compiler" : {
+            "reservedBytes" : 459776,
+            "committedBytes" : 459776
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 481280,
+            "committedBytes" : 481280
+          },
+          "Internal" : {
+            "reservedBytes" : 367616,
+            "committedBytes" : 367616
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 256,
+    "strategy" : "recomputed",
+    "trial" : 1,
+    "openNanos" : 32858849991,
+    "generationTimeToFirstTokenNanos" : 375201415,
+    "handoffTimeToFirstTokenNanos" : 33234051406,
+    "totalNanos" : 34008782909,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 41953280,
+    "toolInferenceStateBytes" : 83906560,
+    "uniqueInferenceStateBytes" : 125859840,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\"answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 9399, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 3203219456,
+      "residentBytes" : 3203219456,
+      "anonymousResidentBytes" : 951398400,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3274657792,
+      "residentBytes" : 3274657792,
+      "anonymousResidentBytes" : 1022836736,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 570791192,
+      "heapCommittedBytes" : 876609536,
+      "nonHeapUsedBytes" : 25828824,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920186368,
+        "totalCommittedBytes" : 1024374784,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1160192,
+            "committedBytes" : 1160192
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223696896,
+            "committedBytes" : 80336896
+          },
+          "Code" : {
+            "reservedBytes" : 257765376,
+            "committedBytes" : 19329024
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 876609536
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 1514496,
+            "committedBytes" : 1514496
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 40960,
+            "committedBytes" : 40960
+          },
+          "Compiler" : {
+            "reservedBytes" : 1034240,
+            "committedBytes" : 1034240
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 481280,
+            "committedBytes" : 481280
+          },
+          "Internal" : {
+            "reservedBytes" : 367616,
+            "committedBytes" : 367616
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 876975384,
+      "heapCommittedBytes" : 922746880,
+      "nonHeapUsedBytes" : 25864584,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920286720,
+        "totalCommittedBytes" : 1071513600,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1168384,
+            "committedBytes" : 1168384
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223748096,
+            "committedBytes" : 81289216
+          },
+          "Code" : {
+            "reservedBytes" : 257782784,
+            "committedBytes" : 19346432
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 922746880
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 2101248,
+            "committedBytes" : 2101248
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 48128,
+            "committedBytes" : 48128
+          },
+          "Compiler" : {
+            "reservedBytes" : 459776,
+            "committedBytes" : 459776
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 485376,
+            "committedBytes" : 485376
+          },
+          "Internal" : {
+            "reservedBytes" : 367616,
+            "committedBytes" : 367616
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 256,
+    "strategy" : "recomputed",
+    "trial" : 2,
+    "openNanos" : 31983632039,
+    "generationTimeToFirstTokenNanos" : 291283084,
+    "handoffTimeToFirstTokenNanos" : 32274915123,
+    "totalNanos" : 33069025822,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 41953280,
+    "toolInferenceStateBytes" : 83906560,
+    "uniqueInferenceStateBytes" : 125859840,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\"answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 9399, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 3274674176,
+      "residentBytes" : 3274674176,
+      "anonymousResidentBytes" : 1022853120,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3426222080,
+      "residentBytes" : 3426222080,
+      "anonymousResidentBytes" : 1174401024,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 876975384,
+      "heapCommittedBytes" : 922746880,
+      "nonHeapUsedBytes" : 25864584,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920286720,
+        "totalCommittedBytes" : 1071513600,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1168384,
+            "committedBytes" : 1168384
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223748096,
+            "committedBytes" : 81289216
+          },
+          "Code" : {
+            "reservedBytes" : 257782784,
+            "committedBytes" : 19346432
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 922746880
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 2101248,
+            "committedBytes" : 2101248
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 48128,
+            "committedBytes" : 48128
+          },
+          "Compiler" : {
+            "reservedBytes" : 459776,
+            "committedBytes" : 459776
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 485376,
+            "committedBytes" : 485376
+          },
+          "Internal" : {
+            "reservedBytes" : 367616,
+            "committedBytes" : 367616
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 456198712,
+      "heapCommittedBytes" : 1111490560,
+      "nonHeapUsedBytes" : 25887304,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918854144,
+        "totalCommittedBytes" : 1262511104,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1179648,
+            "committedBytes" : 1179648
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223685632,
+            "committedBytes" : 84913152
+          },
+          "Code" : {
+            "reservedBytes" : 257803264,
+            "committedBytes" : 19366912
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1111490560
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 714752,
+            "committedBytes" : 714752
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 29696,
+            "committedBytes" : 29696
+          },
+          "Compiler" : {
+            "reservedBytes" : 459776,
+            "committedBytes" : 459776
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 487424,
+            "committedBytes" : 487424
+          },
+          "Internal" : {
+            "reservedBytes" : 368640,
+            "committedBytes" : 368640
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 256,
+    "strategy" : "shared",
+    "trial" : 2,
+    "openNanos" : 15574867174,
+    "generationTimeToFirstTokenNanos" : 351260086,
+    "handoffTimeToFirstTokenNanos" : 15926127260,
+    "totalNanos" : 16902822009,
+    "sharedPrefixTokens" : 256,
+    "sharedPrefixBytes" : 41953280,
+    "baseInferenceStateBytes" : 44575360,
+    "toolInferenceStateBytes" : 44575360,
+    "uniqueInferenceStateBytes" : 47197440,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\"answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 9399, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 3426226176,
+      "residentBytes" : 3426226176,
+      "anonymousResidentBytes" : 1174405120,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3448283136,
+      "residentBytes" : 3448283136,
+      "anonymousResidentBytes" : 1196462080,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 456198712,
+      "heapCommittedBytes" : 1111490560,
+      "nonHeapUsedBytes" : 25908344,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918864384,
+        "totalCommittedBytes" : 1262521344,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1181696,
+            "committedBytes" : 1181696
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223685632,
+            "committedBytes" : 84913152
+          },
+          "Code" : {
+            "reservedBytes" : 257809408,
+            "committedBytes" : 19373056
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1111490560
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 714752,
+            "committedBytes" : 714752
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 29696,
+            "committedBytes" : 29696
+          },
+          "Compiler" : {
+            "reservedBytes" : 459776,
+            "committedBytes" : 459776
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 488448,
+            "committedBytes" : 488448
+          },
+          "Internal" : {
+            "reservedBytes" : 368640,
+            "committedBytes" : 368640
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 359687248,
+      "heapCommittedBytes" : 1111490560,
+      "nonHeapUsedBytes" : 25970440,
+      "nonHeapCommittedBytes" : 31457280,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9931231232,
+        "totalCommittedBytes" : 1274888192,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1187840,
+            "committedBytes" : 1187840
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2856960,
+            "committedBytes" : 2856960
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223683584,
+            "committedBytes" : 84911104
+          },
+          "Code" : {
+            "reservedBytes" : 257854464,
+            "committedBytes" : 19418112
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074096128,
+            "committedBytes" : 1927168
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67178496,
+            "committedBytes" : 13307904
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1111490560
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2975744
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 242688,
+            "committedBytes" : 242688
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 27648,
+            "committedBytes" : 27648
+          },
+          "Compiler" : {
+            "reservedBytes" : 13248512,
+            "committedBytes" : 13248512
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 490496,
+            "committedBytes" : 490496
+          },
+          "Internal" : {
+            "reservedBytes" : 369664,
+            "committedBytes" : 369664
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 1024,
+    "strategy" : "recomputed",
+    "trial" : 0,
+    "openNanos" : 126398572411,
+    "generationTimeToFirstTokenNanos" : 345138028,
+    "handoffTimeToFirstTokenNanos" : 126743710439,
+    "totalNanos" : 127448815819,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 167813120,
+    "toolInferenceStateBytes" : 335626240,
+    "uniqueInferenceStateBytes" : 503439360,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\"<|fim_middle|>unanswer",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 100259, 359, 9399 ],
+    "processBefore" : {
+      "highWaterBytes" : 3664994304,
+      "residentBytes" : 3664994304,
+      "anonymousResidentBytes" : 1413173248,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3973345280,
+      "residentBytes" : 3973345280,
+      "anonymousResidentBytes" : 1721524224,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 1106413280,
+      "heapCommittedBytes" : 1283457024,
+      "nonHeapUsedBytes" : 25372072,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918461952,
+        "totalCommittedBytes" : 1437513728,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1175552,
+            "committedBytes" : 1175552
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223716352,
+            "committedBytes" : 88302592
+          },
+          "Code" : {
+            "reservedBytes" : 257571840,
+            "committedBytes" : 19135488
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074073600,
+            "committedBytes" : 1904640
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1283457024
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 579584,
+            "committedBytes" : 579584
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 37888,
+            "committedBytes" : 37888
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 493568,
+            "committedBytes" : 493568
+          },
+          "Internal" : {
+            "reservedBytes" : 370688,
+            "committedBytes" : 370688
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 1110615504,
+      "heapCommittedBytes" : 1610612736,
+      "nonHeapUsedBytes" : 25396456,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920283648,
+        "totalCommittedBytes" : 1772880896,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1205248,
+            "committedBytes" : 1205248
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223748096,
+            "committedBytes" : 94724096
+          },
+          "Code" : {
+            "reservedBytes" : 257588224,
+            "committedBytes" : 19151872
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1610612736
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 2314240,
+            "committedBytes" : 2314240
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 35840,
+            "committedBytes" : 35840
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 502784,
+            "committedBytes" : 502784
+          },
+          "Internal" : {
+            "reservedBytes" : 372736,
+            "committedBytes" : 372736
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 1024,
+    "strategy" : "shared",
+    "trial" : 0,
+    "openNanos" : 64530270894,
+    "generationTimeToFirstTokenNanos" : 380557029,
+    "handoffTimeToFirstTokenNanos" : 64910827923,
+    "totalNanos" : 65706840864,
+    "sharedPrefixTokens" : 1024,
+    "sharedPrefixBytes" : 167813120,
+    "baseInferenceStateBytes" : 170435200,
+    "toolInferenceStateBytes" : 170435200,
+    "uniqueInferenceStateBytes" : 173057280,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\"<|fim_middle|>unanswer",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 100259, 359, 9399 ],
+    "processBefore" : {
+      "highWaterBytes" : 3973345280,
+      "residentBytes" : 3973345280,
+      "anonymousResidentBytes" : 1721524224,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 3984547840,
+      "residentBytes" : 3984547840,
+      "anonymousResidentBytes" : 1732726784,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 1110615504,
+      "heapCommittedBytes" : 1610612736,
+      "nonHeapUsedBytes" : 25397736,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920580608,
+        "totalCommittedBytes" : 1773177856,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1205248,
+            "committedBytes" : 1205248
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223748096,
+            "committedBytes" : 94724096
+          },
+          "Code" : {
+            "reservedBytes" : 257588224,
+            "committedBytes" : 19151872
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1610612736
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 596992,
+            "committedBytes" : 596992
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 35840,
+            "committedBytes" : 35840
+          },
+          "Compiler" : {
+            "reservedBytes" : 2476032,
+            "committedBytes" : 2476032
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 502784,
+            "committedBytes" : 502784
+          },
+          "Internal" : {
+            "reservedBytes" : 372736,
+            "committedBytes" : 372736
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 1500685776,
+      "heapCommittedBytes" : 1610612736,
+      "nonHeapUsedBytes" : 25426360,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920209920,
+        "totalCommittedBytes" : 1772807168,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1208320,
+            "committedBytes" : 1208320
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223778816,
+            "committedBytes" : 94754816
+          },
+          "Code" : {
+            "reservedBytes" : 257604608,
+            "committedBytes" : 19168256
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1610612736
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 2181120,
+            "committedBytes" : 2181120
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 40960,
+            "committedBytes" : 40960
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 504832,
+            "committedBytes" : 504832
+          },
+          "Internal" : {
+            "reservedBytes" : 373760,
+            "committedBytes" : 373760
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 1024,
+    "strategy" : "shared",
+    "trial" : 1,
+    "openNanos" : 63976634352,
+    "generationTimeToFirstTokenNanos" : 340257432,
+    "handoffTimeToFirstTokenNanos" : 64316891784,
+    "totalNanos" : 65079686436,
+    "sharedPrefixTokens" : 1024,
+    "sharedPrefixBytes" : 167813120,
+    "baseInferenceStateBytes" : 170435200,
+    "toolInferenceStateBytes" : 170435200,
+    "uniqueInferenceStateBytes" : 173057280,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\"<|fim_middle|>unanswer",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 100259, 359, 9399 ],
+    "processBefore" : {
+      "highWaterBytes" : 3984547840,
+      "residentBytes" : 3984547840,
+      "anonymousResidentBytes" : 1732726784,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 4300222464,
+      "residentBytes" : 4300222464,
+      "anonymousResidentBytes" : 2048401408,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 1500685776,
+      "heapCommittedBytes" : 1610612736,
+      "nonHeapUsedBytes" : 25433536,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9920217088,
+        "totalCommittedBytes" : 1772814336,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1209344,
+            "committedBytes" : 1209344
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223778816,
+            "committedBytes" : 94754816
+          },
+          "Code" : {
+            "reservedBytes" : 257610752,
+            "committedBytes" : 19174400
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1610612736
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 2181120,
+            "committedBytes" : 2181120
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 40960,
+            "committedBytes" : 40960
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 505856,
+            "committedBytes" : 505856
+          },
+          "Internal" : {
+            "reservedBytes" : 373760,
+            "committedBytes" : 373760
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 469827664,
+      "heapCommittedBytes" : 1937768448,
+      "nonHeapUsedBytes" : 25465952,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9921551360,
+        "totalCommittedBytes" : 2107694080,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1235968,
+            "committedBytes" : 1235968
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223756288,
+            "committedBytes" : 101122048
+          },
+          "Code" : {
+            "reservedBytes" : 257626112,
+            "committedBytes" : 19189760
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1937768448
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 3499008,
+            "committedBytes" : 3499008
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 29696,
+            "committedBytes" : 29696
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 510976,
+            "committedBytes" : 510976
+          },
+          "Internal" : {
+            "reservedBytes" : 375808,
+            "committedBytes" : 375808
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 1024,
+    "strategy" : "recomputed",
+    "trial" : 1,
+    "openNanos" : 128479874650,
+    "generationTimeToFirstTokenNanos" : 568095660,
+    "handoffTimeToFirstTokenNanos" : 129047970310,
+    "totalNanos" : 129751754488,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 167813120,
+    "toolInferenceStateBytes" : 335626240,
+    "uniqueInferenceStateBytes" : 503439360,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\"<|fim_middle|>unanswer",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 100259, 359, 9399 ],
+    "processBefore" : {
+      "highWaterBytes" : 4300222464,
+      "residentBytes" : 4300222464,
+      "anonymousResidentBytes" : 2048401408,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 4299026432,
+      "residentBytes" : 3818708992,
+      "anonymousResidentBytes" : 1566887936,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 469827664,
+      "heapCommittedBytes" : 1937768448,
+      "nonHeapUsedBytes" : 25478120,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9921556480,
+        "totalCommittedBytes" : 2107699200,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1235968,
+            "committedBytes" : 1235968
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223756288,
+            "committedBytes" : 101122048
+          },
+          "Code" : {
+            "reservedBytes" : 257629184,
+            "committedBytes" : 19192832
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1937768448
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 3499008,
+            "committedBytes" : 3499008
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 29696,
+            "committedBytes" : 29696
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 512000,
+            "committedBytes" : 512000
+          },
+          "Internal" : {
+            "reservedBytes" : 375808,
+            "committedBytes" : 375808
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 1366370632,
+      "heapCommittedBytes" : 1430257664,
+      "nonHeapUsedBytes" : 25314360,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918118912,
+        "totalCommittedBytes" : 1586838528,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1204224,
+            "committedBytes" : 1204224
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223821824,
+            "committedBytes" : 91275264
+          },
+          "Code" : {
+            "reservedBytes" : 257541120,
+            "committedBytes" : 19104768
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1430257664
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 102400,
+            "committedBytes" : 102400
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 41984,
+            "committedBytes" : 41984
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 515072,
+            "committedBytes" : 515072
+          },
+          "Internal" : {
+            "reservedBytes" : 376832,
+            "committedBytes" : 376832
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 1024,
+    "strategy" : "recomputed",
+    "trial" : 2,
+    "openNanos" : 128974714972,
+    "generationTimeToFirstTokenNanos" : 324298292,
+    "handoffTimeToFirstTokenNanos" : 129299013264,
+    "totalNanos" : 130087131417,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 167813120,
+    "toolInferenceStateBytes" : 335626240,
+    "uniqueInferenceStateBytes" : 503439360,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\"<|fim_middle|>unanswer",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 100259, 359, 9399 ],
+    "processBefore" : {
+      "highWaterBytes" : 4299026432,
+      "residentBytes" : 3818708992,
+      "anonymousResidentBytes" : 1566887936,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 4299026432,
+      "residentBytes" : 4129964032,
+      "anonymousResidentBytes" : 1878142976,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 1366370632,
+      "heapCommittedBytes" : 1430257664,
+      "nonHeapUsedBytes" : 25316168,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918332928,
+        "totalCommittedBytes" : 1587052544,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1204224,
+            "committedBytes" : 1204224
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223821824,
+            "committedBytes" : 91275264
+          },
+          "Code" : {
+            "reservedBytes" : 257542144,
+            "committedBytes" : 19105792
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1430257664
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 314368,
+            "committedBytes" : 314368
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 41984,
+            "committedBytes" : 41984
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 515072,
+            "committedBytes" : 515072
+          },
+          "Internal" : {
+            "reservedBytes" : 376832,
+            "committedBytes" : 376832
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 1159611952,
+      "heapCommittedBytes" : 1769996288,
+      "nonHeapUsedBytes" : 25322928,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918255104,
+        "totalCommittedBytes" : 1933348864,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1221632,
+            "committedBytes" : 1221632
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223796224,
+            "committedBytes" : 97885184
+          },
+          "Code" : {
+            "reservedBytes" : 257544192,
+            "committedBytes" : 19107840
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1769996288
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 248832,
+            "committedBytes" : 248832
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 36864,
+            "committedBytes" : 36864
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 514048,
+            "committedBytes" : 514048
+          },
+          "Internal" : {
+            "reservedBytes" : 375808,
+            "committedBytes" : 375808
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 1024,
+    "strategy" : "shared",
+    "trial" : 2,
+    "openNanos" : 64353994772,
+    "generationTimeToFirstTokenNanos" : 387631776,
+    "handoffTimeToFirstTokenNanos" : 64741626548,
+    "totalNanos" : 65516921618,
+    "sharedPrefixTokens" : 1024,
+    "sharedPrefixBytes" : 167813120,
+    "baseInferenceStateBytes" : 170435200,
+    "toolInferenceStateBytes" : 170435200,
+    "uniqueInferenceStateBytes" : 173057280,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\"<|fim_middle|>unanswer",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 100259, 359, 9399 ],
+    "processBefore" : {
+      "highWaterBytes" : 4299026432,
+      "residentBytes" : 4129964032,
+      "anonymousResidentBytes" : 1878142976,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 4299026432,
+      "residentBytes" : 4142252032,
+      "anonymousResidentBytes" : 1890430976,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 1159611952,
+      "heapCommittedBytes" : 1769996288,
+      "nonHeapUsedBytes" : 25330480,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918817280,
+        "totalCommittedBytes" : 1933911040,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1222656,
+            "committedBytes" : 1222656
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223796224,
+            "committedBytes" : 97885184
+          },
+          "Code" : {
+            "reservedBytes" : 257550336,
+            "committedBytes" : 19113984
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1769996288
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 805888,
+            "committedBytes" : 805888
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 36864,
+            "committedBytes" : 36864
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 514048,
+            "committedBytes" : 514048
+          },
+          "Internal" : {
+            "reservedBytes" : 375808,
+            "committedBytes" : 375808
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 1558070832,
+      "heapCommittedBytes" : 1769996288,
+      "nonHeapUsedBytes" : 25339216,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918222336,
+        "totalCommittedBytes" : 1933316096,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1224704,
+            "committedBytes" : 1224704
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 223826944,
+            "committedBytes" : 97915904
+          },
+          "Code" : {
+            "reservedBytes" : 257552384,
+            "committedBytes" : 19116032
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074074624,
+            "committedBytes" : 1905664
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 1769996288
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 167936,
+            "committedBytes" : 167936
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 41984,
+            "committedBytes" : 41984
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 516096,
+            "committedBytes" : 516096
+          },
+          "Internal" : {
+            "reservedBytes" : 376832,
+            "committedBytes" : 376832
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 4096,
+    "strategy" : "recomputed",
+    "trial" : 0,
+    "openNanos" : 546078530854,
+    "generationTimeToFirstTokenNanos" : 567240891,
+    "handoffTimeToFirstTokenNanos" : 546645771745,
+    "totalNanos" : 547581344820,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 671252480,
+    "toolInferenceStateBytes" : 1342504960,
+    "uniqueInferenceStateBytes" : 2013757440,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\" answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 4320, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 6149582848,
+      "residentBytes" : 6149582848,
+      "anonymousResidentBytes" : 3897761792,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 7401385984,
+      "residentBytes" : 6484480000,
+      "anonymousResidentBytes" : 4232658944,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 3344421800,
+      "heapCommittedBytes" : 3791650816,
+      "nonHeapUsedBytes" : 25250464,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9919056896,
+        "totalCommittedBytes" : 3995290624,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1400832,
+            "committedBytes" : 1400832
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224014336,
+            "committedBytes" : 137588736
+          },
+          "Code" : {
+            "reservedBytes" : 257481728,
+            "committedBytes" : 19045376
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 3791650816
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 5120,
+            "committedBytes" : 5120
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 30720,
+            "committedBytes" : 30720
+          },
+          "Compiler" : {
+            "reservedBytes" : 1098752,
+            "committedBytes" : 1098752
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 575488,
+            "committedBytes" : 575488
+          },
+          "Internal" : {
+            "reservedBytes" : 394240,
+            "committedBytes" : 394240
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 3629080784,
+      "heapCommittedBytes" : 4047503360,
+      "nonHeapUsedBytes" : 25264864,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918738432,
+        "totalCommittedBytes" : 4255821824,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1435648,
+            "committedBytes" : 1435648
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224092160,
+            "committedBytes" : 142663680
+          },
+          "Code" : {
+            "reservedBytes" : 257497088,
+            "committedBytes" : 19060736
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 4047503360
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 167936,
+            "committedBytes" : 167936
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 33792,
+            "committedBytes" : 33792
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 593920,
+            "committedBytes" : 593920
+          },
+          "Internal" : {
+            "reservedBytes" : 399360,
+            "committedBytes" : 399360
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 4096,
+    "strategy" : "shared",
+    "trial" : 0,
+    "openNanos" : 271850097579,
+    "generationTimeToFirstTokenNanos" : 453811367,
+    "handoffTimeToFirstTokenNanos" : 272303908946,
+    "totalNanos" : 273178628434,
+    "sharedPrefixTokens" : 4096,
+    "sharedPrefixBytes" : 671252480,
+    "baseInferenceStateBytes" : 673874560,
+    "toolInferenceStateBytes" : 673874560,
+    "uniqueInferenceStateBytes" : 676496640,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\" answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 4320, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 7401385984,
+      "residentBytes" : 6484484096,
+      "anonymousResidentBytes" : 4232663040,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 7401385984,
+      "residentBytes" : 6493691904,
+      "anonymousResidentBytes" : 4241870848,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 3629080784,
+      "heapCommittedBytes" : 4047503360,
+      "nonHeapUsedBytes" : 25267248,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918853120,
+        "totalCommittedBytes" : 4255936512,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1436672,
+            "committedBytes" : 1436672
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224092160,
+            "committedBytes" : 142663680
+          },
+          "Code" : {
+            "reservedBytes" : 257498112,
+            "committedBytes" : 19061760
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 4047503360
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 182272,
+            "committedBytes" : 182272
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 33792,
+            "committedBytes" : 33792
+          },
+          "Compiler" : {
+            "reservedBytes" : 561152,
+            "committedBytes" : 561152
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 593920,
+            "committedBytes" : 593920
+          },
+          "Internal" : {
+            "reservedBytes" : 399360,
+            "committedBytes" : 399360
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 1506601232,
+      "heapCommittedBytes" : 4051697664,
+      "nonHeapUsedBytes" : 25297616,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9922459648,
+        "totalCommittedBytes" : 4263819264,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1438720,
+            "committedBytes" : 1438720
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224076800,
+            "committedBytes" : 142730240
+          },
+          "Code" : {
+            "reservedBytes" : 257520640,
+            "committedBytes" : 19084288
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 4051697664
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 3884032,
+            "committedBytes" : 3884032
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 29696,
+            "committedBytes" : 29696
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 592896,
+            "committedBytes" : 592896
+          },
+          "Internal" : {
+            "reservedBytes" : 399360,
+            "committedBytes" : 399360
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 4096,
+    "strategy" : "shared",
+    "trial" : 1,
+    "openNanos" : 271927390727,
+    "generationTimeToFirstTokenNanos" : 426567877,
+    "handoffTimeToFirstTokenNanos" : 272353958604,
+    "totalNanos" : 273212411818,
+    "sharedPrefixTokens" : 4096,
+    "sharedPrefixBytes" : 671252480,
+    "baseInferenceStateBytes" : 673874560,
+    "toolInferenceStateBytes" : 673874560,
+    "uniqueInferenceStateBytes" : 676496640,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\" answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 4320, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 7401385984,
+      "residentBytes" : 6493700096,
+      "anonymousResidentBytes" : 4241879040,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 7401385984,
+      "residentBytes" : 6494699520,
+      "anonymousResidentBytes" : 4242878464,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 1506601232,
+      "heapCommittedBytes" : 4051697664,
+      "nonHeapUsedBytes" : 25302096,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9922462720,
+        "totalCommittedBytes" : 4263822336,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1439744,
+            "committedBytes" : 1439744
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224076800,
+            "committedBytes" : 142730240
+          },
+          "Code" : {
+            "reservedBytes" : 257521664,
+            "committedBytes" : 19085312
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 4051697664
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 3884032,
+            "committedBytes" : 3884032
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 29696,
+            "committedBytes" : 29696
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 593920,
+            "committedBytes" : 593920
+          },
+          "Internal" : {
+            "reservedBytes" : 399360,
+            "committedBytes" : 399360
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 2970413328,
+      "heapCommittedBytes" : 4051697664,
+      "nonHeapUsedBytes" : 25314768,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918733312,
+        "totalCommittedBytes" : 4260092928,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1440768,
+            "committedBytes" : 1440768
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224117760,
+            "committedBytes" : 142771200
+          },
+          "Code" : {
+            "reservedBytes" : 257523712,
+            "committedBytes" : 19087360
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 4051697664
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 102400,
+            "committedBytes" : 102400
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 35840,
+            "committedBytes" : 35840
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 594944,
+            "committedBytes" : 594944
+          },
+          "Internal" : {
+            "reservedBytes" : 399360,
+            "committedBytes" : 399360
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 4096,
+    "strategy" : "recomputed",
+    "trial" : 1,
+    "openNanos" : 534597553784,
+    "generationTimeToFirstTokenNanos" : 502304301,
+    "handoffTimeToFirstTokenNanos" : 535099858085,
+    "totalNanos" : 536019168337,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 671252480,
+    "toolInferenceStateBytes" : 1342504960,
+    "uniqueInferenceStateBytes" : 2013757440,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\" answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 4320, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 7401385984,
+      "residentBytes" : 6494699520,
+      "anonymousResidentBytes" : 4242878464,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 8342257664,
+      "residentBytes" : 8342257664,
+      "anonymousResidentBytes" : 6090436608,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 2970413328,
+      "heapCommittedBytes" : 4051697664,
+      "nonHeapUsedBytes" : 25314768,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918733312,
+        "totalCommittedBytes" : 4260092928,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1440768,
+            "committedBytes" : 1440768
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224117760,
+            "committedBytes" : 142771200
+          },
+          "Code" : {
+            "reservedBytes" : 257523712,
+            "committedBytes" : 19087360
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 4051697664
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 102400,
+            "committedBytes" : 102400
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 35840,
+            "committedBytes" : 35840
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 594944,
+            "committedBytes" : 594944
+          },
+          "Internal" : {
+            "reservedBytes" : 399360,
+            "committedBytes" : 399360
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 2995685024,
+      "heapCommittedBytes" : 5888802816,
+      "nonHeapUsedBytes" : 25306960,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9918859264,
+        "totalCommittedBytes" : 6133204992,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1561600,
+            "committedBytes" : 1561600
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224159744,
+            "committedBytes" : 178694144
+          },
+          "Code" : {
+            "reservedBytes" : 257518592,
+            "committedBytes" : 19082240
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 5888802816
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 49152,
+            "committedBytes" : 49152
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 31744,
+            "committedBytes" : 31744
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 615424,
+            "committedBytes" : 615424
+          },
+          "Internal" : {
+            "reservedBytes" : 406528,
+            "committedBytes" : 406528
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 4096,
+    "strategy" : "recomputed",
+    "trial" : 2,
+    "openNanos" : 550319158749,
+    "generationTimeToFirstTokenNanos" : 1319041201,
+    "handoffTimeToFirstTokenNanos" : 551638199950,
+    "totalNanos" : 552509993830,
+    "sharedPrefixTokens" : 0,
+    "sharedPrefixBytes" : 0,
+    "baseInferenceStateBytes" : 671252480,
+    "toolInferenceStateBytes" : 1342504960,
+    "uniqueInferenceStateBytes" : 2013757440,
+    "physicallyShared" : false,
+    "output" : "\"unanswerable\" answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 4320, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 8342310912,
+      "residentBytes" : 8342310912,
+      "anonymousResidentBytes" : 6090489856,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 10047803392,
+      "residentBytes" : 10047803392,
+      "anonymousResidentBytes" : 7795982336,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 2995685024,
+      "heapCommittedBytes" : 5888802816,
+      "nonHeapUsedBytes" : 25316016,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9919617024,
+        "totalCommittedBytes" : 6133962752,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1562624,
+            "committedBytes" : 1562624
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224159744,
+            "committedBytes" : 178694144
+          },
+          "Code" : {
+            "reservedBytes" : 257521664,
+            "committedBytes" : 19085312
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 5888802816
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 11264,
+            "committedBytes" : 11264
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 31744,
+            "committedBytes" : 31744
+          },
+          "Compiler" : {
+            "reservedBytes" : 1253376,
+            "committedBytes" : 1253376
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 615424,
+            "committedBytes" : 615424
+          },
+          "Internal" : {
+            "reservedBytes" : 406528,
+            "committedBytes" : 406528
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 7206766240,
+      "heapCommittedBytes" : 7579107328,
+      "nonHeapUsedBytes" : 25323576,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9919422464,
+        "totalCommittedBytes" : 7857086464,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1707008,
+            "committedBytes" : 1707008
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224411648,
+            "committedBytes" : 211959808
+          },
+          "Code" : {
+            "reservedBytes" : 257523712,
+            "committedBytes" : 19087360
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 7579107328
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 135168,
+            "committedBytes" : 135168
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 661504,
+            "committedBytes" : 661504
+          },
+          "Internal" : {
+            "reservedBytes" : 419840,
+            "committedBytes" : 419840
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  }, {
+    "prefixTokens" : 4096,
+    "strategy" : "shared",
+    "trial" : 2,
+    "openNanos" : 273897291536,
+    "generationTimeToFirstTokenNanos" : 443112278,
+    "handoffTimeToFirstTokenNanos" : 274340403814,
+    "totalNanos" : 275237316520,
+    "sharedPrefixTokens" : 4096,
+    "sharedPrefixBytes" : 671252480,
+    "baseInferenceStateBytes" : 673874560,
+    "toolInferenceStateBytes" : 673874560,
+    "uniqueInferenceStateBytes" : 676496640,
+    "physicallyShared" : true,
+    "output" : "\"unanswerable\" answerable\"",
+    "outputTokenIds" : [ 1, 359, 9399, 481, 1, 4320, 481, 1 ],
+    "processBefore" : {
+      "highWaterBytes" : 10047815680,
+      "residentBytes" : 10047815680,
+      "anonymousResidentBytes" : 7795994624,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "processAfter" : {
+      "highWaterBytes" : 10477772800,
+      "residentBytes" : 10477772800,
+      "anonymousResidentBytes" : 8225951744,
+      "fileResidentBytes" : 2251821056,
+      "sharedMemoryResidentBytes" : 0
+    },
+    "jvmBefore" : {
+      "heapUsedBytes" : 7206766240,
+      "heapCommittedBytes" : 7579107328,
+      "nonHeapUsedBytes" : 25334568,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9919461376,
+        "totalCommittedBytes" : 7857125376,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1709056,
+            "committedBytes" : 1709056
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224411648,
+            "committedBytes" : 211959808
+          },
+          "Code" : {
+            "reservedBytes" : 257526784,
+            "committedBytes" : 19090432
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 7579107328
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 168960,
+            "committedBytes" : 168960
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "Compiler" : {
+            "reservedBytes" : 461824,
+            "committedBytes" : 461824
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 662528,
+            "committedBytes" : 662528
+          },
+          "Internal" : {
+            "reservedBytes" : 419840,
+            "committedBytes" : 419840
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    },
+    "jvmAfter" : {
+      "heapUsedBytes" : 1330236816,
+      "heapCommittedBytes" : 8011120640,
+      "nonHeapUsedBytes" : 25335672,
+      "nonHeapCommittedBytes" : 31522816,
+      "bufferPools" : {
+        "mapped" : {
+          "name" : "mapped",
+          "count" : 2,
+          "memoryUsedBytes" : 2224094728,
+          "totalCapacityBytes" : 2224094728
+        },
+        "direct" : {
+          "name" : "direct",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        },
+        "mapped - 'non-volatile memory'" : {
+          "name" : "mapped - 'non-volatile memory'",
+          "count" : 0,
+          "memoryUsedBytes" : 0,
+          "totalCapacityBytes" : 0
+        }
+      },
+      "nativeMemory" : {
+        "available" : true,
+        "totalReservedBytes" : 9919550464,
+        "totalCommittedBytes" : 8297665536,
+        "categories" : {
+          "Native Memory Tracking" : {
+            "reservedBytes" : 1739776,
+            "committedBytes" : 1739776
+          },
+          "Other" : {
+            "reservedBytes" : 7931904,
+            "committedBytes" : 7931904
+          },
+          "Symbol" : {
+            "reservedBytes" : 2817024,
+            "committedBytes" : 2817024
+          },
+          "Object Monitors" : {
+            "reservedBytes" : 0,
+            "committedBytes" : 0
+          },
+          "Safepoint" : {
+            "reservedBytes" : 8192,
+            "committedBytes" : 8192
+          },
+          "GC" : {
+            "reservedBytes" : 224361472,
+            "committedBytes" : 220347392
+          },
+          "Code" : {
+            "reservedBytes" : 257526784,
+            "committedBytes" : 19090432
+          },
+          "Module" : {
+            "reservedBytes" : 183296,
+            "committedBytes" : 183296
+          },
+          "Class" : {
+            "reservedBytes" : 1074075648,
+            "committedBytes" : 1906688
+          },
+          "Metaspace" : {
+            "reservedBytes" : 67169280,
+            "committedBytes" : 13364224
+          },
+          "Java Heap" : {
+            "reservedBytes" : 8216641536,
+            "committedBytes" : 8011120640
+          },
+          "Thread" : {
+            "reservedBytes" : 48388096,
+            "committedBytes" : 2979840
+          },
+          "Arena Chunk" : {
+            "reservedBytes" : 4096,
+            "committedBytes" : 4096
+          },
+          "Tracing" : {
+            "reservedBytes" : 45056,
+            "committedBytes" : 45056
+          },
+          "GCCardSet" : {
+            "reservedBytes" : 30720,
+            "committedBytes" : 30720
+          },
+          "Compiler" : {
+            "reservedBytes" : 740352,
+            "committedBytes" : 740352
+          },
+          "Serviceability" : {
+            "reservedBytes" : 17408,
+            "committedBytes" : 17408
+          },
+          "Synchronization" : {
+            "reservedBytes" : 669696,
+            "committedBytes" : 669696
+          },
+          "Internal" : {
+            "reservedBytes" : 421888,
+            "committedBytes" : 421888
+          },
+          "String Deduplication" : {
+            "reservedBytes" : 1024,
+            "committedBytes" : 1024
+          }
+        }
+      }
+    }
+  } ],
+  "summaries" : [ {
+    "prefixTokens" : 256,
+    "sharedMedianHandoffMillis" : 16387.135687,
+    "recomputedMedianHandoffMillis" : 32274.915123,
+    "improvement" : 0.4922640191446367,
+    "sharedMedianUniqueStateBytes" : 47197440,
+    "recomputedMedianUniqueStateBytes" : 125859840,
+    "sharedPhysicalContractPassed" : true,
+    "recomputedIndependencePassed" : true,
+    "tokenExactAcrossStrategies" : true
+  }, {
+    "prefixTokens" : 1024,
+    "sharedMedianHandoffMillis" : 64741.626548,
+    "recomputedMedianHandoffMillis" : 129047.97031,
+    "improvement" : 0.4983134845710694,
+    "sharedMedianUniqueStateBytes" : 173057280,
+    "recomputedMedianUniqueStateBytes" : 503439360,
+    "sharedPhysicalContractPassed" : true,
+    "recomputedIndependencePassed" : true,
+    "tokenExactAcrossStrategies" : true
+  }, {
+    "prefixTokens" : 4096,
+    "sharedMedianHandoffMillis" : 272353.958604,
+    "recomputedMedianHandoffMillis" : 546645.771745,
+    "improvement" : 0.5017724956792532,
+    "sharedMedianUniqueStateBytes" : 676496640,
+    "recomputedMedianUniqueStateBytes" : 2013757440,
+    "sharedPhysicalContractPassed" : true,
+    "recomputedIndependencePassed" : true,
+    "tokenExactAcrossStrategies" : true
+  } ],
+  "verdict" : {
+    "crossoverPrefixTokens" : 256,
+    "fourKImprovement" : 0.5017724956792532,
+    "passed" : true
+  },
+  "peakRssBytes" : 10477772800,
+  "memoryAccountingComplete" : true,
+  "qualified" : true
+}
