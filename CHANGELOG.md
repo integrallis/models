@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.42] - 2026-09-17
+
 ### Added
 - GGUF chat-template end-of-turn resolution: `GgufTokenizer` reads `tokenizer.chat_template` and adds the token that closes an assistant turn to the end-of-generation set. That token is the last CONTROL token or `eos_token` reference before the generation prompt, and it must also close message content somewhere in the template. Otherwise the result is reported unresolved and the set is unchanged. Of the 55 GGUF vocabularies on the development host, 26 templates resolve, 5 are unresolved (no generation prompt), and no stop set changes, because every resolved marker was already present.
 - End-of-generation provenance: `GgufTokenizer.endOfGenerationSources()` lists the rules behind each terminator (metadata key, `vocabulary-text`, `chat-template-end-of-turn`, ...). `chatTemplateEndOfTurnResolution()` returns `resolved:<id>`, `unresolved:<reason>` or `absent`. `PureJavaBackend` and `RustFfmBackend` diagnostics carry `end-of-generation-token-ids`, `end-of-generation.<id>` and `end-of-generation.chat-template`.
