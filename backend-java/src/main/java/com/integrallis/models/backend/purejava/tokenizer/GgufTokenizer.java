@@ -82,6 +82,11 @@ public final class GgufTokenizer implements Tokenizer {
           "<turn|>",
           "<|tool_response>",
           "<｜end▁of▁sentence｜>");
+  private static final int TOKEN_TYPE_UNKNOWN = -1;
+  private static final int TOKEN_TYPE_NORMAL = 1;
+  private static final int TOKEN_TYPE_CONTROL = 3;
+  private static final String CLOSING_STRIKETHROUGH_TAG = "</s>";
+
   private static final List<String> END_OF_GENERATION_METADATA_KEYS =
       List.of(
           "tokenizer.ggml.eos_token_id",
@@ -387,8 +392,14 @@ public final class GgufTokenizer implements Tokenizer {
     }
     boolean[] endOfGenerationTokens = new boolean[copiedVocab.length];
     markEndOfGeneration(endOfGenerationTokens, eosTokenId);
+    // A tokenizer.json vocabulary has no token types; its added tokens are the control set. When
+    // there are added tokens, an entry outside them is ordinary BPE text (Qwen2's "</s>").
     for (int token = 0; token < copiedVocab.length; token++) {
-      if (END_OF_GENERATION_TOKEN_TEXTS.contains(copiedVocab[token])) {
+      int tokenType =
+          controlTokenIds.isEmpty()
+              ? TOKEN_TYPE_UNKNOWN
+              : controlTokenIds.contains(token) ? TOKEN_TYPE_CONTROL : TOKEN_TYPE_NORMAL;
+      if (isVocabularyTerminator(copiedVocab[token], tokenType)) {
         endOfGenerationTokens[token] = true;
       }
     }
@@ -449,8 +460,10 @@ public final class GgufTokenizer implements Tokenizer {
     for (String key : END_OF_GENERATION_METADATA_KEYS) {
       metadata.getUint32(key).ifPresent(token -> markEndOfGeneration(result, token));
     }
+    List<Integer> tokenTypes =
+        metadata.getInt32Array("tokenizer.ggml.token_type").orElse(List.of());
     for (int token = 0; token < vocab.length; token++) {
-      if (END_OF_GENERATION_TOKEN_TEXTS.contains(vocab[token])) {
+      if (isVocabularyTerminator(vocab[token], tokenType(tokenTypes, token))) {
         result[token] = true;
       }
     }
@@ -472,10 +485,35 @@ public final class GgufTokenizer implements Tokenizer {
     }
   }
 
+  /**
+   * Whether a vocabulary entry is a terminator by its text alone, given its GGUF token type ({@link
+   * #TOKEN_TYPE_UNKNOWN} when the file declares none).
+   *
+   * <p>The text list mirrors llama.cpp's. Two guards keep it from promoting ordinary text: an entry
+   * the file types NORMAL is never a terminator (Qwen2 vocabularies carry {@code </s>} as an
+   * ordinary BPE merge, id 128247), and {@code </s>}, which is also the HTML strikethrough close
+   * tag, must be typed CONTROL (Gemma 3 types it USER_DEFINED among {@code <b>}, {@code </code>}
+   * and other tags). Ids declared in metadata are not subject to either guard.
+   */
+  private static boolean isVocabularyTerminator(String text, int tokenType) {
+    if (!END_OF_GENERATION_TOKEN_TEXTS.contains(text) || tokenType == TOKEN_TYPE_NORMAL) {
+      return false;
+    }
+    return !CLOSING_STRIKETHROUGH_TAG.equals(text)
+        || tokenType == TOKEN_TYPE_UNKNOWN
+        || tokenType == TOKEN_TYPE_CONTROL;
+  }
+
+  private static int tokenType(List<Integer> tokenTypes, int token) {
+    return token < tokenTypes.size() ? tokenTypes.get(token) : TOKEN_TYPE_UNKNOWN;
+  }
+
   private static List<SpecialToken> buildSpecialTokens(GgufMetadata metadata, String[] vocab) {
     boolean[] special = new boolean[vocab.length];
+    List<Integer> declaredTypes =
+        metadata.getInt32Array("tokenizer.ggml.token_type").orElse(List.of());
     for (int token = 0; token < vocab.length; token++) {
-      special[token] = END_OF_GENERATION_TOKEN_TEXTS.contains(vocab[token]);
+      special[token] = isVocabularyTerminator(vocab[token], tokenType(declaredTypes, token));
     }
     metadata
         .getInt32Array("tokenizer.ggml.token_type")

@@ -751,6 +751,109 @@ class GgufTokenizerTest {
     }
   }
 
+  /**
+   * Which vocabulary entries the text heuristic may turn into terminators. Upstream generation
+   * configs read on 2026-09-16 declare Qwen2.5/Qwen3 EOS as [151645, 151643] and Gemma 3 as [1,
+   * 106]; neither lists the {@code </s>} entry the heuristic used to add (Qwen id 128247, typed
+   * NORMAL; Gemma 3 id 212, typed USER_DEFINED inside a block of HTML tags).
+   */
+  @Nested
+  class VocabularyTerminatorTypes {
+
+    @Test
+    void textMatchOnATokenTypedNormalIsNotATerminator() {
+      // Qwen2 vocabulary: "</s>" is an ordinary BPE entry (merge "</s" + ">"), not a control token.
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              typedMetadata(
+                  List.of("<unk>", "answer", "</s>", "<|im_end|>", "<|endoftext|>"),
+                  List.of(2, 1, 1, 3, 3),
+                  3));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(3, 4);
+      assertThat(tokenizer.decode(new int[] {1, 2})).isEqualTo("answer</s>");
+      assertThat(tokenizer.encode(ModelPrompt.control("</s>"))).doesNotContain(2);
+    }
+
+    @Test
+    void closingStrikethroughTagIsATerminatorOnlyWhenControlTypedOrDeclared() {
+      // Gemma 3: "</s>" is USER_DEFINED among "<s>", "</b>", "</code>"; Gemma 4's
+      // "<|tool_response>" is also USER_DEFINED and is a real terminator.
+      GgufTokenizer gemma3Like =
+          GgufTokenizer.fromMetadata(
+              typedMetadata(
+                  List.of("<pad>", "<eos>", "<s>", "</s>", "<end_of_turn>", "</b>"),
+                  List.of(3, 3, 4, 4, 3, 4),
+                  1));
+      GgufTokenizer gemma4Like =
+          GgufTokenizer.fromMetadata(
+              typedMetadata(
+                  List.of("<pad>", "<eos>", "<turn|>", "<|tool_response>"),
+                  List.of(3, 3, 3, 4),
+                  1));
+      GgufTokenizer controlTyped =
+          GgufTokenizer.fromMetadata(
+              typedMetadata(List.of("<unk>", "<eos>", "</s>"), List.of(2, 3, 3), 1));
+      GgufTokenizer declared =
+          GgufTokenizer.fromMetadata(
+              typedMetadata(List.of("<unk>", "<s>", "</s>"), List.of(2, 4, 4), 2));
+
+      assertThat(gemma3Like.endOfGenerationTokenIds()).containsExactly(1, 4);
+      assertThat(gemma4Like.endOfGenerationTokenIds()).containsExactly(1, 2, 3);
+      assertThat(controlTyped.endOfGenerationTokenIds()).containsExactly(1, 2);
+      assertThat(declared.endOfGenerationTokenIds()).containsExactly(2);
+    }
+
+    @Test
+    void untypedVocabularyKeepsTheTextHeuristic() {
+      GgufTokenizer tokenizer =
+          GgufTokenizer.fromMetadata(
+              typedMetadata(List.of("<unk>", "answer", "</s>", "<|im_end|>"), null, 3));
+
+      assertThat(tokenizer.endOfGenerationTokenIds()).containsExactly(2, 3);
+    }
+
+    @Test
+    void byteLevelBpeWithAddedTokensOnlyTreatsAddedTokensAsTextTerminators() {
+      String[] vocab = {"<unk>", "answer", "</s>", "<|im_end|>", "<|endoftext|>"};
+
+      GgufTokenizer withAddedTokens =
+          GgufTokenizer.fromByteLevelBpe(
+              vocab, List.of(), java.util.Set.of(3, 4), -1, 3, false, false, 0, false);
+      GgufTokenizer withoutAddedTokens =
+          GgufTokenizer.fromByteLevelBpe(
+              vocab, List.of(), java.util.Set.of(), -1, 3, false, false, 0, false);
+
+      assertThat(withAddedTokens.endOfGenerationTokenIds()).containsExactly(3, 4);
+      assertThat(withoutAddedTokens.endOfGenerationTokenIds()).containsExactly(2, 3, 4);
+    }
+  }
+
+  private static GgufMetadata typedMetadata(
+      List<String> tokens, List<Integer> tokenTypes, int eosTokenId) {
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put(
+        "tokenizer.ggml.tokens",
+        new GgufMetadataValue.ArrayValue(
+            GgufValueType.STRING,
+            tokens.stream()
+                .map(token -> (GgufMetadataValue) new GgufMetadataValue.StringValue(token))
+                .toList()));
+    if (tokenTypes != null) {
+      entries.put(
+          "tokenizer.ggml.token_type",
+          new GgufMetadataValue.ArrayValue(
+              GgufValueType.INT32,
+              tokenTypes.stream()
+                  .map(type -> (GgufMetadataValue) new GgufMetadataValue.Int32Value(type))
+                  .toList()));
+    }
+    entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
+    entries.put("tokenizer.ggml.bos_token_id", new GgufMetadataValue.Uint32Value(0));
+    entries.put("tokenizer.ggml.eos_token_id", new GgufMetadataValue.Uint32Value(eosTokenId));
+    return new GgufMetadata(entries);
+  }
+
   @Nested
   class Errors {
 
