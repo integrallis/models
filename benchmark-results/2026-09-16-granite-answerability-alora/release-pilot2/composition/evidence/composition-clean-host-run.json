@@ -1,0 +1,78 @@
+{
+  "pass": true,
+  "freshMachine": true,
+  "externalInference": false,
+  "javaMajor": 25,
+  "exitCode": 0,
+  "modelsVersion": "0.3.42",
+  "modeljarsVersion": "0.1.47",
+  "backend": "rust-ffm",
+  "backendSelection": "explicit-native",
+  "startedAt": "2026-09-17T21:49:45Z",
+  "completedAt": "2026-09-17T21:54:23Z",
+  "command": [
+    "jbang",
+    "CompositionCleanHost.java",
+    "--store",
+    "/opt/modeljars-composition-clean-host/store",
+    "--report",
+    "/root/composition/evidence/composition-program-report.json",
+    "--cases-per-suite",
+    "3",
+    "--arm-order",
+    "composite-first"
+  ],
+  "resolvedClasspathSha256": "55b154fa35aa662c8080f639d5fdbdd87b4e8e04a59c2629c4375bd37f5df9d9",
+  "suites": [
+    "squad-v2-dev",
+    "msmarco-v2.1-validation"
+  ],
+  "casesPerSuite": 3,
+  "casesPerArm": 6,
+  "armOrder": "composite-first",
+  "windowSha256": "dfb8cd7203418c79bae27306ffc4857f0ab02be7f9f8ddcae793af556e9cab37",
+  "controlMedianMillis": 17897.5,
+  "compositeMedianMillis": 11661,
+  "latencyImprovement": 0.34845648833635984,
+  "controlMedianUniqueInferenceStateBytes": 251719680.0,
+  "compositeMedianUniqueInferenceStateBytes": 131104000.0,
+  "publicApi": {
+    "entryPoint": "org.modeljars.ModelJars.openActivatedToolRuntime(ModelJar,ModelJar,ModelLoadOptions)",
+    "coordinate": "org.modeljars:modeljars:0.1.47",
+    "jarUri": "file:///root/.m2/repository/org/modeljars/modeljars/0.1.47/modeljars-0.1.47.jar",
+    "jarSha256": "b8800ff6942fc17ffba258b8e03f8a2e9c72361958fc7b2a4cf37079d1852a91",
+    "publicApiClassFromCentral": true,
+    "runtimeTypeOwnedByModelJars": true,
+    "membersResolvedByRuntime": true,
+    "backendSelectedByCatalog": true,
+    "selectedBackend": "rust-ffm",
+    "runViaPublicApi": true
+  },
+  "publishedArtifacts": [
+    {
+      "modelId": "ibm_granite_granite_4_1_3b_gguf_q4_k_m",
+      "coordinate": "org.modeljars.huggingface:ibm-granite.granite-4.1-3b-gguf.q4_k_m:4.1.0-q4_k_m.2",
+      "sha256": "662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29",
+      "markerJarSha256": "fb6aba90d2f06ad70282fd99eed356030e22b0f8a2620c13bab1492df92a3a11",
+      "markerJarUri": "file:///root/.m2/repository/org/modeljars/huggingface/ibm-granite.granite-4.1-3b-gguf.q4_k_m/4.1.0-q4_k_m.2/ibm-granite.granite-4.1-3b-gguf.q4_k_m-4.1.0-q4_k_m.2.jar",
+      "markerResourceUrl": "jar:file:/root/.m2/repository/org/modeljars/huggingface/ibm-granite.granite-4.1-3b-gguf.q4_k_m/4.1.0-q4_k_m.2/ibm-granite.granite-4.1-3b-gguf.q4_k_m-4.1.0-q4_k_m.2.jar!/META-INF/modeljars/registry.properties",
+      "resolvedFromCentral": true,
+      "runViaPublicApi": true
+    },
+    {
+      "modelId": "modeljars_granite_4_1_3b_answerability_alora_integrallis_f32",
+      "coordinate": "org.modeljars.github:modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32:1.0.0-f32.2",
+      "sha256": "67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6",
+      "markerJarSha256": "ca260264f048889afd641b84ca10a09c2b5dfe934be475d7b1639ce7308a0b4f",
+      "markerJarUri": "file:///root/.m2/repository/org/modeljars/github/modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32/1.0.0-f32.2/modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32-1.0.0-f32.2.jar",
+      "markerResourceUrl": "jar:file:/root/.m2/repository/org/modeljars/github/modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32/1.0.0-f32.2/modeljars.activated-adapters.granite-4.1-3b-answerability-alora-integrallis.f32-1.0.0-f32.2.jar!/META-INF/modeljars/registry.properties",
+      "resolvedFromCentral": true,
+      "runViaPublicApi": true
+    }
+  ],
+  "outputLog": {
+    "uri": "https://raw.githubusercontent.com/integrallis/models/<EVIDENCE_REVISION>/benchmark-results/2026-09-16-granite-answerability-alora/release-pilot2/composition/evidence/composition-clean-host-output.log",
+    "sha256": "02d4570d15e1926ba15028893f9f955e24cf65dad18b95db553640dafc971517",
+    "sizeBytes": 14998
+  }
+}
