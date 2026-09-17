@@ -29,10 +29,10 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.model.chat.response.PartialResponse;
-import dev.langchain4j.model.chat.response.PartialResponseContext;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.FinishReason;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -128,39 +128,82 @@ class LangChain4jStopReasonTest {
   }
 
   @Test
-  void cancellingTheStreamingHandleStopsGenerationWithoutFurtherCallbacks() {
+  void cancellationProbeMatchesTheLangChain4jOnTheClasspath() {
+    boolean handlePresent;
+    try {
+      Class.forName("dev.langchain4j.model.chat.response.StreamingHandle");
+      handlePresent = true;
+    } catch (ClassNotFoundException absent) {
+      handlePresent = false;
+    }
+
+    assertThat(LangChain4jPartialResponses.cancellationSupported()).isEqualTo(handlePresent);
+  }
+
+  /**
+   * Exercises cancellation where LangChain4j has a {@code StreamingHandle} (1.8+) and plain
+   * fragment delivery where it does not (1.0.0). The handler is a dynamic proxy so this test
+   * compiles against every version in the framework-compat matrix.
+   */
+  @Test
+  void streamingCancelsThroughTheHandleWhereAvailableAndStreamsPlainlyOtherwise() {
     ScriptedModel delegate = new ScriptedModel(List.of("one", "two", "three"), StopReason.EOS);
     ModelsStreamingChatModel model = new ModelsStreamingChatModel(delegate);
     List<String> partials = new ArrayList<>();
     AtomicReference<ChatResponse> completed = new AtomicReference<>();
     AtomicReference<Throwable> failed = new AtomicReference<>();
+    StreamingChatResponseHandler handler =
+        (StreamingChatResponseHandler)
+            Proxy.newProxyInstance(
+                StreamingChatResponseHandler.class.getClassLoader(),
+                new Class<?>[] {StreamingChatResponseHandler.class},
+                (proxy, method, args) -> {
+                  switch (method.getName()) {
+                    case "onPartialResponse" -> {
+                      if (args.length == 1) {
+                        partials.add((String) args[0]);
+                      } else {
+                        partials.add((String) args[0].getClass().getMethod("text").invoke(args[0]));
+                        Object handle =
+                            args[1].getClass().getMethod("streamingHandle").invoke(args[1]);
+                        Method cancel =
+                            method
+                                .getDeclaringClass()
+                                .getClassLoader()
+                                .loadClass("dev.langchain4j.model.chat.response.StreamingHandle")
+                                .getMethod("cancel");
+                        cancel.invoke(handle);
+                      }
+                    }
+                    case "onCompleteResponse" -> completed.set((ChatResponse) args[0]);
+                    case "onError" -> failed.set((Throwable) args[0]);
+                    case "hashCode" -> {
+                      return System.identityHashCode(proxy);
+                    }
+                    case "equals" -> {
+                      return proxy == args[0];
+                    }
+                    case "toString" -> {
+                      return "recording-handler";
+                    }
+                    default -> {}
+                  }
+                  return null;
+                });
 
-    model.chat(
-        QUESTION,
-        new StreamingChatResponseHandler() {
-          @Override
-          public void onPartialResponse(PartialResponse partial, PartialResponseContext context) {
-            partials.add(partial.text());
-            context.streamingHandle().cancel();
-            assertThat(context.streamingHandle().isCancelled()).isTrue();
-          }
+    model.chat(QUESTION, handler);
 
-          @Override
-          public void onCompleteResponse(ChatResponse response) {
-            completed.set(response);
-          }
-
-          @Override
-          public void onError(Throwable error) {
-            failed.set(error);
-          }
-        });
-
-    assertThat(partials).containsExactly("one");
-    assertThat(delegate.emitted).isEqualTo(1);
-    assertThat(delegate.reported).isEqualTo(StopReason.CANCELLED);
-    assertThat(completed.get()).isNull();
     assertThat(failed.get()).isNull();
+    if (LangChain4jPartialResponses.cancellationSupported()) {
+      assertThat(partials).containsExactly("one");
+      assertThat(delegate.emitted).isEqualTo(1);
+      assertThat(delegate.reported).isEqualTo(StopReason.CANCELLED);
+      assertThat(completed.get()).isNull();
+    } else {
+      assertThat(partials).containsExactly("one", "two", "three");
+      assertThat(delegate.reported).isEqualTo(StopReason.EOS);
+      assertThat(completed.get().finishReason()).isEqualTo(FinishReason.STOP);
+    }
   }
 
   private static StreamingChatResponseHandler completingHandler(

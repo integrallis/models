@@ -39,10 +39,7 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.model.chat.response.PartialResponse;
-import dev.langchain4j.model.chat.response.PartialResponseContext;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
-import dev.langchain4j.model.chat.response.StreamingHandle;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 import java.util.ArrayList;
@@ -114,8 +111,7 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
       streamActivatedTurn(request, handler, activatedModel, prompt, requested, tools);
       return;
     }
-    CancellationHandle cancellation = new CancellationHandle();
-    PartialResponseContext partialContext = new PartialResponseContext(cancellation);
+    LangChain4jPartialResponses.Channel cancellation = LangChain4jPartialResponses.open(handler);
     TokenStream stream =
         new TokenStream() {
           @Override
@@ -123,7 +119,7 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
             if (!terminalSignalSent.get() && !cancellation.isCancelled()) {
               accumulated.append(token);
               if (!toolsDeclared) {
-                handler.onPartialResponse(new PartialResponse(token), partialContext);
+                cancellation.emit(token);
               }
             }
           }
@@ -409,20 +405,5 @@ public final class ModelsStreamingChatModel implements StreamingChatModel, AutoC
   public void close() {
     activatedTurns.close();
     model.close();
-  }
-
-  /** LangChain4j cancellation handle polled by the generation loop after each token. */
-  private static final class CancellationHandle implements StreamingHandle {
-    private volatile boolean cancelled;
-
-    @Override
-    public void cancel() {
-      cancelled = true;
-    }
-
-    @Override
-    public boolean isCancelled() {
-      return cancelled;
-    }
   }
 }
