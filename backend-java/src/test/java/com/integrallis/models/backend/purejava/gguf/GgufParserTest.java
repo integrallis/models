@@ -217,6 +217,46 @@ class GgufParserTest {
   }
 
   @Nested
+  class VocabularyOnlyFiles {
+
+    @Test
+    void parsesAFileWithNoTensorsWhoseMetadataEndsOffTheAlignmentBoundary() {
+      // llama.cpp's vocabulary fixtures (models/ggml-vocab-*.gguf) have no tensors and no padding
+      // after the metadata; llama.cpp only seeks to the aligned data section when tensors exist.
+      byte[] padded =
+          new SyntheticGgufBuilder()
+              .addStringArray("tokenizer.ggml.tokens", java.util.List.of("a", "b"))
+              .addString("general.name", "vocab-only")
+              .build();
+      int unpaddedLength = padded.length;
+      while (padded[unpaddedLength - 1] == 0) {
+        unpaddedLength--;
+      }
+      byte[] unpadded = java.util.Arrays.copyOf(padded, unpaddedLength);
+      assertThat(unpadded.length % GgufConstants.DEFAULT_ALIGNMENT).isNotZero();
+
+      GgufFile file = GgufParser.parseSegment(MemorySegment.ofArray(unpadded));
+
+      assertThat(file.tensorInfos()).isEmpty();
+      assertThat(file.metadata().getStringArray("tokenizer.ggml.tokens"))
+          .contains(java.util.List.of("a", "b"));
+    }
+
+    @Test
+    void stillRejectsAFileWithTensorsWhoseDataSectionStartsPastTheEnd() {
+      byte[] valid =
+          new SyntheticGgufBuilder()
+              .addTensor("x", GgufTensorType.F32, new long[] {1}, new byte[4])
+              .addString("general.name", "z")
+              .build();
+      byte[] truncated = java.util.Arrays.copyOf(valid, valid.length - 5);
+
+      assertThatThrownBy(() -> GgufParser.parseSegment(MemorySegment.ofArray(truncated)))
+          .isInstanceOf(MalformedGgufException.class);
+    }
+  }
+
+  @Nested
   class MalformedInput {
 
     @Test

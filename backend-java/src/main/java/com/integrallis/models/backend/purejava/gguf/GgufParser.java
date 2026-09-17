@@ -106,6 +106,12 @@ public final class GgufParser {
     }
     validateTensorAlignment(tensorInfos, alignment);
     long tensorDataOffset = alignUp(cursor.offset(), alignment);
+    if (tensorInfos.isEmpty()) {
+      // A vocabulary-only file (llama.cpp's models/ggml-vocab-*.gguf) has no data section and need
+      // not be padded after its metadata; llama.cpp only seeks to the aligned start when tensors
+      // exist.
+      tensorDataOffset = Math.min(tensorDataOffset, segment.byteSize());
+    }
     if (tensorDataOffset > segment.byteSize()) {
       throw new MalformedGgufException(
           "aligned tensor data offset "
