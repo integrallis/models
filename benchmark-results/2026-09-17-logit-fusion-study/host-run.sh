@@ -207,7 +207,12 @@ require_data() { # dataset
 }
 
 arm_field() { # label jq-field
-  jq -er --arg l "$1" ".arms[] | select(.label==\$l) | $2" "$STUDY/arms.json"
+  # `jq -e` exits 1 when the value is false or null, and `set -e` would then kill the run for every
+  # arm whose boolean field is false. Read with -r, and fail only on a genuinely absent field.
+  local value
+  value="$(jq -r --arg l "$1" ".arms[] | select(.label==\$l) | $2" "$STUDY/arms.json")" || return 1
+  [ -n "$value" ] && [ "$value" != null ] || return 1
+  printf '%s\n' "$value"
 }
 
 # ----------------------------------------------------------------------------------------------
