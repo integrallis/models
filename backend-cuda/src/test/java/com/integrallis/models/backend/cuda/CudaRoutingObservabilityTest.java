@@ -96,6 +96,68 @@ class CudaRoutingObservabilityTest {
   }
 
   @Test
+  @DisplayName("a decode step is a generated token, not a projection dispatch")
+  void aDecodeStepIsAGeneratedTokenNotAProjectionDispatch() {
+    // The kernel cannot see token boundaries: it is handed one projection at a time and has no
+    // way to know which of them belong to the same generated token. If it increments the step
+    // counter itself, launchesPerDecodeStep becomes launches-per-projection -- which for this
+    // kernel is 1 by construction, for every model, forever. That number would look like a
+    // measurement of the term the pre-registration says decides G4 while being a restatement of
+    // the dispatch loop. So projections and steps are counted separately, and only the
+    // measurement harness, which does see token boundaries, marks a step.
+    CudaRoutingCounters counters = new CudaRoutingCounters();
+    for (int token = 0; token < 3; token++) {
+      for (int projection = 0; projection < 7; projection++) {
+        counters.decodeProjection();
+        counters.launched();
+      }
+      counters.decodeStep();
+    }
+    assertEquals(21L, counters.decodeProjections());
+    assertEquals(3L, counters.decodeSteps());
+    assertEquals(7.0, counters.launchesPerDecodeStep(), 1.0e-9);
+  }
+
+  @Test
+  @DisplayName("per-step terms report zero and say so when no caller marked a token boundary")
+  void perStepTermsAreUndefinedUntilStepsAreMarked() {
+    // "No data" rather than "no effect": a run whose harness never marked token boundaries has
+    // not measured the overhead term, and must not report a plausible number for it.
+    CudaRoutingCounters counters = new CudaRoutingCounters();
+    for (int projection = 0; projection < 12; projection++) {
+      counters.decodeProjection();
+      counters.launched();
+      counters.copiedToDevice(2_048);
+    }
+    assertFalse(counters.decodeStepsMarked());
+    assertEquals(0.0, counters.launchesPerDecodeStep(), 1.0e-9);
+    assertEquals(0.0, counters.transfersPerDecodeStep(), 1.0e-9);
+    assertEquals(0.0, counters.activationBytesPerDecodeStep(), 1.0e-9);
+
+    counters.decodeStep();
+    assertTrue(counters.decodeStepsMarked());
+    assertEquals(12.0, counters.launchesPerDecodeStep(), 1.0e-9);
+  }
+
+  @Test
+  @DisplayName("device allocations report a high-water mark, not a running total")
+  void deviceAllocationsReportAHighWaterMark() {
+    // G4's report needs peak device memory. Summing allocations would answer a different
+    // question -- how much was ever allocated -- and on a kernel that allocates and frees a
+    // per-call buffer for every attention step that sum grows without bound.
+    CudaRoutingCounters counters = new CudaRoutingCounters();
+    counters.deviceAllocated(1_000);
+    counters.deviceAllocated(4_000);
+    assertEquals(5_000L, counters.deviceBytesInUse());
+    assertEquals(5_000L, counters.peakDeviceBytes());
+
+    counters.deviceFreed(4_000);
+    counters.deviceAllocated(2_000);
+    assertEquals(3_000L, counters.deviceBytesInUse());
+    assertEquals(5_000L, counters.peakDeviceBytes(), "the peak must not fall when memory is freed");
+  }
+
+  @Test
   @DisplayName("weight uploads are counted apart from activations so streaming is detectable")
   void weightUploadsAreCountedApartFromActivations() {
     // Weights must be uploaded once per tensor for the life of the process. A weight-upload
