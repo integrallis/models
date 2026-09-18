@@ -17,6 +17,7 @@ package com.integrallis.models.backend.tornado;
 
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -75,9 +76,23 @@ public final class TornadoBackend {
     TornadoGgufBatchedMatrixKernel kernel =
         new TornadoGgufBatchedMatrixKernel(
             options.executionBatchSize(), options.accelerateDecode());
+    // Whatever the capacity gate did not already reserve for the model and its plans is what a
+    // retained KV mirror may use. The mirror's real cost depends on the loaded attention geometry,
+    // which is not known until the model is open, so the budget travels into the kernel and the
+    // kernel refuses — observably — rather than the gate guessing here.
+    TornadoCausalAttentionKernel attentionKernel =
+        options.accelerateAttention()
+            ? new TornadoCausalAttentionKernel(
+                attentionBudgetBytes(decision.device(), decision.requiredBytes()))
+            : null;
     PureJavaBackend backend = null;
     try {
-      backend = PureJavaBackend.load(model, backendConfiguration, kernel);
+      backend =
+          PureJavaBackend.load(
+              model,
+              backendConfiguration,
+              kernel,
+              attentionKernel == null ? BatchedCausalAttentionKernel.none() : attentionKernel);
       Duration readiness = options.eagerReadiness() ? prepare(backend, options) : Duration.ZERO;
       if (options.eagerReadiness() && kernel.calls() == 0) {
         backend.close();
@@ -96,10 +111,29 @@ public final class TornadoBackend {
           readiness.toMillis(),
           kernel.projectionPlanCount(),
           kernel.routedProjectionsByFormat());
+      if (attentionKernel != null) {
+        TornadoAttentionRouting routing = attentionKernel.routing();
+        LOGGER.log(System.Logger.Level.INFO, "Models accelerator {0}", routing.summary());
+        if (options.eagerReadiness() && !routing.ranOnDevice()) {
+          // A kernel that never accepted a step must say so here rather than be discovered later
+          // as an absence of speedup.
+          LOGGER.log(
+              System.Logger.Level.INFO,
+              "Models accelerator attention stayed on the Vector API: {0}",
+              attentionKernel.lastRefusal());
+        }
+      }
       return new TornadoBackendRuntime(
           backend,
-          new TornadoBackendStatus(true, device, "eligible", decision.requiredBytes(), readiness),
-          kernel);
+          new TornadoBackendStatus(
+              true,
+              device,
+              "eligible",
+              decision.requiredBytes(),
+              readiness,
+              attentionKernel != null && attentionKernel.routing().ranOnDevice()),
+          kernel,
+          attentionKernel);
     } catch (LinkageError | RuntimeException failure) {
       if (backend != null) {
         try {
@@ -152,6 +186,16 @@ public final class TornadoBackend {
     return new TornadoBackendRuntime(
         PureJavaBackend.load(model, backendConfiguration, GgufBatchedMatrixKernel.none()),
         new TornadoBackendStatus(false, "Vector API", reason, requiredBytes, Duration.ZERO));
+  }
+
+  /**
+   * Device bytes a retained attention mirror may hold: the same three-quarters safety margin the
+   * capacity gate applies, less what the model and its projection plans already reserved.
+   */
+  private static long attentionBudgetBytes(
+      AcceleratorEligibility.DeviceCapabilities device, long reservedBytes) {
+    long safeCapacity = device.globalMemoryBytes() - device.globalMemoryBytes() / 4L;
+    return Math.max(1L, safeCapacity - reservedBytes);
   }
 
   private static long size(Path model) {

@@ -20,7 +20,8 @@ public record TornadoBackendOptions(
     boolean accelerateDecode,
     boolean eagerReadiness,
     boolean requireAccelerator,
-    int executionBatchSize) {
+    int executionBatchSize,
+    boolean accelerateAttention) {
 
   public TornadoBackendOptions {
     if (executionBatchSize < 4) {
@@ -28,8 +29,30 @@ public record TornadoBackendOptions(
     }
   }
 
-  /** Selects qualified hardware automatically and falls back to the Java Vector API. */
+  /** Projection-only controls, for callers written before attention could be accelerated. */
+  public TornadoBackendOptions(
+      boolean accelerateDecode,
+      boolean eagerReadiness,
+      boolean requireAccelerator,
+      int executionBatchSize) {
+    this(accelerateDecode, eagerReadiness, requireAccelerator, executionBatchSize, false);
+  }
+
+  /**
+   * Selects qualified hardware automatically and falls back to the Java Vector API.
+   *
+   * <p>Attention stays off by default. Its device-resident KV mirror changes what the accelerator
+   * holds for the life of a sequence and how forked branches behave on the device, and neither has
+   * been through a real-hardware gate yet; the projection scope has. Opting in is explicit until
+   * that changes.
+   */
   public static TornadoBackendOptions defaults() {
-    return new TornadoBackendOptions(true, true, false, 32);
+    return new TornadoBackendOptions(true, true, false, 32, false);
+  }
+
+  /** Adds device attention to these controls. */
+  public TornadoBackendOptions withAcceleratedAttention() {
+    return new TornadoBackendOptions(
+        accelerateDecode, eagerReadiness, requireAccelerator, executionBatchSize, true);
   }
 }

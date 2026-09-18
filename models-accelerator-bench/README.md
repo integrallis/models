@@ -50,6 +50,20 @@ tornado -cp "$classpath" \
   32 3072 1024 5 20
 ```
 
+The attention decode gate drives the productised `TornadoCausalAttentionKernel` with its real
+TornadoVM plans, checks it against the production Java attention path, and reports per-step latency
+at several context lengths:
+
+```shell
+tornado -cp "$classpath" \
+  com.integrallis.models.accelerator.TornadoAttentionDecodeExperiment
+```
+
+It fails loudly if nothing reached the device, printing the refusal that closed the gate. Passing it
+qualifies the kernel and the mirror, not the runtime: a full-model decode gate is the separate step
+that decides whether the path ships, because the standing negative result for device attention here
+(A16, 2026-08-29) was an isolated win that lost in the model.
+
 The grouped-projection correctness gate executes both dispatches on the selected device:
 
 ```shell
