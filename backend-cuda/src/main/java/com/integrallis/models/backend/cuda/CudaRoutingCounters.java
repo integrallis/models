@@ -58,6 +58,9 @@ public final class CudaRoutingCounters {
   private final AtomicLong weightUploads = new AtomicLong();
   private final AtomicLong weightUploadBytes = new AtomicLong();
   private final AtomicLong decodeSteps = new AtomicLong();
+  private final AtomicLong decodeProjections = new AtomicLong();
+  private final AtomicLong deviceBytesInUse = new AtomicLong();
+  private final AtomicLong peakDeviceBytes = new AtomicLong();
 
   /** Records one operation that executed on the device. */
   public void accelerated(GgufTensorType type, CudaStage stage, int operations) {
@@ -105,9 +108,34 @@ public final class CudaRoutingCounters {
     weightUploadBytes.addAndGet(bytes);
   }
 
-  /** Records one completed decode step, so per-token averages are derivable. */
+  /**
+   * Marks one generated token, so per-token averages are derivable.
+   *
+   * <p>Called by the measurement harness, never by the kernel. The kernel is handed one projection
+   * at a time and cannot tell which projections belong to the same generated token; if it marked
+   * steps itself, {@link #launchesPerDecodeStep()} would report launches per <em>projection</em>,
+   * which is 1 by construction for every model. That would look like a measurement of the term the
+   * pre-registration says decides G4 while being a restatement of the dispatch loop. Per-projection
+   * dispatch is counted by {@link #decodeProjection()} instead.
+   */
   public void decodeStep() {
     decodeSteps.incrementAndGet();
+  }
+
+  /** Records one single-token projection dispatched to the device. */
+  public void decodeProjection() {
+    decodeProjections.incrementAndGet();
+  }
+
+  /** Records {@code bytes} of device memory allocated by this kernel. */
+  public void deviceAllocated(long bytes) {
+    long inUse = deviceBytesInUse.addAndGet(bytes);
+    peakDeviceBytes.accumulateAndGet(inUse, Math::max);
+  }
+
+  /** Records {@code bytes} of device memory released by this kernel. */
+  public void deviceFreed(long bytes) {
+    deviceBytesInUse.addAndGet(-bytes);
   }
 
   /** Accelerated operation counts keyed {@code FORMAT/STAGE}. */
@@ -169,9 +197,40 @@ public final class CudaRoutingCounters {
     return weightUploadBytes.get();
   }
 
-  /** Completed decode steps. */
+  /** Generated tokens marked by the measurement harness. */
   public long decodeSteps() {
     return decodeSteps.get();
+  }
+
+  /** Single-token projections dispatched to the device. */
+  public long decodeProjections() {
+    return decodeProjections.get();
+  }
+
+  /**
+   * Whether any caller marked a token boundary.
+   *
+   * <p>False means the per-step terms below are unmeasured, not zero. A report must say which.
+   */
+  public boolean decodeStepsMarked() {
+    return decodeSteps.get() > 0;
+  }
+
+  /** Device memory this kernel currently holds. */
+  public long deviceBytesInUse() {
+    return deviceBytesInUse.get();
+  }
+
+  /**
+   * High-water mark of device memory held by this kernel.
+   *
+   * <p>Kernel-owned allocations only: weights, the staging scratch, and the per-call attention
+   * buffers. The CUDA context, the loaded module and the driver's own reservations are not
+   * included, so this is a lower bound on the process's device footprint rather than a reading of
+   * it.
+   */
+  public long peakDeviceBytes() {
+    return peakDeviceBytes.get();
   }
 
   /**
