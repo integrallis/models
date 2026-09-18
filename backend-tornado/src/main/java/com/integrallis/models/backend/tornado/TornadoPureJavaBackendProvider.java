@@ -48,7 +48,10 @@ public final class TornadoPureJavaBackendProvider implements PureJavaBackendProv
     }
     TornadoBackendOptions options = TornadoBackendOptions.defaults();
     AcceleratorEligibility.Decision decision =
-        AcceleratorEligibility.select(devices, modelBytes, options.accelerateDecode());
+        AcceleratorEligibility.select(
+            devices,
+            DeviceMemoryRequest.ofModelFile(
+                modelLabel(model), modelBytes, options.accelerateDecode()));
     if (!decision.eligible()) {
       return Optional.empty();
     }
@@ -60,5 +63,10 @@ public final class TornadoPureJavaBackendProvider implements PureJavaBackendProv
             options.executionBatchSize());
     TornadoBackendRuntime runtime = TornadoBackend.open(model, backendConfiguration, required);
     return Optional.of(runtime.detachBackend());
+  }
+
+  private static String modelLabel(Path model) {
+    Path fileName = model.getFileName();
+    return fileName == null ? model.toString() : fileName.toString();
   }
 }

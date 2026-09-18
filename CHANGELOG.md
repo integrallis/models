@@ -4,6 +4,9 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Changed
+- Accelerator capacity gate: `AcceleratorEligibility.select` now takes a `DeviceMemoryRequest` and adds up weights under the plan shape the kernel actually builds (`PlanShapeStrategy`), per-plan device scratch, and any device-resident KV cache, reporting the result as an itemised `DeviceBudget` with an eager-readiness estimate from the measured 16.5 plans/s A40-4Q rate. It also refuses a tensor at or above the 2 GiB TornadoVM `ByteArray` limit, refuses a plan set whose readiness would exceed 120 s, and refuses a file-size-only budget above 8 GiB of weights instead of gating on a number that omits KV, plan scratch and tensor size. Ineligibility messages now name what was needed, what was available, and which unimplemented plan shape would have fit. The budget for the qualified Qwen3 0.6B Q4_0 profiles is unchanged at 1,074.2 MiB. A 27B-class Q4_K_M model does not fit any device under the shipped plan shape; the arithmetic is in `benchmark-results/2026-09-18-gpu-large-model/LARGE-MODEL-MEMORY.md`.
+
 ## [0.3.42] - 2026-09-17
 
 ### Added

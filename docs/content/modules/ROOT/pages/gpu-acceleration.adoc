@@ -20,6 +20,22 @@ Attention and unsupported tensors continue on the Vector API. AMD, Intel, and
 Metal devices remain CPU fallback paths until each vendor path passes a real
 hardware parity and performance gate.
 
+== Large Models Are Refused, Not Guessed At
+
+The capacity gate adds up what a model would place on the device: weights under
+the plan shape the kernel builds, per-plan scratch, and any device-resident KV
+cache. It refuses a model when a term it needs is unknown rather than assuming
+it is zero, so a model above 8 GiB of weights is not admitted on a file-size-only
+budget. It also refuses a tensor at or above the 2 GiB TornadoVM `ByteArray`
+limit, and a plan set whose eager readiness would exceed 120 seconds.
+
+A 27B-class Q4_K_M model does not run on this path today. It holds no Q4_0
+tensors, and the retained plan cache keeps one host and one device copy of every
+weight per batch shape, so the shipped plan shape asks for roughly twice the
+model on both sides. Ineligibility messages name what was needed, what was
+available, and which plan shape would have fit, so a refusal is actionable
+rather than a bare fallback.
+
 == Add The Optional Backend
 
 [source,kotlin,subs="attributes+"]
