@@ -85,19 +85,21 @@ public final class TornadoBackend {
             model,
             backendConfiguration,
             options,
-            "model has no eligible Q4_0 projections",
+            "model has no eligible Q4_0 or K-quant projections",
             decision.requiredBytes());
       }
       String device = decision.device().name();
       LOGGER.log(
           System.Logger.Level.INFO,
-          "Models accelerator selected {0}; readiness={1} ms plans={2}",
+          "Models accelerator selected {0}; readiness={1} ms plans={2} routed={3}",
           device,
           readiness.toMillis(),
-          kernel.projectionPlanCount());
+          kernel.projectionPlanCount(),
+          kernel.routedProjectionsByFormat());
       return new TornadoBackendRuntime(
           backend,
-          new TornadoBackendStatus(true, device, "eligible", decision.requiredBytes(), readiness));
+          new TornadoBackendStatus(true, device, "eligible", decision.requiredBytes(), readiness),
+          kernel);
     } catch (LinkageError | RuntimeException failure) {
       if (backend != null) {
         try {

@@ -16,16 +16,24 @@
 package com.integrallis.models.backend.tornado;
 
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import java.util.Map;
 import java.util.Objects;
 
 /** Owns the automatically selected accelerated or Vector API backend. */
 public final class TornadoBackendRuntime implements AutoCloseable {
   private PureJavaBackend backend;
   private final TornadoBackendStatus status;
+  private final TornadoGgufBatchedMatrixKernel kernel;
 
   TornadoBackendRuntime(PureJavaBackend backend, TornadoBackendStatus status) {
+    this(backend, status, null);
+  }
+
+  TornadoBackendRuntime(
+      PureJavaBackend backend, TornadoBackendStatus status, TornadoGgufBatchedMatrixKernel kernel) {
     this.backend = Objects.requireNonNull(backend, "backend");
     this.status = Objects.requireNonNull(status, "status");
+    this.kernel = kernel;
   }
 
   /** Returns the loaded backend used by the ordinary Models generation pipeline. */
@@ -45,6 +53,22 @@ public final class TornadoBackendRuntime implements AutoCloseable {
   /** Returns the device-selection, fallback, and readiness outcome. */
   public TornadoBackendStatus status() {
     return status;
+  }
+
+  /**
+   * Returns the projections routed to the device so far, keyed by GGUF weight format.
+   *
+   * <p>Empty when the load fell back to the Vector API. A grouped dispatch counts once per matrix,
+   * so a mixed-format model's counts show whether each of its formats reached the device rather
+   * than only the majority one.
+   */
+  public Map<String, Long> routedProjectionsByFormat() {
+    return kernel == null ? Map.of() : kernel.routedProjectionsByFormat();
+  }
+
+  /** Number of distinct compiled device execution plans, or zero when not accelerated. */
+  public int projectionPlanCount() {
+    return kernel == null ? 0 : kernel.projectionPlanCount();
   }
 
   @Override

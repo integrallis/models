@@ -91,6 +91,10 @@ public final class InferenceBenchmarkCli {
       RaggedPrefillProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "accelerator-profile".equals(args[0])) {
+      AcceleratorProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "compare".equals(args[0])) {
       BenchmarkComparisonCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;

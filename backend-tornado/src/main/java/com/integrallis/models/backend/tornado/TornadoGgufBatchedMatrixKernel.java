@@ -19,8 +19,12 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import uk.ac.manchester.tornado.api.TaskGraph;
@@ -28,18 +32,38 @@ import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
 import uk.ac.manchester.tornado.api.types.arrays.ByteArray;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
+import uk.ac.manchester.tornado.api.types.arrays.IntArray;
 
-/** Q4_0 prefill and optional decode projections backed by Java-authored TornadoVM kernels. */
+/**
+ * Q4_0 and K-quant prefill and optional decode projections backed by Java-authored TornadoVM
+ * kernels.
+ *
+ * <p>Two activation families are served. Q4_0 weights consume the Q8_0 activations prepared by
+ * {@link Q4ProjectionKernel}; Q4_K and Q6_K weights consume the Q8_K activations prepared by {@link
+ * KQuantProjectionKernel}. A grouped dispatch shares one activation preparation, so the two
+ * families are never mixed inside one dual or triple projection even though a Q4_K_M model contains
+ * both.
+ */
 public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   private static final int MINIMUM_BATCH = 4;
   private static final int DEFAULT_EXECUTION_BATCH_SIZE = 32;
   private static final long MINIMUM_MATRIX_VALUES = 1_048_576L;
+
+  /**
+   * Largest weight tensor a single execution plan can hold on the device.
+   *
+   * <p>TornadoVM's {@code ByteArray} is indexed with an {@code int} and carries a small header, so
+   * a mapped tensor at or above two gibibytes cannot be addressed at all. Rejecting it here keeps
+   * the projection on the Vector API rather than failing the load.
+   */
+  private static final long MAX_DEVICE_TENSOR_BYTES = Integer.MAX_VALUE - 1024L;
+
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
           PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY,
           "true",
           PureJavaPlanConfiguration.MIXED_K_PROJECTIONS_PROPERTY,
-          "false",
+          "true",
           PureJavaPlanConfiguration.STAGED_QUANTIZED_FFN_PROPERTY,
           "false",
           PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
@@ -48,6 +72,8 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
   private final Map<ProjectionKey, ProjectionPlan> plans = new LinkedHashMap<>();
   private final Map<DualProjectionKey, DualProjectionPlan> dualPlans = new LinkedHashMap<>();
   private final Map<TripleProjectionKey, TripleProjectionPlan> triplePlans = new LinkedHashMap<>();
+  private final Map<KQuantProjectionKey, KQuantProjectionPlan> kQuantPlans = new LinkedHashMap<>();
+  private final Map<GgufTensorType, Long> routedProjections = new EnumMap<>(GgufTensorType.class);
   private final int executionBatchSize;
   private final boolean accelerateDecode;
   private int planSequence;
@@ -97,7 +123,9 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
 
   @Override
   public boolean supports(GgufTensorType type) {
-    return type == GgufTensorType.Q4_0;
+    return type == GgufTensorType.Q4_0
+        || type == GgufTensorType.Q4_K
+        || type == GgufTensorType.Q6_K;
   }
 
   @Override
@@ -107,12 +135,17 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
         && batchSize <= executionBatchSize
         && rows > 0
         && cols > 0
+        && cols % type.blockSize() == 0
+        && deviceAddressable(type, rows, cols)
         && (long) rows * cols >= MINIMUM_MATRIX_VALUES;
   }
 
   @Override
   public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
-    return supports(firstType) && supports(secondType);
+    if (firstType == GgufTensorType.Q4_0) {
+      return secondType == GgufTensorType.Q4_0;
+    }
+    return firstType == GgufTensorType.Q4_K && secondType == GgufTensorType.Q4_K;
   }
 
   @Override
@@ -124,6 +157,9 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       int batchSize,
       int cols) {
     return supportsDual(firstType, secondType)
+        && cols % firstType.blockSize() == 0
+        && deviceAddressable(firstType, firstRows, cols)
+        && deviceAddressable(secondType, secondRows, cols)
         && eligibleCombined(batchSize, cols, firstRows, secondRows);
   }
 
@@ -148,37 +184,54 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     validateProjectionStorage(firstOutput, firstWeights, input, batchSize, firstRows, cols);
     validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
     int planBatchSize = executionBatchSizeFor(batchSize);
-    DualProjectionKey key =
-        new DualProjectionKey(
-            firstWeights.address(),
-            firstWeights.byteSize(),
-            firstRows,
-            secondWeights.address(),
-            secondWeights.byteSize(),
-            secondRows,
-            planBatchSize,
-            cols);
     long started = System.nanoTime();
-    DualProjectionPlan plan =
-        dualPlans.computeIfAbsent(
-            key,
-            ignored ->
-                new DualProjectionPlan(
-                    nextPlanName(),
-                    firstWeights,
-                    firstRows,
-                    secondWeights,
-                    secondRows,
-                    planBatchSize,
-                    cols));
-    plan.execute(input, firstOutput, secondOutput, batchSize);
-    recordCall(started);
+    if (isKQuant(firstType)) {
+      kQuantPlan(
+              new MemorySegment[] {firstWeights, secondWeights},
+              new GgufTensorType[] {firstType, secondType},
+              new int[] {firstRows, secondRows},
+              planBatchSize,
+              cols)
+          .execute(input, new float[][] {firstOutput, secondOutput}, batchSize);
+    } else {
+      DualProjectionKey key =
+          new DualProjectionKey(
+              firstWeights.address(),
+              firstWeights.byteSize(),
+              firstRows,
+              secondWeights.address(),
+              secondWeights.byteSize(),
+              secondRows,
+              planBatchSize,
+              cols);
+      DualProjectionPlan plan =
+          dualPlans.computeIfAbsent(
+              key,
+              ignored ->
+                  new DualProjectionPlan(
+                      nextPlanName(),
+                      firstWeights,
+                      firstRows,
+                      secondWeights,
+                      secondRows,
+                      planBatchSize,
+                      cols));
+      plan.execute(input, firstOutput, secondOutput, batchSize);
+    }
+    recordCall(started, firstType, secondType);
   }
 
   @Override
   public boolean supportsTriple(
       GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
-    return supports(firstType) && supports(secondType) && supports(thirdType);
+    if (firstType == GgufTensorType.Q4_0) {
+      return secondType == GgufTensorType.Q4_0 && thirdType == GgufTensorType.Q4_0;
+    }
+    if (firstType != GgufTensorType.Q4_K || secondType != GgufTensorType.Q4_K) {
+      return false;
+    }
+    // Q4_K_M promotes the value projection to Q6_K while query and key stay Q4_K.
+    return thirdType == GgufTensorType.Q4_K || thirdType == GgufTensorType.Q6_K;
   }
 
   @Override
@@ -192,6 +245,11 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       int batchSize,
       int cols) {
     return supportsTriple(firstType, secondType, thirdType)
+        && cols % firstType.blockSize() == 0
+        && cols % thirdType.blockSize() == 0
+        && deviceAddressable(firstType, firstRows, cols)
+        && deviceAddressable(secondType, secondRows, cols)
+        && deviceAddressable(thirdType, thirdRows, cols)
         && eligibleCombined(batchSize, cols, firstRows, secondRows, thirdRows);
   }
 
@@ -222,36 +280,46 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     validateProjectionStorage(secondOutput, secondWeights, input, batchSize, secondRows, cols);
     validateProjectionStorage(thirdOutput, thirdWeights, input, batchSize, thirdRows, cols);
     int planBatchSize = executionBatchSizeFor(batchSize);
-    TripleProjectionKey key =
-        new TripleProjectionKey(
-            firstWeights.address(),
-            firstWeights.byteSize(),
-            firstRows,
-            secondWeights.address(),
-            secondWeights.byteSize(),
-            secondRows,
-            thirdWeights.address(),
-            thirdWeights.byteSize(),
-            thirdRows,
-            planBatchSize,
-            cols);
     long started = System.nanoTime();
-    TripleProjectionPlan plan =
-        triplePlans.computeIfAbsent(
-            key,
-            ignored ->
-                new TripleProjectionPlan(
-                    nextPlanName(),
-                    firstWeights,
-                    firstRows,
-                    secondWeights,
-                    secondRows,
-                    thirdWeights,
-                    thirdRows,
-                    planBatchSize,
-                    cols));
-    plan.execute(input, firstOutput, secondOutput, thirdOutput, batchSize);
-    recordCall(started);
+    if (isKQuant(firstType)) {
+      kQuantPlan(
+              new MemorySegment[] {firstWeights, secondWeights, thirdWeights},
+              new GgufTensorType[] {firstType, secondType, thirdType},
+              new int[] {firstRows, secondRows, thirdRows},
+              planBatchSize,
+              cols)
+          .execute(input, new float[][] {firstOutput, secondOutput, thirdOutput}, batchSize);
+    } else {
+      TripleProjectionKey key =
+          new TripleProjectionKey(
+              firstWeights.address(),
+              firstWeights.byteSize(),
+              firstRows,
+              secondWeights.address(),
+              secondWeights.byteSize(),
+              secondRows,
+              thirdWeights.address(),
+              thirdWeights.byteSize(),
+              thirdRows,
+              planBatchSize,
+              cols);
+      TripleProjectionPlan plan =
+          triplePlans.computeIfAbsent(
+              key,
+              ignored ->
+                  new TripleProjectionPlan(
+                      nextPlanName(),
+                      firstWeights,
+                      firstRows,
+                      secondWeights,
+                      secondRows,
+                      thirdWeights,
+                      thirdRows,
+                      planBatchSize,
+                      cols));
+      plan.execute(input, firstOutput, secondOutput, thirdOutput, batchSize);
+    }
+    recordCall(started, firstType, secondType, thirdType);
   }
 
   @Override
@@ -269,19 +337,44 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     }
     validateProjectionStorage(output, weights, input, batchSize, rows, cols);
     int planBatchSize = executionBatchSizeFor(batchSize);
-    ProjectionKey key =
-        new ProjectionKey(weights.address(), weights.byteSize(), planBatchSize, rows, cols);
     long started = System.nanoTime();
-    ProjectionPlan plan =
-        plans.computeIfAbsent(
-            key, ignored -> new ProjectionPlan(nextPlanName(), weights, planBatchSize, rows, cols));
-    plan.execute(input, output, batchSize);
-    recordCall(started);
+    if (isKQuant(type)) {
+      kQuantPlan(
+              new MemorySegment[] {weights},
+              new GgufTensorType[] {type},
+              new int[] {rows},
+              planBatchSize,
+              cols)
+          .execute(input, new float[][] {output}, batchSize);
+    } else {
+      ProjectionKey key =
+          new ProjectionKey(weights.address(), weights.byteSize(), planBatchSize, rows, cols);
+      ProjectionPlan plan =
+          plans.computeIfAbsent(
+              key,
+              ignored -> new ProjectionPlan(nextPlanName(), weights, planBatchSize, rows, cols));
+      plan.execute(input, output, batchSize);
+    }
+    recordCall(started, type);
   }
 
   /** Number of distinct tensor/shape execution plans compiled or awaiting first compilation. */
   public synchronized int projectionPlanCount() {
-    return plans.size() + dualPlans.size() + triplePlans.size();
+    return plans.size() + dualPlans.size() + triplePlans.size() + kQuantPlans.size();
+  }
+
+  /**
+   * Number of model projections routed through this provider, by GGUF weight format.
+   *
+   * <p>A grouped dispatch counts once per matrix, so a Q4_K/Q4_K/Q6_K attention group adds two to
+   * {@code Q4_K} and one to {@code Q6_K}. Formats absent from the map were never accelerated, which
+   * is how a run shows that a mixed-format model actually took the device path for each of its
+   * formats rather than silently falling back for one of them.
+   */
+  public synchronized Map<String, Long> routedProjectionsByFormat() {
+    Map<String, Long> byFormat = new LinkedHashMap<>();
+    routedProjections.forEach((type, count) -> byFormat.put(type.name(), count));
+    return Collections.unmodifiableMap(byFormat);
   }
 
   /** Number of model projection calls routed through this provider. */
@@ -333,9 +426,21 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
         }
       }
     }
+    for (KQuantProjectionPlan plan : kQuantPlans.values()) {
+      try {
+        plan.close();
+      } catch (RuntimeException exception) {
+        if (failure == null) {
+          failure = exception;
+        } else {
+          failure.addSuppressed(exception);
+        }
+      }
+    }
     plans.clear();
     dualPlans.clear();
     triplePlans.clear();
+    kQuantPlans.clear();
     closed = true;
     if (failure != null) {
       throw failure;
@@ -382,9 +487,49 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
     return "q4-model-" + planSequence++;
   }
 
-  private void recordCall(long started) {
+  private void recordCall(long started, GgufTensorType... types) {
     totalNanos += System.nanoTime() - started;
     calls++;
+    for (GgufTensorType type : types) {
+      routedProjections.merge(type, 1L, Long::sum);
+    }
+  }
+
+  private static boolean isKQuant(GgufTensorType type) {
+    return type == GgufTensorType.Q4_K || type == GgufTensorType.Q6_K;
+  }
+
+  private static boolean deviceAddressable(GgufTensorType type, int rows, int cols) {
+    if (rows <= 0 || cols <= 0 || cols % type.blockSize() != 0) {
+      return false;
+    }
+    return (long) rows * (cols / type.blockSize()) * type.typeSize() <= MAX_DEVICE_TENSOR_BYTES;
+  }
+
+  private KQuantProjectionPlan kQuantPlan(
+      MemorySegment[] weights, GgufTensorType[] types, int[] rows, int planBatchSize, int cols) {
+    List<Long> addresses = new ArrayList<>(weights.length);
+    List<Long> byteSizes = new ArrayList<>(weights.length);
+    List<Integer> rowCounts = new ArrayList<>(rows.length);
+    for (MemorySegment weight : weights) {
+      addresses.add(weight.address());
+      byteSizes.add(weight.byteSize());
+    }
+    for (int rowCount : rows) {
+      rowCounts.add(rowCount);
+    }
+    KQuantProjectionKey key =
+        new KQuantProjectionKey(
+            List.copyOf(addresses),
+            List.copyOf(byteSizes),
+            List.copyOf(rowCounts),
+            List.of(types),
+            planBatchSize,
+            cols);
+    return kQuantPlans.computeIfAbsent(
+        key,
+        ignored ->
+            new KQuantProjectionPlan(nextPlanName(), weights, types, rows, planBatchSize, cols));
   }
 
   private record ProjectionKey(long address, long weightBytes, int batchSize, int rows, int cols) {}
@@ -694,6 +839,208 @@ public final class TornadoGgufBatchedMatrixKernel implements GgufBatchedMatrixKe
       copyOutput(firstDeviceOutput, firstOutput, actualBatchSize, firstRows);
       copyOutput(secondDeviceOutput, secondOutput, actualBatchSize, secondRows);
       copyOutput(thirdDeviceOutput, thirdOutput, actualBatchSize, thirdRows);
+    }
+
+    @Override
+    public void close() {
+      closePlan(plan);
+    }
+  }
+
+  private record KQuantProjectionKey(
+      List<Long> addresses,
+      List<Long> byteSizes,
+      List<Integer> rows,
+      List<GgufTensorType> types,
+      int batchSize,
+      int cols) {}
+
+  /**
+   * One compiled K-quant dispatch: up to three weight tensors sharing a single Q8_K activation
+   * preparation.
+   *
+   * <p>The shape is fixed at construction so the task graph and its compiled code are reused across
+   * calls, exactly like the Q4_0 plans. Only shapes {@link #supportsDual} and {@link
+   * #supportsTriple} admit can reach here, so the task selection below is total.
+   */
+  private static final class KQuantProjectionPlan implements AutoCloseable {
+    private final int batchSize;
+    private final int cols;
+    private final int[] rows;
+    private final float[] paddedInput;
+    private final byte[] preparedActivations;
+    private final float[] preparedScales;
+    private final int[] preparedSums;
+    private final ByteArray deviceActivations;
+    private final FloatArray deviceScales;
+    private final IntArray deviceSums;
+    private final FloatArray[] deviceOutputs;
+    private final boolean stagesSums;
+    private final TornadoExecutionPlan plan;
+
+    private KQuantProjectionPlan(
+        String name,
+        MemorySegment[] weights,
+        GgufTensorType[] types,
+        int[] rows,
+        int batchSize,
+        int cols) {
+      this.batchSize = batchSize;
+      this.cols = cols;
+      this.rows = rows.clone();
+      int activationEntries = Math.multiplyExact(batchSize, cols);
+      this.paddedInput = new float[activationEntries];
+      this.preparedActivations = new byte[activationEntries];
+      this.preparedScales =
+          new float[activationEntries / KQuantProjectionKernel.SUPER_BLOCK_VALUES];
+      this.preparedSums = new int[activationEntries / KQuantProjectionKernel.SUM_BLOCK_VALUES];
+      this.deviceActivations = new ByteArray(activationEntries);
+      this.deviceScales = new FloatArray(preparedScales.length);
+      this.deviceSums = new IntArray(preparedSums.length);
+      ByteArray[] deviceWeights = new ByteArray[weights.length];
+      this.deviceOutputs = new FloatArray[weights.length];
+      for (int index = 0; index < weights.length; index++) {
+        deviceWeights[index] = ByteArray.fromSegment(weights[index]);
+        deviceOutputs[index] = new FloatArray(Math.multiplyExact(batchSize, rows[index]));
+        if (types[index] == GgufTensorType.Q6_K) {
+          KQuantProjectionKernel.validateQ6K(
+              deviceWeights[index],
+              deviceActivations,
+              deviceScales,
+              deviceOutputs[index],
+              batchSize,
+              rows[index],
+              cols);
+        } else {
+          KQuantProjectionKernel.validateQ4K(
+              deviceWeights[index],
+              deviceActivations,
+              deviceScales,
+              deviceSums,
+              deviceOutputs[index],
+              batchSize,
+              rows[index],
+              cols);
+        }
+      }
+      // A Q6_K-only dispatch reads no Q8_K block sums, so the buffer must not be staged for a
+      // task that never takes it as a parameter.
+      boolean usesSums = false;
+      for (GgufTensorType type : types) {
+        usesSums |= type == GgufTensorType.Q4_K;
+      }
+      this.stagesSums = usesSums;
+      TaskGraph graph =
+          new TaskGraph(name)
+              .transferToDevice(DataTransferMode.FIRST_EXECUTION, (Object[]) deviceWeights);
+      graph =
+          usesSums
+              ? graph.transferToDevice(
+                  DataTransferMode.EVERY_EXECUTION, deviceActivations, deviceScales, deviceSums)
+              : graph.transferToDevice(
+                  DataTransferMode.EVERY_EXECUTION, deviceActivations, deviceScales);
+      this.plan =
+          new TornadoExecutionPlan(
+              addTask(graph, deviceWeights, types, rows)
+                  .transferToHost(DataTransferMode.EVERY_EXECUTION, (Object[]) deviceOutputs)
+                  .snapshot());
+    }
+
+    private TaskGraph addTask(
+        TaskGraph graph, ByteArray[] deviceWeights, GgufTensorType[] types, int[] rows) {
+      if (deviceWeights.length == 1) {
+        if (types[0] == GgufTensorType.Q6_K) {
+          return graph.task(
+              "multiply-q6k",
+              KQuantProjectionKernel::multiplyQ6K,
+              deviceWeights[0],
+              deviceActivations,
+              deviceScales,
+              deviceOutputs[0],
+              batchSize,
+              rows[0],
+              cols);
+        }
+        return graph.task(
+            "multiply-q4k",
+            KQuantProjectionKernel::multiplyQ4K,
+            deviceWeights[0],
+            deviceActivations,
+            deviceScales,
+            deviceSums,
+            deviceOutputs[0],
+            batchSize,
+            rows[0],
+            cols);
+      }
+      if (deviceWeights.length == 2) {
+        return graph.task(
+            "multiply-q4k-dual",
+            KQuantProjectionKernel::multiplyQ4KDual,
+            deviceWeights[0],
+            rows[0],
+            deviceWeights[1],
+            rows[1],
+            deviceActivations,
+            deviceScales,
+            deviceSums,
+            deviceOutputs[0],
+            deviceOutputs[1],
+            batchSize,
+            cols);
+      }
+      if (types[2] == GgufTensorType.Q6_K) {
+        return graph.task(
+            "multiply-q4k-q4k-q6k",
+            KQuantProjectionKernel::multiplyMixedTriple,
+            deviceWeights[0],
+            rows[0],
+            deviceWeights[1],
+            rows[1],
+            deviceWeights[2],
+            rows[2],
+            deviceActivations,
+            deviceScales,
+            deviceSums,
+            deviceOutputs[0],
+            deviceOutputs[1],
+            deviceOutputs[2],
+            batchSize,
+            cols);
+      }
+      return graph.task(
+          "multiply-q4k-triple",
+          KQuantProjectionKernel::multiplyQ4KTriple,
+          deviceWeights[0],
+          rows[0],
+          deviceWeights[1],
+          rows[1],
+          deviceWeights[2],
+          rows[2],
+          deviceActivations,
+          deviceScales,
+          deviceSums,
+          deviceOutputs[0],
+          deviceOutputs[1],
+          deviceOutputs[2],
+          batchSize,
+          cols);
+    }
+
+    private void execute(float[] input, float[][] outputs, int actualBatchSize) {
+      float[] executionInput =
+          prepareExecutionInput(input, paddedInput, actualBatchSize, batchSize, cols);
+      KQuantProjectionKernel.quantize(
+          executionInput, preparedActivations, preparedScales, preparedSums, batchSize, cols);
+      deviceActivations.getSegment().copyFrom(MemorySegment.ofArray(preparedActivations));
+      deviceScales.getSegment().copyFrom(MemorySegment.ofArray(preparedScales));
+      if (stagesSums) {
+        deviceSums.getSegment().copyFrom(MemorySegment.ofArray(preparedSums));
+      }
+      plan.execute();
+      for (int index = 0; index < outputs.length; index++) {
+        copyOutput(deviceOutputs[index], outputs[index], actualBatchSize, rows[index]);
+      }
     }
 
     @Override
