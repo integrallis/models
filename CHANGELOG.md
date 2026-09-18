@@ -4,6 +4,15 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+- `backend-tornado` K-quant projection kernels: Java TornadoVM kernels for GGUF Q4_K and Q6_K by Q8_K, alongside the existing Q4_0 by Q8_0 kernels. This is what a `Q4_K_M` catalog model is made of, so the accelerator previously admitted none of its projections. Admitted grouped shapes are `Q4_K/Q4_K`, `Q4_K/Q4_K/Q4_K` and `Q4_K/Q4_K/Q6_K` — the last being the query/key/value group `Q4_K_M` presents, since llama.cpp promotes the value projection to Q6_K. Q4_0 (Q8_0 activations) and the K-quants (Q8_K activations) are never combined in one grouped dispatch, and K-quant projections additionally require a column count that is a multiple of 256. Q5_K, Q2_K, Q3_K and every unquantized format still fall back to the Vector API per projection.
+- `TornadoBackendRuntime.routedProjectionsByFormat()` and `projectionPlanCount()`: how many projections actually reached the device, per GGUF weight format, counted once per matrix in a grouped dispatch. A mixed-format model can otherwise look accelerated while one of its formats silently falls back.
+- `models-bench accelerator-profile --model <model.gguf>`: runs prefill and greedy decode on the Tornado backend and writes device, fallback reason, eager-readiness time, prefill/decode tokens per second and the per-format routing counts as JSON. `--require true` makes an unavailable accelerator a hard failure instead of a silent Vector API fallback.
+- Numeric contract for the K-quant kernels, asserted off-device against the production vectors-core CPU kernels: bit-for-bit equality on super-blocks whose scales are powers of two and whose reductions stay exactly representable, and agreement to within two float roundings per super-block otherwise (the CPU kernels fuse the per-super-block scale application with `Math.fma`; the device kernels use a plain multiply and add). Worst measured differences on pseudo-random super-blocks, 2026-09-18, Apple M-series, 256-bit species: Q4_K 7.6e-6 / 6.1e-5 / 1.2e-4 and Q6_K 0.0 / 9.2e-5 / 1.8e-4 at 256 / 1024 / 4096 columns, against reference magnitudes of 3.3e2 / 5.3e2 / 1.4e3. Device-side parity is a hardware gate and has not been run.
+
+### Fixed
+- `backend-tornado` no longer admits a weight tensor too large for TornadoVM's 32-bit array index (about 2 GiB on the device). Such a projection now stays on the Vector API instead of reaching `ByteArray.fromSegment` with an unrepresentable size.
+
 ## [0.3.42] - 2026-09-17
 
 ### Added

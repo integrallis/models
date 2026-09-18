@@ -1,6 +1,6 @@
 = Java GPU Acceleration
 
-`backend-tornado` optionally executes Models-owned Java Q4_0 projection kernels
+`backend-tornado` optionally executes Models-owned Java projection kernels
 on a qualified NVIDIA GPU. The model parser, tokenizer, transformer graph,
 attention, KV cache, sampling, and generation loop remain inside Models. There
 is no external inference server and no Rust or handwritten CUDA kernel in this
@@ -10,15 +10,49 @@ path.
 
 The production selector currently admits:
 
-* GGUF Q4_0 projection work;
+* GGUF Q4_0, Q4_K, and Q6_K projection work;
 * NVIDIA devices exposed by TornadoVM's PTX backend;
 * a device with enough memory for retained prefill and decode plans plus the
-  required safety margin; and
+  required safety margin;
+* a single weight tensor small enough to address with a 32-bit index
+  (under 2 GiB on the device); and
 * fixed 32-token prefill plans and separate single-token decode plans.
 
 Attention and unsupported tensors continue on the Vector API. AMD, Intel, and
 Metal devices remain CPU fallback paths until each vendor path passes a real
 hardware parity and performance gate.
+
+=== Weight Formats And Activation Families
+
+Q4_0 weights are multiplied by Q8_0 activations; Q4_K and Q6_K weights are
+multiplied by Q8_K activations. A grouped dispatch shares one prepared
+activation across two or three weight tensors, so the two families are never
+combined inside one group even though a `Q4_K_M` model contains both. The
+admitted grouped shapes are `Q4_0/Q4_0`, `Q4_0/Q4_0/Q4_0`, `Q4_K/Q4_K`,
+`Q4_K/Q4_K/Q4_K`, and `Q4_K/Q4_K/Q6_K` — the last being the query, key, and
+value group a `Q4_K_M` model presents, since llama.cpp promotes the value
+projection to Q6_K. Any other combination falls back to the Vector API
+per projection, and Q5_K, Q2_K, Q3_K, Q8_0, F32, and BF16 tensors are never
+routed to the device.
+
+K-quant tensors additionally require a column count that is a whole multiple of
+256, the K-quant super-block size. Q4_0's 32-value blocks are not sufficient.
+
+=== Numeric Parity With The CPU Kernels
+
+The K-quant kernels accumulate every per-super-block quantized dot product and
+minimum correction in `int`, so those reductions are exact and independent of
+how work is scheduled. Only the per-super-block scale application is floating
+point, and it runs in ascending super-block order in the same two-step form the
+vectors-core CPU kernels use. The CPU kernels fuse those steps with
+`Math.fma` and the device kernels use a plain multiply and add, so the
+guaranteed contract is agreement to within two float roundings per super-block.
+Off-device parity tests assert both halves of this: bit-for-bit equality on
+super-blocks whose scales are powers of two, and the rounding budget on
+pseudo-random super-blocks.
+
+Device-side parity — that TornadoVM's PTX backend lowers these kernels to the
+same arithmetic — is a hardware gate, not a unit test.
 
 == Add The Optional Backend
 
@@ -82,10 +116,49 @@ plan, so Models constructs and compiles the fixed shapes before accepting a
 visible request. `TornadoBackendStatus` reports that cost and the selected
 device.
 
+A mixed-format model can look accelerated while one of its formats silently
+falls back, so `TornadoBackendRuntime` also reports how many projections reached
+the device per GGUF weight format. A grouped dispatch counts once per matrix.
+
+[source,java]
+----
+try (var runtime = TornadoBackend.open(modelPath, backendConfiguration, options)) {
+    // Run a prefill first; counts are empty until projections are dispatched.
+    System.out.println(runtime.routedProjectionsByFormat()); // {Q4_K=1344, Q6_K=64}
+    System.out.println(runtime.projectionPlanCount());
+}
+----
+
+== Accelerator Profile Gate
+
+`models-bench` runs prefill and decode for a GGUF file on the Tornado backend and
+writes the device, readiness cost, throughput, and per-format routing counts as
+JSON:
+
+[source,shell]
+----
+./gradlew :models-bench:installDist
+
+lib=models-bench/build/install/models-bench/lib
+classpath=$(printf '%s:' "$lib"/*.jar)
+
+tornado -cp "$classpath" \
+  --params="accelerator-profile --model /path/to/model-Q4_K_M.gguf \
+            --tokens 64 --batch 32 --require true \
+            --output build/reports/inference/accelerator-profile.json" \
+  com.integrallis.models.bench.InferenceBenchmarkCli
+----
+
+`--require true` makes an unavailable or ineligible accelerator a hard failure
+rather than a silent Vector API fallback. Without a qualified device the command
+still runs and the report records `accelerated=false` with the reason.
+
 == Measured Gates
 
 The release candidate preserved the exact greedy CPU token sequence on both
-qualified profiles using Qwen3 0.6B Q4_0:
+qualified profiles using Qwen3 0.6B Q4_0. These are Q4_0 numbers; the K-quant
+kernels have not yet been measured on hardware, and no throughput claim is made
+for them here.
 
 [cols="1,1,1,1",options="header"]
 |===

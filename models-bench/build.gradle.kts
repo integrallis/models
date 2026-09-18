@@ -63,6 +63,11 @@ dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
     implementation(project(":models-router"))
+    // The accelerator profile gate drives the Tornado backend directly. backend-tornado keeps
+    // tornado-api off its public API, so nothing here needs it at compile time; the TornadoVM
+    // launcher supplies the device runtime on a GPU host. Without one, TornadoBackend.open catches
+    // the LinkageError and reports a Vector API fallback, which is what the report should say.
+    implementation(project(":backend-tornado"))
     if (nativeBenchmarkRuntime && !aggregateNativeRelease) {
         // The platform artifact contains only the compiled library and metadata. The Java FFM
         // bridge lives in backend-native's ordinary JAR and must be present as well.
