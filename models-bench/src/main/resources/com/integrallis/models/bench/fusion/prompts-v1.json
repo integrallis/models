@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "logit-fusion-prompts-v1",
+  "provenance": "Output-format instructions follow the Qwen3 model card's recommended benchmark prompts [read]; fixed before any run and identical for every arm within a mode.",
+  "system": null,
+  "gsm8k": {
+    "user": "{question}\nPlease reason step by step, and put your final answer within \\boxed{}."
+  },
+  "math500": {
+    "user": "{question}\nPlease reason step by step, and put your final answer within \\boxed{}."
+  },
+  "arc": {
+    "user": "{question}\n\n{choices}\n\nPlease show your choice in the answer field with only the choice letter, e.g., \"answer\": \"C\".",
+    "choice": "{label}. {text}"
+  },
+  "arcLoglik": {
+    "user": "{question}\n\n{choices}\n\nAnswer with only the label of the correct choice.",
+    "choice": "{label}. {text}",
+    "assistantPrefix": "Answer:",
+    "continuation": " {label}"
+  },
+  "generic": {
+    "number": "{question}\nPlease reason step by step, and put your final answer within \\boxed{}.",
+    "math": "{question}\nPlease reason step by step, and put your final answer within \\boxed{}.",
+    "letter": "{question}\n\n{choices}\n\nPlease show your choice in the answer field with only the choice letter, e.g., \"answer\": \"C\"."
+  }
+}
