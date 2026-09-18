@@ -35,6 +35,7 @@ import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.safetensors.SyntheticSafetensorsBuilder;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
+import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel.AttentionScope;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -47,7 +48,9 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
@@ -876,6 +879,128 @@ class LlamaForwardPassTest {
       assertThat(invocations).hasValue(LAYERS);
       accelerated.reset();
       assertThat(resets).hasValue(1);
+    }
+
+    @Test
+    void injectedAttentionKernelRunsDecodeStepsAndKeepsThemTokenIdentical() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+      PureJavaExecutionPlan plan = executionPlan(config, weights, tokens.length, false);
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan);
+      float[] expected = baseline.prefill(tokens, 0).clone();
+      int firstToken = argmax(expected);
+      float[] expectedFirst = baseline.forward(firstToken, tokens.length).clone();
+      int secondToken = argmax(expectedFirst);
+      float[] expectedSecond = baseline.forward(secondToken, tokens.length + 1).clone();
+
+      MirroringAttentionKernel kernel = new MirroringAttentionKernel(config);
+      LlamaForwardPass accelerated =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan,
+              GgufBatchedMatrixKernel.none(),
+              kernel);
+
+      assertThat(accelerated.prefill(tokens, 0)).containsExactly(expected);
+      assertThat(accelerated.forward(firstToken, tokens.length)).containsExactly(expectedFirst);
+      assertThat(accelerated.forward(secondToken, tokens.length + 1))
+          .containsExactly(expectedSecond);
+
+      // Every layer of the prefill chunk and of both decode steps went through the kernel, and
+      // because the prefill ran there too its own rows left nothing to backfill.
+      assertThat(kernel.prefillChunks).isEqualTo(LAYERS);
+      assertThat(kernel.decodeSteps).isEqualTo(2 * LAYERS);
+      assertThat(kernel.mirroredPositions).isZero();
+      assertThat(kernel.scopes).isNotEmpty();
+      assertThat(kernel.scopes.stream().map(AttentionScope::sequenceId).distinct())
+          .as("one sequence, so one identity")
+          .hasSize(1);
+      assertThat(kernel.scopes)
+          .allMatch(scope -> scope.attentionScale() == config.attentionScale());
+    }
+
+    @Test
+    void decodeOnlyAttentionKernelBackfillsThePrefillHistoryAndStaysTokenIdentical() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens = {5, 7, 11, 13, 17, 19, 23, 29};
+      PureJavaExecutionPlan plan = executionPlan(config, weights, tokens.length, false);
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan);
+      float[] expected = baseline.prefill(tokens, 0).clone();
+      int firstToken = argmax(expected);
+      float[] expectedFirst = baseline.forward(firstToken, tokens.length).clone();
+
+      MirroringAttentionKernel kernel = new MirroringAttentionKernel(config, true);
+      LlamaForwardPass accelerated =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              plan,
+              GgufBatchedMatrixKernel.none(),
+              kernel);
+
+      assertThat(accelerated.prefill(tokens, 0)).containsExactly(expected);
+      assertThat(accelerated.forward(firstToken, tokens.length)).containsExactly(expectedFirst);
+
+      // The prefill stayed on the Java path, so the first decode step of every layer had to be
+      // handed the whole cached window before it could attend — the case a device-resident mirror
+      // meets on any model whose prefill shape it does not accept.
+      assertThat(kernel.prefillChunks).isZero();
+      assertThat(kernel.decodeSteps).isEqualTo(LAYERS);
+      assertThat(kernel.mirroredPositions).isEqualTo((long) tokens.length * LAYERS);
+    }
+
+    @Test
+    void injectedAttentionKernelSeesADistinctSequenceIdentityPerForkedBranch() {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      MirroringAttentionKernel kernel = new MirroringAttentionKernel(config);
+      LlamaForwardPass pass =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(
+                  config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+              executionPlan(config, weights, 8, false),
+              GgufBatchedMatrixKernel.none(),
+              kernel);
+      LlamaForwardPass.Session source = pass.openSession();
+      pass.prefill(source, new int[] {5, 7, 11, 13}, 0);
+      LlamaForwardPass.SessionPrefix prefix = pass.freezePrefix(source);
+      LlamaForwardPass.Session first = prefix.fork();
+      LlamaForwardPass.Session second = prefix.fork();
+
+      pass.forward(first, 17, 4);
+      pass.forward(second, 19, 4);
+
+      // Physical prefix sharing on the host is untouched; what the kernel must not do is treat two
+      // branches of it as one continuing sequence.
+      assertThat(pass.sharesPrefixStorage(first, second)).isTrue();
+      assertThat(kernel.scopes.stream().map(AttentionScope::sequenceId).distinct().count())
+          .as("each branch must arrive as its own sequence, never as a continuation of the other")
+          .isEqualTo(2);
+      assertThat(kernel.scopes).allMatch(scope -> scope.sharedPrefixLength() == 4);
     }
 
     @Test
@@ -2531,6 +2656,156 @@ class LlamaForwardPassTest {
       logits = forwardPass.forward(tokens[position], position);
     }
     return logits;
+  }
+
+  /**
+   * An attention kernel that behaves the way a device-resident one has to: it keeps its own mirror
+   * of each layer's KV window, is told which sequence it belongs to, and is handed the rows it has
+   * not yet seen straight out of the cache.
+   *
+   * <p>Its arithmetic is the production Java path's own primitives in the production order, so a
+   * forward pass routed through it must stay token-identical. That is the point: it separates "does
+   * the routing work" from "does a different summation order move a logit", and only the first is
+   * being asserted here.
+   */
+  private static final class MirroringAttentionKernel implements BatchedCausalAttentionKernel {
+    private final LlamaConfig config;
+    private final boolean decodeOnly;
+    private final float[][] keyMirrors;
+    private final float[][] valueMirrors;
+    private final int[] mirrored;
+    private final List<AttentionScope> scopes = new ArrayList<>();
+    private AttentionScope scope;
+    private long sequenceId;
+    private int decodeSteps;
+    private int prefillChunks;
+    private long mirroredPositions;
+
+    MirroringAttentionKernel(LlamaConfig config) {
+      this(config, false);
+    }
+
+    MirroringAttentionKernel(LlamaConfig config, boolean decodeOnly) {
+      this.config = config;
+      this.decodeOnly = decodeOnly;
+      this.keyMirrors = new float[config.numLayers()][];
+      this.valueMirrors = new float[config.numLayers()][];
+      this.mirrored = new int[config.numLayers()];
+      for (int layer = 0; layer < config.numLayers(); layer++) {
+        keyMirrors[layer] = new float[config.contextLength() * config.keyDim()];
+        valueMirrors[layer] = new float[config.contextLength() * config.valueDim()];
+      }
+    }
+
+    @Override
+    public void selectScope(AttentionScope newScope) {
+      scopes.add(newScope);
+      scope = newScope;
+      if (sequenceId != newScope.sequenceId()) {
+        sequenceId = newScope.sequenceId();
+        java.util.Arrays.fill(mirrored, 0);
+      }
+    }
+
+    @Override
+    public int mirroredPosition(int layer) {
+      return mirrored[layer];
+    }
+
+    @Override
+    public void mirrorSpan(
+        int layer,
+        int firstPosition,
+        int positionCount,
+        float[] keys,
+        int keyOffset,
+        int keyRowStride,
+        float[] values,
+        int valueOffset,
+        int valueRowStride) {
+      int keyDim = config.keyDim();
+      int valueDim = config.valueDim();
+      for (int row = 0; row < positionCount; row++) {
+        System.arraycopy(
+            keys,
+            keyOffset + row * keyRowStride,
+            keyMirrors[layer],
+            (firstPosition + row) * keyDim,
+            keyDim);
+        System.arraycopy(
+            values,
+            valueOffset + row * valueRowStride,
+            valueMirrors[layer],
+            (firstPosition + row) * valueDim,
+            valueDim);
+      }
+      mirrored[layer] = firstPosition + positionCount;
+      mirroredPositions += positionCount;
+    }
+
+    @Override
+    public boolean isEligible(
+        int layer,
+        int startPosition,
+        int batchSize,
+        int numHeads,
+        int numKvHeads,
+        int keyLength,
+        int valueLength,
+        int maxSequenceLength,
+        int slidingWindow) {
+      return scope != null
+          && slidingWindow == 0
+          && mirrored[layer] <= startPosition
+          // A prefill chunk can be partitioned down to a single row, which is indistinguishable
+          // from a decode step by shape alone; requiring a nonzero start keeps this fixture's
+          // counts unambiguous about which path each call came from.
+          && (!decodeOnly || (batchSize == 1 && startPosition > 0));
+    }
+
+    @Override
+    public void attend(
+        float[] output,
+        float[] query,
+        float[] key,
+        float[] value,
+        int layer,
+        int startPosition,
+        int batchSize,
+        int numHeads,
+        int numKvHeads,
+        int keyLength,
+        int valueLength,
+        int maxSequenceLength,
+        int slidingWindow) {
+      referenceBatchedAttention(
+          output,
+          query,
+          key,
+          value,
+          keyMirrors[layer],
+          valueMirrors[layer],
+          startPosition,
+          batchSize,
+          numHeads,
+          numKvHeads,
+          keyLength,
+          valueLength,
+          slidingWindow);
+      mirrored[layer] = startPosition + batchSize;
+      if (batchSize == 1) {
+        decodeSteps++;
+      } else {
+        prefillChunks++;
+      }
+    }
+
+    @Override
+    public void reset() {
+      java.util.Arrays.fill(mirrored, 0);
+      sequenceId = 0L;
+      scope = null;
+    }
   }
 
   private static void referenceBatchedAttention(

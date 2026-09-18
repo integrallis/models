@@ -24,7 +24,18 @@ public record TornadoBackendStatus(
     String device,
     String reason,
     long requiredDeviceBytes,
-    Duration readinessTime) {
+    Duration readinessTime,
+    boolean attentionAccelerated) {
+
+  /** Projection-only status, for callers written before attention could be accelerated. */
+  public TornadoBackendStatus(
+      boolean accelerated,
+      String device,
+      String reason,
+      long requiredDeviceBytes,
+      Duration readinessTime) {
+    this(accelerated, device, reason, requiredDeviceBytes, readinessTime, false);
+  }
 
   public TornadoBackendStatus {
     device = requireText(device, "device");

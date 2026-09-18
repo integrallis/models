@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.tornado;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -74,5 +75,35 @@ class AcceleratorEligibilityTest {
   private static AcceleratorEligibility.DeviceCapabilities device(
       String name, String backend, String type, long memory, long allocation) {
     return new AcceleratorEligibility.DeviceCapabilities(name, backend, type, memory, allocation);
+  }
+
+  @Test
+  void aRetainedSequenceReservationRaisesTheRequiredBytesAndCanCloseTheGate() {
+    List<AcceleratorEligibility.DeviceCapabilities> devices =
+        List.of(
+            new AcceleratorEligibility.DeviceCapabilities(
+                "NVIDIA A40", "PTX", "GPU", 8L << 30, 4L << 30));
+    long modelBytes = 2L << 30;
+
+    AcceleratorEligibility.Decision withoutAttention =
+        AcceleratorEligibility.select(devices, modelBytes, false);
+    AcceleratorEligibility.Decision withSmallMirror =
+        AcceleratorEligibility.select(devices, modelBytes, false, 256L << 20);
+    AcceleratorEligibility.Decision withHugeMirror =
+        AcceleratorEligibility.select(devices, modelBytes, false, 16L << 30);
+
+    assertThat(withoutAttention.eligible()).isTrue();
+    assertThat(withSmallMirror.eligible()).isTrue();
+    assertThat(withSmallMirror.requiredBytes())
+        .isEqualTo(withoutAttention.requiredBytes() + (256L << 20));
+    assertThat(withHugeMirror.eligible()).isFalse();
+    assertThat(withHugeMirror.reason()).contains("insufficient device memory");
+  }
+
+  @Test
+  void aNegativeRetainedSequenceReservationIsRejected() {
+    assertThatThrownBy(() -> AcceleratorEligibility.select(List.of(), 1L, false, -1L))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("retainedSequenceBytes");
   }
 }
