@@ -70,3 +70,37 @@ hybrid path must refuse the accelerator rather than silently lose sharing. Teste
 - **Re-release rule:** when a gate passes, the docs' "Qualified Scope" section and the catalog's
   backend flags are updated in the same release that ships the capability. The published guide must
   never claim more than the gates measured, and must not under-claim what they did.
+
+## Amendment 1 (2026-09-18, before any kernel runs on a device): our own Rust GPU kernels
+
+**Decision.** The GPU compute path is our own minimal Rust kernels compiled to PTX (NVIDIA's CUDA
+Rust, released 2026-09-08: `cuda-oxide` compiles ordinary Rust to PTX; `cutile-rs` is the tile-level
+track on stable Rust). TornadoVM is demoted from destination to comparison arm.
+
+**Why, stated plainly:**
+- The TornadoVM jar is not self-contained: applications must install a TornadoVM distribution and
+  launch through it, so "add a dependency and get acceleration" is false today. A Rust shim ships
+  the way `backend-native` already does, as hash-verified platform binaries inside a jar.
+- We control the kernels the formats actually need (fused K-quant dequantise-and-multiply, grouped
+  attention) instead of trusting an external compiler with them.
+- The published decode figures (1.21x-1.32x) are weak enough that the compiler is not visibly
+  earning its dependency.
+
+**Policy boundary, fixed here.**
+- **Minimal and format-driven.** Only the kernels our hot paths need: K-quant projections and
+  decode attention. No general engine, no vendor math library, no third-party inference runtime.
+- **Java owns everything else.** Model parsing, tokenizer, graph, KV cache ownership, sampling and
+  the generation loop stay in Java, exactly as `backend-native` states for the CPU shim.
+- **Sunset condition, named rather than implied.** This shim is retired when OpenJDK's own
+  accelerator work (Project Babylon / HAT) can compile our Java kernels to the same devices at
+  parity. Until then it does not fade, and we say so instead of pretending otherwise.
+- **No Vulkan, no CUDA C++.** Cross-vendor support, if ever, is a separate decision with its own
+  pre-registration.
+
+**Gates are unchanged.** G1 parity, G2 routing observability, G3 no-regression, G4 decode >= 3.0x
+for a 27B-class Q4_K_M model, G5 startup honesty, G6 KV sharing. The Rust arm and the TornadoVM arm
+are measured on the same host, same prompts, same CPU control, and the winner is chosen on G4. If
+neither clears it, we ship neither and report that.
+
+**Comparison arms:** (a) CPU Vector API control; (b) TornadoVM Java kernels; (c) our Rust PTX
+kernels. Same GGUF, same seeds, same prompt set.
