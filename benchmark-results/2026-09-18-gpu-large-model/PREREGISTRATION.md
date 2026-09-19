@@ -104,3 +104,43 @@ neither clears it, we ship neither and report that.
 
 **Comparison arms:** (a) CPU Vector API control; (b) TornadoVM Java kernels; (c) our Rust PTX
 kernels. Same GGUF, same seeds, same prompt set.
+
+## G1 result, 2026-09-18T00:26Z: FAIL (measured on device)
+
+Host: RunPod pod `e35e369wco2coq`, NVIDIA L40S 46 GB, compute capability 8.9, driver 595.91.07,
+CUDA 13.2, 128 vCPU, US-TX-4. Model: Gemma 4 26B-A4B IT Q4_K_M, 16,796,015,136 bytes, sha256
+88f4a13b… verified on the host. Kernels built `-C target-cpu=sm_80` from the pinned nightly.
+
+**Passed before G1, and standing:**
+- `ptxas -arch=sm_80 -O3` assembles the emitted module. No CI check covered this.
+- Capability gate: module loads, all three kernels resolve, kernel id 8f6fcdb39837, **readiness 525 ms**
+  against the G5 ceiling of 120 s. For contrast, the TornadoVM arm's plan compilation was estimated
+  at ~948 s for this model class.
+- `:backend-cuda:check` green on the host as well as on macOS.
+
+**G1 FAILED.** Greedy decode diverges from the Vector API control at **prompt 0, token 0**:
+accelerated token id 236743, control 108.
+
+| evidence | value |
+|---|---|
+| attention routed | false |
+| projections routed | true |
+| Q4_K decode projections | 10,956 |
+| Q6_K decode projections | 446 |
+| refusals | 0 |
+| kernel launches | 11,402 |
+| host transfers | 21,154 |
+
+The accelerator was not inert, and attention did not run, so the pre-registered `expf` tolerance
+explanation does not apply. The K-quant path is bit-exact by construction and is verified so by 21
+off-device tests, therefore a device-side difference is a **kernel defect**. Under G1 no tolerance
+is admissible and the gate is not relaxed.
+
+**G4 is not run.** A decode speed number from a kernel that computes the wrong answer would be
+meaningless; the gate order exists to prevent exactly that. G4, G3 and the CPU control wait on a
+fix that passes G1 on this device.
+
+**Prime suspect**, recorded before diagnosis so it cannot be retrofitted: `UPSTREAM.md` CU-003 —
+`link_section = ".shared"` silently emits into the global address space, which compiles, runs, and
+races across blocks with no warning. That is the shape of a defect that passes sequential
+off-device tests and fails under real parallelism. To be confirmed or eliminated with evidence.
