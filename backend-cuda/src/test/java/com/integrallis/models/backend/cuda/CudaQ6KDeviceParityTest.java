@@ -26,39 +26,51 @@ import java.lang.foreign.ValueLayout;
 import java.util.Random;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * G1 root cause: the Q6_K projection kernel is not bit-exact against the CPU control, even with no
- * attention and no MoE routing anywhere in the picture.
+ * G1 parity: a Q6_K projection must be bit-exact against the CPU control on a real device, at
+ * every row width, with no attention and no MoE routing anywhere in the picture.
  *
- * <p>Found chasing down the G1 parity failure on Gemma 4 26B-A4B IT Q4_K_M (an MoE model): the
- * leading hypothesis was a missing per-expert weight offset. It is falsified by two independent
- * pieces of device evidence, both gathered on an NVIDIA A40 (compute capability 8.6):
+ * <p>Written to reproduce the G1 parity failure on Gemma 4 26B-A4B IT Q4_K_M (an MoE model), where
+ * the leading hypothesis was a missing per-expert weight offset. That was falsified by two
+ * independent pieces of device evidence, both gathered on an NVIDIA A40 (compute capability 8.6):
  *
  * <ul>
- *   <li>A bisection over Q4_K row widths from 1 to 48 super-blocks — spanning the 32-lane warp
- *       boundary where a lane starts owning more than one super-block — is bit-exact at every
+ *   <li>A bisection over Q4_K row widths from 1 to 48 super-blocks &mdash; spanning the 32-lane warp
+ *       boundary where a lane starts owning more than one super-block &mdash; is bit-exact at every
  *       width. There is no multi-block-per-lane defect in Q4_K.
- *   <li>The G1 parity gate was re-run against a fully <b>dense</b> Q4_K_M model (Granite 4.1 3B,
- *       no MoE code touched at all) and it <b>also</b> fails, at prompt 0 token 0, with the same
- *       "both attention and projections routed" signature as the original Gemma 4 report.
+ *   <li>The G1 parity gate was re-run against a fully <b>dense</b> Q4_K_M model (Granite 4.1 3B, no
+ *       MoE code touched at all) and it <b>also</b> failed, at prompt 0 token 0, with the same "both
+ *       attention and projections routed" signature as the original Gemma 4 report.
  * </ul>
  *
- * <p>Bisecting Q6_K the same way isolates it further: a single super-block is exact, but as soon as
- * a second super-block joins the row — the point where the fused kernel's one-lane, ascending-order
- * float fold actually has more than one term to fold — the result stops matching the CPU control
- * bit-for-bit. This is reproduced here with two real Q6_K super-blocks lifted verbatim from
- * Granite's {@code token_embd.weight} (any two real super-blocks would do; the fault is in the
- * fold, not the data) and a fixed-seed activation, with no model, no forward pass, no attention, and
- * no MoE routing anywhere in the call path.
+ * <p><b>The root cause.</b> {@code models} carries two Q6_K row reductions on the CPU and they are
+ * not bit-identical to each other. {@code PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot} reduces
+ * each super-block to one exact {@code int} and folds it with one {@code fma} into one {@code float}
+ * accumulator. {@code VectorUtilSupport.ggufQ6_KQ8_KScalarRowDot} &mdash; the {@code VECTOR_BITSIZE
+ * < 256} fallback, mirrored by {@code dot_q6_k_q8_k_row_scalar} in {@code backend-native} &mdash;
+ * keeps eight {@code float} lane accumulators instead. The device kernel was transcribed from the
+ * scalar one; the CPU control it is measured against is the Panama one, because {@code
+ * TensorOps.ggufMatmul} takes that path on any host with 256-bit vectors, which is every host that
+ * can also run CUDA. The two folds coincide for a row of one super-block and differ by one ULP from
+ * two super-blocks on.
  *
- * <p><b>This is a device-only defect.</b> The 21 Rust host tests in {@code models-cuda-kernels}
- * (bit-exact against a scalar oracle, run on every host with {@code cargo test --release}) cover
- * {@code kquant.rs}'s shared arithmetic compiled for the <em>host</em> target. They cannot see this:
- * the divergence is between what that arithmetic produces when it is compiled for {@code
- * nvptx64-nvidia-cuda} and executed on a real device, and what the same row projection produces on
- * the CPU control path. Nothing off-device can catch that class of bug; only a test that actually
- * launches the kernel, like this one, can.
+ * <p>That is why a one-super-block test passed for weeks while the gate failed: <b>one super-block
+ * proves almost nothing about a fold</b>. Hence the bisection below, at 1, 2, 3, 32, 33 and 48
+ * super-blocks &mdash; both sides of the 32-lane warp boundary, and the first widths at which a
+ * lane owns more than one super-block.
+ *
+ * <p>The fixture is two real, consecutive Q6_K super-blocks lifted verbatim from Granite's {@code
+ * token_embd.weight}; wider rows tile them with a deterministic per-block rotation of the 192
+ * quantised-value bytes, so every row is built from genuine trained scale and {@code d} fields
+ * rather than hand-rolled ones, and no two super-blocks in a row are identical.
+ *
+ * <p><b>This is a device-only defect.</b> The Rust host tests in {@code models-cuda-kernels} now
+ * cover it too (they were comparing against the wrong CPU reduction, which is exactly why they
+ * passed), but only a test that actually launches the kernel can prove what the arithmetic does
+ * when compiled for {@code nvptx64-nvidia-cuda} and executed on real hardware. That is this test.
  */
 class CudaQ6KDeviceParityTest {
 
@@ -69,6 +81,9 @@ class CudaQ6KDeviceParityTest {
   // Q6_K super-block stands on its own, and the defect reproduces with any two real super-blocks.
   private static final int BLOCK_BYTES = 210;
   private static final int QK_K = 256;
+
+  /** Bytes of a Q6_K super-block holding quantised values; the 16 scales and {@code d} follow. */
+  private static final int QUANT_BYTES = 192;
 
   private static final byte[] TWO_REAL_Q6K_BLOCKS = {
     (byte) 0x7b, (byte) 0x0f, (byte) 0xf2, (byte) 0x3d, (byte) 0xad, (byte) 0x34, (byte) 0x9c,
@@ -145,39 +160,67 @@ class CudaQ6KDeviceParityTest {
     }
   }
 
-  @Test
-  @DisplayName("a single Q6_K super-block matches the CPU control bit-for-bit (baseline)")
-  void oneSuperBlockIsExact() {
+  /**
+   * The bisection. One super-block is the width at which the two CPU folds happen to agree, so it
+   * is the baseline rather than the evidence; 2 and 3 are the first widths that separate them; 32,
+   * 33 and 48 straddle the warp boundary, where a lane starts owning more than one super-block.
+   */
+  @ParameterizedTest(name = "{0} super-block(s)")
+  @ValueSource(ints = {1, 2, 3, 32, 33, 48})
+  @DisplayName("a Q6_K row projection is bit-exact against the CPU control at every width")
+  void q6kRowProjectionIsBitExactAtEveryWidth(int superBlocks) {
     CudaGgufBatchedMatrixKernel.Status status = CudaGgufBatchedMatrixKernel.open();
     assumeTrue(
-        status.accelerated(), "requires a CUDA device; not evidence of anything off-device: " + status.reason());
+        status.accelerated(),
+        "requires a CUDA device; not evidence of anything off-device: " + status.reason());
     CudaGgufBatchedMatrixKernel kernel = status.kernel().orElseThrow();
     try (Arena arena = Arena.ofShared()) {
-      MemorySegment weights = arena.allocate(BLOCK_BYTES);
-      MemorySegment.copy(TWO_REAL_Q6K_BLOCKS, 0, weights, ValueLayout.JAVA_BYTE, 0, BLOCK_BYTES);
-      float[] input = activations(42, QK_K);
+      int cols = superBlocks * QK_K;
+      MemorySegment weights = weightsFor(arena, superBlocks);
+      float[] input = activations(42, cols);
 
       float[] cpu = new float[1];
-      TensorOps.ggufMatmul(cpu, input, weights, GgufTensorType.Q6_K, 1, QK_K);
+      TensorOps.ggufMatmul(cpu, input, weights, GgufTensorType.Q6_K, 1, cols);
       float[] gpu = new float[1];
-      kernel.multiply(gpu, input, weights, GgufTensorType.Q6_K, 1, 1, QK_K);
+      kernel.multiply(gpu, input, weights, GgufTensorType.Q6_K, 1, 1, cols);
 
       assertEquals(
           Float.floatToRawIntBits(cpu[0]),
           Float.floatToRawIntBits(gpu[0]),
-          () -> "one super-block should be exact by construction: cpu=" + cpu[0] + " gpu=" + gpu[0]);
+          () ->
+              "Q6_K row projection is not bit-exact at "
+                  + superBlocks
+                  + " super-block(s): cpu="
+                  + cpu[0]
+                  + " (bits "
+                  + Float.floatToRawIntBits(cpu[0])
+                  + ") gpu="
+                  + gpu[0]
+                  + " (bits "
+                  + Float.floatToRawIntBits(gpu[0])
+                  + ", relative delta "
+                  + Math.abs((cpu[0] - gpu[0]) / cpu[0])
+                  + "); G1 admits no token-level tolerance -- see class Javadoc");
     } finally {
       kernel.close();
     }
   }
 
+  /**
+   * The exact case that failed, pinned with the numbers it failed with.
+   *
+   * <p>Kept separate from the bisection so the regression is unmistakable in a failure report:
+   * measured on an NVIDIA A40 (cc 8.6) on 2026-09-19 as cpu bits {@code -1098673107} against gpu
+   * bits {@code -1098673106}, one ULP apart, which compounded over 30 transformer layers into a
+   * flipped argmax at prompt 0, token 0.
+   */
   @Test
-  @DisplayName(
-      "G1 root cause: a two-super-block Q6_K row does not match the CPU control on the device")
-  void twoSuperBlocksDivergeFromTheCpuControl() {
+  @DisplayName("the two-super-block row that failed G1 is bit-exact again")
+  void theTwoSuperBlockRowThatFailedG1IsBitExact() {
     CudaGgufBatchedMatrixKernel.Status status = CudaGgufBatchedMatrixKernel.open();
     assumeTrue(
-        status.accelerated(), "requires a CUDA device; not evidence of anything off-device: " + status.reason());
+        status.accelerated(),
+        "requires a CUDA device; not evidence of anything off-device: " + status.reason());
     CudaGgufBatchedMatrixKernel kernel = status.kernel().orElseThrow();
     try (Arena arena = Arena.ofShared()) {
       int cols = 2 * QK_K;
@@ -190,25 +233,52 @@ class CudaQ6KDeviceParityTest {
       float[] gpu = new float[1];
       kernel.multiply(gpu, input, weights, GgufTensorType.Q6_K, 1, 1, cols);
 
-      // This is the actual G1 defect: the moment the one-lane ascending-order float fold has to
-      // fold a second super-block's contribution, the device result stops being the CPU control's
-      // bit pattern. Measured (2026-09-19, NVIDIA A40, cc 8.6): cpu=-0.256989866, gpu=-0.256989896.
-      // That is what should be failing here until the kernel is fixed.
+      assertEquals(
+          -1098673107,
+          Float.floatToRawIntBits(cpu[0]),
+          () ->
+              "the CPU control moved: this test pins the exact G1 repro, so a changed control "
+                  + "means the fixture or the CPU path changed and the pinned gpu comparison below "
+                  + "no longer reproduces anything. cpu="
+                  + cpu[0]);
       assertEquals(
           Float.floatToRawIntBits(cpu[0]),
           Float.floatToRawIntBits(gpu[0]),
           () ->
-              "Q6_K row projection is not bit-exact past one super-block: cpu="
+              "the G1 root-cause row diverged again: cpu="
                   + cpu[0]
                   + " gpu="
                   + gpu[0]
-                  + " (relative delta "
-                  + Math.abs((cpu[0] - gpu[0]) / cpu[0])
-                  + "); this is a real kernel/CPU-reference disagreement, not test noise -- see "
-                  + "class Javadoc");
+                  + " (the original failure was gpu bits -1098673106)");
     } finally {
       kernel.close();
     }
+  }
+
+  /**
+   * A row of {@code superBlocks} Q6_K super-blocks built from the two real ones.
+   *
+   * <p>Blocks 0 and 1 are the real bytes verbatim. Block {@code i >= 2} is real block {@code i % 2}
+   * with its 192 quantised-value bytes rotated by {@code i}, which keeps the genuine trained scales
+   * and {@code d} while making every super-block in the row distinct, so a fold that silently reused
+   * one block's partials could not pass.
+   */
+  private static MemorySegment weightsFor(Arena arena, int superBlocks) {
+    byte[] row = new byte[superBlocks * BLOCK_BYTES];
+    for (int block = 0; block < superBlocks; block++) {
+      int source = (block % 2) * BLOCK_BYTES;
+      int target = block * BLOCK_BYTES;
+      System.arraycopy(TWO_REAL_Q6K_BLOCKS, source, row, target, BLOCK_BYTES);
+      if (block < 2) {
+        continue;
+      }
+      for (int index = 0; index < QUANT_BYTES; index++) {
+        row[target + index] = TWO_REAL_Q6K_BLOCKS[source + (index + block) % QUANT_BYTES];
+      }
+    }
+    MemorySegment weights = arena.allocate(row.length);
+    MemorySegment.copy(row, 0, weights, ValueLayout.JAVA_BYTE, 0, row.length);
+    return weights;
   }
 
   private static float[] activations(long seed, int count) {

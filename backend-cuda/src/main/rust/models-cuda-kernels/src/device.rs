@@ -38,8 +38,8 @@
 
 use crate::attention::{self, AttentionShape};
 use crate::kquant::{
-    self, Q4_K_BLOCK_BYTES, Q4KRowAccumulator, Q6_K_BLOCK_BYTES, Q6_K_LANES, Q6KBlockLaneSums,
-    Q6KRowAccumulator, Q8_K_SUM_BLOCK, QK_K,
+    self, Q4_K_BLOCK_BYTES, Q4KRowAccumulator, Q6_K_BLOCK_BYTES, Q6KRowAccumulator, Q8_K_SUM_BLOCK,
+    QK_K,
 };
 use core::arch::nvptx::*;
 use core::arch::{asm, global_asm};
@@ -55,9 +55,9 @@ pub const MAX_BLOCKS_PER_ROW: usize = 128;
 pub const WARP_LANES: u32 = 32;
 
 // Shared scratch, sized for the larger of the two projection kernels:
-// Q6_K needs MAX_BLOCKS_PER_ROW * Q6_K_LANES i32 = 128 * 8 * 4 = 4096 bytes.
-// Q4_K needs MAX_BLOCKS_PER_ROW * 2 i32 = 1024 bytes and reuses the same array.
-global_asm!(".shared .align 4 .b8 models_cuda_scratch[4096];");
+// Q4_K needs MAX_BLOCKS_PER_ROW * 2 i32 = 128 * 2 * 4 = 1024 bytes (quantised and minimum sums).
+// Q6_K needs MAX_BLOCKS_PER_ROW * 1 i32 = 512 bytes and reuses the same array.
+global_asm!(".shared .align 4 .b8 models_cuda_scratch[1024];");
 
 /// Stores one `i32` into the shared scratch at `index`.
 ///
@@ -182,8 +182,9 @@ pub unsafe extern "ptx-kernel" fn models_q4k_decode_projection(
 ///
 /// Launch shape: `grid = (rows, batchSize, 1)`, `block = (32, 1, 1)`.
 ///
-/// Q6_K carries no `dmin` term, so it needs no activation sums; it does need the eight float
-/// lane accumulators described in [`crate::kquant`].
+/// Q6_K carries no `dmin` term, so it needs no activation sums, and its fold is a single
+/// accumulator with one `fma` per super-block — see [`crate::kquant`] for why that shape and
+/// not the eight-lane one.
 ///
 /// # Safety
 ///
@@ -215,11 +216,8 @@ pub unsafe extern "ptx-kernel" fn models_q6k_decode_projection(
     while block < blocks_per_row {
         let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
         let activation_offset = batch * cols + block * QK_K;
-        let lane_sums =
-            kquant::q6k_block_lane_sums(weights, weight_offset, quantized, activation_offset);
-        for slot in 0..Q6_K_LANES {
-            unsafe { scratch_store((block * Q6_K_LANES + slot) as u32, lane_sums[slot]) };
-        }
+        let block_sum = kquant::q6k_block_sum(weights, weight_offset, quantized, activation_offset);
+        unsafe { scratch_store(block as u32, block_sum) };
         block += WARP_LANES as usize;
     }
     unsafe { _syncthreads() };
@@ -232,11 +230,8 @@ pub unsafe extern "ptx-kernel" fn models_q6k_decode_projection(
         let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
         let activation_scale = unsafe { *activation_scales.add(batch * blocks_per_row + block) };
         let d = kquant::q6k_block_scale(weights, weight_offset, activation_scale);
-        let mut lane_sums: Q6KBlockLaneSums = [0; Q6_K_LANES];
-        for slot in 0..Q6_K_LANES {
-            lane_sums[slot] = unsafe { scratch_load((block * Q6_K_LANES + slot) as u32) };
-        }
-        accumulator.accumulate(d, lane_sums);
+        let block_sum = unsafe { scratch_load(block as u32) };
+        accumulator.accumulate(d, block_sum);
     }
     unsafe { *output.add(batch * rows as usize + row) = accumulator.finish() };
 }
