@@ -144,3 +144,44 @@ fix that passes G1 on this device.
 `link_section = ".shared"` silently emits into the global address space, which compiles, runs, and
 races across blocks with no warning. That is the shape of a defect that passes sequential
 off-device tests and fails under real parallelism. To be confirmed or eliminated with evidence.
+
+## G1 root cause, 2026-09-19T16:13Z: Q6_K fold is not bit-exact past one super-block
+
+Measured on NVIDIA A40 (46 GB, cc 8.6, driver 570.211.01, CUDA 12.8), after the L40S pod could not
+be restarted (its host had no free GPUs; stopping a pod does not reserve hardware — recorded as an
+operational lesson).
+
+**Hypotheses eliminated with evidence, in order:**
+
+| hypothesis | how it died |
+|---|---|
+| shared scratch emitted into global space (ledger CU-003) | the PTX declares `.shared` correctly |
+| missing `cvta.to.shared` | adding it caused `illegal memory access (700)`, proving `mov.u64` already yields a shared address; reverted |
+| batch index confused with batch count | host passes an index |
+| missing barrier | four `bar.sync` emitted |
+| transposed output index | `batch * rows + row` matches the host allocation |
+| kernel argument packing | Q4_K passes 8 args, Q6_K 7 (needs no sums); both match |
+| host/kernel constant drift | 256 / 16 / 32 / 128 agree on both sides |
+| MoE expert-stack offset | each `(layer, expert, tensor)` is its own zero-copy pre-offset slice uploaded to its own buffer; **and dense Granite 4.1 3B fails identically** (prompt 0 token 0, accelerated 83017 vs control 40665) |
+| Q4_K kernel | bisected 1→48 super-blocks on device, spanning the 32-lane warp boundary: bit-exact at every width |
+
+**Root cause.** The **Q6_K** projection fold is bit-exact for a single super-block and diverges as
+soon as a second joins the one-lane ascending-order float accumulation: cpu bits `-1098673107` vs
+gpu bits `-1098673106`, one ULP. Per operation that is negligible; compounded over 30 layers it
+flips an argmax, which is why G1 failed at the very first token.
+
+**Why nothing caught it.** The 21 Rust parity tests compile `kquant.rs` for the *host* target. They
+say nothing about what that same source does compiled for `nvptx64-nvidia-cuda` and executed on real
+hardware. Only a device-executing test can guard this class of defect, and one now exists
+(`CudaQ6KDeviceParityTest`, PR #198): two real Q6_K super-blocks from Granite's `token_embd.weight`
+and a fixed-seed activation, with no model, forward pass, attention or MoE involved. It fails today
+for the documented reason and skips cleanly off-device.
+
+**G4 remains unrun**, correctly: a decode speed number from a kernel that computes the wrong answer
+would be worse than no number.
+
+**Latent fragility recorded, not chased:** `resident()` keys its device-buffer cache on
+`MemorySegment.address()` with no length check. A synthetic sequence of many growing Q4_K calls
+before a Q6_K call on a shared scratch produced 10^5–10^7 magnitude corruption and occasional NaN.
+It did not reproduce under the fixed-size, one-call-per-tensor pattern of real use, so it is not
+G1's cause, but the missing length check is real.
