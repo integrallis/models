@@ -69,16 +69,19 @@ decoding a sequence. Both still exist and are still useful for what they do. Nei
 
 Runs, on any host with no GPU and no CUDA toolkit:
 
-- 21 Rust parity tests (`cargo test --release`) — Q4_K and Q6_K bit-exact against an oracle
-  transcribed from the shipped CPU kernel, the warp decomposition bit-exact for 1–64 lanes, the
-  Q6_K eight-lane determinism contract, `f16` over all 65,536 bit patterns, `expf` within 1e-6 of
-  the platform `expf`, attention within its stated 2.0e-5 L2 contract;
+- 23 Rust parity tests (`cargo test --release`) — Q4_K and Q6_K bit-exact against an oracle
+  transcribed from the CPU path the accelerator is gated against
+  (`PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot`), the warp decomposition bit-exact for 1–64
+  lanes, both formats bit-exact at 1/2/3/32/33/48 super-blocks, the measured disagreement between
+  the two CPU Q6_K reductions, `f16` over all 65,536 bit patterns, `expf` within 1e-6 of the
+  platform `expf`, attention within its stated 2.0e-5 L2 contract;
 - `cargo clippy -D warnings`;
 - the PTX compile, plus structural assertions on the emitted module (three entry points, `sm_80`,
   `fma.rn.f32` present, scratch in `.shared` and not global);
 - the backend-cuda Java tests — packaging and digest, absent-driver fallback, format and shape
   refusals, routing counters, the KV-sharing refusal, and Q8_K + block-order fold bit-identical to
-  `VectorUtil`;
+  `VectorUtil`. `CudaQ6KDeviceParityTest` is in this module too but launches kernels, so it skips
+  off-device and is only evidence when it runs on a GPU host — see step 2a;
 - the gate command's own tests: argument parsing, the greedy decode loop, the parity comparison and
   its divergence report, the G4 threshold arithmetic, and the off-device self-test semantics.
 
@@ -115,6 +118,22 @@ all three kernels resolve.
 Off-device this exits `0` and prints `SKIP ... accelerated=false`, which is the G3 fallback
 evidence. With `--require-device true` it exits `2` instead, which is what CI should use on a host
 that is supposed to have a GPU.
+
+## Step 2a. The Q6_K device regression test — run it before any model
+
+```bash
+./gradlew :backend-cuda:test --tests '*CudaQ6KDeviceParityTest'
+```
+
+`CudaQ6KDeviceParityTest` launches the Q6_K projection kernel against the CPU control for rows of
+1, 2, 3, 32, 33 and 48 super-blocks, on two real Q6_K super-blocks lifted from Granite's
+`token_embd.weight`, with no model, no forward pass, no attention and no MoE routing in the path.
+It asserts raw-bit equality; there is no tolerance, because G1 has none.
+
+It costs seconds and it localises everything the model-scale gates can only report as "prompt 0,
+token 0". Run it first. If it fails, nothing below is worth the GPU time.
+
+Off-device every arm skips with an explicit reason, which is not evidence of anything.
 
 ## Step 3. Parity — G1
 
