@@ -3,12 +3,38 @@
 
 //! Off-device parity for the K-quant projection arithmetic.
 //!
-//! The oracle in this file is transcribed **verbatim** from the shipped CPU kernel
-//! (`backend-native/src/main/rust/model-kernels/src/lib.rs`, `dot_q4_k_q8_k_row_scalar` and
-//! `dot_q6_k_q8_k_row_scalar`) rather than expressed in terms of the crate under test, so the
-//! comparison is not circular. Every assertion is bit-exact equality, not a tolerance: the
-//! decomposition in `crate::kquant` was designed to make that achievable, and a tolerance here
-//! would hide exactly the kind of reordering it exists to prevent.
+//! The oracles here are transcribed **verbatim** from the CPU path the accelerator is actually
+//! gated against, rather than expressed in terms of the crate under test, so the comparison is
+//! not circular. Every assertion is bit-exact equality, not a tolerance: the decomposition in
+//! `crate::kquant` was designed to make that achievable, and a tolerance here would hide
+//! exactly the kind of reordering it exists to prevent.
+//!
+//! # Which CPU path is the control
+//!
+//! This is the whole substance of the 2026-09-19 G1 defect, so it is spelled out. `models` has
+//! **two** Q6_K row reductions on the CPU and they are not bit-identical to each other:
+//!
+//! * the **Panama** reduction in `vectors-core`
+//!   (`PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot`, and `ggufQ6_KQ8_KVectorRowDot` /
+//!   `ggufQ6_KQ8_KBatchedRowDot` beside it) reduces each super-block to **one** exact `i32` and
+//!   folds it with **one** `fma` into **one** `f32` accumulator;
+//! * the **scalar** fallback (`VectorUtilSupport.ggufQ6_KQ8_KScalarRowDot`, mirrored by
+//!   `dot_q6_k_q8_k_row_scalar` in `backend-native`) keeps **eight** `f32` lane accumulators,
+//!   does eight `fma`s per super-block, and adds the lanes at the end.
+//!
+//! Those two disagree in the last bit as soon as a row has more than one super-block;
+//! `the_two_cpu_q6k_reductions_do_not_agree_bit_for_bit` measures that here rather than
+//! asserting it from the source.
+//!
+//! The kernel is gated against the **Panama** one, because that is the path
+//! `TensorOps.ggufMatmul` takes on any host that can run these kernels: `ggufQ6_KQ8_KMatVecDot`
+//! only falls back to the scalar reduction when `VECTOR_BITSIZE < 256`, and every CUDA bench
+//! host is x86-64 with at least AVX2. Gating against the scalar reduction instead is precisely
+//! the defect that made G1 fail: it was bit-exact for a one-super-block row by coincidence and
+//! one ULP wrong from two super-blocks on.
+//!
+//! Q4_K needs no such choice: its Panama and scalar reductions are the *same* two `fma`s per
+//! super-block into one accumulator, which is why Q4_K was bit-exact on the device all along.
 //!
 //! The device decomposition is exercised too — `q4k_row_dot_as_device` and
 //! `q6k_row_dot_as_device` compute the integer partials in a deliberately scrambled order, the
@@ -21,8 +47,8 @@
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
 use models_cuda_kernels::kquant::{
-    self, Q4_K_BLOCK_BYTES, Q4KRowAccumulator, Q6_K_BLOCK_BYTES, Q6_K_LANES, Q6KRowAccumulator,
-    Q8_K_SUM_BLOCK, QK_K,
+    self, Q4_K_BLOCK_BYTES, Q4KRowAccumulator, Q6_K_BLOCK_BYTES, Q6KRowAccumulator, Q8_K_SUM_BLOCK,
+    QK_K,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -115,7 +141,46 @@ fn dot_q4_k_q8_k_row_oracle(
     sum
 }
 
+/// The CPU control: `PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot` in `vectors-core`,
+/// transcribed unchanged.
+///
+/// One exact `i32` per super-block, one `fma` per super-block, one `f32` accumulator. This is
+/// what a Q6_K projection produces on every host that can also run the CUDA kernels, and
+/// therefore what the kernel has to reproduce bit for bit.
 fn dot_q6_k_q8_k_row_oracle(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK_K;
+    let mut sum = 0_f32;
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
+        let activation_offset = batch * cols + block * QK_K;
+        let d = f16_to_f32_oracle(u16::from_le_bytes([
+            weights[weight_offset + 208],
+            weights[weight_offset + 209],
+        ])) * activation_scales[batch * blocks_per_row + block];
+        sum = d.mul_add(
+            q6k_block_integer_sum_oracle(weights, weight_offset, quantized, activation_offset)
+                as f32,
+            sum,
+        );
+    }
+    sum
+}
+
+/// The *other* CPU reduction: `VectorUtilSupport.ggufQ6_KQ8_KScalarRowDot`, mirrored by
+/// `dot_q6_k_q8_k_row_scalar` in `backend-native`. Eight `f32` lane accumulators.
+///
+/// Kept only so that
+/// [`the_two_cpu_q6k_reductions_do_not_agree_bit_for_bit`] can measure the disagreement between
+/// the two CPU paths instead of asserting it from reading the source. The kernel is **not**
+/// gated against this one; see the module documentation.
+fn dot_q6_k_q8_k_row_eight_lane_oracle(
     weights: &[u8],
     quantized: &[i8],
     activation_scales: &[f32],
@@ -132,35 +197,8 @@ fn dot_q6_k_q8_k_row_oracle(
             weights[weight_offset + 208],
             weights[weight_offset + 209],
         ])) * activation_scales[batch * blocks_per_row + block];
-        let ql = &weights[weight_offset..weight_offset + 128];
-        let qh = &weights[weight_offset + 128..weight_offset + 192];
-        let scales = &weights[weight_offset + 192..weight_offset + 208];
-        let mut integer_sums = [0_i32; 8];
-        for super_block in 0..2 {
-            let ql_base = super_block * 64;
-            let qh_base = super_block * 32;
-            let scale_base = super_block * 8;
-            let quant_base = activation_offset + super_block * 128;
-            for index in 0..32 {
-                let scale_index = index / 16;
-                let ql1 = ql[ql_base + index];
-                let ql2 = ql[ql_base + 32 + index];
-                let high = qh[qh_base + index];
-                let q1 = ((ql1 & 0x0f) | ((high & 0x03) << 4)) as i32 - 32;
-                let q2 = ((ql2 & 0x0f) | (((high >> 2) & 0x03) << 4)) as i32 - 32;
-                let q3 = ((ql1 >> 4) | (((high >> 4) & 0x03) << 4)) as i32 - 32;
-                let q4 = ((ql2 >> 4) | (((high >> 6) & 0x03) << 4)) as i32 - 32;
-                let s1 = scales[scale_base + scale_index] as i8 as i32;
-                let s2 = scales[scale_base + scale_index + 2] as i8 as i32;
-                let s3 = scales[scale_base + scale_index + 4] as i8 as i32;
-                let s4 = scales[scale_base + scale_index + 6] as i8 as i32;
-                let lane = index & 7;
-                integer_sums[lane] += s1 * q1 * quantized[quant_base + index] as i32;
-                integer_sums[lane] += s2 * q2 * quantized[quant_base + index + 32] as i32;
-                integer_sums[lane] += s3 * q3 * quantized[quant_base + index + 64] as i32;
-                integer_sums[lane] += s4 * q4 * quantized[quant_base + index + 96] as i32;
-            }
-        }
+        let integer_sums =
+            q6k_block_lane_sums_oracle(weights, weight_offset, quantized, activation_offset);
         for lane in 0..lane_sums.len() {
             lane_sums[lane] = d.mul_add(integer_sums[lane] as f32, lane_sums[lane]);
         }
@@ -171,6 +209,63 @@ fn dot_q6_k_q8_k_row_oracle(
     }
     sum
 }
+
+/// The eight per-lane integer sums of one Q6_K super-block, as both CPU paths compute them.
+///
+/// The lane split is irrelevant to the integers themselves — `i32` addition is exact and
+/// associative — but the scalar oracle needs them separated, so the decode lives here once.
+fn q6k_block_lane_sums_oracle(
+    weights: &[u8],
+    weight_offset: usize,
+    quantized: &[i8],
+    activation_offset: usize,
+) -> [i32; 8] {
+    let ql = &weights[weight_offset..weight_offset + 128];
+    let qh = &weights[weight_offset + 128..weight_offset + 192];
+    let scales = &weights[weight_offset + 192..weight_offset + 208];
+    let mut integer_sums = [0_i32; 8];
+    for super_block in 0..2 {
+        let ql_base = super_block * 64;
+        let qh_base = super_block * 32;
+        let scale_base = super_block * 8;
+        let quant_base = activation_offset + super_block * 128;
+        for index in 0..32 {
+            let scale_index = index / 16;
+            let ql1 = ql[ql_base + index];
+            let ql2 = ql[ql_base + 32 + index];
+            let high = qh[qh_base + index];
+            let q1 = ((ql1 & 0x0f) | ((high & 0x03) << 4)) as i32 - 32;
+            let q2 = ((ql2 & 0x0f) | (((high >> 2) & 0x03) << 4)) as i32 - 32;
+            let q3 = ((ql1 >> 4) | (((high >> 4) & 0x03) << 4)) as i32 - 32;
+            let q4 = ((ql2 >> 4) | (((high >> 6) & 0x03) << 4)) as i32 - 32;
+            let s1 = scales[scale_base + scale_index] as i8 as i32;
+            let s2 = scales[scale_base + scale_index + 2] as i8 as i32;
+            let s3 = scales[scale_base + scale_index + 4] as i8 as i32;
+            let s4 = scales[scale_base + scale_index + 6] as i8 as i32;
+            let lane = index & 7;
+            integer_sums[lane] += s1 * q1 * quantized[quant_base + index] as i32;
+            integer_sums[lane] += s2 * q2 * quantized[quant_base + index + 32] as i32;
+            integer_sums[lane] += s3 * q3 * quantized[quant_base + index + 64] as i32;
+            integer_sums[lane] += s4 * q4 * quantized[quant_base + index + 96] as i32;
+        }
+    }
+    integer_sums
+}
+
+/// The single exact `i32` the Panama control reduces one super-block to.
+fn q6k_block_integer_sum_oracle(
+    weights: &[u8],
+    weight_offset: usize,
+    quantized: &[i8],
+    activation_offset: usize,
+) -> i32 {
+    q6k_block_lane_sums_oracle(weights, weight_offset, quantized, activation_offset)
+        .iter()
+        .sum()
+}
+
+/// Lanes in a warp: the launch shape the PTX projections require.
+const WARP_LANES: usize = 32;
 
 // ---------------------------------------------------------------------------------------------
 // Fixtures
@@ -351,14 +446,14 @@ fn q6k_row_dot_as_device(
     lanes: usize,
 ) -> f32 {
     let blocks_per_row = cols / QK_K;
-    let mut partials = vec![[0_i32; Q6_K_LANES]; blocks_per_row];
+    let mut partials = vec![0_i32; blocks_per_row];
     for lane in 0..lanes {
         let mut block = lane;
         while block < blocks_per_row {
             let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
             let activation_offset = batch * cols + block * QK_K;
             partials[block] =
-                kquant::q6k_block_lane_sums(weights, weight_offset, quantized, activation_offset);
+                kquant::q6k_block_sum(weights, weight_offset, quantized, activation_offset);
             block += lanes;
         }
     }
@@ -483,43 +578,128 @@ fn q6k_warp_decomposition_is_bit_exact_for_every_lane_count() {
     }
 }
 
-/// Guards the determinism contract rather than the arithmetic: if someone "simplifies" Q6_K to
-/// a single accumulator, this fails even though the answer stays plausible.
+/// Measures, rather than asserts from reading the source, that `models` carries two Q6_K
+/// reductions on the CPU that do not agree in the last bit.
+///
+/// This is the fact the G1 defect turned on. The kernel can only be bit-exact with one of them;
+/// it is gated against the Panama one (see the module documentation), so this test exists to
+/// make the *other* one's existence visible rather than letting a later reader assume the two
+/// are interchangeable.
 #[test]
-fn q6k_single_accumulator_would_diverge_so_the_eight_lanes_are_load_bearing() {
-    // The contract is only *observable* on inputs where the two summation orders actually
-    // disagree in the last bits, which is not most of them. Scan a handful of fixtures and
+fn the_two_cpu_q6k_reductions_do_not_agree_bit_for_bit() {
+    // The disagreement is only *observable* on inputs where the two summation orders actually
+    // differ in the last bits, which is not most of them. Scan a handful of fixtures and
     // require that at least one diverges, so this test cannot quietly stop testing anything.
     let cols = 4_096;
-    let blocks_per_row = cols / QK_K;
     let mut observed_divergence = 0;
     for seed in 0..64_u64 {
         let weights = q6k_tensor(1, cols, 1_000 + seed);
         let (quantized, scales, _, _) = quantized_activations(1, cols, 2_000 + seed);
-        let reference = dot_q6_k_q8_k_row_oracle(&weights, &quantized, &scales, 0, 0, cols);
-        assert_eq!(
-            reference.to_bits(),
-            kquant::q6k_row_dot(&weights, &quantized, &scales, 0, 0, cols).to_bits(),
-            "seed {seed}: the crate diverged from the CPU reference"
-        );
-        let mut naive = 0.0_f32;
-        for block in 0..blocks_per_row {
-            let weight_offset = block * Q6_K_BLOCK_BYTES;
-            let d = kquant::q6k_block_scale(&weights, weight_offset, scales[block]);
-            let lane_sums =
-                kquant::q6k_block_lane_sums(&weights, weight_offset, &quantized, block * QK_K);
-            let total: i32 = lane_sums.iter().sum();
-            naive = d.mul_add(total as f32, naive);
-        }
-        if reference.to_bits() != naive.to_bits() {
+        let panama = dot_q6_k_q8_k_row_oracle(&weights, &quantized, &scales, 0, 0, cols);
+        let eight_lane =
+            dot_q6_k_q8_k_row_eight_lane_oracle(&weights, &quantized, &scales, 0, 0, cols);
+        if panama.to_bits() != eight_lane.to_bits() {
             observed_divergence += 1;
         }
     }
     assert!(
         observed_divergence > 0,
-        "collapsing Q6_K to one accumulator agreed on all 64 fixtures, so this test no longer \
-         observes the eight-lane contract; widen the fixtures rather than deleting the test"
+        "the Panama and scalar CPU Q6_K reductions agreed on all 64 fixtures, so this test no \
+         longer observes the hazard it was written for; widen the fixtures rather than deleting it"
     );
+}
+
+/// The regression the G1 parity gate failed on, at the host level.
+///
+/// The kernel's Q6_K fold used to keep eight `f32` lane accumulators, which is the *scalar* CPU
+/// reduction, not the one the accelerator is gated against. It was bit-exact for a row of one
+/// super-block and one ULP wrong from two super-blocks on. Pin that: the crate's fold must be
+/// the Panama control at every width, and must **not** be the eight-lane fold.
+#[test]
+fn q6k_row_dot_is_the_panama_control_and_not_the_eight_lane_fold() {
+    let cols_widths = [1_usize, 2, 3, 32, 33, 48].map(|blocks| blocks * QK_K);
+    let mut observed_divergence = 0;
+    for cols in cols_widths {
+        for seed in 0..8_u64 {
+            let weights = q6k_tensor(1, cols, 3_000 + seed);
+            let (quantized, scales, _, _) = quantized_activations(1, cols, 4_000 + seed);
+            let panama = dot_q6_k_q8_k_row_oracle(&weights, &quantized, &scales, 0, 0, cols);
+            let actual = kquant::q6k_row_dot(&weights, &quantized, &scales, 0, 0, cols);
+            assert_eq!(
+                panama.to_bits(),
+                actual.to_bits(),
+                "cols {cols}, seed {seed}: the crate's Q6_K fold is not the CPU control"
+            );
+            let eight_lane =
+                dot_q6_k_q8_k_row_eight_lane_oracle(&weights, &quantized, &scales, 0, 0, cols);
+            if eight_lane.to_bits() != panama.to_bits() {
+                observed_divergence += 1;
+            }
+        }
+    }
+    assert!(
+        observed_divergence > 0,
+        "no fixture separated the eight-lane fold from the CPU control, so this test would pass \
+         with the defect still in place; widen the fixtures rather than deleting it"
+    );
+}
+
+/// The Java device bisection (`CudaQ6KDeviceParityTest`) at the arithmetic level, for both
+/// formats: a one-super-block row proves almost nothing, so walk the widths that matter,
+/// including both sides of the 32-lane warp boundary.
+#[test]
+fn both_formats_are_bit_exact_at_every_bisection_width() {
+    for blocks in [1_usize, 2, 3, 32, 33, 48] {
+        let cols = blocks * QK_K;
+        let rows = 3;
+
+        let q4_weights = q4k_tensor(rows, cols, 5_000 + blocks as u64);
+        let (quantized, scales, sums, _) = quantized_activations(1, cols, 6_000 + blocks as u64);
+        for row in 0..rows {
+            let expected =
+                dot_q4_k_q8_k_row_oracle(&q4_weights, &quantized, &scales, &sums, 0, row, cols);
+            let direct = kquant::q4k_row_dot(&q4_weights, &quantized, &scales, &sums, 0, row, cols);
+            let as_device = q4k_row_dot_as_device(
+                &q4_weights,
+                &quantized,
+                &scales,
+                &sums,
+                0,
+                row,
+                cols,
+                WARP_LANES,
+            );
+            assert_eq!(
+                expected.to_bits(),
+                direct.to_bits(),
+                "Q4_K {blocks} super-blocks, row {row}: direct fold diverged"
+            );
+            assert_eq!(
+                expected.to_bits(),
+                as_device.to_bits(),
+                "Q4_K {blocks} super-blocks, row {row}: warp decomposition diverged"
+            );
+        }
+
+        let q6_weights = q6k_tensor(rows, cols, 7_000 + blocks as u64);
+        let (quantized, scales, _, _) = quantized_activations(1, cols, 8_000 + blocks as u64);
+        for row in 0..rows {
+            let expected = dot_q6_k_q8_k_row_oracle(&q6_weights, &quantized, &scales, 0, row, cols);
+            let direct = kquant::q6k_row_dot(&q6_weights, &quantized, &scales, 0, row, cols);
+            let as_device =
+                q6k_row_dot_as_device(&q6_weights, &quantized, &scales, 0, row, cols, WARP_LANES);
+            assert_eq!(
+                expected.to_bits(),
+                direct.to_bits(),
+                "Q6_K {blocks} super-blocks, row {row}: direct fold diverged"
+            );
+            assert_eq!(
+                expected.to_bits(),
+                as_device.to_bits(),
+                "Q6_K {blocks} super-blocks, row {row}: warp decomposition diverged"
+            );
+        }
+    }
 }
 
 #[test]
