@@ -4,6 +4,26 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- The hidden-state prefill now reaches the batched path. `prefill` has consulted the batched
+  execution plan since it was written and `prefillHiddenState` never did, so every hidden-state
+  consumer ran the whole prompt one token at a time: embeddings through `GgufEmbeddingBackend`, and
+  any consumer reading a state off a prompt. Measured on Granite 4.1 3B Q4_K_M on an 8-vCPU
+  EPYC-Milan host, over 128 tokens, the hidden-state prefill went from 66,538 ms (1.9 tok/s) to
+  4,283 ms (29.9 tok/s), a 15.5x improvement. It now runs slightly faster than the logits prefill
+  at that length and reaches parity by 512 tokens, which is the expected shape: it skips the
+  vocabulary projection on every row but the last.
+
+  The `vectors.gguf.pollMillis` budget was the leading hypothesis and was ablated in both
+  directions, 1.86 tok/s at zero against 1.87 at the default; it explains none of the gap. The
+  cause is memory bandwidth, since a single-token forward streams the whole weight set to produce
+  one row.
+
+  Results are unchanged within the repository's existing SIMD reduction tolerance: the hidden
+  state, the key/value cache contents, and the next generated token all match running the prompt
+  one token at a time.
+
 ### Added
 - `backend-tornado` K-quant projection kernels: Java TornadoVM kernels for GGUF Q4_K and Q6_K by Q8_K, alongside the existing Q4_0 by Q8_0 kernels. This is what a `Q4_K_M` catalog model is made of, so the accelerator previously admitted none of its projections. Admitted grouped shapes are `Q4_K/Q4_K`, `Q4_K/Q4_K/Q4_K` and `Q4_K/Q4_K/Q6_K` — the last being the query/key/value group `Q4_K_M` presents, since llama.cpp promotes the value projection to Q6_K. Q4_0 (Q8_0 activations) and the K-quants (Q8_K activations) are never combined in one grouped dispatch, and K-quant projections additionally require a column count that is a multiple of 256. Q5_K, Q2_K, Q3_K and every unquantized format still fall back to the Vector API per projection.
 - `TornadoBackendRuntime.routedProjectionsByFormat()` and `projectionPlanCount()`: how many projections actually reached the device, per GGUF weight format, counted once per matrix in a grouped dispatch. A mixed-format model can otherwise look accelerated while one of its formats silently falls back.
