@@ -94,3 +94,102 @@ theatre. Latency is the stochastic quantity, and carries n = 3.
 The sealed split is opened once. No hyperparameter may be changed and the split re-read. If the
 gate fails, the recorded outcome is a failure, and any subsequent attempt is a new experiment with
 a new pre-registration and a fresh split.
+
+---
+
+# Amendment 1 — enterprise corpus, energy, and a hardware sweep
+
+**Written 2026-09-20. No split has been opened and not one hidden state has been harvested**, so
+this is still pre-registration rather than a revision made after seeing a result. The original gates
+are unchanged; this adds a corpus, an axis, and two hardware arms.
+
+## A1.1 Third corpus — CUAD, because enterprise usage is the case worth making
+
+SQuAD and MS MARCO are academic and web genres. The buyer this tier is aimed at reads contracts,
+policies and support tickets, so a third corpus is added in that genre.
+
+| | CUAD test split |
+| --- | --- |
+| Source | `github.com/TheAtticusProject/cuad` `data.zip`, SHA-256 `f8161d18bea4e9c05e78fa6dda61c19c846fb8087ea969c172753bc2f45b999a` |
+| Contents | 102 commercial contracts, 4,182 clause questions |
+| Negative class | 2,938 unanswerable (0.7025) |
+| **Majority-class floor** | **0.7025** |
+| Licence | Apache-2.0, published by the Atticus Project |
+
+CUAD is the most awkward of the three and that is why it is in. Its base rate is skewed 70/30 rather
+than near-even, which is the enterprise reality the other two do not test: most questions asked of a
+document have no answer in it. Accuracy is a weak metric against a 0.70 floor, so on this corpus the
+weight falls on agreement and calibration, and that is stated now rather than discovered later.
+
+**The gate must hold on all three.** A pass on two and a failure on the third is a failure, reported
+as the disagreement it is.
+
+## A1.2 Long documents — a fixed window, and the ceiling it imposes, reported
+
+Contracts are far longer than SQuAD paragraphs or MS MARCO passages. The protocol therefore takes a
+**fixed 4,000-token window from the start of each contract**, applied identically to answerable and
+unanswerable items, with no answer-aware cropping of any kind — cropping around a known span would
+leak the answer's location for the positives and have no counterpart for the negatives.
+
+**The fraction of answerable items whose gold span falls outside the window is measured and reported
+beside every CUAD figure.** Those items cannot be answered correctly by any model at any quality, so
+they cap achievable accuracy for a reason that has nothing to do with what is being measured. An
+over-long input has silently destroyed two datasets in this tree before; the mitigation is to handle
+the limit and say how often it was hit.
+
+## A1.3 Energy — an axis, measured where possible and approximated where not
+
+Latency alone understates the case. A decision that avoids a decode loop should cost far fewer
+joules, and for an enterprise buyer reporting under CSRD that is the number that matters.
+
+**What this host can and cannot do, checked rather than assumed.** The Hetzner VM exposes
+`/sys/class/powercap` empty, no `/dev/cpu/*/msr`, no `rapl` or `amd_energy` module and no `hwmon`
+entries. **Joules are not measurable on it.** What is available is exact cgroup CPU accounting.
+
+Reported per arm, each labelled by how it was obtained:
+
+| Quantity | Method | Label |
+| --- | --- | --- |
+| CPU-microseconds per decision | cgroup `cpu.stat` delta | **measured** |
+| Watt-hours per decision, CPU arms | CPU-seconds x host TDP fraction, TDP read from the part's specification | **computed, approximate** |
+| Watts and joules, GPU arm | NVML via `nvidia-smi` sampling across the run | **measured** |
+
+The approximation is explicitly an approximation and may not be quoted as a measurement. Its purpose
+is an order of magnitude, which is the scale the comparison actually turns on.
+
+**Honesty condition on any energy claim.** The per-decision figure is the defensible one. Total
+energy reduction is not: efficiency gains of this kind historically raise total consumption rather
+than lower it, and the model this tier imitates is named after the economist who described exactly
+that. No write-up may convert a per-decision saving into a sustainability claim.
+
+## A1.4 GPU arm
+
+`TornadoGgufBatchedMatrixKernel` implements `GgufBatchedMatrixKernel`, so it can be injected through
+`PureJavaBackend.load(path, kernel)`. That arrangement keeps the backend a
+`SharedPrefixInferenceBackend` — the prefix sharing the whole tier depends on survives — while the
+projections execute on the device. Q4_K and Q6_K projection support is on `models` `origin/main`
+(#194), which is what Granite 4.1 3B Q4_K_M needs.
+
+- Host: Vultr `vcg-a16-3c-32g-8vram`, NVIDIA A16, 8 GiB VRAM, about USD 0.236/hour, three locations
+  currently available. A 2.0 GB Q4_K_M fits with room for the cache.
+- The same pre-registered gates apply unchanged. The GPU arm is a hardware comparison, not a
+  different experiment.
+- **`backend-cuda` is excluded.** Our own Rust PTX kernels carry a known Q6_K parity defect that is
+  not bit-exact past one super-block (`models` PR #198, reproduced on an A40). Measuring a decision
+  quality gate on a kernel known to be numerically wrong would produce a number about the defect.
+  The arm may be added once that is fixed and its parity gate is green.
+
+## A1.5 TPU — not reachable from this stack, and saying so
+
+There is **no JVM-native path to a Google TPU**, and this is a structural absence rather than work
+not yet done. TornadoVM targets OpenCL, PTX and SPIR-V. ONNX Runtime ships no TPU execution
+provider. `libtpu` is reached through XLA from C++ or Python. A Coral Edge TPU is int8 with a few
+megabytes of SRAM and cannot hold a 3B model at all. `models-backend-apple` is a bridge to Apple
+Foundation Models, a different model entirely, not an accelerator for our GGUF artifact.
+
+What is possible, if wanted, is an **external hardware control**: the same model family converted to
+JAX/Flax and run on a Cloud TPU, under a small pinned Python environment of the kind this project
+already permits for third-party reproduction. It would bound what the best available hardware does.
+It would say nothing whatever about the JVM tier, because it would be a different implementation of
+a different graph, and it must never be reported as an arm of this experiment. **Not adopted here;
+recorded as available on request.**
