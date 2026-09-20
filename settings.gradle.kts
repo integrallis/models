@@ -14,6 +14,7 @@ include("models")
 include("models-rag")
 include("models-semantic-order")
 include("models-router")
+include("models-decisions")
 
 // --- Backends ---
 include("backend-java")
