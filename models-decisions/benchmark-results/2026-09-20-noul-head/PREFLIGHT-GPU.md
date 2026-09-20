@@ -36,3 +36,10 @@ No external inference runtime will be installed or used.
 
 Tagged `delete-by-2026-09-20T19-27-12Z`. Vultr has no separate firewall resource attached here;
 teardown is the instance alone, confirmed absent by its exact id afterwards.
+
+## Decommission
+
+Deleted 2026-09-20, after the label was validated against the expected one rather than the id
+alone. Post-delete audit: the exact instance id returns HTTP 404, the account holds zero
+instances and zero block-storage volumes. Lifetime about 35 minutes at 0.236/hr, roughly USD 0.14
+against the USD 2.00 ceiling. Evidence copied to `GPU-PARITY.md` before deletion.
