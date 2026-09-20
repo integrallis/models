@@ -11,6 +11,10 @@ dependencies {
     // stay free of any backend so a decision head can be wired to whichever one is qualified.
     testImplementation(project(":backend-java"))
 
+    // The harvest tool drives the rust-ffm kernel, because the qualified answerability evidence is
+    // on that backend and a figure taken on any other one would not be comparable with it.
+    testImplementation(project(":backend-native"))
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
