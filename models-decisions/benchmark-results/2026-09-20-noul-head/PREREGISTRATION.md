@@ -317,3 +317,65 @@ the corpus needs a longer-lived host rather than a louder claim.
 
 The gates themselves are unchanged. The two-corpus requirement is unaffected: SQuAD and MS MARCO
 are complete at N=1000 each.
+
+---
+
+# Amendment 4 — the MS MARCO context was built wrong, and is rebuilt
+
+**Written 2026-09-20T18:15Z. MS MARCO's sealed split was never opened.** The defect below was found
+by inspecting the **train split only**, which the protocol permits; the sealed 300 were harvested
+but never read, and are discarded unread along with the rest.
+
+## The defect
+
+MS MARCO supplies **ten retrieved passages per query**, with an `is_selected` flag marking those
+that contain the answer. The first converter built context as the first three passages **by
+position**, ignoring `is_selected` entirely. Sampling three rows shows answer-bearing passages at
+indices `[5]`, `[4,5]` and `[]` — none inside the window that was fed.
+
+So for a large share of items the model was given context that genuinely does not contain the
+answer, the item was labelled answerable because MS MARCO records a human answer *somewhere*, and
+the model was scored wrong for correctly refusing. **The base was penalised for being right.**
+
+## How it was caught, and what the signature was
+
+The pre-registered sanity condition. On the train split, decode-versus-label accuracy was **0.4660
+against a majority floor of 0.5900**, a margin of **-0.1240**, with the decode verdict saying "not
+answerable" 438 times in 500 while 295 of 500 were labelled answerable.
+
+**Accuracy below the floor is the tell.** A model that had merely found the task hard would land
+near the floor, not beneath it; landing beneath it means the question asked of the model and the
+question the label answers are different questions. The guard was written to stop a high agreement
+with a useless teacher reading as success. It caught the inverse, which is the better outcome.
+
+For contrast, SQuAD v2 on the same check: **0.7860 against a floor of 0.5020, margin +0.2840.**
+
+## The rebuild
+
+Context is now **every retrieved passage, in rank order**. "Answerable" then means answerable from
+the retrieved set, which is what the label actually records. No subset selection, so no judgement
+about which distractors to keep and no way to discard the answer-bearing passage.
+
+| | old (void) | rebuilt |
+| --- | --- | --- |
+| Context | first 3 passages by position | all 10, rank order |
+| SHA-256 | `163a6a12a41a4fd098de32c35a085cc9184913265f43f3adf8076fd45c7e204e` | `01f8294855cf2cbc47ca8b385e9845941878bf32d632550fdcf15eb2f5bb305d` |
+| Rows / answerable / floor | 101,093 / 0.4497 no-answer / 0.5503 | unchanged — only the context changed |
+| Context length | — | p50 497 words, p90 658, p99 1042, max 1443 |
+
+The 1,000 harvested rows from the void construction are **quarantined, not reinterpreted**, as
+`msmarco-void-passage-subset.jsonl`. They measured the wrong question and no figure may be drawn
+from them.
+
+N stays at 1000 with the same seed and splitter. At roughly 20 s/item the rebuild costs about 5.8
+hours, and the host's recorded deletion deadline is extended to **2026-09-21T14:00Z** with the
+spend ceiling raised to **USD 15** to cover it.
+
+## What this says about the process
+
+Two thousand rows were harvested and reported as progress -- `done` lines, wall clock, CPU-seconds,
+ETAs -- without a single row being read back. A validation pass over the first twenty-five rows
+would have caught this before the second corpus began. **Harvest validation is now a required step
+before a corpus is allowed to run to completion, not an optional one**, and the check is the one
+already written into the protocol: decode-versus-label accuracy against the floor, on the train
+split, reported before any further compute is spent.
