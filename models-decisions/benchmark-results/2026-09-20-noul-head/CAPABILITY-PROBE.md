@@ -60,3 +60,22 @@ forked test JVM, and does not treat an environment variable as a task input. The
 visibly rather than passing vacuously, but a cached skip could still have been mistaken for a run.
 `integrationTest` now declares `DECISIONS_GRANITE_MODEL` as an input so changing it invalidates the
 task.
+
+## rust-ffm toolchain on the host (build only, no measurement)
+
+The qualified answerability evidence is on `rust-ffm`, so cycle 3 needs `backend-native` present for
+its figures to be comparable with that evidence.
+
+- Ubuntu 24.04's packaged Cargo is too old for this repository's Rust 2024 crate, as the runbook
+  records. Installed the rustup bootstrap; the repository's pin selected **rustc 1.96.0**.
+- **`:backend-native:assemble` does not build the native library.** It completed in 10 s and
+  produced only the Java jars. The cdylib is built by `prepareNativePlatformResources`, which
+  compiled `jmodels-kernels v0.3.42` and emitted `libjmodels_kernels.so` (458,656 bytes) into
+  `META-INF/models/native/linux-x86_64/`.
+- `:backend-native:test` passes, including the bundled-library poll-budget case, so the FFM binding
+  resolves and loads the library actually built on this host.
+
+**Why this is written down:** had `assemble` been trusted, a cycle-3 arm labelled `rust-ffm` would
+have run with no native library present. Depending on fallback behaviour that either fails outright
+or quietly executes the pure-Java path under the wrong label, which is the ablation hazard the
+working agreement names — a stage that never ran, reported as a stage that did not matter.
