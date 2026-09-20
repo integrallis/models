@@ -80,3 +80,40 @@ the code would be reporting a pipeline number and attributing it to the wrong st
 **Neither is being made on this branch.** `LlamaForwardPass` is live territory for the GPU campaign
 (PR #195 edits `computeBatchedAttention` and `attendHeads` in this same file), and a decisions branch
 quietly rewriting its prefill would collide. Recorded here for a deliberate decision instead.
+
+---
+
+## Fixed, and measured on the same host
+
+`models` branch `perf/batched-hidden-state-prefill`, commit `d23f440d`. Both `prefillHiddenState`
+variants now advance every position but the last through the existing qualified batched path, then
+take one ordinary step for the final token. Same host, same artifact, same kernels, same process
+shape as the measurement above.
+
+| `prefillHiddenState` | 128 tokens | rate | 512 tokens | rate |
+| --- | ---: | ---: | ---: | ---: |
+| before | 66,538 ms | 1.9 tok/s | — | — |
+| **after** | **4,283 ms** | **29.9 tok/s** | 13,973 ms | 36.6 tok/s |
+| `prefill` (logits, batched), for reference | 4,819 ms | 26.6 tok/s | 13,444 ms | 38.1 tok/s |
+
+**15.5x at 128 tokens.** The hidden-state route now runs slightly *faster* than the logits route at
+128 tokens and at parity by 512, which is the expected shape: it skips the vocabulary projection on
+every row but the last, and that saving shrinks in relative terms as the prompt grows.
+
+Correctness is unchanged and asserted rather than assumed: hidden state, key/value cache contents,
+and the next generated token all match running the same prompt one token at a time, within the
+repository's existing `SIMD_REDUCTION_TOLERANCE` of 2.0e-7. 681 `backend-java` tests pass.
+
+### Consequence for the harvest
+
+A 1,000-item harvest at roughly 160 tokens an item moves from about **23 hours** to about
+**1.5 hours** on this box. The pre-registered protocol is now affordable as written, at all three
+corpora, without trimming N.
+
+### A vacuous pass, caught by the counter
+
+Worth recording because it nearly shipped. The first version of the fix's tests used an all-F32 nano
+model, and `TensorOps.supportsBatchedMatmul` does not include F32 — so the fixture could not batch at
+all, and the three equivalence tests passed by comparing the sequential path against itself. Only
+the counter assertion failed, which is the entire reason it was written. The fixture now uses Q8_0
+projections at the dimensions Q8_0 alignment demands.
