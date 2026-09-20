@@ -193,3 +193,82 @@ already permits for third-party reproduction. It would bound what the best avail
 It would say nothing whatever about the JVM tier, because it would be a different implementation of
 a different graph, and it must never be reported as an arm of this experiment. **Not adopted here;
 recorded as available on request.**
+
+---
+
+# Amendment 2 — the Jev arm
+
+**Written 2026-09-20, on registering for the Jev preview and before any access was granted.** No
+Jev output has been seen. No sealed split has been opened. This exists so the comparison protocol
+is fixed while we still have nothing to tune it against.
+
+## A2.1 Why this arm and not an inference from reproductions
+
+Jev is the system this tier's category comes from. Everything published about its performance is
+either vendor-reported (67.8% on a four-workflow benchmark of its own construction, tying GPT-5.6
+Terra at about 1/76th the cost and 25x the speed) or a third-party reproduction we did not run.
+Neither transfers. The only comparison worth making is one where **we run both arms ourselves,
+under one protocol, on data neither of us authored.**
+
+`edgelabs-ai/jev48`, the open reproduction with weights, is **not** a substitute and is not adopted
+here. If it is ever run it must be labelled a reproduction of Jev in every sentence that mentions
+it, because that is what it is.
+
+## A2.2 What the arm is allowed to be used for
+
+**Evaluation only.** Jev outputs are used to score this comparison and for nothing else. They are
+**not** stored as training data, not used to fit a head, and not used to fit a temperature. That
+boundary is not incidental: our own teacher stack is deliberately Apache-2.0 and MIT precisely so
+no trained weight has a licence question attached to it, and a benchmark arm must not reintroduce
+one. **Read the preview terms before the first call** and record here whether evaluation use is
+permitted; if it is not, the arm does not run.
+
+## A2.3 Protocol symmetry, fixed now
+
+- **Same items.** The identical sealed splits from the three corpora, already frozen by seed
+  20260920. Nothing is re-drawn for Jev.
+- **Same state.** The identical context, under the identical 4,000-token window policy, including
+  the same truncation and the same out-of-window accounting.
+- **Same question, one phrasing.** The exact wording is the one already committed in
+  `NoulHarvestTool.buildPrompt`, chosen before either arm ran.
+
+  **Neither arm's phrasing may be tuned.** An independent review of Jev reports that its accuracy
+  *swings with how the question is asked*. That cuts both ways and is the single easiest place to
+  produce a flattering result without technically lying: search phrasings for ours, use the default
+  for theirs. One phrasing, fixed before either arm runs, no per-arm search. If a phrasing sweep is
+  ever run it is run **for both arms** and reported in full.
+- **Same mapping.** Our `Noul` and their binary primitive answer the same proposition. No
+  post-hoc threshold tuning on either side; both report a probability and both are scored at 0.5
+  unless a threshold is fitted on the calibration split, in which case it is fitted for **both**.
+
+## A2.4 What is reported, and separately
+
+Field coverage notes that Jev's published accuracy "is better understood as agreement with a
+model-derived reference than as independently verified correctness." This protocol does not blend
+those. For **each arm, on each corpus**, four numbers with the majority-class floor beside them:
+
+1. **Accuracy against the corpus's published labels** — the only one that is correctness.
+2. **Agreement with our base's decode verdict** — a different quantity, reported as such, and
+   meaningless for Jev except as a curiosity.
+3. **Calibration**: ECE over 15 bins, and Brier. Per corpus, never pooled.
+4. **Cost per decision**: wall latency, CPU-microseconds where the arm is local, and money where
+   the arm is metered.
+
+## A2.5 What would make us lose, stated in advance
+
+We publish the result whichever way it falls. Specifically:
+
+- If Jev is **more accurate** on all three corpora, that is the finding and it is reported in the
+  headline, not a footnote.
+- If our advantage is **only** latency and locality and not quality, the claim is latency and
+  locality. It does not become a quality claim by adjacency.
+- If the margin between arms is **inside the noise** — and with sealed splits of 300, 300 and
+  (pending) 75 it very well may be — the finding is "indistinguishable on this evidence", not a
+  win. A sub-point margin between two systems is exactly the press-release ordering this project
+  refuses to produce.
+
+## A2.6 Timing
+
+Access is not expected to arrive before the harvest finishes, and the arm does not block it. The
+sealed splits are frozen and reproducible from their seed, so the Jev arm runs against **the same
+items** whenever access lands. That is precisely why they were frozen.
