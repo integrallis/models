@@ -66,4 +66,16 @@
         <Method name="router"/>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+    <!-- models-decisions: Choice.options and Score.levels hold List.copyOf results, which are
+         genuinely immutable; SpotBugs cannot see through the factory. The immutability is pinned
+         behaviourally by AnswerSpaceTest, which asserts both that the returned list rejects
+         mutation and that the space copies the options it was handed. Copying again on every read
+         would allocate once per decision for no gain. -->
+    <Match>
+        <Or>
+            <Class name="com.integrallis.models.decisions.Choice"/>
+            <Class name="com.integrallis.models.decisions.Score"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
 </FindBugsFilter>
