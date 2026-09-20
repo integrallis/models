@@ -21,7 +21,7 @@
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
 use models_cuda_kernels::kquant::{
-    self, Q4_K_BLOCK_BYTES, Q4KRowAccumulator, Q6_K_BLOCK_BYTES, Q6_K_LANES, Q6KRowAccumulator,
+    self, Q4_K_BLOCK_BYTES, Q4KRowAccumulator, Q6_K_BLOCK_BYTES, Q6KRowAccumulator,
     Q8_K_SUM_BLOCK, QK_K,
 };
 
@@ -124,7 +124,7 @@ fn dot_q6_k_q8_k_row_oracle(
     cols: usize,
 ) -> f32 {
     let blocks_per_row = cols / QK_K;
-    let mut lane_sums = [0_f32; 8];
+    let mut sum = 0_f32;
     for block in 0..blocks_per_row {
         let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
         let activation_offset = batch * cols + block * QK_K;
@@ -135,7 +135,7 @@ fn dot_q6_k_q8_k_row_oracle(
         let ql = &weights[weight_offset..weight_offset + 128];
         let qh = &weights[weight_offset + 128..weight_offset + 192];
         let scales = &weights[weight_offset + 192..weight_offset + 208];
-        let mut integer_sums = [0_i32; 8];
+        let mut block_sum = 0_i32;
         for super_block in 0..2 {
             let ql_base = super_block * 64;
             let qh_base = super_block * 32;
@@ -154,20 +154,13 @@ fn dot_q6_k_q8_k_row_oracle(
                 let s2 = scales[scale_base + scale_index + 2] as i8 as i32;
                 let s3 = scales[scale_base + scale_index + 4] as i8 as i32;
                 let s4 = scales[scale_base + scale_index + 6] as i8 as i32;
-                let lane = index & 7;
-                integer_sums[lane] += s1 * q1 * quantized[quant_base + index] as i32;
-                integer_sums[lane] += s2 * q2 * quantized[quant_base + index + 32] as i32;
-                integer_sums[lane] += s3 * q3 * quantized[quant_base + index + 64] as i32;
-                integer_sums[lane] += s4 * q4 * quantized[quant_base + index + 96] as i32;
+                block_sum += s1 * q1 * quantized[quant_base + index] as i32;
+                block_sum += s2 * q2 * quantized[quant_base + index + 32] as i32;
+                block_sum += s3 * q3 * quantized[quant_base + index + 64] as i32;
+                block_sum += s4 * q4 * quantized[quant_base + index + 96] as i32;
             }
         }
-        for lane in 0..lane_sums.len() {
-            lane_sums[lane] = d.mul_add(integer_sums[lane] as f32, lane_sums[lane]);
-        }
-    }
-    let mut sum = 0_f32;
-    for lane_sum in lane_sums {
-        sum += lane_sum;
+        sum = d.mul_add(block_sum as f32, sum);
     }
     sum
 }
@@ -351,14 +344,14 @@ fn q6k_row_dot_as_device(
     lanes: usize,
 ) -> f32 {
     let blocks_per_row = cols / QK_K;
-    let mut partials = vec![[0_i32; Q6_K_LANES]; blocks_per_row];
+    let mut partials = vec![0_i32; blocks_per_row];
     for lane in 0..lanes {
         let mut block = lane;
         while block < blocks_per_row {
             let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
             let activation_offset = batch * cols + block * QK_K;
             partials[block] =
-                kquant::q6k_block_lane_sums(weights, weight_offset, quantized, activation_offset);
+                kquant::q6k_block_sum(weights, weight_offset, quantized, activation_offset);
             block += lanes;
         }
     }
@@ -483,10 +476,14 @@ fn q6k_warp_decomposition_is_bit_exact_for_every_lane_count() {
     }
 }
 
-/// Guards the determinism contract rather than the arithmetic: if someone "simplifies" Q6_K to
-/// a single accumulator, this fails even though the answer stays plausible.
+/// Guards the determinism contract rather than the arithmetic. Q6_K folds one exact integer sum
+/// per super-block with a single `fma`, matching the CPU path's scalar and Vector API routes. An
+/// earlier CPU route kept eight float lane accumulators; when the SIMD route was rewritten to a
+/// single accumulator the scalar one was not, and the two disagreed by one to two units in the
+/// last place until that was corrected. This test fails if the eight-lane form is reintroduced,
+/// even though its answer would stay entirely plausible.
 #[test]
-fn q6k_single_accumulator_would_diverge_so_the_eight_lanes_are_load_bearing() {
+fn reintroducing_eight_lane_accumulators_would_diverge_from_the_cpu_contract() {
     // The contract is only *observable* on inputs where the two summation orders actually
     // disagree in the last bits, which is not most of them. Scan a handful of fixtures and
     // require that at least one diverges, so this test cannot quietly stop testing anything.
@@ -502,23 +499,56 @@ fn q6k_single_accumulator_would_diverge_so_the_eight_lanes_are_load_bearing() {
             kquant::q6k_row_dot(&weights, &quantized, &scales, 0, 0, cols).to_bits(),
             "seed {seed}: the crate diverged from the CPU reference"
         );
-        let mut naive = 0.0_f32;
+        // The superseded order: eight float lanes carried across blocks, folded at the close.
+        let mut lane_sums = [0_f32; 8];
         for block in 0..blocks_per_row {
             let weight_offset = block * Q6_K_BLOCK_BYTES;
             let d = kquant::q6k_block_scale(&weights, weight_offset, scales[block]);
-            let lane_sums =
-                kquant::q6k_block_lane_sums(&weights, weight_offset, &quantized, block * QK_K);
-            let total: i32 = lane_sums.iter().sum();
-            naive = d.mul_add(total as f32, naive);
+            let ql = &weights[weight_offset..weight_offset + 128];
+            let qh = &weights[weight_offset + 128..weight_offset + 192];
+            let block_scales = &weights[weight_offset + 192..weight_offset + 208];
+            let mut integer_sums = [0_i32; 8];
+            for super_block in 0..2 {
+                let ql_base = super_block * 64;
+                let qh_base = super_block * 32;
+                let scale_base = super_block * 8;
+                let quant_base = block * QK_K + super_block * 128;
+                for index in 0..32 {
+                    let scale_index = index / 16;
+                    let ql1 = ql[ql_base + index];
+                    let ql2 = ql[ql_base + 32 + index];
+                    let high = qh[qh_base + index];
+                    let q1 = ((ql1 & 0x0f) | ((high & 0x03) << 4)) as i32 - 32;
+                    let q2 = ((ql2 & 0x0f) | (((high >> 2) & 0x03) << 4)) as i32 - 32;
+                    let q3 = ((ql1 >> 4) | (((high >> 4) & 0x03) << 4)) as i32 - 32;
+                    let q4 = ((ql2 >> 4) | (((high >> 6) & 0x03) << 4)) as i32 - 32;
+                    let s1 = block_scales[scale_base + scale_index] as i8 as i32;
+                    let s2 = block_scales[scale_base + scale_index + 2] as i8 as i32;
+                    let s3 = block_scales[scale_base + scale_index + 4] as i8 as i32;
+                    let s4 = block_scales[scale_base + scale_index + 6] as i8 as i32;
+                    let lane = index & 7;
+                    integer_sums[lane] += s1 * q1 * quantized[quant_base + index] as i32;
+                    integer_sums[lane] += s2 * q2 * quantized[quant_base + index + 32] as i32;
+                    integer_sums[lane] += s3 * q3 * quantized[quant_base + index + 64] as i32;
+                    integer_sums[lane] += s4 * q4 * quantized[quant_base + index + 96] as i32;
+                }
+            }
+            for lane in 0..lane_sums.len() {
+                lane_sums[lane] = d.mul_add(integer_sums[lane] as f32, lane_sums[lane]);
+            }
         }
-        if reference.to_bits() != naive.to_bits() {
+        let mut eight_lane = 0_f32;
+        for lane_sum in lane_sums {
+            eight_lane += lane_sum;
+        }
+        if reference.to_bits() != eight_lane.to_bits() {
             observed_divergence += 1;
         }
     }
     assert!(
         observed_divergence > 0,
-        "collapsing Q6_K to one accumulator agreed on all 64 fixtures, so this test no longer \
-         observes the eight-lane contract; widen the fixtures rather than deleting the test"
+        "the eight-lane order agreed with the contract on all 64 fixtures, so this test no longer \
+         observes anything; widen the fixtures rather than deleting the test"
     );
 }
 
