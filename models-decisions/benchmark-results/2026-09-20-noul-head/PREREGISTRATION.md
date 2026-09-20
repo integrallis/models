@@ -272,3 +272,48 @@ We publish the result whichever way it falls. Specifically:
 Access is not expected to arrive before the harvest finishes, and the arm does not block it. The
 sealed splits are frozen and reproducible from their seed, so the Jev arm runs against **the same
 items** whenever access lands. That is precisely why they were frozen.
+
+---
+
+# Amendment 3 — CUAD sample size
+
+**Written 2026-09-20T17:30Z, before CUAD's split was opened.** Seven CUAD items were harvested
+when the wrapper script advanced automatically at the end of MS MARCO; the run was stopped within
+four minutes and **those seven rows are discarded**, because they were drawn from an N=1000 split
+and this amendment changes the draw. No CUAD hidden state has been read, no CUAD label has been
+looked at, and no CUAD figure exists.
+
+## What changed and why
+
+Measured on this host: SQuAD v2 took 6.09 s/item and MS MARCO 7.20 s/item, both close to
+prediction. CUAD's items are an order of magnitude larger, because the 4,000-token window from
+Amendment 1 is doing exactly what it was written to do — contracts are long. At roughly 121 s/item
+CUAD would need about **33.6 hours** for N=1000, against a host deletion deadline about **15.9
+hours** away.
+
+This is a cost-and-clock constraint discovered by measurement, not a response to any CUAD result.
+The original N=1000 was set from SQuAD's smoke without re-deriving it per corpus, which was an
+error in the original sizing rather than a change of intent.
+
+## The change
+
+**CUAD N = 250** (125 train / 50 calibration / **75 sealed**), drawn with the same seed 20260920
+and the same passage-grouped splitter. About 8.4 hours, inside the deadline with margin.
+
+**The 4,000-token window is unchanged.** It would have been faster to shrink the window instead,
+and that option is explicitly rejected: the window is the realistic enterprise shape, and the
+out-of-window gold-span rate is one of the numbers CUAD exists to report. Trading it for runtime
+would corrupt the thing being measured in order to measure it sooner. SQuAD and MS MARCO both
+recorded `outOfWindowAnswerable=0`, so CUAD is the only corpus where this policy has any effect at
+all, which is precisely why it must not move.
+
+## The cost, stated rather than hidden
+
+A sealed split of 75 gives a materially wider interval than the 300 of the other two corpora. Any
+CUAD figure must be reported with that n beside it, and **no CUAD margin smaller than the interval
+75 samples supports may be called a difference**. If the enterprise arm turns out to hinge on a
+margin that 75 items cannot resolve, the honest report is that this run could not resolve it, and
+the corpus needs a longer-lived host rather than a louder claim.
+
+The gates themselves are unchanged. The two-corpus requirement is unaffected: SQuAD and MS MARCO
+are complete at N=1000 each.
