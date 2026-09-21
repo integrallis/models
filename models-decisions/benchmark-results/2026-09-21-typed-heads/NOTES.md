@@ -159,3 +159,27 @@ a narrower product, and JevBench's choice family stays unaddressable until eithe
 training data exists or a head is built that genuinely generalises across option sets -- which the
 OpenJev recipe achieves with a LoRA adapter reshaping the representation, not with a probe over a
 frozen one.
+
+## Ordinal thresholds do not lift the Score ceiling either
+
+A multinomial head treats level 0 and level 4 as no more distant than 0 and 1, discarding the one
+property that makes a Score a Score. The standard repair is an ordered stack: K-1 binary heads
+answering "is the level above k?", with monotonicity enforced across cuts and level probabilities
+taken as consecutive differences. Every training row then informs every threshold above and below
+it, and the ordering is used rather than thrown away.
+
+Same harvest, same 600 states, same sealed split:
+
+| head | accuracy | floor | ordinal MAE |
+| --- | ---: | ---: | ---: |
+| multinomial, l2 1.0 | 0.3083 | 0.2667 | 0.9746 |
+| multinomial, l2 5.0 | 0.1917 | 0.2667 | 1.0025 |
+| ordinal thresholds, l2 1.0 | **0.2833** | 0.2667 | 1.1486 |
+| ordinal thresholds, l2 5.0 | **0.2250** | 0.2667 | 1.0914 |
+
+All four below floor, and the threshold stack's ordinal MAE is *worse* than the multinomial's
+despite being the formulation designed for ordered targets.
+
+That is the fourth distinct attempt at Score over a frozen state -- two harvest prompts, three label
+granularities, two loss formulations, L2 swept on each. The ceiling is not the prompt, not the
+granularity choice, and not the loss. It is the representation.
