@@ -30,3 +30,41 @@ tasks.named<Test>("integrationTest") {
         providers.environmentVariable("DECISIONS_GRANITE_MODEL").orElse("absent")
     )
 }
+
+// Cuts a release artifact from a harvest. The tool lives in the test source set because it drives
+// a qualified backend, but the artifact it writes is a product of the main source set alone.
+//
+//   ./gradlew :models-decisions:release \
+//       -Pharvest=/path/to/squad2.jsonl -Pcorpus=squad2 \
+//       -Pbase=granite-4.1-3b -Pout=/path/to/model.idsn
+tasks.register<JavaExec>("release") {
+    group = "distribution"
+    description = "Fit, calibrate, read the sealed split once, and write the decision artifact"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.decisions.ReleaseTool")
+    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    args(
+        providers.gradleProperty("harvest").get(),
+        providers.gradleProperty("corpus").get(),
+        providers.gradleProperty("base").get(),
+        providers.gradleProperty("out").get(),
+    )
+}
+
+// Runs a released artifact over a JSONL of questions.
+//
+//   ./gradlew :models-decisions:decide \
+//       -Partifact=model.idsn -Pbase=granite.gguf -Pin=questions.jsonl -Pout=verdicts.jsonl
+tasks.register<JavaExec>("decide") {
+    group = "application"
+    description = "Answer a JSONL of questions with a released decision artifact"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.decisions.DecideCli")
+    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    args(
+        providers.gradleProperty("artifact").get(),
+        providers.gradleProperty("base").get(),
+        providers.gradleProperty("in").get(),
+        providers.gradleProperty("out").get(),
+    )
+}

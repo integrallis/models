@@ -43,6 +43,32 @@ public final class FeatureStandardizer {
   }
 
   /**
+   * Rebuilds a standardiser from stored statistics, for {@link DecisionArtifact} alone.
+   *
+   * <p>The arrays are copied, so a caller cannot mutate a loaded standardiser afterwards.
+   */
+  static FeatureStandardizer of(double[] mean, double[] scale) {
+    if (mean.length != scale.length) {
+      throw new IllegalArgumentException(
+          "mean width " + mean.length + " does not match scale width " + scale.length);
+    }
+    if (mean.length == 0) {
+      throw new IllegalArgumentException("a standardiser must not be empty");
+    }
+    return new FeatureStandardizer(mean.clone(), scale.clone());
+  }
+
+  /** The internal mean, uncopied, for the artifact writer only. Never hand this to a caller. */
+  double[] meanInternal() {
+    return mean;
+  }
+
+  /** The internal scale, uncopied, for the artifact writer only. Never hand this to a caller. */
+  double[] scaleInternal() {
+    return scale;
+  }
+
+  /**
    * Fits the statistics on the given rows.
    *
    * @param rows the training rows, all of the same width

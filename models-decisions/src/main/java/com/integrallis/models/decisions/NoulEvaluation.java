@@ -39,7 +39,9 @@ public final class NoulEvaluation {
   private final List<HarvestRecord> calibration = new ArrayList<>();
   private final List<HarvestRecord> sealed = new ArrayList<>();
   private final LogisticHeadTrainer trainer;
+  private final String baseModel;
   private boolean sealedRead;
+  private DecisionArtifact artifact;
 
   /**
    * Prepares an evaluation over one corpus's harvest.
@@ -48,13 +50,19 @@ public final class NoulEvaluation {
    * @param space the answer space, which must be binary for a Noul evaluation
    * @param records every harvested record, already carrying its split
    * @param trainer the head trainer
+   * @param baseModel the base whose hidden states were harvested, carried into the artifact
    * @throws IllegalArgumentException if an item appears in more than one split, or a split is empty
    */
   public NoulEvaluation(
-      String corpus, AnswerSpace space, List<HarvestRecord> records, LogisticHeadTrainer trainer) {
+      String corpus,
+      AnswerSpace space,
+      List<HarvestRecord> records,
+      LogisticHeadTrainer trainer,
+      String baseModel) {
     this.corpus = Objects.requireNonNull(corpus, "corpus");
     this.space = Objects.requireNonNull(space, "space");
     this.trainer = Objects.requireNonNull(trainer, "trainer");
+    this.baseModel = Objects.requireNonNull(baseModel, "baseModel");
     Objects.requireNonNull(records, "records");
 
     Set<String> seen = new HashSet<>();
@@ -90,8 +98,15 @@ public final class NoulEvaluation {
     }
     sealedRead = true;
 
-    LinearDecisionHead head = trainer.fit(space, features(train), labels(train));
-    double temperature = TemperatureFitter.fit(logits(head, calibration), labels(calibration));
+    // Statistics come from the training rows alone. Fitting them over every split would leak the
+    // sealed rows' distribution into the model that is about to be scored on them, and the leak
+    // would show up as a good number rather than as an error.
+    FeatureStandardizer standardizer = FeatureStandardizer.fit(features(train));
+    LinearDecisionHead head =
+        trainer.fit(space, standardizer.applyAll(features(train)), labels(train));
+    double temperature =
+        TemperatureFitter.fit(logits(head, standardizer, calibration), labels(calibration));
+    artifact = new DecisionArtifact(space, standardizer, head, temperature, baseModel);
 
     int size = sealed.size();
     double[] probabilities = new double[size];
@@ -105,7 +120,8 @@ public final class NoulEvaluation {
 
     for (int index = 0; index < size; index++) {
       HarvestRecord record = sealed.get(index);
-      Verdict verdict = head.decide(record.hiddenInternal(), temperature);
+      // Scored through the artifact, so the released file is what this report describes.
+      Verdict verdict = artifact.decide(record.hiddenInternal());
       boolean headSaysTrue = verdict.probabilityOfTrue() >= 0.5;
 
       probabilities[index] = verdict.probabilityOfTrue();
@@ -138,6 +154,21 @@ public final class NoulEvaluation {
         (double) truncated / size);
   }
 
+  /**
+   * The artifact that produced the report, ready to be written and released.
+   *
+   * <p>This is the same object the sealed split was scored through, so the published numbers and
+   * the shipped file cannot drift apart.
+   *
+   * @throws IllegalStateException if the sealed split has not been scored yet
+   */
+  public DecisionArtifact artifact() {
+    if (artifact == null) {
+      throw new IllegalStateException("score the sealed split before releasing the artifact");
+    }
+    return artifact;
+  }
+
   private static float[][] features(List<HarvestRecord> records) {
     float[][] features = new float[records.size()][];
     for (int index = 0; index < records.size(); index++) {
@@ -154,10 +185,11 @@ public final class NoulEvaluation {
     return labels;
   }
 
-  private static double[][] logits(LinearDecisionHead head, List<HarvestRecord> records) {
+  private static double[][] logits(
+      LinearDecisionHead head, FeatureStandardizer standardizer, List<HarvestRecord> records) {
     double[][] logits = new double[records.size()][];
     for (int index = 0; index < records.size(); index++) {
-      logits[index] = head.logits(records.get(index).hiddenInternal());
+      logits[index] = head.logits(standardizer.apply(records.get(index).hiddenInternal()));
     }
     return logits;
   }
