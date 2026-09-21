@@ -45,7 +45,15 @@ public final class AlignmentHeadTool {
 
   private AlignmentHeadTool() {}
 
-  /** Arguments: state harvest, label harvest, training label-set name, comma-separated eval sets. */
+  /**
+   * Arguments: state harvest, label harvest, training label-set name, comma-separated eval specs,
+   * optional L2.
+   *
+   * <p>An eval spec is {@code labelSet} to score the training harvest's own sealed items, or
+   * {@code labelSet@harvestPath} to score a different corpus. The second form is the one that can
+   * actually test transfer: scoring a held-out label set against items whose true label is not in
+   * it asks an incoherent question and can only fail.
+   */
   public static void main(String[] args) throws IOException {
     Path stateHarvest = Path.of(args[0]);
     Path labelHarvest = Path.of(args[1]);
@@ -128,7 +136,28 @@ public final class AlignmentHeadTool {
             },
             1.0);
 
-    for (String evalSet : evalSets) {
+    for (String spec : evalSets) {
+      String evalSet = spec.contains("@") ? spec.substring(0, spec.indexOf('@')) : spec;
+      List<TypedRecord> evalItems = sealedItems;
+      if (spec.contains("@")) {
+        evalItems = new ArrayList<>();
+        Path other = Path.of(spec.substring(spec.indexOf('@') + 1));
+        try (BufferedReader reader = Files.newBufferedReader(other, StandardCharsets.UTF_8)) {
+          String row;
+          while ((row = reader.readLine()) != null) {
+            if (row.isBlank() || !row.contains("\"split\":\"sealed\"")) {
+              continue;
+            }
+            evalItems.add(
+                new TypedRecord(
+                    between(row, "\"id\":\"", "\""),
+                    "sealed",
+                    Integer.parseInt(between(row, "\"outcome\":", ",").trim()),
+                    row.contains("\"truncated\":true"),
+                    stateOf(row)));
+          }
+        }
+      }
       List<float[]> candidates = labelStates.get(evalSet);
       if (candidates == null) {
         System.out.printf("  %-12s  no such label set%n", evalSet);
@@ -137,7 +166,7 @@ public final class AlignmentHeadTool {
       AnswerSpace space = new Choice("which label", labelNames.get(evalSet));
       int hits = 0;
       int[] perOutcome = new int[candidates.size()];
-      for (TypedRecord item : sealedItems) {
+      for (TypedRecord item : evalItems) {
         if (item.outcome() >= candidates.size()) {
           continue; // this item's true label has no counterpart in the held-out set
         }
@@ -159,9 +188,10 @@ public final class AlignmentHeadTool {
         majority = Math.max(majority, count);
       }
       String note = evalSet.equals(trainSet) ? "trained" : "HELD OUT";
+      String scoredOn = spec.contains("@") ? "own items" : "agnews items";
       System.out.printf(
-          "  %-12s %-9s n=%-4d floor %.4f  accuracy %.4f%n",
-          evalSet, note, scored, (double) majority / scored, (double) hits / scored);
+          "  %-12s %-9s %-12s n=%-4d floor %.4f  accuracy %.4f%n",
+          evalSet, note, scoredOn, scored, (double) majority / scored, (double) hits / scored);
     }
   }
 
