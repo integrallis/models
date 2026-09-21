@@ -55,6 +55,9 @@ public final class BriefingDemo {
             .filter(line -> !line.isEmpty())
             .toList();
 
+    // Checked before any inference: a wrong base wastes the whole run and looks like a bad model.
+    artifact.requireBase(model);
+
     PureJavaBackend backend;
     String kernel;
     try {

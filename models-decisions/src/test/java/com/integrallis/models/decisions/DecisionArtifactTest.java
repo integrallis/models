@@ -65,7 +65,8 @@ final class DecisionArtifactTest {
     int width = 24;
     Noul space = new Noul("the state answers the question");
     DecisionArtifact written =
-        new DecisionArtifact(space, standardizer(width), head(space, width), 3.2794, "granite-4.1-3b");
+        new DecisionArtifact(
+            space, standardizer(width), head(space, width), 3.2794, "granite-4.1-3b", "abc123");
     Path file = dir.resolve("noul.idsn");
     written.write(file);
 
@@ -74,6 +75,7 @@ final class DecisionArtifactTest {
     assertThat(read.space()).isEqualTo(space);
     assertThat(read.temperature()).isEqualTo(3.2794);
     assertThat(read.baseModel()).isEqualTo("granite-4.1-3b");
+    assertThat(read.baseDigest()).isEqualTo("abc123");
 
     // The decision itself, not just the stored numbers, must come back identical.
     float[] state = new float[width];
@@ -85,6 +87,39 @@ final class DecisionArtifactTest {
   }
 
   @Test
+  void refusesABaseWhoseDigestDisagrees() throws IOException {
+    // Two files can share a model name and a byte count and hold different weights. A head fed the
+    // wrong weights returns confident nonsense, so the digest has to be the thing that is checked.
+    int width = 8;
+    Noul space = new Noul("p");
+    Path base = dir.resolve("base.gguf");
+    Files.write(base, new byte[] {1, 2, 3, 4});
+    Path other = dir.resolve("other.gguf");
+    Files.write(other, new byte[] {4, 3, 2, 1});
+
+    DecisionArtifact artifact =
+        new DecisionArtifact(
+            space, standardizer(width), head(space, width), 1.0, "base",
+            DecisionArtifact.digestOf(base));
+
+    artifact.requireBase(base); // the right file passes
+    assertThatThrownBy(() -> artifact.requireBase(other))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("base mismatch");
+  }
+
+  @Test
+  void acceptsAnyBaseWhenNoDigestWasRecorded() throws IOException {
+    int width = 8;
+    Noul space = new Noul("p");
+    Path any = dir.resolve("any.gguf");
+    Files.write(any, new byte[] {9});
+    // An older artifact records nothing, and silence must not be read as a contradiction.
+    new DecisionArtifact(space, standardizer(width), head(space, width), 1.0, "base", "")
+        .requireBase(any);
+  }
+
+  @Test
   void roundTripsAChoiceAndAScore() throws IOException {
     int width = 12;
     Choice choice = new Choice("which tool", List.of("search", "calculator", "none"));
@@ -92,7 +127,7 @@ final class DecisionArtifactTest {
     for (AnswerSpace space : List.of(choice, score)) {
       Path file = dir.resolve(space.getClass().getSimpleName() + ".idsn");
       DecisionArtifact written =
-          new DecisionArtifact(space, standardizer(width), head(space, width), 1.5, "base");
+          new DecisionArtifact(space, standardizer(width), head(space, width), 1.5, "base", "");
       written.write(file);
       assertThat(DecisionArtifact.read(file).space()).isEqualTo(space);
     }
@@ -112,7 +147,7 @@ final class DecisionArtifactTest {
     int width = 8;
     Noul space = new Noul("p");
     Path file = dir.resolve("short.idsn");
-    new DecisionArtifact(space, standardizer(width), head(space, width), 1.0, "base").write(file);
+    new DecisionArtifact(space, standardizer(width), head(space, width), 1.0, "base", "").write(file);
     byte[] all = Files.readAllBytes(file);
     Files.write(file, java.util.Arrays.copyOf(all, all.length - 9));
 
@@ -123,7 +158,7 @@ final class DecisionArtifactTest {
   void refusesAStandardizerThatDoesNotMatchTheHead() {
     Noul space = new Noul("p");
     assertThatThrownBy(
-            () -> new DecisionArtifact(space, standardizer(8), head(space, 16), 1.0, "base"))
+            () -> new DecisionArtifact(space, standardizer(8), head(space, 16), 1.0, "base", ""))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("width");
   }
@@ -133,7 +168,7 @@ final class DecisionArtifactTest {
     int width = 10;
     Noul space = new Noul("p");
     DecisionArtifact a =
-        new DecisionArtifact(space, standardizer(width), head(space, width), 2.0, "base");
+        new DecisionArtifact(space, standardizer(width), head(space, width), 2.0, "base", "");
     Path one = dir.resolve("one.idsn");
     Path two = dir.resolve("two.idsn");
     a.write(one);
@@ -150,7 +185,7 @@ final class DecisionArtifactTest {
     Noul space = new Noul("p");
     FeatureStandardizer std = standardizer(width);
     LinearDecisionHead h = head(space, width);
-    DecisionArtifact artifact = new DecisionArtifact(space, std, h, 1.0, "base");
+    DecisionArtifact artifact = new DecisionArtifact(space, std, h, 1.0, "base", "");
 
     float[] raw = new float[width];
     for (int j = 0; j < width; j++) {

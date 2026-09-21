@@ -39,12 +39,14 @@ public final class ReleaseTool {
 
   private ReleaseTool() {}
 
-  /** Arguments: harvest JSONL, corpus name, base model id, output artifact path. */
+  /** Arguments: harvest JSONL, corpus name, base model id, output artifact path, base file. */
   public static void main(String[] args) throws IOException {
     Path harvest = Path.of(args[0]);
     String corpus = args[1];
     String baseModel = args[2];
     Path out = Path.of(args[3]);
+    // The base file itself, so the artifact records what it was actually fitted against.
+    String baseDigest = args.length > 4 && !args[4].isBlank() ? DecisionArtifact.digestOf(Path.of(args[4])) : "";
 
     List<HarvestRecord> records = new ArrayList<>();
     int skipped = 0;
@@ -61,7 +63,8 @@ public final class ReleaseTool {
 
     Noul space = new Noul("the state answers the question");
     NoulEvaluation evaluation =
-        new NoulEvaluation(corpus, space, records, new LogisticHeadTrainer(400, 0.1, 1.0), baseModel);
+        new NoulEvaluation(
+            corpus, space, records, new LogisticHeadTrainer(400, 0.1, 1.0), baseModel, baseDigest);
     NoulReport report = evaluation.scoreSealedOnce();
 
     DecisionArtifact artifact = evaluation.artifact();
@@ -87,6 +90,7 @@ public final class ReleaseTool {
     System.out.printf("  artifact              %s%n", out);
     System.out.printf("  bytes                 %d%n", bytes.length);
     System.out.printf("  sha256                %s%n", sha256(bytes));
+    System.out.printf("  base digest           %s%n", baseDigest.isEmpty() ? "NOT RECORDED" : baseDigest);
 
     // The released file must reproduce the decisions just reported, or the report describes
     // something that was never written to disk.
