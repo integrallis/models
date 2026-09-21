@@ -148,3 +148,46 @@ tasks.register<JavaExec>("baseSpeed") {
     )
     withNativeKernel()
 }
+
+// Harvests one hidden state per item for a fixed question over varying state (Choice / Score).
+tasks.register<JavaExec>("typedHarvest") {
+    group = "verification"
+    description = "Harvest hidden states for a typed corpus"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.decisions.TypedHarvestTool")
+    jvmArgs(
+        "--add-modules", "jdk.incubator.vector",
+        "--enable-native-access=ALL-UNNAMED",
+        "-Xmx12g",
+        "-Dmodels.purejava.maxContextLength=4096",
+    )
+    args(
+        providers.gradleProperty("base").get(),
+        providers.gradleProperty("corpus").get(),
+        providers.gradleProperty("out").get(),
+        providers.gradleProperty("n").get(),
+        providers.gradleProperty("name").get(),
+        providers.gradleProperty("suffix").getOrElse(""),
+    )
+    withNativeKernel()
+}
+
+// Fits a typed head on a harvest and writes the artifact.
+tasks.register<JavaExec>("typedRelease") {
+    group = "distribution"
+    description = "Fit a Choice or Score head, read the sealed split once, write the artifact"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.decisions.TypedReleaseTool")
+    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED", "-Xmx12g")
+    args(
+        providers.gradleProperty("harvest").get(),
+        providers.gradleProperty("corpus").get(),
+        providers.gradleProperty("kind").get(),
+        providers.gradleProperty("labels").get(),
+        providers.gradleProperty("question").get(),
+        providers.gradleProperty("base").get(),
+        providers.gradleProperty("baseFile").getOrElse(""),
+        providers.gradleProperty("l2").getOrElse("1.0"),
+        providers.gradleProperty("out").get(),
+    )
+}
