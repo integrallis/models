@@ -60,6 +60,9 @@ public final class DecideCli {
     // The Rust kernel is the qualified fast path, but it is only bundled for the platforms it was
     // built for. Falling back keeps the artifact testable on a laptop; which path ran is printed,
     // because a silent fallback would make a latency number mean two different things.
+    // Checked before any inference: a wrong base wastes the whole run and looks like a bad model.
+    artifact.requireBase(model);
+
     PureJavaBackend backend;
     String kernel;
     try {

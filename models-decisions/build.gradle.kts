@@ -48,6 +48,7 @@ tasks.register<JavaExec>("release") {
         providers.gradleProperty("corpus").get(),
         providers.gradleProperty("base").get(),
         providers.gradleProperty("out").get(),
+        providers.gradleProperty("baseFile").getOrElse(""),
     )
 }
 
@@ -89,7 +90,11 @@ tasks.register<JavaExec>("briefing") {
 tasks.register<Sync>("demoDist") {
     group = "distribution"
     description = "Copy the demo's full runtime classpath into build/demo-dist"
+    // Jars from the dependency graph, plus this module's own main and test classes. The filter
+    // above dropped directories, and this module's main output is a directory, so without the
+    // explicit includes the demo ships every dependency and none of its own code.
     from(sourceSets["test"].runtimeClasspath.filter { it.isFile })
+    from(tasks.named("classes").map { sourceSets["main"].output })
     from(tasks.named("testClasses").map { sourceSets["test"].output })
     into(layout.buildDirectory.dir("demo-dist"))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE

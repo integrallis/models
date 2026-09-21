@@ -40,6 +40,7 @@ public final class NoulEvaluation {
   private final List<HarvestRecord> sealed = new ArrayList<>();
   private final LogisticHeadTrainer trainer;
   private final String baseModel;
+  private final String baseDigest;
   private boolean sealedRead;
   private DecisionArtifact artifact;
 
@@ -51,6 +52,7 @@ public final class NoulEvaluation {
    * @param records every harvested record, already carrying its split
    * @param trainer the head trainer
    * @param baseModel the base whose hidden states were harvested, carried into the artifact
+   * @param baseDigest the base file's SHA-256, so a wrong base is caught rather than guessed at
    * @throws IllegalArgumentException if an item appears in more than one split, or a split is empty
    */
   public NoulEvaluation(
@@ -58,11 +60,13 @@ public final class NoulEvaluation {
       AnswerSpace space,
       List<HarvestRecord> records,
       LogisticHeadTrainer trainer,
-      String baseModel) {
+      String baseModel,
+      String baseDigest) {
     this.corpus = Objects.requireNonNull(corpus, "corpus");
     this.space = Objects.requireNonNull(space, "space");
     this.trainer = Objects.requireNonNull(trainer, "trainer");
     this.baseModel = Objects.requireNonNull(baseModel, "baseModel");
+    this.baseDigest = Objects.requireNonNull(baseDigest, "baseDigest");
     Objects.requireNonNull(records, "records");
 
     Set<String> seen = new HashSet<>();
@@ -106,7 +110,8 @@ public final class NoulEvaluation {
         trainer.fit(space, standardizer.applyAll(features(train)), labels(train));
     double temperature =
         TemperatureFitter.fit(logits(head, standardizer, calibration), labels(calibration));
-    artifact = new DecisionArtifact(space, standardizer, head, temperature, baseModel);
+    artifact =
+        new DecisionArtifact(space, standardizer, head, temperature, baseModel, baseDigest);
 
     int size = sealed.size();
     double[] probabilities = new double[size];

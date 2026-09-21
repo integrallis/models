@@ -49,7 +49,7 @@ public final class DecisionArtifact {
   /** {@code IDSN} then the format version, so a wrong file fails immediately and by name. */
   private static final int MAGIC = 0x4944_534E;
 
-  private static final int VERSION = 1;
+  private static final int VERSION = 2;
 
   private static final int KIND_NOUL = 0;
   private static final int KIND_CHOICE = 1;
@@ -60,6 +60,7 @@ public final class DecisionArtifact {
   private final LinearDecisionHead head;
   private final double temperature;
   private final String baseModel;
+  private final String baseDigest;
 
   /**
    * Bundles a measured triple.
@@ -69,13 +70,16 @@ public final class DecisionArtifact {
    * @param head the fitted head, expecting standardised features
    * @param temperature the fitted temperature, {@code 1.0} for an uncalibrated release
    * @param baseModel the identifier of the base whose hidden states the head reads
+   * @param baseDigest the base file's SHA-256, or empty if it was not recorded
    */
   public DecisionArtifact(
       AnswerSpace space,
       FeatureStandardizer standardizer,
       LinearDecisionHead head,
       double temperature,
-      String baseModel) {
+      String baseModel,
+      String baseDigest) {
+    this.baseDigest = Objects.requireNonNull(baseDigest, "baseDigest");
     this.space = Objects.requireNonNull(space, "space");
     this.standardizer = Objects.requireNonNull(standardizer, "standardizer");
     this.head = Objects.requireNonNull(head, "head");
@@ -112,6 +116,54 @@ public final class DecisionArtifact {
     return baseModel;
   }
 
+  /** The SHA-256 of the base file this head was fitted against, or empty if unrecorded. */
+  public String baseDigest() {
+    return baseDigest;
+  }
+
+  /**
+   * Checks a base file is the one this head was fitted against.
+   *
+   * <p>A name is not an identity. Two files can carry the same model name and the same byte count
+   * and hold different weights, and a head fed hidden states from the wrong weights returns
+   * confident nonsense rather than an error. This is the check that turns that into a failure.
+   *
+   * @throws IllegalStateException if the digests disagree
+   */
+  public void requireBase(Path baseFile) throws IOException {
+    if (baseDigest.isEmpty()) {
+      return; // nothing was recorded, so there is nothing to contradict
+    }
+    String actual = digestOf(baseFile);
+    if (!actual.equalsIgnoreCase(baseDigest)) {
+      throw new IllegalStateException(
+          "base mismatch: "
+              + baseFile
+              + " is sha256 "
+              + actual
+              + " but this head was fitted against "
+              + baseDigest
+              + "; the hidden states would come from different weights");
+    }
+  }
+
+  /** SHA-256 of a file, as lowercase hex. */
+  public static String digestOf(Path file) throws IOException {
+    try {
+      java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+      try (java.io.InputStream in = new java.io.BufferedInputStream(Files.newInputStream(file))) {
+        byte[] buffer = new byte[1 << 16];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+          digest.update(buffer, 0, read);
+        }
+      }
+      return java.util.HexFormat.of().formatHex(digest.digest());
+    } catch (java.security.NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException(impossible);
+    }
+  }
+
   /** The hidden-state width this artifact requires. */
   public int width() {
     return head.width();
@@ -143,6 +195,7 @@ public final class DecisionArtifact {
       out.writeInt(MAGIC);
       out.writeInt(VERSION);
       writeString(out, baseModel);
+      writeString(out, baseDigest);
       out.writeDouble(temperature);
       writeSpace(out, space);
 
@@ -189,6 +242,7 @@ public final class DecisionArtifact {
             "unsupported artifact version " + version + ", this build reads " + VERSION);
       }
       String baseModel = readString(in);
+      String baseDigest = readString(in);
       double temperature = in.readDouble();
       AnswerSpace space = readSpace(in);
 
@@ -225,7 +279,8 @@ public final class DecisionArtifact {
           FeatureStandardizer.of(mean, scale),
           new LinearDecisionHead(space, weights, bias),
           temperature,
-          baseModel);
+          baseModel,
+          baseDigest);
     } catch (EOFException truncated) {
       throw new IOException(path + " ends before the artifact does; the file is truncated", truncated);
     }
