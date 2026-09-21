@@ -1,0 +1,9 @@
+# Pinned. The PTX kernels need three nightly features (`abi_ptx`, `stdarch_nvptx`,
+# `asm_experimental_arch`) and `-Zbuild-std`, so this crate cannot use the repository-wide
+# stable toolchain in `../../../../rust-toolchain.toml`. Pinned to an exact date so a toolchain
+# regression is distinguishable from our own change; see backend-cuda/UPSTREAM.md.
+[toolchain]
+channel = "nightly-2026-09-17"
+components = ["clippy", "rustfmt", "rust-src", "llvm-bitcode-linker", "llvm-tools"]
+targets = ["nvptx64-nvidia-cuda"]
+profile = "minimal"

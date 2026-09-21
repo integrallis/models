@@ -1,0 +1,19 @@
+[package]
+name = "models-cuda-kernels"
+version = "0.3.42"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Models-owned GPU kernels for K-quant projections and decode attention, compiled to PTX"
+
+[lib]
+name = "models_cuda_kernels"
+# rlib so the host test target links the arithmetic modules directly; cdylib is what makes the
+# nvptx64 target emit a .ptx module. On a host target the cdylib is an unused shared object.
+crate-type = ["rlib", "cdylib"]
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+# No `strip`: the PTX build needs the kernel entry-point symbol names intact.
