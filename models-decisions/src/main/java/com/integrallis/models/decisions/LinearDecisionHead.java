@@ -67,6 +67,16 @@ public final class LinearDecisionHead implements DecisionHead {
     this.bias = bias.clone();
   }
 
+  /** The internal weights, uncopied, for the artifact writer only. Never hand this to a caller. */
+  double[][] weightsInternal() {
+    return weights;
+  }
+
+  /** The internal bias, uncopied, for the artifact writer only. Never hand this to a caller. */
+  double[] biasInternal() {
+    return bias;
+  }
+
   /** Returns the width of hidden state this head reads. */
   public int width() {
     return width;

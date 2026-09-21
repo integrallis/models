@@ -158,7 +158,8 @@ class NoulEvaluationTest {
   }
 
   private static NoulEvaluation evaluation(List<HarvestRecord> records) {
-    return new NoulEvaluation("synthetic", SPACE, records, new LogisticHeadTrainer(300, 0.2, 0.01));
+    return new NoulEvaluation(
+        "synthetic", SPACE, records, new LogisticHeadTrainer(300, 0.2, 0.01), "synthetic-base");
   }
 
   /** Label is a clean function of the first feature, so a linear head can learn it. */
