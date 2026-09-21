@@ -92,3 +92,54 @@ still running; these are the numbers available now, not final ones.
 The `beatsFloor` condition fired on real data exactly as its synthetic test predicted. Without it,
 a Score head at 0.3083 would read as a weak result rather than as no result -- which is how the
 CUAD head's 0.5600 against a 0.7200 floor once read as progress.
+
+## The fixed-label head cannot serve JevBench, and the alignment head did not rescue it
+
+JevBench's 36 choice items use **three** distinct option sets, twelve items each:
+
+| option set | size |
+| --- | ---: |
+| `cancel, refund, status, change_address, other` | 5 |
+| `courier, pickup, post, unknown` | 4 |
+| `math, coding, coding_agent, document, tools, general` | 6 |
+
+Its twelve score items share one set, `0,1,2,3`.
+
+A multinomial head learns *those* labels, so an AG News head has nothing to say about any of them,
+and the benchmark's own items cannot be trained on. The head measured above therefore serves a
+customer who owns a fixed taxonomy and has labelled data for it -- not a benchmark that supplies a
+new option set per question.
+
+`CandidateScorer` exists for exactly this and was built to be label-agnostic: score each candidate
+independently against the state, normalise within the question, so "the ratio between two
+candidates is unaffected by the presence of a third". It needed a trained `Alignment`.
+
+One was trained. Features are the elementwise product and absolute difference between a state and a
+candidate's encoded label text -- nothing in them names a label, so an unseen label is scored on the
+same footing as a trained one. Trained on AG News interactions alone, 3,200 pairs of width 2,048:
+
+| option set | | accuracy | floor |
+| --- | --- | ---: | ---: |
+| agnews | trained | 0.6100 | 0.2650 |
+| jev_ship | held out | **0.1800** | 0.2650 |
+| jev_intent | held out | **0.1750** | 0.2650 |
+| jev_route | held out | **0.1800** | 0.2650 |
+
+**All three held-out sets fall below the floor.** That is not a weak signal to be tuned up, it is no
+signal. The head also reached only 0.6100 on the set it trained on, against 0.8500 for the
+fixed-label head on the same items, so interaction features over a frozen state carry less than
+direct class weights.
+
+**A flaw in this experiment, stated rather than buried.** The held-out sets were scored against AG
+News *items*, whose true label is a news topic with no counterpart in a shipping vocabulary. Asking
+which of `courier / pickup / post / unknown` fits a sports report is incoherent by construction, so
+this run cannot separate "the mechanism does not transfer" from "the question was meaningless".
+What it does establish is that this head, trained this way, transfers nothing usable. A clean test
+needs items whose true labels live in the held-out set.
+
+**Where this leaves the architecture.** Our Choice head is real and works at 0.8500 for a fixed
+taxonomy with training data. Jev reads its option set from the instructions and needs none. That is
+a narrower product, and JevBench's choice family stays unaddressable until either per-option-set
+training data exists or a head is built that genuinely generalises across option sets -- which the
+OpenJev recipe achieves with a LoRA adapter reshaping the representation, not with a probe over a
+frozen one.
