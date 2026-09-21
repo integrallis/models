@@ -92,6 +92,21 @@ class HeadTrainingTest {
   }
 
   @Test
+  void aDecayThatWouldDivergeIsRefusedAtConstruction() {
+    // The weight update subtracts learningRate * l2 * w each step, so the decay factor is
+    // (1 - learningRate * l2). At or above 1 the weights flip sign and grow without bound, and the
+    // first thing the caller sees is a non-finite logit from deep inside the fit. Refuse the
+    // combination up front, where the message can say what is wrong.
+    assertThatThrownBy(() -> new LogisticHeadTrainer(400, 0.1, 10.0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("diverge");
+    assertThatThrownBy(() -> new LogisticHeadTrainer(400, 0.1, 100.0))
+        .isInstanceOf(IllegalArgumentException.class);
+    // Just under the boundary is allowed.
+    assertThat(new LogisticHeadTrainer(400, 0.1, 9.0)).isNotNull();
+  }
+
+  @Test
   void theTrainerRejectsEvidenceItCannotUse() {
     assertThatThrownBy(() -> trainer().fit(ANSWERABLE, new float[0][0], new int[0]))
         .isInstanceOf(IllegalArgumentException.class);

@@ -63,9 +63,52 @@ public final class PreliminaryHeadTool {
     List<HarvestRecord> dev = train.subList(cut, train.size());
 
     Noul space = new Noul("the state answers the question");
-    LinearDecisionHead head =
-        new LogisticHeadTrainer(400, 0.1, 0.01).fit(space, features(fit), labels(fit));
-    double temperature = TemperatureFitter.fit(logitsOf(head, fit), labels(fit));
+    // Statistics from the fitting rows alone; applying them to dev is not a leak, deriving them
+    // from dev would be.
+    FeatureStandardizer standardizer = FeatureStandardizer.fit(features(fit));
+    float[][] fitX = standardizer.applyAll(features(fit));
+    float[][] devX = standardizer.applyAll(features(dev));
+    int[] fitY = labels(fit);
+
+    System.out.printf("%n  %-10s %-9s %-9s %-9s %-9s%n", "L2", "devAcc", "agree", "ECE", "temp");
+    LinearDecisionHead head = null;
+    double temperature = 1.0;
+    double bestAcc = -1.0;
+    for (double l2 : new double[] {0.0, 0.01, 0.1, 1.0, 10.0, 100.0}) {
+      LinearDecisionHead candidate = new LogisticHeadTrainer(400, 0.1, l2).fit(space, fitX, fitY);
+      double[][] devLogits = new double[devX.length][];
+      for (int i = 0; i < devX.length; i++) {
+        devLogits[i] = candidate.logits(devX[i]);
+      }
+      int[] devY = labels(dev);
+      double t = TemperatureFitter.fit(devLogits, devY);
+      int hits = 0;
+      int agreeN = 0;
+      double[] conf = new double[devX.length];
+      boolean[] ok = new boolean[devX.length];
+      for (int i = 0; i < devX.length; i++) {
+        Verdict v = candidate.decide(devX[i], t);
+        boolean says = v.probabilityOfTrue() >= 0.5;
+        hits += says == dev.get(i).label() ? 1 : 0;
+        agreeN += says == dev.get(i).decode() ? 1 : 0;
+        conf[i] = Math.max(v.probabilityOfTrue(), 1.0 - v.probabilityOfTrue());
+        ok[i] = says == dev.get(i).label();
+      }
+      double acc = (double) hits / devX.length;
+      System.out.printf(
+          "  %-10.2f %-9.4f %-9.4f %-9.4f %-9.3f%n",
+          l2,
+          acc,
+          (double) agreeN / devX.length,
+          Calibration.expectedCalibrationError(conf, ok, 10),
+          t);
+      if (acc > bestAcc) {
+        bestAcc = acc;
+        head = candidate;
+        temperature = t;
+      }
+    }
+    System.out.println();
 
     int n = dev.size();
     double[] probability = new double[n];
@@ -78,7 +121,7 @@ public final class PreliminaryHeadTool {
     int positives = 0;
     for (int i = 0; i < n; i++) {
       HarvestRecord r = dev.get(i);
-      Verdict v = head.decide(r.hidden(), temperature);
+      Verdict v = head.decide(standardizer.apply(r.hidden()), temperature);
       boolean says = v.probabilityOfTrue() >= 0.5;
       probability[i] = v.probabilityOfTrue();
       confidence[i] = Math.max(probability[i], 1.0 - probability[i]);
