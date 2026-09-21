@@ -88,9 +88,16 @@ public final class BriefingDemo {
       double prefillSeconds = (System.nanoTime() - prefillStart) / 1e9;
       System.out.printf("  prefill (once)              %7.3f s%n%n", prefillSeconds);
 
+      boolean batched =
+          Boolean.parseBoolean(System.getProperty("decisions.batchQuestions", "false"));
       List<Double> marginal = new ArrayList<>();
       List<Double> probabilities = new ArrayList<>();
       boolean sharedEverywhere = true;
+
+      if (batched) {
+        runBatched(
+            held, sharing, artifact, prefix, questions, documentTokens, marginal, probabilities);
+      } else {
       for (int index = 0; index < questions.size(); index++) {
         String question = questions.get(index);
         int[] tail =
@@ -102,6 +109,7 @@ public final class BriefingDemo {
                         + "\nAnswer:");
 
         long start = System.nanoTime();
+        double seconds;
         double probability;
         try (InferenceSession branch = sharing.fork(prefix)) {
           int position = documentTokens.length;
@@ -113,13 +121,15 @@ public final class BriefingDemo {
           float[] hidden =
               sharing.forwardHiddenState(branch, tail[tail.length - 1], position + tail.length - 1);
           probability = artifact.decide(hidden).probabilityOfTrue();
+          // Stop the clock before witnessing. The witness fork is an assertion about the
+          // implementation, not work a caller would ever do, and timing it means the measurement
+          // pays for its own proof -- the figure would describe the harness, not the model.
+          seconds = (System.nanoTime() - start) / 1e9;
 
-          // A second fork witnesses that the branch really sits on the shared storage.
           try (InferenceSession witness = sharing.fork(prefix)) {
             sharedEverywhere &= sharing.sharesPrefixStorage(branch, witness);
           }
         }
-        double seconds = (System.nanoTime() - start) / 1e9;
         marginal.add(seconds);
         probabilities.add(probability);
 
@@ -130,6 +140,8 @@ public final class BriefingDemo {
             probability >= 0.5 ? "YES" : "NO ",
             probability,
             seconds);
+      }
+
       }
 
       double total = prefillSeconds + marginal.stream().mapToDouble(Double::doubleValue).sum();
@@ -162,5 +174,68 @@ public final class BriefingDemo {
       Files.writeString(out, json.toString(), StandardCharsets.UTF_8);
       System.out.printf("  timings written to %s%n%n", out);
     }
+  }
+
+  /**
+   * Answers every question in one ragged pass over forked branches.
+   *
+   * <p>Only one timing is meaningful here and it is the whole batch. The questions stop being
+   * independent pieces of work, so dividing the batch by ten and calling the result a per-question
+   * cost would report a number the system never pays.
+   */
+  private static void runBatched(
+      PureJavaBackend backend,
+      SharedPrefixInferenceBackend sharing,
+      DecisionArtifact artifact,
+      SharedInferencePrefix prefix,
+      List<String> questions,
+      int[] documentTokens,
+      List<Double> marginal,
+      List<Double> probabilities) {
+    int count = questions.size();
+    int[][] tails = new int[count][];
+    int[] starts = new int[count];
+    for (int index = 0; index < count; index++) {
+      tails[index] =
+          backend
+              .tokenizer()
+              .encode(
+                  " "
+                      + questions.get(index)
+                      + "\nIs the question answerable from the text above? Answer yes or no."
+                      + "\nAnswer:");
+      starts[index] = documentTokens.length;
+    }
+
+    InferenceSession[] branches = new InferenceSession[count];
+    long start = System.nanoTime();
+    float[][] states;
+    try {
+      for (int index = 0; index < count; index++) {
+        branches[index] = sharing.fork(prefix);
+      }
+      states = backend.prefillBatchHiddenStates(branches, tails, starts);
+    } finally {
+      for (InferenceSession branch : branches) {
+        if (branch != null) {
+          branch.close();
+        }
+      }
+    }
+    double seconds = (System.nanoTime() - start) / 1e9;
+
+    for (int index = 0; index < count; index++) {
+      double probability = artifact.decide(states[index]).probabilityOfTrue();
+      probabilities.add(probability);
+      String question = questions.get(index);
+      System.out.printf(
+          "  Q%-2d %-46s %s  p=%.3f%n",
+          index + 1,
+          question.length() > 46 ? question.substring(0, 43) + "..." : question,
+          probability >= 0.5 ? "YES" : "NO ",
+          probability);
+    }
+    marginal.add(seconds);
+    System.out.printf("%n  all %d questions in one batch %7.3f s%n", count, seconds);
   }
 }

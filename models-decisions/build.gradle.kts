@@ -116,3 +116,35 @@ tasks.register<Sync>("demoDist") {
     into(layout.buildDirectory.dir("demo-dist"))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+// What a base costs before a head exists for it. The cheap half of a base swap.
+tasks.register<JavaExec>("baseSpeed") {
+    group = "verification"
+    description = "Measure document prefill and question-tail cost for a candidate base"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.decisions.BaseSpeedProbe")
+    // Some architectures allocate session state for the whole declared context window up front,
+    // so a small model can need more heap than a large one. The probe is about speed, and a heap
+    // limit deciding which bases are measurable would silently narrow the comparison.
+    // Session state is allocated for the declared context window, so a model that declares a very
+    // long one cannot open a session at all; capping it keeps the comparison about speed.
+    jvmArgs(
+        "--add-modules", "jdk.incubator.vector",
+        "--enable-native-access=ALL-UNNAMED",
+        "-Xmx12g",
+        "-Dmodels.purejava.maxContextLength=4096")
+    // Tuning knobs are passed only when asked for. Supplying a default here would mean every run
+    // silently carried a setting, and an unset knob would be indistinguishable from a chosen one.
+    providers.gradleProperty("threads").orNull?.let { jvmArgs("-Dvectors.gguf.threads=$it") }
+    providers.gradleProperty("parallelThreshold").orNull?.let {
+        jvmArgs("-Dvectors.gguf.parallelThreshold=$it")
+    }
+    providers.gradleProperty("prefillBatch").orNull?.let {
+        jvmArgs("-Dmodels.purejava.prefillBatchSize=$it")
+    }
+    args(
+        providers.gradleProperty("base").get(),
+        providers.gradleProperty("doc").get(),
+    )
+    withNativeKernel()
+}

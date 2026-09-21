@@ -1113,6 +1113,44 @@ public final class PureJavaBackend
     return decoder.prefillBatch(unwrapSessions(sessions), tokenBatches);
   }
 
+  /** Whether several sessions can be prefilled together and their hidden states returned. */
+  public boolean supportsBatchedHiddenStates() {
+    return decoder.supportsBatchedHiddenStates();
+  }
+
+  /**
+   * Prefills independent sessions together and returns one final normalized hidden state each.
+   *
+   * <p>Falls back to prefilling them one at a time where the decoder cannot batch, so a caller
+   * gets the same answers either way and only the cost changes.
+   */
+  public float[][] prefillBatchHiddenStates(
+      InferenceSession[] sessions, int[][] tokenBatches, int[] startPositions) {
+    Objects.requireNonNull(sessions, "sessions");
+    Objects.requireNonNull(tokenBatches, "tokenBatches");
+    Objects.requireNonNull(startPositions, "startPositions");
+    if (sessions.length != tokenBatches.length || sessions.length != startPositions.length) {
+      throw new IllegalArgumentException(
+          "sessions "
+              + sessions.length
+              + ", tokenBatches "
+              + tokenBatches.length
+              + " and startPositions "
+              + startPositions.length
+              + " must agree");
+    }
+    if (!decoder.supportsBatchedHiddenStates()) {
+      // The same answers by a slower route, so a caller never has to ask which path it got.
+      float[][] states = new float[sessions.length][];
+      for (int index = 0; index < sessions.length; index++) {
+        states[index] =
+            prefillHiddenState(sessions[index], tokenBatches[index], startPositions[index]);
+      }
+      return states;
+    }
+    return decoder.prefillBatchHiddenStates(unwrapSessions(sessions), tokenBatches);
+  }
+
   @Override
   public LogitBatch prefillBatchTransient(InferenceSession[] sessions, int[][] tokenBatches) {
     if (!decoder.supportsRaggedPrefillBatch()) {
