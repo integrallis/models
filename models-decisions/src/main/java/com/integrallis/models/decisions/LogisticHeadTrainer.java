@@ -51,6 +51,17 @@ public final class LogisticHeadTrainer {
     if (!Double.isFinite(l2) || l2 < 0.0) {
       throw new IllegalArgumentException("l2 must be non-negative and finite");
     }
+    // Each step applies w -= learningRate * l2 * w, so the decay factor is (1 - learningRate * l2).
+    // At or above 1 the weights flip sign and grow without bound, and the caller's first symptom is
+    // a non-finite logit from deep inside the fit. Refuse it here, where the message can be useful.
+    if (learningRate * l2 >= 1.0) {
+      throw new IllegalArgumentException(
+          "learningRate * l2 = "
+              + (learningRate * l2)
+              + " would diverge; the weight decay factor (1 - learningRate * l2) must stay below"
+              + " one, so reduce l2 below "
+              + (1.0 / learningRate));
+    }
     this.iterations = iterations;
     this.learningRate = learningRate;
     this.l2 = l2;
