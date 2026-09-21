@@ -6,7 +6,7 @@ A decision artifact you can run. Not a benchmark claim; see the limits below bef
 
 ```
 ./gradlew :models-decisions:decide \
-  -Partifact=../models-decisions-release/squad2-noul-v0.1.idsn \
+  -Partifact=../models-decisions-release/squad2-noul-v0.2.idsn \
   -Pbase=$HOME/.jvllm/models/granite-4.1-3b-Q4_K_M.gguf \
   -Pin=questions.jsonl \
   -Pout=verdicts.jsonl
@@ -38,8 +38,9 @@ chosen after seeing the result.
 
 ## What is in the file
 
-`squad2-noul-v0.1.idsn`, 82,020 bytes,
-sha256 `efe04e35843c92ee2629129e73125e106ec47d9d6ac31f5c7d0de350a6ed6c8f`.
+`squad2-noul-v0.2.idsn`, 82,088 bytes,
+sha256 `d1b7f3d54d1c04218e3986db66d217490220239b3cc97623a8978ecfb0bce274`,
+fitted against base sha256 `662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29`.
 
 The standardiser, the head and the temperature that were measured together — 2,560-wide, fitted on
 Granite 4.1 3B hidden states. Not the base model: this is the small learned part, and it names the
@@ -74,9 +75,10 @@ The base clears its floor by 0.28, so the comparison is informative rather than 
   refunded. The text settles the question, and the head scored it 0.077 — confidently wrong. squad2
   teaches "is there a matching span", so a negative inference reads as absence. This is the same
   weakness as the adequacy family.
-- **Local latency is not the latency.** There is no `macos-x86_64` Rust kernel, so on a Mac this
-  falls back to pure Java at roughly 22 s/item against 2.26 s/item measured on Linux with rust-ffm.
-  The CLI prints which kernel ran; a number taken from the fallback is not comparable.
+- **Check the kernel line on every run.** The tasks below build and attach the rust-ffm kernel for
+  the host platform, and print which one loaded. It is worth 7-8x: on this 2019 Intel Mac the same
+  ten-question run is 28.3 s with rust-ffm and 211.9 s on the pure-Java fallback. A number taken
+  from the fallback is not comparable with one taken from the kernel.
 - **0.8000 is squad2, not JevBench.** Different task, different corpus. The two numbers are not
   interchangeable and neither predicts the other.
 
@@ -84,3 +86,30 @@ The base clears its floor by 0.28, so the comparison is informative rather than 
 
 Running both arms on the same input file is evaluation, which MCA 2.3(b) permits. Publishing the
 comparison waits on counsel for 2.3(b) and 14.1. Numbers stay internal until then.
+
+## Many questions against one document
+
+```
+./gradlew :models-decisions:briefing \
+  -Partifact=../models-decisions-release/squad2-noul-v0.2.idsn \
+  -Pbase=$HOME/.jvllm/models/granite-4.1-3b-Q4_K_M.gguf \
+  -Pdoc=document.txt -Pquestions=questions.txt -Ptimings=timings.json
+```
+
+The document is prefilled once and frozen; every question forks that physical prefix. Measured on
+this Mac with rust-ffm: 13.85 s prefill, then 1.449 s per question. Prefix sharing is asserted with
+a second witness fork on every question rather than assumed.
+
+## Base identity is checked before any inference
+
+The artifact stores the base file's SHA-256 and refuses to run against a file that disagrees. This
+is not theoretical: the HuggingFace copy of `granite-4.1-3b-Q4_K_M.gguf` is the **same byte size**
+as the one this head was fitted on, 2,099,501,664, with a different digest. A head fed hidden
+states from different weights returns confident nonsense and nothing errors.
+
+## Side by side against Jev
+
+`benchmark-results/2026-09-21-jev-sidebyside/` holds the video, the raw timings and `run_demo.sh`.
+Ten questions on a master services agreement: Jev 10/10 in 2.75 s, ours 7/10 in 18.86 s on an
+8-core EPYC. We lose on both. The three misses are clauses the contract answers by exception or
+negation, which is what squad2 does not teach.

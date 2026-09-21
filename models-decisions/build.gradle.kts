@@ -31,6 +31,18 @@ tasks.named<Test>("integrationTest") {
     )
 }
 
+// The rust-ffm kernel is the qualified fast path and is 8x on this workload, but it only exists
+// after the cargo build has run for the host platform. Every runnable task below depends on it and
+// puts it on the classpath, because the alternative is a silent fallback that looks like a slow
+// model rather than a missing build step.
+val nativeResources = project(":backend-native").layout.buildDirectory
+    .dir("generated/native-platform-resources")
+
+fun JavaExec.withNativeKernel() {
+    dependsOn(":backend-native:prepareNativePlatformResources")
+    classpath += project.files(nativeResources)
+}
+
 // Cuts a release artifact from a harvest. The tool lives in the test source set because it drives
 // a qualified backend, but the artifact it writes is a product of the main source set alone.
 //
@@ -50,6 +62,7 @@ tasks.register<JavaExec>("release") {
         providers.gradleProperty("out").get(),
         providers.gradleProperty("baseFile").getOrElse(""),
     )
+    withNativeKernel()
 }
 
 // Runs a released artifact over a JSONL of questions.
@@ -68,6 +81,7 @@ tasks.register<JavaExec>("decide") {
         providers.gradleProperty("in").get(),
         providers.gradleProperty("out").get(),
     )
+    withNativeKernel()
 }
 
 // Many decisions against one document, timed. The demo arm of the side-by-side.
@@ -84,6 +98,7 @@ tasks.register<JavaExec>("briefing") {
         providers.gradleProperty("questions").get(),
         providers.gradleProperty("timings").getOrElse("decisions-timing.json"),
     )
+    withNativeKernel()
 }
 
 // Stages everything the demo needs to run off a bare JDK on another machine.
@@ -96,6 +111,8 @@ tasks.register<Sync>("demoDist") {
     from(sourceSets["test"].runtimeClasspath.filter { it.isFile })
     from(tasks.named("classes").map { sourceSets["main"].output })
     from(tasks.named("testClasses").map { sourceSets["test"].output })
+    from(nativeResources)
+    dependsOn(":backend-native:prepareNativePlatformResources")
     into(layout.buildDirectory.dir("demo-dist"))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
