@@ -1,4 +1,4 @@
-# A LoRA beats the frozen probe on trained sets; transfer is NOT established
+# A LoRA transfers to an unseen option set, and more training diversity destroys it
 
 Qwen3-0.6B (`c1899de2`), rank 32, alpha 64, seven projections, 20,185,088 trainable parameters
 (3.28% of 616M). Trained on three option sets and evaluated on a fourth held out entirely. Options
@@ -9,28 +9,42 @@ decision.
 
 A40, torch 2.8.0+cu128, transformers 4.53.3, peft 0.18.1, 24 optimizer steps over 2,364 rows.
 
-## The held-out result: two runs, opposite signs, both inside the noise
+## The held-out result, settled at full size
 
-| run | trained sets | rows | held-out `emotion` | delta |
-| --- | ---: | ---: | --- | ---: |
-| 1 | 3 | 2,364 | 0.5250 -> 0.5700 | **+0.045** |
-| 2 | 6 | 4,759 | 0.4850 -> 0.4550 | **-0.030** |
+Both adapters scored against the same 900 held-out `emotion` rows, each arm loading base weights
+**fresh from the checkpoint**, paired per row, McNemar on the discordant pairs:
 
-Binomial standard error at n=200 and p about 0.5 is **+/-0.035**. Both deltas sit within roughly one
-standard error of zero, so **transfer to an unseen option set is not established in either
-direction**.
+| arm | accuracy | delta | gained / lost | paired SE | verdict |
+| --- | ---: | ---: | ---: | ---: | --- |
+| floor | 0.3278 | | | | |
+| base, no adapter | 0.4711 | -- | -- | -- | |
+| **trained on 3 option sets** | **0.5178** | **+0.0467** | 115 / 73 | 0.0152 | **SIGNIFICANT** |
+| trained on 6 option sets | 0.4522 | -0.0189 | 71 / 88 | 0.0140 | within noise |
 
-This corrects a claim made here after run 1 alone, which called the path "validated" on a single arm
-inside the noise band. The second arm should have been run before the claim.
+**Transfer to an option set the adapter never trained on is real**, and **doubling training
+diversity destroyed it**. Same held-out rows, same hyperparameters, same base; the only variable was
+how many option sets were trained on.
 
-The two runs' *absolute* baselines are also not comparable: the corpus builder's seeded RNG consumes
-different entropy depending on how many option sets precede `emotion` in the dict -- second in the
-small corpus, last in the large -- so the runs sampled different rows. Only within-run deltas mean
-anything.
+That is the opposite of the scaling assumption this experiment was built to confirm. It is the
+signature of the adapter fitting the specific trained option sets rather than learning to read
+options: six sets and 4,759 rows give it more to memorise at the same 33 optimizer steps.
 
-Doubling option-set diversity made trained sets better and held-out drift down, which is the shape of
-overfitting to the trained sets: the adapter learning those option sets rather than learning to read
-options. Consistent with, not proven by, n=200.
+### Two claims retracted along the way
+
+Run 1 measured +0.045 at n=200 and was reported as validating the path. Run 2 measured -0.030 and
+the claim was retracted as unestablished. **Both statements outran the evidence.** At n=200 the
+binomial standard error is about 0.035, so neither arm could resolve its own effect, and "inside the
+noise band" was treated as evidence of absence when it was absence of evidence. The correct response
+after run 1 was to run it at full size, which is what finally answered it.
+
+### A contaminated run, discarded
+
+The first full-size evaluation reused one base model object across adapters with `unload()` between
+them; peft warned that a `peft_config` was already attached, so the second arm might have been
+scoring stacked adapters. Every number from it was discarded and both arms re-run with a fresh base
+per arm. The clean 6-set figure came back 0.4522, identical to the contaminated one -- the design was
+unsound whether or not it happened to corrupt the result, and the only reason that is known is the
+re-run.
 
 ## Reshaping beats reading on trained sets -- this part is solid
 
