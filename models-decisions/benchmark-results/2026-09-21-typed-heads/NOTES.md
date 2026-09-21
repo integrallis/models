@@ -130,12 +130,28 @@ signal. The head also reached only 0.6100 on the set it trained on, against 0.85
 fixed-label head on the same items, so interaction features over a frozen state carry less than
 direct class weights.
 
-**A flaw in this experiment, stated rather than buried.** The held-out sets were scored against AG
-News *items*, whose true label is a news topic with no counterpart in a shipping vocabulary. Asking
-which of `courier / pickup / post / unknown` fits a sports report is incoherent by construction, so
-this run cannot separate "the mechanism does not transfer" from "the question was meaningless".
-What it does establish is that this head, trained this way, transfers nothing usable. A clean test
-needs items whose true labels live in the held-out set.
+**That run had a flaw, and it was repaired rather than excused.** The held-out sets were scored
+against AG News *items*, whose true label is a news topic with no counterpart in a shipping
+vocabulary. Asking which of `courier / pickup / post / unknown` fits a sports report is incoherent
+by construction, so a below-floor result could not separate "the mechanism does not transfer" from
+"the question was meaningless".
+
+The clean version scores SST-5 sentiment items against the `negative / positive` set -- never
+trained on, but where the true label genuinely lives:
+
+| evaluation | items | accuracy | floor | margin |
+| --- | --- | ---: | ---: | ---: |
+| agnews, trained | agnews sealed | 0.6100 | 0.2650 | +0.345 |
+| **sst2, held out** | **its own sealed** | **0.4944** | 0.5169 | **-0.023** |
+| *same states, fixed-label head* | *its own sealed* | *0.7865* | *0.5169* | *+0.270* |
+
+**Exactly chance.** On states where a fixed-label head reaches 0.7865, the alignment head reaches
+0.4944 against a 0.5169 floor. The earlier below-floor numbers were therefore not an artifact of the
+broken comparison: the mechanism does not transfer.
+
+Elementwise product and absolute difference over a frozen hidden state do **not** encode a
+label-agnostic "this candidate fits this state" relation. The head learned AG News labels through
+the interaction and nothing more general. That question is now closed rather than open.
 
 **Where this leaves the architecture.** Our Choice head is real and works at 0.8500 for a fixed
 taxonomy with training data. Jev reads its option set from the instructions and needs none. That is
