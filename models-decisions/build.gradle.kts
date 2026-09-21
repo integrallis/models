@@ -68,3 +68,29 @@ tasks.register<JavaExec>("decide") {
         providers.gradleProperty("out").get(),
     )
 }
+
+// Many decisions against one document, timed. The demo arm of the side-by-side.
+tasks.register<JavaExec>("briefing") {
+    group = "application"
+    description = "Answer many questions about one document from a single shared prefix"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.decisions.BriefingDemo")
+    jvmArgs("--add-modules", "jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED")
+    args(
+        providers.gradleProperty("artifact").get(),
+        providers.gradleProperty("base").get(),
+        providers.gradleProperty("doc").get(),
+        providers.gradleProperty("questions").get(),
+        providers.gradleProperty("timings").getOrElse("decisions-timing.json"),
+    )
+}
+
+// Stages everything the demo needs to run off a bare JDK on another machine.
+tasks.register<Sync>("demoDist") {
+    group = "distribution"
+    description = "Copy the demo's full runtime classpath into build/demo-dist"
+    from(sourceSets["test"].runtimeClasspath.filter { it.isFile })
+    from(tasks.named("testClasses").map { sourceSets["test"].output })
+    into(layout.buildDirectory.dir("demo-dist"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
