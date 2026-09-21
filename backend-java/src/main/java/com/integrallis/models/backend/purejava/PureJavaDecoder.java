@@ -162,6 +162,16 @@ interface PureJavaDecoder extends AutoCloseable {
     return false;
   }
 
+  /** Whether this decoder can prefill several sessions and return their hidden states together. */
+  default boolean supportsBatchedHiddenStates() {
+    return false;
+  }
+
+  /** Prefills independent sessions, returning one final normalized hidden state per session. */
+  default float[][] prefillBatchHiddenStates(Session[] sessions, int[][] tokenBatches) {
+    throw new UnsupportedOperationException("this decoder cannot batch hidden states");
+  }
+
   default LogitBatch prefillBatch(Session[] sessions, int[][] tokenBatches) {
     throw new UnsupportedOperationException("this decoder does not batch ragged session prefill");
   }
