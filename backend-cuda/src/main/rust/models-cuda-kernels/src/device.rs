@@ -100,7 +100,8 @@ unsafe fn scratch_load(index: u32) -> i32 {
 
 /// Fused Q4_K dequantise-and-multiply projection for one batch row.
 ///
-/// Launch shape: `grid = (rows, 1, 1)`, `block = (32, 1, 1)`. One warp computes one output row.
+/// Launch shape: `grid = (rows, batchSize, 1)`, `block = (32, 1, 1)`. One warp computes one
+/// output row of one batch row.
 ///
 /// # Safety
 ///
@@ -116,7 +117,6 @@ pub unsafe extern "ptx-kernel" fn models_q4k_decode_projection(
     output: *mut f32,
     rows: u32,
     cols: u32,
-    batch: u32,
 ) {
     let row = unsafe { _block_idx_x() } as usize;
     if row >= rows as usize {
@@ -124,7 +124,10 @@ pub unsafe extern "ptx-kernel" fn models_q4k_decode_projection(
     }
     let lane = unsafe { _thread_idx_x() };
     let cols = cols as usize;
-    let batch = batch as usize;
+    // The batch row is the grid's second dimension. One launch covers the whole prefill batch;
+    // the previous scalar parameter forced one launch per row, which measured 54,306 launches
+    // for 890 projections on an A40.
+    let batch = unsafe { _block_idx_y() } as usize;
     let blocks_per_row = cols / QK_K;
 
     let weight_bytes = rows as usize * blocks_per_row * Q4_K_BLOCK_BYTES;
@@ -177,7 +180,7 @@ pub unsafe extern "ptx-kernel" fn models_q4k_decode_projection(
 
 /// Fused Q6_K dequantise-and-multiply projection for one batch row.
 ///
-/// Launch shape: `grid = (rows, 1, 1)`, `block = (32, 1, 1)`.
+/// Launch shape: `grid = (rows, batchSize, 1)`, `block = (32, 1, 1)`.
 ///
 /// Q6_K carries no `dmin` term, so it needs no activation sums; it does need the eight float
 /// lane accumulators described in [`crate::kquant`].
@@ -193,7 +196,6 @@ pub unsafe extern "ptx-kernel" fn models_q6k_decode_projection(
     output: *mut f32,
     rows: u32,
     cols: u32,
-    batch: u32,
 ) {
     let row = unsafe { _block_idx_x() } as usize;
     if row >= rows as usize {
@@ -201,7 +203,8 @@ pub unsafe extern "ptx-kernel" fn models_q6k_decode_projection(
     }
     let lane = unsafe { _thread_idx_x() };
     let cols = cols as usize;
-    let batch = batch as usize;
+    // As Q4_K: the batch row comes from the grid, not from a parameter.
+    let batch = unsafe { _block_idx_y() } as usize;
     let blocks_per_row = cols / QK_K;
 
     let weight_bytes = rows as usize * blocks_per_row * Q6_K_BLOCK_BYTES;

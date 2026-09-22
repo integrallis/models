@@ -419,35 +419,35 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     CudaStage stage = batchSize == 1 ? CudaStage.DECODE_PROJECTION : CudaStage.PREFILL_PROJECTION;
 
     try (Arena call = Arena.ofConfined()) {
-      for (int batch = 0; batch < batchSize; batch++) {
-        MemorySegment parameters =
-            type == GgufTensorType.Q4_K
-                ? parameterArray(
-                    call,
-                    pointer(call, resident.address()),
-                    pointer(call, quantScratch.address()),
-                    pointer(call, scaleScratch.address()),
-                    pointer(call, sumScratch.address()),
-                    pointer(call, outputScratch.address()),
-                    integer(call, rows),
-                    integer(call, cols),
-                    integer(call, batch))
-                : parameterArray(
-                    call,
-                    pointer(call, resident.address()),
-                    pointer(call, quantScratch.address()),
-                    pointer(call, scaleScratch.address()),
-                    pointer(call, outputScratch.address()),
-                    integer(call, rows),
-                    integer(call, cols),
-                    integer(call, batch));
-        driver.launch(
-            type == GgufTensorType.Q4_K ? q4kProjection : q6kProjection,
-            rows,
-            CudaKernelAbi.BLOCK_THREADS,
-            parameters);
-        counters.launched();
-      }
+      // One launch for the whole batch: the kernel reads its batch row from blockIdx.y. The
+      // previous shape passed the batch index as a scalar and looped, which is why a five-item
+      // run issued 54,306 launches for 890 projections.
+      MemorySegment parameters =
+          type == GgufTensorType.Q4_K
+              ? parameterArray(
+                  call,
+                  pointer(call, resident.address()),
+                  pointer(call, quantScratch.address()),
+                  pointer(call, scaleScratch.address()),
+                  pointer(call, sumScratch.address()),
+                  pointer(call, outputScratch.address()),
+                  integer(call, rows),
+                  integer(call, cols))
+              : parameterArray(
+                  call,
+                  pointer(call, resident.address()),
+                  pointer(call, quantScratch.address()),
+                  pointer(call, scaleScratch.address()),
+                  pointer(call, outputScratch.address()),
+                  integer(call, rows),
+                  integer(call, cols));
+      driver.launch(
+          type == GgufTensorType.Q4_K ? q4kProjection : q6kProjection,
+          rows,
+          batchSize,
+          CudaKernelAbi.BLOCK_THREADS,
+          parameters);
+      counters.launched();
       driver.synchronize();
       MemorySegment host = call.allocate(outputBytes);
       driver.copyToHost(host, outputScratch.address(), outputBytes);

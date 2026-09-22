@@ -33,7 +33,7 @@ final class CudaKernelAbi {
    * <p>Bump whenever a kernel's name, parameter list or launch contract changes. Mirrors {@code
    * PTX_ABI_VERSION} in the Rust crate.
    */
-  static final int VERSION = 1;
+  static final int VERSION = 2;
 
   /** Fused Q4_K dequantise-and-multiply projection. */
   static final String Q4_K_PROJECTION = "models_q4k_decode_projection";

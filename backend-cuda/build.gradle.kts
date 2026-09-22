@@ -21,7 +21,7 @@ apply(plugin = "maven-publish")
 
 // Bump when a kernel name, parameter list or launch contract changes. Mirrors
 // CudaKernelAbi.VERSION in Java and PTX_ABI_VERSION in the Rust crate.
-val cudaAbi = 1
+val cudaAbi = 2
 
 // The PTX virtual architecture. 8.0 is the campaign's floor: the pre-registration's candidate
 // devices (A40, L40S) are 8.6 and 8.9, and PTX is forward compatible, so one sm_80 module serves
