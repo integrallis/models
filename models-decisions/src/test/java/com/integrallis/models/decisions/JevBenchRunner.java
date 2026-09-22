@@ -16,6 +16,8 @@
 package com.integrallis.models.decisions;
 
 import com.integrallis.models.api.InferenceSession;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.models.backend.cuda.CudaGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import java.io.BufferedReader;
@@ -66,8 +68,44 @@ public final class JevBenchRunner {
     int sharedProven = 0;
     long candidateTokens = 0;
 
-    try (PureJavaBackend backend =
-            PureJavaBackend.load(model, RustGgufBatchedMatrixKernel.openBundled());
+    // Kernel selection is explicit and printed. An unreported fallback has invalidated three
+    // measurements in this campaign, so the run says what it actually ran on.
+    String requested = System.getProperty("decisions.kernel", "auto");
+    GgufBatchedMatrixKernel selected;
+    String kernelName;
+    CudaGgufBatchedMatrixKernel.Status cuda =
+        requested.equals("cuda") || requested.equals("auto")
+            ? CudaGgufBatchedMatrixKernel.open()
+            : null;
+    if (cuda != null && cuda.kernel().isPresent()) {
+      selected = cuda.kernel().orElseThrow();
+      kernelName = "cuda [" + cuda.deviceName() + ", cc " + cuda.computeCapability() + "]";
+    } else if (requested.equals("cuda")) {
+      throw new IllegalStateException(
+          "cuda requested and unavailable: " + (cuda == null ? "not attempted" : cuda.reason()));
+    } else {
+      selected = RustGgufBatchedMatrixKernel.openBundled();
+      kernelName = "rust-ffm";
+    }
+    RuntimeReport runtime = new RuntimeReport()
+        .with("model", model.getFileName().toString())
+        .with("mode", Boolean.parseBoolean(System.getProperty("decisions.letterLogits", "false"))
+            ? "letter-logits" : "candidate-scoring")
+        .kernel(
+            kernelName.startsWith("cuda") ? "cuda" : kernelName,
+            cuda != null && cuda.kernel().isPresent() ? cuda.deviceName() : "",
+            cuda != null && cuda.kernel().isPresent()
+                ? "cc " + cuda.computeCapability() + ", ptx " + cuda.ptxTarget() : "")
+        .with("prefillBatchSize", System.getProperty("models.purejava.prefillBatchSize", "32"))
+        .with("maxContextLength", System.getProperty("models.purejava.maxContextLength", "default"));
+    // A caller that demands a configuration gets it or gets an exception, never a quiet fallback.
+    String demanded = System.getProperty("decisions.requireKernel", "");
+    if (!demanded.isBlank()) {
+      runtime.require("kernel", demanded);
+    }
+    System.out.println(runtime);
+
+    try (PureJavaBackend backend = PureJavaBackend.load(model, selected);
         BufferedWriter writer = Files.newBufferedWriter(out, StandardCharsets.UTF_8)) {
 
       SharedPrefixCandidateEvaluator evaluator =
@@ -136,6 +174,34 @@ public final class JevBenchRunner {
         }
       }
     }
+    if (cuda != null && cuda.counters().isPresent()) {
+      var counters = cuda.counters().orElseThrow();
+      // nvidia-smi samples instantaneously and says nothing about whether our kernel was asked to
+      // do anything. These counters do: an inert kernel loaded, reported itself, and refused
+      // every operation.
+      System.out.printf("  cuda inert            %s%n", counters.inert());
+      System.out.printf("  cuda accelerated ops  %d%n", counters.totalAcceleratedOperations());
+      System.out.printf("  cuda by tensor type   %s%n", counters.acceleratedOperations());
+      System.out.printf("  cuda refusals         %s%n", counters.refusals());
+      // The launch/transfer terms are what decide whether a device run can beat the CPU at all.
+      // One launch per batch row means a 512-row prefill projection is 512 serialized launches.
+      System.out.printf("  cuda launches         %d%n", counters.kernelLaunches());
+      System.out.printf(
+          "  cuda h2d              %d copies, %.1f MiB%n",
+          counters.hostToDeviceTransfers(), counters.hostToDeviceBytes() / 1048576.0);
+      System.out.printf(
+          "  cuda d2h              %d copies, %.1f MiB%n",
+          counters.deviceToHostTransfers(), counters.deviceToHostBytes() / 1048576.0);
+      System.out.printf(
+          "  cuda weight uploads   %d tensors, %.1f MiB%n",
+          counters.weightUploads(), counters.weightUploadBytes() / 1048576.0);
+      runtime.with("cudaAcceleratedOps", String.valueOf(counters.totalAcceleratedOperations()))
+             .with("cudaInert", String.valueOf(counters.inert()));
+    }
+    Files.writeString(
+        Path.of(out.toString().replaceAll("\\.tsv$", "") + "-runtime.json"),
+        runtime.toJson() + System.lineSeparator(),
+        StandardCharsets.UTF_8);
     System.out.printf(
         "done: %d tasks, wall %.1f s, candidate-token forwards %d, prefix sharing proven on %d/%d%n",
         done, (System.nanoTime() - wall0) / 1e9, candidateTokens, sharedProven, done);
