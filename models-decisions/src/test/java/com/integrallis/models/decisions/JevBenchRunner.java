@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.decisions;
 
+import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import java.io.BufferedReader;
@@ -71,6 +72,11 @@ public final class JevBenchRunner {
 
       SharedPrefixCandidateEvaluator evaluator =
           new SharedPrefixCandidateEvaluator(backend, temperature);
+      // The letter arm asks the model which letter comes next instead of scoring each option, so
+      // one forward answers the whole question and the option text is read from the prompt.
+      boolean letters = Boolean.parseBoolean(System.getProperty("decisions.letterLogits", "false"));
+      LetterLogitScorer letterScorer = new LetterLogitScorer(temperature);
+      System.out.printf("mode=%s%n", letters ? "letter-logits" : "candidate-scoring");
 
       for (String[] row : rows) {
         String id = row[0];
@@ -83,15 +89,40 @@ public final class JevBenchRunner {
           candidates.add(backend.tokenizer().encode(" " + label));
         }
 
-        long t0 = System.nanoTime();
-        CandidateBatch batch = evaluator.evaluateBatch(state, new Choice(id, labels), candidates);
-        double latency = (System.nanoTime() - t0) / 1e9;
-
-        candidateTokens += batch.candidateTokensEvaluated();
-        sharedProven += batch.sharedPrefixProven() ? 1 : 0;
+        double[] p;
+        double latency;
+        if (letters) {
+          Choice space = new Choice(id, labels);
+          int[] lettered =
+              backend.tokenizer().encode(prompt + "\n" + LetterLogitScorer.renderOptions(labels));
+          int[] letterTokens = new int[labels.size()];
+          for (int i = 0; i < labels.size(); i++) {
+            int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + i));
+            letterTokens[i] = encoded[encoded.length - 1];
+          }
+          long t0 = System.nanoTime();
+          try (InferenceSession session = backend.openSession()) {
+            int last = lettered.length - 1;
+            if (last > 0) {
+              int[] head = new int[last];
+              System.arraycopy(lettered, 0, head, 0, last);
+              backend.prefill(session, head, 0);
+            }
+            float[] logits = backend.forward(session, lettered[last], last);
+            p = letterScorer.score(space, logits, letterTokens).probabilities();
+          }
+          latency = (System.nanoTime() - t0) / 1e9;
+          candidateTokens += 1; // one forward, whatever the option count
+        } else {
+          long t0 = System.nanoTime();
+          CandidateBatch batch = evaluator.evaluateBatch(state, new Choice(id, labels), candidates);
+          latency = (System.nanoTime() - t0) / 1e9;
+          candidateTokens += batch.candidateTokensEvaluated();
+          sharedProven += batch.sharedPrefixProven() ? 1 : 0;
+          p = batch.verdict().probabilities();
+        }
 
         StringBuilder sb = new StringBuilder(id).append('\t').append(latency);
-        double[] p = batch.verdict().probabilities();
         for (int i = 0; i < labels.size(); i++) {
           sb.append('\t').append(labels.get(i)).append('=').append(p[i]);
         }
