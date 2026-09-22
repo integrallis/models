@@ -18,6 +18,7 @@ package com.integrallis.models.decisions;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.SharedInferencePrefix;
 import com.integrallis.models.api.SharedPrefixInferenceBackend;
+import com.integrallis.models.backend.cuda.CudaGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import java.io.IOException;
@@ -51,15 +52,36 @@ public final class BaseSpeedProbe {
     String document = Files.readString(Path.of(args[1]), StandardCharsets.UTF_8).strip();
     String question = args.length > 2 ? args[2] : "What is the monthly fee?";
 
+    // Kernel selection is explicit and reported. A GPU run that silently fell back to the CPU
+    // would attach a plausible number to the wrong claim, which is the failure this campaign
+    // keeps rediscovering.
+    String requested = System.getProperty("decisions.kernel", "auto");
     PureJavaBackend backend;
     String kernel;
-    try {
-      backend = PureJavaBackend.load(model, RustGgufBatchedMatrixKernel.openBundled());
-      kernel = "rust-ffm";
-    } catch (RuntimeException | UnsatisfiedLinkError unavailable) {
-      backend = PureJavaBackend.load(model);
-      kernel = "pure-java";
+    CudaGgufBatchedMatrixKernel.Status cuda = null;
+    if (requested.equals("cuda") || requested.equals("auto")) {
+      cuda = CudaGgufBatchedMatrixKernel.open();
     }
+    if (cuda != null && cuda.kernel().isPresent()) {
+      backend = PureJavaBackend.load(model, cuda.kernel().orElseThrow());
+      kernel =
+          "cuda [" + cuda.deviceName() + ", cc " + cuda.computeCapability()
+              + ", ptx " + cuda.ptxTarget() + "]";
+    } else {
+      if (requested.equals("cuda")) {
+        throw new IllegalStateException(
+            "cuda was requested and is unavailable: "
+                + (cuda == null ? "not attempted" : cuda.reason()));
+      }
+      try {
+        backend = PureJavaBackend.load(model, RustGgufBatchedMatrixKernel.openBundled());
+        kernel = "rust-ffm";
+      } catch (RuntimeException | UnsatisfiedLinkError unavailable) {
+        backend = PureJavaBackend.load(model);
+        kernel = "pure-java";
+      }
+    }
+    final CudaGgufBatchedMatrixKernel.Status cudaStatus = cuda;
 
     try (PureJavaBackend held = backend) {
       SharedPrefixInferenceBackend sharing = held;
@@ -162,7 +184,12 @@ public final class BaseSpeedProbe {
       System.out.printf("  %d tails batched     %7.3f s   speedup %.2fx%n",
           TAIL_COUNT, batchedBest, sequentialBest / batchedBest);
       System.out.printf("  ten questions, seq  %7.3f s%n", prefillBest + sequentialBest);
-      System.out.printf("  ten questions, bat  %7.3f s%n%n", prefillBest + batchedBest);
+      System.out.printf("  ten questions, bat  %7.3f s%n", prefillBest + batchedBest);
+      if (cudaStatus != null && cudaStatus.counters().isPresent()) {
+        // Evidence the device did the work, rather than a claim that it did.
+        System.out.printf("  cuda routing        %s%n", cudaStatus.counters().orElseThrow());
+      }
+      System.out.println();
     }
   }
 

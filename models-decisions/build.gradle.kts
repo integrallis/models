@@ -15,6 +15,10 @@ dependencies {
     // on that backend and a figure taken on any other one would not be comparable with it.
     testImplementation(project(":backend-native"))
 
+    // Same GgufBatchedMatrixKernel SPI as the Rust kernel, so moving projections to a device does
+    // not change the shape of the decision path.
+    testImplementation(project(":backend-cuda"))
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
