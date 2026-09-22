@@ -23,6 +23,13 @@
         <Package name="com.integrallis.models.backend.purejava"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+    <!-- Answer spaces hand back lists that AnswerSpaces.requireLabels already returned as
+         List.copyOf, and DecisionArtifact is a final class of final fields with no array
+         accessor. The values are immutable; SpotBugs cannot see it through the factory. -->
+    <Match>
+        <Package name="com.integrallis.models.decisions"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
     <!-- JFR reads event fields reflectively when the event is committed; nothing in Java reads them. -->
     <Match>
         <Class name="com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffEvent"/>

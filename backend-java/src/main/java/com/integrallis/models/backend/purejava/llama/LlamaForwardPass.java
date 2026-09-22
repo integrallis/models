@@ -900,6 +900,21 @@ public final class LlamaForwardPass {
     }
 
     int dim = config.embeddingDim();
+    float[] finalStates = runSessionPrefillRows(sessions, tokenBatches, dim);
+    System.arraycopy(finalStates, 0, batchX, 0, finalStates.length);
+    projectIndependentSessionLogits(sessionCount, dim, vocabSize);
+    return new LogitBatch(sessionCount, vocabSize, sessionBatchLogits);
+  }
+
+  /**
+   * Runs the ragged prefill for independent sessions and returns each session's final pre-norm
+   * state, one row of {@code dim} per session.
+   *
+   * <p>Shared by the logits and hidden-state entry points so the two cannot drift apart: a batching
+   * bug that appeared in only one of them would be invisible to the other's tests.
+   */
+  private float[] runSessionPrefillRows(Session[] sessions, int[][] tokenBatches, int dim) {
+    int sessionCount = sessions.length;
     float[] finalStates = new float[Math.multiplyExact(sessionCount, dim)];
     int[] consumed = new int[sessionCount];
     int[] chunkCounts = new int[sessionCount];
@@ -948,9 +963,40 @@ public final class LlamaForwardPass {
       }
     }
 
+    return finalStates;
+  }
+
+  /**
+   * Prefills different-length prompts for independent sessions and returns each session's final
+   * normalized hidden state, one row per session.
+   *
+   * <p>This exists because a decision head reads the hidden state and never the vocabulary. Going
+   * through {@link #prefillBatchTransient} would compute a full vocabulary projection per session
+   * and discard it, which on a narrow model costs about as much as a transformer layer.
+   *
+   * <p>The rows are freshly allocated, because a caller holding several sessions' states at once is
+   * the entire point and shared scratch would alias them together.
+   */
+  public float[][] prefillBatchHiddenStates(Session[] sessions, int[][] tokenBatches) {
+    validateSessionPrefillBatch(sessions, tokenBatches);
+    int sessionCount = sessions.length;
+    int dim = config.embeddingDim();
+
+    if (sessionCount == 1 && (!batchedPrefill || tokenBatches[0].length == 1)) {
+      // One session cannot be batched against anything, so take the path that is already tuned.
+      return new float[][] {prefillHiddenState(sessions[0], tokenBatches[0], sessions[0].nextPosition)};
+    }
+
+    float[] finalStates = runSessionPrefillRows(sessions, tokenBatches, dim);
     System.arraycopy(finalStates, 0, batchX, 0, finalStates.length);
-    projectIndependentSessionLogits(sessionCount, dim, vocabSize);
-    return new LogitBatch(sessionCount, vocabSize, sessionBatchLogits);
+    normalizeIndependentSessionBatch(
+        batchXNorm, batchX, sessionCount, dim, weights.outputNormWeight());
+
+    float[][] states = new float[sessionCount][dim];
+    for (int session = 0; session < sessionCount; session++) {
+      System.arraycopy(batchXNorm, session * dim, states[session], 0, dim);
+    }
+    return states;
   }
 
   /** Runs one decode token for each independent session and returns stable logits. */
