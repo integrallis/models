@@ -51,3 +51,31 @@ dequantised weight tile is reused across batch rows. That collapses 54,306 launc
 turns a per-token weight read into a per-tile one. It does not address cause 2.
 
 Not attempted yet. Recorded as "not done", not as "cannot be done".
+
+## Update: the grid-Y fix landed, and the verdict is negative
+
+`CudaDriver.launch` gained a grid-Y dimension and the projection kernels now read the batch row
+from `blockIdx.y`. Launches for a five-item run went **54,306 -> 890**, exactly one per
+projection. ABI bumped 1 -> 2 so a stale PTX module fails closed. Verified bit-identical to the
+old kernel on the two items that were warm in both runs (all ten probabilities, last digit).
+
+Warm head-to-head, same A40 host, same five items, `-Ddecisions.warmupItems=3`:
+
+| arm | wall, 5 items |
+| --- | ---: |
+| CUDA, grid-Y kernel | 98.7 s |
+| CPU, rust-ffm Vector API | 21.0 s |
+
+**The device path is 4.7x slower than 8-core CPU SIMD.** The earlier "3.2x slower" figure
+flattered the GPU: both arms were cold, and the CPU path gains more from warmup.
+
+Collapsing the launch count bought about 5%. That is the measurement that matters here, because
+it falsifies the diagnosis it was built on: launch overhead was not the term. The term is the
+1,620 synchronising host round trips per five items — one device-to-host copy and one
+`cuCtxSynchronize` per projection, because only projections are on the device and every RMSNorm,
+RoPE, attention, SwiGLU and residual runs back on the host.
+
+**A design that offloads only the matmuls cannot win, at any kernel quality.** Beating the CPU
+requires activations resident on the device across the whole layer stack, which means putting the
+elementwise and attention stages on the device too. That is a substantially larger piece of work
+than a kernel tweak, and it is the only version of this worth attempting. Not started.
