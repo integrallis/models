@@ -113,6 +113,12 @@ public final class JevBenchRunner {
       // The letter arm asks the model which letter comes next instead of scoring each option, so
       // one forward answers the whole question and the option text is read from the prompt.
       boolean letters = Boolean.parseBoolean(System.getProperty("decisions.letterLogits", "false"));
+      // SemIf's arm (MIT, github.com/TheoLeeCJ/openjev) scores the same frozen Qwen3.5-4B 9
+      // Intelligence points above ours. Two differences are testable here: it applies the model's
+      // chat template with a system instruction and a JSON payload, and its answer slots are bare
+      // single-token letters rather than " A". Under -Ddecisions.rawPrompt the fourth column is
+      // already the complete prompt and is fed verbatim; the option block is not appended.
+      boolean rawPrompt = Boolean.parseBoolean(System.getProperty("decisions.rawPrompt", "false"));
       LetterLogitScorer letterScorer = new LetterLogitScorer(temperature);
       System.out.printf("mode=%s%n", letters ? "letter-logits" : "candidate-scoring");
 
@@ -148,11 +154,27 @@ public final class JevBenchRunner {
         if (letters) {
           Choice space = new Choice(id, labels);
           int[] lettered =
-              backend.tokenizer().encode(prompt + "\n" + LetterLogitScorer.renderOptions(labels));
+              rawPrompt
+                  ? backend.tokenizer().encode(prompt)
+                  : backend.tokenizer().encode(
+                      prompt + "\n" + LetterLogitScorer.renderOptions(labels));
           int[] letterTokens = new int[labels.size()];
           for (int i = 0; i < labels.size(); i++) {
-            int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + i));
+            int[] encoded =
+                backend.tokenizer().encode(rawPrompt ? String.valueOf((char) ('A' + i))
+                                                     : " " + (char) ('A' + i));
             letterTokens[i] = encoded[encoded.length - 1];
+          }
+          if (rawPrompt) {
+            // SemIf refuses any slot that is not one exact round-trip token, because a multi-token
+            // or merged slot silently reads the wrong logit. Fail closed rather than score it.
+            for (int i = 0; i < labels.size(); i++) {
+              int[] encoded = backend.tokenizer().encode(String.valueOf((char) ('A' + i)));
+              if (encoded.length != 1) {
+                throw new IllegalStateException(
+                    "answer slot " + (char) ('A' + i) + " is not one token: " + encoded.length);
+              }
+            }
           }
           long t0 = System.nanoTime();
           try (InferenceSession session = backend.openSession()) {

@@ -40,6 +40,9 @@ public final class TokenCount {
   public static void main(String[] args) throws Exception {
     Path model = Path.of(args[0]);
     Path tasks = Path.of(args[1]);
+    // Under rawPrompt the fourth column is already the complete prompt, as the runner feeds it,
+    // so the count is the prompt itself and no option block is appended.
+    boolean rawPrompt = args.length > 2 && Boolean.parseBoolean(args[2]);
     List<String[]> rows = new ArrayList<>();
     for (String line : Files.readAllLines(tasks, StandardCharsets.UTF_8)) {
       if (!line.isBlank()) {
@@ -56,10 +59,12 @@ public final class TokenCount {
         String prompt = row[3].replace("\\n", "\n");
 
         int letters =
-            backend
-                .tokenizer()
-                .encode(prompt + "\n" + LetterLogitScorer.renderOptions(labels))
-                .length;
+            rawPrompt
+                ? backend.tokenizer().encode(prompt).length
+                : backend
+                    .tokenizer()
+                    .encode(prompt + "\n" + LetterLogitScorer.renderOptions(labels))
+                    .length;
         int candidate = backend.tokenizer().encode(prompt).length;
         for (String label : labels) {
           candidate += backend.tokenizer().encode(" " + label).length;
