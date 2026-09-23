@@ -149,6 +149,13 @@ public final class LlamaForwardPass {
   private final GgufQ4Kernel q4Kernel;
   private final GgufQ6BatchedKernel q6BatchedKernel;
   private final boolean batchedPrefill;
+
+  /**
+   * Counts hidden-state prefills that reached the batched path. Exposed so a test can prove the
+   * branch was taken instead of inferring it from how long the call took.
+   */
+  private int batchedHiddenStatePrefills;
+
   private final boolean groupedBatchedPrefill;
   private final boolean batchedSessionOutputProjection;
   private final boolean finalLayerPrefillPruning;
@@ -693,8 +700,16 @@ public final class LlamaForwardPass {
       throw new IllegalArgumentException("startPosition must be >= 0");
     }
     int finalIndex = tokens.length - 1;
-    for (int index = 0; index < finalIndex; index++) {
-      forwardInternal(tokens[index], Math.addExact(startPosition, index), Head.NONE);
+    if (batchedPrefill && finalIndex > 1) {
+      // Advance every position but the last through the batched path, then take one ordinary step
+      // for the final token so it yields a hidden state rather than a vocabulary projection. The
+      // batched call's logits are discarded; its purpose here is the key/value cache it leaves.
+      batchedHiddenStatePrefills++;
+      prefill(Arrays.copyOf(tokens, finalIndex), startPosition);
+    } else {
+      for (int index = 0; index < finalIndex; index++) {
+        forwardInternal(tokens[index], Math.addExact(startPosition, index), Head.NONE);
+      }
     }
     return forwardInternal(
         tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.HIDDEN);
@@ -867,9 +882,14 @@ public final class LlamaForwardPass {
     }
 
     int finalIndex = tokens.length - 1;
-    for (int index = 0; index < finalIndex; index++) {
-      forwardSessionInternal(
-          session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
+    if (batchedPrefill && finalIndex > 1) {
+      batchedHiddenStatePrefills++;
+      prefillSessionBatched(session, Arrays.copyOf(tokens, finalIndex));
+    } else {
+      for (int index = 0; index < finalIndex; index++) {
+        forwardSessionInternal(
+            session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
+      }
     }
     return forwardSessionInternal(
             session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.HIDDEN)
@@ -1889,6 +1909,11 @@ public final class LlamaForwardPass {
     cache.clear();
     batchedAttentionKernel.reset();
     nextPosition = 0;
+  }
+
+  /** Returns how many hidden-state prefills have reached the batched path. */
+  int batchedHiddenStatePrefills() {
+    return batchedHiddenStatePrefills;
   }
 
   boolean usesBatchedPrefill() {
