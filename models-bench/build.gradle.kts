@@ -60,6 +60,10 @@ tasks.withType<JavaExec>().configureEach {
 }
 
 dependencies {
+    // The Rust PTX GPU arm. Present on every platform: the module's own fallback reports an
+    // absent or ineligible device rather than failing, so a CPU-only host still builds and runs
+    // the gate command (it reports accelerated=false, which is the G3 evidence).
+    implementation(project(":backend-cuda"))
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
     implementation(project(":models-router"))

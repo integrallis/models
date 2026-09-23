@@ -20,6 +20,7 @@ include("backend-java")
 include("backend-tornado")
 include("models-backend-onnx")
 include("backend-native")
+include("backend-cuda")
 include("backend-apple")
 project(":backend-apple").projectDir = file("models-backend-apple")
 
