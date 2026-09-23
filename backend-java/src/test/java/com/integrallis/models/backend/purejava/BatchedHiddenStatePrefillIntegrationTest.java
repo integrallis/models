@@ -23,6 +23,7 @@ import com.integrallis.models.backend.purejava.fixture.ModelFixtureRegistry;
 import com.integrallis.models.backend.purejava.fixture.ModelFixtureRequirement;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.Test;
  * a decision head's output depend on how many questions happened to be asked together, and that
  * difference would surface as an unreproducible benchmark rather than as a failure.
  */
+@Tag("integration")
 class BatchedHiddenStatePrefillIntegrationTest {
 
   private static final ModelFixtureRequirement QWEN3_0_6B_Q4_0 =
