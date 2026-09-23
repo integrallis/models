@@ -33,10 +33,10 @@ import java.util.Random;
 /**
  * Harvests one hidden state per item for a fixed question over varying state.
  *
- * <p>This is the shape a Choice or Score head wants and the shape the answerability harvest is
- * not: there, the question changed per item and had to ride in the prompt. Here the question is
- * the same for every item, so it is a property of the head rather than of the input, and the state
- * is encoded once with no per-question cost.
+ * <p>This is the shape a Choice or Score head wants and the shape the answerability harvest is not:
+ * there, the question changed per item and had to ride in the prompt. Here the question is the same
+ * for every item, so it is a property of the head rather than of the input, and the state is
+ * encoded once with no per-question cost.
  *
  * <p>The first rows are reported as they land so a malformed corpus shows up in the first minute
  * rather than after an hour of compute. Two corpora have already been harvested to completion in

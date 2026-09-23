@@ -110,8 +110,7 @@ public final class NoulEvaluation {
         trainer.fit(space, standardizer.applyAll(features(train)), labels(train));
     double temperature =
         TemperatureFitter.fit(logits(head, standardizer, calibration), labels(calibration));
-    artifact =
-        new DecisionArtifact(space, standardizer, head, temperature, baseModel, baseDigest);
+    artifact = new DecisionArtifact(space, standardizer, head, temperature, baseModel, baseDigest);
 
     int size = sealed.size();
     double[] probabilities = new double[size];

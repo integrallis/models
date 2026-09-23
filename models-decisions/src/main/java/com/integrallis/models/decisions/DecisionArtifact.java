@@ -282,7 +282,8 @@ public final class DecisionArtifact {
           baseModel,
           baseDigest);
     } catch (EOFException truncated) {
-      throw new IOException(path + " ends before the artifact does; the file is truncated", truncated);
+      throw new IOException(
+          path + " ends before the artifact does; the file is truncated", truncated);
     }
   }
 

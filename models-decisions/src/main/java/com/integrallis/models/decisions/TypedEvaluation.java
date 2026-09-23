@@ -25,9 +25,9 @@ import java.util.Set;
  * Fits a typed head, calibrates it, and reads the sealed split once.
  *
  * <p>The binary sibling is {@link NoulEvaluation}; this one carries answer spaces of any width, so
- * it serves Choice and Score. The discipline is identical and deliberately so: statistics come
- * from the training rows alone, the temperature comes from the calibration rows alone, and the
- * sealed rows are opened after the fitting is finished and refuse to be opened twice.
+ * it serves Choice and Score. The discipline is identical and deliberately so: statistics come from
+ * the training rows alone, the temperature comes from the calibration rows alone, and the sealed
+ * rows are opened after the fitting is finished and refuse to be opened twice.
  *
  * <p>The sealed split is scored <em>through the artifact object</em> that a release would ship, so
  * the numbers reported here cannot describe a different construction from the file on disk.

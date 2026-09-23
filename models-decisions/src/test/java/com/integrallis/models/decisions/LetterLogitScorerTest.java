@@ -39,8 +39,10 @@ final class LetterLogitScorerTest {
     // The vocabulary is dominated by a token that is not an answer. A scorer that softmaxed over
     // everything would return near-zero for every option; conditioning on answering must not.
     float[] logits = new float[100];
-    logits[42] = 50f;                       // some unrelated token the model would rather emit
-    logits[10] = 1f; logits[11] = 2f; logits[12] = 3f;
+    logits[42] = 50f; // some unrelated token the model would rather emit
+    logits[10] = 1f;
+    logits[11] = 2f;
+    logits[12] = 3f;
 
     Verdict verdict = new LetterLogitScorer(1.0).score(ROUTE, logits, new int[] {10, 11, 12});
     double[] p = verdict.probabilities();
@@ -54,7 +56,9 @@ final class LetterLogitScorerTest {
   void permutingTheOptionsPermutesTheAnswer() {
     // Order equivariance: the mechanism must not prefer a position.
     float[] logits = new float[100];
-    logits[10] = 1f; logits[11] = 2f; logits[12] = 3f;
+    logits[10] = 1f;
+    logits[11] = 2f;
+    logits[12] = 3f;
     LetterLogitScorer scorer = new LetterLogitScorer(1.0);
 
     double[] straight = scorer.score(ROUTE, logits, new int[] {10, 11, 12}).probabilities();
@@ -67,11 +71,13 @@ final class LetterLogitScorerTest {
   @Test
   void temperatureFlattensWithoutMovingTheWinner() {
     float[] logits = new float[100];
-    logits[10] = 1f; logits[11] = 5f; logits[12] = 2f;
-    double[] sharp = new LetterLogitScorer(1.0).score(ROUTE, logits, new int[] {10, 11, 12})
-        .probabilities();
-    double[] flat = new LetterLogitScorer(4.0).score(ROUTE, logits, new int[] {10, 11, 12})
-        .probabilities();
+    logits[10] = 1f;
+    logits[11] = 5f;
+    logits[12] = 2f;
+    double[] sharp =
+        new LetterLogitScorer(1.0).score(ROUTE, logits, new int[] {10, 11, 12}).probabilities();
+    double[] flat =
+        new LetterLogitScorer(4.0).score(ROUTE, logits, new int[] {10, 11, 12}).probabilities();
 
     assertThat(sharp[1]).isGreaterThan(flat[1]);
     // Monotonic: temperature cannot change which option wins, only how sure the answer is.
@@ -98,8 +104,9 @@ final class LetterLogitScorerTest {
   @Test
   void refusesMoreOptionsThanThereAreLetters() {
     assertThatThrownBy(
-            () -> LetterLogitScorer.renderOptions(
-                java.util.stream.IntStream.range(0, 30).mapToObj(Integer::toString).toList()))
+            () ->
+                LetterLogitScorer.renderOptions(
+                    java.util.stream.IntStream.range(0, 30).mapToObj(Integer::toString).toList()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("26");
   }

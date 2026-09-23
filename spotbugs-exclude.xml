@@ -78,4 +78,13 @@
         </Or>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+    <!-- These hand back a DecisionArtifact, a final class of final fields with no array accessor.
+         The value is immutable; SpotBugs cannot see that through the accessor. -->
+    <Match>
+        <Or>
+            <Class name="com.integrallis.models.decisions.NoulEvaluation"/>
+            <Class name="com.integrallis.models.decisions.TypedEvaluation"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
 </FindBugsFilter>

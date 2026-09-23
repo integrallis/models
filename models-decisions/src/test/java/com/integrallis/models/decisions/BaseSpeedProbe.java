@@ -28,8 +28,8 @@ import java.nio.file.Path;
 /**
  * What a base costs on this workload, before any head is trained against it.
  *
- * <p>Swapping the base is the largest lever on latency and the most expensive one to try, because
- * a new base needs a fresh harvest and a fresh head. This measures the part that does not need
+ * <p>Swapping the base is the largest lever on latency and the most expensive one to try, because a
+ * new base needs a fresh harvest and a fresh head. This measures the part that does not need
  * either: how long the document prefill and a question tail take. If the cheaper base is not
  * proportionally faster here it will not be faster once a head is fitted, and the harvest is not
  * worth running.
@@ -74,7 +74,8 @@ public final class BaseSpeedProbe {
 
       System.out.printf("%n  base %s%n", model.getFileName());
       System.out.printf("  kernel %s, hidden width %s%n", kernel, widthOf(held, sharing));
-      System.out.printf("  document %d tokens, tail %d tokens%n%n", documentTokens.length, tail.length);
+      System.out.printf(
+          "  document %d tokens, tail %d tokens%n%n", documentTokens.length, tail.length);
 
       double prefillBest = Double.MAX_VALUE;
       double tailBest = Double.MAX_VALUE;
@@ -154,12 +155,15 @@ public final class BaseSpeedProbe {
             batchedTails);
       }
 
-      System.out.printf("%n  best prefill        %7.3f s  (%6.2f ms/token)%n",
+      System.out.printf(
+          "%n  best prefill        %7.3f s  (%6.2f ms/token)%n",
           prefillBest, prefillBest * 1000 / documentTokens.length);
-      System.out.printf("  best question tail  %7.3f s  (%6.2f ms/token)%n",
+      System.out.printf(
+          "  best question tail  %7.3f s  (%6.2f ms/token)%n",
           tailBest, tailBest * 1000 / tail.length);
       System.out.printf("  %d tails sequential  %7.3f s%n", TAIL_COUNT, sequentialBest);
-      System.out.printf("  %d tails batched     %7.3f s   speedup %.2fx%n",
+      System.out.printf(
+          "  %d tails batched     %7.3f s   speedup %.2fx%n",
           TAIL_COUNT, batchedBest, sequentialBest / batchedBest);
       System.out.printf("  ten questions, seq  %7.3f s%n", prefillBest + sequentialBest);
       System.out.printf("  ten questions, bat  %7.3f s%n%n", prefillBest + batchedBest);

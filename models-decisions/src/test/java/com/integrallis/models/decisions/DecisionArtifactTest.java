@@ -82,8 +82,7 @@ final class DecisionArtifactTest {
     for (int j = 0; j < width; j++) {
       state[j] = (float) Math.tan(j * 0.37);
     }
-    assertThat(read.decide(state).probabilities())
-        .isEqualTo(written.decide(state).probabilities());
+    assertThat(read.decide(state).probabilities()).isEqualTo(written.decide(state).probabilities());
   }
 
   @Test
@@ -99,7 +98,11 @@ final class DecisionArtifactTest {
 
     DecisionArtifact artifact =
         new DecisionArtifact(
-            space, standardizer(width), head(space, width), 1.0, "base",
+            space,
+            standardizer(width),
+            head(space, width),
+            1.0,
+            "base",
             DecisionArtifact.digestOf(base));
 
     artifact.requireBase(base); // the right file passes
@@ -147,7 +150,8 @@ final class DecisionArtifactTest {
     int width = 8;
     Noul space = new Noul("p");
     Path file = dir.resolve("short.idsn");
-    new DecisionArtifact(space, standardizer(width), head(space, width), 1.0, "base", "").write(file);
+    new DecisionArtifact(space, standardizer(width), head(space, width), 1.0, "base", "")
+        .write(file);
     byte[] all = Files.readAllBytes(file);
     Files.write(file, java.util.Arrays.copyOf(all, all.length - 9));
 

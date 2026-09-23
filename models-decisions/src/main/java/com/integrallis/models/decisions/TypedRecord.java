@@ -22,9 +22,9 @@ import java.util.Objects;
  * One harvested state and its outcome, for an answer space of any width.
  *
  * <p>The binary {@link HarvestRecord} carries a {@code boolean} because a Noul has exactly two
- * outcomes. A Choice or a Score does not, so the outcome here is the index of the true label in
- * the space's declaration order. Keeping these as separate types rather than widening the binary
- * one means a Noul harvest cannot silently acquire a third outcome.
+ * outcomes. A Choice or a Score does not, so the outcome here is the index of the true label in the
+ * space's declaration order. Keeping these as separate types rather than widening the binary one
+ * means a Noul harvest cannot silently acquire a third outcome.
  *
  * <p>The state is copied in and out. A caller holding the array it passed could otherwise mutate a
  * record after it had been assigned to a split, which would move training data into the sealed set
@@ -77,7 +77,14 @@ public record TypedRecord(String id, String split, int outcome, boolean truncate
 
   @Override
   public String toString() {
-    return "TypedRecord[id=" + id + ", split=" + split + ", outcome=" + outcome + ", width="
-        + state.length + "]";
+    return "TypedRecord[id="
+        + id
+        + ", split="
+        + split
+        + ", outcome="
+        + outcome
+        + ", width="
+        + state.length
+        + "]";
   }
 }

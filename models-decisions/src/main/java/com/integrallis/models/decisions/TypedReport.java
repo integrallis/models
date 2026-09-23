@@ -21,8 +21,8 @@ import java.util.Objects;
  * What a typed head scored on a sealed split.
  *
  * <p>The majority floor sits beside the accuracy because a Choice over four labels and a Choice
- * over forty are not comparable achievements, and an accuracy quoted without its floor hides
- * which one it was.
+ * over forty are not comparable achievements, and an accuracy quoted without its floor hides which
+ * one it was.
  *
  * @param corpus the corpus name
  * @param sealedSize how many items were scored

@@ -28,12 +28,12 @@ import java.util.List;
  *
  * <p>A multinomial head treats levels 0 and 4 as no more distant than 0 and 1, discarding the one
  * property that makes a Score a Score. This fits K-1 binary heads instead -- "is the level above
- * k?" -- so every training row informs every threshold below and above it, and the ordering is
- * used rather than thrown away. Level probabilities come from consecutive differences.
+ * k?" -- so every training row informs every threshold below and above it, and the ordering is used
+ * rather than thrown away. Level probabilities come from consecutive differences.
  *
- * <p>Measured against the multinomial baseline on the same harvest, because the question is
- * whether the ordering carries information a frozen state can express, not whether a different
- * loss produces a different number.
+ * <p>Measured against the multinomial baseline on the same harvest, because the question is whether
+ * the ordering carries information a frozen state can express, not whether a different loss
+ * produces a different number.
  */
 public final class OrdinalThresholdTool {
 

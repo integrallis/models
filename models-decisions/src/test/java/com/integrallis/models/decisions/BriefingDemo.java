@@ -33,8 +33,8 @@ import java.util.List;
  * <p>A hosted decision API is billed and timed per call, and each call carries the document again.
  * Here the document is prefilled once and frozen, and every question forks that physical prefix, so
  * the second question and the twentieth cost only their own tokens. This prints the split — the
- * one-off prefill against the marginal cost per question — because the average alone hides which
- * of the two is being paid.
+ * one-off prefill against the marginal cost per question — because the average alone hides which of
+ * the two is being paid.
  *
  * <p>The prefix sharing is asserted rather than assumed. A fork that quietly copied the prefix
  * would produce identical answers and a completely different cost curve, which is exactly the kind
@@ -98,50 +98,50 @@ public final class BriefingDemo {
         runBatched(
             held, sharing, artifact, prefix, questions, documentTokens, marginal, probabilities);
       } else {
-      for (int index = 0; index < questions.size(); index++) {
-        String question = questions.get(index);
-        int[] tail =
-            held.tokenizer()
-                .encode(
-                    " "
-                        + question
-                        + "\nIs the question answerable from the text above? Answer yes or no."
-                        + "\nAnswer:");
+        for (int index = 0; index < questions.size(); index++) {
+          String question = questions.get(index);
+          int[] tail =
+              held.tokenizer()
+                  .encode(
+                      " "
+                          + question
+                          + "\nIs the question answerable from the text above? Answer yes or no."
+                          + "\nAnswer:");
 
-        long start = System.nanoTime();
-        double seconds;
-        double probability;
-        try (InferenceSession branch = sharing.fork(prefix)) {
-          int position = documentTokens.length;
-          if (tail.length > 1) {
-            int[] head = new int[tail.length - 1];
-            System.arraycopy(tail, 0, head, 0, head.length);
-            held.prefill(branch, head, position);
-          }
-          float[] hidden =
-              sharing.forwardHiddenState(branch, tail[tail.length - 1], position + tail.length - 1);
-          probability = artifact.decide(hidden).probabilityOfTrue();
-          // Stop the clock before witnessing. The witness fork is an assertion about the
-          // implementation, not work a caller would ever do, and timing it means the measurement
-          // pays for its own proof -- the figure would describe the harness, not the model.
-          seconds = (System.nanoTime() - start) / 1e9;
+          long start = System.nanoTime();
+          double seconds;
+          double probability;
+          try (InferenceSession branch = sharing.fork(prefix)) {
+            int position = documentTokens.length;
+            if (tail.length > 1) {
+              int[] head = new int[tail.length - 1];
+              System.arraycopy(tail, 0, head, 0, head.length);
+              held.prefill(branch, head, position);
+            }
+            float[] hidden =
+                sharing.forwardHiddenState(
+                    branch, tail[tail.length - 1], position + tail.length - 1);
+            probability = artifact.decide(hidden).probabilityOfTrue();
+            // Stop the clock before witnessing. The witness fork is an assertion about the
+            // implementation, not work a caller would ever do, and timing it means the measurement
+            // pays for its own proof -- the figure would describe the harness, not the model.
+            seconds = (System.nanoTime() - start) / 1e9;
 
-          try (InferenceSession witness = sharing.fork(prefix)) {
-            sharedEverywhere &= sharing.sharesPrefixStorage(branch, witness);
+            try (InferenceSession witness = sharing.fork(prefix)) {
+              sharedEverywhere &= sharing.sharesPrefixStorage(branch, witness);
+            }
           }
+          marginal.add(seconds);
+          probabilities.add(probability);
+
+          System.out.printf(
+              "  Q%-2d %-46s %s  p=%.3f  %6.3f s%n",
+              index + 1,
+              question.length() > 46 ? question.substring(0, 43) + "..." : question,
+              probability >= 0.5 ? "YES" : "NO ",
+              probability,
+              seconds);
         }
-        marginal.add(seconds);
-        probabilities.add(probability);
-
-        System.out.printf(
-            "  Q%-2d %-46s %s  p=%.3f  %6.3f s%n",
-            index + 1,
-            question.length() > 46 ? question.substring(0, 43) + "..." : question,
-            probability >= 0.5 ? "YES" : "NO ",
-            probability,
-            seconds);
-      }
-
       }
 
       double total = prefillSeconds + marginal.stream().mapToDouble(Double::doubleValue).sum();

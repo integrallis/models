@@ -21,11 +21,11 @@ import java.util.Objects;
 /**
  * Reads a typed decision from one position's logits, over the answer letters alone.
  *
- * <p>The options are written into the prompt as a lettered list and the answer is the
- * distribution over {@code A}, {@code B}, {@code C} at the position where the letter would go.
- * One forward pass answers the whole question however many options it has, and the option text is
- * read from the prompt rather than learned, so a set of options the model has never seen is
- * handled on the same footing as a familiar one.
+ * <p>The options are written into the prompt as a lettered list and the answer is the distribution
+ * over {@code A}, {@code B}, {@code C} at the position where the letter would go. One forward pass
+ * answers the whole question however many options it has, and the option text is read from the
+ * prompt rather than learned, so a set of options the model has never seen is handled on the same
+ * footing as a familiar one.
  *
  * <p>That is the part this project got wrong for a long time. A head fitted over a frozen hidden
  * state learns the labels it was trained on and scores chance on any other set; a candidate scorer

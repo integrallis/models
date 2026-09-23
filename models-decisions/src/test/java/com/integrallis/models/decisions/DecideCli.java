@@ -125,7 +125,9 @@ public final class DecideCli {
     }
     System.out.printf(
         "done: %d items, wall %.1f s, %.3f s/item%n",
-        done, (System.nanoTime() - start) / 1e9, (System.nanoTime() - start) / 1e9 / Math.max(done, 1));
+        done,
+        (System.nanoTime() - start) / 1e9,
+        (System.nanoTime() - start) / 1e9 / Math.max(done, 1));
   }
 
   private static String buildPrompt(String context, String question) {

@@ -49,10 +49,10 @@ public final class AlignmentHeadTool {
    * Arguments: state harvest, label harvest, training label-set name, comma-separated eval specs,
    * optional L2.
    *
-   * <p>An eval spec is {@code labelSet} to score the training harvest's own sealed items, or
-   * {@code labelSet@harvestPath} to score a different corpus. The second form is the one that can
-   * actually test transfer: scoring a held-out label set against items whose true label is not in
-   * it asks an incoherent question and can only fail.
+   * <p>An eval spec is {@code labelSet} to score the training harvest's own sealed items, or {@code
+   * labelSet@harvestPath} to score a different corpus. The second form is the one that can actually
+   * test transfer: scoring a held-out label set against items whose true label is not in it asks an
+   * incoherent question and can only fail.
    */
   public static void main(String[] args) throws IOException {
     Path stateHarvest = Path.of(args[0]);
@@ -76,8 +76,9 @@ public final class AlignmentHeadTool {
       }
     }
     System.out.println("  label sets encoded:");
-    labelStates.forEach((set, states) -> System.out.printf("    %-12s %d labels %s%n",
-        set, states.size(), labelNames.get(set)));
+    labelStates.forEach(
+        (set, states) ->
+            System.out.printf("    %-12s %d labels %s%n", set, states.size(), labelNames.get(set)));
 
     List<TypedRecord> items = new ArrayList<>();
     try (BufferedReader reader = Files.newBufferedReader(stateHarvest, StandardCharsets.UTF_8)) {
@@ -125,8 +126,7 @@ public final class AlignmentHeadTool {
     Noul fits = new Noul("this candidate fits this state");
     LinearDecisionHead head =
         new LogisticHeadTrainer(400, 0.1, l2).fit(fits, standardizer.applyAll(x), y);
-    System.out.printf(
-        "%n  trained on %s: %d pairs of width %d%n", trainSet, x.length, x[0].length);
+    System.out.printf("%n  trained on %s: %d pairs of width %d%n", trainSet, x.length, x[0].length);
 
     CandidateScorer scorer =
         new CandidateScorer(

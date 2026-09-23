@@ -46,7 +46,8 @@ public final class ReleaseTool {
     String baseModel = args[2];
     Path out = Path.of(args[3]);
     // The base file itself, so the artifact records what it was actually fitted against.
-    String baseDigest = args.length > 4 && !args[4].isBlank() ? DecisionArtifact.digestOf(Path.of(args[4])) : "";
+    String baseDigest =
+        args.length > 4 && !args[4].isBlank() ? DecisionArtifact.digestOf(Path.of(args[4])) : "";
 
     List<HarvestRecord> records = new ArrayList<>();
     int skipped = 0;
@@ -90,7 +91,8 @@ public final class ReleaseTool {
     System.out.printf("  artifact              %s%n", out);
     System.out.printf("  bytes                 %d%n", bytes.length);
     System.out.printf("  sha256                %s%n", sha256(bytes));
-    System.out.printf("  base digest           %s%n", baseDigest.isEmpty() ? "NOT RECORDED" : baseDigest);
+    System.out.printf(
+        "  base digest           %s%n", baseDigest.isEmpty() ? "NOT RECORDED" : baseDigest);
 
     // The released file must reproduce the decisions just reported, or the report describes
     // something that was never written to disk.
@@ -107,7 +109,8 @@ public final class ReleaseTool {
       }
     }
     System.out.printf(
-        "  reload reproduces     %s%n", mismatches == 0 ? "yes, bit for bit" : mismatches + " DIFFER");
+        "  reload reproduces     %s%n",
+        mismatches == 0 ? "yes, bit for bit" : mismatches + " DIFFER");
     if (mismatches != 0) {
       throw new IllegalStateException("the written artifact does not reproduce the scored one");
     }
