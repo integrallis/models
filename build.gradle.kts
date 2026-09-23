@@ -59,7 +59,8 @@ val publishedModuleNames =
         "models-spring-boot-starter",
         "models-embedding",
         "models-audio",
-        "models-router"
+        "models-router",
+        "models-decisions"
     )
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
 val scaffoldProjects = libraryProjects.filterNot { it.name in publishedModuleNames }

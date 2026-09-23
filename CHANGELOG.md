@@ -4,6 +4,32 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.43] - 2026-09-23
+
+### Added
+
+- `models-decisions`, a System One decision tier: state in, typed probabilistic decisions out, in
+  one pass, with no decode loop anywhere. Three primitives, `Noul` for binary, `Choice` for 2 to
+  255 unordered options and `Score` for 2 to 10 ordered levels, with the answer space declared
+  before the decision is made so it is a contract rather than something parsed out of prose.
+  Candidates are scored against a state read once, forking from a frozen KV prefix, so many
+  questions against one document pay for that document once. `DecisionArtifact` is the release
+  unit and carries the base weight digest: loading it against weights whose SHA-256 disagrees
+  throws rather than scores.
+
+- `backend-cuda`, Models-owned Rust kernels compiled to PTX and driven through Panama FFM: fused
+  dequantise-and-multiply projections for Q4_K and Q6_K, and grouped-query attention for the decode
+  step. The arithmetic compiles unchanged for the host and for `nvptx64`, so it is tested against a
+  CPU reference on any machine with no GPU and no CUDA toolkit. `CudaRoutingCounters` records what
+  executed on the device and why anything did not, so a run that accelerates nothing distinguishes
+  an unsupported format from an ineligible shape from an absent device. **No kernel here has been
+  shown to beat the CPU path**; measured warm on an A40 against 8-core CPU SIMD it is slower. This
+  is the substrate the measurements run on, not a performance claim.
+
+- `RuntimeReport`, which prints the kernel, device and settings a run actually used and can fail
+  closed on a demanded kernel. An unreported fallback has invalidated measurements here before,
+  once landing within 1% of the previous number while hiding a large difference.
+
 ### Changed
 
 - The hidden-state prefill now reaches the batched path. `prefill` has consulted the batched
