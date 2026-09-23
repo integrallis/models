@@ -78,7 +78,23 @@ public final class JevBenchRunner {
       LetterLogitScorer letterScorer = new LetterLogitScorer(temperature);
       System.out.printf("mode=%s%n", letters ? "letter-logits" : "candidate-scoring");
 
-      for (String[] row : rows) {
+      // Warmup, and it is not a nicety. Measured on an A40 host: the same item scored repeatedly
+      // in one JVM gives 0.9110, 0.9399, then 0.9316622781200229 and that value thereafter,
+      // bit-identical and reproducible in a second JVM. Without this the first two items of every
+      // run are scored on partly-interpreted code, are not reproducible between JVMs, and are also
+      // the slowest, which moves the p50 and p95 a speed metric is built from.
+      int warmupItems = Integer.getInteger("decisions.warmupItems", 3);
+      List<String[]> schedule = new ArrayList<>();
+      for (int i = 0; i < warmupItems && !rows.isEmpty(); i++) {
+        schedule.add(rows.get(0));
+      }
+      int warmupRemaining = schedule.size();
+      schedule.addAll(rows);
+      if (warmupRemaining > 0) {
+        System.out.printf("warmup=%d items (discarded)%n", warmupRemaining);
+      }
+
+      for (String[] row : schedule) {
         String id = row[0];
         List<String> labels = List.of(row[2].split("\\|", -1));
         String prompt = row[3].replace("\\n", "\n");
@@ -120,6 +136,17 @@ public final class JevBenchRunner {
           candidateTokens += batch.candidateTokensEvaluated();
           sharedProven += batch.sharedPrefixProven() ? 1 : 0;
           p = batch.verdict().probabilities();
+        }
+
+        if (warmupRemaining > 0) {
+          // Discarded: no row written, and the tallies restart so warmup cannot leak into them.
+          warmupRemaining--;
+          candidateTokens = 0;
+          sharedProven = 0;
+          if (warmupRemaining == 0) {
+            wall0 = System.nanoTime();
+          }
+          continue;
         }
 
         StringBuilder sb = new StringBuilder(id).append('\t').append(latency);
