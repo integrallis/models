@@ -201,6 +201,16 @@ tasks.named("processResources") {
     dependsOn(preparePtxResources)
 }
 
+// withSourcesJar() (applied at the root) archives sourceSets["main"].allSource, which now
+// includes ptxResourceRoot (registered as a resources srcDir above). Gradle only sees that as a
+// task *input*, not a dependency, so a clean parallel build can race sourcesJar against
+// preparePtxResources and either package a stale/missing PTX module or fail outright depending on
+// scheduling. assemble (and anyone else who runs sourcesJar without first running check, which
+// depends on preparePtxResources transitively via verifyPtxArtifact) can hit this.
+tasks.named("sourcesJar") {
+    dependsOn(preparePtxResources)
+}
+
 val verifyPtxArtifact by tasks.registering {
     group = "verification"
     description = "Recompute the packaged PTX digest and check it against its descriptor"
