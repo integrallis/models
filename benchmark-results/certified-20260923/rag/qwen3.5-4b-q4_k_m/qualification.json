@@ -1,0 +1,47 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/home/ubuntu/final/models-rust-ffm.json",
+    "sha256" : "9624f16f16565a8d457d859a9da51a408e36c37c267d2b095ddf76c307d9791c"
+  },
+  "comparators" : [ {
+    "path" : "/home/ubuntu/final/ollama.json",
+    "sha256" : "411741c3ccc0c8029aec94efdda5b2662d2faae06e437c5c02f65448e6439a12"
+  }, {
+    "path" : "/home/ubuntu/final/llamacpp.json",
+    "sha256" : "80023b6ed80b36fb05e7e65c877bae4842314061c4c2ddbdbdf8ddfa8e0b6f9e"
+  } ],
+  "qualification" : {
+    "modelId" : "unsloth_qwen3_5_4b_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+    "absoluteTier" : "USABLE",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 18,
+    "modelAnswerRate" : 0.6666666666666666,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "ollama", "llama.cpp" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 1.0472554301566261,
+      "endToEndLatencyRatio" : 1.1025668328048668,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    }, {
+      "comparatorBackend" : "llama.cpp",
+      "decodeThroughputRatio" : 1.0461580940188029,
+      "endToEndLatencyRatio" : 1.0598327154155802,
+      "minimumDecodeThroughputRatio" : 0.45,
+      "maximumEndToEndLatencyRatio" : 2.0,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}
