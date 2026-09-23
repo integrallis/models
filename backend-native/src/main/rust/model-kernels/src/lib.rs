@@ -981,8 +981,18 @@ unsafe fn execute_gated_delta_net_partition(
         // The chunked scan reads the recurrent state twice and writes it once per chunk rather
         // than four times per token, which is the whole cost of a long prefill at this shape.
         gated_delta_net_chunked_partition(
-            job, start_head, end_head, query_scale, query, key, value, log_decay, beta, state,
-            output, vectorized,
+            job,
+            start_head,
+            end_head,
+            query_scale,
+            query,
+            key,
+            value,
+            log_decay,
+            beta,
+            state,
+            output,
+            vectorized,
         );
         return;
     }
@@ -1116,14 +1126,13 @@ fn gated_delta_net_chunked_partition(
     for head in start_head..end_head {
         let key_head = head % job.key_head_count;
         let state_offset = head * key_dimension * value_dimension;
-        let head_state =
-            &mut state[state_offset..state_offset + key_dimension * value_dimension];
+        let head_state = &mut state[state_offset..state_offset + key_dimension * value_dimension];
         let mut base = 0;
         while base < job.token_count {
             let span = chunk.min(job.token_count - base);
 
             let mut running = 0.0_f32;
-            for local in 0..span {
+            for (local, decayed) in cumulative[..span].iter_mut().enumerate() {
                 let token = base + local;
                 let token_head = token * job.value_head_count + head;
                 let source = (token * job.key_head_count + key_head) * key_dimension;
@@ -1140,13 +1149,13 @@ fn gated_delta_net_chunked_partition(
                     *entry *= query_scale;
                 }
                 running += log_decay[token_head];
-                cumulative[local] = running;
+                *decayed = running;
             }
             let tail = cumulative[span - 1];
-            for local in 0..span {
+            for (local, &log_sum) in cumulative[..span].iter().enumerate() {
                 let row = local * key_dimension;
-                let decay = cumulative[local].exp();
-                let carry = (tail - cumulative[local]).exp();
+                let decay = log_sum.exp();
+                let carry = (tail - log_sum).exp();
                 for index in 0..key_dimension {
                     decayed_key[row + index] = normalized_key[row + index] * decay;
                     decayed_query[row + index] = normalized_query[row + index] * decay;
@@ -1161,8 +1170,7 @@ fn gated_delta_net_chunked_partition(
             while block < span {
                 let width = GATED_DELTA_NET_TOKEN_BLOCK.min(span - block);
                 for row in 0..key_dimension {
-                    let state_row =
-                        &head_state[row * value_dimension..(row + 1) * value_dimension];
+                    let state_row = &head_state[row * value_dimension..(row + 1) * value_dimension];
                     for local in block..block + width {
                         let key_weight = decayed_key[local * key_dimension + row];
                         if key_weight != 0.0 {
@@ -1274,8 +1282,7 @@ fn gated_delta_net_chunked_partition(
                         let weight = carried_key[source * key_dimension + row];
                         if weight != 0.0 {
                             gated_delta_net_add_scaled(
-                                &mut head_state
-                                    [row * value_dimension..(row + 1) * value_dimension],
+                                &mut head_state[row * value_dimension..(row + 1) * value_dimension],
                                 update_row,
                                 weight,
                                 vectorized,
@@ -6939,19 +6946,14 @@ mod tests {
         }
 
         let tolerance = 2.0e-4_f32;
-        for (index, (actual, expected)) in chunked_output
-            .iter()
-            .zip(&sequential_output)
-            .enumerate()
+        for (index, (actual, expected)) in chunked_output.iter().zip(&sequential_output).enumerate()
         {
             assert!(
                 (actual - expected).abs() <= tolerance * expected.abs().max(1.0),
                 "output[{index}] chunked {actual} vs sequential {expected}"
             );
         }
-        for (index, (actual, expected)) in
-            chunked_state.iter().zip(&sequential_state).enumerate()
-        {
+        for (index, (actual, expected)) in chunked_state.iter().zip(&sequential_state).enumerate() {
             assert!(
                 (actual - expected).abs() <= tolerance * expected.abs().max(1.0),
                 "state[{index}] chunked {actual} vs sequential {expected}"
