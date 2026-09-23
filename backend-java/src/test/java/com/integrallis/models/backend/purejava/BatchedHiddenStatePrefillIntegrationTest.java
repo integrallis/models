@@ -57,7 +57,9 @@ class BatchedHiddenStatePrefillIntegrationTest {
       assertThat(backend.supportsBatchedHiddenStates()).isTrue();
 
       int[] document =
-          backend.tokenizer().encode("Fees are 42,000 per month. Delaware law governs.\n\nQuestion:");
+          backend
+              .tokenizer()
+              .encode("Fees are 42,000 per month. Delaware law governs.\n\nQuestion:");
       int[][] tails = new int[QUESTIONS.size()][];
       int[] starts = new int[QUESTIONS.size()];
       for (int index = 0; index < QUESTIONS.size(); index++) {
@@ -118,9 +120,7 @@ class BatchedHiddenStatePrefillIntegrationTest {
       try (InferenceSession branch = backend.fork(prefix)) {
         batched =
             backend.prefillBatchHiddenStates(
-                new InferenceSession[] {branch},
-                new int[][] {tail},
-                new int[] {document.length});
+                new InferenceSession[] {branch}, new int[][] {tail}, new int[] {document.length});
       }
       // A batch of one must not quietly become a different computation.
       assertThat(batched[0]).isEqualTo(sequential);

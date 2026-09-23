@@ -1004,7 +1004,9 @@ public final class LlamaForwardPass {
 
     if (sessionCount == 1 && (!batchedPrefill || tokenBatches[0].length == 1)) {
       // One session cannot be batched against anything, so take the path that is already tuned.
-      return new float[][] {prefillHiddenState(sessions[0], tokenBatches[0], sessions[0].nextPosition)};
+      return new float[][] {
+        prefillHiddenState(sessions[0], tokenBatches[0], sessions[0].nextPosition)
+      };
     }
 
     float[] finalStates = runSessionPrefillRows(sessions, tokenBatches, dim);

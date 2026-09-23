@@ -1121,8 +1121,8 @@ public final class PureJavaBackend
   /**
    * Prefills independent sessions together and returns one final normalized hidden state each.
    *
-   * <p>Falls back to prefilling them one at a time where the decoder cannot batch, so a caller
-   * gets the same answers either way and only the cost changes.
+   * <p>Falls back to prefilling them one at a time where the decoder cannot batch, so a caller gets
+   * the same answers either way and only the cost changes.
    */
   public float[][] prefillBatchHiddenStates(
       InferenceSession[] sessions, int[][] tokenBatches, int[] startPositions) {
