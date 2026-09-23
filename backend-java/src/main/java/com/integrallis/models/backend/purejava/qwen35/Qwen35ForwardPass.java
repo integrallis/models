@@ -287,11 +287,18 @@ public final class Qwen35ForwardPass {
       throw new IllegalArgumentException(
           "checkpoint must be between 0 and " + checked.checkpoint + ": " + checkpoint);
     }
+    int[] retained = Arrays.copyOf(checked.tokenHistory, checkpoint);
     checked.state = new SessionState(config, weights, checked.capacity, prefillBatchSize);
     checked.checkpoint = 0;
-    for (int index = 0; index < checkpoint; index++) {
-      advance(checked, checked.tokenHistory[index], false);
+    if (checkpoint == 0) {
+      return;
     }
+    // Replay through the batched prefill path, not one token at a time. A Gated DeltaNet state
+    // cannot be truncated the way a KV cache can, so rewinding has to re-run the retained prefix
+    // -- and re-running it at decode rate cost more than prefilling the whole prompt outright,
+    // which made a cached prefix the slowest way to answer. Measured on a 171-token RAG prompt
+    // with a 150-token reusable prefix: p95 TTFT 6371 ms token-by-token.
+    prefill(checked, retained, 0);
   }
 
   /** Clears all sequence state. */
