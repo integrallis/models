@@ -42,6 +42,7 @@ class Q8KActivationsTest {
 
   private static final int SUPER_BLOCK = 256;
   private static final int BLOCK_BYTES = 144;
+  private static final int Q6_K_BLOCK_BYTES = 210;
 
   @Test
   @DisplayName("the Java projection is bit-identical to the Vector API path on real Q4_K blocks")
@@ -153,6 +154,95 @@ class Q8KActivationsTest {
    * The exact decomposition the PTX kernel uses: exact integer partials per super-block, then the
    * float scales folded in ascending block order.
    */
+  @Test
+  @DisplayName("the Q6_K fold is bit-identical to the Vector API path, one fma per super-block")
+  void theQ6KFoldIsBitIdenticalToTheVectorApiPath() {
+    // The absence of this test is why a defect survived: Q4_K had a Vector API comparison and
+    // Q6_K did not. The kernel folded eight float lane accumulators per row on the strength of a
+    // comment claiming the SIMD path did the same. integrallis/vectors#76 established that it had
+    // not for some time and that the two disagreed by one to two units in the last place. The
+    // Vector API route folds exactly one fused multiply per super-block, and so does this.
+    int rows = 24;
+    int cols = 1_024;
+    byte[] weightBytes = q6kTensor(rows, cols, 20_011L);
+    float[] input = activations(cols, 40_961L);
+
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment weights = arena.allocate(weightBytes.length);
+      MemorySegment.copy(weightBytes, 0, weights, ValueLayout.JAVA_BYTE, 0, weightBytes.length);
+
+      float[] expected = new float[rows];
+      VectorUtil.ggufQ6_KQ8_KBatchedMatmul(
+          input, weights, 1, rows, cols, expected, new byte[cols], new float[cols / SUPER_BLOCK]);
+
+      float[] actual = projectQ6KOnHost(weightBytes, input, rows, cols);
+      for (int row = 0; row < rows; row++) {
+        assertEquals(
+            Float.floatToRawIntBits(expected[row]),
+            Float.floatToRawIntBits(actual[row]),
+            "row " + row + " must match the Vector API bit for bit");
+      }
+    }
+  }
+
+  /** The kernel's Q6_K arithmetic, transcribed: exact integer sum, then one fma per block. */
+  private static float[] projectQ6KOnHost(byte[] weights, float[] input, int rows, int cols) {
+    int blocksPerRow = cols / SUPER_BLOCK;
+    byte[] quants = new byte[cols];
+    float[] scales = new float[blocksPerRow];
+    short[] sums = new short[cols / Q8KActivations.SUM_BLOCK_VALUES];
+    Q8KActivations.quantize(input, 1, cols, quants, scales, sums);
+
+    float[] output = new float[rows];
+    for (int row = 0; row < rows; row++) {
+      float sum = 0.0f;
+      for (int block = 0; block < blocksPerRow; block++) {
+        int base = (row * blocksPerRow + block) * Q6_K_BLOCK_BYTES;
+        float d = Float.float16ToFloat(readShort(weights, base + 208)) * scales[block];
+        int blockSum = 0;
+        for (int superBlock = 0; superBlock < 2; superBlock++) {
+          int qlBase = base + superBlock * 64;
+          int qhBase = base + 128 + superBlock * 32;
+          int scaleBase = base + 192 + superBlock * 8;
+          int quantBase = block * SUPER_BLOCK + superBlock * 128;
+          for (int index = 0; index < 32; index++) {
+            int scaleIndex = index / 16;
+            int ql1 = weights[qlBase + index] & 0xff;
+            int ql2 = weights[qlBase + 32 + index] & 0xff;
+            int high = weights[qhBase + index] & 0xff;
+            int q1 = ((ql1 & 0x0f) | ((high & 0x03) << 4)) - 32;
+            int q2 = ((ql2 & 0x0f) | (((high >> 2) & 0x03) << 4)) - 32;
+            int q3 = ((ql1 >> 4) | (((high >> 4) & 0x03) << 4)) - 32;
+            int q4 = ((ql2 >> 4) | (((high >> 6) & 0x03) << 4)) - 32;
+            blockSum += weights[scaleBase + scaleIndex] * q1 * quants[quantBase + index];
+            blockSum += weights[scaleBase + scaleIndex + 2] * q2 * quants[quantBase + index + 32];
+            blockSum += weights[scaleBase + scaleIndex + 4] * q3 * quants[quantBase + index + 64];
+            blockSum += weights[scaleBase + scaleIndex + 6] * q4 * quants[quantBase + index + 96];
+          }
+        }
+        sum = Math.fma(d, blockSum, sum);
+      }
+      output[row] = sum;
+    }
+    return output;
+  }
+
+  /** A Q6_K tensor of pseudo-random but valid blocks. */
+  private static byte[] q6kTensor(int rows, int cols, long seed) {
+    int blocksPerRow = cols / SUPER_BLOCK;
+    byte[] weights = new byte[rows * blocksPerRow * Q6_K_BLOCK_BYTES];
+    java.util.Random random = new java.util.Random(seed);
+    for (int offset = 0; offset < weights.length; offset += Q6_K_BLOCK_BYTES) {
+      for (int i = 0; i < 208; i++) {
+        weights[offset + i] = (byte) random.nextInt(256);
+      }
+      short d = (short) ((random.nextInt(0x2000) + 0x2000) & 0x7fff);
+      weights[offset + 208] = (byte) (d & 0xff);
+      weights[offset + 209] = (byte) ((d >> 8) & 0xff);
+    }
+    return weights;
+  }
+
   private static float[] projectOnHost(byte[] weights, float[] input, int rows, int cols) {
     int blocksPerRow = cols / SUPER_BLOCK;
     byte[] quants = new byte[cols];
