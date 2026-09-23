@@ -66,7 +66,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 /// Bump whenever a kernel's name, parameter list or launch contract changes. The Java side
 /// refuses a module whose recorded ABI differs, exactly as `backend-native` does for its
 /// shared library.
-pub const PTX_ABI_VERSION: u32 = 1;
+pub const PTX_ABI_VERSION: u32 = 2;
 
 /// Kernel entry-point names the Java loader resolves in the compiled module.
 ///
