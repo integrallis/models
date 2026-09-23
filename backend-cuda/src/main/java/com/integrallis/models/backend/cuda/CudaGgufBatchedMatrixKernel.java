@@ -75,6 +75,23 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   /** System property that disables this backend outright. */
   public static final String DISABLED_PROPERTY = "models.cuda.disabled";
 
+  /**
+   * System property that refuses only the decode-attention kernel, leaving the projections routed.
+   *
+   * <p>A per-stage ablation switch, not a feature flag. The projections are bit-exact by
+   * construction; attention carries a stated 2.0e-5 relative-L2 contract because of {@code expf}
+   * (see {@code UPSTREAM.md} CU-005). So when G1 diverges at a token where both stages routed,
+   * there are two live suspects and no way to tell them apart from the report alone. {@code
+   * CudaParityRun} literally tells the reader to "re-run with attention refused"; this is the
+   * switch that makes that re-run possible without recompiling anything.
+   *
+   * <p>The refusal is <b>counted</b>, under the reason {@code ablated-by-models.cuda.attention
+   * .disabled}, once per attention operation diverted. An ablation whose only evidence is an
+   * absence cannot be distinguished from a stage that was never reached, and a toggle that silently
+   * does nothing reads in the results as "this stage does not matter".
+   */
+  public static final String ATTENTION_DISABLED_PROPERTY = "models.cuda.attention.disabled";
+
   private final CudaDriver driver;
   private final BundledPtxModule module;
   private final CudaRoutingCounters counters;
@@ -284,7 +301,16 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean supportsGroupedAttention() {
-    return !closed;
+    if (closed) {
+      return false;
+    }
+    if (Boolean.getBoolean(ATTENTION_DISABLED_PROPERTY)) {
+      // Counted, not silent: see ATTENTION_DISABLED_PROPERTY. This is asked once per attention
+      // operation, so the count is exactly how many the ablation diverted back to the CPU.
+      counters.refused(CudaStage.DECODE_ATTENTION, "ablated-by-" + ATTENTION_DISABLED_PROPERTY);
+      return false;
+    }
+    return true;
   }
 
   @Override
@@ -311,6 +337,11 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int numHeads,
       int numKvHeads,
       float scale) {
+    if (Boolean.getBoolean(ATTENTION_DISABLED_PROPERTY)) {
+      counters.refused(CudaStage.DECODE_ATTENTION, "ablated-by-" + ATTENTION_DISABLED_PROPERTY);
+      throw new UnsupportedOperationException(
+          "CUDA attention refused: ablated by " + ATTENTION_DISABLED_PROPERTY);
+    }
     if (!isAttentionEligible(positionsA, positionsB, numHeads, numKvHeads, keyLength)) {
       counters.refused(
           CudaStage.DECODE_ATTENTION,
