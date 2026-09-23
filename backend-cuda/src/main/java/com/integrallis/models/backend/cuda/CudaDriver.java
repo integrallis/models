@@ -455,13 +455,30 @@ public final class CudaDriver implements AutoCloseable {
    */
   public void launch(
       MemorySegment function, int gridBlocks, int blockThreads, MemorySegment parameters) {
+    launch(function, gridBlocks, 1, blockThreads, parameters);
+  }
+
+  /**
+   * Launches {@code function} over a two-dimensional grid of {@code gridBlocksX} by {@code
+   * gridBlocksY} blocks.
+   *
+   * <p>The second dimension is the batch row. It exists because passing the batch index as a scalar
+   * forced one launch per row: a five-item JevBench run on an A40 issued 54,306 launches for 890
+   * projections, which is the term that made the device path slower than the CPU one.
+   */
+  public void launch(
+      MemorySegment function,
+      int gridBlocksX,
+      int gridBlocksY,
+      int blockThreads,
+      MemorySegment parameters) {
     try {
       check(
           (int)
               cuLaunchKernel.invokeExact(
                   function,
-                  gridBlocks,
-                  1,
+                  gridBlocksX,
+                  gridBlocksY,
                   1,
                   blockThreads,
                   1,
