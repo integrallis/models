@@ -102,6 +102,17 @@ jobs:
           rustup toolchain install 1.96.0 --profile minimal --no-self-update
           rustup component add --toolchain 1.96.0 clippy rustfmt
 
+      # backend-cuda's PTX crate pins its own nightly, builds with -Zbuild-std and links through
+      # llvm-bitcode-linker. Its rust-toolchain.toml declares every component and the nvptx64
+      # target, but the toolchain rustup auto-installs on first use arrives minimal with none of
+      # them. Same installation as ci.yml and codeql.yml.
+      - name: Install pinned Rust nightly for the PTX kernels
+        run: |
+          rustup toolchain install nightly-2026-09-17 --profile minimal --no-self-update
+          rustup component add --toolchain nightly-2026-09-17 \
+            clippy rustfmt rust-src llvm-bitcode-linker llvm-tools
+          rustup target add --toolchain nightly-2026-09-17 nvptx64-nvidia-cuda
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
