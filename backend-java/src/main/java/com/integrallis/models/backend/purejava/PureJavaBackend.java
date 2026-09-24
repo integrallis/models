@@ -1217,6 +1217,17 @@ public final class PureJavaBackend
   }
 
   @Override
+  public boolean groupedDecisionsMatchSingleDecisions() {
+    // Yes, and measured rather than assumed. MEASURED 2026-09-24 on the shipped Qwen3.5-4B at
+    // Q4_K_M: four questions over 120 tokens of shared evidence, answered as a group and then each
+    // asked on its own, agreed to the bit -- 0.000e+00 on every logit of all four. The reason is
+    // that this decoder's batched projection computes each row exactly as its single-row projection
+    // would, so the number of rows in a call cannot reach the result. Splitting one prefill into
+    // several batches is likewise bit-identical.
+    return true;
+  }
+
+  @Override
   public int groupedDecisionBreakEven() {
     // Every question here ends with a single-token step through the whole of the weights in Java,
     // which is the most expensive step in a decision and the one grouping replaces with one step

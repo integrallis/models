@@ -39,9 +39,14 @@ public final class Reorder {
       InferenceBackend backend = runtime.backend();
       Tokenizer tokenizer = backend.tokenizer();
 
-      // Warm the machine before anything is timed.
-      for (int index = 0; index < 3; index++) {
-        answer(backend, tokenizer, cases.get(0), false);
+      // Warm the machine before anything is timed -- and both arrangements, not just one. The two
+      // build different prompts and take different prefill shapes, so warming only the shipped order
+      // left the reordered one interpreted and its first timings measured compilation.
+      for (int index = 0; index < 6; index++) {
+        for (String[] one : cases) {
+          answer(backend, tokenizer, one, false);
+          answer(backend, tokenizer, one, true);
+        }
       }
 
       System.out.println();

@@ -311,6 +311,19 @@ public final class RustFfmBackend
   }
 
   @Override
+  public boolean groupedDecisionsMatchSingleDecisions() {
+    // No. MEASURED 2026-09-24: this kernel keeps a dedicated single-row path -- the `batch_size ==
+    // 1`
+    // specialisations reduce one row's blocks straight to a scalar, while two or more rows
+    // accumulate per-row vector lanes and reduce at the end. Both are correct and they round
+    // differently: 4e-7 relative on one projection, 6e-2 mean logit by the end of the graph, about
+    // 0.03 to 0.10 of probability. Splitting a prefill into several batches is bit-identical, so
+    // the
+    // grouping of rows is not the issue; crossing between one row and many is.
+    return false;
+  }
+
+  @Override
   public int groupedDecisionBreakEven() {
     // Not delegated, because what decides this is the kernel this backend adds and not the graph
     // underneath it. The native quantized decode kernel makes the single-token step that ends each

@@ -37,8 +37,21 @@ public final class Batch2 {
   public static void main(String... args) throws Exception {
     String evidence = Files.readString(Path.of(args[0])).strip();
     try (var harriet = Harriet.open()) {
-      Harriet.noul(harriet, CRITERIA.get(0), evidence);
-      Harriet.noul(harriet, CRITERIA.get(0), evidence);
+      // Warm both paths, not just one. The grouped path is separate code from the one-at-a-time
+      // path, so warming only the latter leaves the former interpreted and the first grouped timing
+      // measures compilation. Worse, unwarmed Panama vector code rounds differently, so the answer
+      // drift printed below was measuring the JIT too. Recorded in this project's working agreement;
+      // the first version of this harness ignored it.
+      List<AnswerSpace> warmup = new ArrayList<>();
+      for (int index = 0; index < 4; index++) {
+        warmup.add(new Noul(CRITERIA.get(index)));
+      }
+      for (int round = 0; round < 4; round++) {
+        for (AnswerSpace space : warmup) {
+          harriet.decide(space, evidence);
+        }
+        Harriet.decideAll(harriet, warmup, evidence);
+      }
 
       System.out.println();
       System.out.printf("  %-4s %-14s %-14s %-9s%n", "n", "one at a time", "grouped", "speedup");

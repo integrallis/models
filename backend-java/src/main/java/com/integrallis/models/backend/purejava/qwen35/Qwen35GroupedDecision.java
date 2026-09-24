@@ -59,7 +59,7 @@ package com.integrallis.models.backend.purejava.qwen35;
  * each question gets its own state and the weights are what get shared.
  *
  * <p>Group size is bounded because the recurrent state is not free: twenty questions at once is
- * about 2 GiB. Callers answer in groups and the weight sweep amortises across each group.
+ * about 2 GiB.
  */
 final class Qwen35GroupedDecision {
 

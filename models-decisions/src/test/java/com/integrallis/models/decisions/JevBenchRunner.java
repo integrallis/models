@@ -51,10 +51,11 @@ public final class JevBenchRunner {
    * every question with the same answer space, leaving only the question's own words to be read per
    * decision. The answer cue stays last in both, because it is what the read-out position means.
    */
-  private static String letterPrompt(String[] row, List<String> labels, boolean optionsFirst) {
+  private static String letterPrompt(
+      String[] row, List<String> labels, boolean optionsFirst, boolean runtimePrompt) {
     String prompt = row[3].replace("\\n", "\n");
     String rendered = LetterLogitScorer.renderOptions(labels);
-    if (!optionsFirst) {
+    if (!optionsFirst && !runtimePrompt) {
       return prompt + "\n" + rendered;
     }
     if (row.length < 7) {
@@ -65,6 +66,11 @@ public final class JevBenchRunner {
     String instructions = row[5].replace("\\n", "\n");
     String rubric = row[6].replace("\\n", "\n");
     String cue = "Answer:";
+    if (runtimePrompt) {
+      // Byte for byte what ModelJarDecisionRuntime.decide sends: evidence, criterion, lettered
+      // options, answer cue. No rubric, because the API has nowhere to put one.
+      return state + "\n" + instructions + "\n" + rendered;
+    }
     String letteredOnly = rendered.substring(0, rendered.length() - cue.length()).stripTrailing();
     return state + "\n\n" + rubric + "\n" + letteredOnly + "\n" + instructions + "\n" + cue;
   }
@@ -92,8 +98,17 @@ public final class JevBenchRunner {
     int sharedProven = 0;
     long candidateTokens = 0;
 
+    // Selectable so the two kernels can be run as arms of one comparison. Their answers are not
+    // the same -- MEASURED 2026-09-24, 6e-2 mean absolute logit apart on this model -- so any claim
+    // resting on a small accuracy difference has to be checked against what merely changing the
+    // kernel does. That control is not possible if the kernel is hardcoded.
+    boolean nativeKernel = !"java".equals(System.getProperty("decisions.kernel", "native"));
     try (PureJavaBackend backend =
-            PureJavaBackend.load(model, RustGgufBatchedMatrixKernel.openBundled());
+            PureJavaBackend.load(
+                model,
+                nativeKernel
+                    ? RustGgufBatchedMatrixKernel.openBundled()
+                    : com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.none());
         BufferedWriter writer = Files.newBufferedWriter(out, StandardCharsets.UTF_8)) {
 
       SharedPrefixCandidateEvaluator evaluator =
@@ -111,6 +126,20 @@ public final class JevBenchRunner {
           Boolean.parseBoolean(System.getProperty("decisions.optionsFirst", "false"));
       if (optionsFirst && !letters) {
         throw new IllegalArgumentException("decisions.optionsFirst only applies to the letter arm");
+      }
+      // The prompt the shipped runtime can actually build. The prepared task prompt carries a
+      // per-label rubric out of the benchmark's `question.criteria`, and AnswerSpace has exactly
+      // two accessors -- question() and labels() -- so no caller of the published API can supply
+      // one. Measuring with the rubric and shipping without it prices a product nobody can buy, so
+      // this arm drops it and reports what the product does today.
+      boolean runtimePrompt =
+          Boolean.parseBoolean(System.getProperty("decisions.runtimePrompt", "false"));
+      if (runtimePrompt && !letters) {
+        throw new IllegalArgumentException(
+            "decisions.runtimePrompt only applies to the letter arm");
+      }
+      if (runtimePrompt && optionsFirst) {
+        throw new IllegalArgumentException("pick one prompt arm");
       }
       LetterLogitScorer letterScorer = new LetterLogitScorer(temperature);
       System.out.printf("mode=%s%n", letters ? "letter-logits" : "candidate-scoring");
@@ -146,7 +175,8 @@ public final class JevBenchRunner {
         double latency;
         if (letters) {
           Choice space = new Choice(id, labels);
-          int[] lettered = backend.tokenizer().encode(letterPrompt(row, labels, optionsFirst));
+          int[] lettered =
+              backend.tokenizer().encode(letterPrompt(row, labels, optionsFirst, runtimePrompt));
           int[] letterTokens = new int[labels.size()];
           for (int i = 0; i < labels.size(); i++) {
             int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + i));

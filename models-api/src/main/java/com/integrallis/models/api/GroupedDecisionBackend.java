@@ -52,6 +52,31 @@ public interface GroupedDecisionBackend extends InferenceBackend {
   }
 
   /**
+   * Whether a grouped answer is bit-identical to the same question asked on its own.
+   *
+   * <p>It is not a given, and where it is false, grouping is not a scheduling choice -- it changes
+   * the answer. A lone question reads its answer out of a batch of one row; a group reads its
+   * answer out of a batch of many. On a backend where those are separate kernels they round
+   * differently, and a 32-layer model amplifies that hard.
+   *
+   * <p>MEASURED 2026-09-24 on the shipped Qwen3.5-4B at Q4_K_M. One projection, the two paths
+   * compared directly on real weights: agreement to 3e-7 to 6e-7 relative, deterministic, and
+   * unaffected by activation outliers -- ordinary fp32 accumulation order and nothing more. The
+   * same difference at the end of the whole graph: 6e-2 mean absolute logit, 3e-2 relative, which
+   * is about 0.03 to 0.10 of probability on a two-outcome question. Roughly five orders of
+   * amplification across the depth.
+   *
+   * <p>So on that backend a grouped answer and a lone answer differ in the second decimal place of
+   * every probability, and a caller cannot tell which of the two the calibration was fitted to. The
+   * default is false: a backend must claim this property, not be assumed to have it.
+   *
+   * @return whether grouping is guaranteed not to change an answer
+   */
+  default boolean groupedDecisionsMatchSingleDecisions() {
+    return false;
+  }
+
+  /**
    * The group size at which answering together starts to beat answering one at a time.
    *
    * <p>There is no universal answer, which is why this is asked of the backend rather than fixed by

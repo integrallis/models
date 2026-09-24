@@ -191,3 +191,11 @@ tasks.register<JavaExec>("typedRelease") {
         providers.gradleProperty("out").get(),
     )
 }
+
+// Prints the test runtime classpath so a diagnostic harness can be compiled and run outside Gradle.
+// A diagnostic that has to be a Gradle test task cannot be rerun with a changed system property
+// without a rebuild, and a diagnostic nobody reruns stops being used.
+tasks.register("printTestClasspath") {
+    val files = sourceSets["test"].runtimeClasspath
+    doLast { println(files.asPath) }
+}

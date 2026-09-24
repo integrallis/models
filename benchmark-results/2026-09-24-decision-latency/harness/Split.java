@@ -40,7 +40,12 @@ public final class Split {
     try (ModelJarDecisionRuntime runtime = Harriet.open()) {
       InferenceBackend backend = runtime.backend();
       Tokenizer tokenizer = backend.tokenizer();
-      Harriet.noul(runtime, short_, evidence);
+      // Warm every shape that gets timed below, at each criterion length.
+      for (int round = 0; round < 4; round++) {
+        for (String criterion : new String[] {short_, medium, long_}) {
+          Harriet.noul(runtime, criterion, evidence);
+        }
+      }
 
       int[] evidenceTokens = tokenizer.encode(evidence);
       System.out.println();

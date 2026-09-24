@@ -42,6 +42,21 @@ public final class Chunk {
         letters[index] = encoded[encoded.length - 1];
       }
       int[] evidenceTokens = tokenizer.encode(evidence);
+
+      // Warm both shapes. An unwarmed comparison of two code paths measures which one the JIT got
+      // to first, and both of these round differently before they are compiled.
+      int[] warm = tokenizer.encode(evidence + "\n" + criteria[0] + "\n" + options);
+      for (int round = 0; round < 6; round++) {
+        backend.reset();
+        backend.prefill(Arrays.copyOf(warm, warm.length - 1), 0);
+        backend.forward(warm[warm.length - 1], warm.length - 1);
+        backend.reset();
+        backend.prefill(Arrays.copyOf(warm, evidenceTokens.length), 0);
+        for (int index = evidenceTokens.length; index < warm.length; index++) {
+          backend.forward(warm[index], index);
+        }
+      }
+
       System.out.println();
       System.out.printf(
           "  %-46s %-7s %-10s %-10s %-10s %-11s%n",

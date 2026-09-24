@@ -237,6 +237,52 @@ class Qwen35ForwardPassTest {
     }
   }
 
+  /**
+   * The number of rows in a projection must not reach the result.
+   *
+   * <p>This is the property that makes grouping a scheduling choice rather than a change of answer,
+   * and it is the property this decoder claims through {@code
+   * groupedDecisionsMatchSingleDecisions()}. MEASURED 2026-09-24 on the shipped Qwen3.5-4B: true to
+   * the bit here, and false on the native kernel, which keeps a separate single-row path that
+   * rounds differently -- 4e-7 on one projection, 0.03 to 0.10 of probability by the end of the
+   * graph. So the claim is asserted rather than assumed, at every batch width a group can produce.
+   */
+  @Test
+  void aProjectionGivesEachRowTheSameAnswerAtEveryBatchWidth(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      var file = GgufParser.parse(model, arena);
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file, 8);
+
+      int[] prompt = {1, 2, 3, 4, 5, 6, 7};
+
+      // One token at a time: every projection sees exactly one row.
+      Qwen35ForwardPass.Session stepped = graph.openSession(8);
+      float[] oneRowAtATime = null;
+      for (int index = 0; index < prompt.length; index++) {
+        oneRowAtATime = graph.forward(stepped, prompt[index], index);
+      }
+      float[] expected = oneRowAtATime.clone();
+
+      // Every other width, including a prefill split in two, which must also change nothing.
+      for (int width = 2; width < prompt.length; width++) {
+        Qwen35ForwardPass.Session session = graph.openSession(8);
+        int position = 0;
+        while (position < prompt.length - 1) {
+          int span = Math.min(width, prompt.length - 1 - position);
+          graph.prefill(session, Arrays.copyOfRange(prompt, position, position + span), position);
+          position += span;
+        }
+        float[] batched = graph.forward(session, prompt[prompt.length - 1], prompt.length - 1);
+        assertThat(batched)
+            .as("prefill width %d must give the same logits as one row at a time", width)
+            .containsExactly(expected);
+      }
+    }
+  }
+
   @Test
   void aGroupedQuestionCannotReadAnotherQuestion(@TempDir Path directory) throws Exception {
     Path model = writeToyModel(directory);
