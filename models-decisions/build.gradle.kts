@@ -196,6 +196,8 @@ tasks.register<JavaExec>("typedRelease") {
 // A diagnostic that has to be a Gradle test task cannot be rerun with a changed system property
 // without a rebuild, and a diagnostic nobody reruns stops being used.
 tasks.register("printTestClasspath") {
-    val files = sourceSets["test"].runtimeClasspath
-    doLast { println(files.asPath) }
+    // A Provider rather than the FileCollection itself, so the task body captures no Project state
+    // and stays usable if the configuration cache is ever switched on.
+    val elements = sourceSets["test"].runtimeClasspath.elements
+    doLast { println(elements.get().joinToString(":") { it.asFile.absolutePath }) }
 }
