@@ -348,7 +348,30 @@ machine's ceiling; the 0.15 s is where any further work belongs, and most of it 
 | grouping at all, no fast decode kernel | 1.25x at n=2, 1.69x at n=20 | on |
 | options ahead of the criterion | 1.76x, minus 8 Intelligence | rejected |
 
-## 10. The gap to a hosted System One service
+## 10. The full public cohort
+
+All 231 public JevBench items, 0.3.46 as released, letter arm, temperature 1.0, nothing fitted
+(`prompt-arms/shipped-231.tsv`):
+
+| tier | accuracy |
+|---|---|
+| easy (48) | 1.0000 |
+| judge (72) | 0.8333 |
+| hard (111) | 0.5586 |
+| **overall (231)** | **0.7359** |
+
+Intelligence 75.1, Calibration 86.2 (ECE 0.0690), Speed 49.6 (p50 3.134 s, p95 86.095 s).
+
+**The Speed figure here is not comparable to the 63.0 published for 0.1.52** and neither is a
+composite built from it. The hard tier's 3,700-token states take 70 to 86 s each under this run's
+settings, and the settings of the published run were not recovered, so putting the two side by side
+would be exactly the press-release arithmetic this project refuses. Intelligence and Calibration are
+measured the same way in both and are up, from 73.3 and 74.1.
+
+This run also predates the recurrence default of CEILING.md section 6, so its Speed understates
+what the release now does.
+
+## 11. The gap to a hosted System One service
 
 A service answering in 5 to 10 ms of compute is not batching better. It is doing far
 less arithmetic. Ours is at this machine's ceiling, so the levers are fewer tokens per
