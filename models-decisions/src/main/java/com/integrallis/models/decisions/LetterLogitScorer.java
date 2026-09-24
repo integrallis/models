@@ -16,6 +16,7 @@
 package com.integrallis.models.decisions;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -57,9 +58,46 @@ public final class LetterLogitScorer {
 
   /** Renders the options as the lettered list the prompt must end with. */
   public static String renderOptions(List<String> options) {
+    return renderOptions(options, Map.of());
+  }
+
+  /**
+   * Renders the rubric, then the lettered options, then the answer cue.
+   *
+   * <p>The layout is measured, not chosen. MEASURED 2026-09-24 over 120 JevBench items on the
+   * shipped Qwen3.5-4B, three renderings of the same declarations:
+   *
+   * <ul>
+   *   <li>no rubric at all: accuracy 0.7500, Intelligence 72.2
+   *   <li>rubric inline beside each letter, {@code A: label -- criterion}: 0.8250, 80.8
+   *   <li>rubric as a list above a bare lettered list, as here: <b>0.8750, 86.1</b>
+   * </ul>
+   *
+   * <p>The block layout was better in every family that moved, and it is within two points of
+   * Intelligence of the best prompt measured, against a noise floor of about one point. The inline
+   * layout was the obvious design and it was worse by five; the ordering above is the only reason
+   * this one is here.
+   *
+   * <p>A space that declares no rubric renders exactly the bytes it always did. An option the
+   * rubric does not cover repeats its own label, so every option is listed and none is silently
+   * absent.
+   *
+   * @param options the outcomes, in declaration order
+   * @param criteria what each outcome covers, keyed by label; any subset, possibly empty
+   * @return the rendered block, ending with the answer cue
+   */
+  public static String renderOptions(List<String> options, Map<String, String> criteria) {
     Objects.requireNonNull(options, "options");
+    Objects.requireNonNull(criteria, "criteria");
     requireRenderable(options.size());
     StringBuilder text = new StringBuilder();
+    if (!criteria.isEmpty()) {
+      text.append("Options:");
+      for (String label : options) {
+        text.append("\n- ").append(label).append(": ").append(criteria.getOrDefault(label, label));
+      }
+      text.append('\n');
+    }
     for (int index = 0; index < options.size(); index++) {
       text.append((char) ('A' + index)).append(": ").append(options.get(index)).append('\n');
     }

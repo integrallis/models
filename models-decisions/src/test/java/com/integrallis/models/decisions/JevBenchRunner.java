@@ -25,7 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Runs a prepared JevBench cohort through the shared-prefix candidate evaluator.
@@ -44,6 +46,34 @@ public final class JevBenchRunner {
   private JevBenchRunner() {}
 
   /**
+   * Reads the prepared rubric block back into a per-label map.
+   *
+   * <p>The block is emitted by {@code prepare_tasks.py} as {@code - label: text} lines under an
+   * {@code Options:} header, straight from the benchmark's own {@code question.criteria}. A label
+   * whose text is just the label again carries nothing and is dropped, so an arm is not credited
+   * with a rubric the benchmark did not actually provide.
+   */
+  private static Map<String, String> parseRubric(String rubric, List<String> labels) {
+    Map<String, String> criteria = new LinkedHashMap<>();
+    for (String line : rubric.split("\n")) {
+      String trimmed = line.strip();
+      if (!trimmed.startsWith("- ")) {
+        continue;
+      }
+      int separator = trimmed.indexOf(": ");
+      if (separator < 0) {
+        continue;
+      }
+      String label = trimmed.substring(2, separator).strip();
+      String text = trimmed.substring(separator + 2).strip();
+      if (labels.contains(label) && !text.isBlank() && !text.equals(label)) {
+        criteria.put(label, text);
+      }
+    }
+    return criteria;
+  }
+
+  /**
    * The prompt the letter arm reads, in one of two orders.
    *
    * <p>Shipped order is state, question, rubric, then the lettered options. Options-first moves the
@@ -52,10 +82,14 @@ public final class JevBenchRunner {
    * decision. The answer cue stays last in both, because it is what the read-out position means.
    */
   private static String letterPrompt(
-      String[] row, List<String> labels, boolean optionsFirst, boolean runtimePrompt) {
+      String[] row,
+      List<String> labels,
+      boolean optionsFirst,
+      boolean runtimePrompt,
+      boolean runtimeCriteria) {
     String prompt = row[3].replace("\\n", "\n");
     String rendered = LetterLogitScorer.renderOptions(labels);
-    if (!optionsFirst && !runtimePrompt) {
+    if (!optionsFirst && !runtimePrompt && !runtimeCriteria) {
       return prompt + "\n" + rendered;
     }
     if (row.length < 7) {
@@ -67,9 +101,34 @@ public final class JevBenchRunner {
     String rubric = row[6].replace("\\n", "\n");
     String cue = "Answer:";
     if (runtimePrompt) {
-      // Byte for byte what ModelJarDecisionRuntime.decide sends: evidence, criterion, lettered
-      // options, answer cue. No rubric, because the API has nowhere to put one.
+      // Byte for byte what ModelJarDecisionRuntime.decide sent before an answer space could carry
+      // a rubric: evidence, criterion, lettered options, answer cue.
       return state + "\n" + instructions + "\n" + rendered;
+    }
+    if (runtimeCriteria) {
+      // What it sends now. The rubric block is parsed back into a per-label map and handed to the
+      // same renderer the runtime uses, so this arm measures the shipped code path and not a
+      // hand-built lookalike.
+      //
+      // Two layouts, because which one a model reads better is not a thing to have an opinion
+      // about. Inline puts each rule beside its letter; block keeps the benchmark's own shape, a
+      // rubric list above a bare lettered list. MEASURED below rather than assumed.
+      Map<String, String> parsed = parseRubric(rubric, labels);
+      if ("block".equals(System.getProperty("decisions.rubricStyle", "inline"))) {
+        StringBuilder text = new StringBuilder(state).append('\n').append(instructions);
+        if (!parsed.isEmpty()) {
+          text.append("\nOptions:");
+          for (String label : labels) {
+            String criterion = parsed.get(label);
+            text.append("\n- ")
+                .append(label)
+                .append(": ")
+                .append(criterion == null ? label : criterion);
+          }
+        }
+        return text.append('\n').append(rendered).toString();
+      }
+      return state + "\n" + instructions + "\n" + LetterLogitScorer.renderOptions(labels, parsed);
     }
     String letteredOnly = rendered.substring(0, rendered.length() - cue.length()).stripTrailing();
     return state + "\n\n" + rubric + "\n" + letteredOnly + "\n" + instructions + "\n" + cue;
@@ -141,6 +200,14 @@ public final class JevBenchRunner {
       if (runtimePrompt && optionsFirst) {
         throw new IllegalArgumentException("pick one prompt arm");
       }
+      // The prompt the runtime builds once an answer space can carry a rubric. Same shape as the
+      // runtime arm, with each lettered option followed by what it covers, which is the whole of
+      // the difference between a score the product can reproduce and one it cannot.
+      boolean runtimeCriteria =
+          Boolean.parseBoolean(System.getProperty("decisions.runtimeCriteria", "false"));
+      if (runtimeCriteria && (!letters || optionsFirst)) {
+        throw new IllegalArgumentException("decisions.runtimeCriteria is a letter-arm prompt arm");
+      }
       LetterLogitScorer letterScorer = new LetterLogitScorer(temperature);
       System.out.printf("mode=%s%n", letters ? "letter-logits" : "candidate-scoring");
 
@@ -176,7 +243,9 @@ public final class JevBenchRunner {
         if (letters) {
           Choice space = new Choice(id, labels);
           int[] lettered =
-              backend.tokenizer().encode(letterPrompt(row, labels, optionsFirst, runtimePrompt));
+              backend
+                  .tokenizer()
+                  .encode(letterPrompt(row, labels, optionsFirst, runtimePrompt, runtimeCriteria));
           int[] letterTokens = new int[labels.size()];
           for (int i = 0; i < labels.size(); i++) {
             int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + i));

@@ -15,8 +15,10 @@
  */
 package com.integrallis.models.decisions;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** Shared validation for the bounded answer spaces. */
@@ -30,6 +32,38 @@ final class AnswerSpaces {
       throw new IllegalArgumentException("question must not be blank");
     }
     return question;
+  }
+
+  /**
+   * Validates and copies a per-label rubric.
+   *
+   * <p>A key that is not a label is rejected rather than ignored. A rubric silently dropped because
+   * of a typo is worse than no rubric: the prompt still forms, the answer still looks well shaped,
+   * and the thing that was supposed to explain the option is simply absent.
+   */
+  static Map<String, String> requireCriteria(Map<String, String> criteria, List<String> labels) {
+    if (criteria == null || criteria.isEmpty()) {
+      return Map.of();
+    }
+    Map<String, String> copy = new LinkedHashMap<>();
+    for (String label : labels) {
+      String text = criteria.get(label);
+      if (text != null) {
+        if (text.isBlank()) {
+          throw new IllegalArgumentException("criterion for " + label + " must not be blank");
+        }
+        copy.put(label, text.strip());
+      }
+    }
+    if (copy.size() != criteria.size()) {
+      for (String key : criteria.keySet()) {
+        if (!labels.contains(key)) {
+          throw new IllegalArgumentException(
+              "criteria key " + key + " is not one of the labels " + labels);
+        }
+      }
+    }
+    return Map.copyOf(copy);
   }
 
   static List<String> requireLabels(List<String> labels, int minimum, int maximum, String what) {

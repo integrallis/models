@@ -90,6 +90,10 @@ if __name__ == "__main__":
     first, first_family = main(cohort, sys.argv[2], sys.argv[3])
     if len(sys.argv) > 5:
         second, second_family = main(cohort, sys.argv[4], sys.argv[5])
+        # Compared against each other, because a difference smaller than what an unrelated
+        # implementation change produces is not a result. Merely swapping the matrix kernel moves
+        # this model's logits by 6e-2 on average, which flips whichever items were close.
+
         flipped = [k for k in first if first[k] != second.get(k)]
         print(f"\n  winners differ on {len(flipped)}/{len(first)} items")
         moved = []

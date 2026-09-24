@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -49,7 +51,7 @@ public final class DecisionArtifact {
   /** {@code IDSN} then the format version, so a wrong file fails immediately and by name. */
   private static final int MAGIC = 0x4944_534E;
 
-  private static final int VERSION = 2;
+  private static final int VERSION = 3;
 
   private static final int KIND_NOUL = 0;
   private static final int KIND_CHOICE = 1;
@@ -311,16 +313,56 @@ public final class DecisionArtifact {
         writeLabels(out, score.levels());
       }
     }
+    // Version 3. The rubric is part of the question: the same labels with a different rubric are a
+    // different decision, MEASURED 2026-09-24 at up to 0.67 of accuracy on one family. An artifact
+    // that recorded the labels and dropped the rubric would not say what was actually asked.
+    writeCriteria(out, space.criteria());
   }
 
   private static AnswerSpace readSpace(DataInputStream in) throws IOException {
     int kind = in.readInt();
     return switch (kind) {
-      case KIND_NOUL -> new Noul(readString(in));
-      case KIND_CHOICE -> new Choice(readString(in), readLabels(in));
-      case KIND_SCORE -> new Score(readString(in), readLabels(in));
+      case KIND_NOUL -> {
+        String proposition = readString(in);
+        yield new Noul(proposition, readCriteria(in));
+      }
+      case KIND_CHOICE -> {
+        String question = readString(in);
+        List<String> options = readLabels(in);
+        yield new Choice(question, options, readCriteria(in));
+      }
+      case KIND_SCORE -> {
+        String question = readString(in);
+        List<String> levels = readLabels(in);
+        yield new Score(question, levels, readCriteria(in));
+      }
       default -> throw new IOException("unknown answer space kind " + kind);
     };
+  }
+
+  private static void writeCriteria(DataOutputStream out, Map<String, String> criteria)
+      throws IOException {
+    out.writeInt(criteria.size());
+    for (Map.Entry<String, String> entry : criteria.entrySet()) {
+      writeString(out, entry.getKey());
+      writeString(out, entry.getValue());
+    }
+  }
+
+  private static Map<String, String> readCriteria(DataInputStream in) throws IOException {
+    int count = in.readInt();
+    if (count == 0) {
+      // No rubric is the common case and a legitimate one, so it is checked before the sanity
+      // bound, which exists to reject a corrupt length and treats zero as implausible.
+      return Map.of();
+    }
+    requireSane(count, "criteria count");
+    Map<String, String> criteria = new LinkedHashMap<>();
+    for (int index = 0; index < count; index++) {
+      String key = readString(in);
+      criteria.put(key, readString(in));
+    }
+    return criteria;
   }
 
   private static void writeLabels(DataOutputStream out, List<String> labels) throws IOException {

@@ -16,6 +16,7 @@
 package com.integrallis.models.decisions;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * An ordinal decision placing its subject on ordered levels.
@@ -24,16 +25,26 @@ import java.util.List;
  *
  * @param question the question being answered
  * @param levels between two and ten ordered levels, lowest first
+ * @param criteria optional rubric saying what each level means, keyed by level; see {@link
+ *     AnswerSpace#criteria()} for what it is worth. Ordinal spaces need it most: a bare "3" says
+ *     nothing, and MEASURED 2026-09-24 this family fell from 0.9167 to 0.2500 without one
  */
-public record Score(String question, List<String> levels) implements AnswerSpace {
+public record Score(String question, List<String> levels, Map<String, String> criteria)
+    implements AnswerSpace {
 
   /** The largest number of ordered levels a single ordinal decision may offer. */
   public static final int MAX_LEVELS = 10;
 
-  /** Validates and copies the levels. */
+  /** Validates and copies the levels and their rubric. */
   public Score {
     question = AnswerSpaces.requireQuestion(question);
     levels = AnswerSpaces.requireLabels(levels, 2, MAX_LEVELS, "levels");
+    criteria = AnswerSpaces.requireCriteria(criteria, levels);
+  }
+
+  /** Levels whose names are expected to carry their own meaning. */
+  public Score(String question, List<String> levels) {
+    this(question, levels, Map.of());
   }
 
   @Override
