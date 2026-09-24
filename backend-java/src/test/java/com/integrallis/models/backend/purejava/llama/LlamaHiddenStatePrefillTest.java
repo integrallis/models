@@ -207,7 +207,8 @@ class LlamaHiddenStatePrefillTest {
             false,
             false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false));
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
   }
 
   private static GgufFile buildNanoModel(Random rng) {

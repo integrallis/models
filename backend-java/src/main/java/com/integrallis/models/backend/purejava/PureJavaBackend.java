@@ -543,7 +543,7 @@ public final class PureJavaBackend
                 "needle2", queryWidth, kvWidth, kvWidth, config.layerCount()),
             planConfiguration,
             batchedMatrixKernel);
-    int contextCapacity = runtimeContextLength(config.maximumSequenceLength());
+    int contextCapacity = runtimeContextLength(config.maximumSequenceLength(), planConfiguration);
     ModelMetadata metadata =
         new ModelMetadata(
             "needle2",
@@ -580,7 +580,7 @@ public final class PureJavaBackend
                 config.numLayers()),
             planConfiguration,
             batchedMatrixKernel);
-    int contextCapacity = runtimeContextLength(config.contextLength());
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     ModelMetadata metadata =
         new ModelMetadata(
             config.architecture(),
@@ -615,7 +615,7 @@ public final class PureJavaBackend
             ModelTopology.from(modelFamily, config, weights),
             planConfiguration,
             batchedMatrixKernel);
-    int contextCapacity = runtimeContextLength(config.contextLength());
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     KvCache cache =
         new KvCache(config.numLayers(), contextCapacity, config.keyDim(), config.valueDim());
     PureJavaDecoder decoder =
@@ -659,7 +659,7 @@ public final class PureJavaBackend
                 config.numLayers()),
             planConfiguration,
             batchedMatrixKernel);
-    int contextCapacity = runtimeContextLength(config.maxPosition());
+    int contextCapacity = runtimeContextLength(config.maxPosition(), planConfiguration);
     PureJavaDecoder decoder =
         new GptOssDecoderAdapter(GptOssForwardPass.load(config, tensors, contextCapacity));
     ModelMetadata metadata =
@@ -695,7 +695,7 @@ public final class PureJavaBackend
                 config.numLayers()),
             planConfiguration,
             batchedMatrixKernel);
-    int contextCapacity = runtimeContextLength(config.contextLength());
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     PureJavaDecoder decoder =
         new MobileMoeDecoderAdapter(
             MobileMoeForwardPass.load(config, tensors, contextCapacity, arena));
@@ -731,7 +731,7 @@ public final class PureJavaBackend
             ModelTopology.from(modelFamily, config, weights),
             planConfiguration,
             batchedMatrixKernel);
-    int contextCapacity = runtimeContextLength(config.contextLength());
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     PureJavaDecoder decoder;
     if (config.usesBidirectionalAttention()) {
       requireLlamaAdapterModel(activatedAdapterDirectory, config.architecture().toString());
@@ -833,7 +833,7 @@ public final class PureJavaBackend
             config.numLayers(),
             config.numHeads(),
             config.numKvHeads(0));
-    int contextCapacity = runtimeContextLength(config.contextLength());
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     Gemma4Decoder decoder = Gemma4Decoder.load(file, contextCapacity, batchedMatrixKernel);
     return new LoadedDecoder(
         new Gemma4DecoderAdapter(decoder), metadata, contextCapacity, executionPlan);
@@ -849,7 +849,7 @@ public final class PureJavaBackend
     Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file, batchedMatrixKernel);
     PureJavaExecutionPlan executionPlan =
         ExecutionPlanner.plan(runtime, graph.topology(), planConfiguration, batchedMatrixKernel);
-    int contextCapacity = runtimeContextLength(config.contextLength());
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     ModelMetadata metadata =
         new ModelMetadata(
             "qwen35",
@@ -1344,23 +1344,20 @@ public final class PureJavaBackend
     }
   }
 
-  private static int runtimeContextLength(int modelContextLength) {
-    String value = System.getProperty(MAX_CONTEXT_LENGTH_PROPERTY);
-    if (value == null || value.isBlank()) {
-      return modelContextLength;
-    }
-    int maxContextLength;
-    try {
-      maxContextLength = Integer.parseInt(value);
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value, e);
-    }
-    if (maxContextLength <= 0) {
-      throw new IllegalArgumentException(
-          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + value);
-    }
-    return Math.min(modelContextLength, maxContextLength);
+  /**
+   * The context a session is sized for.
+   *
+   * <p>A ModelJar can recommend a bound through the plan configuration, which is how a model that
+   * knows its prompts are short avoids being sized for a context it will never reach: at Qwen3.5's
+   * 262,144 tokens the key and value cache alone is about 17 GB, so a default heap dies before the
+   * first answer. A deployment setting still wins over the recommendation.
+   */
+  private static int runtimeContextLength(
+      int modelContextLength, PureJavaPlanConfiguration planConfiguration) {
+    int recommended = planConfiguration.maxContextLength();
+    return recommended == PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT
+        ? modelContextLength
+        : Math.min(modelContextLength, recommended);
   }
 
   private static ModelTopology gemma4Topology(GgufFile file, Gemma4Config config) {

@@ -723,7 +723,8 @@ class LlamaForwardPassTest {
                   false,
                   false,
                   GgufQ8BlockMajorKernel.SCATTERED,
-                  false));
+                  false,
+                  PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
       LlamaForwardPass baseline =
           new LlamaForwardPass(
               config,
@@ -1043,7 +1044,8 @@ class LlamaForwardPassTest {
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1093,7 +1095,8 @@ class LlamaForwardPassTest {
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache baselineCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1127,7 +1130,8 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1393,7 +1397,8 @@ class LlamaForwardPassTest {
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache baselineCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1427,7 +1432,8 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1461,7 +1467,8 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                true);
+                true,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache parallelCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1491,7 +1498,8 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ8BlockMajorKernel.ROW_ACCUMULATED,
-                true);
+                true,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         PureJavaExecutionPlan rowAccumulatedPlan =
             ExecutionPlanner.plan(
                 graalRuntime(),
@@ -1519,7 +1527,8 @@ class LlamaForwardPassTest {
                 true,
                 true,
                 GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED,
-                true);
+                true,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         PureJavaExecutionPlan floatLanePlan =
             ExecutionPlanner.plan(
                 graalRuntime256(),
@@ -1686,7 +1695,8 @@ class LlamaForwardPassTest {
                       false,
                       false,
                       GgufQ8BlockMajorKernel.SCATTERED,
-                      false)));
+                      false,
+                      PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT)));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -2669,7 +2679,8 @@ class LlamaForwardPassTest {
             false,
             false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false));
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
   }
 
   private static RuntimeFingerprint graalRuntime() {
