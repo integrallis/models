@@ -4,6 +4,26 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.44] - 2026-09-23
+
+### Added
+
+- `ResumableInferenceBackend`: a backend can capture a position it has read and return to it, so
+  repeated decisions over one piece of evidence stop paying for that evidence every time. Measured
+  with Harriet on an 8-vCPU EPYC-Milan box over a 112-word contract, per-decision cost fell from
+  3.74 s to 0.69 s. Resumed answers are bit-identical to a cold prefill of the same prompt.
+
+  It is deliberately narrower than `SharedPrefixInferenceBackend`: a shared prefix hands out
+  branches that live at the same time, a resumption is strictly sequential. Sequential reuse is the
+  only shape a recurrent state can offer cheaply, because a Gated DeltaNet state is a running
+  summary that can be copied back but not sliced.
+
+### Fixed
+
+- Qwen3.5 `reset()` and `rewind()` reallocated the whole session state on every call. They now
+  clear the recurrent and convolution state in place; a key or value at or beyond the new position
+  is never read.
+
 ## [0.3.43] - 2026-09-23
 
 ### Added
