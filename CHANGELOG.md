@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.45] - 2026-09-24
+
+### Fixed
+
+- A session was sized for the model's own maximum context. For Qwen3.5 that is 262,144 tokens,
+  whose key and value cache alone is about 17 GB, so opening a decision runtime on a default heap
+  died before the first answer. `models.purejava.maxContextLength` is now a plan-configuration
+  setting like every other, so a ModelJar that knows its prompts are short can recommend a bound.
+  A deployment setting still wins, and absent both the session is sized for the model's maximum.
+  Measured with Harriet on an 8-vCPU EPYC-Milan box: `OutOfMemoryError` before, `open 2.79 s` on a
+  7.7 GiB default heap after.
+
 ## [0.3.44] - 2026-09-23
 
 ### Added
