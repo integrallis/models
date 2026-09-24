@@ -10,6 +10,9 @@ dependencies {
     // The capability probe drives the real pure-Java backend. Test-only: the module itself must
     // stay free of any backend so a decision head can be wired to whichever one is qualified.
     testImplementation(project(":backend-java"))
+    // For JevBenchRunner's competitor-prompt arm, which renders a chat template rather than
+    // guessing at one. Test-only; models-decisions itself stays free of the runtime.
+    testImplementation(project(":models-runtime"))
 
     // The harvest tool drives the rust-ffm kernel, because the qualified answerability evidence is
     // on that backend and a figure taken on any other one would not be comparable with it.

@@ -18,6 +18,8 @@ package com.integrallis.models.decisions;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -43,7 +45,43 @@ import java.util.Map;
  */
 public final class JevBenchRunner {
 
+  /** SemIf's system turn, verbatim from src/semif_phase1/core.py. */
+  private static final String SEMIF_SYSTEM =
+      "Apply the supplied criterion to the supplied evidence. Choose exactly one listed option. "
+          + "Respond with only its uppercase letter, with no explanation or reasoning.";
+
   private JevBenchRunner() {}
+
+  /**
+   * Appends a JSON string literal the way Python's {@code json.dumps(ensure_ascii=False)} does.
+   *
+   * <p>The comparison is only worth anything if the bytes match, and the escaping is part of the
+   * bytes: quote, backslash and the named control escapes, everything else below 0x20 as a unicode
+   * escape, and no escaping of non-ASCII.
+   */
+  private static void appendJsonString(StringBuilder out, String value) {
+    out.append('"');
+    for (int index = 0; index < value.length(); index++) {
+      char character = value.charAt(index);
+      switch (character) {
+        case '"' -> out.append("\\\"");
+        case '\\' -> out.append("\\\\");
+        case '\n' -> out.append("\\n");
+        case '\r' -> out.append("\\r");
+        case '\t' -> out.append("\\t");
+        case '\b' -> out.append("\\b");
+        case '\f' -> out.append("\\f");
+        default -> {
+          if (character < 0x20) {
+            out.append(String.format("\\u%04x", (int) character));
+          } else {
+            out.append(character);
+          }
+        }
+      }
+    }
+    out.append('"');
+  }
 
   /**
    * Scores one task with the labels in the order given, returning probabilities in that order.
@@ -363,6 +401,26 @@ public final class JevBenchRunner {
       boolean averageOrders =
           Boolean.parseBoolean(System.getProperty("decisions.averageOrders", "false"));
       String instruct = System.getProperty("decisions.instruct", "");
+      // The prompt SemIf sends, transcribed from its source rather than described from its README.
+      // SemIf is the second-placed system on this benchmark and runs the same frozen 4B model, so
+      // the interesting comparison is its prompt against ours on one host with one readout.
+      //
+      // Read from src/semif_phase1/core.py and direct.py: a chat template with a system turn, a
+      // user turn carrying one JSON object of evidence, criterion and options, each option a letter
+      // and a description with the label name dropped, and the answer read from the single-token
+      // letters at the final position.
+      boolean semifPrompt =
+          Boolean.parseBoolean(System.getProperty("decisions.semifPrompt", "false"));
+      // SemIf's chat template and system turn, our compact body and layout.
+      //
+      // MEASURED: their whole prompt beats ours on our own model, Intelligence 88.0 to 90.0 and
+      // Calibration 73.0 to 82.1, and costs 2.2x the latency because a JSON payload inside a chat
+      // template is a lot more tokens. But the template markers and the system turn are the same
+      // for
+      // every question about one piece of evidence, so they belong in the shared prefix and cost
+      // nothing per question. This arm keeps them and drops the JSON.
+      boolean chatTemplate =
+          Boolean.parseBoolean(System.getProperty("decisions.chatTemplate", "false"));
       boolean shipped = Boolean.parseBoolean(System.getProperty("decisions.shipped", "false"));
       if (shipped && (!letters || optionsFirst || runtimePrompt || sharedFirst || rubricFirst)) {
         throw new IllegalArgumentException("decisions.shipped is its own prompt arm");
@@ -399,7 +457,84 @@ public final class JevBenchRunner {
 
         double[] p;
         double latency;
-        if (reverseLabels || averageOrders || !instruct.isEmpty()) {
+        if (chatTemplate) {
+          Map<String, String> parsed = parseRubric(row[6].replace("\\n", "\n"), labels);
+          String block = LetterLogitScorer.renderCriteria(labels, parsed);
+          StringBuilder body = new StringBuilder(row[4].replace("\\n", "\n"));
+          if (!block.isEmpty()) {
+            body.append('\n').append(block);
+          }
+          body.append('\n')
+              .append(row[5].replace("\\n", "\n"))
+              .append('\n')
+              .append(LetterLogitScorer.renderOptions(labels));
+          String rendered =
+              ChatTemplate.CHATML_NO_THINK
+                  .render(
+                      List.of(ChatMessage.system(SEMIF_SYSTEM), ChatMessage.user(body.toString())))
+                  .text();
+          int[] templateTokens = backend.tokenizer().encode(rendered);
+          int[] templateLetters = new int[labels.size()];
+          for (int slot = 0; slot < labels.size(); slot++) {
+            // Bare letter: the assistant turn has just opened, so there is no leading space.
+            int[] encoded = backend.tokenizer().encode(String.valueOf((char) ('A' + slot)));
+            if (encoded.length != 1) {
+              throw new IllegalStateException("answer slot is not one token");
+            }
+            templateLetters[slot] = encoded[0];
+          }
+          long startedTemplate = System.nanoTime();
+          try (InferenceSession session = backend.openSession()) {
+            float[] logits = backend.prefill(session, templateTokens, 0);
+            p = letterScorer.score(new Choice(id, labels), logits, templateLetters).probabilities();
+          }
+          latency = (System.nanoTime() - startedTemplate) / 1e9;
+          candidateTokens += 1;
+        } else if (semifPrompt) {
+          Map<String, String> parsed = parseRubric(row[6].replace("\\n", "\n"), labels);
+          StringBuilder payload = new StringBuilder("{\"evidence\": ");
+          appendJsonString(payload, row[4].replace("\\n", "\n"));
+          payload.append(", \"criterion\": ");
+          appendJsonString(payload, row[5].replace("\\n", "\n"));
+          payload.append(", \"options\": [");
+          for (int slot = 0; slot < labels.size(); slot++) {
+            if (slot > 0) {
+              payload.append(", ");
+            }
+            payload
+                .append("{\"letter\": \"")
+                .append((char) ('A' + slot))
+                .append("\", \"description\": ");
+            // SemIf sends only the description; the label name never reaches the model.
+            appendJsonString(payload, parsed.getOrDefault(labels.get(slot), labels.get(slot)));
+            payload.append('}');
+          }
+          payload.append("]}");
+          String rendered =
+              ChatTemplate.CHATML_NO_THINK
+                  .render(
+                      List.of(
+                          ChatMessage.system(SEMIF_SYSTEM), ChatMessage.user(payload.toString())))
+                  .text();
+          int[] semifTokens = backend.tokenizer().encode(rendered);
+          int[] semifLetters = new int[labels.size()];
+          for (int slot = 0; slot < labels.size(); slot++) {
+            // SemIf requires each bare uppercase letter to be one exact round-trip token.
+            int[] encoded = backend.tokenizer().encode(String.valueOf((char) ('A' + slot)));
+            if (encoded.length != 1) {
+              throw new IllegalStateException(
+                  "answer slot is not one token: " + (char) ('A' + slot));
+            }
+            semifLetters[slot] = encoded[0];
+          }
+          long startedSemif = System.nanoTime();
+          try (InferenceSession session = backend.openSession()) {
+            float[] logits = backend.prefill(session, semifTokens, 0);
+            p = letterScorer.score(new Choice(id, labels), logits, semifLetters).probabilities();
+          }
+          latency = (System.nanoTime() - startedSemif) / 1e9;
+          candidateTokens += 1;
+        } else if (reverseLabels || averageOrders || !instruct.isEmpty()) {
           List<String> forward = labels;
           List<String> reversed = new ArrayList<>(labels);
           java.util.Collections.reverse(reversed);
