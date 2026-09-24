@@ -57,17 +57,21 @@ final class Qwen35GroupedDecision {
     private final float[][] suffixValues;
     private int position;
 
-    private Branch(Qwen35Config config, int suffixCapacity) {
+    private Branch(Qwen35Config config, int prefixCapacity, int suffixCapacity) {
       int layers = config.numLayers();
+      int span = Math.addExact(prefixCapacity, suffixCapacity);
       recurrentState = new float[layers][];
       convolutionHistory = new float[layers][];
       suffixKeys = new float[layers][];
       suffixValues = new float[layers][];
       for (int layer = 0; layer < layers; layer++) {
         if (config.usesFullAttention(layer)) {
-          int span = Math.multiplyExact(suffixCapacity, config.attentionKeyDim());
-          suffixKeys[layer] = new float[span];
-          suffixValues[layer] = new float[span];
+          // Prefix and suffix in one array. The prefix half is ~10 MiB a branch against the 100 MiB
+          // of recurrent state, so copying it buys an ordinary single-region attention rather than
+          // a two-region one, and the saving would have been noise.
+          int entries = Math.multiplyExact(span, config.attentionKeyDim());
+          suffixKeys[layer] = new float[entries];
+          suffixValues[layer] = new float[entries];
         } else {
           convolutionHistory[layer] =
               new float[Math.multiplyExact(config.gdnConvDim(), config.gdnConvKernel() - 1)];
@@ -110,10 +114,23 @@ final class Qwen35GroupedDecision {
      * <p>Copied rather than referenced: the recurrence writes the state in place as it reads, so
      * two questions sharing one buffer would answer each other's evidence.
      */
-    void forkFrom(float[][] evidenceRecurrent, float[][] evidenceConvolution) {
+    void forkFrom(
+        float[][] evidenceRecurrent,
+        float[][] evidenceConvolution,
+        float[][] evidenceKeys,
+        float[][] evidenceValues,
+        int prefixLength,
+        int attentionKeyDim) {
       copyEach(evidenceRecurrent, recurrentState);
       copyEach(evidenceConvolution, convolutionHistory);
-      position = 0;
+      int prefixEntries = Math.multiplyExact(prefixLength, attentionKeyDim);
+      for (int layer = 0; layer < evidenceKeys.length; layer++) {
+        if (evidenceKeys[layer] != null && suffixKeys[layer] != null) {
+          System.arraycopy(evidenceKeys[layer], 0, suffixKeys[layer], 0, prefixEntries);
+          System.arraycopy(evidenceValues[layer], 0, suffixValues[layer], 0, prefixEntries);
+        }
+      }
+      position = prefixLength;
     }
 
     private static void copyEach(float[][] source, float[][] destination) {
@@ -129,7 +146,8 @@ final class Qwen35GroupedDecision {
   private final Branch[] branches;
   private final int suffixCapacity;
 
-  Qwen35GroupedDecision(Qwen35Config config, int groupSize, int suffixCapacity) {
+  Qwen35GroupedDecision(
+      Qwen35Config config, int groupSize, int prefixCapacity, int suffixCapacity) {
     if (groupSize < 1) {
       throw new IllegalArgumentException("groupSize must be >= 1: " + groupSize);
     }
@@ -140,7 +158,7 @@ final class Qwen35GroupedDecision {
     this.suffixCapacity = suffixCapacity;
     this.branches = new Branch[groupSize];
     for (int index = 0; index < groupSize; index++) {
-      branches[index] = new Branch(config, suffixCapacity);
+      branches[index] = new Branch(config, prefixCapacity, suffixCapacity);
     }
   }
 
