@@ -46,6 +46,48 @@ public final class JevBenchRunner {
   private JevBenchRunner() {}
 
   /**
+   * Scores one task with the labels in the order given, returning probabilities in that order.
+   *
+   * <p>Everything else is the shipped composition: evidence, rubric, optional instruction, then the
+   * criterion, the lettered options and the answer cue.
+   */
+  private static double[] scoreOrder(
+      PureJavaBackend backend,
+      LetterLogitScorer scorer,
+      String[] row,
+      String id,
+      List<String> order,
+      String instruct) {
+    Map<String, String> parsed = parseRubric(row[6].replace("\\n", "\n"), order);
+    String block = LetterLogitScorer.renderCriteria(order, parsed);
+    StringBuilder shared = new StringBuilder(row[4].replace("\\n", "\n"));
+    if (!block.isEmpty()) {
+      shared.append('\n').append(block);
+    }
+    if (!instruct.isEmpty()) {
+      shared.append('\n').append(instruct);
+    }
+    int[] prompt =
+        backend
+            .tokenizer()
+            .encode(
+                shared
+                    + "\n"
+                    + row[5].replace("\\n", "\n")
+                    + "\n"
+                    + LetterLogitScorer.renderOptions(order));
+    int[] letters = new int[order.size()];
+    for (int slot = 0; slot < order.size(); slot++) {
+      int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + slot));
+      letters[slot] = encoded[encoded.length - 1];
+    }
+    try (InferenceSession session = backend.openSession()) {
+      float[] logits = backend.prefill(session, prompt, 0);
+      return scorer.score(new Choice(id, order), logits, letters).probabilities();
+    }
+  }
+
+  /**
    * Reads the prepared rubric block back into a per-label map.
    *
    * <p>The block is emitted by {@code prepare_tasks.py} as {@code - label: text} lines under an
@@ -305,6 +347,22 @@ public final class JevBenchRunner {
       // answer cue followed by a free token does not, and those 11 tokens are load-bearing.
       boolean labelTokens =
           Boolean.parseBoolean(System.getProperty("decisions.labelTokens", "false"));
+      // Three ways to spend, or not spend, latency on accuracy. Measured, not assumed.
+      //
+      // reverseLabels: a lettered multiple choice has a position bias, and the label order comes
+      // from the task rather than from anything anyone chose. Free to change.
+      //
+      // instruct: one sentence saying what shape the answer takes. It goes in the shared prefix, so
+      // it is free per question however long it is.
+      //
+      // averageOrders: score both label orders and average, which removes the position bias instead
+      // of guessing which way it points. Costs a second pass over the question's own tokens, so it
+      // roughly doubles the per-question cost.
+      boolean reverseLabels =
+          Boolean.parseBoolean(System.getProperty("decisions.reverseLabels", "false"));
+      boolean averageOrders =
+          Boolean.parseBoolean(System.getProperty("decisions.averageOrders", "false"));
+      String instruct = System.getProperty("decisions.instruct", "");
       boolean shipped = Boolean.parseBoolean(System.getProperty("decisions.shipped", "false"));
       if (shipped && (!letters || optionsFirst || runtimePrompt || sharedFirst || rubricFirst)) {
         throw new IllegalArgumentException("decisions.shipped is its own prompt arm");
@@ -341,7 +399,31 @@ public final class JevBenchRunner {
 
         double[] p;
         double latency;
-        if (labelTokens) {
+        if (reverseLabels || averageOrders || !instruct.isEmpty()) {
+          List<String> forward = labels;
+          List<String> reversed = new ArrayList<>(labels);
+          java.util.Collections.reverse(reversed);
+          List<String> primary = reverseLabels ? reversed : forward;
+          long startedOrder = System.nanoTime();
+          double[] firstScores = scoreOrder(backend, letterScorer, row, id, primary, instruct);
+          double[] secondScores = null;
+          List<String> secondary = reverseLabels ? forward : reversed;
+          if (averageOrders) {
+            secondScores = scoreOrder(backend, letterScorer, row, id, secondary, instruct);
+          }
+          latency = (System.nanoTime() - startedOrder) / 1e9;
+          // Realign onto the task's own label order, whatever order each pass used.
+          p = new double[labels.size()];
+          for (int slot = 0; slot < labels.size(); slot++) {
+            String label = labels.get(slot);
+            double value = firstScores[primary.indexOf(label)];
+            if (secondScores != null) {
+              value = 0.5 * (value + secondScores[secondary.indexOf(label)]);
+            }
+            p[slot] = value;
+          }
+          candidateTokens += averageOrders ? 2 : 1;
+        } else if (labelTokens) {
           // Evidence, rubric, criterion, answer cue. No lettered list at all. A space whose labels
           // are not single tokens cannot be read this way and takes the lettered path, and both are
           // counted, so the result says how much of a cohort the shortcut even applies to.

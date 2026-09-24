@@ -4,8 +4,14 @@ Measured 2026-09-24, after the 0.3.46 release brought a warm decision to 0.486 s
 question. The question this answers: is that number close to what the machine can do,
 or is there a lot left?
 
-Short version: **there is about 1.3x to 1.6x left, all of it in one place, and
-everything else is measured out.**
+Short version: **a kernel that had shipped switched off was worth up to 1.34x, the release is about
+1.38x per decision for a demo-shaped workload, and what remains is at the instruction set's
+ceiling.**
+
+An earlier version of this file concluded the opposite -- that the headroom was in the matmul inner
+loop. Section 4 records why that was wrong, because the reasoning was a plausible ceiling estimate
+that ignored what the quantisation actually costs, and it pointed at days of work in the wrong
+place.
 
 ## 1. There is no bookkeeping to remove (`harness/Where`)
 
@@ -62,76 +68,127 @@ way, so there is no longer anything for grouping to amortise -- which is what th
 forced-on measurement shows: 0.63x at two questions to 0.92x at twenty, and answers
 0.045 apart.
 
-## 4. Faster tokens: the kernel is at about two thirds of its issue ceiling
+## 4. Faster tokens: the inner loop is at its ceiling, and that was not the problem
 
-`harness/Ceiling` times a real Q4_K and Q6_K weight from the shipped model at the batch
-width a decision actually uses, and compares against this core's issue limit. Zen has
-AVX2 and no AVX-512, and an int8 dot product goes through `VPMADDUBSW` into
-`VPMADDWD`, so the sustained ceiling is roughly 32 int8 multiply-accumulates per cycle
-per core.
+`harness/Ceiling` times real Q4_K and Q6_K weights from the shipped model at the batch width a
+decision uses. At batch 18 they reach 58-65% and 50-54% of roughly 32 int8 multiply-accumulates
+per cycle per core; batch 1 sits at 17%, which is the bandwidth-bound decode step and expected.
+Thread scaling is clean from 1 to 16 and still gaining, so the partitioning is fine.
 
-Measured on a 16-vCPU shared host (EPYC Rome), which adds about 10% run-to-run spread:
+**An earlier version of this file read that as 1.3x to 1.6x sitting in the inner loop. That was
+wrong**, and the correction matters more than the original claim.
 
-| tensor | type | batch | G-MAC/s | of ceiling |
-|---|---|---|---|---|
-| `blk.0.ffn_up` | Q4_K | 1 | 89-103 | 17-20% |
-| `blk.0.ffn_up` | Q4_K | 18 | 298-330 | 58-65% |
-| `blk.0.ffn_down` | Q6_K | 1 | 88-92 | 17-18% |
-| `blk.0.ffn_down` | Q6_K | 18 | 257-277 | 50-54% |
+That ceiling ignored what Q4_K actually costs. It carries a scale per 32-weight group, so applying
+it is a second vector multiply for every one that does useful work: per 256-weight block the kernel
+spends about 30 vector operations on 256 multiply-accumulates, which is roughly 17-25 MAC/cycle
+structurally. Measured is 21. **The inner loop is at its algorithmic ceiling for AVX2.**
 
-Batch 1 at 17% is the bandwidth-bound decode step and is expected. **Batch 18 at 50-65%
-is the number that matters**, because that is what a decision does.
+Tested rather than argued. The one visibly redundant operation was the per-group scale broadcast,
+recomputed inside the batch loop -- 144 times per block instead of 8. Hoisting it is bit-exact,
+because the accumulation it feeds is integer. Alternating runs, stock against hoisted: 305/344/300
+against 296/322/150 G-MAC/s. **No change**; the compiler was already hoisting it. `-C
+target-cpu=native` likewise does nothing, because the hot paths already carry explicit
+`#[target_feature(enable = "avx2,fma,f16c")]`.
 
-### It is the inner loop, not the work splitting
+Past this needs `vpdpbusd`, which folds the multiply, the widening and the accumulate into one
+instruction and roughly halves the operation count. It is AVX512-VNNI or AVX-VNNI: absent on Zen 3,
+present on Zen 4 and later and on Intel from Ice Lake. That is a deployment choice or a new code
+path, not a tune.
 
-Thread scaling of the same batch-18 matmul:
+## 5. The gap was never in the matmuls (`harness/Achieved`, `harness/PerShape`)
 
-| threads | G-MAC/s | gain |
+The right question is not how fast one matmul goes; it is whether a forward pass -- about two
+hundred matmuls of a dozen shapes, plus norms, a recurrence, attention and a vocabulary projection
+-- gets anywhere near that rate. Both numbers from the same host:
+
+| | G-MAC/s |
+|---|---|
+| best single matmul at batch 18 | 407 |
+| whole forward pass, 18 tokens | 211 |
+
+**52%.** Timing every shape in the model separately and summing gives a matmul floor of 0.205 s
+against a measured forward pass of 0.357 s, so **43% of a forward pass was not matmul at all.**
+
+Two things are visible in the per-shape table. Narrow outputs run at half the rate of wide ones --
+9216-row `ffn_gate` and `ffn_up` at 445-478 G-MAC/s against 218-244 for the 2560- and 1024-row
+tensors, because a 9216-column activation no longer fits in L2 and gets re-streamed. And three
+quantisation types are in play, with Q5_K and Q6_K decoding more per weight than Q4_K.
+
+But neither was the 43%.
+
+## 6. What it was: a kernel that shipped switched off
+
+`models.native.gatedDeltaNet` defaults to false. The Gated DeltaNet recurrence therefore ran in
+Java, token by token, reading and writing each layer's 4 MiB of recurrent state once **per token**
+instead of once per batch. Twenty-four layers over eighteen tokens is about 3.4 GiB of state
+traffic that the chunked native scan does in 192 MiB.
+
+The kernel was written, tested and shipped. Nothing turned it on, because it had been evaluated for
+generation, where a decode step advances one token and a chunked scan has nothing to chunk. A
+decision is the opposite shape: it prefills its whole question in one batch.
+
+| | ms/token | forward pass |
 |---|---|---|
-| 1 | 42.4 | -- |
-| 2 | 78.4 | 1.85x |
-| 4 | 120.1 | 1.53x |
-| 8 | 216.1 | 1.80x |
-| 16 | 330.1 | 1.53x |
+| `gatedDeltaNet=false`, as shipped | 19.9 | 0.359 s |
+| `gatedDeltaNet=true` | **14.5** | **0.261 s** |
 
-It scales cleanly to 16 and is still gaining, so the partitioning is not the problem.
-One thread at 42.4 G-MAC/s against a 64 G-MAC/s per-core ceiling is **66%**, and that
-is where the gap lives.
+**The gain depends on how many tokens are being prefilled, and not monotonically.** On the
+dedicated 4-core host, a forward pass:
 
-### Nothing free is available
+| tokens | false | true | gain |
+|---|---|---|---|
+| 18 | 0.500 s | 0.443 s | 1.13x |
+| 128 | 2.863 s | 2.374 s | **1.21x** |
+| 512 | 11.903 s | 11.645 s | 1.02x |
 
-`-C target-cpu=native` makes no difference at all -- 292 against 298 G-MAC/s at batch
-18, inside the noise, and slightly worse at batch 1. The hot paths already carry
-explicit `#[target_feature(enable = "avx2,fma,f16c")]`, so the compiler has nothing to
-add. The weight block is also already decoded once per row and reused across the whole
-batch, which is the big amortisation and is done.
+Small batches have little state traffic to save; long ones are increasingly dominated by attention,
+which grows with the square of the position count and dilutes the saving. The middle is where
+decisions live. It is never slower in anything measured here.
 
-### What a real attempt would look like
+At decision level on the same host:
 
-Per Q4_K block of 256 weights the kernel spends roughly 30 instructions per batch row
-on 256 multiply-accumulates, which is about 34 MAC/cycle structurally; measured is 21.
-Closing that is instruction-level work on the K-quant inner loop -- the accumulation
-dependency chains and the horizontal reductions -- worth perhaps 1.3x to 1.6x.
+| shape | false | true | gain |
+|---|---|---|---|
+| one document per case, no rubric | 1.483 s | **1.107 s** | **1.34x** |
+| one document per case, with rubric | 2.201 s | 1.604 s | 1.37x |
+| one warm question over shared evidence | 0.444 s | 0.408 s | 1.09x |
 
-**It was not attempted here**, for two reasons worth recording rather than hiding: it is
-a serious rewrite of the hottest code in the project, and it cannot be honestly
-validated on a shared-vCPU host, which is the only host available while the dedicated
-one is scoring the release. Q6_K is the weaker of the two at 50-54% and `ffn_down` and
-`output` are Q6_K, so that is where to start.
+A warm question prefills only its own 18 tokens, so it gains least. A decision that brings its own
+document gains most, and that is the shape the demo videos use.
 
-## 5. The floor, stated plainly
+**It costs one item in 120.** Accuracy 0.9000 to 0.8917, Intelligence 88.9 to 88.0 -- this cohort's
+noise floor, measured in section 5 of NOTES.md -- while Calibration improves from 71.7 to 73.0 and
+the Speed axis from 66.7 to 69.6.
 
-A warm decision is 18 tokens of arithmetic. On 4 physical Milan cores that is 0.333 s at
-the measured 18.5 ms a token, and 0.486 s end to end including a cold-ish first
-resumption. Perfect kernel work would take the arithmetic to roughly 0.21-0.25 s.
+So the decision plan now recommends it, alongside the quantized decode kernel it already
+recommended. A deployment setting still wins over the recommendation, and it is never slower in any
+shape measured, so recommending it does not need a caveat.
 
-Below that needs fewer tokens, which costs accuracy, or a smaller model, or a machine
-with AVX-512 -- Zen 4 or later roughly doubles int8 throughput per core, and this host
-is Zen 3. That is a deployment choice rather than a code change, and it is the single
-largest available factor.
+## 7. Where that leaves it
 
-The other number worth attacking is not the warm one: the **first** decision over new
-evidence costs 5.5 s, because 196 tokens of evidence and rubric are prefilled at
-18.5 ms each. Nothing about that is wasted work, but it is paid again on every process
-start for the same document, and a persisted prefix state would remove it entirely. That
-is a feature rather than a tune, and it is the largest user-visible number left.
+Against the state before this release, per decision on the dedicated host:
+
+| shape | before | after | gain |
+|---|---|---|---|
+| one document per case, as the demo videos do | ~1.53 s | **1.107 s** | **~1.38x** |
+| one warm question over shared evidence | ~0.47 s | **0.408 s** | ~1.15x |
+
+The first row is the one to quote for the videos. The second is small because a warm question is
+already down to its own 18 tokens, which is the point of the shared prefix.
+
+All of the numbers in sections 4 and 5 above were taken on a 16-vCPU shared host, which has more
+cores and about 10% run-to-run spread; the decision-level and per-token figures here are from the
+dedicated 4-core host every other published number uses. Where the two disagree, this host wins.
+
+The arithmetic that remains is at the inner loop's ceiling for this instruction set. What is left,
+in order of size:
+
+1. **A machine with VNNI.** Zen 4 or later, or Intel from Ice Lake, roughly halves the operation
+   count per multiply-accumulate. Larger than everything below put together, and it is a purchase
+   rather than a change.
+2. **Cache blocking for narrow outputs.** `ffn_down` and `ssm_out` run at half the rate of the fat
+   FFN tensors because their activations do not fit in L2. Worth perhaps 15% of a forward pass.
+3. **Whatever is left of the non-matmul 43%** after the recurrence fix. Not re-measured, and it
+   should be: the split between norms, attention and the recurrence has moved.
+4. **A persisted prefix state.** The first decision over new evidence is still the largest
+   user-visible number, and it is paid again on every process start for the same document.
