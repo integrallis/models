@@ -203,6 +203,8 @@ public final class JevBenchRunner {
 
     long wall0 = System.nanoTime();
     int done = 0;
+    int singleTokenLabels = 0;
+    int multiTokenLabels = 0;
     int sharedProven = 0;
     long candidateTokens = 0;
 
@@ -291,6 +293,18 @@ public final class JevBenchRunner {
       // path, so it moves probabilities and has to be scored rather than assumed harmless.
       boolean foldedReadout =
           Boolean.parseBoolean(System.getProperty("decisions.foldedReadout", "false"));
+      // A decision is 98.5% the prefill of its own suffix -- MEASURED 2026-09-24, resumption 4.6 ms
+      // and scoring 0.2 ms out of 391 ms -- so the only lever is tokens, and for a short question
+      // 11 of the 18 are the lettered list rather than the question.
+      //
+      // The list exists so a label of any length can be read from one forward pass. When every
+      // label is already a single token the indirection looks like pure overhead, so this arm drops
+      // it and reads the labels' own logits at the answer position. It is kept, and off, because it
+      // measured 10 noise floors worse: Intelligence 88.9 to 78.6 over 120 items, losing on exactly
+      // the families that qualified. A lettered multiple choice constrains a model in a way that an
+      // answer cue followed by a free token does not, and those 11 tokens are load-bearing.
+      boolean labelTokens =
+          Boolean.parseBoolean(System.getProperty("decisions.labelTokens", "false"));
       boolean shipped = Boolean.parseBoolean(System.getProperty("decisions.shipped", "false"));
       if (shipped && (!letters || optionsFirst || runtimePrompt || sharedFirst || rubricFirst)) {
         throw new IllegalArgumentException("decisions.shipped is its own prompt arm");
@@ -327,7 +341,51 @@ public final class JevBenchRunner {
 
         double[] p;
         double latency;
-        if (letters) {
+        if (labelTokens) {
+          // Evidence, rubric, criterion, answer cue. No lettered list at all. A space whose labels
+          // are not single tokens cannot be read this way and takes the lettered path, and both are
+          // counted, so the result says how much of a cohort the shortcut even applies to.
+          Map<String, String> parsed = parseRubric(row[6].replace("\\n", "\n"), labels);
+          String block = LetterLogitScorer.renderCriteria(labels, parsed);
+          String evidenceText = row[4].replace("\\n", "\n");
+          String criterionText = row[5].replace("\\n", "\n");
+          int[] readout = new int[labels.size()];
+          boolean single = true;
+          for (int slot = 0; slot < labels.size(); slot++) {
+            int[] encoded = backend.tokenizer().encode(" " + labels.get(slot));
+            single &= encoded.length == 1;
+            readout[slot] = encoded[encoded.length - 1];
+          }
+          int[] readoutPrompt;
+          if (single) {
+            singleTokenLabels++;
+            readoutPrompt =
+                backend
+                    .tokenizer()
+                    .encode(
+                        (block.isEmpty() ? evidenceText : evidenceText + "\n" + block)
+                            + "\n"
+                            + criterionText
+                            + "\nAnswer:");
+          } else {
+            multiTokenLabels++;
+            readoutPrompt =
+                backend
+                    .tokenizer()
+                    .encode(letterPrompt(row, labels, false, false, false, false, false, true));
+            for (int slot = 0; slot < labels.size(); slot++) {
+              int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + slot));
+              readout[slot] = encoded[encoded.length - 1];
+            }
+          }
+          long started = System.nanoTime();
+          try (InferenceSession session = backend.openSession()) {
+            float[] logits = backend.prefill(session, readoutPrompt, 0);
+            p = letterScorer.score(new Choice(id, labels), logits, readout).probabilities();
+          }
+          latency = (System.nanoTime() - started) / 1e9;
+          candidateTokens += 1;
+        } else if (letters) {
           Choice space = new Choice(id, labels);
           int[] lettered =
               backend
@@ -400,7 +458,14 @@ public final class JevBenchRunner {
       }
     }
     System.out.printf(
-        "done: %d tasks, wall %.1f s, candidate-token forwards %d, prefix sharing proven on %d/%d%n",
-        done, (System.nanoTime() - wall0) / 1e9, candidateTokens, sharedProven, done);
+        "done: %d tasks, wall %.1f s, candidate-token forwards %d, prefix sharing proven on %d/%d,"
+            + " label-token readout on %d, lettered fallback on %d%n",
+        done,
+        (System.nanoTime() - wall0) / 1e9,
+        candidateTokens,
+        sharedProven,
+        done,
+        singleTokenLabels,
+        multiTokenLabels);
   }
 }

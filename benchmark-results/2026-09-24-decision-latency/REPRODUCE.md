@@ -123,6 +123,9 @@ comparing every column but latency.
     $B F-shipped.tsv 1.0 -Ddecisions.shipped=true                  # composed as the runtime does
     $B G-folded.tsv 1.0 -Ddecisions.shipped=true -Ddecisions.foldedReadout=true
 
+    $B Q-labeltokens-probe.tsv 1.0 -Ddecisions.labelTokens=true  # rejected, see CEILING.md
+    $B Q-lettered-probe.tsv 1.0 -Ddecisions.shipped=true         # its paired baseline
+
 `F-shipped.tsv` must equal `E-rubricfirst.tsv`, which is what makes the layout the arm
 chose the layout the product ships. `G-folded.tsv` must equal it too: the folded
 readout changes the kernel path and must not change an answer.
@@ -131,6 +134,19 @@ The per-question latency the release is about is not measurable on this cohort, 
 every JevBench item carries its own state and there is nothing to share. For that:
 
     $JAVA -cp "$CP" demo.Release document.txt
+
+## Is the remaining latency the machine or us? (CEILING.md)
+
+    $JAVA -cp "$CP" demo.Where document.txt     # every stage of a warm decision, timed
+    $JAVA -Ddiag.cores=<physical> -Ddiag.ghz=<clock> -cp "$CP" demo.Ceiling <model>
+
+`demo.Ceiling` compares achieved multiply-accumulates against this core's int8 issue
+limit, so `diag.cores` must be **physical** cores and `diag.ghz` the sustained clock.
+Getting either wrong scales the "of ceiling" column and nothing else. For thread scaling,
+add `-Dmodels.native.kernels.threads=N`.
+
+Both want a dedicated host. The figures in CEILING.md came from a shared-vCPU one, which
+adds about 10% spread, and that is recorded there rather than smoothed over.
 
 Note that the properties must precede the class name; the line above is folded for
 reading. `runtime-renderer.tsv` is `-Ddecisions.runtimeCriteria=true` taken after the
