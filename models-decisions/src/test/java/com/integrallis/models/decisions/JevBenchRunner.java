@@ -43,6 +43,32 @@ public final class JevBenchRunner {
 
   private JevBenchRunner() {}
 
+  /**
+   * The prompt the letter arm reads, in one of two orders.
+   *
+   * <p>Shipped order is state, question, rubric, then the lettered options. Options-first moves the
+   * lettered options ahead of the question so that everything before the question is shared across
+   * every question with the same answer space, leaving only the question's own words to be read per
+   * decision. The answer cue stays last in both, because it is what the read-out position means.
+   */
+  private static String letterPrompt(String[] row, List<String> labels, boolean optionsFirst) {
+    String prompt = row[3].replace("\\n", "\n");
+    String rendered = LetterLogitScorer.renderOptions(labels);
+    if (!optionsFirst) {
+      return prompt + "\n" + rendered;
+    }
+    if (row.length < 7) {
+      throw new IllegalArgumentException(
+          "options-first needs a task file carrying the prompt's parts; re-run prepare_tasks.py");
+    }
+    String state = row[4].replace("\\n", "\n");
+    String instructions = row[5].replace("\\n", "\n");
+    String rubric = row[6].replace("\\n", "\n");
+    String cue = "Answer:";
+    String letteredOnly = rendered.substring(0, rendered.length() - cue.length()).stripTrailing();
+    return state + "\n\n" + rubric + "\n" + letteredOnly + "\n" + instructions + "\n" + cue;
+  }
+
   /** Arguments: model path, prepared TSV, output TSV, temperature. */
   public static void main(String[] args) throws IOException {
     Path model = Path.of(args[0]);
@@ -75,6 +101,17 @@ public final class JevBenchRunner {
       // The letter arm asks the model which letter comes next instead of scoring each option, so
       // one forward answers the whole question and the option text is read from the prompt.
       boolean letters = Boolean.parseBoolean(System.getProperty("decisions.letterLogits", "false"));
+      // A decision's cost is the arithmetic of the tokens that follow the shared state, MEASURED
+      // 2026-09-24 at 18.5 ms each and compute bound. Today those tokens are the question AND the
+      // options, and the options are most of them and identical across every question with the
+      // same answer space. Ahead of the question they are part of the shared prefix instead, which
+      // measured 1.75x per decision -- and disagreed with the shipped order on 4 of 15 cases, which
+      // is why it is an arm here and not a change to the prompt.
+      boolean optionsFirst =
+          Boolean.parseBoolean(System.getProperty("decisions.optionsFirst", "false"));
+      if (optionsFirst && !letters) {
+        throw new IllegalArgumentException("decisions.optionsFirst only applies to the letter arm");
+      }
       LetterLogitScorer letterScorer = new LetterLogitScorer(temperature);
       System.out.printf("mode=%s%n", letters ? "letter-logits" : "candidate-scoring");
 
@@ -109,8 +146,7 @@ public final class JevBenchRunner {
         double latency;
         if (letters) {
           Choice space = new Choice(id, labels);
-          int[] lettered =
-              backend.tokenizer().encode(prompt + "\n" + LetterLogitScorer.renderOptions(labels));
+          int[] lettered = backend.tokenizer().encode(letterPrompt(row, labels, optionsFirst));
           int[] letterTokens = new int[labels.size()];
           for (int i = 0; i < labels.size(); i++) {
             int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + i));

@@ -141,8 +141,65 @@ both arrangements:
 
 **It is not free: winners agree on only 11 of 15 cases.** Four flip. That is a
 different prompt and therefore a different model, and whether the flips are better
-or worse is not knowable from this harness -- it has no gold labels. Adopting it
-means re-qualifying and re-scoring, not merging.
+or worse is not knowable from this harness -- it has no gold labels.
+
+## 5. So it was scored against gold labels, and rejected (`options-first/`)
+
+Run as a flagged arm of the existing `JevBenchRunner` (`-Ddecisions.optionsFirst=true`)
+over JevBench v1.2's own public items, easy (48) and original (72), scored by importing
+the benchmark's own `scoring`, `metrics` and `composite_v12` modules rather than
+reimplementing them. Temperature 1.0 in both arms -- nothing fitted.
+
+| | shipped order | options first |
+|---|---|---|
+| easy | 48/48 = 1.0000 | 42/48 = 0.8750 |
+| judge | 59/72 = 0.8194 | 55/72 = 0.7639 |
+| **overall** | **107/120 = 0.8917** | **97/120 = 0.8083** |
+| Intelligence | 88.0 | 80.1 |
+| Calibration | 71.9 (ECE 0.1405) | 80.6 (ECE 0.0968) |
+| Speed | 64.8 (p50 2.411 s) | 64.8 (p50 2.415 s) |
+
+Winners differ on 19 of 120. Per family, where it moved:
+
+| family | shipped | options first | n |
+|---|---|---|---|
+| fact | 1.0000 | 0.5000 | 12 |
+| adequacy | 0.7500 | 0.5000 | 12 |
+| extraction | 1.0000 | 0.9167 | 24 |
+| intent | 0.8750 | 0.8333 | 24 |
+| routing | 0.8333 | 0.9167 | 12 |
+| ordinal | 0.9167 | 1.0000 | 12 |
+
+**Rejected.** Two families halve. The composite barely moves -- the Intelligence loss
+is offset by a Calibration gain that is mostly the arm being less confident, which is
+not an improvement anyone asked for -- and the accuracy loss is concentrated rather
+than spread, which is the signature of a prompt the model reads differently and not of
+noise.
+
+**Note what the Speed column does here: nothing.** 64.8 in both arms, p50 within 4 ms.
+Every JevBench item carries its own state, so there is no shared prefix for the options
+to move into and the saving cannot appear. The 1.75x of section 4 is real and it is
+real *only* in the regime `decideAll` is for -- many questions, one document. So this
+arm was measured on a cohort that can price the accuracy cost and cannot price the
+speed benefit, which is stated here rather than resolved, because the benchmark has no
+shared-evidence tier to resolve it with.
+
+**What was not run:** the hard tier (111 items, ~3,700-token states, about 70 s an item
+and 2.2 hours an arm). It was cut once the fast tiers returned a loss this large and
+this concentrated; running it would have refined a number that was already deciding
+against the change. It also would not have helped the speed question: a 3,700-token
+state makes a 50-token options block irrelevant, so the hard tier is where the reorder
+matters least.
+
+## Scoreboard for the week's work
+
+| change | measured | verdict |
+|---|---|---|
+| grouped recurrence in one kernel launch | 12.39 s -> 10.79 s at n=20 | kept |
+| group resumes its evidence | 10.79 s -> 8.22 s at n=20 | kept |
+| grouping at all, fast decode kernel | 1.03x-1.05x, band +-5% | off by default |
+| grouping at all, no fast decode kernel | 1.25x at n=2, 1.69x at n=20 | on |
+| options ahead of the criterion | 1.75x per decision, -8.3 points accuracy | rejected |
 
 ## What this says about the gap to a hosted System One service
 
