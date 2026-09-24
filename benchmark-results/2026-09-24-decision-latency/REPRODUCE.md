@@ -135,6 +135,25 @@ every JevBench item carries its own state and there is nothing to share. For tha
 
     $JAVA -cp "$CP" demo.Release document.txt
 
+## The measured before and after (CEILING.md section 7)
+
+The point of this one is that the before state is run, not reconstructed. Fetch the published jars
+and keep `models` the same on both sides, so only the release's own changes move:
+
+    for a in org/modeljars/modeljars/0.1.52/modeljars-0.1.52.jar \
+             org/modeljars/modeljars-core/0.1.52/modeljars-core-0.1.52.jar \
+             org/modeljars/composite/harriet/0.1.52/harriet-0.1.52.jar; do
+      curl -sS -O --output-dir lib-old "https://repo1.maven.org/maven2/$a"
+    done
+    # lib-old = the current models jars with the three above swapped in
+
+    $JAVA -cp "classes-old:native:lib-old/*" demo.Before cases.tsv   # before
+    $JAVA -cp "classes:native:lib/*"        demo.Before cases.tsv   # after
+
+Alternate them on an idle host and take the median. Do not run anything else while they run: a pair
+taken with another JVM on the box came out with the after arm *slower* than the before arm, which is
+the whole reason for the one-at-a-time rule.
+
 ## Is the remaining latency the machine or us? (CEILING.md)
 
     $JAVA -cp "$CP" demo.Where document.txt     # every stage of a warm decision, timed

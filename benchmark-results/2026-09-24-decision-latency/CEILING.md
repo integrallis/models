@@ -4,9 +4,8 @@ Measured 2026-09-24, after the 0.3.46 release brought a warm decision to 0.486 s
 question. The question this answers: is that number close to what the machine can do,
 or is there a lot left?
 
-Short version: **a kernel that had shipped switched off was worth up to 1.34x, the release is about
-1.38x per decision for a demo-shaped workload, and what remains is at the instruction set's
-ceiling.**
+Short version: **a kernel that had shipped switched off was most of it, the release measures 1.54x
+per decision for a demo-shaped workload, and what remains is at the instruction set's ceiling.**
 
 An earlier version of this file concluded the opposite -- that the headroom was in the matmul inner
 loop. Section 4 records why that was wrong, because the reasoning was a plausible ceiling estimate
@@ -166,15 +165,26 @@ shape measured, so recommending it does not need a caveat.
 
 ## 7. Where that leaves it
 
-Against the state before this release, per decision on the dedicated host:
+**The before state was measured, not computed.** An earlier version of this file quoted "~1.53 s"
+for it, arrived at by taking a measured after-number and adding back an assumed readout saving. That
+is the habit this file exists to avoid, so the published `modeljars 0.1.52` jars were fetched from
+Central and run against the same harness on the same host, with `models` held at 0.3.46 so that only
+the release's own changes move.
 
-| shape | before | after | gain |
+Alternating, on an idle host, fifteen decisions each bringing its own document (`harness/Before`):
+
+| pair | before (0.1.52) | after | |
 |---|---|---|---|
-| one document per case, as the demo videos do | ~1.53 s | **1.107 s** | **~1.38x** |
-| one warm question over shared evidence | ~0.47 s | **0.408 s** | ~1.15x |
+| 1 | 1.665 s | 0.939 s | |
+| 2 | 1.670 s | 1.085 s | |
+| 3 | 1.829 s | 1.110 s | |
+| **median** | **1.67 s** | **1.09 s** | **1.54x** |
 
-The first row is the one to quote for the videos. The second is small because a warm question is
-already down to its own 18 tokens, which is the point of the shared prefix.
+**1.54x, or 35% less time per decision**, in the shape the demo videos use. The estimate it replaces
+was 1.38x, so the estimate was low as well as unearned.
+
+A warm question over already-prefilled evidence gains much less, because it only prefills its own 18
+tokens: 0.444 s to 0.408 s, measured as an A/B of the recurrence change alone on the same build.
 
 All of the numbers in sections 4 and 5 above were taken on a 16-vCPU shared host, which has more
 cores and about 10% run-to-run spread; the decision-level and per-token figures here are from the
