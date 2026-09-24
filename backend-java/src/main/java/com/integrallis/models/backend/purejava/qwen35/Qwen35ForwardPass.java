@@ -377,6 +377,399 @@ public final class Qwen35ForwardPass {
     return logits;
   }
 
+  /**
+   * Answers a group of questions about one piece of evidence, reading the weights once per step.
+   *
+   * <p>The session must be positioned at the end of the evidence. Each question is forked from that
+   * state, and the group then walks forward in lockstep: at each step one token from every
+   * unfinished question forms a batch of rows, and every projection runs over that batch. A
+   * projection does not care where its rows came from, so the 2.55 GiB of weights is swept once for
+   * the whole group instead of once per question.
+   *
+   * <p>Attention and the Gated DeltaNet recurrence stay per branch, because those carry sequence
+   * identity: a shared recurrent state would let one question answer having read another.
+   *
+   * @param session a session positioned at the end of the shared evidence
+   * @param suffixes each question's tokens, the criterion and its rendered options
+   * @param group per-branch state, which must hold at least as many branches as there are questions
+   * @return final-position logits for each question, in the order given
+   */
+  float[][] decideGrouped(Session session, int[][] suffixes, Qwen35GroupedDecision group) {
+    Session checked = requireSession(session);
+    Objects.requireNonNull(suffixes, "suffixes");
+    Objects.requireNonNull(group, "group");
+    int count = suffixes.length;
+    if (count == 0) {
+      throw new IllegalArgumentException("suffixes must not be empty");
+    }
+    if (count > group.groupSize()) {
+      throw new IllegalArgumentException(
+          "group holds " + group.groupSize() + " branches, asked for " + count);
+    }
+    int prefixLength = checked.checkpoint;
+    int dimension = config.embeddingDim();
+    SessionState state = checked.state;
+    BatchScratch batch = state.batchScratch;
+    int longest = 0;
+    for (int[] suffix : suffixes) {
+      if (suffix.length == 0) {
+        throw new IllegalArgumentException("every question must carry at least one token");
+      }
+      longest = Math.max(longest, suffix.length);
+    }
+    if (longest > group.suffixCapacity()) {
+      throw new IllegalArgumentException(
+          "question of " + longest + " tokens exceeds group capacity " + group.suffixCapacity());
+    }
+
+    for (int index = 0; index < count; index++) {
+      group
+          .branch(index)
+          .forkFrom(
+              state.recurrentState,
+              state.convolutionHistory,
+              state.keys,
+              state.values,
+              prefixLength,
+              config.attentionKeyDim());
+    }
+
+    float[][] logits = new float[count][];
+    int[] active = new int[count];
+    for (int step = 0; step < longest; step++) {
+      int rows = 0;
+      for (int index = 0; index < count; index++) {
+        if (suffixes[index].length > step) {
+          active[rows++] = index;
+        }
+      }
+      for (int row = 0; row < rows; row++) {
+        weights.embedToken(suffixes[active[row]][step], batch.rowState);
+        System.arraycopy(batch.rowState, 0, batch.state, row * dimension, dimension);
+      }
+      int position = prefixLength + step;
+
+      for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
+        Layer layer = weights.layer(layerIndex);
+        normalizeBatch(batch.normalized, batch.state, rows, dimension, layer.attentionNorm());
+        if (config.usesFullAttention(layerIndex)) {
+          groupedAttention(
+              batch.projected,
+              batch.normalized,
+              layer.fullAttention(),
+              layerIndex,
+              position,
+              rows,
+              active,
+              group,
+              state,
+              batch);
+        } else {
+          groupedDeltaNet(
+              batch.projected,
+              batch.normalized,
+              layer.gatedDeltaNet(),
+              layerIndex,
+              rows,
+              active,
+              group,
+              state,
+              batch);
+        }
+        addBatch(batch.state, batch.projected, rows * dimension);
+
+        normalizeBatch(batch.normalized, batch.state, rows, dimension, layer.postAttentionNorm());
+        dualProjectBatched(
+            batch.ffnGate,
+            layer.ffnGate(),
+            batch.ffnUp,
+            layer.ffnUp(),
+            batch.normalized,
+            rows,
+            state.scratch,
+            batch.projectionScratch);
+        for (int row = 0; row < rows; row++) {
+          int offset = row * config.hiddenDim();
+          VectorUtil.swiGlu(
+              batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
+        }
+        projectBatched(
+            batch.projected,
+            batch.ffn,
+            layer.ffnDown(),
+            rows,
+            state.scratch,
+            batch.projectionScratch);
+        addBatch(batch.state, batch.projected, rows * dimension);
+      }
+
+      for (int row = 0; row < rows; row++) {
+        group.branch(active[row]).advance();
+        int index = active[row];
+        if (suffixes[index].length == step + 1) {
+          logits[index] = projectRowLogits(batch, row, state.scratch);
+        }
+      }
+    }
+    return logits;
+  }
+
+  /** Logits for one row of a grouped step, which is that question's final position. */
+  private float[] projectRowLogits(BatchScratch batch, int row, ProjectionScratch scratch) {
+    int dimension = config.embeddingDim();
+    float[] normalized = new float[dimension];
+    TensorOps.rmsNorm(
+        normalized,
+        0,
+        batch.state,
+        row * dimension,
+        weights.outputNorm(),
+        dimension,
+        config.rmsNormEpsilon());
+    float[] logits = new float[config.vocabSize()];
+    project(logits, normalized, weights.output(), scratch);
+    return logits;
+  }
+
+  /**
+   * Attention for a grouped step: one projection over every branch, then each branch attends over
+   * its own key and value cache, which already holds the evidence it was forked from.
+   */
+  private void groupedAttention(
+      float[] output,
+      float[] input,
+      FullAttention weights,
+      int layer,
+      int position,
+      int rows,
+      int[] active,
+      Qwen35GroupedDecision group,
+      SessionState state,
+      BatchScratch batch) {
+    int headDimension = config.attentionHeadDim();
+    int queryHeads = config.numHeads();
+    int kvHeads = config.numKvHeads();
+    int queryDimension = config.attentionQueryDim();
+    int keyDimension = config.attentionKeyDim();
+    tripleProjectBatched(
+        batch.queryGate,
+        weights.queryGate(),
+        batch.key,
+        weights.key(),
+        batch.value,
+        weights.value(),
+        input,
+        rows,
+        state.scratch,
+        batch.projectionScratch);
+
+    // Every branch sits at the same position, so one rotary slot serves the whole group.
+    rotary.prepareBatch(position, 1);
+    for (int row = 0; row < rows; row++) {
+      int queryGateBase = row * 2 * queryDimension;
+      int queryBase = row * queryDimension;
+      int keyBase = row * keyDimension;
+      for (int head = 0; head < queryHeads; head++) {
+        int source = queryGateBase + head * 2 * headDimension;
+        int destination = queryBase + head * headDimension;
+        System.arraycopy(batch.queryGate, source, batch.query, destination, headDimension);
+        TensorOps.rmsNorm(
+            batch.query,
+            destination,
+            batch.query,
+            destination,
+            weights.queryNorm(),
+            headDimension,
+            config.rmsNormEpsilon());
+        rotary.applyBatch(batch.query, destination, 0, true);
+      }
+      for (int head = 0; head < kvHeads; head++) {
+        int offset = keyBase + head * headDimension;
+        TensorOps.rmsNorm(
+            batch.key,
+            offset,
+            batch.key,
+            offset,
+            weights.keyNorm(),
+            headDimension,
+            config.rmsNormEpsilon());
+        rotary.applyBatch(batch.key, offset, 0, true);
+      }
+      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
+      System.arraycopy(
+          batch.key, keyBase, branch.suffixKeys(layer), position * keyDimension, keyDimension);
+      System.arraycopy(
+          batch.value, keyBase, branch.suffixValues(layer), position * keyDimension, keyDimension);
+    }
+
+    int queriesPerKvHead = queryHeads / kvHeads;
+    float scale = (float) (1.0 / Math.sqrt(headDimension));
+    for (int row = 0; row < rows; row++) {
+      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
+      int queryBase = row * queryDimension;
+      int queryGateBase = row * 2 * queryDimension;
+      for (int head = 0; head < queryHeads; head++) {
+        int kvHead = head / queriesPerKvHead;
+        int queryOffset = queryBase + head * headDimension;
+        int gate = queryGateBase + head * 2 * headDimension + headDimension;
+        attendHead(
+            batch.attended,
+            queryOffset,
+            batch.query,
+            queryOffset,
+            branch.suffixKeys(layer),
+            kvHead * headDimension,
+            keyDimension,
+            branch.suffixValues(layer),
+            kvHead * headDimension,
+            keyDimension,
+            batch.queryGate,
+            gate,
+            batch.attentionScores,
+            position + 1,
+            headDimension,
+            scale);
+      }
+    }
+    projectBatched(
+        output, batch.attended, weights.output(), rows, state.scratch, batch.projectionScratch);
+  }
+
+  /**
+   * Gated DeltaNet for a grouped step: one projection over every branch, then each branch advances
+   * its own recurrent state by a single token.
+   */
+  private void groupedDeltaNet(
+      float[] output,
+      float[] input,
+      GatedDeltaNet weights,
+      int layer,
+      int rows,
+      int[] active,
+      Qwen35GroupedDecision group,
+      SessionState state,
+      BatchScratch batch) {
+    int convDimension = config.gdnConvDim();
+    int keyDimension = config.gdnKeyDim();
+    int valueDimension = config.gdnValueDim();
+    int valueHeads = config.gdnValueHeads();
+    int headDimension = config.gdnHeadDim();
+    projectBatched(
+        batch.mixed, input, weights.queryKeyValue(), rows, state.scratch, batch.projectionScratch);
+    projectBatched(
+        batch.outputGate,
+        input,
+        weights.outputGate(),
+        rows,
+        state.scratch,
+        batch.projectionScratch);
+    dualProjectBatched(
+        batch.beta,
+        weights.beta(),
+        batch.alpha,
+        weights.alpha(),
+        input,
+        rows,
+        state.scratch,
+        batch.projectionScratch);
+
+    int kernel = config.gdnConvKernel();
+    for (int row = 0; row < rows; row++) {
+      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
+      int mixedBase = row * convDimension;
+      VectorUtil.causalDepthwiseConv1dSilu(
+          batch.mixed,
+          mixedBase,
+          branch.convolutionHistory(layer),
+          0,
+          weights.convolution(),
+          0,
+          convDimension,
+          kernel);
+      System.arraycopy(batch.mixed, mixedBase, batch.gdnQuery, row * keyDimension, keyDimension);
+      System.arraycopy(
+          batch.mixed, mixedBase + keyDimension, batch.gdnKey, row * keyDimension, keyDimension);
+      System.arraycopy(
+          batch.mixed,
+          mixedBase + 2 * keyDimension,
+          batch.gdnValue,
+          row * valueDimension,
+          valueDimension);
+      int gateBase = row * valueHeads;
+      VectorUtil.sigmoidAndScaledSoftplus(
+          batch.beta,
+          gateBase,
+          batch.alpha,
+          gateBase,
+          weights.timeStepBias(),
+          0,
+          weights.decay(),
+          0,
+          batch.logDecay,
+          gateBase,
+          valueHeads);
+    }
+
+    // One token per branch, each against its own state. The recurrence is what makes a question's
+    // answer its own, so it is the one thing the group does not share.
+    float[] rowOutput = new float[valueDimension];
+    for (int row = 0; row < rows; row++) {
+      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
+      // The recurrence takes whole arrays rather than spans, so a row goes in as a copy. The
+      // output has to be copied back: writing it into a slice would discard the answer.
+      applyGatedDeltaNetRecurrence(
+          slice(batch.gdnQuery, row * keyDimension, keyDimension),
+          slice(batch.gdnKey, row * keyDimension, keyDimension),
+          slice(batch.gdnValue, row * valueDimension, valueDimension),
+          slice(batch.logDecay, row * valueHeads, valueHeads),
+          slice(batch.beta, row * valueHeads, valueHeads),
+          branch.recurrentState(layer),
+          rowOutput,
+          batch.normalizedQuery,
+          batch.normalizedKey,
+          batch.memory,
+          batch.delta,
+          1,
+          config.gdnKeyHeads(),
+          valueHeads,
+          headDimension,
+          headDimension);
+      System.arraycopy(rowOutput, 0, batch.recurrent, row * valueDimension, valueDimension);
+    }
+
+    for (int row = 0; row < rows; row++) {
+      int valueBase = row * valueDimension;
+      for (int head = 0; head < valueHeads; head++) {
+        int offset = valueBase + head * headDimension;
+        TensorOps.rmsNorm(
+            batch.recurrent,
+            offset,
+            batch.recurrent,
+            offset,
+            weights.outputNorm(),
+            headDimension,
+            config.rmsNormEpsilon());
+      }
+      VectorUtil.swiGlu(
+          batch.recurrent,
+          valueBase,
+          batch.outputGate,
+          valueBase,
+          batch.recurrent,
+          valueBase,
+          valueDimension);
+    }
+    projectBatched(
+        output, batch.recurrent, weights.output(), rows, state.scratch, batch.projectionScratch);
+  }
+
+  /** A copy of one row, because the recurrence entry point takes whole arrays rather than spans. */
+  private static float[] slice(float[] source, int offset, int length) {
+    float[] copy = new float[length];
+    System.arraycopy(source, offset, copy, 0, length);
+    return copy;
+  }
+
   private Session requireSession(Session session) {
     Objects.requireNonNull(session, "session");
     if (session.owner != this) {
