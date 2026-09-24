@@ -45,6 +45,20 @@ library really loaded before trusting a number:
 
     java ... demo.Probe document.txt | grep native-kernel-abi     # must print 6
 
+## Warmup, which is part of the measurement
+
+Every harness in `harness/` warms each path it is about to compare, and none of the
+numbers in NOTES.md can be reproduced without that. Unwarmed Panama vector code takes
+a different path with a different accumulation order, so an unwarmed comparison of two
+code paths measures which one the compiler reached first. The first pass of this work
+reported a state leak that did not exist for exactly that reason; see NOTES.md section 0.
+
+Check the premise before trusting a comparison:
+
+    java ... demo.Determinism <model>        # every line must read 0.000e+00
+
+and if a harness is modified so that it exercises a new path, warm that path too.
+
 ## Running
 
     CP="classes:native:lib/*"
@@ -75,29 +89,44 @@ Note that `demo.Batch2` calls `decideAll`, whose grouping is gated on what the b
 reports for `groupedDecisionBreakEven()`. To force the grouped path where the backend
 says it does not pay, add `-Dmodeljars.decisions.minimumGroupSize=2`.
 
-## Section 5: the options-first arm against gold labels
+    # Section 4 and the answer-changing comparisons
+    $JAVA -cp "$CP" demo.Cross document.txt      # batched, stepped, split, both kernels
+    $JAVA -cp "$CP" demo.Matmul <model> blk.0.ffn_up.weight
+    $JAVA -cp "$CP" demo.Grouped <model>         # add -Ddiag.kernel=java for the other arm
+
+## Prompt arms against gold labels
 
 JevBench v1.2's public items, from its own repository:
 
     cat datasets/public/easy.jsonl datasets/public/original.jsonl > jevbench-120.jsonl
     python3 options-first/prepare_tasks.py jevbench-120.jsonl jevbench-120.tsv
 
-Both arms, one at a time, temperature 1.0, nothing fitted:
+Every arm, one at a time, temperature 1.0, nothing fitted. `JevBenchRunner` warms
+three items and discards them; that is verified sufficient by re-running at 25 and
+comparing every column but latency.
 
     M=~/.modeljars/cache/sha256/00/00fe7986...a4/model.gguf
-    for arm in false true; do
-      $JAVA -Xmx12g -Dmodels.purejava.maxContextLength=8192 \
-        -Dmodels.native.quantizedDecode=true \
-        -Ddecisions.letterLogits=true -Ddecisions.optionsFirst=$arm \
-        -cp "$CP" com.integrallis.models.decisions.JevBenchRunner \
-        $M jevbench-120.tsv out-$arm.tsv 1.0
-    done
+    B="$JAVA -Xmx12g -Dmodels.purejava.maxContextLength=8192 \
+        -Dmodels.native.quantizedDecode=true -Ddecisions.letterLogits=true \
+        -cp $CP com.integrallis.models.decisions.JevBenchRunner $M jevbench-120.tsv"
+
+    $B shipped-w3.tsv 1.0                                          # benchmark prompt
+    $B shipped-w25.tsv 1.0 -Ddecisions.warmupItems=25               # warmup control
+    $B shipped-gdnnative.tsv 1.0 -Dmodels.native.gatedDeltaNet=true # noise floor
+    $B runtime-prompt.tsv 1.0 -Ddecisions.runtimePrompt=true        # no rubric
+    $B runtime-block.tsv 1.0 -Ddecisions.runtimeCriteria=true -Ddecisions.rubricStyle=block
+    $B runtime-criteria.tsv 1.0 -Ddecisions.runtimeCriteria=true    # inline rubric
+    $B options-first-fast.tsv 1.0 -Ddecisions.optionsFirst=true
+
+Note that the properties must precede the class name; the line above is folded for
+reading. `runtime-renderer.tsv` is `-Ddecisions.runtimeCriteria=true` taken after the
+block layout became the renderer's default, and must equal `runtime-block.tsv`.
 
 Scored with the benchmark's own modules, not a reimplementation:
 
     python3 options-first/score_arm.py jevbench-120.jsonl \
-      options-first/shipped-order-fast.tsv shipped \
-      options-first/options-first-fast.tsv options-first
+      prompt-arms/shipped-w3.tsv shipped \
+      prompt-arms/options-first-fast.tsv options-first
 
 `score_arm.py` expects a checkout of JevBench on its `sys.path`; the path is at the top
 of the file. Digests of both arms' outputs are in `options-first/SHA256SUMS`.

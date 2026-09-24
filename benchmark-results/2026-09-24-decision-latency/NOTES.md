@@ -1,209 +1,277 @@
-# Where a typed decision's time actually goes
+# Where a typed decision's time goes, and what changes its answer
 
-Measured 2026-09-24. Everything below was run here, on one box, under one protocol.
-Nothing in this file is read from a paper or inferred from a vendor's claim.
+Measured 2026-09-24 on one dedicated host, one protocol, both arms of every
+comparison measured rather than one extrapolated. Nothing here is read from a paper
+or a vendor page.
 
-## The box
+**This file was rewritten after a first pass got a central thing wrong. Read
+section 0 before the numbers.**
 
-Hetzner CCX33, 8 vCPU on AMD EPYC Milan (4 physical cores, SMT), 32 GiB, Ubuntu,
-Temurin JDK 25.0.3. Idle apart from the run.
+## 0. The first pass measured the JIT
 
-## What was under test
+Every ad-hoc harness here was originally written without warmup. That is not a
+detail: unwarmed Panama vector code takes a different path with a different
+accumulation order, so an unwarmed comparison of two code paths measures which one
+the compiler reached first.
 
-Harriet, `org.modeljars.composite:harriet`, a typed decision recipe over a frozen
-Qwen3.5-4B at Q4_K_M, 2.55 GiB of weights, via `RustFfmBackend` at native kernel
-ABI 6. Evidence is a 143-token contract (`document.txt`); the fifteen decision
-cases are `cases.tsv`.
+It produced a confident and wrong diagnosis. Two identical calls -- one forward of
+one token, run twice -- differed on **all 248,320 logits**, which reads exactly like
+a state leak between sessions. It is not. Warmup 0 against warmup 3:
 
-Harnesses are in `harness/`. Each is a single class run as
+| comparison | warmup 0 | warmup 3 |
+|---|---|---|
+| two fresh sessions, one token at position 0 | max 3.810e-01 | **0.000e+00** |
+| default session, reset between | max 7.863e-01 | **0.000e+00** |
+| fresh session vs default session | max 1.057e+00 | **0.000e+00** |
+| ten further repeats against each other | 0.000e+00 | 0.000e+00 |
 
-    java --enable-native-access=ALL-UNNAMED --add-modules jdk.incubator.vector \
-      -Dmodels.native.gatedDeltaNet=true -cp "classes:native:lib/*" demo.<Name> <input>
+**There is no determinism bug and no state leak.** The tell was in the first run all
+along: the ten repeats agreed, because warmup had happened by then.
 
-## 1. A decision is compute bound, not bandwidth bound (`Threads`, `Split`)
+This project's working agreement already records this failure mode, from a previous
+sweep it corrupted. It was walked into anyway. Every harness in `harness/` now warms
+each path it is about to compare, and `harness/Determinism.java` exists to check the
+premise rather than assume it.
 
-This is the finding everything else follows from, and it is the opposite of what
-the grouped-decision code was written to exploit.
+**The bench harness was never affected.** `JevBenchRunner` warms three items and
+discards them. Re-run at warmup 25, its probabilities are byte-identical to warmup 3
+(`prompt-arms/shipped-w3.tsv` against `shipped-w25.tsv`, comparing every column but
+latency). So every accuracy number below is warmup-clean, and so were the ones
+published before.
 
-Prefill time against token count, one batch, evidence prefilled separately:
+Numbers withdrawn from the first pass: the "alone" column of `Split` (3.745 s and
+5.330 s for the medium and long criteria, actually 0.621 s and 2.121 s), and the
+answer-drift column of `Batch2`.
+
+## 1. The host
+
+Hetzner CCX33: 8 vCPU on AMD EPYC Milan, 4 physical cores with SMT, 32 GiB, Ubuntu
+24.04, Temurin 25.0.3. Idle apart from the run, one measurement at a time.
+
+Harriet, `org.modeljars.composite:harriet`, over a frozen Qwen3.5-4B at Q4_K_M,
+2.55 GiB, through `RustFfmBackend` at native kernel ABI 6. Evidence is a 143-token
+contract; the decision cases are `cases.tsv`; the accuracy cohort is JevBench v1.2's
+public easy and original tiers, 120 items, prepared by
+`options-first/prepare_tasks.py`.
+
+## 2. A decision is compute bound (`harness/Threads`, `harness/Split`)
+
+Prefill against token count, one batch, evidence prefilled separately:
 
 | tokens | seconds | ms/token |
 |--------|---------|----------|
-| 17     | 0.322   | 18.9     |
-| 30     | 0.556   | 18.5     |
-| 107    | 2.033   | 19.0     |
-| 143    | 2.684   | 18.8     |
+| 17     | 0.315   | 18.5     |
+| 30     | 0.571   | 19.0     |
+| 107    | 2.064   | 19.3     |
+| 143    | 2.638   | 18.4     |
 
-Dead linear, no fixed cost. If reading the weights dominated there would be a
-large intercept and a near-flat slope.
+Linear, no fixed cost. If reading the 2.55 GiB of weights dominated there would be a
+large intercept and a flat slope.
 
-Prefill of the same 143 tokens against thread count:
+Prefill of 143 tokens against thread count:
 
 | threads | seconds | ms/token |
 |---------|---------|----------|
-| 1       | 10.056  | 70.3     |
-| 2       | 5.157   | 36.1     |
-| 4       | 2.577   | 18.0     |
-| 8       | 2.981   | 20.9     |
+| 1       | 8.649   | 60.5     |
+| 2       | 5.130   | 35.9     |
+| 4       | 2.965   | 20.7     |
+| 8       | 2.641   | 18.5     |
 
 It halves, halves again, then saturates on the box's four physical cores. That is
-arithmetic at its ceiling. **N questions cost N questions' arithmetic however they
+arithmetic at the ceiling. **N questions cost N questions' arithmetic however they
 are arranged.**
 
-The single-token step that ends a decision behaves the other way: 0.172 s, 0.091 s,
-0.064 s, 0.066 s over the same thread counts. Flat past two threads -- bandwidth.
+The single-token step that ends a decision behaves the other way -- 0.167, 0.091,
+0.065, 0.067 s over the same thread counts. Flat past two threads: bandwidth.
 
-So one decision, warm, over shared evidence:
+One warm decision over shared evidence, 17-token question: 0.315 s prefill + 0.083 s
+final step + 0.010 s = 0.408 s, and `Split` measures 0.408 s end to end.
 
-| part                              | seconds | share |
-|-----------------------------------|---------|-------|
-| prefill the question's own tokens | 0.322   | 76%   |
-| final single-token step           | 0.065   | 16%   |
-| everything else                   | 0.035   | 8%    |
-| **total**                         | 0.422   |       |
+## 3. Grouping costs answers and buys nothing here (`harness/Batch2`)
 
-## 2. Grouping questions is worth what that final step costs (`Batch2`)
+Twenty questions over one piece of evidence, both arms measured, warmed.
 
-Twenty questions over one piece of evidence, both arms measured, not extrapolated.
+With the answer-preservation gate on, which is the shipped default:
 
-With the native quantized decode kernel (the shipped default):
+| n | one at a time | grouped | speedup | max answer drift |
+|---|---|---|---|---|
+| 2 | 0.818 | 0.828 | 0.99x | 0.00e+00 |
+| 5 | 2.244 | 2.142 | 1.05x | 0.00e+00 |
+| 10 | 4.217 | 4.221 | 1.00x | 0.00e+00 |
+| 20 | 8.153 | 8.480 | 0.96x | 0.00e+00 |
 
-| n  | one at a time | grouped | speedup |
-|----|---------------|---------|---------|
-| 2  | 0.916         | 1.311   | 0.70x   |
-| 5  | 2.540         | 2.899   | 0.88x   |
-| 10 | 4.796         | 4.675   | 1.03x   |
-| 20 | 8.951         | 8.626   | 1.04x   |
-| 30 | 13.600        | 13.011  | 1.05x   |
+Forced on with `-Dmodeljars.decisions.allowInexactGrouping=true`:
 
-Run-to-run band is about +-5%, calibrated from a group size past the backend's
-maximum where both arms take the identical path and measured 0.98x. So grouping is
-a wash at every size.
+| n | one at a time | grouped | speedup | max answer drift |
+|---|---|---|---|---|
+| 2 | 0.833 | 1.154 | 0.72x | 7.15e-02 |
+| 5 | 2.115 | 2.450 | 0.86x | 7.15e-02 |
+| 10 | 4.144 | 4.460 | 0.93x | 7.15e-02 |
+| 20 | 8.167 | 7.959 | 1.03x | 7.15e-02 |
 
-With that kernel off, same code, same box:
+So grouping is a regression below twenty questions, a wash at twenty, and it moves
+every answer by 0.07 of probability. It is off by default and the backend is what
+says so.
 
-| n  | one at a time | grouped | speedup |
-|----|---------------|---------|---------|
-| 2  | 1.687         | 1.350   | 1.25x   |
-| 5  | 4.366         | 2.943   | 1.48x   |
-| 10 | 8.593         | 5.416   | 1.59x   |
-| 20 | 16.839        | 9.935   | 1.69x   |
+Two defects were found and fixed on the way to that answer, and both were worth
+fixing regardless:
 
-The only thing that changed is the price of the step grouping removes. This is why
-`GroupedDecisionBackend.groupedDecisionBreakEven()` is asked of the backend rather
-than fixed by the caller.
-
-### Two defects found on the way
-
-- The grouped path called `reset()` and re-read the whole evidence on every grouped
-  call, then discarded the resumption point so the next one-at-a-time decision paid
-  for it again. Worth 2.68 s per call here. Twenty questions: 10.79 s -> 8.22 s.
+- The grouped path called `reset()` and re-read the whole evidence on every call,
+  then discarded the resumption point so the next one-at-a-time decision paid again.
+  The evidence read costs 2.64 s against 0.41 s for a question, so a group paid more
+  for its evidence than for every question in it. Twenty questions: 10.79 s to
+  8.22 s.
 - The Gated DeltaNet kernel stays on the calling thread for one token of one
-  sequence, which is right for decode; the grouped path called it once per branch,
-  so every branch ran on one core. Handing it the whole group: 12.39 s -> 10.79 s.
+  sequence, which is right for decode. The grouped path called it once per branch, so
+  every branch ran on one core. Handing it the whole group: 12.39 s to 10.79 s.
 
-## 3. Batched and single-row arithmetic disagree, by up to 0.04 (`Chunk`)
+## 4. What actually changes an answer (`harness/Cross`, `harness/Matmul`, `harness/Grouped`)
 
-A question prefilled as one batch does not give the same answer as the same question
-fed a token at a time. Six criteria over the same contract, probability of the first
-option:
+All warmed. One projection, real Q4_K weights, the same activations:
 
-| criterion                                      | batched | per token | shift |
-|------------------------------------------------|---------|-----------|-------|
-| Is a monthly fee stated?                       | 0.9407  | 0.9522    | 0.012 |
-| Is an uptime guarantee stated?                 | 0.9041  | 0.8922    | 0.012 |
-| May Customer Data be used to train models?     | 0.1134  | 0.1173    | 0.004 |
-| Is a liability cap stated?                     | 0.8693  | 0.8690    | 0.000 |
-| Does the liability cap apply to data breaches? | 0.4600  | 0.4884    | 0.028 |
-| Can the agreement be terminated for convenience?| 0.9156 | 0.9196    | 0.004 |
+| comparison | relative |
+|---|---|
+| native batch N vs Java batch N | 3e-7 |
+| native batch N vs native one row at a time | 3e-7 at N>=2, 0 at N=1 |
+| native, the same call twice | 0 |
+| Java batch N vs Java one row at a time | **0 at every N** |
 
-Max logit gap 0.5-0.8 across 248,320 logits. It is **not** the chunked associative
-scan: repeating with the pure Java per-token recurrence gives the same spread
-(worst 0.044). It is batch-size-dependent matrix arithmetic, and it predates all of
-this work. A caller needing bit-identical answers must pick one path and stay on it.
+Unaffected by activation outliers up to 200x. Ordinary fp32 accumulation order.
 
-## 4. The lever that is actually large: the options block (`Reorder`)
+The same differences after 32 layers, 24 tokens:
 
-A decision's cost is the arithmetic of the tokens after the shared evidence. Today
-those are the criterion **and** the rendered options, and the options are most of
-them -- and identical across every question with the same answer space. Moving them
-ahead of the criterion makes them part of the shared prefix.
+| comparison | max logit | mean | relative | argmax |
+|---|---|---|---|---|
+| Java batched vs Java stepped | 0.000e+00 | 0.000e+00 | 0 | same |
+| Java one batch vs two batches | 0.000e+00 | 0.000e+00 | 0 | same |
+| native one batch vs two batches | 0.000e+00 | 0.000e+00 | 0 | same |
+| native batched vs native stepped | 3.255e-01 | 5.599e-02 | 2.5e-02 | same |
+| native stepped vs Java stepped | 3.354e-01 | 5.940e-02 | 2.6e-02 | same |
 
-Fifteen cases, per-question part only, shared prefix prefilled outside the clock in
-both arrangements:
+So: **splitting a prefill changes nothing in either kernel**, and the Java kernel's
+row result does not depend on how many rows share the call. What does differ is
+crossing between the native kernel's one-row path and its many-row path -- the
+`batch_size == 1` specialisations reduce one row straight to a scalar, while two or
+more accumulate per-row vector lanes and reduce at the end -- and crossing between
+the two kernels at all. 3e-7 on one projection becomes 3e-2 at the logits, about
+five orders of amplification over the depth.
 
-| | now | options first |
+Grouped against the same question asked alone, four questions over 120 tokens of
+shared evidence:
+
+| kernel | result |
+|---|---|
+| pure Java | 0.000e+00 on every logit of all four |
+| native | 0.28, 0.27, 0.28 max logit on three of four; the fourth exactly 0 |
+
+That is the whole basis for `GroupedDecisionBackend.groupedDecisionsMatchSingleDecisions()`.
+A lone question reads its answer out of a batch of one row and a group reads its out
+of a batch of many.
+
+A caller who needs the same bits twice gets them: the shipped path is fixed and
+deterministic, and repeated identical calls agree exactly. What is not available is
+agreement *across* implementations.
+
+## 5. The noise floor, so the rest can be read (`prompt-arms/shipped-gdnnative.tsv`)
+
+Swapping the recurrence kernel across all 24 Gated DeltaNet layers -- a real
+implementation change, same prompt, same cohort:
+
+| | shipped | recurrence kernel flipped |
 |---|---|---|
-| suffix tokens, total | 463 | 240 |
-| mean seconds | 0.623 | 0.356 |
+| accuracy | 0.8917 | 0.8833 |
+| Intelligence | 88.0 | 87.0 |
+| winners differing | -- | 1 of 120 |
 
-**1.75x on every decision, in every configuration, with no kernel work.**
+**One item, one point of Intelligence.** That is the unit everything below is
+measured in. Logit-level divergence of 6e-2 sounds alarming and moves one decision
+in 120: the probabilities move, the argmax mostly does not.
 
-**It is not free: winners agree on only 11 of 15 cases.** Four flip. That is a
-different prompt and therefore a different model, and whether the flips are better
-or worse is not knowable from this harness -- it has no gold labels.
+## 6. The published score was for a prompt the product could not build
 
-## 5. So it was scored against gold labels, and rejected (`options-first/`)
+JevBench hands every system a per-label rubric out of `question.criteria`.
+`AnswerSpace` had two accessors, `question()` and `labels()`, so no caller could
+supply one. The benchmark arm read the rubric; the shipped runtime did not.
 
-Run as a flagged arm of the existing `JevBenchRunner` (`-Ddecisions.optionsFirst=true`)
-over JevBench v1.2's own public items, easy (48) and original (72), scored by importing
-the benchmark's own `scoring`, `metrics` and `composite_v12` modules rather than
-reimplementing them. Temperature 1.0 in both arms -- nothing fitted.
+Same model, same kernel, same 120 items, the only variable being the rubric and its
+layout:
+
+| arm | accuracy | Intelligence | Calibration | p50 |
+|---|---|---|---|---|
+| benchmark prompt, rubric block + lettered list | 0.8917 | 88.0 | 71.9 | 2.342 s |
+| what shipped: no rubric at all | 0.7500 | **72.2** | 80.1 | 1.429 s |
+| rubric inline, `A: label -- criterion` | 0.8250 | 80.8 | 78.1 | 2.036 s |
+| rubric as a block above a bare lettered list | 0.8750 | **86.1** | 66.8 | 2.220 s |
+
+Sixteen points of Intelligence between what was measured and what shipped, against a
+one-point noise floor. Per family, no rubric against block: ordinal 0.2500 against
+0.9167, routing 0.3333 against 0.7500. That is what `A: 3` means to a reader who was
+never told what 3 is.
+
+**Fixed:** the three answer spaces carry an optional rubric and the runtime renders
+it. The layout was measured rather than chosen -- inline was the obvious design and
+scored five points worse. The shipped renderer was then re-run over the cohort and
+reproduces the block arm's probabilities exactly (`runtime-renderer.tsv` against
+`runtime-block.tsv`), so 86.1 is a number the product produces and not one a harness
+produces.
+
+Still 1.9 points below the benchmark prompt, which also carries a blank line and a
+second answer cue. Within about two noise floors, and not chased.
+
+Calibration moves the other way, 71.9 to 66.8: the rubric makes the model more
+confident as well as more right. Temperature is the instrument for that and none was
+fitted here.
+
+## 7. The 1.76x that was not taken (`harness/Reorder`, `prompt-arms/options-first-fast.tsv`)
+
+A decision's cost is the arithmetic of the tokens after the shared evidence, and for
+a short question most of those tokens are the options -- identical across every
+question with the same answer space. Moving them ahead of the criterion makes them
+part of the shared prefix. Fifteen cases, warmed, per-question part only:
 
 | | shipped order | options first |
 |---|---|---|
-| easy | 48/48 = 1.0000 | 42/48 = 0.8750 |
-| judge | 59/72 = 0.8194 | 55/72 = 0.7639 |
-| **overall** | **107/120 = 0.8917** | **97/120 = 0.8083** |
-| Intelligence | 88.0 | 80.1 |
-| Calibration | 71.9 (ECE 0.1405) | 80.6 (ECE 0.0968) |
-| Speed | 64.8 (p50 2.411 s) | 64.8 (p50 2.415 s) |
+| suffix tokens, total | 463 | 240 |
+| mean seconds | 0.702 | 0.398 |
 
-Winners differ on 19 of 120. Per family, where it moved:
+**1.76x on every decision, no kernel work.** Then scored against gold labels:
+accuracy 0.8917 to 0.8083, Intelligence 88.0 to 80.1, with `fact` 1.0000 to 0.5000
+and `adequacy` 0.7500 to 0.5000.
 
-| family | shipped | options first | n |
-|---|---|---|---|
-| fact | 1.0000 | 0.5000 | 12 |
-| adequacy | 0.7500 | 0.5000 | 12 |
-| extraction | 1.0000 | 0.9167 | 24 |
-| intent | 0.8750 | 0.8333 | 24 |
-| routing | 0.8333 | 0.9167 | 12 |
-| ordinal | 0.9167 | 1.0000 | 12 |
+**Rejected.** Eight noise floors down, concentrated in two families rather than
+spread, which is a prompt the model reads differently and not sampling. The arm stays
+flagged and off, with its output and digest, so the next person to have the idea can
+see it was tried.
 
-**Rejected.** Two families halve. The composite barely moves -- the Intelligence loss
-is offset by a Calibration gain that is mostly the arm being less confident, which is
-not an improvement anyone asked for -- and the accuracy loss is concentrated rather
-than spread, which is the signature of a prompt the model reads differently and not of
-noise.
+Worth recording precisely: the Speed axis is *identical* in both arms, 64.8 either
+way, because every JevBench item carries its own state and there is no shared prefix
+for the options to move into. That cohort can price this change's cost and
+structurally cannot price its benefit. The decision was made on the cost.
 
-**Note what the Speed column does here: nothing.** 64.8 in both arms, p50 within 4 ms.
-Every JevBench item carries its own state, so there is no shared prefix for the options
-to move into and the saving cannot appear. The 1.75x of section 4 is real and it is
-real *only* in the regime `decideAll` is for -- many questions, one document. So this
-arm was measured on a cohort that can price the accuracy cost and cannot price the
-speed benefit, which is stated here rather than resolved, because the benchmark has no
-shared-evidence tier to resolve it with.
+**Not re-asked after section 6.** A rubric makes the shared part of a prompt larger,
+so the reordering is worth more now than when it was rejected. The accuracy objection
+is unchanged and the question is open.
 
-**What was not run:** the hard tier (111 items, ~3,700-token states, about 70 s an item
-and 2.2 hours an arm). It was cut once the fast tiers returned a loss this large and
-this concentrated; running it would have refined a number that was already deciding
-against the change. It also would not have helped the speed question: a 3,700-token
-state makes a 50-token options block irrelevant, so the hard tier is where the reorder
-matters least.
+**Not run:** the hard tier, 111 items of about 3,700-token states, roughly 70 s an
+item. It is where a 50-token options block matters least and would not have changed a
+verdict already eight floors clear.
 
-## Scoreboard for the week's work
+## 8. Scoreboard
 
 | change | measured | verdict |
 |---|---|---|
-| grouped recurrence in one kernel launch | 12.39 s -> 10.79 s at n=20 | kept |
-| group resumes its evidence | 10.79 s -> 8.22 s at n=20 | kept |
-| grouping at all, fast decode kernel | 1.03x-1.05x, band +-5% | off by default |
+| answer spaces carry a rubric | Intelligence 72.2 to 86.1 | kept |
+| grouped recurrence in one kernel launch | 12.39 s to 10.79 s at n=20 | kept |
+| group resumes its evidence | 10.79 s to 8.22 s at n=20 | kept |
+| gate grouping on answer preservation | drift 7.15e-02 to 0.00e+00 | kept |
+| grouping at all, native backend | 0.72x to 1.03x | off by default |
 | grouping at all, no fast decode kernel | 1.25x at n=2, 1.69x at n=20 | on |
-| options ahead of the criterion | 1.75x per decision, -8.3 points accuracy | rejected |
+| options ahead of the criterion | 1.76x, minus 8 Intelligence | rejected |
 
-## What this says about the gap to a hosted System One service
+## 9. The gap to a hosted System One service
 
-A hosted service answering in ~5-10 ms of compute is not doing a better job of
-batching. It is doing far less arithmetic. On this box our arithmetic is already at
-the machine's ceiling, so the levers are fewer tokens per question (finding 4), a
-smaller model, or more FLOPs -- not scheduling.
+A service answering in 5 to 10 ms of compute is not batching better. It is doing far
+less arithmetic. Ours is at this machine's ceiling, so the levers are fewer tokens per
+question, a smaller model, or more FLOPs -- not scheduling. Three days of scheduling
+work to establish that, and the largest single win of the week came from noticing that
+a label is a token and not an explanation.
