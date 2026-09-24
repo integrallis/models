@@ -16,19 +16,39 @@
 package com.integrallis.models.decisions;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * A binary proposition: the decision reports how probable it is that the proposition holds.
  *
  * @param proposition the statement being judged
+ * @param criteria optional rubric saying when the proposition holds and when it does not, keyed by
+ *     {@code "true"} and {@code "false"}; see {@link AnswerSpace#criteria()} for what it is worth
  */
-public record Noul(String proposition) implements AnswerSpace {
+public record Noul(String proposition, Map<String, String> criteria) implements AnswerSpace {
 
   private static final List<String> LABELS = List.of("false", "true");
 
-  /** Validates the proposition. */
+  /** Validates the proposition and its rubric. */
   public Noul {
     AnswerSpaces.requireQuestion(proposition);
+    criteria = AnswerSpaces.requireCriteria(criteria, LABELS);
+  }
+
+  /** A proposition whose wording is expected to carry its own meaning. */
+  public Noul(String proposition) {
+    this(proposition, Map.of());
+  }
+
+  /**
+   * A proposition with a written rule for each outcome.
+   *
+   * @param proposition the statement being judged
+   * @param whenTrue what must hold for the proposition to be true
+   * @param whenFalse what makes it false
+   */
+  public Noul(String proposition, String whenTrue, String whenFalse) {
+    this(proposition, Map.of("true", whenTrue, "false", whenFalse));
   }
 
   @Override

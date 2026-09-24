@@ -16,6 +16,7 @@
 package com.integrallis.models.decisions;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -55,7 +56,12 @@ public final class LetterLogitScorer {
     this.temperature = temperature;
   }
 
-  /** Renders the options as the lettered list the prompt must end with. */
+  /**
+   * Renders the options as the lettered list the prompt must end with.
+   *
+   * <p>Letters and answer cue only. Any rubric goes in its own block before the criterion; see
+   * {@link #renderCriteria(List, Map)} for why.
+   */
   public static String renderOptions(List<String> options) {
     Objects.requireNonNull(options, "options");
     requireRenderable(options.size());
@@ -64,6 +70,46 @@ public final class LetterLogitScorer {
       text.append((char) ('A' + index)).append(": ").append(options.get(index)).append('\n');
     }
     return text.append("Answer:").toString();
+  }
+
+  /**
+   * Renders the rubric alone, with no letters and no answer cue.
+   *
+   * <p>Separate from {@link #renderOptions(List)} because the two belong in different parts of the
+   * prompt, and that is measured rather than assumed. MEASURED 2026-09-24 over 120 JevBench items
+   * on the shipped Qwen3.5-4B, four arrangements of the same declarations:
+   *
+   * <ul>
+   *   <li>no rubric at all: accuracy 0.7500, Intelligence 72.2
+   *   <li>rubric and letters both after the criterion: 0.8750, 86.1
+   *   <li>rubric and letters both before it: 0.8000, 79.6
+   *   <li><b>rubric before the criterion, letters after it: 0.9000, 88.9</b>
+   * </ul>
+   *
+   * <p>Against a noise floor of about one point. The last is the best measured and it is also the
+   * cheapest, because the rubric is most of the added tokens and everything before the criterion is
+   * shared across every question about one piece of evidence. Moving the letters as well undid it
+   * -- {@code fact} fell from 1.0000 to 0.3333 -- so what a model needs after the question is the
+   * letter-to-label mapping, and what it is happy to have read beforehand is what the labels mean.
+   *
+   * @param options the outcomes, in declaration order
+   * @param criteria what each outcome covers, keyed by label; any subset, possibly empty
+   * @return the rubric block with no trailing newline, or an empty string when nothing is declared
+   */
+  public static String renderCriteria(List<String> options, Map<String, String> criteria) {
+    Objects.requireNonNull(options, "options");
+    Objects.requireNonNull(criteria, "criteria");
+    requireRenderable(options.size());
+    if (criteria.isEmpty()) {
+      return "";
+    }
+    StringBuilder text = new StringBuilder("Options:");
+    for (String label : options) {
+      // An option the rubric does not cover repeats its own label, so every option is listed and
+      // none is silently absent from the block that is supposed to explain them.
+      text.append("\n- ").append(label).append(": ").append(criteria.getOrDefault(label, label));
+    }
+    return text.toString();
   }
 
   /**

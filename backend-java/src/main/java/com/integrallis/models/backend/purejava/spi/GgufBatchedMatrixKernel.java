@@ -54,6 +54,44 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
     throw new UnsupportedOperationException("injected kernel does not support Gated DeltaNet");
   }
 
+  /**
+   * Returns whether this kernel can advance a group of independent sequences in one launch.
+   *
+   * <p>Answering N questions about one piece of evidence is N independent recurrences that share
+   * nothing. Issuing them one at a time leaves each on the calling thread; issuing them together is
+   * what lets a kernel spread them across its pool.
+   */
+  default boolean supportsGroupedGatedDeltaNet() {
+    return false;
+  }
+
+  /**
+   * Advances {@code rowCount} sequences by one token each against one recurrent state apiece.
+   *
+   * <p>{@code state} is addressed by slot and {@code rowStateSlot} maps row to slot, because a
+   * group whose questions differ in length stops feeding the short ones first and the rows still
+   * advancing are then a scattered subset of the slots. Null means row {@code i} owns slot {@code
+   * i}.
+   */
+  default void groupedGatedDeltaNet(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output,
+      int[] rowStateSlot,
+      int rowCount,
+      int stateSlotCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    throw new UnsupportedOperationException(
+        "injected kernel does not support grouped Gated DeltaNet");
+  }
+
   /** Returns whether this implementation supports the given GGUF weight format. */
   boolean supports(GgufTensorType type);
 

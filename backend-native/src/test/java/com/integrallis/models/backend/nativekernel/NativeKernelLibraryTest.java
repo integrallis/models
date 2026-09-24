@@ -62,7 +62,233 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.MANY_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.GATED_DELTA_NET_F32)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.GROUPED_GATED_DELTA_NET_F32)).isTrue();
+      assertThat(kernels.supportsGroupedGatedDeltaNet()).isTrue();
     }
+  }
+
+  /**
+   * A grouped launch must equal each row advanced on its own.
+   *
+   * <p>The slot table is deliberately scattered rather than the identity: questions of unequal
+   * length drop out as they finish, so the rows still advancing address slots out of order. An
+   * identity-only test would pass while every ragged group read another question's state.
+   */
+  @Test
+  void groupedGatedDeltaNetMatchesEachRowAdvancedAlone() {
+    int rows = 3;
+    int slots = 5;
+    int heads = 2;
+    int dimension = 2;
+    int statePerSlot = heads * dimension * dimension;
+    int[] rowSlot = {4, 0, 2};
+
+    float[] query = fixture(11, rows * heads * dimension);
+    float[] key = fixture(12, rows * heads * dimension);
+    float[] value = fixture(13, rows * heads * dimension);
+    float[] beta = fixture(14, rows * heads);
+    float[] logDecay = fixture(15, rows * heads);
+    for (int index = 0; index < logDecay.length; index++) {
+      logDecay[index] = -Math.abs(logDecay[index]);
+    }
+    float[] initial = fixture(16, slots * statePerSlot);
+
+    float[] groupedState = initial.clone();
+    float[] groupedOutput = new float[rows * heads * dimension];
+    float[] expectedState = initial.clone();
+    float[] expectedOutput = new float[rows * heads * dimension];
+
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4)) {
+      kernels.groupedGatedDeltaNetF32(
+          query,
+          key,
+          value,
+          logDecay,
+          beta,
+          groupedState,
+          groupedOutput,
+          rowSlot,
+          rows,
+          slots,
+          heads,
+          heads,
+          dimension,
+          dimension);
+
+      for (int row = 0; row < rows; row++) {
+        int span = heads * dimension;
+        float[] rowState =
+            Arrays.copyOfRange(
+                expectedState, rowSlot[row] * statePerSlot, (rowSlot[row] + 1) * statePerSlot);
+        float[] rowOutput = new float[span];
+        kernels.gatedDeltaNetF32(
+            Arrays.copyOfRange(query, row * span, (row + 1) * span),
+            Arrays.copyOfRange(key, row * span, (row + 1) * span),
+            Arrays.copyOfRange(value, row * span, (row + 1) * span),
+            Arrays.copyOfRange(logDecay, row * heads, (row + 1) * heads),
+            Arrays.copyOfRange(beta, row * heads, (row + 1) * heads),
+            rowState,
+            rowOutput,
+            1,
+            heads,
+            heads,
+            dimension,
+            dimension);
+        System.arraycopy(rowOutput, 0, expectedOutput, row * span, span);
+        System.arraycopy(rowState, 0, expectedState, rowSlot[row] * statePerSlot, statePerSlot);
+      }
+    }
+
+    assertThat(groupedOutput).containsExactly(expectedOutput);
+    assertThat(groupedState).containsExactly(expectedState);
+  }
+
+  /** A slot outside the state buffer must be rejected, not written on a worker thread. */
+  @Test
+  void groupedGatedDeltaNetRejectsASlotOutsideTheState() {
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
+      assertThatThrownBy(
+              () ->
+                  kernels.groupedGatedDeltaNetF32(
+                      new float[4],
+                      new float[4],
+                      new float[4],
+                      new float[2],
+                      new float[2],
+                      new float[2 * 4],
+                      new float[4],
+                      new int[] {0, 7},
+                      2,
+                      2,
+                      1,
+                      1,
+                      2,
+                      2))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("invalid shape");
+    }
+  }
+
+  /**
+   * Every argument the grouped entry rejects, rejected in Java before the boundary.
+   *
+   * <p>A slot table or a length the native side cannot serve becomes an out-of-bounds write on a
+   * worker thread, which is not a failure that reports itself. These are cheap checks guarding an
+   * expensive mistake, so each one is pinned.
+   */
+  @Test
+  void groupedGatedDeltaNetRejectsArgumentsItCannotServe() {
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
+      assertThatThrownBy(() -> call(kernels, null, new int[] {0, 1}, 2, 2, 1, 1, 2, 2))
+          .isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 0, 2, 1, 1, 2, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("rowCount");
+      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 2, 1, 1, 1, 2, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("stateSlotCount must be at least rowCount");
+      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 2, 2, 2, 3, 2, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("divisible");
+      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 2, 2, 1, 1, 257, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("256");
+      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0}, 2, 2, 1, 1, 2, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("rowStateSlot holds");
+      assertThatThrownBy(() -> call(kernels, new float[4], new int[] {0, 1}, 2, 2, 1, 1, 2, 2))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("state");
+    }
+  }
+
+  /** A null slot table means row i owns slot i, which must agree with spelling that out. */
+  @Test
+  void groupedGatedDeltaNetTreatsANullSlotTableAsTheIdentity() {
+    int rows = 2;
+    int heads = 1;
+    int dimension = 2;
+    float[] query = fixture(31, rows * heads * dimension);
+    float[] value = fixture(32, rows * heads * dimension);
+    float[] gates = fixture(33, rows * heads);
+    float[] initial = fixture(34, rows * heads * dimension * dimension);
+
+    float[] implicitState = initial.clone();
+    float[] implicitOutput = new float[rows * heads * dimension];
+    float[] explicitState = initial.clone();
+    float[] explicitOutput = new float[rows * heads * dimension];
+
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
+      kernels.groupedGatedDeltaNetF32(
+          query,
+          query,
+          value,
+          gates,
+          gates,
+          implicitState,
+          implicitOutput,
+          null,
+          rows,
+          rows,
+          heads,
+          heads,
+          dimension,
+          dimension);
+      kernels.groupedGatedDeltaNetF32(
+          query,
+          query,
+          value,
+          gates,
+          gates,
+          explicitState,
+          explicitOutput,
+          new int[] {0, 1},
+          rows,
+          rows,
+          heads,
+          heads,
+          dimension,
+          dimension);
+    }
+
+    assertThat(implicitOutput).containsExactly(explicitOutput);
+    assertThat(implicitState).containsExactly(explicitState);
+  }
+
+  private static void call(
+      NativeKernelLibrary kernels,
+      float[] state,
+      int[] slots,
+      int rowCount,
+      int stateSlotCount,
+      int keyHeads,
+      int valueHeads,
+      int keyDimension,
+      int valueDimension) {
+    kernels.groupedGatedDeltaNetF32(
+        new float[64],
+        new float[64],
+        new float[64],
+        new float[64],
+        new float[64],
+        state,
+        new float[64],
+        slots,
+        rowCount,
+        stateSlotCount,
+        keyHeads,
+        valueHeads,
+        keyDimension,
+        valueDimension);
+  }
+
+  private static float[] fixture(int seed, int count) {
+    java.util.Random random = new java.util.Random(seed);
+    float[] values = new float[count];
+    for (int index = 0; index < count; index++) {
+      values[index] = (float) (random.nextDouble() * 2.0 - 1.0);
+    }
+    return values;
   }
 
   @Test

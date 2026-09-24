@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -49,7 +51,17 @@ public final class DecisionArtifact {
   /** {@code IDSN} then the format version, so a wrong file fails immediately and by name. */
   private static final int MAGIC = 0x4944_534E;
 
-  private static final int VERSION = 2;
+  private static final int VERSION = 3;
+
+  /**
+   * The oldest layout this build still reads.
+   *
+   * <p>Version 3 added a per-label rubric after each answer space. Version 2 files simply stop
+   * there, so they are read as an empty rubric rather than rejected -- an artifact is a record of a
+   * decision that was already taken, and refusing to read one because a later build learned a new
+   * field would destroy evidence to no purpose.
+   */
+  private static final int OLDEST_READABLE_VERSION = 2;
 
   private static final int KIND_NOUL = 0;
   private static final int KIND_CHOICE = 1;
@@ -237,14 +249,19 @@ public final class DecisionArtifact {
                 path, magic, MAGIC));
       }
       int version = in.readInt();
-      if (version != VERSION) {
+      if (version < OLDEST_READABLE_VERSION || version > VERSION) {
         throw new IOException(
-            "unsupported artifact version " + version + ", this build reads " + VERSION);
+            "unsupported artifact version "
+                + version
+                + ", this build reads "
+                + OLDEST_READABLE_VERSION
+                + " to "
+                + VERSION);
       }
       String baseModel = readString(in);
       String baseDigest = readString(in);
       double temperature = in.readDouble();
-      AnswerSpace space = readSpace(in);
+      AnswerSpace space = readSpace(in, version);
 
       int width = in.readInt();
       requireSane(width, "standardiser width");
@@ -311,16 +328,62 @@ public final class DecisionArtifact {
         writeLabels(out, score.levels());
       }
     }
+    // Version 3. The rubric is part of the question: the same labels with a different rubric are a
+    // different decision, MEASURED 2026-09-24 at up to 0.67 of accuracy on one family. An artifact
+    // that recorded the labels and dropped the rubric would not say what was actually asked.
+    writeCriteria(out, space.criteria());
   }
 
-  private static AnswerSpace readSpace(DataInputStream in) throws IOException {
+  private static AnswerSpace readSpace(DataInputStream in, int version) throws IOException {
     int kind = in.readInt();
     return switch (kind) {
-      case KIND_NOUL -> new Noul(readString(in));
-      case KIND_CHOICE -> new Choice(readString(in), readLabels(in));
-      case KIND_SCORE -> new Score(readString(in), readLabels(in));
+      case KIND_NOUL -> {
+        String proposition = readString(in);
+        yield new Noul(proposition, readCriteria(in, version));
+      }
+      case KIND_CHOICE -> {
+        String question = readString(in);
+        List<String> options = readLabels(in);
+        yield new Choice(question, options, readCriteria(in, version));
+      }
+      case KIND_SCORE -> {
+        String question = readString(in);
+        List<String> levels = readLabels(in);
+        yield new Score(question, levels, readCriteria(in, version));
+      }
       default -> throw new IOException("unknown answer space kind " + kind);
     };
+  }
+
+  private static void writeCriteria(DataOutputStream out, Map<String, String> criteria)
+      throws IOException {
+    out.writeInt(criteria.size());
+    for (Map.Entry<String, String> entry : criteria.entrySet()) {
+      writeString(out, entry.getKey());
+      writeString(out, entry.getValue());
+    }
+  }
+
+  private static Map<String, String> readCriteria(DataInputStream in, int version)
+      throws IOException {
+    if (version < 3) {
+      // Nothing to read: the field did not exist, and a version 2 artifact recorded a decision
+      // taken without a rubric.
+      return Map.of();
+    }
+    int count = in.readInt();
+    if (count == 0) {
+      // No rubric is the common case and a legitimate one, so it is checked before the sanity
+      // bound, which exists to reject a corrupt length and treats zero as implausible.
+      return Map.of();
+    }
+    requireSane(count, "criteria count");
+    Map<String, String> criteria = new LinkedHashMap<>();
+    for (int index = 0; index < count; index++) {
+      String key = readString(in);
+      criteria.put(key, readString(in));
+    }
+    return criteria;
   }
 
   private static void writeLabels(DataOutputStream out, List<String> labels) throws IOException {

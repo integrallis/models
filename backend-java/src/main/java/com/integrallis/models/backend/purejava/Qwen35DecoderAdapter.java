@@ -155,6 +155,22 @@ final class Qwen35DecoderAdapter implements PureJavaDecoder {
   }
 
   @Override
+  public boolean supportsGroupedDecisions() {
+    return true;
+  }
+
+  @Override
+  public int maximumGroupSize() {
+    return forwardPass.prefillBatchSize();
+  }
+
+  @Override
+  public float[][] decideGrouped(int[][] suffixes) {
+    Objects.requireNonNull(suffixes, "suffixes");
+    return forwardPass.decideGrouped(defaultSession.delegate, suffixes);
+  }
+
+  @Override
   public Object captureResumption() {
     return forwardPass.captureLinearState(defaultSession.delegate);
   }

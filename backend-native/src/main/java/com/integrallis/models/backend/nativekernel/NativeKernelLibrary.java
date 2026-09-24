@@ -31,7 +31,7 @@ import java.util.Objects;
 /** Versioned FFM access to Models-owned native inference kernels. */
 @SuppressWarnings("restricted")
 public final class NativeKernelLibrary implements AutoCloseable {
-  public static final int ABI_VERSION = 5;
+  public static final int ABI_VERSION = 6;
   public static final String THREAD_COUNT_PROPERTY = "models.native.kernels.threads";
 
   /**
@@ -174,6 +174,25 @@ public final class NativeKernelLibrary implements AutoCloseable {
           ValueLayout.JAVA_INT,
           ValueLayout.JAVA_INT,
           ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor GROUPED_GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
 
   private final Arena libraryArena;
   private final long capabilities;
@@ -183,6 +202,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle quantizedGroupedBatchedHandle;
   private final MethodHandle quantizedIndependentBatchedHandle;
   private final MethodHandle gatedDeltaNetHandle;
+  private final MethodHandle groupedGatedDeltaNetHandle;
   private final MethodHandle setActiveThreadsHandle;
   private final MethodHandle groupedAttentionHandle;
   private final int threadCount;
@@ -200,6 +220,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle quantizedGroupedBatchedHandle,
       MethodHandle quantizedIndependentBatchedHandle,
       MethodHandle gatedDeltaNetHandle,
+      MethodHandle groupedGatedDeltaNetHandle,
       MethodHandle setActiveThreadsHandle,
       MethodHandle groupedAttentionHandle,
       int threadCount,
@@ -213,6 +234,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.quantizedGroupedBatchedHandle = quantizedGroupedBatchedHandle;
     this.quantizedIndependentBatchedHandle = quantizedIndependentBatchedHandle;
     this.gatedDeltaNetHandle = gatedDeltaNetHandle;
+    this.groupedGatedDeltaNetHandle = groupedGatedDeltaNetHandle;
     this.setActiveThreadsHandle = setActiveThreadsHandle;
     this.groupedAttentionHandle = groupedAttentionHandle;
     this.pollMillis = pollMillis;
@@ -275,6 +297,13 @@ public final class NativeKernelLibrary implements AutoCloseable {
               lookup,
               "jmodels_gated_delta_net_f32_with_context",
               GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR);
+      MethodHandle groupedGatedDeltaNet =
+          (capabilityMask & NativeKernelCapability.GROUPED_GATED_DELTA_NET_F32.mask()) != 0
+              ? downcallCritical(
+                  lookup,
+                  "jmodels_gated_delta_net_group_f32_with_context",
+                  GROUPED_GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR)
+              : null;
       MethodHandle setActiveThreads =
           (capabilityMask & NativeKernelCapability.ACTIVE_THREADS.mask()) != 0
               ? downcall(
@@ -310,6 +339,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
           quantizedGroupedBatched,
           quantizedIndependentBatched,
           gatedDeltaNet,
+          groupedGatedDeltaNet,
           setActiveThreads,
           groupedAttention,
           threadCount,
@@ -418,6 +448,117 @@ public final class NativeKernelLibrary implements AutoCloseable {
       throw failure;
     } catch (Throwable failure) {
       throw bridgeFailure("Gated DeltaNet recurrence", failure);
+    }
+  }
+
+  /** Returns whether the loaded library can advance a group of sequences in one launch. */
+  public boolean supportsGroupedGatedDeltaNet() {
+    return groupedGatedDeltaNetHandle != null;
+  }
+
+  /**
+   * Advances {@code rowCount} independent sequences by one token each, one recurrent state apiece.
+   *
+   * <p>{@code state} is addressed by slot rather than by row, and {@code rowStateSlot} maps row to
+   * slot. A group of questions whose lengths differ stops feeding the short ones first, so the rows
+   * still advancing are a scattered subset of the slots. Null means row {@code i} owns slot {@code
+   * i}.
+   */
+  public void groupedGatedDeltaNetF32(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output,
+      int[] rowStateSlot,
+      int rowCount,
+      int stateSlotCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(key, "key");
+    Objects.requireNonNull(value, "value");
+    Objects.requireNonNull(logDecay, "logDecay");
+    Objects.requireNonNull(beta, "beta");
+    Objects.requireNonNull(state, "state");
+    Objects.requireNonNull(output, "output");
+    requirePositive(rowCount, "rowCount");
+    requirePositive(stateSlotCount, "stateSlotCount");
+    requirePositive(keyHeadCount, "keyHeadCount");
+    requirePositive(valueHeadCount, "valueHeadCount");
+    requirePositive(keyDimension, "keyDimension");
+    requirePositive(valueDimension, "valueDimension");
+    if (stateSlotCount < rowCount) {
+      throw new IllegalArgumentException(
+          "stateSlotCount must be at least rowCount: " + stateSlotCount + " < " + rowCount);
+    }
+    if (valueHeadCount % keyHeadCount != 0) {
+      throw new IllegalArgumentException("valueHeadCount must be divisible by keyHeadCount");
+    }
+    if (keyDimension > 256 || valueDimension > 256) {
+      throw new IllegalArgumentException("Gated DeltaNet dimensions must not exceed 256");
+    }
+    if (rowStateSlot != null && rowStateSlot.length < rowCount) {
+      throw new IllegalArgumentException(
+          "rowStateSlot holds " + rowStateSlot.length + " entries for " + rowCount + " rows");
+    }
+    int requiredQuery =
+        Math.multiplyExact(Math.multiplyExact(rowCount, keyHeadCount), keyDimension);
+    int requiredValue =
+        Math.multiplyExact(Math.multiplyExact(rowCount, valueHeadCount), valueDimension);
+    int requiredGates = Math.multiplyExact(rowCount, valueHeadCount);
+    int requiredState =
+        Math.multiplyExact(
+            Math.multiplyExact(Math.multiplyExact(stateSlotCount, valueHeadCount), keyDimension),
+            valueDimension);
+    requireCapacity(query, requiredQuery, "query");
+    requireCapacity(key, requiredQuery, "key");
+    requireCapacity(value, requiredValue, "value");
+    requireCapacity(logDecay, requiredGates, "logDecay");
+    requireCapacity(beta, requiredGates, "beta");
+    requireCapacity(state, requiredState, "state");
+    requireCapacity(output, requiredValue, "output");
+    if (groupedGatedDeltaNetHandle == null) {
+      throw new UnsupportedOperationException(
+          "loaded native library has no grouped Gated DeltaNet kernel");
+    }
+
+    // invokeExact is typed on the static types at the call site, so the slot table has to be a
+    // MemorySegment local rather than a ternary that widens to Object.
+    MemorySegment slots =
+        rowStateSlot == null ? MemorySegment.NULL : MemorySegment.ofArray(rowStateSlot);
+    try {
+      int status =
+          (int)
+              groupedGatedDeltaNetHandle.invokeExact(
+                  context,
+                  MemorySegment.ofArray(query),
+                  MemorySegment.ofArray(key),
+                  MemorySegment.ofArray(value),
+                  MemorySegment.ofArray(logDecay),
+                  MemorySegment.ofArray(beta),
+                  MemorySegment.ofArray(state),
+                  (long) state.length,
+                  MemorySegment.ofArray(output),
+                  slots,
+                  rowCount,
+                  stateSlotCount,
+                  keyHeadCount,
+                  valueHeadCount,
+                  keyDimension,
+                  valueDimension);
+      if (status != STATUS_OK) {
+        throw new IllegalStateException(
+            "native grouped Gated DeltaNet kernel failed: " + statusName(status));
+      }
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("grouped Gated DeltaNet recurrence", failure);
     }
   }
 

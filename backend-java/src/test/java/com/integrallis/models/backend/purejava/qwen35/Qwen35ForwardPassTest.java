@@ -34,6 +34,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -186,6 +187,130 @@ class Qwen35ForwardPassTest {
       batched.rewind(batchedSession, 2);
       assertThat(batched.prefill(batchedSession, new int[] {3, 4, 5, 6}, 2))
           .containsExactly(sequential.forward(new int[] {1, 2, 3, 4, 5, 6}));
+    }
+  }
+
+  /**
+   * A GROUPED ANSWER MUST EQUAL THE ANSWER ASKED ALONE.
+   *
+   * <p>Grouping shares the weight sweep across questions and shares nothing else. If a branch's
+   * recurrent state or key and value cache leaked into another, question two would answer having
+   * read question one -- silently, and with a well-formed distribution, which is the worst shape a
+   * defect can take. So each grouped answer is compared against the same question asked against a
+   * cold prefill of the evidence.
+   */
+  @Test
+  void groupedDecisionsMatchAskingEachQuestionAlone(@TempDir Path directory) throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      var file = GgufParser.parse(model, arena);
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file, 4);
+
+      int[] evidence = {1, 2, 3};
+      int[][] questions = {{4, 5}, {6}, {7, 4, 5}};
+
+      float[][] alone = new float[questions.length][];
+      for (int index = 0; index < questions.length; index++) {
+        Qwen35ForwardPass.Session session = graph.openSession(8);
+        graph.prefill(session, evidence, 0);
+        int[] suffix = questions[index];
+        if (suffix.length > 1) {
+          graph.prefill(session, Arrays.copyOf(suffix, suffix.length - 1), evidence.length);
+        }
+        alone[index] =
+            graph.forward(session, suffix[suffix.length - 1], evidence.length + suffix.length - 1);
+      }
+
+      Qwen35ForwardPass.Session shared = graph.openSession(8);
+      graph.prefill(shared, evidence, 0);
+      Qwen35GroupedDecision group =
+          new Qwen35GroupedDecision(graph.config(), questions.length, evidence.length, 4);
+      float[][] grouped = graph.decideGrouped(shared, questions, group);
+
+      assertThat(grouped.length).isEqualTo(questions.length);
+      for (int index = 0; index < questions.length; index++) {
+        assertThat(grouped[index])
+            .as("question %d grouped against asked alone", index)
+            .containsExactly(alone[index]);
+      }
+    }
+  }
+
+  /**
+   * The number of rows in a projection must not reach the result.
+   *
+   * <p>This is the property that makes grouping a scheduling choice rather than a change of answer,
+   * and it is the property this decoder claims through {@code
+   * groupedDecisionsMatchSingleDecisions()}. MEASURED 2026-09-24 on the shipped Qwen3.5-4B: true to
+   * the bit here, and false on the native kernel, which keeps a separate single-row path that
+   * rounds differently -- 4e-7 on one projection, 0.03 to 0.10 of probability by the end of the
+   * graph. So the claim is asserted rather than assumed, at every batch width a group can produce.
+   */
+  @Test
+  void aProjectionGivesEachRowTheSameAnswerAtEveryBatchWidth(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      var file = GgufParser.parse(model, arena);
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file, 8);
+
+      int[] prompt = {1, 2, 3, 4, 5, 6, 7};
+
+      // One token at a time: every projection sees exactly one row.
+      Qwen35ForwardPass.Session stepped = graph.openSession(8);
+      float[] oneRowAtATime = null;
+      for (int index = 0; index < prompt.length; index++) {
+        oneRowAtATime = graph.forward(stepped, prompt[index], index);
+      }
+      float[] expected = oneRowAtATime.clone();
+
+      // Every other width, including a prefill split in two, which must also change nothing.
+      for (int width = 2; width < prompt.length; width++) {
+        Qwen35ForwardPass.Session session = graph.openSession(8);
+        int position = 0;
+        while (position < prompt.length - 1) {
+          int span = Math.min(width, prompt.length - 1 - position);
+          graph.prefill(session, Arrays.copyOfRange(prompt, position, position + span), position);
+          position += span;
+        }
+        float[] batched = graph.forward(session, prompt[prompt.length - 1], prompt.length - 1);
+        assertThat(batched)
+            .as("prefill width %d must give the same logits as one row at a time", width)
+            .containsExactly(expected);
+      }
+    }
+  }
+
+  @Test
+  void aGroupedQuestionCannotReadAnotherQuestion(@TempDir Path directory) throws Exception {
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      var file = GgufParser.parse(model, arena);
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file, 4);
+      int[] evidence = {1, 2, 3};
+
+      // The same question in two groups whose other members differ. If anything leaked between
+      // branches the shared question would answer differently depending on its neighbours.
+      Qwen35ForwardPass.Session first = graph.openSession(8);
+      graph.prefill(first, evidence, 0);
+      float[][] withOneNeighbour =
+          graph.decideGrouped(
+              first,
+              new int[][] {{4, 5}, {6}},
+              new Qwen35GroupedDecision(graph.config(), 2, evidence.length, 4));
+
+      Qwen35ForwardPass.Session second = graph.openSession(8);
+      graph.prefill(second, evidence, 0);
+      float[][] withAnother =
+          graph.decideGrouped(
+              second,
+              new int[][] {{4, 5}, {7, 7, 7}},
+              new Qwen35GroupedDecision(graph.config(), 2, evidence.length, 4));
+
+      assertThat(withAnother[0]).containsExactly(withOneNeighbour[0]);
     }
   }
 
