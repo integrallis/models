@@ -38,32 +38,31 @@ import org.junit.jupiter.api.Test;
 final class AnswerSpaceCriteriaTest {
 
   @Test
-  void aRubricReachesTheRenderedOptions() {
+  void aRubricRendersAsItsOwnBlockWithNoLettersAndNoCue() {
     Noul space =
         new Noul(
             "Does the cap apply to data breaches?",
             "The cap is stated and no carve-out removes breaches from it",
             "There is no cap, or a carve-out puts breaches outside it");
 
-    String rendered = LetterLogitScorer.renderOptions(space.labels(), space.criteria());
-
-    assertThat(rendered)
+    // No letters and no answer cue: the rubric goes before the criterion and the letters after it,
+    // which is worth 2.8 points of Intelligence over keeping them together.
+    assertThat(LetterLogitScorer.renderCriteria(space.labels(), space.criteria()))
         .isEqualTo(
             """
             Options:
             - false: There is no cap, or a carve-out puts breaches outside it
-            - true: The cap is stated and no carve-out removes breaches from it
-            A: false
-            B: true
-            Answer:""");
+            - true: The cap is stated and no carve-out removes breaches from it""");
+    assertThat(LetterLogitScorer.renderOptions(space.labels()))
+        .isEqualTo("A: false\nB: true\nAnswer:");
   }
 
   @Test
   void aSpaceWithoutARubricRendersExactlyAsItAlwaysDid() {
     List<String> options = List.of("billing", "technical");
 
-    assertThat(LetterLogitScorer.renderOptions(options, Map.of()))
-        .isEqualTo(LetterLogitScorer.renderOptions(options))
+    assertThat(LetterLogitScorer.renderCriteria(options, Map.of())).isEmpty();
+    assertThat(LetterLogitScorer.renderOptions(options))
         .isEqualTo("A: billing\nB: technical\nAnswer:");
   }
 
@@ -77,15 +76,12 @@ final class AnswerSpaceCriteriaTest {
 
     // The option the rubric does not cover repeats its own label rather than vanishing from the
     // list, so the model still sees every option it is allowed to pick.
-    assertThat(LetterLogitScorer.renderOptions(space.labels(), space.criteria()))
+    assertThat(LetterLogitScorer.renderCriteria(space.labels(), space.criteria()))
         .isEqualTo(
             """
             Options:
             - billing: Asks about a charge, invoice or payment
-            - technical: technical
-            A: billing
-            B: technical
-            Answer:""");
+            - technical: technical""");
   }
 
   /**

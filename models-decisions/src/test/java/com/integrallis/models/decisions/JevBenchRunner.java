@@ -86,10 +86,18 @@ public final class JevBenchRunner {
       List<String> labels,
       boolean optionsFirst,
       boolean runtimePrompt,
-      boolean runtimeCriteria) {
+      boolean runtimeCriteria,
+      boolean sharedFirst,
+      boolean rubricFirst,
+      boolean shipped) {
     String prompt = row[3].replace("\\n", "\n");
     String rendered = LetterLogitScorer.renderOptions(labels);
-    if (!optionsFirst && !runtimePrompt && !runtimeCriteria) {
+    if (!optionsFirst
+        && !runtimePrompt
+        && !runtimeCriteria
+        && !sharedFirst
+        && !rubricFirst
+        && !shipped) {
       return prompt + "\n" + rendered;
     }
     if (row.length < 7) {
@@ -104,6 +112,42 @@ public final class JevBenchRunner {
       // Byte for byte what ModelJarDecisionRuntime.decide sent before an answer space could carry
       // a rubric: evidence, criterion, lettered options, answer cue.
       return state + "\n" + instructions + "\n" + rendered;
+    }
+    if (shipped) {
+      // Composed exactly as ModelJarDecisionRuntime composes it: a shared prefix of evidence and
+      // rubric, then the criterion, the letters and the cue.
+      Map<String, String> parsed = parseRubric(rubric, labels);
+      String block = LetterLogitScorer.renderCriteria(labels, parsed);
+      String shared = block.isEmpty() ? state : state + "\n" + block;
+      return shared + "\n" + instructions + "\n" + LetterLogitScorer.renderOptions(labels);
+    }
+    if (rubricFirst) {
+      // Evidence, rubric, criterion, lettered options, cue. Shared through the rubric.
+      String block = LetterLogitScorer.renderCriteria(labels, parseRubric(rubric, labels));
+      StringBuilder text = new StringBuilder(state);
+      if (!block.isEmpty()) {
+        text.append('\n').append(block);
+      }
+      return text.append('\n').append(instructions).append('\n').append(rendered).toString();
+    }
+    if (sharedFirst) {
+      // Evidence, rubric and lettered options, then the criterion, then the cue. Everything before
+      // the criterion is identical for every question over this evidence and answer space.
+      Map<String, String> parsed = parseRubric(rubric, labels);
+      String block = LetterLogitScorer.renderCriteria(labels, parsed);
+      String letters = LetterLogitScorer.renderOptions(labels);
+      letters = letters.substring(0, letters.length() - cue.length()).stripTrailing();
+      StringBuilder text = new StringBuilder(state);
+      if (!block.isEmpty()) {
+        text.append('\n').append(block);
+      }
+      return text.append('\n')
+          .append(letters)
+          .append('\n')
+          .append(instructions)
+          .append('\n')
+          .append(cue)
+          .toString();
     }
     if (runtimeCriteria) {
       // What it sends now. The rubric block is parsed back into a per-label map and handed to the
@@ -128,7 +172,12 @@ public final class JevBenchRunner {
         }
         return text.append('\n').append(rendered).toString();
       }
-      return state + "\n" + instructions + "\n" + LetterLogitScorer.renderOptions(labels, parsed);
+      String block = LetterLogitScorer.renderCriteria(labels, parsed);
+      StringBuilder text = new StringBuilder(state).append('\n').append(instructions);
+      if (!block.isEmpty()) {
+        text.append('\n').append(block);
+      }
+      return text.append('\n').append(LetterLogitScorer.renderOptions(labels)).toString();
     }
     String letteredOnly = rendered.substring(0, rendered.length() - cue.length()).stripTrailing();
     return state + "\n\n" + rubric + "\n" + letteredOnly + "\n" + instructions + "\n" + cue;
@@ -208,6 +257,44 @@ public final class JevBenchRunner {
       if (runtimeCriteria && (!letters || optionsFirst)) {
         throw new IllegalArgumentException("decisions.runtimeCriteria is a letter-arm prompt arm");
       }
+      // Everything that does not vary between questions about one piece of evidence, placed before
+      // the criterion so it can be prefilled once and resumed. For a batch of questions over one
+      // answer space that is the evidence, the rubric and the lettered options; what is left per
+      // question is the criterion and the answer cue.
+      //
+      // This is the performance question, because a decision's cost is the arithmetic of the tokens
+      // after the shared prefix and MEASURED 2026-09-24 that is 18.5 ms each. Carrying a rubric is
+      // worth 14 points of Intelligence and costs 40-odd tokens on every question; in the prefix it
+      // costs them once. Whether the criterion still works at the end is what this measures.
+      boolean sharedFirst =
+          Boolean.parseBoolean(System.getProperty("decisions.sharedFirst", "false"));
+      if (sharedFirst && (!letters || optionsFirst || runtimePrompt)) {
+        throw new IllegalArgumentException("decisions.sharedFirst is its own prompt arm");
+      }
+      // Half of sharedFirst. Moving the rubric AND the lettered options ahead of the criterion cost
+      // 6.5 points, but not evenly: fact fell from 1.0000 to 0.3333 while routing and ordinal rose
+      // to 1.0000. Two things moved at once, so this moves only the rubric and leaves the letters
+      // after the criterion, on the guess that what hurt was declaring the letter-to-label mapping
+      // before the question it answers. The rubric is the larger share of the tokens anyway.
+      boolean rubricFirst =
+          Boolean.parseBoolean(System.getProperty("decisions.rubricFirst", "false"));
+      if (rubricFirst && (!letters || optionsFirst || runtimePrompt || sharedFirst)) {
+        throw new IllegalArgumentException("decisions.rubricFirst is its own prompt arm");
+      }
+      // The shipped composition, built by the runtime's own two halves rather than by this file, so
+      // that the arm which decided the layout and the code that ships it are checked against each
+      // other rather than merely believed to agree.
+      // The runtime reads its answer off the final position of one prefill of the whole suffix,
+      // rather than prefilling all but the last token and stepping that one alone. The step removed
+      // is a single token read through all 2.55 GiB of weights, 67 ms and bandwidth bound; as one
+      // more row of an already compute-bound batch it is 18.5 ms. It is also a different kernel
+      // path, so it moves probabilities and has to be scored rather than assumed harmless.
+      boolean foldedReadout =
+          Boolean.parseBoolean(System.getProperty("decisions.foldedReadout", "false"));
+      boolean shipped = Boolean.parseBoolean(System.getProperty("decisions.shipped", "false"));
+      if (shipped && (!letters || optionsFirst || runtimePrompt || sharedFirst || rubricFirst)) {
+        throw new IllegalArgumentException("decisions.shipped is its own prompt arm");
+      }
       LetterLogitScorer letterScorer = new LetterLogitScorer(temperature);
       System.out.printf("mode=%s%n", letters ? "letter-logits" : "candidate-scoring");
 
@@ -245,7 +332,16 @@ public final class JevBenchRunner {
           int[] lettered =
               backend
                   .tokenizer()
-                  .encode(letterPrompt(row, labels, optionsFirst, runtimePrompt, runtimeCriteria));
+                  .encode(
+                      letterPrompt(
+                          row,
+                          labels,
+                          optionsFirst,
+                          runtimePrompt,
+                          runtimeCriteria,
+                          sharedFirst,
+                          rubricFirst,
+                          shipped));
           int[] letterTokens = new int[labels.size()];
           for (int i = 0; i < labels.size(); i++) {
             int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + i));
@@ -253,13 +349,18 @@ public final class JevBenchRunner {
           }
           long t0 = System.nanoTime();
           try (InferenceSession session = backend.openSession()) {
-            int last = lettered.length - 1;
-            if (last > 0) {
-              int[] head = new int[last];
-              System.arraycopy(lettered, 0, head, 0, last);
-              backend.prefill(session, head, 0);
+            float[] logits;
+            if (foldedReadout) {
+              logits = backend.prefill(session, lettered, 0);
+            } else {
+              int last = lettered.length - 1;
+              if (last > 0) {
+                int[] head = new int[last];
+                System.arraycopy(lettered, 0, head, 0, last);
+                backend.prefill(session, head, 0);
+              }
+              logits = backend.forward(session, lettered[last], last);
             }
-            float[] logits = backend.forward(session, lettered[last], last);
             p = letterScorer.score(space, logits, letterTokens).probabilities();
           }
           latency = (System.nanoTime() - t0) / 1e9;

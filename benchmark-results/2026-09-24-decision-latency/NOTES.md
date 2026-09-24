@@ -189,6 +189,9 @@ in 120: the probabilities move, the argmax mostly does not.
 
 ## 6. The published score was for a prompt the product could not build
 
+> Superseded in part by section 8: the gap is real and the final number is 88.9.
+
+
 JevBench hands every system a per-label rubric out of `question.criteria`.
 `AnswerSpace` had two accessors, `question()` and `labels()`, so no caller could
 supply one. The benchmark arm read the rubric; the shipped runtime did not.
@@ -209,7 +212,11 @@ one-point noise floor. Per family, no rubric against block: ordinal 0.2500 again
 never told what 3 is.
 
 **Fixed:** the three answer spaces carry an optional rubric and the runtime renders
-it. The layout was measured rather than chosen -- inline was the obvious design and
+it. Section 8 supersedes the layout below and the final figure: the shipped rendering
+puts the rubric before the criterion and scores **88.9**, not 86.1.
+
+The rest of this section is the intermediate step and is kept because the ordering of
+the four arrangements is the finding. The layout was measured rather than chosen -- inline was the obvious design and
 scored five points worse. The shipped renderer was then re-run over the cohort and
 reproduces the block arm's probabilities exactly (`runtime-renderer.tsv` against
 `runtime-block.tsv`), so 86.1 is a number the product produces and not one a harness
@@ -256,11 +263,84 @@ is unchanged and the question is open.
 item. It is where a 50-token options block matters least and would not have changed a
 verdict already eight floors clear.
 
-## 8. Scoreboard
+## 8. The performance release
+
+The rubric of section 6 is worth 14 points of Intelligence and costs 53 tokens. A
+decision's cost is the arithmetic of the tokens after the shared prefix, at 18.5 ms
+each, so carried per question that rubric is **0.98 s of added latency on every
+question** -- the fix in section 6 took a sub-second decision and made it a
+second-and-a-half one.
+
+The release is that it does not have to be per question. Which side of the shared/per
+question split each part of the prompt falls on is a free parameter, and it turns out
+to be the same parameter that sets accuracy.
+
+Four arrangements of the same declarations, 120 items, warmup-clean:
+
+| arrangement | accuracy | Intelligence |
+|---|---|---|
+| no rubric at all | 0.7500 | 72.2 |
+| rubric and letters both **after** the criterion | 0.8750 | 86.1 |
+| rubric and letters both **before** it | 0.8000 | 79.6 |
+| **rubric before, letters after** | **0.9000** | **88.9** |
+
+Moving both was a 6.5-point loss and moving only the rubric is a 2.8-point **gain** --
+the best of the four, and the best number measured this week. Per family the reason is
+visible: with the letters moved too, `fact` fell from 1.0000 to 0.3333, while
+`ordinal` and `routing` rose to 1.0000. A model wants the letter-to-label mapping
+after the question it answers, and is content to have read what the labels mean
+beforehand. Two things had moved at once and only one of them was the problem.
+
+So the shared prefix is evidence + rubric, and the per-question suffix is criterion +
+letters + cue. Measured through the shipped API over one contract, 20 questions, warm
+(`harness/Release`):
+
+| rubric | shared tokens | suffix tokens | per question |
+|---|---|---|---|
+| none | 143 | 18 | 0.490 s |
+| declared, 53 tokens | 196 | 18 | 0.486 s |
+
+**A rubric now costs nothing per question.** The suffix is the same 18 tokens either
+way, and the 53 tokens are read once for the batch instead of 20 times. Against the
+0.98 s per question the naive placement would have cost, that is the release.
+
+### The readout was a whole weight sweep for one token
+
+A decision ended by prefilling all but its last token and then stepping that token
+alone. A single token goes through all 2.55 GiB: 67 ms, and flat in thread count past
+two because it is bandwidth. As one more row of a batch that is already compute bound
+it is 18.5 ms.
+
+Reading the answer off the final position of one prefill of the whole suffix:
+**0.520 s to 0.485 s per question**, and it is a different kernel path so it was
+scored rather than assumed harmless -- accuracy 0.9000 either way, Intelligence 88.9
+either way, **0 of 120 winners differ** (`prompt-arms/F-shipped.tsv` against
+`G-folded.tsv`). Free.
+
+It does not unify the grouped path: forced on after this change, grouping still drifts
+4.5e-02 and still runs 0.63x to 0.92x. The gate of section 3 stands.
+
+### What was left on the table
+
+The final projection computes all 248,320 logits when a typed decision needs two to
+ten. That is 521 MB of the 2.55 GiB read once per decision, about 13.7 ms at this
+box's measured 38 GB/s, or 2.8% of a question. It needs a new backend entry point to
+project selected rows, and 2.8% does not pay for that surface. Written down rather
+than done.
+
+Per question now: 18 tokens x 18.5 ms = 0.333 s of irreducible arithmetic, plus about
+0.15 s of resumption and bookkeeping, measured 0.486 s. The arithmetic is at the
+machine's ceiling; the 0.15 s is where any further work belongs, and most of it is the
+~100 MiB of recurrent state a resumption restores per question.
+
+## 9. Release scoreboard
 
 | change | measured | verdict |
 |---|---|---|
 | answer spaces carry a rubric | Intelligence 72.2 to 86.1 | kept |
+| rubric shared, letters after the criterion | 86.1 to **88.9**, and free per question | kept |
+| readout folded into the prefill | 0.520 s to 0.485 s, 0 of 120 answers moved | kept |
+| project only the answer letters | 2.8% for a new entry point | not done |
 | grouped recurrence in one kernel launch | 12.39 s to 10.79 s at n=20 | kept |
 | group resumes its evidence | 10.79 s to 8.22 s at n=20 | kept |
 | gate grouping on answer preservation | drift 7.15e-02 to 0.00e+00 | kept |
@@ -268,7 +348,7 @@ verdict already eight floors clear.
 | grouping at all, no fast decode kernel | 1.25x at n=2, 1.69x at n=20 | on |
 | options ahead of the criterion | 1.76x, minus 8 Intelligence | rejected |
 
-## 9. The gap to a hosted System One service
+## 10. The gap to a hosted System One service
 
 A service answering in 5 to 10 ms of compute is not batching better. It is doing far
 less arithmetic. Ours is at this machine's ceiling, so the levers are fewer tokens per

@@ -117,6 +117,20 @@ comparing every column but latency.
     $B runtime-block.tsv 1.0 -Ddecisions.runtimeCriteria=true -Ddecisions.rubricStyle=block
     $B runtime-criteria.tsv 1.0 -Ddecisions.runtimeCriteria=true    # inline rubric
     $B options-first-fast.tsv 1.0 -Ddecisions.optionsFirst=true
+    $B A-block.tsv 1.0 -Ddecisions.runtimeCriteria=true            # rubric after the criterion
+    $B B-sharedfirst.tsv 1.0 -Ddecisions.sharedFirst=true          # rubric and letters before it
+    $B E-rubricfirst.tsv 1.0 -Ddecisions.rubricFirst=true          # rubric before, letters after
+    $B F-shipped.tsv 1.0 -Ddecisions.shipped=true                  # composed as the runtime does
+    $B G-folded.tsv 1.0 -Ddecisions.shipped=true -Ddecisions.foldedReadout=true
+
+`F-shipped.tsv` must equal `E-rubricfirst.tsv`, which is what makes the layout the arm
+chose the layout the product ships. `G-folded.tsv` must equal it too: the folded
+readout changes the kernel path and must not change an answer.
+
+The per-question latency the release is about is not measurable on this cohort, because
+every JevBench item carries its own state and there is nothing to share. For that:
+
+    $JAVA -cp "$CP" demo.Release document.txt
 
 Note that the properties must precede the class name; the line above is folded for
 reading. `runtime-renderer.tsv` is `-Ddecisions.runtimeCriteria=true` taken after the
