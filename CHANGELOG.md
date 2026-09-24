@@ -4,6 +4,57 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.46] - 2026-09-24
+
+### Added
+
+- An answer space can say what its labels mean. `AnswerSpace.criteria()` carries an optional
+  per-label rubric, `Noul`, `Choice` and `Score` accept one, and `LetterLogitScorer.renderCriteria`
+  renders it. The published score for a decision model had been measured on a prompt this API could
+  not build: JevBench hands every system a per-label rubric out of `question.criteria`, and
+  `AnswerSpace` had only `question()` and `labels()`. Measured over 120 JevBench items on a
+  dedicated CCX33, same model and kernel, the only variable being whether a rubric reaches the
+  prompt: accuracy 0.7500 and Intelligence 72.2 without, 0.9000 and **88.9** with. Ordinal questions
+  went from 0.2500 to 0.9167, which is what `A: 3` means to a reader never told what 3 is. For scale,
+  swapping the recurrence kernel across all 24 layers moves one item in that cohort.
+- Where the rubric goes was measured rather than chosen, and it is also where the latency is. Rubric
+  and letters both after the criterion scored 86.1, both before it 79.6, the rubric before with the
+  letters after 88.9. The last is both the most accurate and the cheapest, because everything before
+  the criterion is shared across every question about one piece of evidence: a 53-token rubric costs
+  0.486 s per question against 0.490 s for no rubric at all. Placed after the criterion it would
+  have cost 0.98 s per question.
+- `GroupedDecisionBackend.groupedDecisionsMatchSingleDecisions()` and
+  `groupedDecisionBreakEven()`, so a backend states whether grouping changes its answers and at what
+  size it starts to pay, instead of the caller assuming both.
+
+### Fixed
+
+- Grouping could change an answer. A lone question reads its answer out of a batch of one row and a
+  group reads its out of a batch of many, and the native kernel keeps a separate single-row path.
+  Measured: three of four grouped answers differed from the same questions asked alone, by up to
+  0.28 of a logit; the pure Java decoder is bit-identical. Grouping is now refused unless the
+  backend states it preserves answers, however profitable it would be.
+- A grouped decision re-read its whole evidence on every call and discarded the resumption point, so
+  the next one-at-a-time decision paid for it again. Twenty questions went from 10.79 s to 8.22 s.
+- The Gated DeltaNet kernel stays on the calling thread for one token of one sequence, which is right
+  for decode; a group called it once per branch and ran every branch on one core. It now takes a
+  whole group in one launch, at native kernel ABI 6. Twenty questions: 12.39 s to 10.79 s.
+- A decision ended by prefilling all but its last token and then stepping that token alone, reading
+  all 2.55 GiB of weights for one token at 67 ms. The answer is now read off the final position of
+  one prefill, where it is one more row of an already compute-bound batch. 0.520 s to 0.485 s per
+  question, with no answer changed: 0 of 120 winners moved.
+- Artifacts written before the rubric existed stay readable. Version 3 appends a per-label rubric;
+  version 2 files are read as having none rather than rejected.
+
+### Changed
+
+- Documentation that claimed a decision is bandwidth bound, and that answering N questions one at a
+  time pays for the weights N times, said the opposite of what this hardware does. Batched prefill
+  measures 18.5 ms per token, linear with no fixed cost, halving from one thread to two and again to
+  four before saturating on four physical cores. It is compute bound and already at the ceiling, so
+  N questions cost N questions' arithmetic however they are arranged. The claims are corrected in
+  place and the measurements are in `benchmark-results/2026-09-24-decision-latency`.
+
 ## [0.3.45] - 2026-09-24
 
 ### Fixed
