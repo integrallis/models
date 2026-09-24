@@ -335,7 +335,7 @@ public final class Qwen35ForwardPass {
     return config;
   }
 
-  int prefillBatchSize() {
+  public int prefillBatchSize() {
     return prefillBatchSize;
   }
 
@@ -375,6 +375,32 @@ public final class Qwen35ForwardPass {
     float[] logits = new float[config.vocabSize()];
     project(logits, normalized, weights.output(), scratch);
     return logits;
+  }
+
+  /**
+   * Answers a group of questions against the evidence this session is positioned at.
+   *
+   * <p>The per-branch state is sized from the questions themselves, so callers outside this package
+   * never handle it.
+   *
+   * @param session a session positioned at the end of the shared evidence
+   * @param suffixes each question's tokens, the criterion and its rendered options
+   * @return final-position logits per question, in the order given
+   */
+  public float[][] decideGrouped(Session session, int[][] suffixes) {
+    Session checked = requireSession(session);
+    Objects.requireNonNull(suffixes, "suffixes");
+    if (suffixes.length == 0) {
+      throw new IllegalArgumentException("suffixes must not be empty");
+    }
+    int longest = 0;
+    for (int[] suffix : suffixes) {
+      longest = Math.max(longest, suffix.length);
+    }
+    return decideGrouped(
+        checked,
+        suffixes,
+        new Qwen35GroupedDecision(config, suffixes.length, checked.checkpoint, longest));
   }
 
   /**

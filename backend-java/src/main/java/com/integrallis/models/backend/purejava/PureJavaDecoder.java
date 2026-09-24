@@ -121,6 +121,21 @@ interface PureJavaDecoder extends AutoCloseable {
     return false;
   }
 
+  /** Whether this decoder can answer several suffixes against one prefix in a single sweep. */
+  default boolean supportsGroupedDecisions() {
+    return false;
+  }
+
+  /** The largest group this decoder will answer at once. */
+  default int maximumGroupSize() {
+    return 1;
+  }
+
+  /** Answers each suffix against the prefix the default session is positioned at. */
+  default float[][] decideGrouped(int[][] suffixes) {
+    throw new UnsupportedOperationException("decoder cannot answer a group");
+  }
+
   /** Captures the default session's state at its current position. */
   default Object captureResumption() {
     throw new UnsupportedOperationException("decoder cannot capture a resumption");

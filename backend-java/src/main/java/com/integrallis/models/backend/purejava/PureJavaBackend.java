@@ -19,6 +19,7 @@ import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.AuxiliaryInferenceBackend;
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
+import com.integrallis.models.api.GroupedDecisionBackend;
 import com.integrallis.models.api.HiddenStateInferenceBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
@@ -96,7 +97,8 @@ import java.util.Set;
  * any native dependencies.
  */
 public final class PureJavaBackend
-    implements ResumableInferenceBackend,
+    implements GroupedDecisionBackend,
+        ResumableInferenceBackend,
         SpeculativeInferenceBackend,
         AuxiliaryInferenceBackend,
         HiddenStateInferenceBackend,
@@ -1202,6 +1204,21 @@ public final class PureJavaBackend
   @Override
   public boolean supportsResumption() {
     return decoder.supportsResumption();
+  }
+
+  @Override
+  public boolean supportsGroupedDecisions() {
+    return decoder.supportsGroupedDecisions();
+  }
+
+  @Override
+  public int maximumGroupSize() {
+    return decoder.maximumGroupSize();
+  }
+
+  @Override
+  public float[][] decideGrouped(int[][] suffixes) {
+    return decoder.decideGrouped(suffixes);
   }
 
   @Override

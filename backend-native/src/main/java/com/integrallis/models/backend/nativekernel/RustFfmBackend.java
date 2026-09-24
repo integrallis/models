@@ -18,6 +18,7 @@ package com.integrallis.models.backend.nativekernel;
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.GroupedDecisionBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
@@ -43,7 +44,10 @@ import java.util.Objects;
  * Models-owned Rust code through FFM.
  */
 public final class RustFfmBackend
-    implements ResumableInferenceBackend, SpeculativeInferenceBackend, BatchInferenceBackend {
+    implements GroupedDecisionBackend,
+        ResumableInferenceBackend,
+        SpeculativeInferenceBackend,
+        BatchInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
   public static final String LOAD_WARMUP_PROPERTY = "models.native.loadWarmup";
@@ -291,6 +295,21 @@ public final class RustFfmBackend
   @Override
   public boolean supportsResumption() {
     return delegate.supportsResumption();
+  }
+
+  @Override
+  public boolean supportsGroupedDecisions() {
+    return delegate.supportsGroupedDecisions();
+  }
+
+  @Override
+  public int maximumGroupSize() {
+    return delegate.maximumGroupSize();
+  }
+
+  @Override
+  public float[][] decideGrouped(int[][] suffixes) {
+    return delegate.decideGrouped(suffixes);
   }
 
   @Override
