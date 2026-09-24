@@ -1217,6 +1217,15 @@ public final class PureJavaBackend
   }
 
   @Override
+  public int groupedDecisionBreakEven() {
+    // Every question here ends with a single-token step through the whole of the weights in Java,
+    // which is the most expensive step in a decision and the one grouping replaces with one step
+    // for the group. MEASURED 2026-09-24 on a Hetzner CCX33 with the native decode kernel off:
+    // 1.21x at two questions, 1.49x at five, 1.69x at twenty. Worth it from two.
+    return 2;
+  }
+
+  @Override
   public float[][] decideGrouped(int[][] suffixes) {
     return decoder.decideGrouped(suffixes);
   }
