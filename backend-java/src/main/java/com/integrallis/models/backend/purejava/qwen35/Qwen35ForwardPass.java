@@ -408,9 +408,14 @@ public final class Qwen35ForwardPass {
    *
    * <p>The session must be positioned at the end of the evidence. Each question is forked from that
    * state, and the group then walks forward in lockstep: at each step one token from every
-   * unfinished question forms a batch of rows, and every projection runs over that batch. A
-   * projection does not care where its rows came from, so the 2.55 GiB of weights is swept once for
-   * the whole group instead of once per question.
+   * unfinished question forms a batch of rows, and every projection runs over that batch.
+   *
+   * <p>MEASURED 2026-09-24 on a Hetzner CCX33: this is worth about 4% over asking the questions one
+   * at a time, and it loses below roughly ten questions. Batched prefill on this box is compute
+   * bound at 18.5 ms per token and saturates at four threads, so the group's arithmetic is the same
+   * arithmetic either way. What grouping actually saves is the bandwidth-bound single-token step
+   * that ends each question -- one per group instead of one per question. See {@link
+   * Qwen35GroupedDecision} for the numbers.
    *
    * <p>Attention and the Gated DeltaNet recurrence stay per branch, because those carry sequence
    * identity: a shared recurrent state would let one question answer having read another.
@@ -449,15 +454,14 @@ public final class Qwen35ForwardPass {
     }
 
     for (int index = 0; index < count; index++) {
-      group
-          .branch(index)
-          .forkFrom(
-              state.recurrentState,
-              state.convolutionHistory,
-              state.keys,
-              state.values,
-              prefixLength,
-              config.attentionKeyDim());
+      group.forkBranch(
+          index,
+          state.recurrentState,
+          state.convolutionHistory,
+          state.keys,
+          state.values,
+          prefixLength,
+          config.attentionKeyDim());
     }
 
     float[][] logits = new float[count][];
@@ -738,30 +742,7 @@ public final class Qwen35ForwardPass {
 
     // One token per branch, each against its own state. The recurrence is what makes a question's
     // answer its own, so it is the one thing the group does not share.
-    float[] rowOutput = new float[valueDimension];
-    for (int row = 0; row < rows; row++) {
-      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
-      // The recurrence takes whole arrays rather than spans, so a row goes in as a copy. The
-      // output has to be copied back: writing it into a slice would discard the answer.
-      applyGatedDeltaNetRecurrence(
-          slice(batch.gdnQuery, row * keyDimension, keyDimension),
-          slice(batch.gdnKey, row * keyDimension, keyDimension),
-          slice(batch.gdnValue, row * valueDimension, valueDimension),
-          slice(batch.logDecay, row * valueHeads, valueHeads),
-          slice(batch.beta, row * valueHeads, valueHeads),
-          branch.recurrentState(layer),
-          rowOutput,
-          batch.normalizedQuery,
-          batch.normalizedKey,
-          batch.memory,
-          batch.delta,
-          1,
-          config.gdnKeyHeads(),
-          valueHeads,
-          headDimension,
-          headDimension);
-      System.arraycopy(rowOutput, 0, batch.recurrent, row * valueDimension, valueDimension);
-    }
+    groupedRecurrence(layer, rows, active, group, batch);
 
     for (int row = 0; row < rows; row++) {
       int valueBase = row * valueDimension;
@@ -787,6 +768,70 @@ public final class Qwen35ForwardPass {
     }
     projectBatched(
         output, batch.recurrent, weights.output(), rows, state.scratch, batch.projectionScratch);
+  }
+
+  /**
+   * Advances every active branch's recurrent state by one token.
+   *
+   * <p>Issued as one call rather than one per branch. A kernel asked to advance a single sequence
+   * by a single token has nothing to spread across its threads and deliberately stays on the
+   * caller, so asking N times in a row answered N questions on one core while every projection
+   * around it used the whole machine. MEASURED 2026-09-24 on a Hetzner CCX33: twenty questions cost
+   * 12.39 s grouped that way, and 10.79 s once the whole group went in one call. Handed the whole
+   * group, the kernel has rows x heads independent recurrences.
+   *
+   * <p>{@code active} is also the row-to-slot table: questions of unequal length drop out as they
+   * finish, so the rows still advancing are a scattered subset of the group's state slots.
+   */
+  private void groupedRecurrence(
+      int layer, int rows, int[] active, Qwen35GroupedDecision group, BatchScratch batch) {
+    int keyDimension = config.gdnKeyDim();
+    int valueDimension = config.gdnValueDim();
+    int valueHeads = config.gdnValueHeads();
+    int headDimension = config.gdnHeadDim();
+    float[] groupState = group.recurrentState(layer);
+    if (batchedMatrixKernel.supportsGroupedGatedDeltaNet()) {
+      batchedMatrixKernel.groupedGatedDeltaNet(
+          batch.gdnQuery,
+          batch.gdnKey,
+          batch.gdnValue,
+          batch.logDecay,
+          batch.beta,
+          groupState,
+          batch.recurrent,
+          active,
+          rows,
+          group.groupSize(),
+          config.gdnKeyHeads(),
+          valueHeads,
+          headDimension,
+          headDimension);
+      return;
+    }
+    // No grouped kernel: step each row into its own slot of the same array the kernel would have
+    // written, so both paths address state identically and the parity test covers both.
+    int elements = group.recurrentStateElements();
+    float[] rowOutput = batch.rowRecurrent;
+    for (int row = 0; row < rows; row++) {
+      GatedDeltaNetRecurrence.forwardSlotInPlace(
+          slice(batch.gdnQuery, row * keyDimension, keyDimension),
+          slice(batch.gdnKey, row * keyDimension, keyDimension),
+          slice(batch.gdnValue, row * valueDimension, valueDimension),
+          slice(batch.logDecay, row * valueHeads, valueHeads),
+          slice(batch.beta, row * valueHeads, valueHeads),
+          groupState,
+          active[row] * elements,
+          rowOutput,
+          batch.normalizedQuery,
+          batch.normalizedKey,
+          batch.memory,
+          batch.delta,
+          config.gdnKeyHeads(),
+          valueHeads,
+          headDimension,
+          headDimension);
+      System.arraycopy(rowOutput, 0, batch.recurrent, row * valueDimension, valueDimension);
+    }
   }
 
   /** A copy of one row, because the recurrence entry point takes whole arrays rather than spans. */
@@ -1518,6 +1563,7 @@ public final class Qwen35ForwardPass {
     private final float[] gdnKey;
     private final float[] gdnValue;
     private final float[] recurrent;
+    private final float[] rowRecurrent;
     private final float[] normalizedQuery;
     private final float[] normalizedKey;
     private final float[] memory;
@@ -1547,6 +1593,7 @@ public final class Qwen35ForwardPass {
       gdnKey = batchBuffer(batchSize, config.gdnKeyDim());
       gdnValue = batchBuffer(batchSize, config.gdnValueDim());
       recurrent = batchBuffer(batchSize, config.gdnValueDim());
+      rowRecurrent = new float[config.gdnValueDim()];
       normalizedQuery = new float[config.gdnHeadDim()];
       normalizedKey = new float[config.gdnHeadDim()];
       memory = new float[config.gdnHeadDim()];

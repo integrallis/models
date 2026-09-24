@@ -18,14 +18,28 @@ package com.integrallis.models.backend.purejava.qwen35;
 /**
  * State for answering several questions about one piece of evidence in lockstep.
  *
- * <p>MEASURED 2026-09-24, Harriet on an 8-vCPU EPYC-Milan box: twenty questions over one contract
- * cost 9.12 s, a flat 0.46 s each, because each question re-read the model's weights. A question's
- * own tokens are a dozen or so; the 2.55 GiB sweep dwarfs them. Answering N questions the obvious
- * way sweeps the weights N times.
+ * <p>MEASURED 2026-09-24, Harriet on a Hetzner CCX33 (8 vCPU, EPYC Milan, 4 physical cores): twenty
+ * questions over one contract cost 8.95 s one at a time, a flat 0.45 s each. Answering them
+ * together costs 8.63 s. The gain is 4%.
  *
- * <p>A projection does not care where its rows came from. Run one token from each of N questions as
- * a batch of N rows and the weights are read <em>once</em> for all of them, which is how a hosted
- * System One model holds latency flat as questions are added.
+ * <p>That is worth writing down plainly, because this class was built expecting far more. The
+ * expectation was that a decision is bandwidth bound -- that reading 2.55 GiB of weights dominates,
+ * that a question's dozen tokens ride along for free, and that N questions therefore pay for the
+ * weights N times over. <b>On this hardware that is false.</b> A batched prefill measures 18.5 ms
+ * per token, dead linear from 17 tokens to 143 with no fixed cost, and it halves from one thread to
+ * two and again from two to four before saturating at the box's four physical cores. It is compute
+ * bound and already at the arithmetic ceiling. N questions cost N questions' arithmetic however
+ * they are arranged, and no amount of batching changes that.
+ *
+ * <p>What grouping does still save is the single-token step at the end of each question, which
+ * <em>is</em> bandwidth bound -- 65 ms, and flat in thread count past two. One per question becomes
+ * one per group. Twenty questions save nineteen of them, about 1.2 s, which is the 4% observed and
+ * very nearly all of it. With the native decode kernel switched off that step costs more and the
+ * same grouping is worth 1.69x, which is the same finding seen from the other side.
+ *
+ * <p>So the honest summary: grouping trades a bandwidth-bound step per question for one per group,
+ * and it is a wash unless that step is expensive. It loses below about ten questions, where the
+ * lockstep walk's own narrow batches are themselves bandwidth bound.
  *
  * <p>What cannot be shared is anything carrying sequence identity:
  *
@@ -51,7 +65,6 @@ final class Qwen35GroupedDecision {
 
   /** The private state one question needs while the evidence's state is shared. */
   static final class Branch {
-    private final float[][] recurrentState;
     private final float[][] convolutionHistory;
     private final float[][] suffixKeys;
     private final float[][] suffixValues;
@@ -60,7 +73,6 @@ final class Qwen35GroupedDecision {
     private Branch(Qwen35Config config, int prefixCapacity, int suffixCapacity) {
       int layers = config.numLayers();
       int span = Math.addExact(prefixCapacity, suffixCapacity);
-      recurrentState = new float[layers][];
       convolutionHistory = new float[layers][];
       suffixKeys = new float[layers][];
       suffixValues = new float[layers][];
@@ -75,17 +87,8 @@ final class Qwen35GroupedDecision {
         } else {
           convolutionHistory[layer] =
               new float[Math.multiplyExact(config.gdnConvDim(), config.gdnConvKernel() - 1)];
-          recurrentState[layer] =
-              new float
-                  [Math.multiplyExact(
-                      Math.multiplyExact(config.gdnValueHeads(), config.gdnHeadDim()),
-                      config.gdnHeadDim())];
         }
       }
-    }
-
-    float[] recurrentState(int layer) {
-      return recurrentState[layer];
     }
 
     float[] convolutionHistory(int layer) {
@@ -115,13 +118,11 @@ final class Qwen35GroupedDecision {
      * two questions sharing one buffer would answer each other's evidence.
      */
     void forkFrom(
-        float[][] evidenceRecurrent,
         float[][] evidenceConvolution,
         float[][] evidenceKeys,
         float[][] evidenceValues,
         int prefixLength,
         int attentionKeyDim) {
-      copyEach(evidenceRecurrent, recurrentState);
       copyEach(evidenceConvolution, convolutionHistory);
       int prefixEntries = Math.multiplyExact(prefixLength, attentionKeyDim);
       for (int layer = 0; layer < evidenceKeys.length; layer++) {
@@ -146,6 +147,19 @@ final class Qwen35GroupedDecision {
   private final Branch[] branches;
   private final int suffixCapacity;
 
+  /**
+   * Recurrent state for every branch of a layer in one array, branch-major.
+   *
+   * <p>Held here rather than on the branch so a step is a single kernel call. A kernel told to
+   * advance one sequence by one token has nothing to spread across a thread pool and runs on the
+   * caller; told to advance twenty, it has twenty independent recurrences. MEASURED 2026-09-24:
+   * calling the recurrence once per branch made twenty grouped questions cost 12.4 s, and one call
+   * for the whole group brought that to 10.8 s.
+   */
+  private final float[][] recurrentState;
+
+  private final int recurrentStateElements;
+
   Qwen35GroupedDecision(
       Qwen35Config config, int groupSize, int prefixCapacity, int suffixCapacity) {
     if (groupSize < 1) {
@@ -160,6 +174,53 @@ final class Qwen35GroupedDecision {
     for (int index = 0; index < groupSize; index++) {
       branches[index] = new Branch(config, prefixCapacity, suffixCapacity);
     }
+    this.recurrentStateElements =
+        Math.multiplyExact(
+            Math.multiplyExact(config.gdnValueHeads(), config.gdnHeadDim()), config.gdnHeadDim());
+    this.recurrentState = new float[config.numLayers()][];
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      if (!config.usesFullAttention(layer)) {
+        recurrentState[layer] = new float[Math.multiplyExact(groupSize, recurrentStateElements)];
+      }
+    }
+  }
+
+  /** Every branch's recurrent state for one layer, branch-major, or null on attention layers. */
+  float[] recurrentState(int layer) {
+    return recurrentState[layer];
+  }
+
+  /** Floats one branch occupies in a layer's recurrent state. */
+  int recurrentStateElements() {
+    return recurrentStateElements;
+  }
+
+  /**
+   * Forks a branch from the evidence's state.
+   *
+   * <p>Copied rather than referenced: the recurrence writes the state in place as it reads, so two
+   * questions sharing one buffer would answer each other's evidence.
+   */
+  void forkBranch(
+      int index,
+      float[][] evidenceRecurrent,
+      float[][] evidenceConvolution,
+      float[][] evidenceKeys,
+      float[][] evidenceValues,
+      int prefixLength,
+      int attentionKeyDim) {
+    for (int layer = 0; layer < recurrentState.length; layer++) {
+      if (recurrentState[layer] != null && evidenceRecurrent[layer] != null) {
+        System.arraycopy(
+            evidenceRecurrent[layer],
+            0,
+            recurrentState[layer],
+            index * recurrentStateElements,
+            recurrentStateElements);
+      }
+    }
+    branches[index].forkFrom(
+        evidenceConvolution, evidenceKeys, evidenceValues, prefixLength, attentionKeyDim);
   }
 
   int groupSize() {
@@ -181,10 +242,10 @@ final class Qwen35GroupedDecision {
   /** Bytes of private state a group holds, which is what bounds how many questions run at once. */
   long stateBytes() {
     long bytes = 0L;
+    for (float[] layer : recurrentState) {
+      bytes += layer == null ? 0L : (long) layer.length * Float.BYTES;
+    }
     for (Branch branch : branches) {
-      for (float[] layer : branch.recurrentState) {
-        bytes += layer == null ? 0L : (long) layer.length * Float.BYTES;
-      }
       for (float[] layer : branch.suffixKeys) {
         bytes += layer == null ? 0L : 2L * layer.length * Float.BYTES;
       }
