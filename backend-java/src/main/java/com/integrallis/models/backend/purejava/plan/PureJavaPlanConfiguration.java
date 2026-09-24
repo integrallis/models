@@ -40,13 +40,25 @@ public record PureJavaPlanConfiguration(
     boolean stagedQuantizedLayer,
     boolean blockMajorQ8Activations,
     GgufQ8BlockMajorKernel q8BlockMajorKernel,
-    boolean parallelQ8FfnPreparation) {
+    boolean parallelQ8FfnPreparation,
+    int maxContextLength) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
   public static final String Q4_KERNEL_PROPERTY = "models.purejava.q4Kernel";
   public static final String Q6_BATCHED_KERNEL_PROPERTY = "models.purejava.q6BatchedKernel";
   public static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
+
+  /**
+   * The context a session is sized for. Absent, a session is sized for the model's own maximum,
+   * which for a long-context model is tens of gigabytes of key and value cache that a short-prompt
+   * workload never reaches. A ModelJar that knows its prompts are short recommends a bound here.
+   */
+  public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
+
+  /** Sentinel meaning "size the session for the model's own maximum". */
+  public static final int MODEL_MAXIMUM_CONTEXT = 0;
+
   public static final String FINAL_LAYER_PREFILL_PRUNING_PROPERTY =
       "models.purejava.finalLayerPrefillPruning";
   public static final String FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY =
@@ -72,6 +84,7 @@ public record PureJavaPlanConfiguration(
           Q4_KERNEL_PROPERTY,
           Q6_BATCHED_KERNEL_PROPERTY,
           PREFILL_BATCH_SIZE_PROPERTY,
+          MAX_CONTEXT_LENGTH_PROPERTY,
           FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
           FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
           BATCHED_ATTENTION_SCORES_PROPERTY,
@@ -108,7 +121,8 @@ public record PureJavaPlanConfiguration(
         false,
         false,
         GgufQ8BlockMajorKernel.SCATTERED,
-        false);
+        false,
+        MODEL_MAXIMUM_CONTEXT);
   }
 
   /** Reads deployment overrides without running a performance probe. */
@@ -157,7 +171,8 @@ public record PureJavaPlanConfiguration(
             configured(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, deployment, recommendations)),
         q8BlockMajorKernel(configured(Q8_BLOCK_MAJOR_KERNEL_PROPERTY, deployment, recommendations)),
         parallelQ8FfnPreparation(
-            configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, deployment, recommendations)));
+            configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, deployment, recommendations)),
+        maxContextLength(configured(MAX_CONTEXT_LENGTH_PROPERTY, deployment, recommendations)));
   }
 
   private static void validateSettings(Map<String, String> settings, String source) {
@@ -272,6 +287,24 @@ public record PureJavaPlanConfiguration(
       return false;
     }
     throw new IllegalArgumentException(property + " must be true or false: " + configured);
+  }
+
+  static int maxContextLength(String configured) {
+    if (configured == null) {
+      return MODEL_MAXIMUM_CONTEXT;
+    }
+    int value;
+    try {
+      value = Integer.parseInt(configured.trim());
+    } catch (NumberFormatException failure) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + configured, failure);
+    }
+    if (value <= 0) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + configured);
+    }
+    return value;
   }
 
   static int prefillBatchSize(String configured) {

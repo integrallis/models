@@ -271,7 +271,8 @@ class ExecutionPlannerTest {
             false,
             false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -300,7 +301,8 @@ class ExecutionPlannerTest {
             false,
             false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -335,7 +337,8 @@ class ExecutionPlannerTest {
             false,
             false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -417,7 +420,8 @@ class ExecutionPlannerTest {
             false,
             false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, uniformTopology(GgufTensorType.Q4_0), configuration);
@@ -502,7 +506,8 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false));
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isFalse();
@@ -528,7 +533,8 @@ class ExecutionPlannerTest {
             false,
             false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -572,7 +578,8 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false));
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
 
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -604,7 +611,8 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false));
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
 
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -1122,7 +1130,8 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     GgufQ8BlockMajorKernel.SCATTERED,
-                    false))
+                    false,
+                    PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThatThrownBy(() -> PureJavaPlanConfiguration.groupedProjections("sometimes"))
