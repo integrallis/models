@@ -24,6 +24,7 @@ import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.ResumableInferenceBackend;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
@@ -41,7 +42,8 @@ import java.util.Objects;
  * GGUF backend that keeps transformer execution in Java and delegates qualified matrix kernels to
  * Models-owned Rust code through FFM.
  */
-public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchInferenceBackend {
+public final class RustFfmBackend
+    implements ResumableInferenceBackend, SpeculativeInferenceBackend, BatchInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
   public static final String LOAD_WARMUP_PROPERTY = "models.native.loadWarmup";
@@ -284,6 +286,21 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
   @Override
   public void rewind(int checkpoint) {
     delegate.rewind(checkpoint);
+  }
+
+  @Override
+  public boolean supportsResumption() {
+    return delegate.supportsResumption();
+  }
+
+  @Override
+  public Resumption capture() {
+    return delegate.capture();
+  }
+
+  @Override
+  public void resume(Resumption point) {
+    delegate.resume(point);
   }
 
   @Override

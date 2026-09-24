@@ -116,6 +116,21 @@ interface PureJavaDecoder extends AutoCloseable {
     return false;
   }
 
+  /** Whether this decoder can return to a position it has read without re-reading it. */
+  default boolean supportsResumption() {
+    return false;
+  }
+
+  /** Captures the default session's state at its current position. */
+  default Object captureResumption() {
+    throw new UnsupportedOperationException("decoder cannot capture a resumption");
+  }
+
+  /** Returns the default session to a captured position. */
+  default void resume(Object point) {
+    throw new UnsupportedOperationException("decoder cannot resume");
+  }
+
   default boolean supportsActivatedBranch() {
     return false;
   }

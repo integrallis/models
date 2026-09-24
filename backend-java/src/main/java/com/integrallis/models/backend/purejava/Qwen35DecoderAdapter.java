@@ -150,6 +150,25 @@ final class Qwen35DecoderAdapter implements PureJavaDecoder {
   }
 
   @Override
+  public boolean supportsResumption() {
+    return true;
+  }
+
+  @Override
+  public Object captureResumption() {
+    return forwardPass.captureLinearState(defaultSession.delegate);
+  }
+
+  @Override
+  public void resume(Object point) {
+    Objects.requireNonNull(point, "point");
+    if (!(point instanceof Qwen35ForwardPass.LinearStateSnapshot snapshot)) {
+      throw new IllegalArgumentException("resumption was not issued by this decoder");
+    }
+    forwardPass.restoreLinearState(defaultSession.delegate, snapshot);
+  }
+
+  @Override
   public void close() {}
 
   private Qwen35Session requireSession(Session session) {
