@@ -53,6 +53,16 @@ public final class DecisionArtifact {
 
   private static final int VERSION = 3;
 
+  /**
+   * The oldest layout this build still reads.
+   *
+   * <p>Version 3 added a per-label rubric after each answer space. Version 2 files simply stop
+   * there, so they are read as an empty rubric rather than rejected -- an artifact is a record of a
+   * decision that was already taken, and refusing to read one because a later build learned a new
+   * field would destroy evidence to no purpose.
+   */
+  private static final int OLDEST_READABLE_VERSION = 2;
+
   private static final int KIND_NOUL = 0;
   private static final int KIND_CHOICE = 1;
   private static final int KIND_SCORE = 2;
@@ -239,14 +249,19 @@ public final class DecisionArtifact {
                 path, magic, MAGIC));
       }
       int version = in.readInt();
-      if (version != VERSION) {
+      if (version < OLDEST_READABLE_VERSION || version > VERSION) {
         throw new IOException(
-            "unsupported artifact version " + version + ", this build reads " + VERSION);
+            "unsupported artifact version "
+                + version
+                + ", this build reads "
+                + OLDEST_READABLE_VERSION
+                + " to "
+                + VERSION);
       }
       String baseModel = readString(in);
       String baseDigest = readString(in);
       double temperature = in.readDouble();
-      AnswerSpace space = readSpace(in);
+      AnswerSpace space = readSpace(in, version);
 
       int width = in.readInt();
       requireSane(width, "standardiser width");
@@ -319,22 +334,22 @@ public final class DecisionArtifact {
     writeCriteria(out, space.criteria());
   }
 
-  private static AnswerSpace readSpace(DataInputStream in) throws IOException {
+  private static AnswerSpace readSpace(DataInputStream in, int version) throws IOException {
     int kind = in.readInt();
     return switch (kind) {
       case KIND_NOUL -> {
         String proposition = readString(in);
-        yield new Noul(proposition, readCriteria(in));
+        yield new Noul(proposition, readCriteria(in, version));
       }
       case KIND_CHOICE -> {
         String question = readString(in);
         List<String> options = readLabels(in);
-        yield new Choice(question, options, readCriteria(in));
+        yield new Choice(question, options, readCriteria(in, version));
       }
       case KIND_SCORE -> {
         String question = readString(in);
         List<String> levels = readLabels(in);
-        yield new Score(question, levels, readCriteria(in));
+        yield new Score(question, levels, readCriteria(in, version));
       }
       default -> throw new IOException("unknown answer space kind " + kind);
     };
@@ -349,7 +364,13 @@ public final class DecisionArtifact {
     }
   }
 
-  private static Map<String, String> readCriteria(DataInputStream in) throws IOException {
+  private static Map<String, String> readCriteria(DataInputStream in, int version)
+      throws IOException {
+    if (version < 3) {
+      // Nothing to read: the field did not exist, and a version 2 artifact recorded a decision
+      // taken without a rubric.
+      return Map.of();
+    }
     int count = in.readInt();
     if (count == 0) {
       // No rubric is the common case and a legitimate one, so it is checked before the sanity

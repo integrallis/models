@@ -198,4 +198,73 @@ final class DecisionArtifactTest {
     double[] expected = Calibration.softmax(h.logits(std.apply(raw)), 1.0);
     assertThat(artifact.decide(raw).probabilities()).isEqualTo(expected);
   }
+
+  /**
+   * AN ARTIFACT WRITTEN BEFORE THE RUBRIC EXISTED MUST STILL BE READABLE.
+   *
+   * <p>Version 3 appended a per-label rubric after each answer space. A version 2 file simply stops
+   * where the rubric would begin. Refusing to read one because a later build learned a new field
+   * would destroy the record of a decision that was already taken, which is the one thing an
+   * artifact exists to prevent.
+   */
+  @Test
+  void readsAVersionTwoArtifactAsHavingNoRubric() throws Exception {
+    Path directory = dir;
+    Noul space = new Noul("Is the fee stated?");
+    int width = 4;
+    Path written = directory.resolve("v3.idsn");
+    new DecisionArtifact(
+            space, standardizer(width), head(space, width), 1.0, "qwen3.5-4b", "a".repeat(64))
+        .write(written);
+
+    // Rewrite the same bytes with the version stamped back to 2 and the trailing rubric count --
+    // zero, for a space with no rubric -- removed, which is exactly what a 0.3.45 build produced.
+    byte[] bytes = Files.readAllBytes(written);
+    bytes[7] = 2;
+    Path old = directory.resolve("v2.idsn");
+    Files.write(old, stripRubricCount(bytes, space.proposition()));
+
+    DecisionArtifact read = DecisionArtifact.read(old);
+
+    assertThat(read.space()).isEqualTo(space);
+    assertThat(read.space().criteria()).isEmpty();
+  }
+
+  /**
+   * Drops the rubric count version 3 writes immediately after the answer space.
+   *
+   * <p>Located from the proposition's own bytes rather than from a hardcoded offset, so the test
+   * keeps working if a field written before it changes length.
+   */
+  private static byte[] stripRubricCount(byte[] bytes, String proposition) {
+    byte[] needle = proposition.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    int at = indexOf(bytes, needle);
+    if (at < 0) {
+      throw new IllegalStateException("proposition not found in the artifact");
+    }
+    int count = at + needle.length;
+    if (bytes[count] != 0
+        || bytes[count + 1] != 0
+        || bytes[count + 2] != 0
+        || bytes[count + 3] != 0) {
+      throw new IllegalStateException("expected a zero rubric count after the proposition");
+    }
+    byte[] stripped = new byte[bytes.length - 4];
+    System.arraycopy(bytes, 0, stripped, 0, count);
+    System.arraycopy(bytes, count + 4, stripped, count, bytes.length - count - 4);
+    return stripped;
+  }
+
+  private static int indexOf(byte[] haystack, byte[] needle) {
+    outer:
+    for (int index = 0; index + needle.length <= haystack.length; index++) {
+      for (int offset = 0; offset < needle.length; offset++) {
+        if (haystack[index + offset] != needle[offset]) {
+          continue outer;
+        }
+      }
+      return index;
+    }
+    return -1;
+  }
 }
