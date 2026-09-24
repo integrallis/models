@@ -25,6 +25,7 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.ResumableInferenceBackend;
 import com.integrallis.models.api.SharedInferencePrefix;
 import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
@@ -95,7 +96,8 @@ import java.util.Set;
  * any native dependencies.
  */
 public final class PureJavaBackend
-    implements SpeculativeInferenceBackend,
+    implements ResumableInferenceBackend,
+        SpeculativeInferenceBackend,
         AuxiliaryInferenceBackend,
         HiddenStateInferenceBackend,
         SharedPrefixInferenceBackend {
@@ -1196,6 +1198,29 @@ public final class PureJavaBackend
     checkOpen();
     return decoder.verifyTransient(tokens, startPosition);
   }
+
+  @Override
+  public boolean supportsResumption() {
+    return decoder.supportsResumption();
+  }
+
+  @Override
+  public Resumption capture() {
+    int position = decoder.checkpoint();
+    Object point = decoder.captureResumption();
+    return new DecoderResumption(position, point);
+  }
+
+  @Override
+  public void resume(Resumption point) {
+    Objects.requireNonNull(point, "point");
+    if (!(point instanceof DecoderResumption resumption)) {
+      throw new IllegalArgumentException("resumption was not issued by this backend");
+    }
+    decoder.resume(resumption.point());
+  }
+
+  private record DecoderResumption(int position, Object point) implements Resumption {}
 
   @Override
   public void rewind(int checkpoint) {

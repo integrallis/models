@@ -66,7 +66,7 @@ public final class Qwen35ForwardPass {
   }
 
   /** Immutable copy of one session's convolution and recurrent state at a retained prefix. */
-  static final class LinearStateSnapshot {
+  public static final class LinearStateSnapshot {
     private final Session session;
     private final int checkpoint;
     private final int[] tokenPrefix;
@@ -288,7 +288,7 @@ public final class Qwen35ForwardPass {
           "checkpoint must be between 0 and " + checked.checkpoint + ": " + checkpoint);
     }
     int[] retained = Arrays.copyOf(checked.tokenHistory, checkpoint);
-    checked.state = new SessionState(config, weights, checked.capacity, prefillBatchSize);
+    checked.state.clear();
     checked.checkpoint = 0;
     if (checkpoint == 0) {
       return;
@@ -304,17 +304,17 @@ public final class Qwen35ForwardPass {
   /** Clears all sequence state. */
   public void reset(Session session) {
     Session checked = requireSession(session);
-    checked.state = new SessionState(config, weights, checked.capacity, prefillBatchSize);
+    checked.state.clear();
     checked.checkpoint = 0;
   }
 
   /** Captures the Gated DeltaNet state needed to resume this session's retained token prefix. */
-  LinearStateSnapshot captureLinearState(Session session) {
+  public LinearStateSnapshot captureLinearState(Session session) {
     return new LinearStateSnapshot(requireSession(session));
   }
 
   /** Restores a snapshot without replaying its retained prefix. */
-  void restoreLinearState(Session session, LinearStateSnapshot snapshot) {
+  public void restoreLinearState(Session session, LinearStateSnapshot snapshot) {
     Session checked = requireSession(session);
     Objects.requireNonNull(snapshot, "snapshot");
     if (snapshot.session != checked) {
@@ -1051,6 +1051,26 @@ public final class Qwen35ForwardPass {
                   [Math.multiplyExact(
                       Math.multiplyExact(config.gdnValueHeads(), config.gdnHeadDim()),
                       config.gdnHeadDim())];
+        }
+      }
+    }
+
+    /**
+     * Returns this state to a fresh sequence without reallocating it. Only the recurrent and
+     * convolution state carry history that a new sequence must not see; a key or value entry at or
+     * beyond the new position is never read, because attention only attends to earlier positions.
+     * Reallocating instead costs a full session's worth of arrays on every reset, which is what
+     * made a repeated decision on one model slower than the decision itself.
+     */
+    private void clear() {
+      for (float[] history : convolutionHistory) {
+        if (history != null) {
+          Arrays.fill(history, 0.0f);
+        }
+      }
+      for (float[] state : recurrentState) {
+        if (state != null) {
+          Arrays.fill(state, 0.0f);
         }
       }
     }
