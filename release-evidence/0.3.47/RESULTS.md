@@ -30,6 +30,14 @@ missing-corpus skips. Formatting and staging of the six relevant Models modules 
 local checks used the already-qualified staged Vectors 0.1.23 repository while Central publication
 was processing; the remote release must independently consume Central's Vectors artifacts.
 
+After publication, the same 116 local cases passed against public Vectors with zero skips after
+fetching the external corpus at `integrallis/model-router-corpus@c3aecd41894502d74a4e7df3326d91ccf2490991`.
+The four formerly skipped cases check minimum task counts, split coverage, train/eval leakage,
+and duplicate prompts. They do not run an embedding or measure task/model selection quality.
+Full local `complianceCheck` also passes. The first remote CI compiled and tested successfully
+but rejected stale release-version metadata; landing-page, native Cargo, and notebook versions
+were corrected before repeating the release gates.
+
 ## Publication checks
 
 The release workflow resolves four independent Maven consumers from a fresh temporary cache:
