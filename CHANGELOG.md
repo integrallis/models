@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.47] - 2026-09-25
+
 ### Fixed
 
 - Reject non-finite/negative routing price and latency ceilings, and quality floors outside
@@ -13,6 +15,11 @@ All notable changes to models are documented here.
   as `CancellationException` with the original cause.
 
 ### Added
+
+- Per-request capability and data-boundary factories on the Spring AI and LangChain4j routed
+  adapters. Factories receive the complete original request; requirements constrain both selection
+  and fallback, including streams. Existing constructors retain their unconstrained defaults.
+
 
 - `GgufHugePages` loads weights into an anonymous `MADV_HUGEPAGE` mapping instead of mapping the
   GGUF, so a 2.6 GiB model costs roughly 1,300 page-table entries rather than 650,000. **Off by
@@ -27,6 +34,11 @@ All notable changes to models are documented here.
   `Arena.allocate` was doing: `GgufParser.parse` went from 1.858 s to 0.653 s when the path is on.
 
 ### Changed
+
+- Consume Vectors 0.1.23, including the Q6_K scalar bit-equality correction, and update Jackson
+  dependencies to 2.21.7. The latter removes the three OSV advisory matches on the adapter's
+  previously declared Databind 2.21.4 dependency.
+
 
 - Q4_K output-row tiling was implemented, measured and **reverted**. It is worth +9.1% on an
   isolated matmul and +0.4% on a real forward pass, because the isolated arm re-times one ~13 MB

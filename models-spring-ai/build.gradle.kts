@@ -9,7 +9,7 @@ dependencies {
     api(project(":models-runtime"))
     api(project(":models-router"))
 
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.7")
 
     compileOnly("org.springframework.ai:spring-ai-model:$springAiVersion")
     compileOnly("org.springframework.ai:spring-ai-rag:$springAiVersion")

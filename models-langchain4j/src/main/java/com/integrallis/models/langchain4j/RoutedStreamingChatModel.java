@@ -21,6 +21,7 @@ import com.integrallis.models.router.RoutingContinuity;
 import com.integrallis.models.router.RoutingDecision;
 import com.integrallis.models.router.RoutingFeedback;
 import com.integrallis.models.router.RoutingRequest;
+import com.integrallis.models.router.RoutingRequirements;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -40,6 +41,7 @@ public final class RoutedStreamingChatModel implements StreamingChatModel {
   private final ModelFleet<StreamingChatModel> fleet;
   private final Function<ChatRequest, RoutingRequest> requestFactory;
   private final Function<ChatRequest, RoutingContinuity> continuityFactory;
+  private final Function<ChatRequest, RoutingRequirements> requirementsFactory;
 
   /** Routes from the latest user message, without implicit session affinity. */
   public RoutedStreamingChatModel(ModelFleet<StreamingChatModel> fleet) {
@@ -60,9 +62,25 @@ public final class RoutedStreamingChatModel implements StreamingChatModel {
       ModelFleet<StreamingChatModel> fleet,
       Function<ChatRequest, RoutingRequest> requestFactory,
       Function<ChatRequest, RoutingContinuity> continuityFactory) {
+    this(fleet, requestFactory, continuityFactory, ignored -> RoutingRequirements.none());
+  }
+
+  /**
+   * Routes with requirements extracted from the complete original request, including its history.
+   *
+   * <p>Requirements constrain the selected model and every fallback. The application supplies
+   * capability and data-boundary policy; the adapter does not infer sensitive data. A null
+   * requirement result fails before any client is invoked.
+   */
+  public RoutedStreamingChatModel(
+      ModelFleet<StreamingChatModel> fleet,
+      Function<ChatRequest, RoutingRequest> requestFactory,
+      Function<ChatRequest, RoutingContinuity> continuityFactory,
+      Function<ChatRequest, RoutingRequirements> requirementsFactory) {
     this.fleet = Objects.requireNonNull(fleet, "fleet");
     this.requestFactory = Objects.requireNonNull(requestFactory, "requestFactory");
     this.continuityFactory = Objects.requireNonNull(continuityFactory, "continuityFactory");
+    this.requirementsFactory = Objects.requireNonNull(requirementsFactory, "requirementsFactory");
   }
 
   @Override
@@ -71,9 +89,11 @@ public final class RoutedStreamingChatModel implements StreamingChatModel {
     Objects.requireNonNull(handler, "handler");
     RoutingRequest routingRequest =
         Objects.requireNonNull(requestFactory.apply(request), "routing request");
+    RoutingRequirements requirements =
+        Objects.requireNonNull(requirementsFactory.apply(request), "routing requirements");
     RoutingContinuity continuity =
         Objects.requireNonNull(continuityFactory.apply(request), "routing continuity");
-    RoutingDecision decision = fleet.decide(routingRequest, continuity);
+    RoutingDecision decision = fleet.decide(routingRequest, requirements, continuity);
     List<ModelCandidate> order = new ArrayList<>();
     order.add(decision.selected());
     order.addAll(decision.fallbacks());

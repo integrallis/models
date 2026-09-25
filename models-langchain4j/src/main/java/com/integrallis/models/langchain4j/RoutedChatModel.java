@@ -18,6 +18,7 @@ package com.integrallis.models.langchain4j;
 import com.integrallis.models.router.ModelFleet;
 import com.integrallis.models.router.RoutingContinuity;
 import com.integrallis.models.router.RoutingRequest;
+import com.integrallis.models.router.RoutingRequirements;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -33,6 +34,7 @@ public final class RoutedChatModel implements ChatModel {
   private final ModelFleet<ChatModel> fleet;
   private final Function<ChatRequest, RoutingRequest> requestFactory;
   private final Function<ChatRequest, RoutingContinuity> continuityFactory;
+  private final Function<ChatRequest, RoutingRequirements> requirementsFactory;
 
   /** Routes from the latest user message, without implicit session affinity. */
   public RoutedChatModel(ModelFleet<ChatModel> fleet) {
@@ -50,9 +52,25 @@ public final class RoutedChatModel implements ChatModel {
       ModelFleet<ChatModel> fleet,
       Function<ChatRequest, RoutingRequest> requestFactory,
       Function<ChatRequest, RoutingContinuity> continuityFactory) {
+    this(fleet, requestFactory, continuityFactory, ignored -> RoutingRequirements.none());
+  }
+
+  /**
+   * Routes with requirements extracted from the complete original request, including its history.
+   *
+   * <p>Requirements constrain the selected model and every fallback. The application supplies
+   * capability and data-boundary policy; the adapter does not infer sensitive data. A null
+   * requirement result fails before any client is invoked.
+   */
+  public RoutedChatModel(
+      ModelFleet<ChatModel> fleet,
+      Function<ChatRequest, RoutingRequest> requestFactory,
+      Function<ChatRequest, RoutingContinuity> continuityFactory,
+      Function<ChatRequest, RoutingRequirements> requirementsFactory) {
     this.fleet = Objects.requireNonNull(fleet, "fleet");
     this.requestFactory = Objects.requireNonNull(requestFactory, "requestFactory");
     this.continuityFactory = Objects.requireNonNull(continuityFactory, "continuityFactory");
+    this.requirementsFactory = Objects.requireNonNull(requirementsFactory, "requirementsFactory");
   }
 
   @Override
@@ -60,9 +78,13 @@ public final class RoutedChatModel implements ChatModel {
     Objects.requireNonNull(request, "request");
     RoutingRequest routingRequest =
         Objects.requireNonNull(requestFactory.apply(request), "routing request");
+    RoutingRequirements requirements =
+        Objects.requireNonNull(requirementsFactory.apply(request), "routing requirements");
     RoutingContinuity continuity =
         Objects.requireNonNull(continuityFactory.apply(request), "routing continuity");
-    return fleet.execute(routingRequest, continuity, model -> model.doChat(request)).value();
+    return fleet
+        .execute(routingRequest, requirements, continuity, model -> model.doChat(request))
+        .value();
   }
 
   private static RoutingRequest defaultRequest(ChatRequest request) {

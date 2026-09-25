@@ -231,6 +231,9 @@ jobs:
           -PmodelsAppleBridgeArtifactDirectory=apple-release-artifacts
           --no-daemon --stacktrace
 
+      - name: Verify independent Maven consumers
+        run: python3 scripts/verify-maven-runtime.py --repository build/staging-deploy
+
       - name: Prepare staged-release notebook classpath
         env:
           VERSION: ${{ needs.version.outputs.value }}
@@ -368,3 +371,4 @@ jobs:
           path: |
             models/out/jreleaser/trace.log
             models/out/jreleaser/output.properties
+            models/build/maven-runtime-smoke/

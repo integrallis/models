@@ -21,6 +21,7 @@ import com.integrallis.models.router.RoutingContinuity;
 import com.integrallis.models.router.RoutingDecision;
 import com.integrallis.models.router.RoutingFeedback;
 import com.integrallis.models.router.RoutingRequest;
+import com.integrallis.models.router.RoutingRequirements;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -45,6 +46,7 @@ public final class RoutedSpringAiChatModel implements ChatModel {
   private final ModelFleet<ChatModel> fleet;
   private final Function<Prompt, RoutingRequest> requestFactory;
   private final Function<Prompt, RoutingContinuity> continuityFactory;
+  private final Function<Prompt, RoutingRequirements> requirementsFactory;
 
   /** Routes from the latest user message, without implicit session affinity. */
   public RoutedSpringAiChatModel(ModelFleet<ChatModel> fleet) {
@@ -63,9 +65,25 @@ public final class RoutedSpringAiChatModel implements ChatModel {
       ModelFleet<ChatModel> fleet,
       Function<Prompt, RoutingRequest> requestFactory,
       Function<Prompt, RoutingContinuity> continuityFactory) {
+    this(fleet, requestFactory, continuityFactory, ignored -> RoutingRequirements.none());
+  }
+
+  /**
+   * Routes with requirements extracted from the complete original request, including its history.
+   *
+   * <p>Requirements constrain the selected model and every fallback. The application supplies
+   * capability and data-boundary policy; the adapter does not infer sensitive data. A null
+   * requirement result fails before any client is invoked.
+   */
+  public RoutedSpringAiChatModel(
+      ModelFleet<ChatModel> fleet,
+      Function<Prompt, RoutingRequest> requestFactory,
+      Function<Prompt, RoutingContinuity> continuityFactory,
+      Function<Prompt, RoutingRequirements> requirementsFactory) {
     this.fleet = Objects.requireNonNull(fleet, "fleet");
     this.requestFactory = Objects.requireNonNull(requestFactory, "requestFactory");
     this.continuityFactory = Objects.requireNonNull(continuityFactory, "continuityFactory");
+    this.requirementsFactory = Objects.requireNonNull(requirementsFactory, "requirementsFactory");
   }
 
   @Override
@@ -73,7 +91,9 @@ public final class RoutedSpringAiChatModel implements ChatModel {
     Objects.requireNonNull(prompt, "prompt");
     RoutingRequest request = routeRequest(prompt);
     RoutingContinuity continuity = routeContinuity(prompt);
-    return fleet.execute(request, continuity, model -> model.call(prompt)).value();
+    return fleet
+        .execute(request, routeRequirements(prompt), continuity, model -> model.call(prompt))
+        .value();
   }
 
   @Override
@@ -82,7 +102,8 @@ public final class RoutedSpringAiChatModel implements ChatModel {
     return Flux.defer(
         () -> {
           RoutingRequest request = routeRequest(prompt);
-          RoutingDecision decision = fleet.decide(request, routeContinuity(prompt));
+          RoutingDecision decision =
+              fleet.decide(request, routeRequirements(prompt), routeContinuity(prompt));
           List<ModelCandidate> order = new ArrayList<>();
           order.add(decision.selected());
           order.addAll(decision.fallbacks());
@@ -132,6 +153,10 @@ public final class RoutedSpringAiChatModel implements ChatModel {
 
   private RoutingRequest routeRequest(Prompt prompt) {
     return Objects.requireNonNull(requestFactory.apply(prompt), "routing request");
+  }
+
+  private RoutingRequirements routeRequirements(Prompt prompt) {
+    return Objects.requireNonNull(requirementsFactory.apply(prompt), "routing requirements");
   }
 
   private RoutingContinuity routeContinuity(Prompt prompt) {
