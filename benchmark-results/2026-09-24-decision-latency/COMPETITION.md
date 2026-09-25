@@ -78,3 +78,103 @@ priority, and the cheap version of it does not work.
 Their browser model ladder, authored balanced accuracy on 144 items: Qwen3-0.6B 0.440,
 MiniCPM5-2B 0.686, Qwen3.5-4B 0.813. Quality tracks size, which is the same thing our own
 0.6B arm said. Nothing in a prompt or a kernel closes a gap that size.
+
+---
+
+# CLM: the second competitor, and the first one we can actually run
+
+Read 2026-09-24 from `github.com/Contrastive-LM/CLM` at commit-of-clone (Apache-2.0,
+797 stars, last push 2026-09-24). Announced the same day on X claiming "up to 9x faster
+than Jev" with comparable quality. Everything in this section is either *read from their
+source* or *their own committed numbers*, clearly marked. Nothing here is measured by us
+yet, and nothing here should be repeated as though it were.
+
+## Architecture, read from `src/clm/heads.py` and `src/clm/schema.py`
+
+CLM-8B is a **bi-encoder**, not a decoder readout:
+
+- encoder: **frozen Qwen3-8B with last-token pooling**, 4096-d, served by vLLM
+  `--runner pooling`
+- two MLP projection heads, `4096 -> width -> 512`, depth 2 by default
+- score is `exp(logit_scale) * cos(state_head(s), action_head(c))`, InfoNCE-trained
+- the trained artifact is **75 MB of MLP heads** over an off-the-shelf encoder
+
+Training, per their README: 60M Nemotron Q&A pairs, 30M synthetic hard negatives, 1M
+agentic trajectories.
+
+The action head embeds **the option's own text**. That is how it escapes the failure this
+project measured on 2026-09-21 and wrote into `LetterLogitScorer`: a head fitted over a
+frozen hidden state learns the labels it was trained on and scores chance on any other
+set. CLM's labels are not classes, they are strings to embed, so an unseen option is just
+unseen text. **This is a real architecture we have not tried and cannot dismiss on the
+grounds we dismissed the old one.**
+
+## The structural weakness, visible in their own results
+
+A bi-encoder embeds state and option **independently**, so the option text never attends
+to the state. Their committed `examples/t_rex/results/*.json`:
+
+| | CLM | Jev |
+|---|---|---|
+| model latency p50 | 2.6 ms | 131.9 ms |
+| agreement with the planner's correct move | **0.658** | **0.987** |
+| shield interventions | **4883** | **28** |
+| mean best score / deaths | 697 / 0 | 697 / 0 |
+
+Both arms score 697 with zero deaths, which is what the README's "on par" rests on. The
+equal score is the harness's safety net: across 3,342 decisions the shield replaced CLM's
+answer 4,883 times, against 28 for Jev.
+
+And the task is not subtle. The prompt's options read:
+
+    jump: Safe. Clears the 2 large cacti. Best.
+    duck: Unsafe. Hits the 2 large cacti. Collision.
+    run:  Unsafe. Hits the 2 large cacti. Collision.
+
+The answer is written in the option text and CLM picks it 66% of the time. That is the
+bi-encoder's limit arriving as a number: "Safe ... Best" and "Unsafe ... Collision" are
+similar strings, and nothing lets either one look at *this* state. A cross-encoder gets
+98.7%.
+
+**Our letter-logit readout is a cross-encoder.** The options sit in the prompt and attend
+to the evidence. That is the axis on which we should expect to beat CLM, and it is now the
+obvious thing to measure.
+
+## Two things they do not have that we do
+
+**They re-encode the state per question.** `schema.state_text` appends each question's
+instructions to the state, so N questions about one document cost N full encoder passes
+over the whole document. Our shared-evidence prefix -- prefill the evidence once, resume
+per question -- has no counterpart in their design. Measured here, that is the difference
+between 1.38 s and 0.61 s per question.
+
+**They need a GPU.** vLLM serving Qwen3-8B, benchmarked on a 4090 and an H100. We are a
+4B on CPU.
+
+## Where their 9x is real, and where it does not reach us
+
+Their speedup grows "when the number of candidate actions is large or when actions are
+reused across states" -- both are bi-encoder sweet spots, because cached action
+embeddings make extra candidates nearly free. Neither describes our workload: we already
+answer a question of any option count in **one** forward pass, so we are already O(1) in
+options. Their 9x is measured against Jev, not against us, on an 8B against our 4B. It
+does not transfer, and per section 1 of this file the rule stands: we re-run every arm
+ourselves or we make no comparison.
+
+Convergent detail worth noting: `schema.state_text` is commented "Context first, question
+last -- the layout the heads were trained on." We measured our way to the same layout
+independently (`ACCURACY.md`: rubric before the criterion, letters after, 88.9 against
+79.6 for the alternative).
+
+## What to measure, and what it costs
+
+CLM-v0.1-8B weights are Apache-2.0 and on the Hub, so **this is the first competitor we
+can run on our own harness** rather than read about -- no MCA constraint, no self-reported
+number to take on faith. The arms that matter:
+
+1. CLM-8B on our 120-item JevBench cohort, their heads, their encoder, our scoring -- does
+   the cross-encoder advantage show up where the answer depends on the state?
+2. `clm-raw`, their own no-head ablation, as the floor.
+3. Harriet on the same items, already at Intelligence 88.0.
+
+Needs a GPU box for the vLLM encoder, which is a RunPod pod and not the CPU bench host.
