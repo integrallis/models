@@ -35,9 +35,37 @@ spends 144 bytes per 256 weights, so a wider batch feeds more multiply-accumulat
 
 The last three agree because a 60-token prompt fits one pass at all of them, so there is a single
 "unchunked" answer and the shipped default of 32 is not it. `max|logit|` moves by **0.073**, the same
-order as the grouped-vs-single defect this project already fixed (up to 0.28). Whether that moves
-Intelligence is **not measured**; the noise floor here is about one item in 120, so it is worth an
-arm of its own. Flagged, not concluded.
+order as the grouped-vs-single defect this project already fixed (up to 0.28).
+
+### 1a. Measured: it does not move the answer. The default is safe.
+
+Every one of the 120 cohort prompts is longer than one 32-token pass (p50 about 102 tokens, max 146),
+so every published Intelligence number was produced through multi-chunk prefill and a single-pass
+configuration would compute every item differently. Worth settling rather than leaving flagged.
+
+The shipped letter-logit arm, twice, changing only the chunk width:
+
+| | prefillBatchSize 32 (shipped) | prefillBatchSize 256 (one pass) |
+|---|---|---|
+| Intelligence | **88.0** | **88.0** |
+| accuracy | 107/120 (0.8917) | 107/120 (0.8917) |
+| easy / judge | 48/48 / 59/72 | 48/48 / 59/72 |
+| Calibration | 71.9 (ECE 0.1405) | 72.0 (ECE 0.1402) |
+
+Per-item, comparing the two arms' probabilities directly:
+
+| | |
+|---|---|
+| items with byte-identical probabilities | **114 / 120** |
+| max probability delta | 0.0624 |
+| p50 / p95 delta | 0 / 5.6e-04 |
+| **items whose argmax changed** | **0** |
+
+So the perturbation is real and confined: it touches six items, reaches six probability points on the
+worst one, flips nothing, and moves Calibration by a tenth of a point. **The shipped default of 32 is
+not a defect and needs no change.** Recorded because the logit delta alone looked like one, and the
+cheap version of this conclusion -- "0.073 of a logit, same order as a bug we fixed, therefore
+suspect" -- would have been wrong.
 
 ## 2. Final-layer prefill pruning: already on
 
