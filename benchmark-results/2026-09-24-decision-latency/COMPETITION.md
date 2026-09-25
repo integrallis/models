@@ -166,6 +166,28 @@ last -- the layout the heads were trained on." We measured our way to the same l
 independently (`ACCURACY.md`: rubric before the criterion, letters after, 88.9 against
 79.6 for the alternative).
 
+## MEASURED 2026-09-25: do not add it to the catalog as a decision model
+
+Run on a RunPod A40, same 120 items and same JevBench scorer as every arm in `ACCURACY.md`. Full
+writeup, per-family breakdown, pinned digests and reproduction in `clm-arm/RESULTS.md`.
+
+| arm | Intelligence | Calibration | accuracy |
+|---|---|---|---|
+| **Harriet** (Qwen3.5-4B, letter logits, CPU) | **88.0** | 86.2 | 0.9000 |
+| CLM-8B `clm-latest`, their reference heads | **46.8** | 32.6 (ECE 0.3370) | 0.4917 |
+| CLM `clm-raw`, their own no-head ablation | 33.3 | 51.9 (ECE 0.2404) | 0.3333 |
+
+Zero-shot on typed decisions it scores about half our Intelligence. The prediction above held:
+`tool_selection` is its best family at **0.917** -- a fixed, self-describing action set, the
+bi-encoder's sweet spot and the case their README advertises -- and `ordinal` is its worst at
+**0.250**, which is chance for four levels and exactly what we scored on ordinal before rubrics
+reached the prompt. A scaled cosine has no mechanism for order.
+
+Catalog inclusion means running on our stack against an oracle, which for CLM is porting Qwen3-8B
+last-token pooling plus converting two MLP heads out of a `torch.save`. The numbers do not justify
+that port. Whether CLM is worth having as a **reranker** -- a different workload with a different
+policy, which this cohort does not exercise -- is untested and left open.
+
 ## What to measure, and what it costs
 
 CLM-v0.1-8B weights are Apache-2.0 and on the Hub, so **this is the first competitor we
