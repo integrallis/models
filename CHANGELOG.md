@@ -4,6 +4,14 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Reject non-finite/negative routing price and latency ceilings, and quality floors outside
+  `[0, 1]`, at policy construction. `NaN` previously bypassed hard eligibility comparisons.
+- Stop blocking fleet execution on cancellation or interruption without invoking fallback clients
+  or recording a model-health failure. Preserve the interrupt flag and propagate interruption
+  as `CancellationException` with the original cause.
+
 ### Added
 
 - `GgufHugePages` loads weights into an anonymous `MADV_HUGEPAGE` mapping instead of mapping the

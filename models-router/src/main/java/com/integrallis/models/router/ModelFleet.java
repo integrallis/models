@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 
 /**
  * Provider-neutral bindings between routing candidates and callable application clients.
@@ -119,6 +120,9 @@ public final class ModelFleet<T> {
 
   /**
    * Executes with continuity plus explicit per-request capability and data-boundary requirements.
+   *
+   * <p>Cancellation stops execution without fallback or a model-health penalty. Interruption is
+   * propagated as {@link CancellationException}, preserving the thread's interrupt flag.
    */
   public <R> RoutedResult<R> execute(
       RoutingRequest request,
@@ -129,6 +133,7 @@ public final class ModelFleet<T> {
     Objects.requireNonNull(requirements, "requirements");
     Objects.requireNonNull(continuity, "continuity");
     Objects.requireNonNull(invocation, "invocation");
+    checkInterrupted();
     RoutingDecision initial = router.route(request, continuity, requirements);
     List<ModelCandidate> order = new ArrayList<>();
     order.add(initial.selected());
@@ -136,6 +141,7 @@ public final class ModelFleet<T> {
     List<RoutingAttempt> attempts = new ArrayList<>();
     Throwable lastFailure = null;
     for (int index = 0; index < order.size(); index++) {
+      checkInterrupted();
       ModelCandidate candidate = order.get(index);
       long started = System.nanoTime();
       try {
@@ -153,6 +159,16 @@ public final class ModelFleet<T> {
                     Map.of("fallback", 1.0));
         return new RoutedResult<>(value, completed, attempts);
       } catch (Exception failure) {
+        if (failure instanceof CancellationException cancellation) {
+          throw cancellation;
+        }
+        if (failure instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+          Thread.currentThread().interrupt();
+          CancellationException cancellation =
+              new CancellationException("routed invocation interrupted");
+          cancellation.initCause(failure);
+          throw cancellation;
+        }
         lastFailure = failure;
         attempts.add(
             new RoutingAttempt(
@@ -164,6 +180,12 @@ public final class ModelFleet<T> {
       }
     }
     throw new RoutingExecutionException(attempts, lastFailure);
+  }
+
+  private static void checkInterrupted() {
+    if (Thread.currentThread().isInterrupted()) {
+      throw new CancellationException("routed invocation interrupted");
+    }
   }
 
   private RoutingFeedback feedback(
