@@ -48,10 +48,10 @@ import java.util.Locale;
  *
  * <p><b>And it does not carry to a real decision, which is why this is off by default.</b> The same
  * build measured over ten alternating rounds of the video-shape workload -- fifteen decisions, a
- * fresh document each -- came out at 1.3837 s per decision on 4 KiB pages against 1.3689 s on
- * 2 MiB, which is +1.1% on five rounds won out of ten and per-round deltas that alternate sign.
- * That is a coin flip, and {@code /proc/meminfo} confirmed 2,674,688 kB of {@code AnonHugePages}
- * during those runs, so the arm genuinely ran: this is no effect rather than no data.
+ * fresh document each -- came out at 1.3837 s per decision on 4 KiB pages against 1.3689 s on 2
+ * MiB, which is +1.1% on five rounds won out of ten and per-round deltas that alternate sign. That
+ * is a coin flip, and {@code /proc/meminfo} confirmed 2,674,688 kB of {@code AnonHugePages} during
+ * those runs, so the arm genuinely ran: this is no effect rather than no data.
  *
  * <p>The untested explanation for the split is arithmetic intensity. A decision prefills a whole
  * document, so it runs at a far wider batch than the 18 tokens above, and each weight byte then
@@ -80,9 +80,9 @@ public final class GgufHugePages {
    * <p>Defaults to {@code auto}, which is <b>off</b>: measured, it buys nothing on a real decision.
    * {@code true} forces the copy on Linux x86-64, which is worth measuring for a workload that
    * prefills narrowly rather than in wide batches. It stays a property rather than becoming a
-   * default because the win also depends on a kernel setting this code cannot see --
-   * {@code transparent_hugepage/enabled} must be {@code always} or {@code madvise} -- and because
-   * a caller who is memory constrained would rather have the mapping back.
+   * default because the win also depends on a kernel setting this code cannot see -- {@code
+   * transparent_hugepage/enabled} must be {@code always} or {@code madvise} -- and because a caller
+   * who is memory constrained would rather have the mapping back.
    */
   public static final String HUGE_PAGES_PROPERTY = "models.purejava.hugePages";
 
@@ -112,8 +112,8 @@ public final class GgufHugePages {
   /**
    * Whether the most recent {@link #copyInto} had its huge page advice accepted by the kernel.
    *
-   * <p>Exists so a benchmark can assert that the arm it believes it is running is the arm that
-   * ran. {@code /proc/meminfo}'s {@code AnonHugePages} is the independent check.
+   * <p>Exists so a benchmark can assert that the arm it believes it is running is the arm that ran.
+   * {@code /proc/meminfo}'s {@code AnonHugePages} is the independent check.
    */
   public static boolean lastAdviceAccepted() {
     return lastAdviceAccepted;
@@ -214,12 +214,7 @@ public final class GgufHugePages {
       MemorySegment result =
           (MemorySegment)
               mmap.invokeExact(
-                  MemorySegment.NULL,
-                  length,
-                  PROT_READ_WRITE,
-                  MAP_PRIVATE_ANONYMOUS,
-                  -1,
-                  0L);
+                  MemorySegment.NULL, length, PROT_READ_WRITE, MAP_PRIVATE_ANONYMOUS, -1, 0L);
       // mmap reports failure as MAP_FAILED, which is -1 and not null.
       if (result.address() == -1L || result.address() == 0L) {
         return MemorySegment.NULL;
