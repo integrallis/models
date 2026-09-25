@@ -17,6 +17,7 @@ package com.integrallis.models.langchain4j;
 
 import com.integrallis.models.router.ModelCandidate;
 import com.integrallis.models.router.ModelFleet;
+import com.integrallis.models.router.RoutingCancellation;
 import com.integrallis.models.router.RoutingContinuity;
 import com.integrallis.models.router.RoutingDecision;
 import com.integrallis.models.router.RoutingFeedback;
@@ -183,6 +184,12 @@ public final class RoutedStreamingChatModel implements StreamingChatModel {
       boolean emitted,
       Throwable failure,
       long started) {
+    if (RoutingCancellation.isCancellation(failure)) {
+      if (terminalDelivered.compareAndSet(false, true)) {
+        handler.onError(failure);
+      }
+      return;
+    }
     ModelCandidate candidate = order.get(index);
     record(routingRequest, taskType, candidate.id(), false, -1, started);
     if (!emitted && index + 1 < order.size() && !terminalDelivered.get()) {

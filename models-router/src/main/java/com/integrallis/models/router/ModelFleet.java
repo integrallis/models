@@ -168,10 +168,16 @@ public final class ModelFleet<T> {
         if (failure instanceof CancellationException cancellation) {
           throw cancellation;
         }
-        if (failure instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+        if (RoutingCancellation.isInterruption(failure) || Thread.currentThread().isInterrupted()) {
           Thread.currentThread().interrupt();
           CancellationException cancellation =
               new CancellationException("routed invocation interrupted");
+          cancellation.initCause(failure);
+          throw cancellation;
+        }
+        if (RoutingCancellation.isCancellation(failure)) {
+          CancellationException cancellation =
+              new CancellationException("routed invocation cancelled");
           cancellation.initCause(failure);
           throw cancellation;
         }
