@@ -1,78 +1,105 @@
-# Side by side — Integrallis Decisions vs TypeSafe Jev
+# Side by side — Harriet vs TypeSafe Jev
 
-Video: `sidebyside.mp4` (24.5 s), `sidebyside.gif`, raw terminal capture `sidebyside.cast`.
+Video: `sidebyside.mp4` (14.9 s), `sidebyside.gif`, raw terminal capture `sidebyside.cast`.
 Re-run it with `run_demo.sh`. Both arms answer the same ten questions about the same 404-token
 master services agreement, and each timing is taken inside the process that answers, so neither
 side is credited or charged with the other's network path.
 
+**Recorded 2026-09-25. Both arms were re-run for it; nothing here is a carried-over number.**
+
 ## Result
 
-| | TypeSafe Jev | Integrallis |
+| | TypeSafe Jev | Harriet |
 | --- | ---: | ---: |
-| correct of 10 | **10** | **7** |
-| total wall time | **2.75 s** | 18.86 s |
-| one-off prefill | n/a | 8.98 s |
-| marginal per question | **0.275 s** | 0.989 s |
-| document sent to a server | 10x | 0 |
-| input tokens billed | 7,292 | 0 |
+| correct of 10 | **10** | 7 |
+| total, cold start | **2.71 s** | 10.36 s |
+| one-off prefill | n/a | 5.89 s |
+| marginal per question | **0.271 s** | 0.447 s |
+| document sent to a server | 10x | **0** |
+| input tokens billed | 7,292 | **0** |
+| runs offline | no | **yes** |
 | prefix physically shared | n/a | yes, 10/10 |
-| runs offline | no | yes |
+| model | `jev-1.13.0` | Qwen3.5-4B Q4_K_M, frozen |
+| kernel | hosted | rust-ffm, native abi 6 |
 
-Jev `jev-1.13.0` over its hosted `/v1/systemone`. Ours is Granite 4.1 3B Q4_K_M plus an 82 KB
-head, on one 8-core AMD EPYC-Milan (Hetzner ccx33), rust-ffm kernel, base pinned by sha256
-`662b0626cd58f443…`.
+**We lose on both measured axes: three answers and 3.8x on wall clock.**
 
-We lose on both axes measured here. The gap is 6.9x on wall time and three questions on accuracy.
+## Disclosure: we do not know what Jev runs on
 
-## The three misses
+Not the device, not how many, not whether requests were batched, not what else shared the machine.
+Its timings include the network round trip from a laptop in Arizona to its API, which *penalises* it
+on network and credits it on nothing. Harriet's host is named and it is a CPU: a RunPod `cpu3c`,
+32 vCPU on an AMD EPYC 9655P (Zen 5), 16 worker threads, model on local disk.
 
-Q3 may Acme use customer data to train models, Q5 does the liability cap apply to data breaches,
-Q7 what is the early termination fee. The contract answers all three — by *exception or negation*
-in each case ("shall not use", "this cap does not apply to Section 4", a fee stated as a condition
-of terminating for convenience). The head was fitted on squad2, which teaches whether a matching
-span is present, so a clause that settles a question by excluding something reads as absence.
-No amount of hardware moves this; it needs training data whose labels turn on entailment.
+So the wall-clock column is two systems on unknown-versus-known hardware. It is not a like-for-like
+comparison and must not be read as one. The rows below the line in the video — documents sent,
+tokens billed, offline — are the ones that do not depend on whose machine is bigger.
 
-A CUAD-fitted head was cut to attack exactly that and is **not shipped**: 0.5600 accuracy against
-a 0.7200 majority floor, 68% of sealed items truncated, temperature pinned at the fitter's 64.0
-ceiling. That is the known CUAD defect — gold spans outside the 4,000-token window mean the labels
-describe text the model was never shown.
+## What changed since the 2026-09-21 recording, and why it had to be re-made
 
-## Speed, and what actually moved it
+The old video is kept as `sidebyside-2026-09-21-granite-head.{mp4,gif,cast}`. It showed
+**Granite 4.1 3B plus an 82 KB squad2-fitted Noul head**, and *neither part ships any more*. Harriet
+is frozen Qwen3.5-4B read through letter logits with no trained head at all, so the old arm could not
+be re-run — the old video advertised a product that does not exist.
 
-| kernel | prefill | marginal/question | total |
+Against our own history, on the hardware class the old one used (4 Milan cores), the new stack is
+**slower**: 22.7 s cold-start against the old 18.9 s, because Qwen3.5-4B is a bigger model than
+Granite 3B. It buys that back on the benchmark that matters — JevBench Intelligence went 72.2 to
+**88.0** — and on a wider box. Both figures are stated rather than the flattering one chosen.
+
+| Harriet, same ten questions | prefill | marginal | cold total |
 | --- | ---: | ---: | ---: |
-| pure-java (2019 Intel Mac) | 126.28 s | 8.558 s | 211.87 s |
-| pure-java (8-core EPYC) | 85.44 s | 5.504 s | 140.47 s |
-| **rust-ffm (8-core EPYC)** | **7.69 s** | **0.948 s** | **17.17 s** |
+| 4 Milan cores (the old video's hardware class) | 13.10 s | 0.954 s | 22.65 s |
+| 16 threads, Zen 5 (recorded) | 5.89 s | 0.447 s | **10.36 s** |
 
-The native kernel is 8.2x on total wall time and 11x on prefill. Both earlier runs were the
-fallback path: no native kernel had ever been bundled for any platform, because
-`prepareNativePlatformResources` depends on a cargo build that had not run. The kernel used here
-was compiled from our own crate on the target box.
+## Accuracy: 7 of 10, and the same two clauses as before
 
-Two things this cost, recorded so they are not repeated:
+Misses are **Q3** (may Acme use customer data to train models), **Q4** (what is the liability cap),
+**Q5** (does the cap apply to data breaches).
 
-- A prediction was published from the fallback path ("the Linux box will give us ~2.26 s/item")
-  without first checking which kernel had loaded. The demo now prints the kernel on every run.
-- `native.properties` was hand-written with `abi=1`; the loader requires `abi=5`. It failed closed
-  with a clear message, which is the correct behaviour, but the run before that silently used the
-  fallback and produced timings within 1% of the previous one — which is exactly what a
-  no-op change looks like when a switch is not observable.
+Q3 and Q5 are settled by *exception or negation* — "shall not use", "this cap does not apply to
+Section 4". The old video missed those too and blamed the squad2 head, which teaches whether a
+matching span is present. **That explanation was incomplete**: the head is gone and the misses
+remain, so the failure is not a property of the discarded component. Q4 sits at p=0.4687, a hair
+under the threshold, and is the one genuinely borderline answer. Q7, which the old arm missed, is
+now correct.
 
-## The trap this run nearly walked into
+Output is deterministic: two runs on the Milan host and two on the Zen 5 host returned
+byte-identical probabilities `[0.7332, 0.617, 0.3739, 0.4687, 0.2452, 0.6743, 0.5752, 0.7734,
+0.055, 0.0401]`, so the 7/10 is a property of the model and not of a scheduling accident.
 
-The HuggingFace copy of `granite-4.1-3b-Q4_K_M.gguf` is **byte-for-byte the same size** as ours,
-2,099,501,664, with a different sha256 (`87320650…` against `662b0626…`). Different weights, same
-name, same size. A head reads hidden states from specific weights; fed the wrong ones it returns
-confident nonsense and nothing errors.
+## Why the gap is prefill, and what would close it
 
-The artifact recorded `baseModel` as a *name*, which would not have caught it. As of v0.2 it
-records the base's sha256 and `requireBase()` refuses to run against a file that disagrees, before
-any inference is spent. Two tests cover it.
+Of the 10.36 s, **5.89 s is the one-off prefill** of the document and 4.47 s is the ten questions.
+Per question we are 1.6x behind Jev, not 3.8x. Jev has no prefill because it re-sends the document
+on every call, which is what the 7,292 billed tokens are.
+
+Hardware does not close it. Measured on the recorded host, this demo saturates at 16 threads:
+
+| threads | 4 | 8 | 16 | 32 |
+| --- | ---: | ---: | ---: | ---: |
+| cold total | 15.40 s | 15.33 s | **10.30 s** | 10.80 s |
+
+4 to 8 buys nothing and 16 to 32 is worse, so 96 or 192 cores would not have helped either. Two
+measured-but-unbuilt software levers are what remain: persisted prefix state, which deletes the
+5.89 s outright, and an AVX-512+VNNI Q4_K path, measured at 2.26x on the inner loop at this batch
+width. See `../../../benchmark-results/2026-09-24-decision-latency/latency/NOTES.md`.
 
 ## Honest scope
 
-These ten questions are a demo, not a benchmark: one document, one family, gold labels written by
-us. The measured benchmark position is in `../2026-09-21-jevbench-baseline/`. This artifact is a
-Noul head and answers 24 of JevBench's 72 public items; choice and score have no trained head.
+Ten questions, one document, one family, gold labels written by us. **A demo, not a benchmark.** The
+measured benchmark position is in `../2026-09-21-jevbench-baseline/`.
+
+## Traps this demo has walked into
+
+- **A kernel misreport, twice.** The 2026-09-21 run published a prediction from the fallback path
+  without checking which kernel had loaded. The rebuilt arm then guessed the kernel from
+  `runtime.toString()` and wrote `pure-java` for a run that was demonstrably on `rust-ffm`. It now
+  asks `runtime.backend().name()` and prints the native ABI, and the JSON carries both.
+- **Prefill measured, never subtracted.** The one-off prefill is its own timed call against a fresh
+  state, after a warmup on a *different* document. Differencing two averages to get it is how this
+  project earned a retraction.
+- **A truncated recording.** The first capture derived the scp target from a string substitution,
+  hung under a pty, and produced a cast missing the entire comparison table — including the
+  disclosure. Host and port are explicit now, and the cast is checked for every section before it is
+  converted.
