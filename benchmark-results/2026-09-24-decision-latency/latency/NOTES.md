@@ -82,10 +82,37 @@ which reports `avx512_vnni`, `avx_vnni` and `avx512_bf16`. RunPod bills those at
 | AVX2 `vpdpbusd` | 249.4 | **2.65x** |
 | AVX-512 `vpdpbusd` | 485.7 | **5.17x** |
 
-This is an instruction-throughput ceiling, not a matmul prediction: the real kernel also pays nibble
-unpacking, per-group scales and memory, and Amdahl will take most of it. It is still the largest
-unexploited factor found, it lands on the ~79% of a decision that is matmul, and the kernel already
-does runtime capability dispatch so it is an added path rather than a rewrite.
+This is an instruction-throughput ceiling and **most of it does not transfer**. Measured on the real
+loop shape next.
+
+### 4a. What actually transfers: 2.26x, and why the 2.65x did not
+
+Reading the kernel first: per 32 weights our AVX2 path is `maddubs` + `madd` + `add` = **three** ops,
+and the `madd` applies the per-group scale *and* pair-adds in one instruction. A 256-bit `vpdpbusd`
+rewrite is also three (`dpbusd`, `mullo`, `add`). **At 256 bits VNNI wins nothing here**, and the
+scale cannot be hoisted earlier because a 4-bit quant times a 6-bit scale leaves `u8`. The 2.65x came
+from a loop with no scale multiply.
+
+What is left is 512-bit **width**: one `dpbusd` covers 64 weights instead of 32, and the nibble unpack
+halves too. `latency/q4k_shape.c` and `latency/q4k_batched.c` measure exactly that, on a 9216x2560
+Q4_K tensor, 12.7 MiB of weights streaming, one core:
+
+| arm | batch 1 | batch 18 |
+|---|---|---|
+| AVX2, 8 groups of 32 | 31.0 G-MAC/s | 67.3 G-MAC/s |
+| AVX-512 + VNNI, 4 groups of 64 | 41.2 G-MAC/s | **152.4 G-MAC/s** |
+| ratio | 1.33x | **2.26x** |
+
+The batch dimension is the whole story. At batch 1 the nibble unpack is paid once per dot and
+dominates, so halving the dot buys 1.33x. At batch 18 the unpack is hoisted above the batch loop --
+which is what the real kernel does -- so the dot dominates and the width shows up as **2.26x**.
+
+**Batch 18 is our case**, so 2.26x is the figure to plan against: it is on the real loop shape, at the
+real width, with weights streaming rather than resident. It lands on the ~79% of a decision that is
+matmul, and the kernel already dispatches on runtime capability, so this is an added path and not a
+rewrite.
+
+Still to be proven on `ColdShape` and `Achieved` before it counts, per the row-tiling lesson.
 
 Two further reasons it is attractive beyond speed:
 
@@ -108,10 +135,26 @@ wrong number would have been published.
 
 ## What to do next
 
-Implement an AVX-512 + VNNI `Q4_K` path behind the existing capability dispatch, and judge it on
-`ColdShape` and `Achieved` rather than an isolated matmul -- per `../q4k-row-tile/NOTES.md`, a
-resident-tensor microbenchmark already produced a +9.1% result that was +0.4% on a real forward pass.
+Two levers, in order of what they cost us.
 
-Latency arithmetic, to be checked and not assumed: 0.506 s at 32 Zen 5 threads today, on a workload
-that is ~79% matmul. Whether that reaches the 300 ms the live workloads want depends entirely on how
-much of the 2.65x-5.17x survives decode and memory, which is exactly what the measurement will say.
+**1. Cores. 2.9x, available today, zero code.** 1.471 s on Milan at 4 threads against 0.506 s on
+Zen 5 at 32. Nothing to build; it is a deployment choice. Our own benchmarking is what the Hetzner
+quota blocks, not a customer.
+
+**2. An AVX-512 + VNNI `Q4_K` path behind the existing capability dispatch. 2.26x on the inner loop**
+at our batch width, so something under that end-to-end on the ~79% of a decision that is matmul.
+Worth building, and it has two correctness arguments on top of speed:
+
+* `vpdpbusd` accumulates straight to int32, skipping `maddubs`'s int16 intermediate where two
+  `u8 * s8` products can reach 64,770 and overflow -- the hazard `q4ShortPairwiseSupported` and the
+  widened kernels exist for.
+* Integer multiply-accumulate is associative, so the path should be **bit-identical** to a correct
+  widened AVX2 path rather than merely close. That is a testable claim and the test is cheap.
+
+Judge it on `ColdShape` and `Achieved`, never on an isolated matmul: per `../q4k-row-tile/NOTES.md` a
+resident-tensor microbenchmark already produced +9.1% that was +0.4% on a real forward pass. Both
+harnesses exist.
+
+Arithmetic to check and not assume: 0.506 s at 32 Zen 5 threads today. If the 2.26x delivers even
+half of itself end-to-end, that is roughly 0.3 s, which is the bar the live workloads
+(300 ms trading blocks, 2 Hz drone control) actually want.
