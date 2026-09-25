@@ -95,7 +95,7 @@ twice -- it streams all 2.6 GB once. `ColdShape` was written for exactly this an
 future kernel change should be judged on it and on `Achieved`, never on `PerShape`
 alone.
 
-## 3. Huge pages: +4.8% on a real forward pass, no code change
+## 3. Huge pages: +3.7% on a forward pass, nothing on a decision
 
 2.6 GB of weights under 4 KiB pages is 650k page-table entries against an L2 TLB that
 holds roughly two thousand, so nearly every new block pays a page walk. Staging the
@@ -114,10 +114,47 @@ This recovers about a sixth of the resident-vs-cold gap from section 1, which bo
 confirms the latency diagnosis and says most of that gap is something other than the
 TLB.
 
-To ship it the loader has to stop depending on where the file happens to live: read
-the weights into an anonymous arena marked `MADV_HUGEPAGE` rather than mmapping the
-GGUF directly. Same resident bytes -- the page cache already holds them -- plus one
-copy at load.
+### 3a. Implemented, and it does not carry to a decision
+
+`GgufHugePages` reads the weights into an anonymous `MADV_HUGEPAGE` mapping instead of
+mapping the GGUF, so the win no longer depends on the file being on tmpfs. Measured on
+the real implementation:
+
+| measurement | 4 KiB pages | 2 MiB pages | |
+|---|---|---|---|
+| forward pass, 18 tokens, 8 rounds | 0.4999 s | 0.4813 s | **+3.7%**, 7/8 rounds |
+| **video-shape decision, 10 rounds** | **1.3837 s** | **1.3689 s** | **+1.1%, 5/10 rounds** |
+
+Per-round deltas on the decision arm: +0.062, +0.082, -0.044, +0.098, -0.112, -0.099,
++0.111, +0.001, -0.162, -0.085. That is a coin flip.
+
+**This is no effect, not no data.** `AnonHugePages` was sampled at 2,674,688 kB during
+the decision runs, so the treatment was applied. The default is therefore `off`, the
+property stays, and both numbers are in the class javadoc.
+
+The untested guess at why the split exists is arithmetic intensity. A decision prefills
+a whole document and so runs at a much wider batch than 18 tokens; each weight byte then
+feeds many more multiply-accumulates, and load latency -- the thing huge pages hide -- is
+a smaller share of a compute-bound prefill. Recorded as a hypothesis, not a finding.
+
+### 3b. Getting it wrong twice, both caught by checking the premise
+
+**`Arena.allocate` zero-initialises.** The first implementation took the destination from
+the arena and then advised it. Arena allocation returns zeroed memory, so every page was
+already faulted in as 4 KiB before `madvise` ran, and advising afterwards only leaves the
+region for khugepaged to maybe collapse later. Result: 16 MiB of huge pages out of 2.6 GiB
+and a forward-pass A/B that measured -0.6%. The fix is to `mmap` the region directly, advise
+it while it is still untouched, and let the arena own it via `reinterpret`. That also deleted
+a 2.7 GB memset: parse went from 1.858 s to 0.653 s.
+
+**`invokeExact` in statement position.** `madvise.invokeExact(...)` as a bare statement is a
+`void` call against an `int` descriptor. It throws `WrongMethodTypeException` on every
+invocation, which the surrounding catch-all swallowed, so the advice never happened and the
+A/B would have compared 4 KiB pages against 4 KiB pages. Bind the result.
+
+Both were caught for the same reason: the harness sampled `/proc/meminfo` and asserted the
+pages were actually granted. A toggle that silently does nothing measures as "this does not
+matter", which is the most expensive kind of wrong answer available here.
 
 ## 4. What this rules in and out for the next attempt
 
@@ -127,6 +164,9 @@ real workload. The inner loop is not the constraint.
 
 **Ruled out, infrastructurally:** VNNI (`vpdpbusd`) needs Zen 4+ or Ice Lake+ and
 Hetzner offers only Zen 3 in the dedicated CCX line.
+
+**Ruled in, measured, shipped off by default:** huge-page-backed weights. Real on a bare
+forward pass, absent on a decision.
 
 **Ruled in, untested:** software prefetch at a tuned distance in the Q4_K row loop,
 which attacks the measured stall directly. And -- more promising because we are using
