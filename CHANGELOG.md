@@ -4,6 +4,31 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- `GgufHugePages` loads weights into an anonymous `MADV_HUGEPAGE` mapping instead of mapping the
+  GGUF, so a 2.6 GiB model costs roughly 1,300 page-table entries rather than 650,000. **Off by
+  default**, via `models.purejava.hugePages`, because that is what the measurement says. On a
+  dedicated CCX33 it is worth +3.7% on a bare 18-token forward pass (0.4999 s to 0.4813 s, seven of
+  eight alternating rounds won) and nothing at all on the workload the decision path actually runs:
+  ten rounds of a fifteen-decision video-shape cohort give 1.3837 s against 1.3689 s per decision,
+  +1.1% on five rounds won out of ten, with per-round deltas that alternate sign. `AnonHugePages`
+  was sampled at 2,674,688 kB during those runs, so that is no effect rather than no data. Kept,
+  off, because it is bit-exact and cheap to switch on for a workload that prefills narrowly instead
+  of in wide batches. Mapping the region directly also removed a 2.7 GB zeroing memset that
+  `Arena.allocate` was doing: `GgufParser.parse` went from 1.858 s to 0.653 s when the path is on.
+
+### Changed
+
+- Q4_K output-row tiling was implemented, measured and **reverted**. It is worth +9.1% on an
+  isolated matmul and +0.4% on a real forward pass, because the isolated arm re-times one ~13 MB
+  tensor until it is L3 resident and a forward pass never sees a weight twice. Two earlier
+  conclusions are retracted in the benchmark notes as a result: the Q4_K inner loop is **not** at its
+  algorithmic ceiling -- the same kernel reaches 25.6 MAC/cycle/core with weights resident against
+  17.1 cold, and neither arm uses more than a fifth of the host's measured 38.0 GB/s -- and the
+  "43% of a forward pass is not matmul" figure was an artifact of timing resident tensors, where
+  cold it is 21%.
+
 ## [0.3.46] - 2026-09-24
 
 ### Added
