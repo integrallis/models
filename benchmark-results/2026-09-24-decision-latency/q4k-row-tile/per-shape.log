@@ -1,0 +1,156 @@
+=== round 1  PerShape ===
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 24, 2026 10:11:08 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 24, 2026 10:11:08 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+
+  batch 18
+
+  shape                    type   count  rows    G-MAC/s     total s    
+  ffn_down.weight          Q6_K   16     2560    166.1       0.0409     
+  ffn_down.weight          Q4_K   16     2560    166.2       0.0409     
+  attn_qkv.weight          Q5_K   24     8192    166.6       0.0544     
+  attn_q.weight            Q4_K   8      8192    189.7       0.0159     
+  ssm_out.weight           Q5_K   24     2560    137.1       0.0330     
+  ffn_up.weight            Q4_K   32     9216    191.0       0.0712     
+  attn_k.weight            Q4_K   8      1024    127.7       0.0030     
+  attn_output.weight       Q4_K   8      2560    154.5       0.0098     
+  ffn_gate.weight          Q4_K   32     9216    195.3       0.0696     
+  attn_v.weight            Q4_K   3      1024    133.1       0.0011     
+  attn_v.weight            Q6_K   5      1024    137.2       0.0017     
+  attn_gate.weight         Q4_K   24     4096    181.6       0.0249     
+
+  matmul floor for the whole model: 0.3663 s  (175.2 G-MAC/s aggregate)
+  a measured forward pass of 18 tokens costs about 0.357 s; anything above the floor is not matmul
+
+=== round 1  PerShape ===
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 24, 2026 10:11:09 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 24, 2026 10:11:09 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+
+  batch 18
+
+  shape                    type   count  rows    G-MAC/s     total s    
+  ffn_down.weight          Q6_K   16     2560    169.7       0.0400     
+  ffn_down.weight          Q4_K   16     2560    172.7       0.0393     
+  attn_qkv.weight          Q5_K   24     8192    168.0       0.0539     
+  attn_q.weight            Q4_K   8      8192    218.4       0.0138     
+  ssm_out.weight           Q5_K   24     2560    141.2       0.0321     
+  ffn_up.weight            Q4_K   32     9216    218.1       0.0623     
+  attn_k.weight            Q4_K   8      1024    142.2       0.0027     
+  attn_output.weight       Q4_K   8      2560    160.3       0.0094     
+  ffn_gate.weight          Q4_K   32     9216    215.7       0.0630     
+  attn_v.weight            Q4_K   3      1024    144.2       0.0010     
+  attn_v.weight            Q6_K   5      1024    137.1       0.0017     
+  attn_gate.weight         Q4_K   24     4096    202.2       0.0224     
+
+  matmul floor for the whole model: 0.3417 s  (187.8 G-MAC/s aggregate)
+  a measured forward pass of 18 tokens costs about 0.357 s; anything above the floor is not matmul
+
+=== round 2  PerShape ===
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 24, 2026 10:11:10 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 24, 2026 10:11:10 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+
+  batch 18
+
+  shape                    type   count  rows    G-MAC/s     total s    
+  ffn_down.weight          Q6_K   16     2560    173.6       0.0392     
+  ffn_down.weight          Q4_K   16     2560    173.7       0.0391     
+  attn_qkv.weight          Q5_K   24     8192    168.8       0.0537     
+  attn_q.weight            Q4_K   8      8192    202.3       0.0149     
+  ssm_out.weight           Q5_K   24     2560    146.9       0.0308     
+  ffn_up.weight            Q4_K   32     9216    203.5       0.0668     
+  attn_k.weight            Q4_K   8      1024    136.6       0.0028     
+  attn_output.weight       Q4_K   8      2560    161.6       0.0093     
+  ffn_gate.weight          Q4_K   32     9216    205.4       0.0662     
+  attn_v.weight            Q4_K   3      1024    136.7       0.0010     
+  attn_v.weight            Q6_K   5      1024    140.5       0.0017     
+  attn_gate.weight         Q4_K   24     4096    188.8       0.0240     
+
+  matmul floor for the whole model: 0.3495 s  (183.6 G-MAC/s aggregate)
+  a measured forward pass of 18 tokens costs about 0.357 s; anything above the floor is not matmul
+
+=== round 2  PerShape ===
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 24, 2026 10:11:11 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 24, 2026 10:11:11 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+
+  batch 18
+
+  shape                    type   count  rows    G-MAC/s     total s    
+  ffn_down.weight          Q6_K   16     2560    168.5       0.0403     
+  ffn_down.weight          Q4_K   16     2560    175.9       0.0386     
+  attn_qkv.weight          Q5_K   24     8192    164.8       0.0550     
+  attn_q.weight            Q4_K   8      8192    214.0       0.0141     
+  ssm_out.weight           Q5_K   24     2560    141.2       0.0321     
+  ffn_up.weight            Q4_K   32     9216    216.0       0.0629     
+  attn_k.weight            Q4_K   8      1024    141.1       0.0027     
+  attn_output.weight       Q4_K   8      2560    155.3       0.0097     
+  ffn_gate.weight          Q4_K   32     9216    212.6       0.0639     
+  attn_v.weight            Q4_K   3      1024    141.8       0.0010     
+  attn_v.weight            Q6_K   5      1024    131.3       0.0018     
+  attn_gate.weight         Q4_K   24     4096    198.1       0.0229     
+
+  matmul floor for the whole model: 0.3450 s  (186.0 G-MAC/s aggregate)
+  a measured forward pass of 18 tokens costs about 0.357 s; anything above the floor is not matmul
+
+=== round 3  PerShape ===
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 24, 2026 10:11:11 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 24, 2026 10:11:12 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+
+  batch 18
+
+  shape                    type   count  rows    G-MAC/s     total s    
+  ffn_down.weight          Q6_K   16     2560    184.1       0.0369     
+  ffn_down.weight          Q4_K   16     2560    171.5       0.0396     
+  attn_qkv.weight          Q5_K   24     8192    163.8       0.0553     
+  attn_q.weight            Q4_K   8      8192    210.0       0.0144     
+  ssm_out.weight           Q5_K   24     2560    144.2       0.0314     
+  ffn_up.weight            Q4_K   32     9216    204.4       0.0665     
+  attn_k.weight            Q4_K   8      1024    135.5       0.0028     
+  attn_output.weight       Q4_K   8      2560    171.8       0.0088     
+  ffn_gate.weight          Q4_K   32     9216    204.7       0.0664     
+  attn_v.weight            Q4_K   3      1024    134.9       0.0010     
+  attn_v.weight            Q6_K   5      1024    139.8       0.0017     
+  attn_gate.weight         Q4_K   24     4096    188.5       0.0240     
+
+  matmul floor for the whole model: 0.3488 s  (184.0 G-MAC/s aggregate)
+  a measured forward pass of 18 tokens costs about 0.357 s; anything above the floor is not matmul
+
+=== round 3  PerShape ===
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 24, 2026 10:11:12 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 24, 2026 10:11:12 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+
+  batch 18
+
+  shape                    type   count  rows    G-MAC/s     total s    
+  ffn_down.weight          Q6_K   16     2560    172.5       0.0394     
+  ffn_down.weight          Q4_K   16     2560    188.0       0.0361     
+  attn_qkv.weight          Q5_K   24     8192    166.5       0.0544     
+  attn_q.weight            Q4_K   8      8192    229.0       0.0132     
+  ssm_out.weight           Q5_K   24     2560    142.2       0.0319     
+  ffn_up.weight            Q4_K   32     9216    235.3       0.0577     
+  attn_k.weight            Q4_K   8      1024    147.0       0.0026     
+  attn_output.weight       Q4_K   8      2560    167.2       0.0090     
+  ffn_gate.weight          Q4_K   32     9216    238.6       0.0570     
+  attn_v.weight            Q4_K   3      1024    148.3       0.0010     
+  attn_v.weight            Q6_K   5      1024    140.9       0.0017     
+  attn_gate.weight         Q4_K   24     4096    211.8       0.0214     
+
+  matmul floor for the whole model: 0.3253 s  (197.3 G-MAC/s aggregate)
+  a measured forward pass of 18 tokens costs about 0.357 s; anything above the floor is not matmul
+

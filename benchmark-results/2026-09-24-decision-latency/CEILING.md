@@ -67,7 +67,7 @@ way, so there is no longer anything for grouping to amortise -- which is what th
 forced-on measurement shows: 0.63x at two questions to 0.92x at twenty, and answers
 0.045 apart.
 
-## 4. Faster tokens: the inner loop is at its ceiling, and that was not the problem
+## 4. Faster tokens: the inner loop is NOT at its ceiling -- see the correction below
 
 `harness/Ceiling` times real Q4_K and Q6_K weights from the shipped model at the batch width a
 decision uses. At batch 18 they reach 58-65% and 50-54% of roughly 32 int8 multiply-accumulates
@@ -81,6 +81,15 @@ That ceiling ignored what Q4_K actually costs. It carries a scale per 32-weight 
 it is a second vector multiply for every one that does useful work: per 256-weight block the kernel
 spends about 30 vector operations on 256 multiply-accumulates, which is roughly 17-25 MAC/cycle
 structurally. Measured is 21. **The inner loop is at its algorithmic ceiling for AVX2.**
+
+> **RETRACTED 2026-09-24, later the same day.** This conclusion is wrong, and the two
+> failed experiments that produced it were not enough evidence for it. On a dedicated
+> CCX33 whose cores actually run at 2400 MHz -- not the 2.0 GHz the BIOS string claims,
+> which is where the "21" came from -- the same kernel reaches **25.6 MAC/cycle/core
+> when its weights are cache resident** and only **17.1** when they stream from DRAM.
+> Identical instructions, 50% apart. The arithmetic is not the wall; load latency is.
+> Neither arm is bandwidth bound either: both use under a fifth of the 38 GB/s this box
+> can sustain. Full measurements in `q4k-row-tile/NOTES.md`.
 
 Tested rather than argued. The one visibly redundant operation was the per-group scale broadcast,
 recomputed inside the batch loop -- 144 times per block instead of 8. Hoisting it is bit-exact,
@@ -107,6 +116,17 @@ hundred matmuls of a dozen shapes, plus norms, a recurrence, attention and a voc
 
 **52%.** Timing every shape in the model separately and summing gives a matmul floor of 0.205 s
 against a measured forward pass of 0.357 s, so **43% of a forward pass was not matmul at all.**
+
+> **CORRECTED 2026-09-24, later the same day.** That 43% is an artifact of how the floor
+> was measured, not a property of the forward pass. `PerShape` times one exemplar tensor
+> per shape, eight warmups and ten rounds deep; a 9216x2560 Q4_K tensor is ~13 MB and this
+> CCX has 32 MB of L3, so it is resident by the time it is timed. A forward pass never sees
+> a weight twice. Re-measured with `q4k-row-tile/ColdShape.java`, which touches every
+> `blk.*` weight exactly once in layer order, the matmul floor is **0.392 s against a
+> 0.498 s forward pass -- 79% matmul, not 57%**. The per-shape numbers in the table below,
+> including the 445-478 against 218-244 spread, are resident-tensor rates and do not
+> describe what the model does. Judge kernel changes on `ColdShape` and `Achieved`, never
+> on `PerShape` alone.
 
 Two things are visible in the per-shape table. Narrow outputs run at half the rate of wide ones --
 9216-row `ffn_gate` and `ffn_up` at 445-478 G-MAC/s against 218-244 for the 2560- and 1024-row
