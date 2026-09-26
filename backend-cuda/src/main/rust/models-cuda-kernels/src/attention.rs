@@ -60,11 +60,15 @@ pub const MAX_EXP_RELATIVE_ERROR: f32 = 1.0e-6;
 pub const MAX_HEAD_RELATIVE_L2: f32 = 2.0e-5;
 
 /// `log2(e)`, from `core` so the value is the platform's rather than a transcribed literal.
-const LOG2_E: f32 = 1.442_695_04_f32;
+// Bit-identical to Java's `1.44269504f` (both 0x3fb8aa3b), checked, so the named constant is
+// used rather than a re-spelled literal.
+const LOG2_E: f32 = core::f32::consts::LOG2_E;
 /// High part of `ln(2)`, chosen with trailing mantissa zeros so `x - n * LN2_HI` stays exact.
-const LN2_HI: f32 = 0.693_145_752_f32;
+// Java writes `0.693145752f`; this is the shortest literal with the same f32 bits (0x3f317200).
+const LN2_HI: f32 = 0.693_145_75_f32;
 /// Low part of `ln(2)`, carrying the remainder of the split.
-const LN2_LO: f32 = 1.428_606_77e-6_f32;
+// Java writes `1.42860677e-6f`; same f32 bits (0x35bfbe8e).
+const LN2_LO: f32 = 1.428_606_8e-6_f32;
 
 /// Softmax input clamp, matching the CPU kernel. An infinity is clamped to an endpoint, not
 /// mapped to 0 or infinity, and the clamp is what bounds the constructed exponent.
@@ -104,13 +108,9 @@ pub fn expf(x: f32) -> f32 {
     // Java clamps FIRST, so an infinity becomes a finite endpoint rather than 0 or inf. The
     // clamp is also what keeps `n + 127` inside [1, 254], which is why no subnormal two-step
     // scaling is needed here and none exists on the Java side.
-    let x = if x < EXP_LOWER {
-        EXP_LOWER
-    } else if x > EXP_UPPER {
-        EXP_UPPER
-    } else {
-        x
-    };
+    // `clamp` is exactly Java's `Math.min(Math.max(x, lower), upper)` for a non-NaN `x`, and NaN
+    // already returned above, so the panic-on-unordered-bounds case cannot arise.
+    let x = x.clamp(EXP_LOWER, EXP_UPPER);
     // n = round(x * log2 e), via the 1.5 * 2^23 magic constant rather than a rounding
     // intrinsic. Plain `*` and `+`, never an fma: contracting these would change the result,
     // and Rust does not contract without fast-math.
