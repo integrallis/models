@@ -79,11 +79,13 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
    * System property that refuses only the decode-attention kernel, leaving the projections routed.
    *
    * <p>A per-stage ablation switch, not a feature flag. The projections are bit-exact by
-   * construction; attention carries a stated 2.0e-5 relative-L2 contract because of {@code expf}
-   * (see {@code UPSTREAM.md} CU-005). So when G1 diverges at a token where both stages routed,
-   * there are two live suspects and no way to tell them apart from the report alone. {@code
-   * CudaParityRun} literally tells the reader to "re-run with attention refused"; this is the
-   * switch that makes that re-run possible without recompiling anything.
+   * construction, and attention is too since its {@code expf} became an exact transcription of
+   * {@code GroupedQueryAttentionKernel.expScalar} (see {@code UPSTREAM.md} CU-005). The switch
+   * still earns its place: it is what isolated the attention kernel as the cause when G1 diverged
+   * at prompt 0 token 7 on an A40, and it is the only way to tell two routed stages apart from a
+   * report alone if either regresses. {@code CudaParityRun} literally tells the reader to "re-run
+   * with attention refused"; this is the switch that makes that re-run possible without recompiling
+   * anything.
    *
    * <p>The refusal is <b>counted</b>, under the reason {@code ablated-by-models.cuda.attention
    * .disabled}, once per attention operation diverted. An ablation whose only evidence is an
