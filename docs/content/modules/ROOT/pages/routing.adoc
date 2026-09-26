@@ -59,6 +59,14 @@ Blocking calls try the ranked fallbacks when a client fails. Streaming calls
 may fall back only before the first response fragment reaches the application;
 switching after that point would combine output from two models.
 
+Standard `CancellationException` and `InterruptedException` signals, including signals nested in
+SDK cause chains, stop fallback without recording a model-health failure. Blocking interruption
+restores the caller's interrupt flag. Streaming adapters preserve the original error signal;
+they do not interrupt an asynchronous callback thread. Spring subscription disposal propagates
+upstream cancellation. Ordinary provider timeouts remain eligible for fallback before content
+has been emitted. LangChain4j's newer rich callback/cancellation-context forwarding still needs
+separate qualification; this change handles cancellation delivered as an error or thrown by a client.
+
 == Per-Request Capabilities And Data Boundaries
 
 All three framework adapters accept a fourth constructor argument that maps the complete

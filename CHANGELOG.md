@@ -8,6 +8,10 @@ All notable changes to models are documented here.
 
 ### Fixed
 
+- Preserve standard cancellation/interruption signals through SDK cause chains. Stop Spring AI
+  and LangChain4j streaming fallback on these signals without penalizing model health; keep the
+  original streaming error and restore interruption only for blocking callers.
+
 - Reject non-finite/negative routing price and latency ceilings, and quality floors outside
   `[0, 1]`, at policy construction. `NaN` previously bypassed hard eligibility comparisons.
 - Stop blocking fleet execution on cancellation or interruption without invoking fallback clients

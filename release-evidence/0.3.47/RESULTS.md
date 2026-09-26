@@ -23,7 +23,8 @@ Sixteen added regression cases exercise blocking and streaming paths in both fra
 
 These are synthetic control-flow tests. They do not measure model quality, detect PII, attest a
 provider's locality, or establish real-provider SLA/cost behavior. Classification, total budgets,
-completion deadlines, and streaming cancellation still require further qualification.
+completion deadlines, rich streaming callbacks and provider cancellation contexts still require
+further qualification.
 
 Local Temurin 25.0.3 tests on the Intel Mac: 116 cases, 112 passed, zero failures/errors, four
 missing-corpus skips. Formatting and staging of the six relevant Models modules passed. These
@@ -61,3 +62,20 @@ release dry run pass. Publication must then be checked directly against Maven Ce
 
 Optional GPU paths are not newly qualified by hosted CPU CI. The release does not include open
 CUDA/Tornado/NEON experimental pull requests, paid-provider tests, or model-quality claims.
+
+## Cancellation follow-up
+
+A deterministic fake-provider probe found that SDK-wrapped blocking cancellation and streaming
+cancellation errors could start another provider and penalize model health. Fourteen new cases
+failed against `ee8dab27` before the fix (the subscription-disposal control already passed). The
+follow-up classifies standard cancellation/interruption through cycle-safe cause chains, preserves
+streaming errors, and restores interruption for blocking callers only. Additional controls cover
+ordinary timeouts, suppressed cancellation, cyclic causes, callback-thread interrupt state, and
+cancellation during fallback. These are control-flow tests, not live-provider cancellation tests.
+LangChain4j's newer rich callbacks and cancellation contexts remain a separate qualification gap.
+
+Local follow-up verification: all 141 router/framework cases passed, zero skips. This includes
+25 added cancellation/classification cases; 14 were confirmed failing before the repair. The
+original eight-case standalone probe now records zero fallback calls and zero cancellation health
+penalties. The same fake-provider inputs were used before and after. Remote framework compatibility
+and a new signed release dry run must qualify this follow-up before publication.

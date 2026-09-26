@@ -17,6 +17,7 @@ package com.integrallis.models.spring.ai;
 
 import com.integrallis.models.router.ModelCandidate;
 import com.integrallis.models.router.ModelFleet;
+import com.integrallis.models.router.RoutingCancellation;
 import com.integrallis.models.router.RoutingContinuity;
 import com.integrallis.models.router.RoutingDecision;
 import com.integrallis.models.router.RoutingFeedback;
@@ -141,6 +142,9 @@ public final class RoutedSpringAiChatModel implements ChatModel {
                             started)))
         .onErrorResume(
             failure -> {
+              if (RoutingCancellation.isCancellation(failure)) {
+                return Flux.error(failure);
+              }
               fleet
                   .router()
                   .record(feedback(request, taskType, candidate.id(), false, -1, started));
