@@ -185,3 +185,49 @@ would be worse than no number.
 before a Q6_K call on a shared scratch produced 10^5–10^7 magnitude corruption and occasional NaN.
 It did not reproduce under the fixed-size, one-call-per-tensor pattern of real use, so it is not
 G1's cause, but the missing length check is real.
+
+## G1 resolved in code, 2026-09-26T16:30Z — and the same defect existed upstream
+
+**The fix.** The device fold was a transcription of the *wrong CPU reduction*. `models` carried two
+Q6_K row reductions that were not bit-identical to each other:
+
+| path | shape |
+|---|---|
+| `PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot` | one exact `i32` per super-block, one `fma` into one `f32` accumulator |
+| `VectorUtilSupport.ggufQ6_KQ8_KScalarRowDot` (the `VECTOR_BITSIZE < 256` fallback) | eight `f32` lane accumulators, summed at the end |
+
+`Q6KRowAccumulator` was transcribed from the scalar one. The control it is measured against is the
+Panama one, because `TensorOps.ggufMatmul` takes that path on any host with 256-bit vectors — which
+is every host that can also run CUDA. **The two folds coincide at exactly one super-block and differ
+by one ULP from two on**, which is why a one-super-block test passed for weeks while G1 failed at
+prompt 0, token 0. Reproduced off-device at the same bits the A40 reported: single accumulator
+`-0.256989866` (bits `-1098673107`), eight lanes `-0.256989896` (bits `-1098673106`).
+
+It was never an `fma` contraction problem. The emitted PTX contains `fma.rn.f32` and no unfused
+`mul`/`add` pair either side of the change; what changed is how many fused operations there are and
+in what shape. Per super-block: 8 `fma` + 8 `add` + 8 shared stores + 8 shared loads became 1 `fma`,
+no `add`, 1 store, 1 load. Shared scratch dropped from 4096 to 1024 bytes. **Q4_K needed no change
+and never had the defect** — its two CPU reductions are already the same shape — and that contrast is
+what localised this.
+
+**The same defect existed in `vectors`, and was fixed there independently.** Vectors PR #76 (merged
+2026-09-22) made the scalar path bit-identical to the Panama path, unifying on the single-accumulator
+integer `blockSum` + one `fma` form — the *same direction* this kernel fix took. Verified by reading
+the published `vectors-core-0.1.23-sources.jar` from Central, and Models now pins
+`vectorsVersion = 0.1.23`. So the follow-up this campaign recorded — "vectors disagrees with vectors
+on Q6_K, so a Q6_K result is not reproducible across machines" — was real and is now closed upstream.
+Worth stating plainly: a GPU parity gate surfaced a CPU reproducibility bug that affected every host
+with narrow vectors, independent of any GPU.
+
+**Status of the gates.** G1 is fixed in code and covered by tests that run without a device
+(14 Rust host tests, including one that measures the two CPU reductions disagreeing rather than
+asserting it from the source, and one that fails unless the crate is the Panama control). The
+device-executing bisection at 1, 2, 3, 32, 33 and 48 super-blocks skips off-device. **No device run
+has confirmed the fix, and G3, the CPU control and G4 remain unrun.** They are not being run now: the
+prior campaign overspent, and a decode number from a kernel whose parity is unconfirmed would be
+worth less than the GPU hour it cost.
+
+**Kernel work already on main.** PR #196 merged the Rust PTX kernels and #204 changed the batch row
+to come from `blockIdx.y` rather than a scalar parameter. **The defective eight-lane fold is
+therefore live on main**, and `backend-cuda` is deliberately not published to Central, so no released
+artifact carries it.
