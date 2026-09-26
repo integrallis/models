@@ -228,7 +228,10 @@ UTF-8 bytes plus message framing and the explicit output limit. This is a contex
 universal tokenizer bound or a spending guarantee. Media requires an explicit accounting factory.
 Custom request factories remain supported. To use execution controls with a framework adapter,
 pass a fifth constructor argument: a function from the complete `ChatRequest` or `Prompt` to
-`RoutingExecutionOptions`. The original provider request, options and metadata stay intact.
+`RoutingExecutionOptions`. The original provider request is passed to the delegate public API. LangChain4j delegates receive
+`chat(...)`, allowing their SDK to apply provider-specific defaults and listeners before its
+internal `doChat(...)` hook. Explicit request options retain precedence over those defaults.
+Include provider defaults that add prompt content or tools in the accounting overhead.
 
 Budgeted adapter calls require an explicit `maxOutputTokens` (LangChain4j) or `maxTokens` (Spring)
 within the reserved output bound. Spring AI 1.x internal tool execution must be explicitly disabled;

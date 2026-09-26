@@ -328,7 +328,7 @@ public final class RoutedStreamingChatModel implements StreamingChatModel {
         execution.call(
             () -> {
               execution.checkActive();
-              fleet.model(candidate.id()).client().doChat(request, forwarding);
+              fleet.model(candidate.id()).client().chat(request, forwarding);
               return null;
             });
       } catch (Exception | Error failure) {

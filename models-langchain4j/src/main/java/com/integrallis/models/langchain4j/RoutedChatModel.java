@@ -108,7 +108,7 @@ public final class RoutedChatModel implements ChatModel {
             requirements,
             continuity,
             options,
-            model -> model.doChat(request),
+            model -> model.chat(request),
             RoutingAccounting::usage)
         .value();
   }
