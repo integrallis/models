@@ -1,0 +1,903 @@
+{
+ "schemaVersion": 1,
+ "kind": "arm",
+ "createdAt": "2026-09-17T19:34:05.852924167Z",
+ "config": {
+  "arm": {
+   "label": "RERANK",
+   "spec": "rerank:A+B+C:tuned",
+   "canonical": "rerank:A+B+C:tuned",
+   "kind": "rerank",
+   "members": [
+    "A",
+    "B",
+    "C"
+   ],
+   "rule": "poe",
+   "weights": [
+    0.3333333333333333,
+    0.3333333333333333,
+    0.3333333333333333
+   ],
+   "weightSource": "uniform (pilot substitution for tuned)",
+   "tieBreakMember": null,
+   "samples": 1,
+   "frozenPath": null,
+   "frozenSha256": null,
+   "pilot": true,
+   "pilotSubstitution": "tuned weights -> uniform",
+   "scorer": "number",
+   "reusedMemberReports": [
+    "/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-A.json",
+    "/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-B.json",
+    "/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-C.json"
+   ],
+   "reusedMemberReportSha256s": [
+    "420c6a569214afc9a73605c2d61a2c6888e0c2b8dc2e01c5be107b5fc0b07d17",
+    "b6f5b6e1c1bf7c882dd097c22173a3a9365f0ee4bc23154b313aac77b73f8c21",
+    "f41695dc5cefed11ef792bc2f669719562a882455de87c436baef3866ddf6828"
+   ]
+  },
+  "decoding": {
+   "temperature": 0.0,
+   "topK": 0,
+   "topP": 1.0,
+   "seeds": [
+    20260917
+   ],
+   "maxTokens": 1024,
+   "thinking": "off",
+   "chatTemplate": "chatml-no-think",
+   "chatTemplateSha256": "cbd2eea69af920f3a901940acb011e5b6171679e55f0918216abd53bb7b99ca6",
+   "promptsSource": "resource:/com/integrallis/models/bench/fusion/prompts-v1.json",
+   "promptsSha256": "87b64679dc050753b36748d2dd9e58ecd6ead7ed96e1036f29010679d7405d38",
+   "memberThreads": 3,
+   "contextLength": 10240,
+   "tokenLogEvery": 1,
+   "arcScoring": "generative",
+   "rerankScore": "sum",
+   "rerankPromptThinking": "off",
+   "greedyRule": "argmax over fused double scores, lowest token id on ties; Sampler when T > 0"
+  },
+  "members": [
+   {
+    "name": "A",
+    "path": "/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf",
+    "sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+    "sizeBytes": 639446688,
+    "tokenizerSha256": "f297a3492faa9d2eb759492b1ea440d75abbfb187ac70f84da3dc7b9aad9af54",
+    "tokenizerFields": {
+     "tokenizer.ggml.token_type": "8765404f5d153febd8ad51c2ac157e835d8da1fc77baa3261ce553eb463fb43c",
+     "tokenizer.ggml.scores": "absent",
+     "tokenizer.ggml.add_eos_token": "absent",
+     "tokenizer.ggml.seperator_token_id": "absent",
+     "tokenizer.ggml.eos_token_id": "219218f6a2164c2cf8f0f19c1a2a4efbf0738237d52e7e2b815e35e85aa60e28",
+     "tokenizer.ggml.pre": "cb4814a8ea32aff2eb6837073ec0b0d8abacf506f1c6ef454141d4e66f787bc4",
+     "derived.special_tokens": "2a90265a3e6deb1254d17f73764ee1b1505be7d7a39c2175aa27818051aca268",
+     "tokenizer.ggml.add_bos_token": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+     "tokenizer.ggml.padding_token_id": "10a4b406fc1768fe959ce4f98ed8928a54ec7b8d0cd57c70964e953de8c6b88d",
+     "tokenizer.ggml.unknown_token_id": "absent",
+     "tokenizer.ggml.bos_token_id": "10a4b406fc1768fe959ce4f98ed8928a54ec7b8d0cd57c70964e953de8c6b88d",
+     "tokenizer.ggml.eom_token_id": "absent",
+     "tokenizer.ggml.add_space_prefix": "absent",
+     "tokenizer.ggml.tokens": "88b8415a5f6b27adeb8c71de994da3e04042b6b3ea80ab2a2d9cdbb1455e121a",
+     "tokenizer.ggml.merges": "9e392bd8ad440b06ea9f66cd323737f08eccc15637e3d4369b223f87e0056638",
+     "tokenizer.ggml.model": "2e5fb0b7f026db90724d364a5b5b98abbf354ea09df3e23b4a4365a14a0a6c70",
+     "tokenizer.ggml.eot_token_id": "absent"
+    },
+    "chatTemplateSha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+    "architecture": "qwen3",
+    "ggufFileType": 7,
+    "vocabularySize": 151936,
+    "diagnostics": {
+     "backend": "pure-java",
+     "planVersion": "pure-java-v20",
+     "environment": {
+      "end-of-generation.chat-template": "resolved:151645",
+      "vector-provider": "PanamaVectorUtilSupport",
+      "q4-short-pairwise-supported": "true",
+      "model-architecture": "qwen3",
+      "end-of-generation-token-ids": "151643,151645",
+      "gguf-executor": "persistent",
+      "java-version": "25.0.4.1",
+      "fast-scalar-fma": "true",
+      "vm-name": "OpenJDK 64-Bit Server VM",
+      "gguf-chunks-per-thread": "2",
+      "os": "Linux",
+      "gguf-parallel": "true",
+      "sve": "false",
+      "processors": "16",
+      "compiler": "hotspot-c2",
+      "vm-vendor": "Eclipse Adoptium",
+      "end-of-generation.151645": "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "end-of-generation.151643": "vocabulary-text",
+      "architecture": "amd64",
+      "performance-cliff.fused-grouped-attention-not-wired": "architecture=qwen3, group-size=2",
+      "performance-cliffs": "vector-width-capped,fused-grouped-attention-not-wired",
+      "vector-api": "true",
+      "gguf-threads": "16",
+      "q4-unsigned-pairwise-supported": "true",
+      "java-feature": "25",
+      "active-vector-bits": "256",
+      "preferred-vector-bits": "512",
+      "cpu-model": "AMD EPYC-Genoa Processor",
+      "performance-cliff.vector-width-capped": "active-vector-bits=256, preferred-vector-bits=512, vector-provider=PanamaVectorUtilSupport",
+      "vm-version": "25.0.4.1+1-LTS",
+      "fast-vector-fma": "true",
+      "projection-layers": "28"
+     },
+     "optimizations": [
+      {
+       "id": "grouped-projections",
+       "status": "ENABLED",
+       "reason": "loaded tensor topology has a retained grouped projection kernel",
+       "settings": {
+        "gate-up": "grouped",
+        "qkv": "independent",
+        "implementation": "vector-api"
+       }
+      },
+      {
+       "id": "mixed-k-projections",
+       "status": "UNSUPPORTED",
+       "reason": "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+       "settings": {
+        "formats": "Q4_K,Q4_K,Q6_K",
+        "eligible-layers": "0"
+       }
+      },
+      {
+       "id": "q4-kernel",
+       "status": "UNSUPPORTED",
+       "reason": "the loaded model has no Q4_0 projection tensors",
+       "settings": {
+        "compiler": "hotspot-c2",
+        "requested": "widened",
+        "short-supported": "true",
+        "java-feature": "25",
+        "active-vector-bits": "256",
+        "unsigned-supported": "true",
+        "os": "Linux",
+        "architecture": "amd64"
+       }
+      },
+      {
+       "id": "batched-prefill",
+       "status": "ENABLED",
+       "reason": "all loaded projection tensors have retained batched kernels",
+       "settings": {
+        "batch-size": "32"
+       }
+      },
+      {
+       "id": "q6-batched-kernel",
+       "status": "UNSUPPORTED",
+       "reason": "loaded projection topology has no Q6_K consumer",
+       "settings": {
+        "requested-kernel": "one-query-block",
+        "kernel": "one-query-block",
+        "architecture": "amd64",
+        "batch-size": "32",
+        "active-vector-bits": "256"
+       }
+      },
+      {
+       "id": "final-layer-prefill-pruning",
+       "status": "ENABLED",
+       "reason": "the validated final FFN runs only for requested prompt output rows",
+       "settings": {
+        "output-rows": "requested",
+        "formats": "Q8_0,Q8_0,Q8_0"
+       }
+      },
+      {
+       "id": "final-layer-kv-only-prefill",
+       "status": "ENABLED",
+       "reason": "unused final-layer prompt rows compute only the persistent K/V state",
+       "settings": {
+        "formats": "Q8_0,Q8_0,Q8_0,Q8_0",
+        "unused-rows": "kv-only"
+       }
+      },
+      {
+       "id": "batched-attention-scores",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.batchedAttentionScores",
+       "settings": {
+        "rows-per-group": "1"
+       }
+      },
+      {
+       "id": "batched-attention-values",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.batchedAttentionValues",
+       "settings": {
+        "rows-per-group": "1"
+       }
+      },
+      {
+       "id": "staged-quantized-ffn",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.stagedQuantizedFfn",
+       "settings": {
+        "parallel": "true",
+        "stages": "2",
+        "executor": "persistent",
+        "eligible-layers": "28"
+       }
+      },
+      {
+       "id": "staged-quantized-layer",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.stagedQuantizedLayer",
+       "settings": {
+        "parallel": "true",
+        "stages": "7",
+        "executor": "persistent",
+        "eligible-layers": "28"
+       }
+      },
+      {
+       "id": "block-major-q8-activations",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.blockMajorQ8Activations",
+       "settings": {
+        "prefill-batch-size": "32",
+        "layout": "block-major-bytes"
+       }
+      },
+      {
+       "id": "q8-block-major-kernel",
+       "status": "DISABLED",
+       "reason": "models.purejava.q8BlockMajorKernel selects scattered accumulation",
+       "settings": {
+        "requested-kernel": "scattered",
+        "kernel": "scattered",
+        "floating-point-order": "scalar-block-order",
+        "compiler": "hotspot-c2",
+        "active-vector-bits": "256"
+       }
+      },
+      {
+       "id": "parallel-q8-ffn-preparation",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.parallelQ8FfnPreparation",
+       "settings": {
+        "staged-layers": "28",
+        "partition": "batch-rows",
+        "partitions": "16",
+        "eligible-layers": "28"
+       }
+      },
+      {
+       "id": "mapped-model-weights",
+       "status": "ENABLED",
+       "reason": "model tensors remain mapped for model-scale streaming locality",
+       "settings": {
+        "storage": "memory-segment",
+        "artifact-format": "gguf"
+       }
+      },
+      {
+       "id": "vector-fma",
+       "status": "ENABLED",
+       "reason": "vectors-core selected deterministic vector FMA for this platform",
+       "settings": {
+        "fast-scalar-fma": "true"
+       }
+      },
+      {
+       "id": "persistent-row-executor",
+       "status": "ENABLED",
+       "reason": "vectors-core selected reusable GGUF row workers",
+       "settings": {
+        "threads": "16",
+        "chunks-per-thread": "2",
+        "executor": "persistent"
+       }
+      }
+     ]
+    },
+    "loadMillis": 283
+   },
+   {
+    "name": "B",
+    "path": "/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf",
+    "sha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+    "sizeBytes": 1834426016,
+    "tokenizerSha256": "f297a3492faa9d2eb759492b1ea440d75abbfb187ac70f84da3dc7b9aad9af54",
+    "tokenizerFields": {
+     "tokenizer.ggml.token_type": "8765404f5d153febd8ad51c2ac157e835d8da1fc77baa3261ce553eb463fb43c",
+     "tokenizer.ggml.scores": "absent",
+     "tokenizer.ggml.add_eos_token": "absent",
+     "tokenizer.ggml.seperator_token_id": "absent",
+     "tokenizer.ggml.eos_token_id": "219218f6a2164c2cf8f0f19c1a2a4efbf0738237d52e7e2b815e35e85aa60e28",
+     "tokenizer.ggml.pre": "cb4814a8ea32aff2eb6837073ec0b0d8abacf506f1c6ef454141d4e66f787bc4",
+     "derived.special_tokens": "2a90265a3e6deb1254d17f73764ee1b1505be7d7a39c2175aa27818051aca268",
+     "tokenizer.ggml.add_bos_token": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+     "tokenizer.ggml.padding_token_id": "10a4b406fc1768fe959ce4f98ed8928a54ec7b8d0cd57c70964e953de8c6b88d",
+     "tokenizer.ggml.unknown_token_id": "absent",
+     "tokenizer.ggml.bos_token_id": "10a4b406fc1768fe959ce4f98ed8928a54ec7b8d0cd57c70964e953de8c6b88d",
+     "tokenizer.ggml.eom_token_id": "absent",
+     "tokenizer.ggml.add_space_prefix": "absent",
+     "tokenizer.ggml.tokens": "88b8415a5f6b27adeb8c71de994da3e04042b6b3ea80ab2a2d9cdbb1455e121a",
+     "tokenizer.ggml.merges": "9e392bd8ad440b06ea9f66cd323737f08eccc15637e3d4369b223f87e0056638",
+     "tokenizer.ggml.model": "2e5fb0b7f026db90724d364a5b5b98abbf354ea09df3e23b4a4365a14a0a6c70",
+     "tokenizer.ggml.eot_token_id": "absent"
+    },
+    "chatTemplateSha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+    "architecture": "qwen3",
+    "ggufFileType": 7,
+    "vocabularySize": 151936,
+    "diagnostics": {
+     "backend": "pure-java",
+     "planVersion": "pure-java-v20",
+     "environment": {
+      "end-of-generation.chat-template": "resolved:151645",
+      "vector-provider": "PanamaVectorUtilSupport",
+      "q4-short-pairwise-supported": "true",
+      "model-architecture": "qwen3",
+      "end-of-generation-token-ids": "151643,151645",
+      "gguf-executor": "persistent",
+      "java-version": "25.0.4.1",
+      "fast-scalar-fma": "true",
+      "vm-name": "OpenJDK 64-Bit Server VM",
+      "gguf-chunks-per-thread": "2",
+      "os": "Linux",
+      "gguf-parallel": "true",
+      "sve": "false",
+      "processors": "16",
+      "compiler": "hotspot-c2",
+      "vm-vendor": "Eclipse Adoptium",
+      "end-of-generation.151645": "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "end-of-generation.151643": "vocabulary-text",
+      "architecture": "amd64",
+      "performance-cliff.fused-grouped-attention-not-wired": "architecture=qwen3, group-size=2",
+      "performance-cliffs": "vector-width-capped,fused-grouped-attention-not-wired",
+      "vector-api": "true",
+      "gguf-threads": "16",
+      "q4-unsigned-pairwise-supported": "true",
+      "java-feature": "25",
+      "active-vector-bits": "256",
+      "preferred-vector-bits": "512",
+      "cpu-model": "AMD EPYC-Genoa Processor",
+      "performance-cliff.vector-width-capped": "active-vector-bits=256, preferred-vector-bits=512, vector-provider=PanamaVectorUtilSupport",
+      "vm-version": "25.0.4.1+1-LTS",
+      "fast-vector-fma": "true",
+      "projection-layers": "28"
+     },
+     "optimizations": [
+      {
+       "id": "grouped-projections",
+       "status": "ENABLED",
+       "reason": "loaded tensor topology has a retained grouped projection kernel",
+       "settings": {
+        "gate-up": "grouped",
+        "qkv": "independent",
+        "implementation": "vector-api"
+       }
+      },
+      {
+       "id": "mixed-k-projections",
+       "status": "UNSUPPORTED",
+       "reason": "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+       "settings": {
+        "formats": "Q4_K,Q4_K,Q6_K",
+        "eligible-layers": "0"
+       }
+      },
+      {
+       "id": "q4-kernel",
+       "status": "UNSUPPORTED",
+       "reason": "the loaded model has no Q4_0 projection tensors",
+       "settings": {
+        "compiler": "hotspot-c2",
+        "requested": "widened",
+        "short-supported": "true",
+        "java-feature": "25",
+        "active-vector-bits": "256",
+        "unsigned-supported": "true",
+        "os": "Linux",
+        "architecture": "amd64"
+       }
+      },
+      {
+       "id": "batched-prefill",
+       "status": "ENABLED",
+       "reason": "all loaded projection tensors have retained batched kernels",
+       "settings": {
+        "batch-size": "32"
+       }
+      },
+      {
+       "id": "q6-batched-kernel",
+       "status": "UNSUPPORTED",
+       "reason": "loaded projection topology has no Q6_K consumer",
+       "settings": {
+        "requested-kernel": "one-query-block",
+        "kernel": "one-query-block",
+        "architecture": "amd64",
+        "batch-size": "32",
+        "active-vector-bits": "256"
+       }
+      },
+      {
+       "id": "final-layer-prefill-pruning",
+       "status": "ENABLED",
+       "reason": "the validated final FFN runs only for requested prompt output rows",
+       "settings": {
+        "output-rows": "requested",
+        "formats": "Q8_0,Q8_0,Q8_0"
+       }
+      },
+      {
+       "id": "final-layer-kv-only-prefill",
+       "status": "ENABLED",
+       "reason": "unused final-layer prompt rows compute only the persistent K/V state",
+       "settings": {
+        "formats": "Q8_0,Q8_0,Q8_0,Q8_0",
+        "unused-rows": "kv-only"
+       }
+      },
+      {
+       "id": "batched-attention-scores",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.batchedAttentionScores",
+       "settings": {
+        "rows-per-group": "1"
+       }
+      },
+      {
+       "id": "batched-attention-values",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.batchedAttentionValues",
+       "settings": {
+        "rows-per-group": "1"
+       }
+      },
+      {
+       "id": "staged-quantized-ffn",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.stagedQuantizedFfn",
+       "settings": {
+        "parallel": "true",
+        "stages": "2",
+        "executor": "persistent",
+        "eligible-layers": "28"
+       }
+      },
+      {
+       "id": "staged-quantized-layer",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.stagedQuantizedLayer",
+       "settings": {
+        "parallel": "true",
+        "stages": "7",
+        "executor": "persistent",
+        "eligible-layers": "28"
+       }
+      },
+      {
+       "id": "block-major-q8-activations",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.blockMajorQ8Activations",
+       "settings": {
+        "prefill-batch-size": "32",
+        "layout": "block-major-bytes"
+       }
+      },
+      {
+       "id": "q8-block-major-kernel",
+       "status": "DISABLED",
+       "reason": "models.purejava.q8BlockMajorKernel selects scattered accumulation",
+       "settings": {
+        "requested-kernel": "scattered",
+        "kernel": "scattered",
+        "floating-point-order": "scalar-block-order",
+        "compiler": "hotspot-c2",
+        "active-vector-bits": "256"
+       }
+      },
+      {
+       "id": "parallel-q8-ffn-preparation",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.parallelQ8FfnPreparation",
+       "settings": {
+        "staged-layers": "28",
+        "partition": "batch-rows",
+        "partitions": "16",
+        "eligible-layers": "28"
+       }
+      },
+      {
+       "id": "mapped-model-weights",
+       "status": "ENABLED",
+       "reason": "model tensors remain mapped for model-scale streaming locality",
+       "settings": {
+        "storage": "memory-segment",
+        "artifact-format": "gguf"
+       }
+      },
+      {
+       "id": "vector-fma",
+       "status": "ENABLED",
+       "reason": "vectors-core selected deterministic vector FMA for this platform",
+       "settings": {
+        "fast-scalar-fma": "true"
+       }
+      },
+      {
+       "id": "persistent-row-executor",
+       "status": "ENABLED",
+       "reason": "vectors-core selected reusable GGUF row workers",
+       "settings": {
+        "threads": "16",
+        "chunks-per-thread": "2",
+        "executor": "persistent"
+       }
+      }
+     ]
+    },
+    "loadMillis": 71
+   },
+   {
+    "name": "C",
+    "path": "/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf",
+    "sha256": "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300",
+    "sizeBytes": 4280404704,
+    "tokenizerSha256": "f297a3492faa9d2eb759492b1ea440d75abbfb187ac70f84da3dc7b9aad9af54",
+    "tokenizerFields": {
+     "tokenizer.ggml.token_type": "8765404f5d153febd8ad51c2ac157e835d8da1fc77baa3261ce553eb463fb43c",
+     "tokenizer.ggml.scores": "absent",
+     "tokenizer.ggml.add_eos_token": "absent",
+     "tokenizer.ggml.seperator_token_id": "absent",
+     "tokenizer.ggml.eos_token_id": "219218f6a2164c2cf8f0f19c1a2a4efbf0738237d52e7e2b815e35e85aa60e28",
+     "tokenizer.ggml.pre": "cb4814a8ea32aff2eb6837073ec0b0d8abacf506f1c6ef454141d4e66f787bc4",
+     "derived.special_tokens": "2a90265a3e6deb1254d17f73764ee1b1505be7d7a39c2175aa27818051aca268",
+     "tokenizer.ggml.add_bos_token": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+     "tokenizer.ggml.padding_token_id": "10a4b406fc1768fe959ce4f98ed8928a54ec7b8d0cd57c70964e953de8c6b88d",
+     "tokenizer.ggml.unknown_token_id": "absent",
+     "tokenizer.ggml.bos_token_id": "10a4b406fc1768fe959ce4f98ed8928a54ec7b8d0cd57c70964e953de8c6b88d",
+     "tokenizer.ggml.eom_token_id": "absent",
+     "tokenizer.ggml.add_space_prefix": "absent",
+     "tokenizer.ggml.tokens": "88b8415a5f6b27adeb8c71de994da3e04042b6b3ea80ab2a2d9cdbb1455e121a",
+     "tokenizer.ggml.merges": "9e392bd8ad440b06ea9f66cd323737f08eccc15637e3d4369b223f87e0056638",
+     "tokenizer.ggml.model": "2e5fb0b7f026db90724d364a5b5b98abbf354ea09df3e23b4a4365a14a0a6c70",
+     "tokenizer.ggml.eot_token_id": "absent"
+    },
+    "chatTemplateSha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+    "architecture": "qwen3",
+    "ggufFileType": 7,
+    "vocabularySize": 151936,
+    "diagnostics": {
+     "backend": "pure-java",
+     "planVersion": "pure-java-v20",
+     "environment": {
+      "end-of-generation.chat-template": "resolved:151645",
+      "vector-provider": "PanamaVectorUtilSupport",
+      "q4-short-pairwise-supported": "true",
+      "model-architecture": "qwen3",
+      "end-of-generation-token-ids": "151643,151645",
+      "gguf-executor": "persistent",
+      "java-version": "25.0.4.1",
+      "fast-scalar-fma": "true",
+      "vm-name": "OpenJDK 64-Bit Server VM",
+      "gguf-chunks-per-thread": "2",
+      "os": "Linux",
+      "gguf-parallel": "true",
+      "sve": "false",
+      "processors": "16",
+      "compiler": "hotspot-c2",
+      "vm-vendor": "Eclipse Adoptium",
+      "end-of-generation.151645": "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "end-of-generation.151643": "vocabulary-text",
+      "architecture": "amd64",
+      "performance-cliff.fused-grouped-attention-not-wired": "architecture=qwen3, group-size=2",
+      "performance-cliffs": "vector-width-capped,fused-grouped-attention-not-wired",
+      "vector-api": "true",
+      "gguf-threads": "16",
+      "q4-unsigned-pairwise-supported": "true",
+      "java-feature": "25",
+      "active-vector-bits": "256",
+      "preferred-vector-bits": "512",
+      "cpu-model": "AMD EPYC-Genoa Processor",
+      "performance-cliff.vector-width-capped": "active-vector-bits=256, preferred-vector-bits=512, vector-provider=PanamaVectorUtilSupport",
+      "vm-version": "25.0.4.1+1-LTS",
+      "fast-vector-fma": "true",
+      "projection-layers": "36"
+     },
+     "optimizations": [
+      {
+       "id": "grouped-projections",
+       "status": "ENABLED",
+       "reason": "loaded tensor topology has a retained grouped projection kernel",
+       "settings": {
+        "gate-up": "grouped",
+        "qkv": "independent",
+        "implementation": "vector-api"
+       }
+      },
+      {
+       "id": "mixed-k-projections",
+       "status": "UNSUPPORTED",
+       "reason": "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+       "settings": {
+        "formats": "Q4_K,Q4_K,Q6_K",
+        "eligible-layers": "0"
+       }
+      },
+      {
+       "id": "q4-kernel",
+       "status": "UNSUPPORTED",
+       "reason": "the loaded model has no Q4_0 projection tensors",
+       "settings": {
+        "compiler": "hotspot-c2",
+        "requested": "widened",
+        "short-supported": "true",
+        "java-feature": "25",
+        "active-vector-bits": "256",
+        "unsigned-supported": "true",
+        "os": "Linux",
+        "architecture": "amd64"
+       }
+      },
+      {
+       "id": "batched-prefill",
+       "status": "ENABLED",
+       "reason": "all loaded projection tensors have retained batched kernels",
+       "settings": {
+        "batch-size": "32"
+       }
+      },
+      {
+       "id": "q6-batched-kernel",
+       "status": "UNSUPPORTED",
+       "reason": "loaded projection topology has no Q6_K consumer",
+       "settings": {
+        "requested-kernel": "one-query-block",
+        "kernel": "one-query-block",
+        "architecture": "amd64",
+        "batch-size": "32",
+        "active-vector-bits": "256"
+       }
+      },
+      {
+       "id": "final-layer-prefill-pruning",
+       "status": "ENABLED",
+       "reason": "the validated final FFN runs only for requested prompt output rows",
+       "settings": {
+        "output-rows": "requested",
+        "formats": "Q8_0,Q8_0,Q8_0"
+       }
+      },
+      {
+       "id": "final-layer-kv-only-prefill",
+       "status": "ENABLED",
+       "reason": "unused final-layer prompt rows compute only the persistent K/V state",
+       "settings": {
+        "formats": "Q8_0,Q8_0,Q8_0,Q8_0",
+        "unused-rows": "kv-only"
+       }
+      },
+      {
+       "id": "batched-attention-scores",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.batchedAttentionScores",
+       "settings": {
+        "rows-per-group": "1"
+       }
+      },
+      {
+       "id": "batched-attention-values",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.batchedAttentionValues",
+       "settings": {
+        "rows-per-group": "1"
+       }
+      },
+      {
+       "id": "staged-quantized-ffn",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.stagedQuantizedFfn",
+       "settings": {
+        "parallel": "true",
+        "stages": "2",
+        "executor": "persistent",
+        "eligible-layers": "36"
+       }
+      },
+      {
+       "id": "staged-quantized-layer",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.stagedQuantizedLayer",
+       "settings": {
+        "parallel": "true",
+        "stages": "7",
+        "executor": "persistent",
+        "eligible-layers": "36"
+       }
+      },
+      {
+       "id": "block-major-q8-activations",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.blockMajorQ8Activations",
+       "settings": {
+        "prefill-batch-size": "32",
+        "layout": "block-major-bytes"
+       }
+      },
+      {
+       "id": "q8-block-major-kernel",
+       "status": "DISABLED",
+       "reason": "models.purejava.q8BlockMajorKernel selects scattered accumulation",
+       "settings": {
+        "requested-kernel": "scattered",
+        "kernel": "scattered",
+        "floating-point-order": "scalar-block-order",
+        "compiler": "hotspot-c2",
+        "active-vector-bits": "256"
+       }
+      },
+      {
+       "id": "parallel-q8-ffn-preparation",
+       "status": "DISABLED",
+       "reason": "disabled by models.purejava.parallelQ8FfnPreparation",
+       "settings": {
+        "staged-layers": "36",
+        "partition": "batch-rows",
+        "partitions": "16",
+        "eligible-layers": "36"
+       }
+      },
+      {
+       "id": "mapped-model-weights",
+       "status": "ENABLED",
+       "reason": "model tensors remain mapped for model-scale streaming locality",
+       "settings": {
+        "storage": "memory-segment",
+        "artifact-format": "gguf"
+       }
+      },
+      {
+       "id": "vector-fma",
+       "status": "ENABLED",
+       "reason": "vectors-core selected deterministic vector FMA for this platform",
+       "settings": {
+        "fast-scalar-fma": "true"
+       }
+      },
+      {
+       "id": "persistent-row-executor",
+       "status": "ENABLED",
+       "reason": "vectors-core selected reusable GGUF row workers",
+       "settings": {
+        "threads": "16",
+        "chunks-per-thread": "2",
+        "executor": "persistent"
+       }
+      }
+     ]
+    },
+    "loadMillis": 63
+   }
+  ],
+  "dataset": {
+   "name": "gsm8k",
+   "path": "/opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl",
+   "sha256": "1c1dd9360722591f5dc72221419d3e8c7e974c6d532c1636fea4deaaa5afd692",
+   "hfRepo": "openai/gsm8k",
+   "hfRevision": "740312add88f781978c0658806c59bc2815b9866",
+   "manifestPath": "/opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json",
+   "manifestSha256": "512b107649d85afaee047af3e8511ab81ef72e64e18620be1c2c333b571e0c84",
+   "sha256MatchesManifest": true,
+   "devIdsSha256": "46a804c07dff535db79a90485a5936970b2b704f4d80f91ef704412a3b639a16",
+   "offset": 0,
+   "limit": 50,
+   "itemCount": 50,
+   "selectedIdsSha256": "dab7c109ffc2138d5c8bcd09e9a4703e51b2553c179d36c19313f6d3845d6d54"
+  },
+  "backend": {
+   "name": "pure-java",
+   "nativeLibraryPath": null,
+   "nativeLibrarySha256": null
+  },
+  "extra": {}
+ },
+ "environment": {
+  "modelsCommit": "b6350805a3bdf8e7c5ae78a576b22bc1aa304869",
+  "modelsRevisionArgument": "b6350805a3bdf8e7c5ae78a576b22bc1aa304869",
+  "modelsDirty": false,
+  "javaVersionOutput": "openjdk version \"25.0.4.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-25.0.4.1+1 (build 25.0.4.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.4.1+1 (build 25.0.4.1+1-LTS, mixed mode, sharing)\n",
+  "jvmInputArguments": [
+   "--add-modules=jdk.incubator.vector",
+   "--enable-native-access=ALL-UNNAMED",
+   "-XX:NativeMemoryTracking=summary",
+   "-Xms2g",
+   "-Xmx12g",
+   "-XX:+UseG1GC",
+   "-XX:+AlwaysPreTouch"
+  ],
+  "inferenceSystemProperties": {
+   "java.vendor": "Eclipse Adoptium",
+   "java.vendor.url": "https://adoptium.net/",
+   "java.vendor.url.bug": "https://github.com/adoptium/adoptium-support/issues",
+   "java.vendor.version": "Temurin-25.0.4.1+1",
+   "java.version": "25.0.4.1",
+   "java.version.date": "2026-08-18",
+   "java.vm.compressedOopsMode": "Zero based",
+   "java.vm.info": "mixed mode, sharing",
+   "java.vm.name": "OpenJDK 64-Bit Server VM",
+   "java.vm.specification.name": "Java Virtual Machine Specification",
+   "java.vm.specification.vendor": "Oracle Corporation",
+   "java.vm.specification.version": "25",
+   "java.vm.vendor": "Eclipse Adoptium",
+   "java.vm.version": "25.0.4.1+1-LTS",
+   "models.purejava.maxContextLength": "10240"
+  },
+  "vectorRuntime": {
+   "providerName": "PanamaVectorUtilSupport",
+   "vectorApi": true,
+   "configuredMaxVectorBits": 256,
+   "preferredVectorBits": 512,
+   "activeVectorBits": 256,
+   "fastVectorFma": true,
+   "fastScalarFma": true,
+   "sve": false,
+   "q4ShortPairwiseSupported": true,
+   "q4UnsignedPairwiseSupported": true,
+   "ggufParallel": true,
+   "ggufExecutor": "persistent",
+   "ggufThreads": 16,
+   "ggufChunksPerThread": 2
+  },
+  "availableProcessors": 16,
+  "host": {
+   "hostname": "modeljars-logit-fusion-f1",
+   "cpuModel": "AMD EPYC-Genoa Processor",
+   "cpuFlags": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm rep_good nopl cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx512_bf16 clzero xsaveerptr wbnoinvd arat avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid fsrm",
+   "logicalCores": 16,
+   "ramBytes": 32853520384,
+   "osName": "Linux",
+   "osVersion": "6.8.0-138-generic",
+   "arch": "amd64"
+  }
+ },
+ "timings": {
+  "wallMillis": 369821,
+  "processCpuSeconds": 5793.99,
+  "peakRssBytes": 9242423296,
+  "peakRssMethod": "linux-VmHWM",
+  "loadMillis": 417
+ },
+ "summary": {
+  "items": 50,
+  "correct": 44,
+  "accuracy": 0.88,
+  "outputs": 150,
+  "truncatedOutputs": 1,
+  "truncationRate": 0.006666666666666667,
+  "extractionFailures": 0,
+  "extractionFailureRate": 0.0,
+  "generatedTokens": 0,
+  "generationSeconds": 0.0,
+  "tokensPerSecond": 0.0,
+  "coreSeconds": 5786.180000000002,
+  "coreSecondsPerItem": 115.72360000000005,
+  "reusedCoreSeconds": 77096.79000000001,
+  "p95TraceTokens": 486.0,
+  "aggregationAccuracy": {
+   "majority": 0.82,
+   "consist": 0.82,
+   "conf": 0.0,
+   "oracle": 0.98
+  },
+  "reasoningAnswerMismatchRate": {},
+  "g3": null,
+  "g5TruncationFlag": false
+ },
+ "itemsOmitted": {
+  "count": 50,
+  "reason": "Per-item generations live only in the raw report, which is gitignored for size; verify it against EVIDENCE-MANIFEST.json.",
+  "rawSha256": "355af91eb6ed8998b1101a99ed9e4e966fc624e86d04f434e166d56f08e975c2"
+ }
+}

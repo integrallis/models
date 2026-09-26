@@ -1,0 +1,40 @@
+2026-09-17T15:02:24Z models checkout f2bf5183df5da8abe598cbd5635fe2987d0d4446
+2026-09-17T15:03:19Z bootstrap complete
+2026-09-17T15:03:19Z PHASE-DONE bootstrap
+2026-09-17T15:03:20Z data arc-challenge-test 34a24467a308f8d57eab7c80526d3e133e58b7e93ad0c65e63c1bf95ab234e34
+2026-09-17T15:03:20Z data gsm8k-dev 60c604123af3219f057924439a9a225673d9bcbb40310582e3307c6d1cb2f829
+2026-09-17T15:03:20Z data gsm8k-test 1c1dd9360722591f5dc72221419d3e8c7e974c6d532c1636fea4deaaa5afd692
+2026-09-17T15:03:20Z data math500-test f0bcbfd12ffab4675c3b921b480fc44fa7ea6ec04dc8ec63566319a6f40872a3
+2026-09-17T15:03:20Z PHASE-DONE data
+2026-09-17T15:03:29Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf 9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031
+2026-09-17T15:04:45Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf 061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a
+2026-09-17T15:07:36Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf 8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300
+2026-09-17T15:09:56Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/BIG-q4--Qwen3-8B-Q4_K_M.gguf d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785
+2026-09-17T15:09:56Z PHASE-DONE models q8
+2026-09-17T15:09:56Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T15:09:56Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T15:09:56Z pilot substitution for F-mix: tuned weights -> uniform (S2 precedes S3 tuning)
+2026-09-17T15:09:56Z run logit-fusion run --arm fuse:A+B+C:mixture:tuned --arm-label F-mix --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision f2bf5183df5da8abe598cbd5635fe2987d0d4446 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-F-mix.json.part
+2026-09-17T16:20:49Z exit 0: DONE arm F-mix accuracy=0.8600 (43/50) truncation=0.0000 tokens/s=3.55 core-s=66465.0 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-F-mix.json.part
+2026-09-17T16:20:49Z PHASE-DONE pilot F-mix gsm8k
+2026-09-17T16:20:49Z pilot substitution for AB: tuned weights -> uniform (S2 precedes S3 tuning)
+2026-09-17T16:20:49Z run logit-fusion run --arm fuse:A+B:poe:tuned --arm-label AB --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision f2bf5183df5da8abe598cbd5635fe2987d0d4446 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-AB.json.part
+2026-09-17T16:55:26Z exit 0: DONE arm AB accuracy=0.7600 (38/50) truncation=0.0000 tokens/s=6.99 core-s=33044.6 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-AB.json.part
+2026-09-17T16:55:26Z PHASE-DONE pilot AB gsm8k
+2026-09-17T16:55:26Z pilot substitution for AC: tuned weights -> uniform (S2 precedes S3 tuning)
+2026-09-17T16:55:26Z run logit-fusion run --arm fuse:A+C:poe:tuned --arm-label AC --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision f2bf5183df5da8abe598cbd5635fe2987d0d4446 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-AC.json.part
+2026-09-17T17:48:38Z exit 0: DONE arm AC accuracy=0.9600 (48/50) truncation=0.0000 tokens/s=4.61 core-s=50854.7 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-AC.json.part
+2026-09-17T17:48:38Z PHASE-DONE pilot AC gsm8k
+2026-09-17T17:48:38Z pilot substitution for BC: tuned weights -> uniform (S2 precedes S3 tuning)
+2026-09-17T17:48:38Z run logit-fusion run --arm fuse:B+C:poe:tuned --arm-label BC --members B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision f2bf5183df5da8abe598cbd5635fe2987d0d4446 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-BC.json.part
+2026-09-17T18:43:43Z exit 0: DONE arm BC accuracy=0.8600 (43/50) truncation=0.0000 tokens/s=4.60 core-s=52649.5 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-BC.json.part
+2026-09-17T18:43:43Z PHASE-FAILED pilot BC gsm8k rc=2
+2026-09-17T18:44:09Z models checkout b6350805a3bdf8e7c5ae78a576b22bc1aa304869
+2026-09-17T18:44:15Z bootstrap complete
+2026-09-17T18:44:15Z PHASE-DONE bootstrap
+2026-09-17T18:44:15Z run logit-fusion run --arm fuse:A+B+C:poe:uniform --arm-label F-uniform --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-F-uniform.json.part
+2026-09-17T19:55:10Z exit 0: DONE arm F-uniform accuracy=0.8400 (42/50) truncation=0.0000 tokens/s=3.51 core-s=67567.0 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-F-uniform.json.part
+2026-09-17T19:55:10Z PHASE-DONE pilot F-uniform gsm8k
+2026-09-17T19:55:10Z run logit-fusion run --arm fuse:A+B+C:article:0.5,0.2,0.3 --arm-label F-article --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-F-article.json.part
+2026-09-17T21:06:42Z exit 0: DONE arm F-article accuracy=0.9000 (45/50) truncation=0.0000 tokens/s=3.53 core-s=68157.7 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-F-article.json.part
+2026-09-17T21:06:42Z PHASE-DONE pilot F-article gsm8k
