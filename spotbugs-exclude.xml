@@ -66,6 +66,14 @@
         <Method name="router"/>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+    <!-- An Attempt is the intentional lifecycle handle for an active reservation. Sharing its
+         identity lets provider callbacks and cancellation settle the same reservation exactly once;
+         a defensive copy would double-charge or lose that coordination. -->
+    <Match>
+        <Class name="com.integrallis.models.router.RoutingExecution"/>
+        <Method name="beginAttempt"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
     <!-- models-decisions: every answer space's criteria() hands back a Map.copyOf result, built by
          AnswerSpaces.requireCriteria, so it is already immutable. Asserted behaviourally by
          AnswerSpaceCriteriaTest rather than trusted. Noul joins the list below because it now holds

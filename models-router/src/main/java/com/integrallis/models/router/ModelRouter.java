@@ -130,12 +130,37 @@ public final class ModelRouter {
     Objects.requireNonNull(continuity, "continuity");
     Objects.requireNonNull(requirements, "requirements");
 
+    if (request.taskType().isEmpty()
+        && (override.isLocalOnly() || requirements.dataBoundary().localOnly())
+        && !classifier.local()) {
+      throw new NoEligibleModelException(
+          "local-only data cannot be sent to a remote or undeclared classifier; declare a local classifier or supply the task type");
+    }
     String taskType = request.taskType().orElseGet(() -> classifier.classify(request.query()));
     SessionState session = activeSession(request);
     String previousModel = session == null ? null : session.modelId;
     RoutingContinuity effectiveContinuity = mergeContinuity(continuity, session);
+    boolean stateLocked =
+        (continuity.activeToolLoop() && adaptiveOptions.toolLoopHardLock())
+            || (!continuity.contextPortable() && adaptiveOptions.nonPortableContextHardLock());
+    String owner = continuity.ownerModelId() != null ? continuity.ownerModelId() : previousModel;
+    if (stateLocked && owner == null) {
+      throw new NoEligibleModelException(
+          "non-portable/tool state requires an owner model or a live session");
+    }
+    if (stateLocked && previousModel != null && !previousModel.equals(owner)) {
+      throw new NoEligibleModelException("declared state owner conflicts with the session model");
+    }
     List<ModelCandidate> eligible =
         eligible(request, override, taskType, previousModel, effectiveContinuity, requirements);
+    if (stateLocked) {
+      String requiredOwner = owner;
+      eligible =
+          eligible.stream().filter(candidate -> candidate.id().equals(requiredOwner)).toList();
+      if (eligible.isEmpty())
+        throw new NoEligibleModelException(
+            "state owner " + owner + " is unavailable or violates request requirements");
+    }
     Scoring scoring =
         new Scoring(
             request,
@@ -153,7 +178,7 @@ public final class ModelRouter {
     ranked.sort(Comparator.comparingDouble(ScoredCandidate::score).reversed());
 
     ScoredCandidate selected = ranked.getFirst();
-    boolean hardLocked = false;
+    boolean hardLocked = stateLocked;
     boolean retainedBySwitchMargin = false;
     ScoredCandidate current = find(ranked, previousModel);
     if (current != null && mustPreserveContinuity(effectiveContinuity, session)) {
@@ -425,7 +450,8 @@ public final class ModelRouter {
     }
     Map<String, Integer> cache = new LinkedHashMap<>(supplied.cachedPrefixTokens());
     cache.putIfAbsent(session.modelId, session.cachedInputTokens);
-    return new RoutingContinuity(supplied.activeToolLoop(), supplied.contextPortable(), cache);
+    return new RoutingContinuity(
+        supplied.activeToolLoop(), supplied.contextPortable(), cache, supplied.ownerModelId());
   }
 
   private void evictExpiredSessions(Instant now) {
@@ -481,6 +507,10 @@ public final class ModelRouter {
   }
 
   /** Starts building a router with no candidates registered. */
+  boolean classifierIsLocal() {
+    return classifier.local();
+  }
+
   public static Builder builder() {
     return new Builder();
   }

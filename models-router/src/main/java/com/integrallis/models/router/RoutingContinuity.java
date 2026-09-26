@@ -20,11 +20,22 @@ import java.util.Map;
 
 /** Request-time facts that determine whether conversation state can safely move between models. */
 public record RoutingContinuity(
-    boolean activeToolLoop, boolean contextPortable, Map<String, Integer> cachedPrefixTokens) {
+    boolean activeToolLoop,
+    boolean contextPortable,
+    Map<String, Integer> cachedPrefixTokens,
+    String ownerModelId) {
   private static final RoutingContinuity NONE = new RoutingContinuity(false, true, Map.of());
+
+  /** Retains the original constructor; session affinity supplies ownership when available. */
+  public RoutingContinuity(
+      boolean activeToolLoop, boolean contextPortable, Map<String, Integer> cachedPrefixTokens) {
+    this(activeToolLoop, contextPortable, cachedPrefixTokens, null);
+  }
 
   /** Validates and defensively copies the evidence. */
   public RoutingContinuity {
+    if (ownerModelId != null && ownerModelId.isBlank())
+      throw new IllegalArgumentException("ownerModelId must not be blank");
     cachedPrefixTokens = Map.copyOf(cachedPrefixTokens);
     cachedPrefixTokens.forEach(
         (model, tokens) -> {
@@ -48,11 +59,18 @@ public record RoutingContinuity(
 
   /** Fluent builder. */
   public static final class Builder {
+    private String ownerModelId;
     private boolean activeToolLoop;
     private boolean contextPortable = true;
     private final Map<String, Integer> cachedPrefixTokens = new LinkedHashMap<>();
 
     private Builder() {}
+
+    /** Binds non-portable state to its producing model, even without a remembered session. */
+    public Builder ownerModelId(String value) {
+      this.ownerModelId = value;
+      return this;
+    }
 
     public Builder activeToolLoop(boolean value) {
       this.activeToolLoop = value;
@@ -73,7 +91,8 @@ public record RoutingContinuity(
     }
 
     public RoutingContinuity build() {
-      return new RoutingContinuity(activeToolLoop, contextPortable, cachedPrefixTokens);
+      return new RoutingContinuity(
+          activeToolLoop, contextPortable, cachedPrefixTokens, ownerModelId);
     }
   }
 }

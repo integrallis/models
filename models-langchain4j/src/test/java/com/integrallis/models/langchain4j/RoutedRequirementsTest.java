@@ -86,8 +86,9 @@ class RoutedRequirementsTest {
     assertThat(routed.apply(privateRequest)).isEqualTo("local");
     assertThat(routed.apply(publicRequest)).isEqualTo("hosted");
     assertThat(received).hasSize(2);
-    assertThat(received.get(0)).isSameAs(privateRequest);
-    assertThat(received.get(1)).isSameAs(publicRequest);
+    // The provider public API can copy the request while merging its own defaults.
+    assertThat(received.get(0)).isEqualTo(privateRequest);
+    assertThat(received.get(1)).isEqualTo(publicRequest);
   }
 
   @ParameterizedTest

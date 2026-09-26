@@ -17,11 +17,11 @@ package com.integrallis.models.langchain4j;
 
 import com.integrallis.models.router.ModelFleet;
 import com.integrallis.models.router.RoutingContinuity;
+import com.integrallis.models.router.RoutingExecutionOptions;
 import com.integrallis.models.router.RoutingRequest;
 import com.integrallis.models.router.RoutingRequirements;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -35,6 +35,7 @@ public final class RoutedChatModel implements ChatModel {
   private final Function<ChatRequest, RoutingRequest> requestFactory;
   private final Function<ChatRequest, RoutingContinuity> continuityFactory;
   private final Function<ChatRequest, RoutingRequirements> requirementsFactory;
+  private final Function<ChatRequest, RoutingExecutionOptions> executionFactory;
 
   /** Routes from the latest user message, without implicit session affinity. */
   public RoutedChatModel(ModelFleet<ChatModel> fleet) {
@@ -67,6 +68,22 @@ public final class RoutedChatModel implements ChatModel {
       Function<ChatRequest, RoutingRequest> requestFactory,
       Function<ChatRequest, RoutingContinuity> continuityFactory,
       Function<ChatRequest, RoutingRequirements> requirementsFactory) {
+    this(
+        fleet,
+        requestFactory,
+        continuityFactory,
+        requirementsFactory,
+        ignored -> RoutingExecutionOptions.unlimited());
+  }
+
+  /** Routes with complete token bounds, shared spending controls and an end-to-end deadline. */
+  public RoutedChatModel(
+      ModelFleet<ChatModel> fleet,
+      Function<ChatRequest, RoutingRequest> requestFactory,
+      Function<ChatRequest, RoutingContinuity> continuityFactory,
+      Function<ChatRequest, RoutingRequirements> requirementsFactory,
+      Function<ChatRequest, RoutingExecutionOptions> executionFactory) {
+    this.executionFactory = Objects.requireNonNull(executionFactory, "executionFactory");
     this.fleet = Objects.requireNonNull(fleet, "fleet");
     this.requestFactory = Objects.requireNonNull(requestFactory, "requestFactory");
     this.continuityFactory = Objects.requireNonNull(continuityFactory, "continuityFactory");
@@ -76,6 +93,9 @@ public final class RoutedChatModel implements ChatModel {
   @Override
   public ChatResponse doChat(ChatRequest request) {
     Objects.requireNonNull(request, "request");
+    RoutingExecutionOptions options =
+        Objects.requireNonNull(executionFactory.apply(request), "routing execution options");
+    RoutingAccounting.validate(request, options);
     RoutingRequest routingRequest =
         Objects.requireNonNull(requestFactory.apply(request), "routing request");
     RoutingRequirements requirements =
@@ -83,18 +103,18 @@ public final class RoutedChatModel implements ChatModel {
     RoutingContinuity continuity =
         Objects.requireNonNull(continuityFactory.apply(request), "routing continuity");
     return fleet
-        .execute(routingRequest, requirements, continuity, model -> model.doChat(request))
+        .execute(
+            routingRequest,
+            requirements,
+            continuity,
+            options,
+            model -> model.chat(request),
+            RoutingAccounting::usage)
         .value();
   }
 
   private static RoutingRequest defaultRequest(ChatRequest request) {
-    List<ChatMessage> messages = request.messages();
-    for (int index = messages.size() - 1; index >= 0; index--) {
-      if (messages.get(index) instanceof UserMessage user) {
-        return RoutingRequest.builder(user.singleText()).build();
-      }
-    }
-    return RoutingRequest.builder("").build();
+    return RoutingRequests.estimate(request);
   }
 
   private static RoutingContinuity defaultContinuity(ChatRequest request) {

@@ -17,21 +17,25 @@ package com.integrallis.models.spring.ai;
 
 import com.integrallis.models.router.ModelCandidate;
 import com.integrallis.models.router.ModelFleet;
+import com.integrallis.models.router.RoutingBudgetExceededException;
 import com.integrallis.models.router.RoutingCancellation;
 import com.integrallis.models.router.RoutingContinuity;
 import com.integrallis.models.router.RoutingDecision;
+import com.integrallis.models.router.RoutingExecution;
+import com.integrallis.models.router.RoutingExecutionOptions;
 import com.integrallis.models.router.RoutingFeedback;
 import com.integrallis.models.router.RoutingRequest;
 import com.integrallis.models.router.RoutingRequirements;
+import com.integrallis.models.router.RoutingUsage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -48,6 +52,7 @@ public final class RoutedSpringAiChatModel implements ChatModel {
   private final Function<Prompt, RoutingRequest> requestFactory;
   private final Function<Prompt, RoutingContinuity> continuityFactory;
   private final Function<Prompt, RoutingRequirements> requirementsFactory;
+  private final Function<Prompt, RoutingExecutionOptions> executionFactory;
 
   /** Routes from the latest user message, without implicit session affinity. */
   public RoutedSpringAiChatModel(ModelFleet<ChatModel> fleet) {
@@ -81,6 +86,22 @@ public final class RoutedSpringAiChatModel implements ChatModel {
       Function<Prompt, RoutingRequest> requestFactory,
       Function<Prompt, RoutingContinuity> continuityFactory,
       Function<Prompt, RoutingRequirements> requirementsFactory) {
+    this(
+        fleet,
+        requestFactory,
+        continuityFactory,
+        requirementsFactory,
+        ignored -> RoutingExecutionOptions.unlimited());
+  }
+
+  /** Routes with complete token bounds, shared spending controls and an end-to-end deadline. */
+  public RoutedSpringAiChatModel(
+      ModelFleet<ChatModel> fleet,
+      Function<Prompt, RoutingRequest> requestFactory,
+      Function<Prompt, RoutingContinuity> continuityFactory,
+      Function<Prompt, RoutingRequirements> requirementsFactory,
+      Function<Prompt, RoutingExecutionOptions> executionFactory) {
+    this.executionFactory = Objects.requireNonNull(executionFactory, "executionFactory");
     this.fleet = Objects.requireNonNull(fleet, "fleet");
     this.requestFactory = Objects.requireNonNull(requestFactory, "requestFactory");
     this.continuityFactory = Objects.requireNonNull(continuityFactory, "continuityFactory");
@@ -90,10 +111,17 @@ public final class RoutedSpringAiChatModel implements ChatModel {
   @Override
   public ChatResponse call(Prompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
+    RoutingExecutionOptions options = executionOptions(prompt);
     RoutingRequest request = routeRequest(prompt);
     RoutingContinuity continuity = routeContinuity(prompt);
     return fleet
-        .execute(request, routeRequirements(prompt), continuity, model -> model.call(prompt))
+        .execute(
+            request,
+            routeRequirements(prompt),
+            continuity,
+            options,
+            model -> model.call(prompt),
+            RoutedSpringAiChatModel::usage)
         .value();
   }
 
@@ -102,13 +130,42 @@ public final class RoutedSpringAiChatModel implements ChatModel {
     Objects.requireNonNull(prompt, "prompt");
     return Flux.defer(
         () -> {
-          RoutingRequest request = routeRequest(prompt);
-          RoutingDecision decision =
-              fleet.decide(request, routeRequirements(prompt), routeContinuity(prompt));
-          List<ModelCandidate> order = new ArrayList<>();
-          order.add(decision.selected());
-          order.addAll(decision.fallbacks());
-          return streamAttempt(prompt, request, decision.taskType(), order, 0);
+          if (Thread.currentThread().isInterrupted())
+            return Flux.error(new CancellationException("routed stream interrupted"));
+          RoutingExecution execution = new RoutingExecution(executionOptions(prompt));
+          // Subscribe cancellation before classification or provider setup. The same absolute timer
+          // stays active across every chunk and fallback; it is not an idle timeout.
+          reactor.core.publisher.Mono<ChatResponse> cancellation =
+              reactor.core.publisher.Mono.create(
+                  sink -> {
+                    AutoCloseable registration =
+                        execution.onCancel(
+                            () ->
+                                sink.error(
+                                    new CancellationException(
+                                        "routed stream cancelled or deadline exceeded")));
+                    sink.onDispose(
+                        () -> {
+                          try {
+                            registration.close();
+                          } catch (Exception ignored) {
+                          }
+                        });
+                  });
+          return Flux.defer(
+                  () -> {
+                    execution.checkActive();
+                    RoutingRequest request = routeRequest(prompt);
+                    RoutingDecision decision =
+                        fleet.decide(
+                            request, routeRequirements(prompt), routeContinuity(prompt), execution);
+                    List<ModelCandidate> order = new ArrayList<>();
+                    order.add(decision.selected());
+                    order.addAll(decision.fallbacks());
+                    return streamAttempt(prompt, request, decision.taskType(), order, 0, execution);
+                  })
+              .takeUntilOther(cancellation)
+              .doFinally(signal -> execution.close());
         });
   }
 
@@ -117,42 +174,135 @@ public final class RoutedSpringAiChatModel implements ChatModel {
       RoutingRequest request,
       String taskType,
       List<ModelCandidate> order,
-      int index) {
-    ModelCandidate candidate = order.get(index);
-    AtomicBoolean emitted = new AtomicBoolean();
-    AtomicLong firstTokenNanos = new AtomicLong(-1);
-    long started = System.nanoTime();
-    return Flux.defer(() -> fleet.model(candidate.id()).client().stream(prompt))
-        .doOnNext(
-            ignored -> {
-              emitted.set(true);
-              firstTokenNanos.compareAndSet(-1, System.nanoTime());
-            })
-        .doOnComplete(
-            () ->
-                fleet
-                    .router()
-                    .record(
-                        feedback(
-                            request,
-                            taskType,
-                            candidate.id(),
-                            true,
-                            firstTokenNanos.get(),
-                            started)))
-        .onErrorResume(
-            failure -> {
-              if (RoutingCancellation.isCancellation(failure)) {
-                return Flux.error(failure);
-              }
-              fleet
-                  .router()
-                  .record(feedback(request, taskType, candidate.id(), false, -1, started));
-              if (!emitted.get() && index + 1 < order.size()) {
-                return streamAttempt(prompt, request, taskType, order, index + 1);
-              }
-              return Flux.error(failure);
-            });
+      int index,
+      RoutingExecution execution) {
+    return Flux.defer(
+        () -> {
+          execution.checkActive();
+          ModelCandidate candidate = order.get(index);
+          RoutingExecution.Attempt reservation;
+          try {
+            reservation = execution.beginAttempt(candidate);
+          } catch (RoutingBudgetExceededException denied) {
+            return index + 1 < order.size()
+                ? streamAttempt(prompt, request, taskType, order, index + 1, execution)
+                : Flux.error(denied);
+          }
+          AtomicBoolean emitted = new AtomicBoolean();
+          AtomicLong firstTokenNanos = new AtomicLong(-1);
+          java.util.concurrent.atomic.AtomicReference<RoutingUsage> lastUsage =
+              new java.util.concurrent.atomic.AtomicReference<>();
+          java.util.concurrent.atomic.AtomicReference<AutoCloseable> cancelRegistration =
+              new java.util.concurrent.atomic.AtomicReference<>();
+          long started = System.nanoTime();
+          return Flux.defer(
+                  () -> {
+                    execution.checkActive();
+                    return fleet.model(candidate.id()).client().stream(prompt);
+                  })
+              .doOnSubscribe(
+                  subscription -> cancelRegistration.set(execution.onCancel(subscription::cancel)))
+              .doOnNext(
+                  response -> {
+                    execution.checkActive();
+                    emitted.set(true);
+                    firstTokenNanos.compareAndSet(-1, System.nanoTime());
+                    // Spring providers expose cumulative usage on the final response; never sum
+                    // cumulative chunks.
+                    lastUsage.set(usage(response));
+                  })
+              .doOnComplete(
+                  () -> {
+                    execution.checkActive();
+                    reservation.settle(lastUsage.get());
+                    execution.checkActive();
+                    fleet
+                        .router()
+                        .record(
+                            feedback(
+                                request,
+                                taskType,
+                                candidate.id(),
+                                true,
+                                firstTokenNanos.get(),
+                                started));
+                  })
+              .onErrorResume(
+                  failure -> {
+                    reservation.close();
+                    if (failure instanceof RoutingBudgetExceededException)
+                      return Flux.error(failure);
+                    execution.checkActive();
+                    if (RoutingCancellation.isCancellation(failure)) return Flux.error(failure);
+                    fleet
+                        .router()
+                        .record(feedback(request, taskType, candidate.id(), false, -1, started));
+                    if (!emitted.get() && index + 1 < order.size())
+                      return streamAttempt(prompt, request, taskType, order, index + 1, execution);
+                    return Flux.error(failure);
+                  })
+              .doFinally(
+                  signal -> {
+                    reservation.close();
+                    AutoCloseable registration = cancelRegistration.get();
+                    if (registration != null) {
+                      try {
+                        registration.close();
+                      } catch (Exception ignored) {
+                      }
+                    }
+                  });
+        });
+  }
+
+  private RoutingExecutionOptions executionOptions(Prompt prompt) {
+    RoutingExecutionOptions options =
+        Objects.requireNonNull(executionFactory.apply(prompt), "routing execution options");
+    if (options.budgeted()
+        && (prompt.getOptions() == null
+            || prompt.getOptions().getMaxTokens() == null
+            || prompt.getOptions().getMaxTokens() < 0
+            || prompt.getOptions().getMaxTokens() > options.tokenBounds().outputTokens())) {
+      throw new IllegalArgumentException(
+          "budgeted prompts require an explicit provider maxTokens within the declared output bound");
+    }
+    if (options.budgeted()
+        && prompt.getOptions()
+            instanceof org.springframework.ai.model.tool.ToolCallingChatOptions tools
+        && internalToolExecutionEnabled(tools)) {
+      throw new IllegalArgumentException(
+          "budgeted tool calls require internal tool execution disabled; route each tool turn explicitly");
+    }
+    return options;
+  }
+
+  private static boolean internalToolExecutionEnabled(
+      org.springframework.ai.model.tool.ToolCallingChatOptions tools) {
+    try {
+      // Spring AI 1.x can execute extra provider calls internally. 2.0 removed this option.
+      var accessor =
+          org.springframework.ai.model.tool.ToolCallingChatOptions.class.getMethod(
+              "getInternalToolExecutionEnabled");
+      return !Boolean.FALSE.equals(accessor.invoke(tools));
+    } catch (NoSuchMethodException absentInSpringAi2) {
+      return false;
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalArgumentException("cannot verify tool execution policy", failure);
+    }
+  }
+
+  private static RoutingUsage usage(ChatResponse response) {
+    if (response == null
+        || response.getMetadata() == null
+        || response.getMetadata().getUsage() == null) return null;
+    var usage = response.getMetadata().getUsage();
+    // EmptyUsage reports zeroes even when no provider usage was supplied.
+    if (usage.getClass().getSimpleName().equals("EmptyUsage")
+        || (Integer.valueOf(0).equals(usage.getPromptTokens())
+            && Integer.valueOf(0).equals(usage.getCompletionTokens()))
+        || usage.getPromptTokens() == null
+        || usage.getCompletionTokens() == null) return null;
+    return new RoutingUsage(usage.getPromptTokens(), usage.getCompletionTokens());
   }
 
   private RoutingRequest routeRequest(Prompt prompt) {
@@ -187,13 +337,7 @@ public final class RoutedSpringAiChatModel implements ChatModel {
   }
 
   private static RoutingRequest defaultRequest(Prompt prompt) {
-    List<Message> messages = prompt.getInstructions();
-    for (int index = messages.size() - 1; index >= 0; index--) {
-      if (messages.get(index) instanceof UserMessage user) {
-        return RoutingRequest.builder(user.getText()).build();
-      }
-    }
-    return RoutingRequest.builder(prompt.getContents()).build();
+    return RoutingRequests.estimate(prompt);
   }
 
   private static RoutingContinuity defaultContinuity(Prompt prompt) {
