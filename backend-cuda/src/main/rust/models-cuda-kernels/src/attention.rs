@@ -8,26 +8,40 @@
 //!
 //! # Numeric contract, stated
 //!
-//! Attention is **not** bit-exact with the CPU path, and cannot be made so without also owning
-//! the CPU's `expf`. Everything else is:
+//! Attention **is** bit-exact with the CPU path. It was not, until 2026-09-26, and the reason is
+//! worth keeping: `expf` below was an independently written minimax polynomial, while the CPU
+//! kernel (`GroupedQueryAttentionKernel.expScalar`) uses a Taylor-coefficient polynomial with a
+//! different Cody-Waite split and a different rounding step. Two implementations of the same idea,
+//! neither wrong, that disagreed -- and the host test bounded `expf` against the *platform* `exp`
+//! rather than against the CPU path it actually has to match, so the disagreement was invisible.
+//! That is the same mistake the Q6_K fold made one layer down. `expf` is now an exact
+//! transcription of the CPU's, so every stage agrees:
 //!
 //! | stage | device order | matches CPU bit-for-bit |
 //! | --- | --- | --- |
 //! | score dot product | one thread per position, `fma` over `key_length` in index order | yes |
 //! | score scaling | one multiply per score | yes |
 //! | softmax maximum | parallel reduction | yes — `max` is exact and order-free |
-//! | `exp` | [`expf`] below | **no** — see below |
+//! | `exp` | [`expf`] below | yes — an exact transcription of the CPU's |
 //! | softmax sum | one thread, ascending position order | yes, given identical inputs |
 //! | normalisation | one multiply per score | yes |
 //! | value accumulation | one thread per output dimension, `fma` over positions in order | yes |
 //!
-//! The single divergence is `exp`. `core` has no floating-point transcendentals, rustc emits no
-//! libdevice linkage for `nvptx64`, and PTX's own `ex2.approx.f32` is documented at about two
-//! ulp. So [`expf`] below is our own, and it is used on **both** sides — host and device run the
-//! same polynomial, which is why the host parity test is meaningful. Its measured agreement with
-//! the platform `expf` is asserted in `tests/attention_parity.rs`
-//! ([`MAX_EXP_RELATIVE_ERROR`]), and the end-to-end head contract against the CPU reference is
-//! [`MAX_HEAD_RELATIVE_L2`]. Both are checked, not asserted.
+//! `core` has no floating-point transcendentals, rustc emits no libdevice linkage for `nvptx64`,
+//! and PTX's own `ex2.approx.f32` is documented at about two ulp, so [`expf`] has to be ours. The
+//! requirement is not that it be accurate — it is that it be **the same function the CPU runs**.
+//! It therefore uses the CPU's clamp, magic-constant rounding, Cody-Waite split, Taylor
+//! coefficients and single-step exponent construction, in that order, with `fma` exactly where the
+//! CPU has one.
+//!
+//! One host-dependency remains, and it is not ours: `MathUtil.fma` falls back to `a * b + c` when
+//! the JVM reports no fast scalar FMA, so on such a host the CPU path changes and this kernel would
+//! no longer match it. That is the same class of hazard as the Q6_K reduction split, it belongs in
+//! `vectors`, and it is recorded rather than worked around here.
+//!
+//! [`MAX_EXP_RELATIVE_ERROR`] still bounds agreement with the platform `exp`, kept as a sanity
+//! check that the transcription is a real exponential and not merely self-consistent.
+//! [`MAX_HEAD_RELATIVE_L2`] remains the end-to-end head contract. Both are checked, not asserted.
 //!
 //! [`MAX_EXP_RELATIVE_ERROR`]: crate::attention::MAX_EXP_RELATIVE_ERROR
 //! [`MAX_HEAD_RELATIVE_L2`]: crate::attention::MAX_HEAD_RELATIVE_L2
@@ -46,11 +60,31 @@ pub const MAX_EXP_RELATIVE_ERROR: f32 = 1.0e-6;
 pub const MAX_HEAD_RELATIVE_L2: f32 = 2.0e-5;
 
 /// `log2(e)`, from `core` so the value is the platform's rather than a transcribed literal.
-const LOG2_E: f32 = core::f32::consts::LOG2_E;
+const LOG2_E: f32 = 1.442_695_04_f32;
 /// High part of `ln(2)`, chosen with trailing mantissa zeros so `x - n * LN2_HI` stays exact.
-const LN2_HI: f32 = 0.693_359_4_f32;
+const LN2_HI: f32 = 0.693_145_752_f32;
 /// Low part of `ln(2)`, carrying the remainder of the split.
-const LN2_LO: f32 = -2.121_944_4e-4_f32;
+const LN2_LO: f32 = 1.428_606_77e-6_f32;
+
+/// Softmax input clamp, matching the CPU kernel. An infinity is clamped to an endpoint, not
+/// mapped to 0 or infinity, and the clamp is what bounds the constructed exponent.
+const EXP_LOWER: f32 = -87.0_f32;
+/// Upper clamp; see [`EXP_LOWER`].
+const EXP_UPPER: f32 = 88.0_f32;
+/// `1.5 * 2^23`. Adding then subtracting it rounds a float to an integral value at f32
+/// precision without a rounding intrinsic.
+const ROUND_MAGIC: f32 = 12_582_912.0_f32;
+
+/// Taylor coefficients `1/720 .. 1/2`, in Horner order.
+const P0: f32 = 1.0 / 720.0;
+/// See [`P0`].
+const P1: f32 = 1.0 / 120.0;
+/// See [`P0`].
+const P2: f32 = 1.0 / 24.0;
+/// See [`P0`].
+const P3: f32 = 1.0 / 6.0;
+/// See [`P0`].
+const P4: f32 = 0.5;
 
 /// `exp` for the softmax, identical on host and device.
 ///
@@ -62,58 +96,39 @@ const LN2_LO: f32 = -2.121_944_4e-4_f32;
 /// matters and the overflow path does not; both are handled anyway.
 #[inline]
 pub fn expf(x: f32) -> f32 {
+    // NaN propagates through the Java expression too (Math.max/Math.min return NaN, and the
+    // polynomial carries it), so an early return is observably identical and cheaper.
     if x.is_nan() {
         return x;
     }
-    // exp(-104) is already below the smallest subnormal binary32.
-    if x < -104.0 {
-        return 0.0;
-    }
-    if x > 88.722_84 {
-        return f32::INFINITY;
-    }
-    // n = round(x * log2(e)), computed without a rounding intrinsic.
-    let scaled = x * LOG2_E;
-    let n = if scaled >= 0.0 {
-        (scaled + 0.5) as i32
+    // Java clamps FIRST, so an infinity becomes a finite endpoint rather than 0 or inf. The
+    // clamp is also what keeps `n + 127` inside [1, 254], which is why no subnormal two-step
+    // scaling is needed here and none exists on the Java side.
+    let x = if x < EXP_LOWER {
+        EXP_LOWER
+    } else if x > EXP_UPPER {
+        EXP_UPPER
     } else {
-        (scaled - 0.5) as i32
+        x
     };
-    let nf = n as f32;
-    // r = x - n*ln2, split so the subtraction stays exact in the high part.
-    let r = crate::float::fma(nf, -LN2_HI, x);
-    let r = crate::float::fma(nf, -LN2_LO, r);
-    // Minimax polynomial for exp(r) on [-ln2/2, ln2/2].
-    let mut poly = 1.986_124_5e-4_f32;
-    poly = crate::float::fma(poly, r, 1.390_073_5e-3_f32);
-    poly = crate::float::fma(poly, r, 8.333_346e-3_f32);
-    poly = crate::float::fma(poly, r, 4.166_663e-2_f32);
-    poly = crate::float::fma(poly, r, 1.666_666_6e-1_f32);
-    poly = crate::float::fma(poly, r, 5.0e-1_f32);
-    poly = crate::float::fma(poly, r * r, r + 1.0);
-    scale_by_power_of_two(poly, n)
-}
-
-/// Multiplies `value` by `2^n` without calling `ldexp`.
-///
-/// Splits the exponent in two steps so subnormal results stay representable instead of
-/// flushing through an out-of-range intermediate.
-#[inline(always)]
-fn scale_by_power_of_two(value: f32, n: i32) -> f32 {
-    if (-126..=127).contains(&n) {
-        return value * f32::from_bits(((n + 127) as u32) << 23);
-    }
-    if n > 127 {
-        return value
-            * f32::from_bits((254_u32) << 23)
-            * f32::from_bits(((n - 127 + 127) as u32) << 23);
-    }
-    // n < -126: two halves, each in range, so the product underflows gradually.
-    let half = n / 2;
-    let rest = n - half;
-    value
-        * f32::from_bits(((half.max(-126) + 127) as u32) << 23)
-        * f32::from_bits(((rest.max(-126) + 127) as u32) << 23)
+    // n = round(x * log2 e), via the 1.5 * 2^23 magic constant rather than a rounding
+    // intrinsic. Plain `*` and `+`, never an fma: contracting these would change the result,
+    // and Rust does not contract without fast-math.
+    let n = (x * LOG2_E + ROUND_MAGIC) - ROUND_MAGIC;
+    // r = x - n*ln2, Cody-Waite split into a high and low part.
+    let r = crate::float::fma(n, -LN2_HI, x);
+    let r = crate::float::fma(n, -LN2_LO, r);
+    // Taylor coefficients, in Horner order, ending in two fma-by-one steps. These are exact
+    // reciprocals of factorials -- not a minimax fit -- because that is what the CPU uses.
+    let mut p = P0;
+    p = crate::float::fma(p, r, P1);
+    p = crate::float::fma(p, r, P2);
+    p = crate::float::fma(p, r, P3);
+    p = crate::float::fma(p, r, P4);
+    p = crate::float::fma(p, r, 1.0);
+    p = crate::float::fma(p, r, 1.0);
+    // Single-step exponent construction. `n` is already integral, so the cast is exact.
+    p * f32::from_bits((((n as i32) + 127) as u32) << 23)
 }
 
 /// Dot product of a query head against one cached key row, in index order with `fma`.
