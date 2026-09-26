@@ -75,6 +75,25 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   /** System property that disables this backend outright. */
   public static final String DISABLED_PROPERTY = "models.cuda.disabled";
 
+  /**
+   * System property that refuses only the decode-attention kernel, leaving the projections routed.
+   *
+   * <p>A per-stage ablation switch, not a feature flag. The projections are bit-exact by
+   * construction, and attention is too since its {@code expf} became an exact transcription of
+   * {@code GroupedQueryAttentionKernel.expScalar} (see {@code UPSTREAM.md} CU-005). The switch
+   * still earns its place: it is what isolated the attention kernel as the cause when G1 diverged
+   * at prompt 0 token 7 on an A40, and it is the only way to tell two routed stages apart from a
+   * report alone if either regresses. {@code CudaParityRun} literally tells the reader to "re-run
+   * with attention refused"; this is the switch that makes that re-run possible without recompiling
+   * anything.
+   *
+   * <p>The refusal is <b>counted</b>, under the reason {@code ablated-by-models.cuda.attention
+   * .disabled}, once per attention operation diverted. An ablation whose only evidence is an
+   * absence cannot be distinguished from a stage that was never reached, and a toggle that silently
+   * does nothing reads in the results as "this stage does not matter".
+   */
+  public static final String ATTENTION_DISABLED_PROPERTY = "models.cuda.attention.disabled";
+
   private final CudaDriver driver;
   private final BundledPtxModule module;
   private final CudaRoutingCounters counters;
@@ -284,7 +303,16 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean supportsGroupedAttention() {
-    return !closed;
+    if (closed) {
+      return false;
+    }
+    if (Boolean.getBoolean(ATTENTION_DISABLED_PROPERTY)) {
+      // Counted, not silent: see ATTENTION_DISABLED_PROPERTY. This is asked once per attention
+      // operation, so the count is exactly how many the ablation diverted back to the CPU.
+      counters.refused(CudaStage.DECODE_ATTENTION, "ablated-by-" + ATTENTION_DISABLED_PROPERTY);
+      return false;
+    }
+    return true;
   }
 
   @Override
@@ -311,6 +339,11 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int numHeads,
       int numKvHeads,
       float scale) {
+    if (Boolean.getBoolean(ATTENTION_DISABLED_PROPERTY)) {
+      counters.refused(CudaStage.DECODE_ATTENTION, "ablated-by-" + ATTENTION_DISABLED_PROPERTY);
+      throw new UnsupportedOperationException(
+          "CUDA attention refused: ablated by " + ATTENTION_DISABLED_PROPERTY);
+    }
     if (!isAttentionEligible(positionsA, positionsB, numHeads, numKvHeads, keyLength)) {
       counters.refused(
           CudaStage.DECODE_ATTENTION,
@@ -328,8 +361,8 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       DeviceBuffer queryBuffer = upload(call, query, queryOffset, numHeads * keyLength);
       DeviceBuffer keyBuffer = upload(call, keysA, keysAOffset, positionsA * keyDim);
       DeviceBuffer valueBuffer = upload(call, valuesA, valuesAOffset, positionsA * valueDim);
-      long scoreDevice = driver.allocate(scoreBytes);
-      long outputDevice = driver.allocate(outputBytes);
+      DeviceBuffer scoreBuffer = allocateTracked(scoreBytes);
+      DeviceBuffer outputBuffer = allocateTracked(outputBytes);
       try {
         MemorySegment parameters =
             parameterArray(
@@ -337,8 +370,8 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
                 pointer(call, queryBuffer.address()),
                 pointer(call, keyBuffer.address()),
                 pointer(call, valueBuffer.address()),
-                pointer(call, scoreDevice),
-                pointer(call, outputDevice),
+                pointer(call, scoreBuffer.address()),
+                pointer(call, outputBuffer.address()),
                 integer(call, numHeads),
                 integer(call, numKvHeads),
                 integer(call, keyLength),
@@ -352,17 +385,17 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         driver.synchronize();
 
         MemorySegment host = call.allocate(outputBytes);
-        driver.copyToHost(host, outputDevice, outputBytes);
+        driver.copyToHost(host, outputBuffer.address(), outputBytes);
         counters.copiedToHost(outputBytes);
         MemorySegment.copy(
             host, ValueLayout.JAVA_FLOAT, 0, output, outputOffset, numHeads * valueLength);
         counters.accelerated(GgufTensorType.F32, CudaStage.DECODE_ATTENTION, numHeads);
       } finally {
-        driver.free(scoreDevice);
-        driver.free(outputDevice);
-        queryBuffer.free(driver);
-        keyBuffer.free(driver);
-        valueBuffer.free(driver);
+        scoreBuffer.free(driver, counters);
+        outputBuffer.free(driver, counters);
+        queryBuffer.free(driver, counters);
+        keyBuffer.free(driver, counters);
+        valueBuffer.free(driver, counters);
       }
     }
     counters.copiedToDevice(queryBytes + keyBytes + valueBytes);
@@ -456,7 +489,9 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     counters.copiedToHost(outputBytes);
     counters.accelerated(type, stage, 1);
     if (batchSize == 1) {
-      counters.decodeStep();
+      // A projection, not a token. Only the measurement harness can see token boundaries; see
+      // CudaRoutingCounters#decodeStep.
+      counters.decodeProjection();
     }
   }
 
@@ -473,10 +508,9 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       return existing;
     }
     long bytes = (long) rows * (cols / type.blockSize()) * type.typeSize();
-    long devicePointer = driver.allocate(bytes);
-    driver.copyToDevice(devicePointer, weights, bytes);
+    DeviceBuffer buffer = allocateTracked(bytes);
+    driver.copyToDevice(buffer.address(), weights, bytes);
     counters.uploadedWeights(bytes);
-    DeviceBuffer buffer = new DeviceBuffer(devicePointer, bytes);
     weightResidency.put(key, buffer);
     return buffer;
   }
@@ -486,18 +520,25 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       return current;
     }
     if (current != null) {
-      current.free(driver);
+      current.free(driver, counters);
     }
-    return new DeviceBuffer(driver.allocate(bytes), bytes);
+    return allocateTracked(bytes);
+  }
+
+  /** Allocates device memory and records it against the run's high-water mark. */
+  private DeviceBuffer allocateTracked(long bytes) {
+    long devicePointer = driver.allocate(bytes);
+    counters.deviceAllocated(bytes);
+    return new DeviceBuffer(devicePointer, bytes);
   }
 
   private DeviceBuffer upload(Arena call, float[] source, int offset, int elements) {
     long bytes = (long) elements * Float.BYTES;
-    long devicePointer = driver.allocate(bytes);
+    DeviceBuffer buffer = allocateTracked(bytes);
     MemorySegment staged = call.allocate(bytes);
     MemorySegment.copy(source, offset, staged, ValueLayout.JAVA_FLOAT, 0, elements);
-    driver.copyToDevice(devicePointer, staged, bytes);
-    return new DeviceBuffer(devicePointer, bytes);
+    driver.copyToDevice(buffer.address(), staged, bytes);
+    return buffer;
   }
 
   private static MemorySegment pointer(Arena arena, long value) {
@@ -532,12 +573,12 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       return;
     }
     closed = true;
-    weightResidency.values().forEach(buffer -> buffer.free(driver));
+    weightResidency.values().forEach(buffer -> buffer.free(driver, counters));
     weightResidency.clear();
     for (DeviceBuffer buffer :
         new DeviceBuffer[] {quantScratch, scaleScratch, sumScratch, outputScratch}) {
       if (buffer != null) {
-        buffer.free(driver);
+        buffer.free(driver, counters);
       }
     }
     arena.close();
@@ -546,8 +587,9 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   /** A device allocation and its size. */
   private record DeviceBuffer(long address, long bytes) {
-    void free(CudaDriver driver) {
+    void free(CudaDriver driver, CudaRoutingCounters counters) {
       driver.free(address);
+      counters.deviceFreed(bytes);
     }
   }
 

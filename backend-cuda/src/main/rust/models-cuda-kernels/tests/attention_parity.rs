@@ -38,6 +38,29 @@ fn attention_dot_oracle(a: &[f32], b: &[f32]) -> f32 {
     sum
 }
 
+/// Softmax with the **CPU kernel's** exp, for the bit-exactness contract.
+///
+/// Identical in shape to [`attention_softmax_oracle`], differing only in which exponential it calls.
+/// That single substitution is the difference between a 2.0e-5 tolerance and raw-bit equality, which
+/// is the whole lesson of the G1 attention divergence.
+fn attention_softmax_cpu_oracle(scores: &mut [f32]) {
+    let mut max = f32::NEG_INFINITY;
+    for &score in scores.iter() {
+        if score > max {
+            max = score;
+        }
+    }
+    let mut sum = 0.0_f32;
+    for score in scores.iter_mut() {
+        *score = cpu_exp_scalar_oracle(*score - max);
+        sum += *score;
+    }
+    let inverse = 1.0_f32 / sum;
+    for score in scores.iter_mut() {
+        *score *= inverse;
+    }
+}
+
 fn attention_softmax_oracle(scores: &mut [f32]) {
     let mut max = f32::NEG_INFINITY;
     for &score in scores.iter() {
@@ -94,6 +117,37 @@ fn attend_head_oracle(
 /// every lane recomputes the (exact, order-free) maximum, exp is elementwise, the softmax sum
 /// is replayed in position order, and each output dimension accumulates over positions in order
 /// on its own lane.
+/// [`attend_head_oracle`] with the CPU kernel's softmax substituted in, and nothing else changed.
+fn attend_head_cpu_oracle(
+    shape: &AttentionShape,
+    head: usize,
+    query: &[f32],
+    keys: &[f32],
+    values: &[f32],
+    output: &mut [f32],
+) {
+    let group = shape.num_heads / shape.num_kv_heads;
+    let kv = head / group;
+    let q = &query[head * shape.key_length..(head + 1) * shape.key_length];
+    let mut row_scores = vec![0.0_f32; shape.positions];
+    for row in 0..shape.positions {
+        let base = row * shape.key_dim + kv * shape.key_length;
+        let k = &keys[base..base + shape.key_length];
+        row_scores[row] = attention_dot_oracle(q, k) * shape.scale;
+    }
+    attention_softmax_cpu_oracle(&mut row_scores);
+    for value in output.iter_mut() {
+        *value = 0.0;
+    }
+    for row in 0..shape.positions {
+        let base = row * shape.value_dim + kv * shape.value_length;
+        let weight = row_scores[row];
+        for index in 0..shape.value_length {
+            output[index] = values[base + index].mul_add(weight, output[index]);
+        }
+    }
+}
+
 fn attend_head_as_device(
     shape: &AttentionShape,
     head: usize,
@@ -227,11 +281,17 @@ fn gemma4_full(positions: usize) -> AttentionShape {
 
 #[test]
 fn expf_agrees_with_the_platform_exp_over_the_softmax_range() {
-    // Softmax only ever evaluates exp on `score - max`, which is <= 0. Cover well past the
-    // point where the result stops mattering, plus the positive side for completeness.
+    // Softmax only ever evaluates exp on `score - max`, which is <= 0.
+    //
+    // The sweep stays inside the CPU kernel's [-87, 88] clamp, and that is a correctness
+    // requirement, not a convenience. Outside the clamp the function is deliberately not an
+    // exponential: exp(-120) returns exp(-87), which is ~40% away from the true value. Sweeping
+    // -120 here would be measuring the clamp and calling it an accuracy defect. Bit-identity with
+    // the CPU across the clamped range -- including the edges -- is covered by
+    // `expf_is_bit_identical_to_the_cpu_kernels_exp`, which is the test that actually guards G1.
     let mut worst = 0.0_f32;
     let mut worst_at = 0.0_f32;
-    let mut sample = -120.0_f32;
+    let mut sample = -87.0_f32;
     while sample <= 40.0 {
         let expected = sample.exp();
         let actual = attention::expf(sample);
@@ -254,10 +314,89 @@ fn expf_agrees_with_the_platform_exp_over_the_softmax_range() {
 #[test]
 fn expf_handles_the_edges_softmax_can_reach() {
     assert_eq!(attention::expf(0.0).to_bits(), 1.0_f32.to_bits());
-    assert_eq!(attention::expf(-200.0), 0.0);
-    assert!(attention::expf(f32::NEG_INFINITY) == 0.0);
-    assert!(attention::expf(f32::INFINITY).is_infinite());
+    // The CPU kernel clamps its input to [-87, 88] before doing anything else, so a very negative
+    // score and a negative infinity both become exp(-87) -- a small normal number, NOT zero -- and
+    // a positive infinity becomes exp(88) rather than infinity. These assertions previously read
+    // `== 0.0` and `is_infinite()`, which is what the kernel did while it disagreed with the CPU.
+    let at_lower = attention::expf(-87.0);
+    assert_eq!(attention::expf(-200.0).to_bits(), at_lower.to_bits());
+    assert_eq!(attention::expf(f32::NEG_INFINITY).to_bits(), at_lower.to_bits());
+    assert!(at_lower > 0.0, "exp(-87) is a normal float, not a flush to zero");
+    let at_upper = attention::expf(88.0);
+    assert_eq!(attention::expf(f32::INFINITY).to_bits(), at_upper.to_bits());
+    assert!(at_upper.is_finite(), "the upper clamp keeps the result finite");
     assert!(attention::expf(f32::NAN).is_nan());
+}
+
+/// The CPU kernel's `expScalar`, transcribed here independently of `attention::expf`.
+///
+/// This is the oracle that matters. `expf` must equal *this*, bit for bit -- not merely be a good
+/// exponential. Written out separately on purpose: if someone edits `expf`, this does not move with
+/// it, and the test below fails.
+fn cpu_exp_scalar_oracle(x: f32) -> f32 {
+    // Pinned as raw bit patterns, not decimal literals, for two reasons. First, this oracle must
+    // stay independent of `attention.rs`: re-spelling a literal to satisfy a lint in both places
+    // would keep this test green while both drifted away from Java together. Second, these ARE the
+    // Java constants -- `GroupedQueryAttentionKernel` writes `1.44269504f`, `0.693145752f` and
+    // `1.42860677e-6f`, and those are exactly the f32 values below. Verified, not assumed.
+    const LOG2E: f32 = f32::from_bits(0x3fb8_aa3b); // Java 1.44269504f
+    const LN2_HI: f32 = f32::from_bits(0x3f31_7200); // Java 0.693145752f
+    const LN2_LO: f32 = f32::from_bits(0x35bf_be8e); // Java 1.42860677e-6f
+    const ROUND_MAGIC: f32 = 12_582_912.0; // 1.5 * 2^23, exact
+    let x = x.clamp(-87.0, 88.0);
+    let n = (x * LOG2E + ROUND_MAGIC) - ROUND_MAGIC;
+    let r = f32::mul_add(n, -LN2_HI, x);
+    let r = f32::mul_add(n, -LN2_LO, r);
+    let mut p = 1.0_f32 / 720.0;
+    p = f32::mul_add(p, r, 1.0 / 120.0);
+    p = f32::mul_add(p, r, 1.0 / 24.0);
+    p = f32::mul_add(p, r, 1.0 / 6.0);
+    p = f32::mul_add(p, r, 0.5);
+    p = f32::mul_add(p, r, 1.0);
+    p = f32::mul_add(p, r, 1.0);
+    p * f32::from_bits((((n as i32) + 127) as u32) << 23)
+}
+
+#[test]
+fn expf_is_bit_identical_to_the_cpu_kernels_exp() {
+    // The whole G1 attention divergence was this test not existing. `expf` was a minimax
+    // polynomial; the CPU uses Taylor coefficients, a different Cody-Waite split and a different
+    // rounding step. Both are fine exponentials. They are not the same function, and greedy argmax
+    // does not forgive that.
+    let mut sample = -120.0_f32;
+    let mut checked = 0_u64;
+    while sample <= 40.0 {
+        let actual = attention::expf(sample);
+        let expected = cpu_exp_scalar_oracle(sample);
+        assert_eq!(
+            actual.to_bits(),
+            expected.to_bits(),
+            "expf({sample}) = {actual} (bits {}) but the CPU kernel gives {expected} (bits {})",
+            actual.to_bits(),
+            expected.to_bits()
+        );
+        checked += 1;
+        sample += 0.000_37;
+    }
+    assert!(checked > 400_000, "expected a dense sweep, checked only {checked}");
+
+    for edge in [
+        0.0_f32,
+        -0.0,
+        -87.0,
+        88.0,
+        -200.0,
+        f32::NEG_INFINITY,
+        f32::INFINITY,
+        -1.0e-30,
+        -f32::MIN_POSITIVE,
+    ] {
+        assert_eq!(
+            attention::expf(edge).to_bits(),
+            cpu_exp_scalar_oracle(edge).to_bits(),
+            "expf disagrees with the CPU kernel at the edge x={edge}"
+        );
+    }
 }
 
 #[test]
@@ -442,4 +581,64 @@ fn softmax_weights_sum_to_one_within_rounding() {
     let total: f32 = scores.iter().sum();
     assert!((total - 1.0).abs() < 1.0e-5, "softmax summed to {total}");
     assert!(scores.iter().all(|weight| *weight >= 0.0));
+}
+
+
+#[test]
+fn a_head_is_bit_exact_against_the_cpu_kernel() {
+    // This is the contract G1 actually needs. `one_head_meets_the_declared_contract_against_the_cpu
+    // _kernel` compares against an oracle built on the *platform* exp, which is why it carries a
+    // 2.0e-5 relative-L2 bound; that bound is a sanity check, not the requirement. Greedy argmax
+    // does not tolerate 2.0e-5 -- it flipped a token on an A40 at prompt 0, token 7 -- so the real
+    // requirement is raw-bit equality against the arithmetic the CPU runs.
+    for (label, shape) in [
+        ("sliding", gemma4_sliding(97)),
+        ("full", gemma4_full(97)),
+        ("one position", gemma4_full(1)),
+        ("two positions", gemma4_full(2)),
+        ("warp boundary", gemma4_full(32)),
+        ("past a warp", gemma4_full(33)),
+    ] {
+        let (query, keys, values) = fixture(&shape, 101);
+        for head in 0..shape.num_heads {
+            let mut expected = vec![0.0_f32; shape.value_length];
+            attend_head_cpu_oracle(&shape, head, &query, &keys, &values, &mut expected);
+
+            let mut actual = vec![0.0_f32; shape.value_length];
+            let mut scratch = vec![0.0_f32; shape.positions];
+            attention::attend_head(
+                &shape, head, &query, &keys, &values, &mut scratch, &mut actual,
+            );
+
+            for index in 0..shape.value_length {
+                assert_eq!(
+                    actual[index].to_bits(),
+                    expected[index].to_bits(),
+                    "{label}: head {head} dimension {index} is not bit-exact: \
+                     kernel {} (bits {}) vs CPU {} (bits {})",
+                    actual[index],
+                    actual[index].to_bits(),
+                    expected[index],
+                    expected[index].to_bits()
+                );
+            }
+        }
+    }
+}
+
+
+#[test]
+fn the_libraries_reduction_constants_are_the_javas_bit_for_bit() {
+    // `attention.rs` keeps these as decimal literals for readability, and a lint can push a
+    // literal to a different spelling. This asserts the spelling still lands on Java's bits.
+    // The library constants are private, so they are exercised through `expf` at inputs where a
+    // one-bit change in any of them changes the result.
+    for x in [-1.0_f32, -0.5, -7.25, -30.0, -86.5, 0.25, 12.0, 87.5] {
+        let expected = cpu_exp_scalar_oracle(x);
+        assert_eq!(
+            attention::expf(x).to_bits(),
+            expected.to_bits(),
+            "expf({x}) drifted from the CPU kernel: a reduction constant no longer matches Java"
+        );
+    }
 }

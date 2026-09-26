@@ -36,7 +36,7 @@ Rows below are marked with which of these they already have.
 | `CU-002` | No `fma` for `f32` in `core`; `mul_add` is `std`-only | **Correctness trap** | `core::intrinsics::fmaf32` (nightly) | Not searched |
 | `CU-003` | `#[link_section = ".shared"]` silently emits into **global** address space | **Silent miscompile** | `global_asm!` + inline PTX | Not searched — best candidate |
 | `CU-004` | `core::arch::nvptx` exposes no shared memory, warp shuffle, or atomics | Gap | Inline PTX `asm!` | Not searched |
-| `CU-005` | No floating-point transcendentals in `core`; no libdevice linkage for `nvptx64` | Gap | Own `expf`, contract stated | Not searched |
+| `CU-005` | No floating-point transcendentals in `core`; no libdevice linkage for `nvptx64` | Gap | Own `expf`, transcribed from the CPU kernel — bit-exact | Not searched |
 | `CU-006` | PTX kernels require three nightly features | Expected | Pinned nightly | Tracking issue exists upstream |
 | `CU-007` | PTX cannot be assembled without `ptxas` (CUDA toolkit, Linux) | Environmental | GPU-host gate | Not a bug |
 
@@ -227,6 +227,34 @@ Has (1), (2), (3). Needs (4), (5).
 **What the toolchain does.** `core` has no float transcendentals at all (they live in `std`,
 backed by the platform libm), and rustc emits no linkage to NVIDIA's `libdevice` bitcode for
 `nvptx64`. `ex2.approx.f32` is available through inline PTX but is documented at about two ulp.
+
+**What we did, and the mistake in between.** We wrote our own `expf` and used it on both host and
+device, so host tests exercised the device arithmetic. That much was right. What was wrong is the
+reference it was validated against: the test bounded it to 1.0e-6 of the **platform** `exp`, and the
+end-to-end head contract allowed 2.0e-5 relative L2 against a platform-`exp` oracle. Neither
+reference is the one that matters. The CPU kernel
+(`GroupedQueryAttentionKernel.expScalar`) is itself a polynomial — deliberately, so its results do
+not depend on JIT tier — and ours was a *different* polynomial: minimax coefficients against the
+CPU's Taylor ones, a different Cody-Waite split (`0.6933594`/`-2.121944e-4` against
+`0.693145752`/`1.42860677e-6`), add-half-and-truncate rounding against the CPU's `1.5 * 2^23` magic
+constant, and a two-step exponent scaling the CPU does not have. Both are respectable exponentials.
+They are not the same function, and greedy argmax does not forgive a 2.0e-5 difference: on an A40 it
+flipped a token at prompt 0, token 7.
+
+`expf` is now an exact transcription of `expScalar`, including its `[-87, 88]` clamp — so an
+infinity clamps to an endpoint rather than mapping to `0` or `inf`, which is a visible behaviour
+change at the edges. `expf_is_bit_identical_to_the_cpu_kernels_exp` sweeps ~430,000 samples plus the
+edges against an independently written copy of the CPU polynomial, and
+`a_head_is_bit_exact_against_the_cpu_kernel` asserts raw-bit equality of head output across six
+shapes including 1, 2, 32 and 33 positions.
+
+**This is the same mistake as the Q6_K fold, one layer up:** a device kernel validated against a
+plausible reference instead of the one the gate compares it to. The lesson is not "own your
+transcendentals" — we already did — it is **validate against the exact code path the gate uses.**
+
+**Residual hazard, not ours.** `MathUtil.fma` falls back to `a * b + c` when the JVM reports no fast
+scalar FMA, so on such a host the CPU path itself changes and this kernel would stop matching it.
+Same class as the Q6_K reduction split; it belongs in `vectors`.
 
 **Reproduction.** As CU-002, with `x.exp()`:
 
