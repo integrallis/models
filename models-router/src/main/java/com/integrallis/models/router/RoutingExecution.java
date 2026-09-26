@@ -20,10 +20,9 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 
@@ -32,9 +31,17 @@ import java.util.function.LongSupplier;
  * active reservations conservatively; stopping an already running external provider is best effort.
  */
 public final class RoutingExecution implements AutoCloseable {
-  private static final ScheduledExecutorService TIMER =
-      Executors.newSingleThreadScheduledExecutor(
-          Thread.ofPlatform().daemon().name("models-routing-deadlines").factory());
+  private static final ScheduledThreadPoolExecutor TIMER = deadlineTimer();
+
+  private static ScheduledThreadPoolExecutor deadlineTimer() {
+    var timer =
+        new ScheduledThreadPoolExecutor(
+            1, Thread.ofPlatform().daemon().name("models-routing-deadlines").factory());
+    // Completed calls must not retain cancelled queue entries until a potentially distant deadline.
+    timer.setRemoveOnCancelPolicy(true);
+    return timer;
+  }
+
   private final RoutingExecutionOptions options;
   private final RoutingBudget requestBudget;
   private final RoutingCancellationToken stop = new RoutingCancellationToken();
