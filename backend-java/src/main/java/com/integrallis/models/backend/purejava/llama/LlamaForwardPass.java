@@ -1810,8 +1810,11 @@ public final class LlamaForwardPass {
 
       // Store K,V in cache
       sequenceCache.store(layer, position, k, v);
-      // Grouped-query attention, partitioned over heads
-      attendHeads(q, 0, attnOut, 0, layer, position, sequenceCache);
+      // Grouped-query attention: on the device when the kernel accepts this step, else over the
+      // Java worker partition.
+      if (!attendDecodeThroughKernel(q, k, v, attnOut, layer, position, sequenceCache)) {
+        attendHeads(q, 0, attnOut, 0, layer, position, sequenceCache);
+      }
 
       // Output projection
       matmulDispatch(
@@ -2208,6 +2211,7 @@ public final class LlamaForwardPass {
     int batchSize = toBatch - fromBatch;
     int chunkStartPosition = startPosition + fromBatch;
     int slidingWindow = config.usesSlidingWindow(layerIndex) ? config.slidingWindow() : 0;
+    batchedAttentionKernel.selectScope(attentionScope(cache));
     if (!config.usesGraniteScaling()
         && fromBatch == 0
         && batchedAttentionKernel.isEligible(
@@ -2219,7 +2223,8 @@ public final class LlamaForwardPass {
             config.keyLength(),
             config.valueLength(),
             cache.maxSeqLen(),
-            slidingWindow)) {
+            slidingWindow)
+        && mirrorCachedWindow(layerIndex, chunkStartPosition, cache)) {
       batchedAttentionKernel.attend(
           batchAttnOut,
           batchQ,
@@ -2246,6 +2251,104 @@ public final class LlamaForwardPass {
           startPosition + batch,
           cache);
     }
+  }
+
+  /** Describes the sequence and arithmetic of the next kernel call. */
+  private BatchedCausalAttentionKernel.AttentionScope attentionScope(KvCache sequenceCache) {
+    return new BatchedCausalAttentionKernel.AttentionScope(
+        sequenceCache.sequenceId(),
+        sequenceCache.sharedPrefixLength(),
+        config.attentionScale(),
+        fusedGroupedAttention);
+  }
+
+  /**
+   * Offers one decode step to the batched causal-attention kernel, returning whether it ran.
+   *
+   * <p>This is the step the Java path spends the most time in as a context grows: every layer
+   * streams the whole cached window for one query row. A kernel that retains a device-resident
+   * mirror of that window is told how far its mirror reaches and is handed the missing rows
+   * straight out of the cache's zero-copy spans, so a decode that follows a Java-path prefill does
+   * not have to recompute or re-derive the history. Refusal is ordinary and leaves behaviour
+   * exactly as it was.
+   */
+  private boolean attendDecodeThroughKernel(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] output,
+      int layer,
+      int position,
+      KvCache sequenceCache) {
+    if (batchedAttentionKernel == BatchedCausalAttentionKernel.none()) {
+      return false;
+    }
+    int slidingWindow = config.usesSlidingWindow(layer) ? config.slidingWindow() : 0;
+    batchedAttentionKernel.selectScope(attentionScope(sequenceCache));
+    if (!batchedAttentionKernel.isEligible(
+        layer,
+        position,
+        1,
+        config.numHeads(),
+        config.numKvHeads(),
+        config.keyLength(),
+        config.valueLength(),
+        cache.maxSeqLen(),
+        slidingWindow)) {
+      return false;
+    }
+    if (!mirrorCachedWindow(layer, position, sequenceCache)) {
+      return false;
+    }
+    batchedAttentionKernel.attend(
+        output,
+        query,
+        key,
+        value,
+        layer,
+        position,
+        1,
+        config.numHeads(),
+        config.numKvHeads(),
+        config.keyLength(),
+        config.valueLength(),
+        cache.maxSeqLen(),
+        slidingWindow);
+    return true;
+  }
+
+  /**
+   * Hands the kernel every cached row of this layer it has not yet mirrored, up to but excluding
+   * the row the caller is about to attend with. Returns false when the window cannot be offered.
+   */
+  private boolean mirrorCachedWindow(int layer, int position, KvCache sequenceCache) {
+    int mirrored = batchedAttentionKernel.mirroredPosition(layer);
+    if (mirrored < 0) {
+      return true;
+    }
+    if (mirrored > position) {
+      return false;
+    }
+    if (mirrored == position) {
+      return true;
+    }
+    AttentionView view = sequenceCache.attentionView(layer, mirrored, position);
+    int keyDim = sequenceCache.keyDim();
+    int valueDim = sequenceCache.valueDim();
+    for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
+      KvCache.AttentionSpan span = view.span(spanIndex);
+      batchedAttentionKernel.mirrorSpan(
+          layer,
+          span.firstPosition(),
+          span.positionCount(),
+          span.keyBuffer(),
+          span.keyOffset(),
+          keyDim,
+          span.valueBuffer(),
+          span.valueOffset(),
+          valueDim);
+    }
+    return true;
   }
 
   /** Runs grouped-query attention for one query row with the heads partitioned over workers. */
@@ -2415,6 +2518,7 @@ public final class LlamaForwardPass {
 
   private boolean batchedAttentionKernelEligible(int layerIndex, int startPosition, int batchSize) {
     int slidingWindow = config.usesSlidingWindow(layerIndex) ? config.slidingWindow() : 0;
+    batchedAttentionKernel.selectScope(attentionScope(cache));
     return !config.usesGraniteScaling()
         && batchedAttentionKernel.isEligible(
             layerIndex,

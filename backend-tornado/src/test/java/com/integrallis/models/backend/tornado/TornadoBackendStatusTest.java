@@ -52,4 +52,16 @@ class TornadoBackendStatusTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("readinessTime");
   }
+
+  @Test
+  void attentionAccelerationIsReportedSeparatelyFromProjectionAcceleration() {
+    TornadoBackendStatus projectionsOnly =
+        new TornadoBackendStatus(true, "device", "eligible", 1L, java.time.Duration.ZERO);
+    TornadoBackendStatus withAttention =
+        new TornadoBackendStatus(true, "device", "eligible", 1L, java.time.Duration.ZERO, true);
+
+    assertThat(projectionsOnly.attentionAccelerated()).isFalse();
+    assertThat(withAttention.attentionAccelerated()).isTrue();
+    assertThat(withAttention.accelerated()).isTrue();
+  }
 }

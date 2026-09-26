@@ -353,6 +353,25 @@ public final class PureJavaBackend
         BatchedCausalAttentionKernel.none());
   }
 
+  /**
+   * Loads a GGUF model with injected projection and causal-attention kernels and a qualified
+   * backend configuration.
+   *
+   * <p>The returned backend owns and closes both kernels.
+   */
+  public static PureJavaBackend load(
+      Path modelPath,
+      BackendConfiguration backendConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel,
+      BatchedCausalAttentionKernel batchedAttentionKernel) {
+    return load(
+        modelPath,
+        ModelMemoryArena.create(),
+        Objects.requireNonNull(backendConfiguration, "backendConfiguration"),
+        Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel"),
+        Objects.requireNonNull(batchedAttentionKernel, "batchedAttentionKernel"));
+  }
+
   static PureJavaBackend load(Path modelPath, Arena arena) {
     return load(
         modelPath,

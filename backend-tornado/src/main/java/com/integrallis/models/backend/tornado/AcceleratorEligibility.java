@@ -28,13 +28,31 @@ public final class AcceleratorEligibility {
 
   public static Decision select(
       List<DeviceCapabilities> devices, long modelSizeBytes, boolean accelerateDecode) {
+    return select(devices, modelSizeBytes, accelerateDecode, 0L);
+  }
+
+  /**
+   * Applies the same policy with an extra reservation for state the accelerator holds for the life
+   * of a sequence rather than the life of the model — today, accelerated attention's
+   * device-resident KV mirror. Passing zero reproduces the projection-only budget exactly.
+   */
+  public static Decision select(
+      List<DeviceCapabilities> devices,
+      long modelSizeBytes,
+      boolean accelerateDecode,
+      long retainedSequenceBytes) {
     Objects.requireNonNull(devices, "devices");
+    if (retainedSequenceBytes < 0) {
+      throw new IllegalArgumentException("retainedSequenceBytes must not be negative");
+    }
     if (modelSizeBytes <= 0) {
       return Decision.ineligible("model size must be positive", 0);
     }
     long retainedCopies = accelerateDecode ? 2L : 1L;
     long requiredBytes =
-        Math.addExact(Math.multiplyExact(modelSizeBytes, retainedCopies), PLAN_OVERHEAD_BYTES);
+        Math.addExact(
+            Math.addExact(Math.multiplyExact(modelSizeBytes, retainedCopies), PLAN_OVERHEAD_BYTES),
+            retainedSequenceBytes);
     long largestAllocation = Math.min(modelSizeBytes, MAX_ESTIMATED_SINGLE_ALLOCATION_BYTES);
     List<DeviceCapabilities> qualified =
         devices.stream()

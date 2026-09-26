@@ -54,6 +54,53 @@ pseudo-random super-blocks.
 Device-side parity — that TornadoVM's PTX backend lowers these kernels to the
 same arithmetic — is a hardware gate, not a unit test.
 
+== Device Attention (Opt-In, Not Yet Hardware-Qualified)
+
+`TornadoBackendOptions.withAcceleratedAttention()` routes the single-token
+decode step of causal grouped-query attention to the device as well. It is off
+by default and is not part of the qualified scope above. Prefill chunks are
+refused and stay on the Vector API: a layer holds one KV mirror, and a prefill
+chunk is a different execution shape, so accepting it would compile a second
+plan owning a second, empty mirror for that layer.
+
+What it changes: the device keeps a position-major mirror of each layer's KV
+window for the life of a sequence, so a decode step uploads one new key/value
+row per layer instead of the whole attended window. The host KV cache remains
+the source of truth; forking, freezing a shared prefix, rewinding, and clearing
+are unchanged, and `sharesPrefixStorage` still reports physical host sharing
+between branches. On the device a mirror belongs to exactly one sequence, so two
+branches of one frozen prefix do not share mirrored rows: switching between them
+discards and rebuilds a mirror, which the routing report counts.
+
+What is proven and what is not:
+
+* off-device tests hold the kernel bit-exact against a scalar reference and
+  within a relative L2 of `2e-5` against the production Java attention path
+  (measured `2.97e-7` on the tested geometry);
+* no real-device parity or performance gate has been run for this path. The
+  standing device-attention measurement on this codebase is negative: on an A16
+  (2026-08-29) a tiled prefill attention kernel passed its isolated numeric gate
+  at relative L2 `3.47e-7` with a `1.31x` isolated speedup, and then regressed
+  warm prefill on a 250-token prompt from `4.781 s` to `10.266 s`. That
+  measurement covered prefill, not the single-token decode step this path
+  targets, and it does not settle it either way.
+
+Read the routing report before concluding anything about it:
+
+[source,java]
+----
+runtime.attentionRouting().ifPresent(routing -> System.out.println(routing.summary()));
+----
+
+Zero device layer-steps with a nonzero refusal count means attention never ran,
+which is a different statement from attention running and not helping. The
+report names the gate that closed.
+
+Attention stays on the Vector API when the layer uses a sliding window, when the
+architecture uses the fused grouped arithmetic (Granite), when the head geometry
+is not expressible as grouped-query attention, or when the mirror would exceed
+the device budget the capacity gate left.
+
 == Add The Optional Backend
 
 [source,kotlin,subs="attributes+"]
