@@ -231,3 +231,77 @@ worth less than the GPU hour it cost.
 to come from `blockIdx.y` rather than a scalar parameter. **The defective eight-lane fold is
 therefore live on main**, and `backend-cuda` is deliberately not published to Central, so no released
 artifact carries it.
+
+## Device confirmation, 2026-09-26 — measured on an NVIDIA A40
+
+Host: NVIDIA A40, compute capability 8.6, driver 580.159.04, CUDA 13.0, Intel Xeon Gold 6342 at
+2.80 GHz, 8 processors, 50 GB RAM, RunPod EU-SE-1. Kernel sha256
+`070bb81cc7a10f077c6808a2825cdf69379423e1efbfea74aaa63f38d9cd9a2c`, PTX target `sm_80`, toolchain
+`nightly-2026-09-17`. Model: dense Granite 4.1 3B Q4_K_M, sha256 `662b0626…fb32eb29`,
+2,099,501,664 bytes — verified on the host. Models revision `203a591b`. Total billed time ~42 min.
+
+### The Q6_K fix is confirmed bit-exact on device
+
+`CudaQ6KDeviceParityTest`, raw-bit equality with no tolerance, **7 of 7 arms pass** — including the
+two-super-block row that originally failed G1, and the bisection at 1, 2, 3, 32, 33 and 48
+super-blocks, spanning the 32-lane warp boundary in both directions. The one-ULP fold defect is
+closed.
+
+### G1 parity: the projections pass, the attention kernel is the remaining divergence
+
+Two runs on the same host and model, separated by the per-stage ablation switch:
+
+| run | result |
+|---|---|
+| both stages routed, 20 prompts × 32 tokens | **FAIL** — first divergence prompt 0, **token 7**; accelerated 86897 vs control 22559 |
+| **attention ablated, projections only**, 5 prompts × 32 tokens | **PASS** — 160 tokens token-for-token identical |
+
+The passing run routed 35,376 projection operations to the device — Q4_K decode 27,200, Q6_K decode
+6,976, Q4_K prefill 960, Q6_K prefill 240 — and recorded exactly one refusal,
+`DECODE_ATTENTION/ablated-by-models.cuda.attention.disabled`. The ablation is **observable**, not
+silent, which is what makes this a measurement rather than an absence.
+
+**Conclusion.** The K-quant projection kernels are bit-exact at model scale. The divergence is
+entirely in `models_gqa_decode_attention`, which carries a stated 2.0e-5 relative-L2 contract because
+of `expf` (UPSTREAM.md CU-005). At token 7 that tolerance flipped an argmax. Note what the earlier
+failure hid: while the Q6_K defect was live, parity died at token 0 and the attention tolerance was
+never reachable as a distinct cause. Fixing one defect exposed the next.
+
+This is a **G1 failure**, recorded as such. A tolerance that is acceptable for a tensor norm is not
+acceptable for greedy argmax, so the pre-registered gate is correct to reject it. Either the attention
+kernel becomes bit-exact, or G1 is amended with a pre-registered token-level rule — and that amendment
+must be argued on its merits before any run, not chosen after seeing this result.
+
+### G4 decode: 1.905×, below the 3.0× gate, and the overhead term explains why
+
+| | |
+|---|---|
+| accelerated | **6.76 tok/s** |
+| same-host CPU control | 3.55 tok/s |
+| **speedup** | **1.905×** |
+| gate threshold | 3.00× |
+| verdict | **FAIL** |
+
+Measured over 1,260 decode steps, 256,296 decode projections, 201 weight uploads:
+
+| per decode step | measured |
+|---|---|
+| kernel launches | **241** |
+| host transfers | **402** |
+| activation bytes | **12,660,712** (~12.7 MB) |
+
+`backend-cuda/README.md` predicted ~3.4× as dispatched and ~9.8× with grouped dispatch and one sync
+per layer. **The measurement is below even the pessimistic figure**, so per the pre-registration the
+assumed per-operation cost was wrong — the prediction is not being quietly dropped. 402 host transfers
+and 12.7 MB moved per token, for 241 launches, is the dominant term: the device is being fed one
+projection at a time with a round trip each. That is a dispatch-architecture problem, not a kernel
+arithmetic problem, and it is what makes a 27B-class model impractical on this path today.
+
+### What was not run, and why
+
+The 26B MoE model was not fetched. There was no point: G1 fails on a 2.1 GB dense model for a reason
+that has nothing to do with model size or MoE routing, and a 16.8 GB download plus its decode run
+would have cost billed time to re-measure a known failure. The dense arm is also the better instrument
+— it removes expert routing from the picture entirely.
+
+G3 no-regression was not run. It gates an accelerator that does not yet pass G1.
