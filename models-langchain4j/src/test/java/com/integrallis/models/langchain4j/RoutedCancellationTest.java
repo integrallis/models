@@ -79,6 +79,9 @@ class RoutedCancellationTest {
             ChatRequest.builder().messages(UserMessage.from("question")).build(),
             new StreamingChatResponseHandler() {
               @Override
+              public void onPartialResponse(String text) {}
+
+              @Override
               public void onCompleteResponse(ChatResponse response) {
                 terminals.incrementAndGet();
               }
@@ -116,6 +119,9 @@ class RoutedCancellationTest {
         .doChat(
             ChatRequest.builder().messages(UserMessage.from("question")).build(),
             new StreamingChatResponseHandler() {
+              @Override
+              public void onPartialResponse(String text) {}
+
               @Override
               public void onCompleteResponse(ChatResponse response) {
                 throw new AssertionError("unexpected success");
