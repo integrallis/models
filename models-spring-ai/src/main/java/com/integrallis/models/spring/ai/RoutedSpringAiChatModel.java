@@ -230,10 +230,10 @@ public final class RoutedSpringAiChatModel implements ChatModel {
               .onErrorResume(
                   failure -> {
                     reservation.close();
-                    execution.checkActive();
-                    if (RoutingCancellation.isCancellation(failure)
-                        || failure instanceof RoutingBudgetExceededException)
+                    if (failure instanceof RoutingBudgetExceededException)
                       return Flux.error(failure);
+                    execution.checkActive();
+                    if (RoutingCancellation.isCancellation(failure)) return Flux.error(failure);
                     fleet
                         .router()
                         .record(feedback(request, taskType, candidate.id(), false, -1, started));

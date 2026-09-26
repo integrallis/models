@@ -245,4 +245,27 @@ class RoutedExecutionControlsTest {
     assertThat(bounds.contextTokens()).isEqualTo(127);
     assertThat(RoutingRequests.estimate(prompt).estimatedTokens()).isGreaterThan(3);
   }
+
+  @Test
+  void reportedOverrunKeepsBudgetFailureAndNeverCallsFallback() {
+    RoutingBudget budget = new RoutingBudget(BigDecimal.ONE);
+    AtomicInteger fallback = new AtomicInteger();
+    var fleet =
+        ModelFleet.<ChatModel>builder()
+            .model(candidate("a"), model(p -> Flux.just(response(new DefaultUsage(300, 100)))))
+            .model(
+                candidate("b"),
+                model(
+                    p -> {
+                      fallback.incrementAndGet();
+                      return Flux.empty();
+                    }))
+            .build();
+    assertThatThrownBy(() -> routed(fleet, options(budget)).stream(prompt()).blockLast())
+        .isInstanceOf(RoutingBudgetExceededException.class);
+    assertThat(budget.snapshot().spent()).isEqualByComparingTo("0.4");
+    assertThat(budget.snapshot().reserved()).isEqualByComparingTo("0");
+    assertThat(fallback).hasValue(0);
+    assertThat(fleet.router().status("a").orElseThrow().consecutiveFailures()).isZero();
+  }
 }
