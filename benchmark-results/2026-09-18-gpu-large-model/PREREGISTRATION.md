@@ -305,3 +305,45 @@ would have cost billed time to re-measure a known failure. The dense arm is also
 — it removes expert routing from the picture entirely.
 
 G3 no-regression was not run. It gates an accelerator that does not yet pass G1.
+
+## G1 PASSES, 2026-09-26T22:39Z — measured on an NVIDIA RTX A6000
+
+```
+PASS cuda-kernel-gate mode=parity device=NVIDIA RTX A6000 prompts=20 tokens=640 identical
+```
+
+Host: RTX A6000, cc 8.6, driver 580.159.03, CUDA 13.0. Dense Granite 4.1 3B Q4_K_M, sha256 verified.
+Models revision `66714cd`. **640 tokens, token-for-token identical, zero refusals, both stages
+routed** — no ablation, no tolerance. Routing proves the work ran on device: 1,016,000
+`F32/DECODE_ATTENTION`, 101,600 `Q4_K/DECODE_PROJECTION`, 26,056 `Q6_K/DECODE_PROJECTION`, 4,160 and
+1,040 prefill projections. 44 of 44 device tests pass.
+
+### It took four fixes, all one mistake
+
+| defect | validated against | needed |
+|---|---|---|
+| Q6_K fold | the scalar fallback reduction | the Panama reduction |
+| `expf` | the platform `exp` | the CPU kernel's own polynomial |
+| score dot product | a comment asserting agreement | Java's lane-striped tree fold |
+| device softmax sum | a comment asserting ascending order | the same pinned fold |
+
+**A device kernel written to the mathematically natural order and validated against a plausible
+reference rather than the code path the gate compares it to.** Each fix exposed the next, because
+while an earlier one was broken the later cause was unreachable — parity died at token 0, so nothing
+downstream could be observed. The divergence point walked forward: token 0 → token 7 → none.
+
+### The deepest finding was not a GPU bug
+
+The CPU had **three host-dependent switches feeding token selection**: the reduction lane count
+(8 at 256 bits, 4 on 128-bit ARM, 16 with `vectors.maxBits` raised) and both fast-FMA flags, each of
+which degrades a fused multiply-add to a separate multiply and add. So **the same model produced
+different attention scores on ARM than on x86**, undeclared. The kernel could not match "the CPU"
+because there was no single CPU answer. Fixed separately in models #222, which changes nothing on a
+256-bit host and therefore moves no oracle.
+
+### G1 is green. G4 is now the only failing gate, and its cause is structural
+
+Decode remains **1.905×** (6.76 vs 3.55 tok/s) against the 3.0× threshold, with **241 launches, 402
+host transfers and 12.7 MB of activations per decode step**. Parity was never the ceiling. The device
+is fed one projection at a time with a round trip each, so the next work is grouped dispatch in the
+Java layer — batching projections per layer with one sync — not more kernel arithmetic.
