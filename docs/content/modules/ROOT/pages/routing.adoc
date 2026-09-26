@@ -59,6 +59,39 @@ Blocking calls try the ranked fallbacks when a client fails. Streaming calls
 may fall back only before the first response fragment reaches the application;
 switching after that point would combine output from two models.
 
+== Per-Request Capabilities And Data Boundaries
+
+All three framework adapters accept a fourth constructor argument that maps the complete
+original `Prompt` or `ChatRequest` to `RoutingRequirements`. That mapping can inspect history,
+tool results, options, and application metadata instead of relying only on the latest user text.
+The requirements apply to the winner and every fallback, including streaming fallback:
+
+[source,java]
+----
+ChatModel routed = new RoutedSpringAiChatModel(
+    fleet,
+    prompt -> RoutingRequest.builder(prompt.getContents()).build(),
+    prompt -> RoutingContinuity.builder()
+        .activeToolLoop(!prompt.getInstructions().isEmpty()
+            && prompt.getInstructions().getLast() instanceof ToolResponseMessage)
+        .build(),
+    prompt -> RoutingRequirements.builder()
+        .requireCapability("tool-calling")
+        .dataBoundary(RoutingDataBoundary.LOCAL_ONLY)
+        .build());
+----
+
+This example permits only candidates declared local and tool-capable. If none remain, routing
+fails before invoking a client. Declare capabilities with `ModelCandidate.Builder.capabilities`;
+quality/task tags do not grant capabilities. The same four-argument constructor is available on
+`RoutedChatModel` and `RoutedStreamingChatModel`.
+
+The application owns this policy: the adapters do not automatically classify PII, infer required
+modalities, or validate a client's locality declaration. Existing constructors use
+`RoutingRequirements.none()`. A requirements factory returning null fails before any client is
+invoked. Spring AI evaluates the factory once per stream subscription; blocking calls and
+LangChain4j streaming evaluate it once per invocation.
+
 == How A Decision Is Made
 
 Routing happens in two stages:

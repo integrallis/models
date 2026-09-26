@@ -80,6 +80,12 @@ public final class ModelFleet<T> {
     return router.route(request, continuity);
   }
 
+  /** Returns a decision constrained by requirements and conversation continuity together. */
+  public RoutingDecision decide(
+      RoutingRequest request, RoutingRequirements requirements, RoutingContinuity continuity) {
+    return router.route(request, continuity, requirements);
+  }
+
   public RoutedModel<T> route(
       RoutingRequest request, RoutingPolicy policy, RoutingContinuity continuity) {
     RoutingDecision decision = router.route(request, policy, continuity);

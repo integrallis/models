@@ -199,7 +199,7 @@ dependencies {
     api(project(":models-api"))
 
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
-    implementation("com.fasterxml.jackson.core:jackson-core:2.21.4")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.21.7")
 
     testImplementation(project(":models-runtime"))
 }

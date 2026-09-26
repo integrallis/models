@@ -122,7 +122,7 @@ dependencies {
     implementation(project(":models-spring-ai"))
     implementation("dev.langchain4j:langchain4j:$langchain4jVersion")
     implementation("org.apache.lucene:lucene-core:10.4.0")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.7")
     implementation("org.springframework.ai:spring-ai-rag:2.0.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
