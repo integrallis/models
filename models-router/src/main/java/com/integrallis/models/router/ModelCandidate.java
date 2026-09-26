@@ -65,7 +65,7 @@ public record ModelCandidate(
     if (timeToFirstTokenMillis < 0) {
       throw new IllegalArgumentException("timeToFirstTokenMillis must not be negative");
     }
-    if (tokensPerSecond <= 0) {
+    if (!Double.isFinite(tokensPerSecond) || tokensPerSecond <= 0) {
       throw new IllegalArgumentException("tokensPerSecond must be positive");
     }
     if (contextWindow < 1) {

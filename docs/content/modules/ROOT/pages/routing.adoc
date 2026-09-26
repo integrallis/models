@@ -185,3 +185,92 @@ and their named weighted contribution appears in the routing explanation.
 
 Keep hard rules in filters. A model that cannot satisfy a request should not
 win merely because unrelated scores compensate for it.
+
+== Request Accounting, Budgets And Completion Deadlines
+
+The price ceiling is a candidate filter. To limit total spending, use execution controls:
+
+[source,java]
+----
+// Reuse this object for every request in this session (or tenant).
+var sessionBudget = new RoutingBudget(new java.math.BigDecimal("2.00"));
+var controls = RoutingExecutionOptions.builder()
+    .tokenBounds(new RoutingTokenBounds(4000, 512))
+    .requestBudget(new java.math.BigDecimal("0.10"))
+    .sharedBudget(sessionBudget)
+    .timeout(java.time.Duration.ofSeconds(20))
+    .build();
+
+var result = fleet.execute(request, requirements, continuity, controls,
+    client -> client.call(originalRequest),
+    response -> new RoutingUsage(response.inputTokens(), response.outputTokens()));
+----
+
+The last two lambdas adapt your own client and response types. Return `null` for missing usage;
+never substitute zero. Prices and limits must use one currency. Each attempt reserves its full
+input/output bound atomically in the shared account. Known usage settles the actual token cost;
+failed, cancelled or unknown usage retains the full reservation. Reservations and settlement are
+idempotent. A rejected reservation can try a cheaper eligible fallback without invoking or
+penalizing the rejected model. All retries consume the same request and shared budgets.
+`sessionBudget.snapshot()` exposes spent, reserved and available amounts. This ledger is in-process;
+sharing a budget across JVMs requires an application-owned external admission service.
+
+The input bound covers *all* history, system instructions, tool definitions/calls/results,
+attachments, provider framing and hidden state. Input plus reserved output is used for context
+admission. Both adapter packages expose `RoutingRequests.account(...)`: supply model-specific
+text and media counters, additional provider overhead, and an output reserve. No attachment is
+fetched to count it. Standard tool descriptions are included, but their exact vendor serialization,
+unresolved Spring tool names and vendor-specific state need an additional application bound.
+In a mixed fleet use bounds valid for every eligible tokenizer/provider, or use separate fleets.
+
+The default adapter request factory now estimates the entire standard text history and tools using
+UTF-8 bytes plus message framing and the explicit output limit. This is a context estimate, not a
+universal tokenizer bound or a spending guarantee. Media requires an explicit accounting factory.
+Custom request factories remain supported. To use execution controls with a framework adapter,
+pass a fifth constructor argument: a function from the complete `ChatRequest` or `Prompt` to
+`RoutingExecutionOptions`. The original provider request, options and metadata stay intact.
+
+Budgeted adapter calls require an explicit `maxOutputTokens` (LangChain4j) or `maxTokens` (Spring)
+within the reserved output bound. Spring AI 1.x internal tool execution must be explicitly disabled;
+route each tool turn separately. Disable billable SDK retries and hidden multi-call behavior in
+application-owned clients. A provider can still ignore its cap, report different billing units,
+or continue working after cancellation. Such behavior cannot be controlled by this ledger. If
+reported token usage exceeds a bound, actual cost is recorded and execution fails without fallback.
+A late response after cancellation does not refund the conservative reservation. Local electricity
+and infrastructure costs are not inferred from zero token prices.
+
+The deadline starts before classification and spans retries and the entire stream; chunks do not
+reset it. It uses monotonic time. Blocking controlled calls run on a virtual thread, so deadline or
+explicit cancellation can return while an uncooperative provider is still running. Applications
+that depend on thread-local state must propagate it in their supplied client. Provider interruption
+and cancellation are best effort. `RoutingCancellationToken` supports cancellation before the first
+response. Spring subscriber disposal cancels upstream and retains unknown usage. LangChain4j forwards
+all callbacks supported by the runtime SDK, including thinking, tools, raw events and original
+cancellation contexts; any observable event prevents switching providers. Use the explicit token
+when cancellation must be observable even if the provider never sends another callback.
+
+A local-only boundary also applies to classification and its embedding call. Unknown classifiers
+are treated as potentially remote. Wrap an entirely local classifier with
+`TaskClassifier.local(classifier)`, or provide a task override. Budgeted calls likewise require a
+local classifier or an override so classification cannot silently create unaccounted API spend.
+The declaration is the application's responsibility; it is not a network sandbox.
+
+A hard continuity lock removes other models from the fallback list. For an active tool loop or
+non-portable state, supply a live session or `RoutingContinuity.builder().ownerModelId(id)`.
+Missing/conflicting ownership or an owner that violates current requirements fails closed.
+Explicitly disabling the corresponding adaptive hard-lock option retains its previous opt-out
+meaning and makes portability the application's responsibility.
+
+== Selection Quality Evaluation
+
+`models-bench` provides `router-evaluate MANIFEST.json REPORT.json` for paired observation replay.
+It requires multiple datasets, disjoint calibration/evaluation prompts, pinned input hashes and
+complete observations from every model. It compares each model, static cheapest, static best chosen
+on calibration, the router, and classifier/quality/performance ablations. See
+`models-bench/router-evaluation.md` for the input contract and collection protocol.
+
+Replay measures selection against reference answers and reports per-dataset/task quality, cost,
+latency distributions, budget/deadline violations and changed selections under ablation. It is not
+live-provider SLA or cancellation qualification. Synthetic regression fixtures test the evaluator;
+they do not establish model capability. No new multi-dataset model-quality claim accompanies these
+execution-control changes.

@@ -42,6 +42,30 @@ public interface TaskClassifier {
    * @return a classifier returning null
    */
   static TaskClassifier none() {
-    return query -> null;
+    return local(query -> null);
+  }
+
+  /**
+   * Whether classification, including all embedding calls, stays in this process. Unknown is
+   * remote.
+   */
+  default boolean local() {
+    return false;
+  }
+
+  /** Declares that the entire supplied classifier runs locally, including its embedder. */
+  static TaskClassifier local(TaskClassifier delegate) {
+    java.util.Objects.requireNonNull(delegate, "delegate");
+    return new TaskClassifier() {
+      @Override
+      public String classify(String query) {
+        return delegate.classify(query);
+      }
+
+      @Override
+      public boolean local() {
+        return true;
+      }
+    };
   }
 }
