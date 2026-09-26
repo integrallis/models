@@ -66,7 +66,10 @@ public final class TornadoBackend {
           0);
     }
     AcceleratorEligibility.Decision decision =
-        AcceleratorEligibility.select(devices, modelBytes, options.accelerateDecode());
+        AcceleratorEligibility.select(
+            devices,
+            DeviceMemoryRequest.ofModelFile(
+                modelLabel(model), modelBytes, options.accelerateDecode()));
     if (!decision.eligible()) {
       return fallback(
           model, backendConfiguration, options, decision.reason(), decision.requiredBytes());
@@ -152,6 +155,11 @@ public final class TornadoBackend {
     return new TornadoBackendRuntime(
         PureJavaBackend.load(model, backendConfiguration, GgufBatchedMatrixKernel.none()),
         new TornadoBackendStatus(false, "Vector API", reason, requiredBytes, Duration.ZERO));
+  }
+
+  private static String modelLabel(Path model) {
+    Path fileName = model.getFileName();
+    return fileName == null ? model.toString() : fileName.toString();
   }
 
   private static long size(Path model) {
