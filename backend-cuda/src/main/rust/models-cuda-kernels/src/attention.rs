@@ -158,11 +158,51 @@ pub fn expf(x: f32) -> f32 {
 /// Dot product of a query head against one cached key row, in index order with `fma`.
 ///
 /// Matches `attention_dot_scalar` in the CPU kernel crate exactly.
+/// Lanes in the CPU kernel's pinned reduction shape. Not a device tuning knob: it is the CPU's
+/// `REDUCTION_SPECIES` length, and changing it here silently breaks bit-exactness.
+pub const REDUCTION_LANES: usize = 8;
+
+/// Folds eight lane accumulators exactly as the CPU's `reduceAddPinnedTree` does.
+///
+/// The CPU applies three rotate-and-add steps to the whole vector and returns lane 0. Working that
+/// out for eight lanes, with `w[i] = a[i] + a[(i+4)&7]` then `u[i] = w[i] + w[(i+2)&7]` then
+/// `z[i] = u[i] + u[(i+1)&7]`, lane 0 is:
+///
+/// ```text
+/// ((a0 + a4) + (a2 + a6)) + ((a1 + a5) + (a3 + a7))
+/// ```
+///
+/// Written as that expression rather than as a loop, because the grouping *is* the contract.
+#[inline]
+pub fn fold_pinned_tree(acc: &[f32; REDUCTION_LANES]) -> f32 {
+    ((acc[0] + acc[4]) + (acc[2] + acc[6])) + ((acc[1] + acc[5]) + (acc[3] + acc[7]))
+}
+
+/// Dot product in the CPU kernel's reduction shape, not in index order.
+///
+/// A sequential accumulation over `key_length` is the natural thing to write and it is **wrong
+/// here**: the CPU keeps eight striped partial sums and folds them with a fixed tree, so a
+/// sequential sum disagrees in the last bits and flips tokens under greedy argmax. This mirrors
+/// `GroupedQueryAttentionKernel.scoreGroup` — eight accumulators, lane `l` taking every eighth
+/// element from `l`, the tree fold, then the ragged tail added into the folded sum in index order.
 #[inline]
 pub fn attention_dot(query: &[f32], key: &[f32]) -> f32 {
-    let mut sum = 0.0_f32;
-    for index in 0..query.len() {
-        sum = crate::float::fma(query[index], key[index], sum);
+    let columns = query.len();
+    let vector_limit = columns - (columns % REDUCTION_LANES);
+    let mut acc = [0.0_f32; REDUCTION_LANES];
+    let mut column = 0;
+    while column < vector_limit {
+        for lane in 0..REDUCTION_LANES {
+            let index = column + lane;
+            acc[lane] = crate::float::fma(query[index], key[index], acc[lane]);
+        }
+        column += REDUCTION_LANES;
+    }
+    // The fold happens before the tail, exactly as the CPU orders it.
+    let mut sum = fold_pinned_tree(&acc);
+    while column < columns {
+        sum = crate::float::fma(query[column], key[column], sum);
+        column += 1;
     }
     sum
 }
@@ -185,16 +225,36 @@ pub fn score_maximum(scores: &[f32]) -> f32 {
 /// `exp`. The summation is deliberately sequential: float addition is not associative and the
 /// CPU reference sums in ascending position order.
 #[inline]
+/// Softmax in the CPU kernel's reduction shape.
+///
+/// The maximum needs no pinning — `max` is exact and order-free — and the exponential is
+/// elementwise. Only the **sum** is order-sensitive, so it uses the same eight striped accumulators
+/// and the same tree fold as [`attention_dot`], with the tail added after the fold. Note the sum
+/// accumulates with plain addition, not `fma`, because that is what the CPU does here: it adds
+/// already-computed exponentials rather than fusing a multiply into the accumulation.
 pub fn softmax(scores: &mut [f32]) {
     let maximum = score_maximum(scores);
-    let mut sum = 0.0_f32;
-    for index in 0..scores.len() {
+    let size = scores.len();
+    let vector_limit = size - (size % REDUCTION_LANES);
+    let mut acc = [0.0_f32; REDUCTION_LANES];
+    let mut index = 0;
+    while index < vector_limit {
+        for lane in 0..REDUCTION_LANES {
+            let at = index + lane;
+            scores[at] = expf(scores[at] - maximum);
+            acc[lane] += scores[at];
+        }
+        index += REDUCTION_LANES;
+    }
+    let mut sum = fold_pinned_tree(&acc);
+    while index < size {
         scores[index] = expf(scores[index] - maximum);
         sum += scores[index];
+        index += 1;
     }
     let inverse = 1.0_f32 / sum;
-    for index in 0..scores.len() {
-        scores[index] *= inverse;
+    for value in scores.iter_mut() {
+        *value *= inverse;
     }
 }
 

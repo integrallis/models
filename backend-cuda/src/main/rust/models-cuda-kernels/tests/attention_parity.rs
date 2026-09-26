@@ -30,6 +30,8 @@ use models_cuda_kernels::attention::{
 // Oracle: the shipped CPU attention path, using the platform `exp`.
 // ---------------------------------------------------------------------------------------------
 
+/// The **platform-natural** dot: sequential, index order. Kept for the loose relative-L2 contract
+/// only. It is NOT what the CPU kernel computes -- see [`cpu_shape_dot_oracle`].
 fn attention_dot_oracle(a: &[f32], b: &[f32]) -> f32 {
     let mut sum = 0.0_f32;
     for (x, y) in a.iter().zip(b) {
@@ -38,26 +40,64 @@ fn attention_dot_oracle(a: &[f32], b: &[f32]) -> f32 {
     sum
 }
 
-/// Softmax with the **CPU kernel's** exp, for the bit-exactness contract.
+/// `GroupedQueryAttentionKernel.scoreGroup`'s reduction, transcribed from the Java source.
 ///
-/// Identical in shape to [`attention_softmax_oracle`], differing only in which exponential it calls.
-/// That single substitution is the difference between a 2.0e-5 tolerance and raw-bit equality, which
-/// is the whole lesson of the G1 attention divergence.
-fn attention_softmax_cpu_oracle(scores: &mut [f32]) {
+/// Eight striped accumulators (`REDUCTION_SPECIES` is pinned to 256 bits), a fixed rotate-and-add
+/// tree fold, then the ragged tail added into the folded sum. Written out here independently of
+/// `attention::attention_dot` so that editing the library does not move this oracle with it -- which
+/// is the discipline the Q6_K and `expf` bugs both taught.
+fn cpu_shape_dot_oracle(a: &[f32], b: &[f32]) -> f32 {
+    const LANES: usize = 8;
+    let columns = a.len();
+    let limit = columns - (columns % LANES);
+    let mut acc = [0.0_f32; LANES];
+    let mut i = 0;
+    while i < limit {
+        for lane in 0..LANES {
+            acc[lane] = a[i + lane].mul_add(b[i + lane], acc[lane]);
+        }
+        i += LANES;
+    }
+    // lane 0 of three rotate-and-add steps over eight lanes
+    let mut sum =
+        ((acc[0] + acc[4]) + (acc[2] + acc[6])) + ((acc[1] + acc[5]) + (acc[3] + acc[7]));
+    while i < columns {
+        sum = a[i].mul_add(b[i], sum);
+        i += 1;
+    }
+    sum
+}
+
+/// The CPU kernel's softmax: pinned sum, plain addition, tail after the fold.
+fn cpu_shape_softmax_oracle(scores: &mut [f32]) {
+    const LANES: usize = 8;
     let mut max = f32::NEG_INFINITY;
     for &score in scores.iter() {
         if score > max {
             max = score;
         }
     }
-    let mut sum = 0.0_f32;
-    for score in scores.iter_mut() {
-        *score = cpu_exp_scalar_oracle(*score - max);
-        sum += *score;
+    let size = scores.len();
+    let limit = size - (size % LANES);
+    let mut acc = [0.0_f32; LANES];
+    let mut i = 0;
+    while i < limit {
+        for lane in 0..LANES {
+            scores[i + lane] = cpu_exp_scalar_oracle(scores[i + lane] - max);
+            acc[lane] += scores[i + lane];
+        }
+        i += LANES;
+    }
+    let mut sum =
+        ((acc[0] + acc[4]) + (acc[2] + acc[6])) + ((acc[1] + acc[5]) + (acc[3] + acc[7]));
+    while i < size {
+        scores[i] = cpu_exp_scalar_oracle(scores[i] - max);
+        sum += scores[i];
+        i += 1;
     }
     let inverse = 1.0_f32 / sum;
-    for score in scores.iter_mut() {
-        *score *= inverse;
+    for value in scores.iter_mut() {
+        *value *= inverse;
     }
 }
 
@@ -133,9 +173,9 @@ fn attend_head_cpu_oracle(
     for row in 0..shape.positions {
         let base = row * shape.key_dim + kv * shape.key_length;
         let k = &keys[base..base + shape.key_length];
-        row_scores[row] = attention_dot_oracle(q, k) * shape.scale;
+        row_scores[row] = cpu_shape_dot_oracle(q, k) * shape.scale;
     }
-    attention_softmax_cpu_oracle(&mut row_scores);
+    cpu_shape_softmax_oracle(&mut row_scores);
     for value in output.iter_mut() {
         *value = 0.0;
     }
@@ -178,9 +218,21 @@ fn attend_head_as_device(
             position += lanes;
         }
     }
-    let mut sum = 0.0_f32;
-    for index in 0..shape.positions {
-        sum += scores[index];
+    // The device folds this sum in the CPU's pinned eight-lane shape, so this model of the device
+    // must fold it the same way or it stops modelling the device.
+    let mut acc = [0.0_f32; 8];
+    let limit = shape.positions - (shape.positions % 8);
+    let mut at = 0;
+    while at < limit {
+        for lane_index in 0..8 {
+            acc[lane_index] += scores[at + lane_index];
+        }
+        at += 8;
+    }
+    let mut sum = ((acc[0] + acc[4]) + (acc[2] + acc[6])) + ((acc[1] + acc[5]) + (acc[3] + acc[7]));
+    while at < shape.positions {
+        sum += scores[at];
+        at += 1;
     }
     let inverse = 1.0_f32 / sum;
     for lane in 0..lanes {

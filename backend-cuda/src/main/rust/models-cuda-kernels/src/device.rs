@@ -316,11 +316,25 @@ pub unsafe extern "ptx-kernel" fn models_gqa_decode_attention(
     }
     unsafe { _syncthreads() };
 
-    // Stage 4: the sum is float addition, so one lane adds it in ascending position order to
-    // match the CPU reference, then every lane recomputes the reciprocal identically.
-    let mut sum = 0.0_f32;
-    for index in 0..shape.positions {
-        sum += unsafe { *row_scores.add(index) };
+    // Stage 4: the sum is float addition, so its grouping decides its last bits. Ascending position
+    // order was WRONG here -- the CPU keeps eight striped accumulators and folds them with a fixed
+    // tree (`GroupedQueryAttentionKernel.reduceAddPinnedTree`), so a linear sum disagreed and flipped
+    // tokens under greedy argmax. One lane reproduces that exact shape, then every lane recomputes
+    // the reciprocal identically.
+    let positions = shape.positions;
+    let vector_limit = positions - (positions % attention::REDUCTION_LANES);
+    let mut acc = [0.0_f32; attention::REDUCTION_LANES];
+    let mut folded = 0;
+    while folded < vector_limit {
+        for lane_index in 0..attention::REDUCTION_LANES {
+            acc[lane_index] += unsafe { *row_scores.add(folded + lane_index) };
+        }
+        folded += attention::REDUCTION_LANES;
+    }
+    let mut sum = attention::fold_pinned_tree(&acc);
+    while folded < positions {
+        sum += unsafe { *row_scores.add(folded) };
+        folded += 1;
     }
     let inverse = 1.0_f32 / sum;
 
