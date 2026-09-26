@@ -19,13 +19,37 @@
 //!
 //! | stage | device order | matches CPU bit-for-bit |
 //! | --- | --- | --- |
-//! | score dot product | one thread per position, `fma` over `key_length` in index order | yes |
+//! | score dot product | one thread per position, `fma` over `key_length` in index order | **NO — see below** |
 //! | score scaling | one multiply per score | yes |
 //! | softmax maximum | parallel reduction | yes — `max` is exact and order-free |
 //! | `exp` | [`expf`] below | yes — an exact transcription of the CPU's |
 //! | softmax sum | one thread, ascending position order | yes, given identical inputs |
 //! | normalisation | one multiply per score | yes |
 //! | value accumulation | one thread per output dimension, `fma` over positions in order | yes |
+//!
+//! # The score dot product does not match, and this table used to claim it did
+//!
+//! Measured 2026-09-26 on an A6000 and an A40: with `expf` made bit-exact, G1 still diverges at
+//! prompt 0 token 7, and the two cards produce *different* wrong tokens (14853 and 86897) against
+//! the same control (22559). So the remaining divergence is real and order-sensitive.
+//!
+//! [`attention_dot`] accumulates sequentially: one accumulator, `fma` over `key_length` in index
+//! order. The CPU kernel does not. `GroupedQueryAttentionKernel` accumulates into a `FloatVector` —
+//! `lanes` independent partial sums, each taking every `lanes`-th element — and then folds them with
+//! `reduceAddFixedTree`, a fixed rotate-and-add tree, before a scalar tail in index order. Different
+//! summation order, different last bits, and greedy argmax does not forgive it.
+//!
+//! **`lanes` is host-dependent.** It is 8 at 256-bit, 16 at 512-bit, 4 at 128-bit, and
+//! `reduceAddFixedTree` branches on exactly those cases. So the CPU's attention score is not
+//! reproducible across vector widths either — the same hazard as the Q6_K reduction split and
+//! `MathUtil.fma`'s non-FMA fallback. Hard-coding 8 lanes here would bake a host assumption into a
+//! device kernel and silently mismatch a 512-bit host.
+//!
+//! This is the third instance of one mistake: **a device kernel written to the mathematically
+//! natural order, validated against a reference that is not the code path the gate compares it to.**
+//! Q6_K copied the scalar fallback instead of the Panama reduction; `expf` was checked against the
+//! platform `exp` instead of the CPU's polynomial; and this row simply asserted agreement that was
+//! never tested. The pattern, not any one bug, is the finding.
 //!
 //! `core` has no floating-point transcendentals, rustc emits no libdevice linkage for `nvptx64`,
 //! and PTX's own `ex2.approx.f32` is documented at about two ulp, so [`expf`] has to be ours. The
