@@ -334,11 +334,16 @@ fn expf_handles_the_edges_softmax_can_reach() {
 /// exponential. Written out separately on purpose: if someone edits `expf`, this does not move with
 /// it, and the test below fails.
 fn cpu_exp_scalar_oracle(x: f32) -> f32 {
-    const LOG2E: f32 = 1.442_695_04;
-    const LN2_HI: f32 = 0.693_145_752;
-    const LN2_LO: f32 = 1.428_606_77e-6;
-    const ROUND_MAGIC: f32 = 12_582_912.0;
-    let x = x.max(-87.0).min(88.0);
+    // Pinned as raw bit patterns, not decimal literals, for two reasons. First, this oracle must
+    // stay independent of `attention.rs`: re-spelling a literal to satisfy a lint in both places
+    // would keep this test green while both drifted away from Java together. Second, these ARE the
+    // Java constants -- `GroupedQueryAttentionKernel` writes `1.44269504f`, `0.693145752f` and
+    // `1.42860677e-6f`, and those are exactly the f32 values below. Verified, not assumed.
+    const LOG2E: f32 = f32::from_bits(0x3fb8_aa3b); // Java 1.44269504f
+    const LN2_HI: f32 = f32::from_bits(0x3f31_7200); // Java 0.693145752f
+    const LN2_LO: f32 = f32::from_bits(0x35bf_be8e); // Java 1.42860677e-6f
+    const ROUND_MAGIC: f32 = 12_582_912.0; // 1.5 * 2^23, exact
+    let x = x.clamp(-87.0, 88.0);
     let n = (x * LOG2E + ROUND_MAGIC) - ROUND_MAGIC;
     let r = f32::mul_add(n, -LN2_HI, x);
     let r = f32::mul_add(n, -LN2_LO, r);
@@ -618,5 +623,22 @@ fn a_head_is_bit_exact_against_the_cpu_kernel() {
                 );
             }
         }
+    }
+}
+
+
+#[test]
+fn the_libraries_reduction_constants_are_the_javas_bit_for_bit() {
+    // `attention.rs` keeps these as decimal literals for readability, and a lint can push a
+    // literal to a different spelling. This asserts the spelling still lands on Java's bits.
+    // The library constants are private, so they are exercised through `expf` at inputs where a
+    // one-bit change in any of them changes the result.
+    for x in [-1.0_f32, -0.5, -7.25, -30.0, -86.5, 0.25, 12.0, 87.5] {
+        let expected = cpu_exp_scalar_oracle(x);
+        assert_eq!(
+            attention::expf(x).to_bits(),
+            expected.to_bits(),
+            "expf({x}) drifted from the CPU kernel: a reduction constant no longer matches Java"
+        );
     }
 }
