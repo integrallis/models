@@ -1,0 +1,57 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 17, 2026 7:55:11 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Sep 17, 2026 7:55:11 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+START arm=fuse:A+B+C:article:0.5,0.2,0.3 label=F-article dataset=gsm8k items=50 thinking=off weights=[0.5, 0.2, 0.3] substitution=null
+   1/50 gsm8k-test-0000              pred=18           gold=18           correct tokens=366 109684 ms
+   2/50 gsm8k-test-0001              pred=3            gold=3            correct tokens=117 33671 ms
+   3/50 gsm8k-test-0002              pred=70000        gold=70000        correct tokens=338 96193 ms
+   4/50 gsm8k-test-0003              pred=540          gold=540          correct tokens=203 57110 ms
+   5/50 gsm8k-test-0004              pred=20           gold=20           correct tokens=293 89317 ms
+   6/50 gsm8k-test-0005              pred=64           gold=64           correct tokens=426 122421 ms
+   7/50 gsm8k-test-0006              pred=260          gold=260          correct tokens=317 90194 ms
+   8/50 gsm8k-test-0007              pred=120          gold=160          wrong   tokens=375 109682 ms
+   9/50 gsm8k-test-0008              pred=45           gold=45           correct tokens=467 136485 ms
+  10/50 gsm8k-test-0009              pred=460          gold=460          correct tokens=260 72325 ms
+  11/50 gsm8k-test-0010              pred=366          gold=366          correct tokens=252 71026 ms
+  12/50 gsm8k-test-0011              pred=694          gold=694          correct tokens=238 67276 ms
+  13/50 gsm8k-test-0012              pred=12           gold=13           wrong   tokens=331 93275 ms
+  14/50 gsm8k-test-0013              pred=18           gold=18           correct tokens=516 147454 ms
+  15/50 gsm8k-test-0014              pred=60           gold=60           correct tokens=330 93744 ms
+  16/50 gsm8k-test-0015              pred=125          gold=125          correct tokens=424 122850 ms
+  17/50 gsm8k-test-0016              pred=230          gold=230          correct tokens=244 68081 ms
+  18/50 gsm8k-test-0017              pred=57500        gold=57500        correct tokens=280 77086 ms
+  19/50 gsm8k-test-0018              pred=7            gold=7            correct tokens=275 74087 ms
+  20/50 gsm8k-test-0019              pred=6            gold=6            correct tokens=440 124728 ms
+  21/50 gsm8k-test-0020              pred=15           gold=15           correct tokens=418 117507 ms
+  22/50 gsm8k-test-0021              pred=23           gold=14           wrong   tokens=262 73551 ms
+  23/50 gsm8k-test-0022              pred=7            gold=7            correct tokens=188 52658 ms
+  24/50 gsm8k-test-0023              pred=8            gold=8            correct tokens=215 59885 ms
+  25/50 gsm8k-test-0024              pred=26           gold=26           correct tokens=169 46380 ms
+  26/50 gsm8k-test-0025              pred=2            gold=2            correct tokens=362 100895 ms
+  27/50 gsm8k-test-0026              pred=243          gold=243          correct tokens=295 84252 ms
+  28/50 gsm8k-test-0027              pred=16           gold=16           correct tokens=277 77229 ms
+  29/50 gsm8k-test-0028              pred=25           gold=25           correct tokens=301 84018 ms
+  30/50 gsm8k-test-0029              pred=94           gold=104          wrong   tokens=138 42121 ms
+  31/50 gsm8k-test-0030              pred=109          gold=109          correct tokens=273 74688 ms
+  32/50 gsm8k-test-0031              pred=80           gold=80           correct tokens=357 100350 ms
+  33/50 gsm8k-test-0032              pred=35           gold=35           correct tokens=212 57162 ms
+  34/50 gsm8k-test-0033              pred=70           gold=70           correct tokens=213 57430 ms
+  35/50 gsm8k-test-0034              pred=23           gold=23           correct tokens=243 66633 ms
+  36/50 gsm8k-test-0035              pred=9            gold=9            correct tokens=227 62362 ms
+  37/50 gsm8k-test-0036              pred=75           gold=75           correct tokens=311 88174 ms
+  38/50 gsm8k-test-0037              pred=0            gold=2            wrong   tokens=376 105370 ms
+  39/50 gsm8k-test-0038              pred=10           gold=10           correct tokens=272 76056 ms
+  40/50 gsm8k-test-0039              pred=18           gold=18           correct tokens=478 137889 ms
+  41/50 gsm8k-test-0040              pred=8            gold=8            correct tokens=232 64027 ms
+  42/50 gsm8k-test-0041              pred=200          gold=200          correct tokens=443 132328 ms
+  43/50 gsm8k-test-0042              pred=26           gold=26           correct tokens=149 45873 ms
+  44/50 gsm8k-test-0043              pred=48           gold=48           correct tokens=367 103112 ms
+  45/50 gsm8k-test-0044              pred=20           gold=20           correct tokens=396 113825 ms
+  46/50 gsm8k-test-0045              pred=104          gold=104          correct tokens=317 92268 ms
+  47/50 gsm8k-test-0046              pred=163          gold=163          correct tokens=368 107367 ms
+  48/50 gsm8k-test-0047              pred=800          gold=800          correct tokens=355 97119 ms
+  49/50 gsm8k-test-0048              pred=8            gold=8            correct tokens=163 43729 ms
+  50/50 gsm8k-test-0049              pred=30           gold=30           correct tokens=239 64468 ms
+DONE arm F-article accuracy=0.9000 (45/50) truncation=0.0000 tokens/s=3.53 core-s=68157.7 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-F-article.json.part

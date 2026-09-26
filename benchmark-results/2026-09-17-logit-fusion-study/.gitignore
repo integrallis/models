@@ -1,0 +1,9 @@
+# Raw arm reports carry a 50-item generation dump each (87 MB total). Their numbers are
+# committed in the *.summary.json companions and every file is hashed in
+# EVIDENCE-MANIFEST.json, so any claim in RESULTS-LOG.md can be verified without them.
+# The raw files exist only on the workstation and still need a real archive.
+evidence/*/pilot-*[!y].json
+
+# Machine configuration from the run hosts, not evidence.
+hosts/known_hosts_*
+hosts/*.env

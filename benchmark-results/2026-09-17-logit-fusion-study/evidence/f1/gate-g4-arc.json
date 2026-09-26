@@ -1,0 +1,93 @@
+{
+  "schemaVersion" : 1,
+  "kind" : "gate-g4",
+  "createdAt" : "2026-09-17T17:27:07.104309728Z",
+  "config" : {
+    "arm" : null,
+    "decoding" : null,
+    "members" : [ ],
+    "dataset" : {
+      "name" : "arc",
+      "path" : "/opt/modeljars-runs/logit-fusion-20260917/data/arc-challenge-test.jsonl",
+      "sha256" : "34a24467a308f8d57eab7c80526d3e133e58b7e93ad0c65e63c1bf95ab234e34",
+      "hfRepo" : null,
+      "hfRevision" : null,
+      "manifestPath" : null,
+      "manifestSha256" : null,
+      "sha256MatchesManifest" : null,
+      "devIdsSha256" : null,
+      "offset" : 0,
+      "limit" : 0,
+      "itemCount" : 1172,
+      "selectedIdsSha256" : "367e9ab2507d7bf55528c9b3b6d18ee65946bacd614648353d8d777b136fbdf3"
+    },
+    "backend" : null,
+    "extra" : { }
+  },
+  "environment" : {
+    "modelsCommit" : "f2bf5183df5da8abe598cbd5635fe2987d0d4446",
+    "modelsRevisionArgument" : null,
+    "modelsDirty" : false,
+    "javaVersionOutput" : "openjdk version \"25.0.4.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-25.0.4.1+1 (build 25.0.4.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.4.1+1 (build 25.0.4.1+1-LTS, mixed mode, sharing)\n",
+    "jvmInputArguments" : [ "--add-modules=jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED", "-XX:NativeMemoryTracking=summary", "-Xms2g", "-Xmx12g", "-XX:+UseG1GC", "-XX:+AlwaysPreTouch" ],
+    "inferenceSystemProperties" : {
+      "java.vendor" : "Eclipse Adoptium",
+      "java.vendor.url" : "https://adoptium.net/",
+      "java.vendor.url.bug" : "https://github.com/adoptium/adoptium-support/issues",
+      "java.vendor.version" : "Temurin-25.0.4.1+1",
+      "java.version" : "25.0.4.1",
+      "java.version.date" : "2026-08-18",
+      "java.vm.compressedOopsMode" : "Zero based",
+      "java.vm.info" : "mixed mode, sharing",
+      "java.vm.name" : "OpenJDK 64-Bit Server VM",
+      "java.vm.specification.name" : "Java Virtual Machine Specification",
+      "java.vm.specification.vendor" : "Oracle Corporation",
+      "java.vm.specification.version" : "25",
+      "java.vm.vendor" : "Eclipse Adoptium",
+      "java.vm.version" : "25.0.4.1+1-LTS"
+    },
+    "vectorRuntime" : {
+      "providerName" : "PanamaVectorUtilSupport",
+      "vectorApi" : true,
+      "configuredMaxVectorBits" : 256,
+      "preferredVectorBits" : 512,
+      "activeVectorBits" : 256,
+      "fastVectorFma" : true,
+      "fastScalarFma" : true,
+      "sve" : false,
+      "q4ShortPairwiseSupported" : true,
+      "q4UnsignedPairwiseSupported" : true,
+      "ggufParallel" : true,
+      "ggufExecutor" : "persistent",
+      "ggufThreads" : 16,
+      "ggufChunksPerThread" : 2
+    },
+    "availableProcessors" : 16,
+    "host" : {
+      "hostname" : "modeljars-logit-fusion-f1",
+      "cpuModel" : "AMD EPYC-Genoa Processor",
+      "cpuFlags" : "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm rep_good nopl cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx512_bf16 clzero xsaveerptr wbnoinvd arat avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid fsrm",
+      "logicalCores" : 16,
+      "ramBytes" : 32853520384,
+      "osName" : "Linux",
+      "osVersion" : "6.8.0-138-generic",
+      "arch" : "amd64"
+    }
+  },
+  "timings" : {
+    "wallMillis" : 353,
+    "processCpuSeconds" : 0.83,
+    "peakRssBytes" : 2271907840,
+    "peakRssMethod" : "linux-VmHWM",
+    "loadMillis" : 0
+  },
+  "summary" : {
+    "dataset" : "arc",
+    "scorer" : "letter",
+    "total" : 1172,
+    "passed" : 1172,
+    "failures" : [ ],
+    "pass" : true
+  },
+  "items" : [ ]
+}

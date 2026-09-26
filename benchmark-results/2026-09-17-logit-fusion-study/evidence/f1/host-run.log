@@ -1,0 +1,76 @@
+2026-09-17T15:00:16Z models checkout f2bf5183df5da8abe598cbd5635fe2987d0d4446
+2026-09-17T15:01:23Z bootstrap complete
+2026-09-17T15:01:23Z PHASE-DONE bootstrap
+2026-09-17T15:01:26Z data arc-challenge-test 34a24467a308f8d57eab7c80526d3e133e58b7e93ad0c65e63c1bf95ab234e34
+2026-09-17T15:01:26Z data gsm8k-dev 60c604123af3219f057924439a9a225673d9bcbb40310582e3307c6d1cb2f829
+2026-09-17T15:01:26Z data gsm8k-test 1c1dd9360722591f5dc72221419d3e8c7e974c6d532c1636fea4deaaa5afd692
+2026-09-17T15:01:26Z data math500-test f0bcbfd12ffab4675c3b921b480fc44fa7ea6ec04dc8ec63566319a6f40872a3
+2026-09-17T15:01:26Z PHASE-DONE data
+2026-09-17T15:01:32Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf 9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031
+2026-09-17T15:01:52Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf 061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a
+2026-09-17T15:02:39Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf 8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300
+2026-09-17T15:03:24Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/BIG-q4--Qwen3-8B-Q4_K_M.gguf d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785
+2026-09-17T15:03:24Z PHASE-DONE models q8
+2026-09-17T15:07:21Z fetched /opt/modeljars-runs/logit-fusion-20260917/store/models/BIG-q8--Qwen3-8B-Q8_0.gguf 408b955510e196121c1c375201744783b5c9a43c7956d73fc78df54c66e883d6
+2026-09-17T15:07:21Z PHASE-DONE models big-q8
+2026-09-17T15:07:21Z run logit-fusion gate g0 --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf,BIG=/opt/modeljars-runs/logit-fusion-20260917/store/models/BIG-q4--Qwen3-8B-Q4_K_M.gguf --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g0.json
+2026-09-17T15:07:31Z exit 0: PASS G0 members=4 mismatches=0 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g0.json
+2026-09-17T15:07:31Z run logit-fusion gate g1 --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --limit 20 --max-tokens 1024 --thinking off --context-length 10240 --backend pure-java --models-revision f2bf5183df5da8abe598cbd5635fe2987d0d4446 --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g1.json
+2026-09-17T17:19:51Z exit 0: PASS G1 comparisons=60 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g1.json
+2026-09-17T17:19:51Z run logit-fusion gate g2-dump --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --limit 20 --steps 50 --out /opt/modeljars-runs/logit-fusion-20260917/work/g2-dump --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g2-dump.json --backend pure-java --models-revision f2bf5183df5da8abe598cbd5635fe2987d0d4446
+2026-09-17T17:26:52Z exit 0: DONE G2-DUMP items=20 dir=/opt/modeljars-runs/logit-fusion-20260917/work/g2-dump
+2026-09-17T17:27:04Z run logit-fusion gate g4 --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-gsm8k.json
+2026-09-17T17:27:05Z exit 0: PASS G4 gsm8k 1319/1319 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-gsm8k.json
+2026-09-17T17:27:05Z run logit-fusion gate g4 --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-dev.jsonl --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-gsm8k-dev.json
+2026-09-17T17:27:06Z exit 0: PASS G4 gsm8k 500/500 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-gsm8k-dev.json
+2026-09-17T17:27:06Z run logit-fusion gate g4 --dataset arc --data /opt/modeljars-runs/logit-fusion-20260917/data/arc-challenge-test.jsonl --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-arc.json
+2026-09-17T17:27:07Z exit 0: PASS G4 arc 1172/1172 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-arc.json
+2026-09-17T17:27:07Z run logit-fusion gate g4 --dataset math500 --data /opt/modeljars-runs/logit-fusion-20260917/data/math500-test.jsonl --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-math500.json
+2026-09-17T17:27:08Z exit 0: PASS G4 math500 500/500 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g4-math500.json
+2026-09-17T17:27:08Z run logit-fusion gate g6 --report /opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g6.json
+2026-09-17T17:27:09Z exit 0: PASS G6 datasets=3 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/gate-g6.json
+2026-09-17T17:27:09Z PHASE-DONE gates
+2026-09-17T17:27:09Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T17:27:09Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T17:27:09Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T17:27:09Z arm VOTE needs /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-A.json; run arm A first
+2026-09-17T17:27:09Z PHASE-FAILED pilot gsm8k rc=7
+2026-09-17T17:27:09Z arm RERANK needs /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-A.json; run arm A first
+2026-09-17T17:27:09Z PHASE-FAILED pilot gsm8k rc=7
+2026-09-17T17:27:10Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T17:27:10Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T17:27:10Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T18:03:51Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T18:04:00Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T18:04:38Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T18:05:01Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T18:05:40Z PHASE-FAILED pilot gsm8k rc=1
+2026-09-17T18:07:12Z models checkout b6350805a3bdf8e7c5ae78a576b22bc1aa304869
+2026-09-17T18:07:20Z bootstrap complete
+2026-09-17T18:07:20Z PHASE-DONE bootstrap
+2026-09-17T18:07:20Z run logit-fusion run --arm member:A --arm-label A --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-A.json.part
+2026-09-17T18:27:28Z exit 0: DONE arm A accuracy=0.6600 (33/50) truncation=0.0200 tokens/s=12.01 core-s=19285.9 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-A.json.part
+2026-09-17T18:27:28Z PHASE-DONE pilot A gsm8k
+2026-09-17T18:27:28Z run logit-fusion run --arm member:B --arm-label B --members B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-B.json.part
+2026-09-17T18:47:58Z exit 0: DONE arm B accuracy=0.7800 (39/50) truncation=0.0000 tokens/s=12.87 core-s=19593.7 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-B.json.part
+2026-09-17T18:47:58Z PHASE-DONE pilot B gsm8k
+2026-09-17T18:47:58Z run logit-fusion run --arm member:C --arm-label C --members C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-C.json.part
+2026-09-17T19:27:53Z exit 0: DONE arm C accuracy=0.9800 (49/50) truncation=0.0000 tokens/s=6.40 core-s=38217.2 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-C.json.part
+2026-09-17T19:27:53Z PHASE-DONE pilot C gsm8k
+2026-09-17T19:27:53Z pilot substitution for VOTE: tie-break best -> B (dev best member not chosen yet)
+2026-09-17T19:27:53Z run logit-fusion run --arm vote:A+B+C:best --arm-label VOTE --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --member-reports /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-A.json,/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-B.json,/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-C.json --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-VOTE.json.part
+2026-09-17T19:27:55Z exit 0: DONE arm VOTE accuracy=0.8200 (41/50) truncation=0.0067 tokens/s=0.00 core-s=0.1 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-VOTE.json.part
+2026-09-17T19:27:55Z PHASE-DONE pilot VOTE gsm8k
+2026-09-17T19:27:55Z pilot substitution for RERANK: tuned weights -> uniform (S2 precedes S3 tuning)
+2026-09-17T19:27:55Z run logit-fusion run --arm rerank:A+B+C:tuned --arm-label RERANK --members A=/opt/modeljars-runs/logit-fusion-20260917/store/models/A-q8--Qwen3-0.6B-Q8_0.gguf,B=/opt/modeljars-runs/logit-fusion-20260917/store/models/B-q8--Qwen3-1.7B-Q8_0.gguf,C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --member-reports /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-A.json,/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-B.json,/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-C.json --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-RERANK.json.part
+2026-09-17T19:34:06Z exit 0: DONE arm RERANK accuracy=0.8800 (44/50) truncation=0.0067 tokens/s=0.00 core-s=5786.2 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-RERANK.json.part
+2026-09-17T19:34:06Z PHASE-DONE pilot RERANK gsm8k
+2026-09-17T19:34:06Z run logit-fusion run --arm sc:C:2 --arm-label SC-k --members C=/opt/modeljars-runs/logit-fusion-20260917/store/models/C-q8--Qwen3-4B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0.7 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-SC-k.json.part
+2026-09-17T21:07:05Z exit 0: DONE arm SC-k accuracy=0.9800 (49/50) truncation=0.0000 tokens/s=5.71 core-s=78120.9 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-SC-k.json.part
+2026-09-17T21:07:05Z PHASE-DONE pilot SC-k gsm8k
+2026-09-17T21:07:05Z run logit-fusion run --arm member:BIG --arm-label BIG --members BIG=/opt/modeljars-runs/logit-fusion-20260917/store/models/BIG-q4--Qwen3-8B-Q4_K_M.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-BIG.json.part
+2026-09-17T22:19:20Z exit 0: DONE arm BIG accuracy=0.9600 (48/50) truncation=0.0000 tokens/s=3.61 core-s=68531.2 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-BIG.json.part
+2026-09-17T22:19:20Z PHASE-DONE pilot BIG gsm8k
+2026-09-17T22:19:20Z run logit-fusion run --arm member:BIG --arm-label BIG-Q8 --members BIG=/opt/modeljars-runs/logit-fusion-20260917/store/models/BIG-q8--Qwen3-8B-Q8_0.gguf --dataset gsm8k --data /opt/modeljars-runs/logit-fusion-20260917/data/gsm8k-test.jsonl --data-manifest /opt/modeljars-runs/logit-fusion-20260917/data/data-manifest.json --thinking off --temperature 0 --seed 20260917 --max-tokens 1024 --context-length 10240 --limit 50 --backend pure-java --models-revision b6350805a3bdf8e7c5ae78a576b22bc1aa304869 --pilot true --report /opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-BIG-Q8.json.part
+2026-09-17T23:13:19Z exit 0: DONE arm BIG-Q8 accuracy=0.9800 (49/50) truncation=0.0000 tokens/s=5.05 core-s=51582.1 report=/opt/modeljars-runs/logit-fusion-20260917/evidence/pilot-gsm8k-BIG-Q8.json.part
+2026-09-17T23:13:19Z PHASE-DONE pilot BIG-Q8 gsm8k
