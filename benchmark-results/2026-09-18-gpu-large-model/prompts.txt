@@ -1,0 +1,62 @@
+# Campaign prompt set for the GPU large-model arms (G1 parity, G4 decode).
+#
+# 20 prompts, fixed order, committed. Blank lines and lines starting with '#' are ignored by
+# GreedyDecode.readPrompts, so the file carries its own provenance rather than a sibling README
+# that can drift out of step with it.
+#
+# HOW THESE WERE CHOSEN
+#
+# They were written for this campaign. They are not sampled from a public benchmark, and they are
+# not scored: G1 compares token id sequences between two arms of the same model, and G4 measures
+# tokens per second. Neither reads the text. What the prompts have to do is hold the two arms to
+# identical work and keep that work representative, which gives five constraints:
+#
+# 1. Self-contained. No retrieval, no tool use, no reference to the current date, no proper noun
+#    whose meaning moves. A prompt whose answer depends on anything outside itself would make a
+#    rerun in six months a different measurement.
+# 2. ASCII only. No smart quotes, no em dashes, no non-breaking spaces. Byte-level BPE tokenizers
+#    split those differently depending on how the file was edited, and a prompt set that changes
+#    its token count when someone opens it in a different editor is not a pinned input.
+# 3. Long-running answers. Each prompt asks for something whose natural answer runs well past 64
+#    tokens, so all 64 decoded tokens are decode work. A prompt the model finishes in 20 tokens
+#    would still be decoded to 64 -- end-of-generation is recorded and not obeyed -- but the tail
+#    would be degenerate continuation and not representative of the regime G4 is about.
+# 4. A deliberate length spread, ordered shortest to longest. The shortest is about 10 tokens and
+#    the longest about 70, so prefill tokens/s is measured across a range of prompt lengths
+#    instead of at one point. The ordering is by length so that the order is reproducible from
+#    the file rather than being an accident of how it was typed. Ties in length are broken
+#    alphabetically, so the ordering rule is total and a reordered file is a changed input.
+# 5. A spread of task families: explanation, code, SQL, arithmetic reasoning, translation,
+#    rewriting, extraction with a format constraint, summarization of inline text, and code
+#    review. Different families put different pressure on the vocabulary and on how early the
+#    model would otherwise stop.
+#
+# WHAT THESE PROMPTS DO NOT TEST
+#
+# No chat template is applied: the gate commands call tokenizer.encode on the raw line. The gates
+# measure kernels, not chat behaviour, and a template would add tokens that differ per model and
+# make the same prompt file a different input for each one. The consequence is that answer quality
+# here is not evidence of anything, and no conclusion about the model should be drawn from this
+# file. It is an input pinned by sha256 in every report, and nothing more.
+
+
+Describe three differences between latency and throughput.
+Explain what a memory page fault is and when one is not an error.
+Explain why floating point addition is not associative, with an example.
+Summarize the argument for using a write-ahead log in a database engine.
+Explain the difference between a mutex and a semaphore to a new engineer.
+Write a Python function that returns the nth Fibonacci number iteratively.
+List the steps a CPU takes to execute a single load instruction from cache.
+What is quantization in neural network inference, and what does it cost you?
+Write a SQL query that finds the second highest salary in an employees table.
+Explain how a hash map resizes, and why the amortized insert cost stays constant.
+Explain the difference between supervised, unsupervised, and reinforcement learning, and give one task that suits each.
+Translate the following sentence into Spanish and then explain your word choices: The quick brown fox jumps over the lazy dog.
+A train leaves at 9:15 and arrives at 13:40, having stopped twice for eleven minutes each. How long was it moving? Show your reasoning.
+Extract the name, date, and amount from this line and return them as JSON: Invoice 8841 issued to Acme Corporation on 2024-03-14 for 1,250.00 USD.
+Explain to a non-technical reader what a large language model does when it generates text, without using the words neural, network, or transformer.
+You are reviewing a pull request that adds a cache to a function with side effects. Explain what could go wrong and what you would ask the author to change.
+A colleague says that adding more threads always makes a program faster. Explain, with a concrete example, when that is false and what actually limits the speedup.
+Given the list of numbers 14, 3, 27, 8, 19, and 5, sort them in ascending order and then explain which sorting algorithm you would choose for a list of ten million numbers and why.
+Rewrite the following sentence to be clearer without changing its meaning, then say what you changed: The implementation of the feature was completed by the team ahead of the originally scheduled date.
+Summarize the following paragraph in two sentences: Garbage collection frees a program from tracking the lifetime of every object by hand, but it moves the cost from the programmer to the runtime; a collector that pauses the world can ruin tail latency, while a concurrent collector spends CPU cycles that the application would otherwise have used.
