@@ -41,13 +41,14 @@ import java.util.Optional;
  *
  * <h2>Weights are uploaded once, from the mapped file</h2>
  *
- * {@link #weightResidency} keys on the weight segment's address, so a tensor is uploaded the first
- * time it is projected and never again, whatever batch shape asks for it later. The upload reads
- * the mapped GGUF segment directly — there is no host-side duplicate at any point. The TornadoVM
- * arm cannot do this today: {@code ByteArray.fromSegment} copies into a fresh off-heap array and
- * prefill and decode are separate plans, which the large-model analysis costs at about 33 GB of
- * host memory for a 26B model. That difference is measured by {@link
- * CudaRoutingCounters#weightUploadBytes()}, not asserted.
+ * {@link #weightResidency} keys on the weight segment's address <em>and</em> verifies the tensor's
+ * byte length and format before reusing an entry, so a tensor is uploaded the first time it is
+ * projected and never again, whatever batch shape asks for it later. The upload reads the mapped
+ * GGUF segment directly — there is no host-side duplicate at any point. The TornadoVM arm cannot do
+ * this today: {@code ByteArray.fromSegment} copies into a fresh off-heap array and prefill and
+ * decode are separate plans, which the large-model analysis costs at about 33 GB of host memory for
+ * a 26B model. That difference is measured by {@link CudaRoutingCounters#weightUploadBytes()}, not
+ * asserted.
  *
  * <h2>KV cache ownership, and gate G6</h2>
  *
@@ -75,6 +76,43 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   /** System property that disables this backend outright. */
   public static final String DISABLED_PROPERTY = "models.cuda.disabled";
 
+  /**
+   * System property that refuses only the decode-attention kernel, leaving the projections routed.
+   *
+   * <p>A per-stage ablation switch, not a feature flag. The projections are bit-exact by
+   * construction, and attention is too since its {@code expf} became an exact transcription of
+   * {@code GroupedQueryAttentionKernel.expScalar} (see {@code UPSTREAM.md} CU-005). The switch
+   * still earns its place: it is what isolated the attention kernel as the cause when G1 diverged
+   * at prompt 0 token 7 on an A40, and it is the only way to tell two routed stages apart from a
+   * report alone if either regresses. {@code CudaParityRun} literally tells the reader to "re-run
+   * with attention refused"; this is the switch that makes that re-run possible without recompiling
+   * anything.
+   *
+   * <p>The refusal is <b>counted</b>, under the reason {@code ablated-by-models.cuda.attention
+   * .disabled}, once per attention operation diverted. An ablation whose only evidence is an
+   * absence cannot be distinguished from a stage that was never reached, and a toggle that silently
+   * does nothing reads in the results as "this stage does not matter".
+   */
+  public static final String ATTENTION_DISABLED_PROPERTY = "models.cuda.attention.disabled";
+
+  /**
+   * Restores a full {@code cuCtxSynchronize} after every launch. Off by default; a diagnostic, not
+   * a correctness switch.
+   *
+   * <p>The hot path does not need it. Launches go to the legacy null stream and {@code
+   * cuMemcpyDtoH_v2} is both host-synchronous and ordered on that stream, so the copy already
+   * cannot begin until the kernel has finished. Synchronising first was a redundant full-context
+   * barrier — roughly 200 of them per decode step on the measured path, where decode reached only
+   * 1.905x against a 3.0x gate. Removing it changes no result, only how long the host waits.
+   *
+   * <p>What the barrier did buy is <b>attribution</b>. An asynchronous launch fault surfaces at the
+   * next driver call, so without it a faulting kernel reports as {@code cuMemcpyDtoH failed} rather
+   * than {@code cuCtxSynchronize failed}. That distinction cost a real debugging detour on this
+   * campaign, so the barrier stays reachable instead of being deleted. Turn it on when a kernel is
+   * suspected of faulting; leave it off when measuring anything.
+   */
+  public static final String SYNC_EVERY_LAUNCH_PROPERTY = "models.cuda.syncEveryLaunch";
+
   private final CudaDriver driver;
   private final BundledPtxModule module;
   private final CudaRoutingCounters counters;
@@ -84,12 +122,21 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private final Arena arena;
 
   /** Device pointers for weight tensors, keyed on the mapped segment address. */
-  private final Map<Long, DeviceBuffer> weightResidency = new HashMap<>();
+  private final Map<Long, ResidentWeight> weightResidency = new HashMap<>();
 
-  private DeviceBuffer quantScratch;
-  private DeviceBuffer scaleScratch;
-  private DeviceBuffer sumScratch;
+  // One contiguous device region holding the quantised activations, their scales and their
+  // per-16 sums, in that order. Three separate buffers meant three cuMemcpyHtoD calls per staged
+  // activation; packing them is one call for the same bytes. The kernels still receive three
+  // pointers -- they are offsets into this region, so no kernel signature changes.
+  private DeviceBuffer activationScratch;
+  private long scaleOffset;
+  private long sumOffset;
   private DeviceBuffer outputScratch;
+  // Long-lived staging. A confined Arena per projection allocated and freed native memory roughly
+  // two hundred times per decode step for buffers whose size barely changes.
+  private final Arena staging = Arena.ofShared();
+  private MemorySegment uploadStaging = MemorySegment.NULL;
+  private MemorySegment downloadStaging = MemorySegment.NULL;
   private byte[] hostQuants = new byte[0];
   private float[] hostScales = new float[0];
   private short[] hostSums = new short[0];
@@ -284,7 +331,16 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean supportsGroupedAttention() {
-    return !closed;
+    if (closed) {
+      return false;
+    }
+    if (Boolean.getBoolean(ATTENTION_DISABLED_PROPERTY)) {
+      // Counted, not silent: see ATTENTION_DISABLED_PROPERTY. This is asked once per attention
+      // operation, so the count is exactly how many the ablation diverted back to the CPU.
+      counters.refused(CudaStage.DECODE_ATTENTION, "ablated-by-" + ATTENTION_DISABLED_PROPERTY);
+      return false;
+    }
+    return true;
   }
 
   @Override
@@ -311,6 +367,11 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int numHeads,
       int numKvHeads,
       float scale) {
+    if (Boolean.getBoolean(ATTENTION_DISABLED_PROPERTY)) {
+      counters.refused(CudaStage.DECODE_ATTENTION, "ablated-by-" + ATTENTION_DISABLED_PROPERTY);
+      throw new UnsupportedOperationException(
+          "CUDA attention refused: ablated by " + ATTENTION_DISABLED_PROPERTY);
+    }
     if (!isAttentionEligible(positionsA, positionsB, numHeads, numKvHeads, keyLength)) {
       counters.refused(
           CudaStage.DECODE_ATTENTION,
@@ -328,8 +389,8 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       DeviceBuffer queryBuffer = upload(call, query, queryOffset, numHeads * keyLength);
       DeviceBuffer keyBuffer = upload(call, keysA, keysAOffset, positionsA * keyDim);
       DeviceBuffer valueBuffer = upload(call, valuesA, valuesAOffset, positionsA * valueDim);
-      long scoreDevice = driver.allocate(scoreBytes);
-      long outputDevice = driver.allocate(outputBytes);
+      DeviceBuffer scoreBuffer = allocateTracked(scoreBytes);
+      DeviceBuffer outputBuffer = allocateTracked(outputBytes);
       try {
         MemorySegment parameters =
             parameterArray(
@@ -337,8 +398,8 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
                 pointer(call, queryBuffer.address()),
                 pointer(call, keyBuffer.address()),
                 pointer(call, valueBuffer.address()),
-                pointer(call, scoreDevice),
-                pointer(call, outputDevice),
+                pointer(call, scoreBuffer.address()),
+                pointer(call, outputBuffer.address()),
                 integer(call, numHeads),
                 integer(call, numKvHeads),
                 integer(call, keyLength),
@@ -349,20 +410,22 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
                 floating(call, scale));
         driver.launch(gqaAttention, numHeads, CudaKernelAbi.BLOCK_THREADS, parameters);
         counters.launched();
-        driver.synchronize();
+        if (Boolean.getBoolean(SYNC_EVERY_LAUNCH_PROPERTY)) {
+          driver.synchronize();
+        }
 
         MemorySegment host = call.allocate(outputBytes);
-        driver.copyToHost(host, outputDevice, outputBytes);
+        driver.copyToHost(host, outputBuffer.address(), outputBytes);
         counters.copiedToHost(outputBytes);
         MemorySegment.copy(
             host, ValueLayout.JAVA_FLOAT, 0, output, outputOffset, numHeads * valueLength);
         counters.accelerated(GgufTensorType.F32, CudaStage.DECODE_ATTENTION, numHeads);
       } finally {
-        driver.free(scoreDevice);
-        driver.free(outputDevice);
-        queryBuffer.free(driver);
-        keyBuffer.free(driver);
-        valueBuffer.free(driver);
+        scoreBuffer.free(driver, counters);
+        outputBuffer.free(driver, counters);
+        queryBuffer.free(driver, counters);
+        keyBuffer.free(driver, counters);
+        valueBuffer.free(driver, counters);
       }
     }
     counters.copiedToDevice(queryBytes + keyBytes + valueBytes);
@@ -384,24 +447,26 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     }
     Q8KActivations.quantize(input, batchSize, cols, hostQuants, hostScales, hostSums);
 
-    quantScratch = ensure(quantScratch, (long) quants);
-    scaleScratch = ensure(scaleScratch, (long) scales * Float.BYTES);
-    sumScratch = ensure(sumScratch, (long) sums * Short.BYTES);
-    try (Arena call = Arena.ofConfined()) {
-      MemorySegment staged = call.allocate((long) quants);
-      MemorySegment.copy(hostQuants, 0, staged, ValueLayout.JAVA_BYTE, 0, quants);
-      driver.copyToDevice(quantScratch.address(), staged, quants);
+    // Pack quants | scales | sums into one region and upload it once. Scales are read as floats on
+    // the device, so their offset is aligned to 4 bytes; sums follow the scales and are already
+    // 4-byte aligned by construction.
+    long quantBytes = quants;
+    long alignedQuantBytes = (quantBytes + 3L) & ~3L;
+    long scaleBytes = (long) scales * Float.BYTES;
+    long sumBytes = (long) sums * Short.BYTES;
+    long totalBytes = alignedQuantBytes + scaleBytes + sumBytes;
+    activationScratch = ensure(activationScratch, totalBytes);
+    scaleOffset = alignedQuantBytes;
+    sumOffset = alignedQuantBytes + scaleBytes;
 
-      MemorySegment stagedScales = call.allocate((long) scales * Float.BYTES);
-      MemorySegment.copy(hostScales, 0, stagedScales, ValueLayout.JAVA_FLOAT, 0, scales);
-      driver.copyToDevice(scaleScratch.address(), stagedScales, (long) scales * Float.BYTES);
-
-      MemorySegment stagedSums = call.allocate((long) sums * Short.BYTES);
-      MemorySegment.copy(hostSums, 0, stagedSums, ValueLayout.JAVA_SHORT, 0, sums);
-      driver.copyToDevice(sumScratch.address(), stagedSums, (long) sums * Short.BYTES);
-    }
-    counters.copiedToDevice(
-        (long) quants + (long) scales * Float.BYTES + (long) sums * Short.BYTES);
+    uploadStaging = ensureStaging(uploadStaging, totalBytes);
+    MemorySegment.copy(hostQuants, 0, uploadStaging, ValueLayout.JAVA_BYTE, 0, quants);
+    MemorySegment.copy(
+        hostScales, 0, uploadStaging.asSlice(scaleOffset), ValueLayout.JAVA_FLOAT, 0, scales);
+    MemorySegment.copy(
+        hostSums, 0, uploadStaging.asSlice(sumOffset), ValueLayout.JAVA_SHORT, 0, sums);
+    driver.copyToDevice(activationScratch.address(), uploadStaging, totalBytes);
+    counters.copiedToDevice(totalBytes);
   }
 
   /** Launches one projection against already-staged activations. */
@@ -427,17 +492,17 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               ? parameterArray(
                   call,
                   pointer(call, resident.address()),
-                  pointer(call, quantScratch.address()),
-                  pointer(call, scaleScratch.address()),
-                  pointer(call, sumScratch.address()),
+                  pointer(call, activationScratch.address()),
+                  pointer(call, activationScratch.address() + scaleOffset),
+                  pointer(call, activationScratch.address() + sumOffset),
                   pointer(call, outputScratch.address()),
                   integer(call, rows),
                   integer(call, cols))
               : parameterArray(
                   call,
                   pointer(call, resident.address()),
-                  pointer(call, quantScratch.address()),
-                  pointer(call, scaleScratch.address()),
+                  pointer(call, activationScratch.address()),
+                  pointer(call, activationScratch.address() + scaleOffset),
                   pointer(call, outputScratch.address()),
                   integer(call, rows),
                   integer(call, cols));
@@ -448,15 +513,19 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           CudaKernelAbi.BLOCK_THREADS,
           parameters);
       counters.launched();
-      driver.synchronize();
-      MemorySegment host = call.allocate(outputBytes);
-      driver.copyToHost(host, outputScratch.address(), outputBytes);
-      MemorySegment.copy(host, ValueLayout.JAVA_FLOAT, 0, output, 0, batchSize * rows);
+      if (Boolean.getBoolean(SYNC_EVERY_LAUNCH_PROPERTY)) {
+        driver.synchronize();
+      }
+      downloadStaging = ensureStaging(downloadStaging, outputBytes);
+      driver.copyToHost(downloadStaging, outputScratch.address(), outputBytes);
+      MemorySegment.copy(downloadStaging, ValueLayout.JAVA_FLOAT, 0, output, 0, batchSize * rows);
     }
     counters.copiedToHost(outputBytes);
     counters.accelerated(type, stage, 1);
     if (batchSize == 1) {
-      counters.decodeStep();
+      // A projection, not a token. Only the measurement harness can see token boundaries; see
+      // CudaRoutingCounters#decodeStep.
+      counters.decodeProjection();
     }
   }
 
@@ -468,17 +537,49 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
    */
   private DeviceBuffer resident(MemorySegment weights, GgufTensorType type, int rows, int cols) {
     long key = weights.address();
-    DeviceBuffer existing = weightResidency.get(key);
-    if (existing != null) {
-      return existing;
-    }
     long bytes = (long) rows * (cols / type.blockSize()) * type.typeSize();
-    long devicePointer = driver.allocate(bytes);
-    driver.copyToDevice(devicePointer, weights, bytes);
+    ResidentWeight existing = weightResidency.get(key);
+    if (existing != null) {
+      if (existing.matches(bytes, type)) {
+        return existing.buffer();
+      }
+      // The address is the same but the tensor is not. In the live path this cannot happen --
+      // mapped
+      // GGUF tensors are permanent, uniquely-addressed slices of the mapped file -- but the cache
+      // must not depend silently on that, because anything that recycles a host address (a freed
+      // and
+      // reallocated segment, or an expert cache reusing one staging buffer across experts) would
+      // otherwise be served a buffer of the wrong size or format. That reads past the upload or
+      // reinterprets its bytes, and it surfaces as enormous or NaN activations far from the cause.
+      // Replace the entry instead.
+      existing.buffer().free(driver, counters);
+      weightResidency.remove(key);
+    }
+    DeviceBuffer buffer = allocateTracked(bytes);
+    driver.copyToDevice(buffer.address(), weights, bytes);
     counters.uploadedWeights(bytes);
-    DeviceBuffer buffer = new DeviceBuffer(devicePointer, bytes);
-    weightResidency.put(key, buffer);
+    weightResidency.put(key, new ResidentWeight(buffer, bytes, type));
     return buffer;
+  }
+
+  /**
+   * A resident weight tensor, identified by more than the host address it came from.
+   *
+   * <p>Keying residency on the address alone was a latent fault: the address says where a tensor
+   * starts, never how long it is or how it is encoded.
+   */
+  private record ResidentWeight(DeviceBuffer buffer, long bytes, GgufTensorType type) {
+    boolean matches(long expectedBytes, GgufTensorType expectedType) {
+      return bytes == expectedBytes && type == expectedType;
+    }
+  }
+
+  /** Grows a reusable host staging segment, never shrinking it. */
+  private MemorySegment ensureStaging(MemorySegment current, long bytes) {
+    if (current != MemorySegment.NULL && current.byteSize() >= bytes) {
+      return current;
+    }
+    return staging.allocate(bytes);
   }
 
   private DeviceBuffer ensure(DeviceBuffer current, long bytes) {
@@ -486,18 +587,25 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       return current;
     }
     if (current != null) {
-      current.free(driver);
+      current.free(driver, counters);
     }
-    return new DeviceBuffer(driver.allocate(bytes), bytes);
+    return allocateTracked(bytes);
+  }
+
+  /** Allocates device memory and records it against the run's high-water mark. */
+  private DeviceBuffer allocateTracked(long bytes) {
+    long devicePointer = driver.allocate(bytes);
+    counters.deviceAllocated(bytes);
+    return new DeviceBuffer(devicePointer, bytes);
   }
 
   private DeviceBuffer upload(Arena call, float[] source, int offset, int elements) {
     long bytes = (long) elements * Float.BYTES;
-    long devicePointer = driver.allocate(bytes);
+    DeviceBuffer buffer = allocateTracked(bytes);
     MemorySegment staged = call.allocate(bytes);
     MemorySegment.copy(source, offset, staged, ValueLayout.JAVA_FLOAT, 0, elements);
-    driver.copyToDevice(devicePointer, staged, bytes);
-    return new DeviceBuffer(devicePointer, bytes);
+    driver.copyToDevice(buffer.address(), staged, bytes);
+    return buffer;
   }
 
   private static MemorySegment pointer(Arena arena, long value) {
@@ -532,22 +640,23 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       return;
     }
     closed = true;
-    weightResidency.values().forEach(buffer -> buffer.free(driver));
+    weightResidency.values().forEach(entry -> entry.buffer().free(driver, counters));
     weightResidency.clear();
-    for (DeviceBuffer buffer :
-        new DeviceBuffer[] {quantScratch, scaleScratch, sumScratch, outputScratch}) {
+    for (DeviceBuffer buffer : new DeviceBuffer[] {activationScratch, outputScratch}) {
       if (buffer != null) {
-        buffer.free(driver);
+        buffer.free(driver, counters);
       }
     }
+    staging.close();
     arena.close();
     driver.close();
   }
 
   /** A device allocation and its size. */
   private record DeviceBuffer(long address, long bytes) {
-    void free(CudaDriver driver) {
+    void free(CudaDriver driver, CudaRoutingCounters counters) {
       driver.free(address);
+      counters.deviceFreed(bytes);
     }
   }
 
