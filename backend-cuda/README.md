@@ -185,13 +185,38 @@ decides G4 — not the kernels.
 
 | dispatch shape | ops/token | overhead | total | decode | vs CPU |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| **A. As implemented.** Per-projection round trip and synchronise; each of 8 experts dispatched separately | ~3,700 | 18.5 ms | 22.8 ms | ~44 tok/s | **~3.4×** |
-| **B. Grouped experts, one synchronise per layer** | ~720 | 3.6 ms | 7.9 ms | ~127 tok/s | **~9.8×** |
+| **A. As implemented.** Per-projection round trip and synchronise; each of 8 experts dispatched separately | ~3,700 | 18.5 ms | 22.8 ms | ~44 tok/s | ~3.4× *(estimate — measured 1.7×)* |
+| **B. Grouped experts, one synchronise per layer** | ~720 | 3.6 ms | 7.9 ms | ~127 tok/s | ~9.8× *(estimate — see below)* |
+
+> **Measured 2026-09-27, and this table's reasoning is wrong.** On an L40S, dense Granite 4.1 3B
+> Q4_K_M, decode measured **1.717×** — below even shape A's estimate. The three shape-A overheads were
+> then removed (the redundant per-projection `cuCtxSynchronize`, three activation uploads coalesced
+> into one, per-projection arena allocation hoisted) and measured again **on the same host, both arms,
+> with G1 parity verified on each**: accelerated throughput went **12.23 → 12.01 tok/s**, and the ratio
+> moved 1.717× → 1.820× only because the CPU control fell further. At one sample per arm that is noise,
+> not a 6% win.
+>
+> `transfersPerDecodeStep` stayed at **402** and `activationBytesPerDecodeStep` at **12,660,712** —
+> unchanged, because none of those fixes removes a transfer. **So the per-operation host cost was not
+> the bound; the bus is.** The table attributed the gap to synchronisation and dispatch granularity,
+> and removing them moved nothing. Shape B's ~9.8× rests on the same reasoning and should not be
+> quoted until it is measured.
+>
+> What the measurement points at instead is the SPI itself: `multiply` names a `float[]`, so every
+> projection's result must land on the host, and the operations between projections (RMSNorm, RoPE,
+> SwiGLU, residual add) run on the CPU — so the tensor crosses PCIe between almost every pair. The
+> pre-registered design for device-resident activations, with its gates and stop rule, is in
+> `benchmark-results/2026-09-18-gpu-large-model/RESIDENT-ACTIVATIONS.md` on
+> `exp/gpu-large-model-campaign`.
+>
+> Kept as written above rather than deleted, because a wrong prediction with a measurement beside it is
+> more useful than a quietly corrected one: the error was in the reasoning, not the arithmetic.
 
 Shape A is what the current SPI forces: `multiply` returns a `float[]`, so it must synchronise
 before returning, and a 30-layer MoE with 8 active experts does that roughly 900 times per token.
 It lands just above the 3.0× bar with no margin — which on a term estimated at 5 µs is not a
-result anyone should plan around.
+result anyone should plan around. That caution was right, and the measurement went the other way:
+the term was not 5 µs of host cost dominating, it was bus traffic the estimate never counted.
 
 **So the honest answer on G4: yes, these two kernels are sufficient in principle, and no, the
 current dispatch shape does not give them room.** The two kernels cover 2.42 GiB of the 2.42 GiB

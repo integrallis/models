@@ -41,13 +41,14 @@ import java.util.Optional;
  *
  * <h2>Weights are uploaded once, from the mapped file</h2>
  *
- * {@link #weightResidency} keys on the weight segment's address, so a tensor is uploaded the first
- * time it is projected and never again, whatever batch shape asks for it later. The upload reads
- * the mapped GGUF segment directly — there is no host-side duplicate at any point. The TornadoVM
- * arm cannot do this today: {@code ByteArray.fromSegment} copies into a fresh off-heap array and
- * prefill and decode are separate plans, which the large-model analysis costs at about 33 GB of
- * host memory for a 26B model. That difference is measured by {@link
- * CudaRoutingCounters#weightUploadBytes()}, not asserted.
+ * {@link #weightResidency} keys on the weight segment's address <em>and</em> verifies the tensor's
+ * byte length and format before reusing an entry, so a tensor is uploaded the first time it is
+ * projected and never again, whatever batch shape asks for it later. The upload reads the mapped
+ * GGUF segment directly — there is no host-side duplicate at any point. The TornadoVM arm cannot do
+ * this today: {@code ByteArray.fromSegment} copies into a fresh off-heap array and prefill and
+ * decode are separate plans, which the large-model analysis costs at about 33 GB of host memory for
+ * a 26B model. That difference is measured by {@link CudaRoutingCounters#weightUploadBytes()}, not
+ * asserted.
  *
  * <h2>KV cache ownership, and gate G6</h2>
  *
@@ -121,7 +122,7 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private final Arena arena;
 
   /** Device pointers for weight tensors, keyed on the mapped segment address. */
-  private final Map<Long, DeviceBuffer> weightResidency = new HashMap<>();
+  private final Map<Long, ResidentWeight> weightResidency = new HashMap<>();
 
   // One contiguous device region holding the quantised activations, their scales and their
   // per-16 sums, in that order. Three separate buffers meant three cuMemcpyHtoD calls per staged
@@ -536,16 +537,41 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
    */
   private DeviceBuffer resident(MemorySegment weights, GgufTensorType type, int rows, int cols) {
     long key = weights.address();
-    DeviceBuffer existing = weightResidency.get(key);
-    if (existing != null) {
-      return existing;
-    }
     long bytes = (long) rows * (cols / type.blockSize()) * type.typeSize();
+    ResidentWeight existing = weightResidency.get(key);
+    if (existing != null) {
+      if (existing.matches(bytes, type)) {
+        return existing.buffer();
+      }
+      // The address is the same but the tensor is not. In the live path this cannot happen --
+      // mapped
+      // GGUF tensors are permanent, uniquely-addressed slices of the mapped file -- but the cache
+      // must not depend silently on that, because anything that recycles a host address (a freed
+      // and
+      // reallocated segment, or an expert cache reusing one staging buffer across experts) would
+      // otherwise be served a buffer of the wrong size or format. That reads past the upload or
+      // reinterprets its bytes, and it surfaces as enormous or NaN activations far from the cause.
+      // Replace the entry instead.
+      existing.buffer().free(driver, counters);
+      weightResidency.remove(key);
+    }
     DeviceBuffer buffer = allocateTracked(bytes);
     driver.copyToDevice(buffer.address(), weights, bytes);
     counters.uploadedWeights(bytes);
-    weightResidency.put(key, buffer);
+    weightResidency.put(key, new ResidentWeight(buffer, bytes, type));
     return buffer;
+  }
+
+  /**
+   * A resident weight tensor, identified by more than the host address it came from.
+   *
+   * <p>Keying residency on the address alone was a latent fault: the address says where a tensor
+   * starts, never how long it is or how it is encoded.
+   */
+  private record ResidentWeight(DeviceBuffer buffer, long bytes, GgufTensorType type) {
+    boolean matches(long expectedBytes, GgufTensorType expectedType) {
+      return bytes == expectedBytes && type == expectedType;
+    }
   }
 
   /** Grows a reusable host staging segment, never shrinking it. */
@@ -614,7 +640,7 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       return;
     }
     closed = true;
-    weightResidency.values().forEach(buffer -> buffer.free(driver, counters));
+    weightResidency.values().forEach(entry -> entry.buffer().free(driver, counters));
     weightResidency.clear();
     for (DeviceBuffer buffer : new DeviceBuffer[] {activationScratch, outputScratch}) {
       if (buffer != null) {
