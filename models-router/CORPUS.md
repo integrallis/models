@@ -49,9 +49,11 @@ Measured here on the SQ4 index that ships, EmbeddingGemma-300M Q8_0, threshold 0
 
     accuracy 0.9044 (435/481), unclassified 0
 
-The corpus repository's README also quotes an SQ4 figure of 0.9019. That number is not comparable to
-this one: no whole number of correct answers out of 481 held-out prompts yields 0.9019, so it was
-measured against a differently sized split. Re-measure rather than diffing against it.
+The corpus repository quotes an older SQ4 figure of 0.9019. That is 423/469, measured before the
+`synthetic-instruction-v1` prompts grew the held-out split from 469 to 481 and the training split
+from 1881 to 1929. The index was rebuilt against the larger training set but the evaluation was not
+re-run, so the two numbers describe different held-out sets and the difference between them says
+nothing about the index. The 12 added held-out prompts fall in `extraction` and `summarization`.
 
 `TaskExemplarsTest` reads the corpus when it can find one, and skips otherwise. Point it at a
 checkout with `-Dmodels.router.corpus=/path/to/model-router-corpus/benchmark-prompts.tsv`.
