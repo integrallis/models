@@ -65,7 +65,11 @@ public final class TensorOps {
   /** Offset-aware RMS normalization for attention heads stored in contiguous buffers. */
   public static void rmsNorm(
       float[] out, int outOffset, float[] x, int xOffset, float[] weight, int size, float eps) {
-    float sumSq = VectorUtil.dotProduct(x, xOffset, x, xOffset, size);
+    // Host-independent: VectorUtil.dotProduct sizes its reduction from the host (four accumulators
+    // of SPECIES_PREFERRED lanes, folded by a width switch), so this sum -- and therefore every
+    // token this model selects -- differed between a 128-bit, 256-bit and 512-bit machine. See
+    // PinnedReduction; at the 256-bit default this is bit-identical to what it replaces.
+    float sumSq = PinnedReduction.sumOfSquares(x, xOffset, size);
     float rms = (float) Math.sqrt(sumSq / size + eps);
     float scale = 1.0f / rms;
     // (x * scale) * weight lanewise, the same two roundings in the same order as the scalar
@@ -233,7 +237,8 @@ public final class TensorOps {
     float[] row = new float[cols];
     for (int r = 0; r < rows; r++) {
       MemorySegment.copy(weight, LITTLE_ENDIAN_FLOAT, (long) r * cols * Float.BYTES, row, 0, cols);
-      out[r] = VectorUtil.dotProduct(x, 0, row, 0, cols);
+      // Pinned for the same reason as rmsNorm: an F32 row score feeds token selection.
+      out[r] = PinnedReduction.dot(x, 0, row, 0, cols);
     }
   }
 
@@ -1259,7 +1264,7 @@ public final class TensorOps {
       GgufTensorValues.dequantizeRow(weights, type, row, columns, decodedWeightRow);
       for (int batch = 0; batch < batchSize; batch++) {
         output[batch * rows + row] =
-            VectorUtil.dotProduct(input, batch * columns, decodedWeightRow, 0, columns);
+            PinnedReduction.dot(input, batch * columns, decodedWeightRow, 0, columns);
       }
     }
   }
