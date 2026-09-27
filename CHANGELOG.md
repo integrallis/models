@@ -4,6 +4,94 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- The same model produced **different output text on different machines**. Every vectorised float
+  reduction in the model path sized itself from the host — `SPECIES_PREFERRED` capped by
+  `vectors.maxBits` — and a float reduction's last bits are decided by how many partial sums it keeps
+  and in what order it folds them. In a retrieval score that is invisible. In a transformer it
+  decides which token is selected, so it changes the generated text. `PinnedReduction` pins the shape
+  at eight lanes and now backs `rmsNorm`, the F32 row score, the batched F32 path and the attention
+  reduction. It is **bit-identical to what it replaces at the 256-bit default**, so x86 hosts running
+  the default see no change; ARM and narrower or wider configurations do.
+
+- CUDA K-quant and attention kernels are now bit-exact against the CPU control, and G1 token parity
+  passes on device (640 tokens identical, both stages routed). Three defects, all the same mistake of
+  validating a device kernel against a plausible reference instead of the path the gate compares it
+  to: Q6_K folded the way the scalar path folds rather than the way the Panama control does; `expf`
+  approximated the exponential instead of transcribing the CPU's own polynomial, argument reduction
+  and rounding; and the attention reduction folded in a different order.
+
+- Completed deadlines were never removed from the routing timer queue, so a long-lived
+  `RoutingExecution` accumulated them.
+
+- Spring AI did not surface budget overruns as terminal accounting failures.
+
+- LangChain4j applied SDK parameters around provider public APIs rather than through them.
+
+### Added
+
+- Routing execution controls: per-request and shared spending budgets, deadlines, token bounds and
+  cancellation, via `RoutingExecution`, `RoutingExecutionOptions`, `RoutingBudget`,
+  `RoutingTokenBounds`, `RoutingUsage`, `RoutingCancellationToken` and
+  `RoutingBudgetExceededException`, surfaced on the Spring AI and LangChain4j routed adapters.
+  `RoutingBudget` is a thread-safe account in one application-selected currency, reusable across a
+  session, tenant or process; candidate prices and the account must agree on currency, and **usage
+  the provider does not report is charged at the reserved bound**. It is an in-process ledger and not
+  a payment API. Existing constructors keep their unbudgeted behaviour.
+
+- `TaskClassifier.local()` declares whether classification, including every embedding call, stays in
+  this process. It defaults to `false`, so **unknown is treated as remote**. Wrapping a
+  `PretrainedTaskClassifier` with `TaskClassifier.local` is only correct when the supplied embedder
+  is also local: the index establishes nothing about the embedding client's data boundary.
+
+- A task index records the embedding prefixes its exemplars were built with, and
+  `PretrainedTaskClassifier` applies the query side itself, so callers pass bare queries. Supplying
+  one side without the other is refused rather than half-applied. `--document-prefix` and
+  `--query-prefix` select them on `task-index build`, and `task-index evaluate` gains `--per-item`
+  for paired comparisons between two indexes.
+
+- `ToolSpecRetriever` applies a document prefix when indexing tool descriptions and a query prefix
+  when selecting. It embeds both sides, so it is the easiest place here to get an instruction-tuned
+  embedder wrong, and getting it wrong is silent: selection still returns tools, just less accurately
+  than the model allows. One prefix without the other is refused.
+
+- Bench gates for the GPU campaign and router evaluation: `CudaParityRun`, `CudaDecodeRun`,
+  `GreedyDecode`, `CudaRoutingRecorder` and `RouterSelectionEvaluationCli`.
+
+### Changed
+
+- The bundled router task index is rebuilt and now embeds both exemplars and queries with
+  EmbeddingGemma's classification prefix, `task: classification | query: `, **worth +4.2 points of
+  held-out accuracy**: 0.9459 (455/481) against 0.9044 (435/481) unprefixed, McNemar exact
+  p = 0.0012 on 36 discordant pairs. Gains concentrate where intent rather than surface form
+  separates the classes — extraction +0.185, reasoning +0.119, summarization to 58/58 — while code,
+  math, translation and near-ceiling sql move by at most one prompt.
+
+  The arm that lost is the more useful result. Embedding exemplars as titled documents and queries as
+  search queries, which is the obvious pairing to reach for, measured **0.8399 — 6.4 points below
+  using no prefix at all** — and collapsed chat from 41/50 to 17/50. The two sides land in regions
+  the model keeps apart. Two plausible prefixes, one worth +4.2 and one worth −6.4, and the GGUF
+  carries no template metadata to arbitrate: `BundledTaskIndexTest` now pins both prefixes, including
+  the trailing space that `java.util.Properties` would otherwise eat. Pre-registration, decision rule
+  and per-task results in `docs/findings/embeddinggemma-task-prefix-ab.md`.
+
+  Not separated: which half of the prefix earns the gain, since the arm moved `task: classification`
+  and the `query: ` scaffold together. Not measured: whether any of this transfers to Nomic or E5, or
+  the per-query cost of the seven extra tokens.
+
+- Consume Vectors 0.1.24. Its manifest grew from 164 to 200 bytes to carry an embedding recipe
+  reference, and the version is an exact match rather than a floor, so **0.1.24 cannot open an index
+  written by 0.1.23**. The bundled index is migrated accordingly. `models-router/CORPUS.md` gains the
+  archive packaging step, which was previously undocumented — the documented rebuild writes a
+  collection directory, but what ships is a zip of its contents with the generation directories at the
+  archive root.
+
+- Align `jackson-datatype-jdk8` to 2.21.7, the last Jackson module still on 2.21.4.
+
+- Corrected a `backend-cuda` contract table that asserted the score dot product matches the CPU. It
+  was never tested and it does not: the Java path uses a lane-striped `FloatVector` fold.
+
 ## [0.3.47] - 2026-09-25
 
 ### Fixed
