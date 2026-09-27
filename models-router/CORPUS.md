@@ -47,9 +47,25 @@ held-out split is what `task-index evaluate` scores:
 
 Measured here on the SQ4 index that ships, EmbeddingGemma-300M Q8_0, threshold 0.0:
 
-    accuracy 0.9044 (435/481), unclassified 0
+    accuracy 0.9459 (455/481), unclassified 0
 
-The corpus repository quotes an older SQ4 figure of 0.9019. That is 423/469, measured before the
+The shipped index embeds both exemplars and queries with EmbeddingGemma's classification prefix,
+`task: classification | query: `, which is worth **+4.2 points** over embedding them bare
+(0.9459 vs 0.9044, McNemar exact p = 0.0012). A rebuild must pass it on both sides:
+
+    --document-prefix 'task: classification | query: ' \
+    --query-prefix 'task: classification | query: '
+
+`BundledTaskIndexTest` pins both, because dropping them costs those 4.2 points and nothing else would
+notice -- classification keeps returning a task for every prompt, just a worse one. The index records
+them and `PretrainedTaskClassifier` applies the query side itself, so callers pass bare queries.
+
+Do not substitute the retrieval prefixes (`title: none | text: ` / `task: search result | query: `):
+measured at 0.8399, which is 6.4 points **below** using no prefix at all. Details and the
+pre-registration in `docs/findings/embeddinggemma-task-prefix-ab.md`.
+
+The corpus repository quotes an older SQ4 figure of 0.9019. That is 423/469 on unprefixed
+embeddings, measured before the
 `synthetic-instruction-v1` prompts grew the held-out split from 469 to 481 and the training split
 from 1881 to 1929. The index was rebuilt against the larger training set but the evaluation was not
 re-run, so the two numbers describe different held-out sets and the difference between them says
