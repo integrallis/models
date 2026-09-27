@@ -94,6 +94,59 @@ class ToolSpecRetrieverTest {
         .hasMessageContaining("zero");
   }
 
+  @Test
+  void appliesTheDocumentPrefixWhenIndexingAndTheQueryPrefixWhenSelecting() {
+    RecordingEmbeddingBackend embeddings =
+        new RecordingEmbeddingBackend(
+            List.of(vector(1.0f, 0.0f), vector(0.0f, 1.0f)), vector(1.0f, 0.0f));
+    ToolSpecRetriever retriever =
+        new ToolSpecRetriever(
+            embeddings, List.of(LIGHTS, WEATHER), "search_document: ", "search_query: ");
+
+    retriever.select("switch on the kitchen lights", 1);
+
+    // Each side carries its own instruction. Swapping these is the silent failure this guards.
+    assertThat(embeddings.embeddedDocuments)
+        .allSatisfy(document -> assertThat(document).startsWith("search_document: "));
+    assertThat(embeddings.embeddedQueries)
+        .containsExactly("search_query: switch on the kitchen lights");
+  }
+
+  @Test
+  void embedsBothSidesUnprefixedWhenNoRecipeIsGiven() {
+    RecordingEmbeddingBackend embeddings =
+        new RecordingEmbeddingBackend(List.of(vector(1.0f, 0.0f)), vector(1.0f, 0.0f));
+    ToolSpecRetriever retriever = new ToolSpecRetriever(embeddings, List.of(LIGHTS));
+
+    retriever.select("lights", 1);
+
+    assertThat(embeddings.embeddedDocuments)
+        .allSatisfy(d -> assertThat(d).startsWith("set_lights"));
+    assertThat(embeddings.embeddedQueries).containsExactly("lights");
+  }
+
+  @Test
+  void refusesADocumentPrefixWithoutAQueryPrefix() {
+    RecordingEmbeddingBackend embeddings =
+        new RecordingEmbeddingBackend(List.of(vector(1.0f, 0.0f)), vector(1.0f, 0.0f));
+
+    assertThatThrownBy(
+            () -> new ToolSpecRetriever(embeddings, List.of(LIGHTS), "search_document: ", null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be supplied together");
+  }
+
+  @Test
+  void refusesAQueryPrefixWithoutADocumentPrefix() {
+    RecordingEmbeddingBackend embeddings =
+        new RecordingEmbeddingBackend(List.of(vector(1.0f, 0.0f)), vector(1.0f, 0.0f));
+
+    assertThatThrownBy(
+            () -> new ToolSpecRetriever(embeddings, List.of(LIGHTS), null, "search_query: "))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be supplied together");
+  }
+
   private static float[] vector(float... values) {
     return values;
   }
