@@ -46,13 +46,19 @@ public final class TaskIndex implements AutoCloseable {
   private final String embeddingModelId;
   private final int dimension;
   private final List<String> taskNames;
+  private final String queryPrefix;
 
   private TaskIndex(
-      VectorCollection collection, String embeddingModelId, int dimension, List<String> taskNames) {
+      VectorCollection collection,
+      String embeddingModelId,
+      int dimension,
+      List<String> taskNames,
+      String queryPrefix) {
     this.collection = collection;
     this.embeddingModelId = embeddingModelId;
     this.dimension = dimension;
     this.taskNames = taskNames;
+    this.queryPrefix = queryPrefix;
   }
 
   /**
@@ -89,7 +95,9 @@ public final class TaskIndex implements AutoCloseable {
             .quantizer(quantizer)
             .storagePath(directory.toAbsolutePath())
             .build();
-    return new TaskIndex(collection, modelId, dimension, tasks);
+    // Absent in indexes written before prefixes were an option, which used none on either side.
+    return new TaskIndex(
+        collection, modelId, dimension, tasks, manifest.getProperty("queryPrefix"));
   }
 
   private static String require(Properties manifest, String key, Path file) {
@@ -98,6 +106,19 @@ public final class TaskIndex implements AutoCloseable {
       throw new IllegalArgumentException(file + " has no " + key);
     }
     return value;
+  }
+
+  /**
+   * The prefix a query must carry to match how this index's exemplars were embedded.
+   *
+   * <p>Empty for an index built without prefixes, which is every index written before they were an
+   * option. Recorded here rather than left to the caller because querying a prefixed index without
+   * the prefix degrades accuracy silently -- classification still returns a task, just a worse one.
+   *
+   * @return the query-side prefix, or empty if the index was built without one
+   */
+  public Optional<String> queryPrefix() {
+    return Optional.ofNullable(queryPrefix);
   }
 
   /**
