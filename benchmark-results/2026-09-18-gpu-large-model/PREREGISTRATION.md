@@ -347,3 +347,16 @@ Decode remains **1.905×** (6.76 vs 3.55 tok/s) against the 3.0× threshold, wit
 host transfers and 12.7 MB of activations per decode step**. Parity was never the ceiling. The device
 is fed one projection at a time with a round trip each, so the next work is grouped dispatch in the
 Java layer — batching projections per layer with one sync — not more kernel arithmetic.
+
+## Dispatch hypothesis rejected, 2026-09-27T02:51Z
+
+Measured A/B on one L40S, both arms, parity PASS on each: removing the redundant per-projection
+`cuCtxSynchronize`, coalescing three activation uploads into one, and hoisting per-projection arena
+allocations produced **no measurable improvement**. Accelerated throughput fell 12.23 → 12.01 tok/s;
+the ratio rose 1.717× → 1.820× only because the control fell further, which at one sample per arm is
+noise. **Transfers per step stayed at exactly 402 and bytes per step at 12,660,712.**
+
+The README's ~3.4×/~9.8× prediction was wrong in its reasoning, not just its number: it blamed
+synchronisation and dispatch granularity, and removing those moved nothing. **The bus is the bound.**
+Full analysis and the pre-registered design for device-resident activations, including its decision
+rule and the gates each new kernel must pass, are in [RESIDENT-ACTIVATIONS.md](RESIDENT-ACTIVATIONS.md).
