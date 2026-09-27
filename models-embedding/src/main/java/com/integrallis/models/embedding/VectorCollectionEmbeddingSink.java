@@ -16,7 +16,9 @@
 package com.integrallis.models.embedding;
 
 import com.integrallis.models.api.EmbeddingBackend;
+import com.integrallis.vectors.core.ContentHash;
 import com.integrallis.vectors.core.Document;
+import com.integrallis.vectors.core.EmbeddingRecipe;
 import com.integrallis.vectors.db.VectorCollection;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +34,35 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>The embedding array is passed directly to {@link Document#of(String, float[], String)}.
  * Vectors performs its documented defensive copy at the staging boundary.
+ *
+ * <h2>Instruction prefixes</h2>
+ *
+ * <p>If the collection declares an {@link EmbeddingRecipe} with a document prefix, this sink
+ * applies it before embedding. That matters because several models shipped here are
+ * <b>asymmetric</b>: Nomic-embed-text wants {@code search_document: } when indexing and {@code
+ * search_query: } when searching, and E5 wants {@code passage: } and {@code query: }. Embedding a
+ * document without its prefix is not an error anyone sees — retrieval still works, and is simply
+ * worse than the model allows. Before recipes existed there was nowhere to record the prefix and
+ * nothing to apply it, so it was left to each caller and no caller knew it was responsible.
+ *
+ * <p>The <b>query</b> side is not this class's to fix: a sink writes documents. Whatever performs
+ * the search must apply {@link EmbeddingRecipe#queryInput(String)} to the query, and mixing a
+ * prefixed document set with an unprefixed query is the shape of mistake these models punish
+ * quietly.
+ *
+ * <p>The stored text is always the caller's original, never the prefixed form, so re-embedding does
+ * not apply the prefix twice. The content hash covers what was <em>embedded</em>, so it answers
+ * "would re-embedding change this vector".
  */
 public final class VectorCollectionEmbeddingSink implements AutoCloseable {
 
   private final EmbeddingBackend backend;
   private final VectorCollection collection;
   private final int dimension;
+
+  /** The collection's recipe, or null when it declares none. */
+  private final EmbeddingRecipe recipe;
+
   private final AtomicBoolean closed = new AtomicBoolean();
 
   /**
@@ -59,6 +84,43 @@ public final class VectorCollectionEmbeddingSink implements AutoCloseable {
               + ")");
     }
     this.dimension = backendDim;
+    this.recipe = collection.config().recipe().orElse(null);
+    if (this.recipe != null && this.recipe.dimension() != backendDim) {
+      // The collection already rejects a recipe whose dimension contradicts its own, so this
+      // catches
+      // the remaining gap: a backend that is not the model the recipe names.
+      throw new IllegalArgumentException(
+          "EmbeddingBackend dimension ("
+              + backendDim
+              + ") does not match the collection's embedding recipe "
+              + this.recipe.modelId()
+              + ' '
+              + this.recipe.modelVersion()
+              + " (dimension "
+              + this.recipe.dimension()
+              + "): this sink would embed with a different model than the collection records");
+    }
+  }
+
+  /**
+   * Text as it should be handed to the model, with the recipe's document prefix applied.
+   *
+   * <p>Returns the input unchanged when the collection declares no recipe or no prefix.
+   */
+  private String embeddedInput(String text) {
+    return recipe == null ? text : recipe.documentInput(text);
+  }
+
+  /**
+   * Builds the stored document: the caller's original text, and a hash of what was embedded.
+   *
+   * <p>Those differ whenever a prefix applies, and the hash must cover the embedded form -- it
+   * exists to answer "would re-embedding change this vector", which a hash of the bare text cannot.
+   */
+  private Document documentFor(String id, float[] vector, String text, String embedded) {
+    return text.equals(embedded)
+        ? Document.of(id, vector, text)
+        : new Document(id, vector, text, java.util.Map.of(), ContentHash.of(embedded));
   }
 
   /**
@@ -70,8 +132,9 @@ public final class VectorCollectionEmbeddingSink implements AutoCloseable {
     ensureOpen();
     Objects.requireNonNull(id, "id must not be null");
     Objects.requireNonNull(text, "text must not be null");
-    float[] vector = validateVector(backend.embed(text), 0);
-    collection.add(Document.of(id, vector, text));
+    String embedded = embeddedInput(text);
+    float[] vector = validateVector(backend.embed(embedded), 0);
+    collection.add(documentFor(id, vector, text, embedded));
   }
 
   /**
@@ -95,7 +158,11 @@ public final class VectorCollectionEmbeddingSink implements AutoCloseable {
       Objects.requireNonNull(ids.get(i), "ids must not contain null");
       Objects.requireNonNull(texts.get(i), "texts must not contain null");
     }
-    float[][] vectors = backend.embedAll(texts);
+    List<String> embedded = new ArrayList<>(texts.size());
+    for (String text : texts) {
+      embedded.add(embeddedInput(text));
+    }
+    float[][] vectors = backend.embedAll(embedded);
     if (vectors == null) {
       throw new IllegalStateException("backend returned a null vector batch");
     }
@@ -112,7 +179,7 @@ public final class VectorCollectionEmbeddingSink implements AutoCloseable {
     }
     List<Document> docs = new ArrayList<>(texts.size());
     for (int i = 0; i < texts.size(); i++) {
-      docs.add(Document.of(ids.get(i), vectors[i], texts.get(i)));
+      docs.add(documentFor(ids.get(i), vectors[i], texts.get(i), embedded.get(i)));
     }
     collection.addAll(docs);
   }
