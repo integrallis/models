@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.backend.purejava.gptoss;
 
+import com.integrallis.models.backend.purejava.gguf.GgufFile;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.models.backend.purejava.tensor.TensorSource;
@@ -29,17 +31,17 @@ final class GptOssWeights {
 
   record Layer(
       float[] attentionNorm,
-      BFloat16Matrix query,
+      GptOssProjection query,
       float[] queryBias,
-      BFloat16Matrix key,
+      GptOssProjection key,
       float[] keyBias,
-      BFloat16Matrix value,
+      GptOssProjection value,
       float[] valueBias,
-      BFloat16Matrix output,
+      GptOssProjection output,
       float[] outputBias,
       float[] sinks,
       float[] postAttentionNorm,
-      BFloat16Matrix router,
+      GptOssProjection router,
       float[] routerBias,
       GptOssMxfp4ExpertWeights experts) {
 
@@ -101,20 +103,110 @@ final class GptOssWeights {
     }
   }
 
-  private final BFloat16Matrix tokenEmbedding;
+  private final GptOssProjection tokenEmbedding;
   private final float[] outputNorm;
-  private final BFloat16Matrix output;
+  private final GptOssProjection output;
   private final Layer[] layers;
 
   private GptOssWeights(
-      BFloat16Matrix tokenEmbedding, float[] outputNorm, BFloat16Matrix output, Layer[] layers) {
+      GptOssProjection tokenEmbedding,
+      float[] outputNorm,
+      GptOssProjection output,
+      Layer[] layers) {
     this.tokenEmbedding = Objects.requireNonNull(tokenEmbedding, "tokenEmbedding");
     this.outputNorm = Objects.requireNonNull(outputNorm, "outputNorm").clone();
     this.output = Objects.requireNonNull(output, "output");
     this.layers = Objects.requireNonNull(layers, "layers").clone();
   }
 
-  static GptOssWeights load(TensorSource source, GptOssHuggingFaceConfig config) {
+  /**
+   * Maps a complete GPT-OSS decoder from a GGUF file.
+   *
+   * <p>The same weights as {@link #load}, differently stored: attention matrices are K-quants
+   * rather than BF16, the experts arrive as three stacked tensors rather than fused blocks and
+   * scales, and the head is its own tensor rather than optionally tied. {@link GptOssProjection} is
+   * what lets the graph be shared across both.
+   */
+  static GptOssWeights fromGguf(GgufFile file, GptOssConfig config) {
+    Objects.requireNonNull(file, "file");
+    Objects.requireNonNull(config, "config");
+
+    GptOssProjection tokenEmbedding =
+        ggufMatrix(file, "token_embd.weight", config.vocabSize(), config.hiddenSize());
+    GptOssProjection output =
+        file.hasTensor("output.weight")
+            ? ggufMatrix(file, "output.weight", config.vocabSize(), config.hiddenSize())
+            : tokenEmbedding;
+    Layer[] layers = new Layer[config.numLayers()];
+    for (int layer = 0; layer < layers.length; layer++) {
+      String prefix = "blk." + layer + ".";
+      layers[layer] =
+          new Layer(
+              ggufVector(file, prefix + "attn_norm.weight", config.hiddenSize()),
+              ggufMatrix(
+                  file, prefix + "attn_q.weight", config.queryDimension(), config.hiddenSize()),
+              ggufVector(file, prefix + "attn_q.bias", config.queryDimension()),
+              ggufMatrix(
+                  file, prefix + "attn_k.weight", config.keyValueDimension(), config.hiddenSize()),
+              ggufVector(file, prefix + "attn_k.bias", config.keyValueDimension()),
+              ggufMatrix(
+                  file, prefix + "attn_v.weight", config.keyValueDimension(), config.hiddenSize()),
+              ggufVector(file, prefix + "attn_v.bias", config.keyValueDimension()),
+              ggufMatrix(
+                  file,
+                  prefix + "attn_output.weight",
+                  config.hiddenSize(),
+                  config.queryDimension()),
+              ggufVector(file, prefix + "attn_output.bias", config.hiddenSize()),
+              // One learned logit per query head, added to the softmax denominator.
+              ggufVector(file, prefix + "attn_sinks.weight", config.numHeads()),
+              ggufVector(file, prefix + "post_attention_norm.weight", config.hiddenSize()),
+              ggufMatrix(
+                  file, prefix + "ffn_gate_inp.weight", config.numExperts(), config.hiddenSize()),
+              ggufVector(file, prefix + "ffn_gate_inp.bias", config.numExperts()),
+              GptOssMxfp4ExpertWeights.fromGguf(
+                  file,
+                  layer,
+                  config.numExperts(),
+                  config.hiddenSize(),
+                  config.intermediateSize()));
+    }
+    return new GptOssWeights(
+        tokenEmbedding,
+        ggufVector(file, "output_norm.weight", config.hiddenSize()),
+        output,
+        layers);
+  }
+
+  private static GptOssProjection ggufMatrix(GgufFile file, String name, int rows, int columns) {
+    GgufTensorData tensor = file.getTensor(name);
+    long[] expected = {columns, rows};
+    if (!Arrays.equals(expected, tensor.shape())) {
+      throw new IllegalArgumentException(
+          name
+              + " shape must be "
+              + Arrays.toString(expected)
+              + ", found "
+              + Arrays.toString(tensor.shape()));
+    }
+    return GptOssProjection.ofGguf(tensor.dataSegment(), tensor.type(), rows, columns);
+  }
+
+  private static float[] ggufVector(GgufFile file, String name, int length) {
+    GgufTensorData tensor = file.getTensor(name);
+    long[] expected = {length};
+    if (!Arrays.equals(expected, tensor.shape())) {
+      throw new IllegalArgumentException(
+          name
+              + " shape must be "
+              + Arrays.toString(expected)
+              + ", found "
+              + Arrays.toString(tensor.shape()));
+    }
+    return GgufTensorValues.toFloatArray(tensor);
+  }
+
+  static GptOssWeights load(TensorSource source, GptOssConfig config) {
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(config, "config");
     if (!"safetensors".equals(source.format())) {
@@ -122,9 +214,9 @@ final class GptOssWeights {
           "GPT-OSS weights require Safetensors; got " + source.format());
     }
 
-    BFloat16Matrix tokenEmbedding =
+    GptOssProjection tokenEmbedding =
         matrix(source, "model.embed_tokens.weight", config.vocabSize(), config.hiddenSize());
-    BFloat16Matrix output =
+    GptOssProjection output =
         config.tieWordEmbeddings()
             ? tokenEmbedding
             : matrix(source, "lm_head.weight", config.vocabSize(), config.hiddenSize());
@@ -190,7 +282,7 @@ final class GptOssWeights {
         tokenEmbedding, vector(source, "model.norm.weight", config.hiddenSize()), output, layers);
   }
 
-  BFloat16Matrix tokenEmbedding() {
+  GptOssProjection tokenEmbedding() {
     return tokenEmbedding;
   }
 
@@ -198,7 +290,7 @@ final class GptOssWeights {
     return outputNorm.clone();
   }
 
-  BFloat16Matrix output() {
+  GptOssProjection output() {
     return output;
   }
 
@@ -215,9 +307,9 @@ final class GptOssWeights {
     return enabled ? vector(source, name, length) : new float[length];
   }
 
-  private static BFloat16Matrix matrix(TensorSource source, String name, int rows, int columns) {
+  private static GptOssProjection matrix(TensorSource source, String name, int rows, int columns) {
     TensorView tensor = requireBf16(source, name, rows, columns);
-    return BFloat16Matrix.of(tensor.data(), rows, columns);
+    return GptOssProjection.ofBFloat16(BFloat16Matrix.of(tensor.data(), rows, columns));
   }
 
   private static float[] vector(TensorSource source, String name, int length) {
