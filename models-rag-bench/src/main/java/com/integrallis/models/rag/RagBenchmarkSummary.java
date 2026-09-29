@@ -41,8 +41,32 @@ public record RagBenchmarkSummary(
     double citationRecall,
     double citationPrecision,
     double abstentionAccuracy,
-    double correctAnswerRate) {
+    double correctAnswerRate,
+    double rawCorrectAnswerRate,
+    double modelAnswerRate,
+    double modelAnswerCorrectRate,
+    double extractiveFallbackRate) {
 
+  /**
+   * The share of attempts whose answer came from the model, and how often that answer was right.
+   *
+   * <p>Published beside {@code correctAnswerRate} because that rate measures the <b>pipeline</b>,
+   * not the model: when a generated answer fails citation screening, the grounding policy replaces
+   * it with text extracted from the retrieved document and the replacement is what gets scored. A
+   * model that emits nothing usable can therefore report {@code correctAnswerRate} of 1.000.
+   *
+   * <p>That is not hypothetical. On 2026-09-29, fourteen models were reported as scoring 1.000
+   * across every quality metric when 69% of all 378 attempts had in fact been answered by {@code
+   * EXTRACTIVE_FALLBACK}, six of the fourteen had a {@code rawCorrectAnswerRate} of zero, and only
+   * five passed {@link RagProductionQualificationPolicy}'s model-contribution gate. The numbers
+   * needed to see that were only in {@code runs[]}, so every consumer that read the summary -- a
+   * report, a release note, a person -- read the pipeline's score as the model's.
+   *
+   * <p>{@code rawCorrectAnswerRate} scores the model's own text before grounding; {@code
+   * modelAnswerRate} and {@code modelAnswerCorrectRate} are the two quantities the qualification
+   * gate actually thresholds; {@code extractiveFallbackRate} is how often the harness answered
+   * instead. Anything consuming a summary now gets all of them without walking the runs.
+   */
   public RagPerformanceSummary policyMetrics() {
     return new RagPerformanceSummary(
         totalAttempts,

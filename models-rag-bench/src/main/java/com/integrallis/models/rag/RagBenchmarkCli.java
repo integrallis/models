@@ -391,8 +391,15 @@ public final class RagBenchmarkCli {
   private static void printSummary(RagBenchmarkReport report, Path output) {
     RagBenchmarkSummary summary = report.summary();
     System.out.printf(
+        // model= and fallback= are printed next to correct= on purpose. correct= is the pipeline's
+        // score: where a generated answer fails citation screening the grounding policy substitutes
+        // an extractive one, so correct= can read 100% for a model that contributed nothing.
+        // Printing
+        // the three together is what stops the line being read as a statement about the model.
         "%s/%s/%s: tier=%s success=%d/%d p95-retrieval=%.1fms p95-ttft=%.1fms "
-            + "p50-decode=%.2f tok/s p95-e2e=%.1fms correct=%.1f%%%nreport: %s%n",
+            + "p50-decode=%.2f tok/s p95-e2e=%.1fms correct=%.1f%% "
+            + "model-answered=%.1f%% of-those-correct=%.1f%% extractive-fallback=%.1f%%"
+            + "%nreport: %s%n",
         report.framework(),
         report.backend(),
         report.modelId(),
@@ -404,6 +411,9 @@ public final class RagBenchmarkCli {
         summary.p50DecodeTokensPerSecond(),
         summary.endToEndMillis().p95(),
         summary.correctAnswerRate() * 100,
+        summary.modelAnswerRate() * 100,
+        summary.modelAnswerCorrectRate() * 100,
+        summary.extractiveFallbackRate() * 100,
         output.toAbsolutePath());
   }
 

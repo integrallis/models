@@ -1,6 +1,13 @@
 # Decoder architectures — ALL IMPLEMENTED as of 2026-09-29
 
-**Closed out 2026-09-29.** Seven of the eight are now qualified on published weights: `lfm2`,
+**Corrected 2026-09-29 — see `release-evidence/CORRECTION-2026-09-29.md`.** The paragraph below counted
+a model as qualified on a `correctAnswerRate` of 1.000, which scores the pipeline rather than the model:
+69% of those attempts were answered by `EXTRACTIVE_FALLBACK`. Under
+`RagProductionQualificationPolicy`, five models qualify and four architectures have none -- `qwen3next`,
+`deepseek2`, `gemma3n` and `gpt-oss`. The superseded claim is kept below rather than deleted, because a
+record of what was believed is part of the record.
+
+~~Seven of the eight are now qualified on published weights:~~ `lfm2`,
 `qwen3moe`, `qwen35moe`, `qwen3next`, `deepseek2`, `gemma3n` and `gpt-oss` from a GGUF, alongside
 `gemma4` E2B and E4B. Only `mistral3` has no published-weights run behind it. Fourteen models in total,
 each at 1.000 on all six quality metrics over 27/27 attempts with zero failures.
