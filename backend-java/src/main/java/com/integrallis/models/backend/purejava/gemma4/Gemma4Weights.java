@@ -149,18 +149,48 @@ final class Gemma4Weights {
     LayerWeights[] layers = new LayerWeights[config.numLayers()];
     for (int layer = 0; layer < layers.length; layer++) {
       String prefix = "blk." + layer + ".";
+      // A layer past the owning prefix attends to an earlier layer's cache and never evaluates a
+      // key or a value of its own, so the file carries neither attn_k, attn_k_norm nor attn_v for
+      // it. Gemma 4 E4B declares shared_kv_layers=18 over 42 layers and omits all three from
+      // blk.24 onwards; llama.cpp marks exactly those three not-required for exactly these layers
+      // (models/gemma4.cpp, kv_flags). Requiring them here rejected E4B outright, and it was the
+      // loader alone: the forward pass already skips the key and value projections for a layer that
+      // does not own its cache.
+      boolean ownsKvCache = config.ownsKvCache(layer);
+      Matrix keyProjection =
+          ownsKvCache
+              ? matrix(file, prefix + "attn_k.weight", config.keyDim(layer), config.embeddingDim())
+              : optionalMatrix(
+                  file, prefix + "attn_k.weight", config.keyDim(layer), config.embeddingDim());
+      float[] keyNorm =
+          ownsKvCache
+              ? vector(file, prefix + "attn_k_norm.weight", config.headDim(layer))
+              : optionalVector(file, prefix + "attn_k_norm.weight", config.headDim(layer));
+      // attn_v is optional on every layer and not only the sharing ones, which is how llama.cpp
+      // loads it: a KV-owning layer without one uses its key projection as the value too. That
+      // substitution is only sound while the two have the same width, so it is checked here rather
+      // than assumed -- the forward pass copies keyDim floats into a valueDim buffer, and a file
+      // where the two differ would read past the key or leave the value half-written instead of
+      // reporting anything.
       Matrix valueProjection =
           optionalMatrix(
               file, prefix + "attn_v.weight", config.valueDim(layer), config.embeddingDim());
-      if (config.usesSlidingWindow(layer) && valueProjection == null) {
+      if (ownsKvCache
+          && valueProjection == null
+          && config.keyDim(layer) != config.valueDim(layer)) {
         throw new IllegalArgumentException(
-            "Tensor not found: " + prefix + "attn_v.weight for sliding attention");
+            "Tensor not found: "
+                + prefix
+                + "attn_v.weight, and its key projection cannot stand in for it: keyDim "
+                + config.keyDim(layer)
+                + " != valueDim "
+                + config.valueDim(layer));
       }
       layers[layer] =
           new LayerWeights(
               vector(file, prefix + "attn_norm.weight", config.embeddingDim()),
               matrix(file, prefix + "attn_q.weight", config.queryDim(layer), config.embeddingDim()),
-              matrix(file, prefix + "attn_k.weight", config.keyDim(layer), config.embeddingDim()),
+              keyProjection,
               valueProjection,
               matrix(
                   file,
@@ -168,7 +198,7 @@ final class Gemma4Weights {
                   config.embeddingDim(),
                   config.attentionOutputDim(layer)),
               vector(file, prefix + "attn_q_norm.weight", config.headDim(layer)),
-              vector(file, prefix + "attn_k_norm.weight", config.headDim(layer)),
+              keyNorm,
               vector(file, prefix + "post_attention_norm.weight", config.embeddingDim()),
               vector(file, prefix + "ffn_norm.weight", config.embeddingDim()),
               matrix(

@@ -1744,7 +1744,15 @@ final class Gemma4ForwardPass {
     for (int layer = 0; layer < config.numLayers(); layer++) {
       Gemma4Weights.LayerWeights layerWeights = weights.layer(layer);
       registerF32Scratch(scratch, layerWeights.queryProjection(), batchCapacity);
-      registerF32Scratch(scratch, layerWeights.keyProjection(), batchCapacity);
+      // Null on a layer that shares an earlier layer's cache. Unreachable today, because
+      // supportsBatchedPrefill refuses any model with KV sharing before this runs -- guarded
+      // anyway,
+      // because "unreachable" here rests on a check in another method, and the same reasoning about
+      // a null projection in the planner is what produced a NullPointerException on the first
+      // routed model to reach the fleet.
+      if (layerWeights.keyProjection() != null) {
+        registerF32Scratch(scratch, layerWeights.keyProjection(), batchCapacity);
+      }
       if (layerWeights.valueProjection() != null) {
         registerF32Scratch(scratch, layerWeights.valueProjection(), batchCapacity);
       }
