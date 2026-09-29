@@ -61,6 +61,10 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: Warm the Gradle distribution
+        uses: ./.github/actions/warm-gradle
+        with:
+          working-directory: models
 
       - name: Cache local model fixtures
         uses: actions/cache@v5
