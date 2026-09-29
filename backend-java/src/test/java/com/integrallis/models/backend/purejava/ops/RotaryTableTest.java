@@ -137,4 +137,66 @@ class RotaryTableTest {
             },
             offset(1.0e-6f));
   }
+
+  @Test
+  void aPartialRotaryWidthLeavesTheRestOfTheHeadUntouched() {
+    // Phi-4-mini rotates 96 of 128 dimensions. The table is built at the rotary width, and this is
+    // the property that makes that correct: everything at or above the width must be bit-identical
+    // afterwards. If the table were built at the head width instead it would rotate dimensions the
+    // model leaves alone -- fluent, wrong output rather than an error.
+    int headDim = 128;
+    int ropeWidth = 96;
+    RotaryTable partial = new RotaryTable(ropeWidth, 10_000.0f, 1.0f);
+    partial.prepare(5);
+
+    float[] head = new float[headDim];
+    for (int index = 0; index < headDim; index++) {
+      head[index] = 1.0f + index * 0.01f;
+    }
+    float[] before = head.clone();
+
+    partial.apply(head, 0, true);
+
+    for (int index = ropeWidth; index < headDim; index++) {
+      assertThat(head[index])
+          .describedAs("dimension %s is above the rotary width and must not move", index)
+          .isEqualTo(before[index]);
+    }
+    boolean anyRotated = false;
+    for (int index = 0; index < ropeWidth; index++) {
+      anyRotated |= head[index] != before[index];
+    }
+    assertThat(anyRotated)
+        .describedAs("the rotated region must actually change, or this test proves nothing")
+        .isTrue();
+  }
+
+  @Test
+  void aPartialRotaryWidthRotatesTheSameWayAsAFullHeadOfThatWidth() {
+    // The rotated region must be exactly what a full-rotary head of the rotary width would produce:
+    // the frequency denominator is the rotary width, matching ggml's -2*i/n_dims with n_dims =
+    // n_rot.
+    // Were the denominator the head width the angles would differ and the output would be subtly
+    // wrong everywhere rather than obviously wrong somewhere.
+    int ropeWidth = 96;
+    RotaryTable table = new RotaryTable(ropeWidth, 10_000.0f, 1.0f);
+    table.prepare(7);
+
+    float[] wide = new float[128];
+    float[] exact = new float[ropeWidth];
+    for (int index = 0; index < ropeWidth; index++) {
+      wide[index] = 0.5f + index * 0.02f;
+      exact[index] = 0.5f + index * 0.02f;
+    }
+    for (int index = ropeWidth; index < wide.length; index++) {
+      wide[index] = 99.0f;
+    }
+
+    table.apply(wide, 0, true);
+    table.apply(exact, 0, true);
+
+    for (int index = 0; index < ropeWidth; index++) {
+      assertThat(wide[index]).isEqualTo(exact[index]);
+    }
+  }
 }

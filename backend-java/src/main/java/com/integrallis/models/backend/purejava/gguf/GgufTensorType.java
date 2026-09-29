@@ -40,6 +40,7 @@ public enum GgufTensorType {
    * Upstream ternary, 1.6875 bpw: 48 bytes of base-3 trits (5 per byte), 4 bytes of 4-per-byte
    * trits, one fp16 scale, per 256 weights.
    */
+  MXFP4(39, 32, 17),
   TQ1_0(34, 256, 54),
 
   /** Upstream ternary, 2.0625 bpw: 64 bytes at 2 bits per element plus one fp16 scale, per 256. */

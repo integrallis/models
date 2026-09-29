@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.ops;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
+import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -205,6 +206,34 @@ public final class TensorOps {
   }
 
   /**
+   * Matrix-vector product against MXFP4 weights.
+   *
+   * <p>Scalar and float-activation, unlike the K-quant kernels, which quantize the activation to Q8
+   * and reduce in integer arithmetic. That is deliberate: MXFP4 arrives here to make the type
+   * multipliable at all -- before this, an MXFP4 tensor could be decoded but not multiplied, and
+   * {@code ggufMatmul} threw. Being correct first and fast second is the same order the MXFP4 and
+   * ternary decoders were written in, and a Q8-activation MXFP4 kernel has to be proven identical
+   * to this one, which needs this one to exist.
+   *
+   * <p>No per-row buffer: {@link Mxfp4Dequantizer#dotProduct} consumes the packed bytes directly,
+   * so a row of any width costs nothing but the read.
+   */
+  private static void mxfp4Matmul(
+      float[] out, float[] x, MemorySegment qWeight, int rows, int cols) {
+    if (cols % Mxfp4Dequantizer.BLOCK_SIZE != 0) {
+      throw new IllegalArgumentException(
+          "MXFP4 row length must be a multiple of "
+              + Mxfp4Dequantizer.BLOCK_SIZE
+              + ", but was "
+              + cols);
+    }
+    long rowBytes = (long) (cols / Mxfp4Dequantizer.BLOCK_SIZE) * Mxfp4Dequantizer.BLOCK_BYTES;
+    for (int row = 0; row < rows; row++) {
+      out[row] = Mxfp4Dequantizer.dotProduct(qWeight, row * rowBytes, x, 0, cols);
+    }
+  }
+
+  /**
    * F32 projection with one float reduction order in every JIT tier.
    *
    * <p>Each mapped weight row is copied to a reused heap row and scored with {@link
@@ -258,6 +287,12 @@ public final class TensorOps {
     Objects.requireNonNull(q4Kernel, "q4Kernel");
     switch (type) {
       case F32 -> f32Matmul(out, x, qWeight, rows, cols);
+      // The same routine the batched path uses, at a batch of one, so the two cannot disagree. F16
+      // was reachable only in batches until Gemma 4 E4B arrived carrying per_layer_model_proj as
+      // F16
+      // where the E2B file carries it as BF16 -- and the per-layer projection runs a token at a
+      // time.
+      case F16 -> multiplyF16Batch(out, x, qWeight, 1, rows, cols);
       case BF16 -> BFloat16Matrix.of(qWeight, rows, cols).multiply(x, out);
       case Q4_0 ->
           VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
@@ -299,6 +334,7 @@ public final class TensorOps {
       case Q6_K ->
           VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
+      case MXFP4 -> mxfp4Matmul(out, x, qWeight, rows, cols);
       default -> throw new UnsupportedOperationException("GGUF matmul not supported for: " + type);
     }
   }
