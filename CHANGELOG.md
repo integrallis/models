@@ -4,7 +4,91 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Fused grouped-query attention is now available to every grouped-query model, off by default.**
+  The fused kernels read each cached K and V row once per KV head instead of once per query head,
+  which on a decode step bound by cache bytes is one pass instead of `groupSize`. They were always
+  parameterised by group size, head stride and scale and were never Granite-specific.
+
+  **It is off by default because it is not token-preserving, which we measured rather than assumed.**
+  The fused path agrees with the head-by-head loop to 1.4e-6 relative on the attention output, flat in
+  context length (3.8e-7 at 64 cached rows, 1.4e-6 at 1024 and 4096) — but greedy decoding is a
+  discrete argmax, so a perturbation that small still flips a token whenever the top two candidates
+  sit inside it. Swapping only the attention kernel under Granite on the RAG workload changed **2 of 9
+  generated answers from byte-identical prompts** (a comma became a semicolon; one clause was
+  reworded) at unchanged `correctAnswerRate`, `retrievalRecall` and `abstentionAccuracy`. The Rust
+  native grouped-attention kernel diverges less — 7.3e-7 relative, bit-identical at a single cached
+  position — and still flipped those same two answers.
+
+  **And the gain does not justify that cost.** Measured on a group-8 model (qwen2.5-coder-3b,
+  1838-token context, four counterbalanced arms): **2.89 vs 2.74 tok/s decode, a 5.5% gain**. The two
+  `true` arms agreed to 0.3% and each path's checksum was bit-reproducible, so the measurement is tight
+  — it is the *prediction* that was wrong. A bytes-per-token model said 1.45x, assuming the head-by-head
+  path's `groupSize` re-reads of each K and V row all come from DRAM. They do not: one group's KV
+  working set is under a megabyte per layer at this context, so it is L2/L3 resident and fusion saves
+  cache traffic rather than memory traffic. The Rust native grouped-attention kernel is the better
+  candidate if an attention change is ever adopted — 15% decode measured on Granite, and half the
+  divergence — but it flips the same answers.
+
+  A qualification record is a claim about the bytes a model produced, and a published one cannot be
+  retracted. So each architecture keeps the route its records were measured on: Granite the native
+  kernel with the Java fused loop as its fallback, everything else head-by-head. Adopting a faster
+  route is a **new measurement epoch** — every pinned greedy oracle re-run and the tier band
+  re-derived on it — not a default flip. `models.purejava.fusedGroupedAttention=true` asks for it by
+  name, and the choice is recorded as the `fused-grouped-attention` optimization decision so a record
+  always says which route produced it.
+
+- **New performance tier `PERFORMANCE_REDUCED`, split out of `OFFLINE`.** `OFFLINE` was conflating
+  "too slow for this SLO" with "cannot be used at all", and the difference turned out to be most of the
+  catalogue. Measured on the small/medium qualification campaign: of 28 models tiered `OFFLINE`, **every
+  one** passed retrieval recall, citation recall, abstention accuracy and correct-answer rate — none
+  were broken, they were slower than the USABLE latency bound. Five were rejected on the tail alone,
+  with a ttft median under 2000ms at 95% confidence and only 3–7 of 27 requests over it;
+  `gemma_3_4b_it` missed by **90ms (4.5%)** while holding better than 2x margin on retrieval, tpot and
+  end-to-end, and landed in the same tier as a model 3x over.
+
+  A `PERFORMANCE_REDUCED` model is shippable with a slower latency expectation, which for a
+  small/medium-first catalogue is a product category rather than a failure. Quality failures still
+  outrank latency, so a model that is both slow and ungrounded reports `FAILED_QUALITY` — returning
+  "works, just slower" for a model producing wrong answers would be worse than the old tier was.
+
+  `OFFLINE` is retained and no longer produced: 316 certified records carry it and a published
+  qualification cannot be retracted. Those records are unaffected — `performanceTier` is a stored field,
+  not a recomputation — and they stay re-readable, since an `OFFLINE` record whose quality gates passed
+  is a `PERFORMANCE_REDUCED` record under the current taxonomy, derivable from the stored summary
+  without re-running anything.
+
+- The `fused-grouped-attention-not-wired` performance cliff is now
+  **`fused-grouped-attention-disabled`**. It used to mean the fused kernel served Granite only; it now
+  means the faster route was available and not taken. The id changed rather than being kept stable
+  because records carrying the old one were written when it meant something else —
+  `benchmark-results/2026-09-16-loader-cliffs/README.md` is one of them.
+
 ### Fixed
+
+- **Four defects that only a real published model could expose, each found on a fleet worker after the
+  weights had already been downloaded.** All four were invisible to the unit suite for the same
+  reason: the fixtures were uniform on the axis that broke.
+
+  - The execution planner crashed with a `NullPointerException` on the first mixture-of-experts model
+    to reach the fleet. `ModelTopology` decided thread-shareability by dereferencing the dense
+    feed-forward's first matrix, which is null on a routed layer. It now walks every segment a layer
+    actually owns. The regression test needs an auto arena, because with a confined one the
+    shareability check short-circuits false before it ever reaches the null.
+  - Gemma 4 E4B would not load: its shared-expert hidden dimension **varies by layer** and the loader
+    read one key for all of them. Scratch buffers are now sized from the maximum and indexed per
+    layer — kept deliberately separate, since a buffer sized from one layer's width is an
+    out-of-bounds write rather than an exception when another layer is wider.
+  - Gemma 4 E4B, again, was rejected with `Tensor not found: blk.24.attn_v.weight`. It declares
+    `shared_kv_layers=18` over 42 layers, so layers 24-41 attend to an earlier layer's cache and carry
+    no `attn_k`, `attn_k_norm` or `attn_v` of their own. The forward pass already skipped those
+    projections for such a layer; the loader was demanding tensors nothing would have read. Every
+    fixture had given all three to every layer *because* the loader demanded them, so the shape a real
+    file has could not be expressed in a test.
+  - `ggufMatmul` handled F16 only in its batched form, which a decoder running one token at a time
+    cannot reach. Gemma 4 E4B publishes `per_layer_model_proj` as F16 where E2B publishes BF16, and
+    that projection runs per token.
 
 - The same model produced **different output text on different machines**. Every vectorised float
   reduction in the model path sized itself from the host — `SPECIES_PREFERRED` capped by
@@ -30,6 +114,68 @@ All notable changes to models are documented here.
 - LangChain4j applied SDK parameters around provider public APIs rather than through them.
 
 ### Added
+
+- **Eight decoder architectures the pure-Java backend could not load before: `lfm2`, `qwen3moe`,
+  `mistral3`, `qwen35moe`, `qwen3next`, `gemma3n`, `deepseek2`, and `gpt-oss` from a GGUF.**
+
+  Four of them are qualified on real published weights, measured here on a 16-vCPU m6a.4xlarge. Every
+  model below scored `correctAnswerRate`, `retrievalRecall`, `citationRecall`, `citationPrecision`,
+  `factCoverage` and `abstentionAccuracy` of **1.000 over 27/27 attempts with zero failures**:
+
+  | model | arch | size | ttft p50 | tpot p50 |
+  |---|---|---|---|---|
+  | `LFM2-1.2B-Instruct` Q4_K_M | `lfm2` | 0.7 GB | 11.1 s | 65.6 ms |
+  | `Qwen3-30B-A3B` Q4_K_M (3 variants) | `qwen3moe` | 18.6 GB | 3.9 s | ~106 ms |
+  | `Ornith-1.0-35B` Q4_K_M | `qwen35moe` | 21.2 GB | 13.0 s | 87.2 ms |
+  | `KAT-Coder-V2.5-Dev` Q4_K_M | `qwen35moe` | 21.4 GB | 20.1 s | 130.8 ms |
+  | `Qwen3.5-35B-A3B` Q4_K_M | `qwen35moe` | 22.0 GB | 15.4 s | 101.0 ms |
+  | `Qwen3-Coder-Next` Q4_K_M | `qwen3next` | 48.5 GB | 38.6 s | 241.0 ms |
+  | `gemma-4-E2B-it` Q4_K_M | `gemma4` (already supported, see Fixed) | 3.4 GB | 3.0 s | 58.0 ms |
+
+  `Qwen3-Coder-Next` is an 80B-class model answering correctly on all 27 attempts inside a 64 GB box at
+  39.2 GB peak RSS — the largest artifact this backend has qualified.
+
+  `mistral3`, `gemma3n`, `deepseek2` and `gpt-oss`-from-GGUF are **implemented and verified against
+  unit-level scalar references only; no published-weights qualification yet**, so nothing in the
+  catalogue claims them.
+
+  What each needed, since "supports the architecture" hides the work: `lfm2` interleaves attention
+  with gated short convolutions over a shift register; `qwen3moe` and `qwen35moe` add routed experts
+  read as strides over one stacked tensor; `qwen3next` adds a gated delta network whose beta and alpha
+  arrive interleaved in a single `ssm_ba` tensor, grouped per key head; `gemma3n` carries four parallel
+  residual streams with AltUp predict/correct plus LAuReL low-rank residuals; `deepseek2` uses
+  multi-head latent attention with a YaRN variant that moves the mscale into the softmax; `gpt-oss`
+  reads MXFP4 experts as one interleaved blob where its safetensors form splits blocks from scales.
+
+  Expert routing is shared between architectures and comes in two forms that are not interchangeable:
+  renormalised (softmax over the selected experts, weights sum to one) for `qwen3moe` and `qwen35moe`,
+  unnormalised (softmax over all experts, weights used as they are) for `deepseek2`, which publishes
+  no `expert_weights_norm` at all. Routed models run the expert branch one token at a time, since
+  expert selection differs per token and a batched matmul cannot serve rows that need different
+  weights.
+
+- **Pre-tokenizer splits for tekken (Mistral 3), the o200k family, single-digit GPT-2, deepseek-coder,
+  deepseek-llm and hunyuan.** A GGUF carries a pre-tokenizer *name*, not its regex, so an unrecognised
+  name silently falls back to a split that is wrong for the model: it loads, generates fluent text, and
+  scores worse for no visible reason. Several are sequences of expressions applied in order rather than
+  one alternation, because the reference applies them that way and joining them changes the split —
+  measured, not assumed: joined against sequential over 32 strings differed on 4 for deepseek-coder,
+  every one CJK, Hangul or leading whitespace. Every pattern is transcribed from the model's own
+  `tokenizer.json` or the reference's corresponding case, with the source named in the javadoc.
+  o200k matters beyond gpt-oss: `phi3` declares `gpt-4o` on a byte-level BPE vocabulary, so it would
+  have been scheduled and tokenized with no word-boundary split at all.
+
+- Sharded HuggingFace models can be qualified. The CLI required a single `model.safetensors`, which was
+  the only thing standing between a sharded bundle and a run — `gpt-oss-20b` ships three shards and an
+  index. The artifact digest hashes **the shards**, in index order, rather than the index: an index holds
+  a tensor-name-to-shard map and no weight content, so hashing it would let two different models with
+  the same layout write the same provenance digest.
+
+- `greedyOracleSweepSmall` and `greedyOracleSweepLarge` run the pinned llama.cpp greedy oracles as
+  Gradle tasks, split because one 7B-class fixture can run past 45 minutes and a single task reports
+  nothing for most of an hour. The `fusedGroupedAttention` property is forwarded explicitly: its
+  default is off, so without forwarding the sweep would exercise the very baseline the oracles were
+  recorded on and pass while proving nothing.
 
 - Routing execution controls: per-request and shared spending budgets, deadlines, token bounds and
   cancellation, via `RoutingExecution`, `RoutingExecutionOptions`, `RoutingBudget`,
