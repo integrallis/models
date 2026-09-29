@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.VectorUtil;
@@ -1883,6 +1884,66 @@ class TensorOpsTest {
           * (1.0f
               + (float)
                   Math.tanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
+    }
+  }
+
+  @Test
+  void ggufMatmulMultipliesMxfp4WeightsInsteadOfRefusingThem() {
+    // Before this, GgufTensorType.MXFP4 fell through to the switch default and ggufMatmul threw
+    // UnsupportedOperationException: an MXFP4 tensor could be decoded but not multiplied. That is
+    // what blocked the GGUF route for gpt-oss, whose expert tensors are MXFP4.
+    int rows = 3;
+    int cols = 64; // two 32-weight blocks per row
+    int blocksPerRow = cols / Mxfp4Dequantizer.BLOCK_SIZE;
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment weight =
+          arena.allocate((long) rows * blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES);
+      java.util.Random rng = new java.util.Random(4242L);
+      for (int block = 0; block < rows * blocksPerRow; block++) {
+        long base = (long) block * Mxfp4Dequantizer.BLOCK_BYTES;
+        weight.set(ValueLayout.JAVA_BYTE, base, (byte) (126 + (block % 5)));
+        for (int j = 0; j < Mxfp4Dequantizer.BLOCK_SIZE / 2; j++) {
+          weight.set(ValueLayout.JAVA_BYTE, base + 1 + j, (byte) rng.nextInt(256));
+        }
+      }
+      float[] x = new float[cols];
+      for (int i = 0; i < cols; i++) {
+        x[i] = (rng.nextFloat() - 0.5f) * 2.0f;
+      }
+
+      float[] actual = new float[rows];
+      TensorOps.ggufMatmul(actual, x, weight, GgufTensorType.MXFP4, rows, cols);
+
+      // Reference: dequantise each row and multiply in plain floats.
+      long rowBytes = (long) blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES;
+      float[] rowWeights = new float[cols];
+      for (int row = 0; row < rows; row++) {
+        Mxfp4Dequantizer.dequantize(weight, row * rowBytes, rowWeights, 0, cols);
+        float expected = 0.0f;
+        for (int i = 0; i < cols; i++) {
+          expected += rowWeights[i] * x[i];
+        }
+        assertThat(actual[row]).isEqualTo(expected, within(1.0e-3f));
+      }
+      // And the result is not trivially zero, so the assertions above have content.
+      boolean anyNonZero = false;
+      for (float value : actual) {
+        anyNonZero |= Math.abs(value) > 1.0e-4f;
+      }
+      assertThat(anyNonZero).describedAs("a zero result would satisfy any tolerance").isTrue();
+    }
+  }
+
+  @Test
+  void ggufMatmulRefusesAnMxfp4RowThatIsNotAWholeNumberOfBlocks() {
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment weight = arena.allocate(Mxfp4Dequantizer.BLOCK_BYTES);
+      float[] x = new float[40];
+      float[] out = new float[1];
+
+      assertThatThrownBy(() -> TensorOps.ggufMatmul(out, x, weight, GgufTensorType.MXFP4, 1, 40))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("MXFP4 row length");
     }
   }
 }
