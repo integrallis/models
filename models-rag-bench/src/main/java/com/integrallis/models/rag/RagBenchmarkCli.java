@@ -249,8 +249,8 @@ public final class RagBenchmarkCli {
         configuration.backendVersion(),
         configuration.modelId(),
         configuration.model(),
-        artifactIdentity == null ? null : sha256(artifactIdentity),
-        artifactIdentity == null ? 0 : Files.size(artifactIdentity),
+        artifactIdentity == null ? null : artifactSha256(artifactIdentity),
+        artifactIdentity == null ? 0 : artifactSizeBytes(artifactIdentity),
         new RagBenchmarkSettings(
             corpus.fingerprint(),
             configuration.workload().id(),
@@ -294,8 +294,17 @@ public final class RagBenchmarkCli {
       if (Files.isRegularFile(primaryWeights)) {
         return primaryWeights;
       }
+      // Sharded bundles carry no single model.safetensors -- gpt-oss-20b ships three shards and an
+      // index -- and SafetensorsBundle already loads either shape. Rejecting them here was the only
+      // thing standing between a sharded Hugging Face model and a qualification run.
+      Path index = artifact.resolve("model.safetensors.index.json");
+      if (Files.isRegularFile(index)) {
+        return index;
+      }
       throw new IllegalArgumentException(
-          "Hugging Face model directory has no model.safetensors: " + artifact);
+          "Hugging Face model directory has neither model.safetensors nor"
+              + " model.safetensors.index.json: "
+              + artifact);
     }
     throw new IllegalArgumentException("artifact does not exist: " + artifact);
   }
@@ -539,6 +548,86 @@ public final class RagBenchmarkCli {
       case "deepseek" -> URI.create("https://api.deepseek.com");
       default -> null;
     };
+  }
+
+  /**
+   * Artifact digest, covering the weights even when they are sharded.
+   *
+   * <p>For a single file this is that file's SHA-256. For a sharded bundle the identity path is the
+   * index, and hashing the index alone would be poor provenance: it holds a tensor-name to shard
+   * map and no weight content, so two different models with the same layout could produce the same
+   * digest in a qualification record. The shards are hashed instead, in the index's own order so
+   * the result is stable.
+   */
+  private static String artifactSha256(Path identity) throws IOException {
+    List<Path> shards = shardsOf(identity);
+    if (shards.isEmpty()) {
+      return sha256(identity);
+    }
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      for (Path shard : shards) {
+        try (InputStream input = Files.newInputStream(shard);
+            DigestInputStream hashing = new DigestInputStream(input, digest)) {
+          hashing.transferTo(OutputStreamDiscarder.INSTANCE);
+        }
+      }
+      return HexFormat.of().formatHex(digest.digest());
+    } catch (NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException("SHA-256 is unavailable", impossible);
+    }
+  }
+
+  /** Artifact size, summed across shards for a sharded bundle. */
+  private static long artifactSizeBytes(Path identity) throws IOException {
+    List<Path> shards = shardsOf(identity);
+    if (shards.isEmpty()) {
+      return Files.size(identity);
+    }
+    long total = 0;
+    for (Path shard : shards) {
+      total = Math.addExact(total, Files.size(shard));
+    }
+    return total;
+  }
+
+  /**
+   * The shard files an index refers to, in index order, or empty when the path is not an index.
+   *
+   * <p>Deliberately deduplicated while preserving order: an index maps every tensor to a shard, so
+   * the same shard appears once per tensor it holds.
+   */
+  private static List<Path> shardsOf(Path identity) throws IOException {
+    // getFileName() is null for a root path such as "/", which is not an index but is a legal Path.
+    Path fileName = identity.getFileName();
+    if (fileName == null || !fileName.toString().equals("model.safetensors.index.json")) {
+      return List.of();
+    }
+    // getParent() is null for a bare filename, which happens when the index is given as a relative
+    // path in the working directory. Resolving against null would be an NPE on a legitimate input.
+    Path parent = identity.getParent();
+    Path directory = parent == null ? Path.of("") : parent;
+    List<String> names =
+        new java.util.ArrayList<>(
+            new java.util.LinkedHashSet<>(
+                java.util.regex.Pattern.compile("\"([^\"]*\\.safetensors)\"")
+                    .matcher(Files.readString(identity))
+                    .results()
+                    .map(match -> match.group(1))
+                    .toList()));
+    List<Path> shards = new java.util.ArrayList<>();
+    for (String name : names) {
+      Path shard = directory.resolve(name);
+      if (!Files.isRegularFile(shard)) {
+        throw new IllegalArgumentException(
+            "safetensors index names a shard that is missing: " + shard);
+      }
+      shards.add(shard);
+    }
+    if (shards.isEmpty()) {
+      throw new IllegalArgumentException("safetensors index names no shards: " + identity);
+    }
+    return shards;
   }
 
   private static String sha256(Path path) throws IOException {
