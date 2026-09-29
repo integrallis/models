@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.48] - 2026-09-29
+
 ### Changed
 
 - **Fused grouped-query attention is now available to every grouped-query model, off by default.**
