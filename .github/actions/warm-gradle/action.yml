@@ -22,6 +22,11 @@ description: >
 # reuses what this step placed in GRADLE_USER_HOME and never touches the network for it.
 # Not applied to native-kernels.yml or release.yml: their Windows matrix legs invoke Gradle through
 # a per-platform `matrix.gradle`, not `./gradlew`, so warming it needs a different command there.
+# Referencing this action: the path is resolved from GITHUB_WORKSPACE, NOT from a step's
+# working-directory. Workflows here that check the repository out with `path: models` must therefore
+# say `./models/.github/actions/warm-gradle`; only a root checkout uses `./.github/actions/...`.
+# Getting that wrong fails every job at once with "Can't find 'action.yml' ... Did you forget to run
+# actions/checkout before running your local action?", which reads like a missing checkout and is not.
 inputs:
   working-directory:
     description: Directory holding the Gradle wrapper. Defaults to the workspace root.
