@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.gemma4;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.assertj.core.data.Offset.offset;
 
 import com.integrallis.models.api.LogitBatch;
@@ -82,6 +83,123 @@ class Gemma4ForwardPassTest {
       assertThat(actual.checkpoint()).isEqualTo(2);
       assertThat(experts.stats().misses()).isGreaterThan(0);
     }
+  }
+
+  /**
+   * A per-layer feed-forward width, checked against the independent scalar reference.
+   *
+   * <p>Gemma 4 E2B was refused at load -- "blk.15.ffn_gate.weight shape must be [1536, 6144], found
+   * [1536, 12288]" -- because the width was read once from layer 0 and used for every layer. The
+   * config test for the array form did not catch it: every element of its array is the same number,
+   * so a broadcast scalar and a genuine per-layer list are indistinguishable there.
+   *
+   * <p>Loading is what failed, but agreeing with the reference is what makes the fix correct rather
+   * than merely permissive: the buffers now serve the widest layer, so a stride still taken from
+   * layer 0's width would read the wrong slice instead of overflowing.
+   */
+  @Test
+  void aFeedForwardWidthThatVariesPerLayerMatchesTheScalarReference() throws Exception {
+    ToyModel model = ToyModel.createVaryingSharedFeedForward();
+
+    assertThat(model.config().sharedHiddenDim(0)).isEqualTo(3);
+    assertThat(model.config().sharedHiddenDim(1))
+        .describedAs("the fixture must genuinely vary, or this tests the uniform case again")
+        .isEqualTo(5)
+        .isNotEqualTo(model.config().sharedHiddenDim(0));
+    assertThat(model.config().maxSharedHiddenDim()).isEqualTo(5);
+
+    Gemma4Weights weights = Gemma4Weights.fromGgufFile(model.file(), model.config());
+    Gemma4TensorLayout layout = weights.expertLayout();
+    Gemma4ExpertLoader.PositionalReader reader = reader(model.file().fileSegment());
+
+    try (Gemma4ExpertCache experts =
+        new Gemma4ExpertCache(
+            new Gemma4ExpertLoader(reader),
+            model.config().numLayers(),
+            model.config().numExperts(),
+            1,
+            (layer, expert) -> layout.layer(layer).expert(expert),
+            Gemma4ExpertCache.CachePolicy.LFU)) {
+      LayeredKvCache cache = Gemma4KvCache.create(model.config(), 8, 2);
+      Gemma4ForwardPass actual = new Gemma4ForwardPass(model.config(), weights, cache, experts);
+      ScalarReference expected = new ScalarReference(model);
+
+      assertClose(actual.forward(0, 0), expected.forward(0));
+      assertClose(actual.forward(1, 1), expected.forward(1));
+
+      // And the batched path, which strides its rows by the same width.
+      actual.reset();
+      expected.reset();
+      assertClose(actual.prefill(new int[] {0, 1}, 0), expected.prefill(0, 1));
+    }
+  }
+
+  /** The same variation on a dense model, whose two feed-forward paths must still agree. */
+  @Test
+  void aDenseModelWithPerLayerFeedForwardWidthsAgreesBetweenItsTwoPaths() throws Exception {
+    ToyModel model = ToyModel.createDenseVaryingFeedForward();
+    Gemma4Weights weights = Gemma4Weights.fromGgufFile(model.file(), model.config());
+
+    assertThat(model.config().sharedHiddenDim(1)).isNotEqualTo(model.config().sharedHiddenDim(0));
+
+    Gemma4Experts experts =
+        new Gemma4MappedExperts(
+            model.file().fileSegment(),
+            model.config().numLayers(),
+            model.config().numExperts(),
+            (layer, expert) -> {
+              throw new AssertionError("a dense model must never resolve an expert");
+            });
+    LayeredKvCache cache = Gemma4KvCache.create(model.config(), 8, 2);
+    Gemma4ForwardPass pass = new Gemma4ForwardPass(model.config(), weights, cache, experts);
+
+    float[] serial = pass.forward(0, 0);
+    float[] serialSecond = pass.forward(1, 1);
+    pass.reset();
+    float[] batched = pass.prefill(new int[] {0, 1}, 0);
+
+    assertThat(serial).isNotNull();
+    assertClose(batched, serialSecond);
+  }
+
+  @Test
+  void aDenseGemma4LoadsAndItsBatchedPathAgreesWithOneTokenAtATime() throws Exception {
+    // Two separate dense branches were added -- one in the single-token layer step and one in the
+    // batched prefill step -- so the invariant that matters is that they agree. A mistake in either
+    // shows up here, and this also proves the loader tolerates the six routed tensors a dense GGUF
+    // does not carry and that nothing dereferences the null router projection or expert layout.
+    ToyModel model = ToyModel.createDense();
+    Gemma4Weights weights = Gemma4Weights.fromGgufFile(model.file(), model.config());
+
+    assertThat(model.config().isDense()).isTrue();
+    assertThat(weights.expertLayout())
+        .describedAs("a dense model has no expert tensor layout to build")
+        .isNull();
+
+    Gemma4Experts experts =
+        new Gemma4MappedExperts(
+            model.file().fileSegment(),
+            model.config().numLayers(),
+            model.config().numExperts(),
+            (layer, expert) -> {
+              throw new AssertionError("a dense model must never resolve an expert");
+            });
+    LayeredKvCache cache = Gemma4KvCache.create(model.config(), 8, 2);
+    Gemma4ForwardPass pass = new Gemma4ForwardPass(model.config(), weights, cache, experts);
+
+    float[] step0 = pass.forward(0, 0).clone();
+    float[] step1 = pass.forward(1, 1).clone();
+    for (float value : step1) {
+      assertThat(Float.isFinite(value)).describedAs("dense logits must be finite").isTrue();
+    }
+
+    pass.reset();
+    float[] batched = pass.prefill(new int[] {0, 1}, 0);
+
+    assertThat(batched)
+        .describedAs("batched dense prefill must match the single-token dense path")
+        .containsExactly(step1);
+    assertThat(step0).isNotEqualTo(step1);
   }
 
   @Test
@@ -485,6 +603,151 @@ class Gemma4ForwardPassTest {
     };
   }
 
+  @Test
+  void anESeriesModelRunsWithPerLayerEmbeddingsAndASharedKeyValueLayer() {
+    // These two features were refused outright until now, so nothing exercised them. The mapping
+    // asserted here is the reference's: a sliding sharing layer reads kvOwningLayers - 2.
+    ToyModel model = ToyModel.createESeries(220);
+    Gemma4Config config = model.config();
+
+    assertThat(config.usesPerLayerEmbeddings()).isTrue();
+    assertThat(config.perLayerEmbeddingDim()).isEqualTo(2);
+    assertThat(config.kvOwningLayers()).isEqualTo(2);
+    assertThat(config.ownsKvCache(0)).isTrue();
+    assertThat(config.ownsKvCache(1)).isTrue();
+    assertThat(config.ownsKvCache(2)).isFalse();
+    assertThat(config.kvSourceLayer(2)).isEqualTo(0);
+
+    Gemma4ForwardPass pass = eSeriesPass(model);
+    float[] first = pass.forward(0, 0).clone();
+    float[] second = pass.forward(1, 1).clone();
+
+    for (float value : first) {
+      assertThat(Float.isFinite(value)).describedAs("E-series logits must be finite").isTrue();
+    }
+    for (float value : second) {
+      assertThat(Float.isFinite(value)).isTrue();
+    }
+    assertThat(second).isNotEqualTo(first);
+  }
+
+  @Test
+  void theSharingLayersOwnKeyAndValueWeightsNeverReachTheOutput() {
+    // The sharpest statement of key-value sharing, and unlike probing the cache it cannot be
+    // confused by cache layout: layer 2 attends to layer 0's cache, so its OWN key and value
+    // projections are dead weight. Two models differing in nothing but those tensors must agree
+    // exactly. Were layer 2 computing and storing them it would also be overwriting the very cache
+    // it is meant to read.
+    float[] withOneKv = eSeriesLogits(ToyModel.createESeries(220, 32, 30));
+    float[] withAnother = eSeriesLogits(ToyModel.createESeries(220, 55, 30));
+
+    assertThat(withAnother).containsExactly(withOneKv);
+
+    // The control: varying an OWNING layer's key weights DOES change the output, so the equality
+    // above is a real property of sharing and not the fixture ignoring these tensors.
+    float[] owningChanged = eSeriesLogits(ToyModel.createESeries(220, 32, 44));
+    assertThat(owningChanged).isNotEqualTo(withOneKv);
+  }
+
+  /**
+   * The same tensor as F16, which is how Gemma 4 E4B ships it where E2B ships BF16.
+   *
+   * <p>Two distinct gaps, one after the other, in the same field of the same tensor: adding BF16
+   * got E2B loading and left E4B refused with "unsupported matrix type F16". And F16 needed more
+   * than the accepted-type set -- {@code ggufMatmul} handled F16 only in its batched form, while
+   * the per-layer projection runs a token at a time, so accepting the type alone would have moved
+   * the failure from the loader into the kernel.
+   *
+   * <p>Checked against an F32 twin holding the same F16-rounded values rather than just "it loads",
+   * because the half-precision path has to compute the right numbers, not merely be admitted. (Not
+   * against the scalar reference: that reference implements the mixture-of-experts layout, and the
+   * E-series fixture is dense.)
+   */
+  @Test
+  void anESeriesModelWhosePerLayerProjectionIsF16MatchesAnF32Twin() throws Exception {
+    float[] half = eSeriesLogits(ToyModel.createESeriesF16Projection());
+    float[] single = eSeriesLogits(ToyModel.createESeriesF16ProjectionAsFloat32());
+
+    assertThat(half).hasSameSizeAs(single);
+    for (int index = 0; index < single.length; index++) {
+      assertThat(half[index])
+          .describedAs("F16 logit %s must equal its F32 twin", index)
+          .isEqualTo(single[index], within(1.0e-5f));
+    }
+  }
+
+  @Test
+  void anESeriesModelWhosePerLayerProjectionIsBf16Loads() {
+    // The published E-series files store per_layer_model_proj as BF16 while everything around it is
+    // a
+    // K-quant. The loader's accepted-matrix set omitted BF16, so every real E-series model was
+    // rejected at load with "unsupported matrix type BF16" -- a gap the all-F32 fixtures could not
+    // show, and which only a real model surfaced. ggufMatmul has handled BF16 all along.
+    ToyModel model = ToyModel.createESeriesBf16Projection();
+
+    Gemma4ForwardPass pass =
+        new Gemma4ForwardPass(
+            model.config(),
+            Gemma4Weights.fromGgufFile(model.file(), model.config()),
+            Gemma4KvCache.create(model.config(), 8, 2),
+            noExperts(model));
+    float[] logits = pass.forward(0, 0);
+
+    for (float value : logits) {
+      assertThat(Float.isFinite(value)).isTrue();
+    }
+  }
+
+  @Test
+  void thePerLayerEmbeddingTableChangesTheOutput() {
+    // Two models differing in nothing but the per-layer embedding table. If the table were ignored
+    // -- the failure mode that matters, because it produces plausible output -- these would agree.
+    float[] withOneTable = eSeriesLogits(ToyModel.createESeries(220));
+    float[] withAnother = eSeriesLogits(ToyModel.createESeries(221));
+
+    assertThat(withAnother)
+        .describedAs("the per-layer embedding table must actually reach the residual stream")
+        .isNotEqualTo(withOneTable);
+  }
+
+  @Test
+  void theESeriesDoesNotTakeTheBatchedPrefillPath() {
+    // Its batched layer step carries neither the per-layer fold nor the key-value sharing, so
+    // batching it would store keys and values for the sharing layers. Serial is correct and slower.
+    ToyModel model = ToyModel.createESeries(220);
+    Gemma4ForwardPass pass = eSeriesPass(model);
+
+    assertThat(pass.usesBatchedPrefill()).isFalse();
+    float[] serial = eSeriesLogits(model);
+    pass.reset();
+    float[] prefilled = pass.prefill(new int[] {0, 1}, 0);
+    assertThat(prefilled).hasSameSizeAs(serial);
+  }
+
+  private static float[] eSeriesLogits(ToyModel model) {
+    Gemma4ForwardPass pass = eSeriesPass(model);
+    pass.forward(0, 0);
+    return pass.forward(1, 1).clone();
+  }
+
+  private static Gemma4ForwardPass eSeriesPass(ToyModel model) {
+    return new Gemma4ForwardPass(
+        model.config(),
+        Gemma4Weights.fromGgufFile(model.file(), model.config()),
+        Gemma4KvCache.create(model.config(), 8, 2),
+        noExperts(model));
+  }
+
+  private static Gemma4Experts noExperts(ToyModel model) {
+    return new Gemma4MappedExperts(
+        model.file().fileSegment(),
+        model.config().numLayers(),
+        model.config().numExperts(),
+        (layer, expert) -> {
+          throw new AssertionError("a dense or E-series model must never resolve an expert");
+        });
+  }
+
   private record ToyModel(Gemma4Config config, GgufFile file, Map<String, float[]> tensors) {
 
     private Gemma4Config withExpertsUsed(int expertsUsed) {
@@ -499,7 +762,7 @@ class Gemma4ForwardPassTest {
           config.slidingValueLength(),
           config.vocabSize(),
           config.contextLength(),
-          config.sharedHiddenDim(),
+          config.sharedHiddenDim(0),
           config.expertHiddenDim(),
           config.numExperts(),
           expertsUsed,
@@ -555,7 +818,368 @@ class Gemma4ForwardPassTest {
       return new ToyModel(config, fixture.build(), Map.copyOf(fixture.values));
     }
 
+    /**
+     * The routed toy model with a <b>per-layer</b> shared feed-forward width, so the independent
+     * scalar reference can check the arithmetic and not merely that the file loads.
+     */
+    private static ToyModel createVaryingSharedFeedForward() {
+      Gemma4Config config =
+          new Gemma4Config(
+              4,
+              2,
+              1,
+              List.of(1, 1),
+              4,
+              4,
+              4,
+              4,
+              4,
+              8,
+              List.of(3, 5),
+              2,
+              2,
+              1,
+              1_000_000.0f,
+              10_000.0f,
+              4,
+              4,
+              1.0e-6f,
+              2,
+              List.of(true, false),
+              30.0f,
+              0,
+              0);
+      FixtureBuilder fixture = new FixtureBuilder();
+      fixture.f32(
+          "token_embd.weight",
+          new long[] {4, 4},
+          new float[] {
+            0.20f, -0.10f, 0.30f, 0.40f,
+            -0.30f, 0.50f, 0.20f, -0.40f,
+            0.60f, 0.10f, -0.20f, 0.30f,
+            -0.20f, -0.30f, 0.40f, 0.50f
+          });
+      fixture.f32("output_norm.weight", new long[] {4}, norm(9));
+      fixture.f32("rope_freqs.weight", new long[] {2}, new float[] {1.0f, 1.0e30f});
+      addLayer(fixture, 0, true, 3);
+      addLayer(fixture, 1, false, 5);
+      return new ToyModel(config, fixture.build(), Map.copyOf(fixture.values));
+    }
+
+    /**
+     * A dense model whose feed-forward is <b>wider on layer 1 than on layer 0</b>, as an E-series
+     * MatFormer is.
+     *
+     * <p>Layer 1's width is deliberately the larger one, so a buffer or a shape check taken from
+     * layer 0 is too small rather than merely different -- the shape of the defect that refused
+     * Gemma 4 E2B at blk.15.
+     */
+    private static ToyModel createDenseVaryingFeedForward() {
+      Gemma4Config config =
+          new Gemma4Config(
+              4,
+              2,
+              1,
+              List.of(1, 1),
+              4,
+              4,
+              4,
+              4,
+              4,
+              8,
+              List.of(3, 5),
+              0,
+              0,
+              0,
+              1_000_000.0f,
+              10_000.0f,
+              4,
+              4,
+              1.0e-6f,
+              2,
+              List.of(true, false),
+              30.0f,
+              0,
+              0);
+      FixtureBuilder fixture = new FixtureBuilder();
+      fixture.f32(
+          "token_embd.weight",
+          new long[] {4, 4},
+          new float[] {
+            0.20f, -0.10f, 0.30f, 0.40f,
+            -0.30f, 0.50f, 0.20f, -0.40f,
+            0.60f, 0.10f, -0.20f, 0.30f,
+            -0.20f, -0.30f, 0.40f, 0.50f
+          });
+      fixture.f32("output_norm.weight", new long[] {4}, norm(9));
+      fixture.f32("rope_freqs.weight", new long[] {2}, new float[] {1.0f, 1.0e30f});
+      addDenseLayer(fixture, 0, true, 30, 3);
+      addDenseLayer(fixture, 1, false, 31, 5);
+      return new ToyModel(config, fixture.build(), Map.copyOf(fixture.values));
+    }
+
+    /**
+     * A dense Gemma 4: no expert metadata, and none of the routed tensors. Mirrors what the real
+     * 12B/31B GGUFs carry -- zero {@code *_exps}, no router, and a single {@code post_ffw_norm}.
+     */
+    private static ToyModel createDense() {
+      Gemma4Config config =
+          new Gemma4Config(
+              4,
+              2,
+              1,
+              List.of(1, 1),
+              4,
+              4,
+              4,
+              4,
+              4,
+              8,
+              3, // sharedHiddenDim: the dense feed-forward width
+              0,
+              0,
+              0, // expertHiddenDim, numExperts, numExpertsUsed -- dense
+              1_000_000.0f,
+              10_000.0f,
+              4,
+              4,
+              1.0e-6f,
+              2,
+              List.of(true, false),
+              30.0f);
+      FixtureBuilder fixture = new FixtureBuilder();
+      fixture.f32(
+          "token_embd.weight",
+          new long[] {4, 4},
+          new float[] {
+            0.20f, -0.10f, 0.30f, 0.40f,
+            -0.30f, 0.50f, 0.20f, -0.40f,
+            0.60f, 0.10f, -0.20f, 0.30f,
+            -0.20f, -0.30f, 0.40f, 0.50f
+          });
+      fixture.f32("output_norm.weight", new long[] {4}, norm(9));
+      fixture.f32("rope_freqs.weight", new long[] {2}, new float[] {1.0f, 1.0e30f});
+      addDenseLayer(fixture, 0, true);
+      addDenseLayer(fixture, 1, false);
+      return new ToyModel(config, fixture.build(), Map.copyOf(fixture.values));
+    }
+
+    /**
+     * An E-series shaped model: per-layer input embeddings plus a shared key-value layer.
+     *
+     * <p>Three layers with {@code sharedKvLayers=1}, so layers 0 and 1 own a cache and layer 2
+     * shares one. Layer 2 is sliding, so it reads {@code kvOwningLayers - 2 = 0} -- layer 0, also
+     * sliding, with the same head dimension. That is the mapping the reference uses and the reason
+     * the -2/-1 is there.
+     *
+     * @param perLayerSeed varies only the per-layer embedding table, so two models built with
+     *     different seeds differ in nothing else
+     */
+    private static ToyModel createESeries(int perLayerSeed) {
+      return createESeries(perLayerSeed, 32, 30);
+    }
+
+    private static ToyModel createESeries(
+        int perLayerSeed, int sharingLayerKvSeed, int owningLayerKvSeed) {
+      Gemma4Config config =
+          new Gemma4Config(
+              4,
+              3,
+              1,
+              List.of(1, 1, 1),
+              4,
+              4,
+              4,
+              4,
+              4,
+              8,
+              3,
+              0,
+              0,
+              0,
+              1_000_000.0f,
+              10_000.0f,
+              4,
+              4,
+              1.0e-6f,
+              2,
+              List.of(true, false, true),
+              30.0f,
+              1,
+              2);
+      FixtureBuilder fixture = new FixtureBuilder();
+      fixture.f32(
+          "token_embd.weight",
+          new long[] {4, 4},
+          new float[] {
+            0.20f, -0.10f, 0.30f, 0.40f,
+            -0.30f, 0.50f, 0.20f, -0.40f,
+            0.60f, 0.10f, -0.20f, 0.30f,
+            -0.20f, -0.30f, 0.40f, 0.50f
+          });
+      fixture.f32("output_norm.weight", new long[] {4}, norm(9));
+      fixture.f32("rope_freqs.weight", new long[] {2}, new float[] {1.0f, 1.0e30f});
+      // perLayerEmbeddingDim * numLayers = 2 * 3 = 6
+      fixture.f32("per_layer_token_embd.weight", new long[] {6, 4}, matrix(4, 6, perLayerSeed));
+      fixture.f32("per_layer_model_proj.weight", new long[] {4, 6}, matrix(6, 4, 170));
+      // Length is perLayerEmbeddingDim, not the model width: this norm runs over each 2-wide slice.
+      fixture.f32("per_layer_proj_norm.weight", new long[] {2}, norm(180, 2));
+      addESeriesLayer(fixture, 0, true, owningLayerKvSeed);
+      addESeriesLayer(fixture, 1, false, 31);
+      addESeriesLayer(fixture, 2, true, sharingLayerKvSeed);
+      return new ToyModel(config, fixture.build(), Map.copyOf(fixture.values));
+    }
+
+    /**
+     * The F16 fixture's twin, with the per-layer projection written as F32 holding exactly the
+     * values F16 rounds to. The reference for the half-precision path: same numbers, different
+     * encoding.
+     */
+    private static ToyModel createESeriesF16ProjectionAsFloat32() {
+      FixtureBuilder fixture = new FixtureBuilder();
+      fixture.f32(
+          "token_embd.weight",
+          new long[] {4, 4},
+          new float[] {
+            0.20f, -0.10f, 0.30f, 0.40f,
+            -0.30f, 0.50f, 0.20f, -0.40f,
+            0.60f, 0.10f, -0.20f, 0.30f,
+            -0.20f, -0.30f, 0.40f, 0.50f
+          });
+      fixture.f32("output_norm.weight", new long[] {4}, norm(9));
+      fixture.f32("rope_freqs.weight", new long[] {2}, new float[] {1.0f, 1.0e30f});
+      fixture.f32("per_layer_token_embd.weight", new long[] {6, 4}, matrix(4, 6, 220));
+      fixture.f32("per_layer_model_proj.weight", new long[] {4, 6}, halfRounded(matrix(6, 4, 170)));
+      fixture.f32("per_layer_proj_norm.weight", new long[] {2}, norm(180, 2));
+      addESeriesLayer(fixture, 0, true, 30);
+      addESeriesLayer(fixture, 1, false, 31);
+      addESeriesLayer(fixture, 2, true, 32);
+      return new ToyModel(
+          ToyModel.createESeries(220).config(), fixture.build(), Map.copyOf(fixture.values));
+    }
+
+    /** What F16 storage rounds each value to, so an F32 twin holds the same numbers. */
+    private static float[] halfRounded(float[] source) {
+      float[] rounded = new float[source.length];
+      for (int index = 0; index < source.length; index++) {
+        rounded[index] = Float.float16ToFloat(Float.floatToFloat16(source[index]));
+      }
+      return rounded;
+    }
+
+    /** The E-series with its per-layer projection as F16, which is how E4B ships it. */
+    private static ToyModel createESeriesF16Projection() {
+      FixtureBuilder fixture = new FixtureBuilder();
+      fixture.f32(
+          "token_embd.weight",
+          new long[] {4, 4},
+          new float[] {
+            0.20f, -0.10f, 0.30f, 0.40f,
+            -0.30f, 0.50f, 0.20f, -0.40f,
+            0.60f, 0.10f, -0.20f, 0.30f,
+            -0.20f, -0.30f, 0.40f, 0.50f
+          });
+      fixture.f32("output_norm.weight", new long[] {4}, norm(9));
+      fixture.f32("rope_freqs.weight", new long[] {2}, new float[] {1.0f, 1.0e30f});
+      fixture.f32("per_layer_token_embd.weight", new long[] {6, 4}, matrix(4, 6, 220));
+      fixture.f16("per_layer_model_proj.weight", new long[] {4, 6}, matrix(6, 4, 170));
+      fixture.f32("per_layer_proj_norm.weight", new long[] {2}, norm(180, 2));
+      addESeriesLayer(fixture, 0, true, 30);
+      addESeriesLayer(fixture, 1, false, 31);
+      addESeriesLayer(fixture, 2, true, 32);
+      return new ToyModel(
+          ToyModel.createESeries(220).config(), fixture.build(), Map.copyOf(fixture.values));
+    }
+
+    /**
+     * The E-series model with its per-layer projection stored as BF16, which is how the published
+     * files ship it while their other matrices are K-quants.
+     */
+    private static ToyModel createESeriesBf16Projection() {
+      FixtureBuilder fixture = new FixtureBuilder();
+      fixture.f32(
+          "token_embd.weight",
+          new long[] {4, 4},
+          new float[] {
+            0.20f, -0.10f, 0.30f, 0.40f,
+            -0.30f, 0.50f, 0.20f, -0.40f,
+            0.60f, 0.10f, -0.20f, 0.30f,
+            -0.20f, -0.30f, 0.40f, 0.50f
+          });
+      fixture.f32("output_norm.weight", new long[] {4}, norm(9));
+      fixture.f32("rope_freqs.weight", new long[] {2}, new float[] {1.0f, 1.0e30f});
+      fixture.f32("per_layer_token_embd.weight", new long[] {6, 4}, matrix(4, 6, 220));
+      fixture.bf16("per_layer_model_proj.weight", new long[] {4, 6}, matrix(6, 4, 170));
+      fixture.f32("per_layer_proj_norm.weight", new long[] {2}, norm(180, 2));
+      addESeriesLayer(fixture, 0, true, 30);
+      addESeriesLayer(fixture, 1, false, 31);
+      addESeriesLayer(fixture, 2, true, 32);
+      return new ToyModel(
+          ToyModel.createESeries(220).config(), fixture.build(), Map.copyOf(fixture.values));
+    }
+
+    private static void addESeriesLayer(FixtureBuilder fixture, int layer, boolean sliding) {
+      addESeriesLayer(fixture, layer, sliding, 30 + layer);
+    }
+
+    private static void addESeriesLayer(
+        FixtureBuilder fixture, int layer, boolean sliding, int keyValueSeed) {
+      addDenseLayer(fixture, layer, sliding, keyValueSeed);
+      String prefix = "blk." + layer + ".";
+      fixture.f32(prefix + "inp_gate.weight", new long[] {4, 2}, matrix(2, 4, 190 + layer));
+      fixture.f32(prefix + "proj.weight", new long[] {2, 4}, matrix(4, 2, 200 + layer));
+      fixture.f32(prefix + "post_norm.weight", new long[] {4}, norm(210 + layer));
+    }
+
+    private static void addDenseLayer(FixtureBuilder fixture, int layer, boolean sliding) {
+      addDenseLayer(fixture, layer, sliding, 30 + layer);
+    }
+
+    /**
+     * @param keyValueSeed seeds the key and value projections, so one layer's can be varied alone.
+     *     FixtureBuilder APPENDS, so writing a tensor twice leaves two entries under one name and
+     *     the loader reads the first -- an override after the fact is silently ignored, which is
+     *     why the seed is threaded in here instead.
+     */
+    private static void addDenseLayer(
+        FixtureBuilder fixture, int layer, boolean sliding, int keyValueSeed) {
+      addDenseLayer(fixture, layer, sliding, keyValueSeed, 3);
+    }
+
+    private static void addDenseLayer(
+        FixtureBuilder fixture, int layer, boolean sliding, int keyValueSeed, int hidden) {
+      String prefix = "blk." + layer + ".";
+      fixture.f32(prefix + "attn_norm.weight", new long[] {4}, norm(11 + layer));
+      fixture.f32(prefix + "attn_q.weight", new long[] {4, 4}, matrix(4, 4, 20 + layer));
+      fixture.f32(prefix + "attn_k.weight", new long[] {4, 4}, matrix(4, 4, keyValueSeed));
+      if (sliding) {
+        fixture.f32(prefix + "attn_v.weight", new long[] {4, 4}, matrix(4, 4, keyValueSeed + 10));
+      }
+      fixture.f32(prefix + "attn_output.weight", new long[] {4, 4}, matrix(4, 4, 50 + layer));
+      fixture.f32(prefix + "attn_q_norm.weight", new long[] {4}, norm(60 + layer));
+      fixture.f32(prefix + "attn_k_norm.weight", new long[] {4}, norm(70 + layer));
+      fixture.f32(prefix + "post_attention_norm.weight", new long[] {4}, norm(80 + layer));
+      fixture.f32(prefix + "ffn_norm.weight", new long[] {4}, norm(90 + layer));
+      fixture.f32(
+          prefix + "ffn_gate.weight", new long[] {4, hidden}, matrix(hidden, 4, 100 + layer));
+      fixture.f32(prefix + "ffn_up.weight", new long[] {4, hidden}, matrix(hidden, 4, 110 + layer));
+      fixture.f32(
+          prefix + "ffn_down.weight", new long[] {hidden, 4}, matrix(4, hidden, 120 + layer));
+      // Only post_ffw_norm -- no pre_ffw_norm_2, post_ffw_norm_1, post_ffw_norm_2, router or
+      // experts.
+      fixture.f32(prefix + "post_ffw_norm.weight", new long[] {4}, norm(160 + layer));
+      fixture.f32(
+          prefix + "layer_output_scale.weight",
+          new long[] {1},
+          new float[] {0.90f + 0.05f * layer});
+    }
+
     private static void addLayer(FixtureBuilder fixture, int layer, boolean sliding) {
+      addLayer(fixture, layer, sliding, 3);
+    }
+
+    private static void addLayer(
+        FixtureBuilder fixture, int layer, boolean sliding, int sharedHidden) {
       String prefix = "blk." + layer + ".";
       fixture.f32(prefix + "attn_norm.weight", new long[] {4}, norm(11 + layer));
       fixture.f32(prefix + "attn_q.weight", new long[] {4, 4}, matrix(4, 4, 20 + layer));
@@ -569,9 +1193,18 @@ class Gemma4ForwardPassTest {
       fixture.f32(prefix + "post_attention_norm.weight", new long[] {4}, norm(80 + layer));
 
       fixture.f32(prefix + "ffn_norm.weight", new long[] {4}, norm(90 + layer));
-      fixture.f32(prefix + "ffn_gate.weight", new long[] {4, 3}, matrix(3, 4, 100 + layer));
-      fixture.f32(prefix + "ffn_up.weight", new long[] {4, 3}, matrix(3, 4, 110 + layer));
-      fixture.f32(prefix + "ffn_down.weight", new long[] {3, 4}, matrix(4, 3, 120 + layer));
+      fixture.f32(
+          prefix + "ffn_gate.weight",
+          new long[] {4, sharedHidden},
+          matrix(sharedHidden, 4, 100 + layer));
+      fixture.f32(
+          prefix + "ffn_up.weight",
+          new long[] {4, sharedHidden},
+          matrix(sharedHidden, 4, 110 + layer));
+      fixture.f32(
+          prefix + "ffn_down.weight",
+          new long[] {sharedHidden, 4},
+          matrix(4, sharedHidden, 120 + layer));
       fixture.f32(prefix + "pre_ffw_norm_2.weight", new long[] {4}, norm(130 + layer));
       fixture.f32(prefix + "post_ffw_norm_1.weight", new long[] {4}, norm(140 + layer));
       fixture.f32(prefix + "post_ffw_norm_2.weight", new long[] {4}, norm(150 + layer));
@@ -653,9 +1286,9 @@ class Gemma4ForwardPassTest {
 
         float[] sharedInput = rms(state, tensor(prefix + "ffn_norm.weight"), config.rmsNormEps());
         float[] sharedGate =
-            matmul(tensor(prefix + "ffn_gate.weight"), config.sharedHiddenDim(), sharedInput);
+            matmul(tensor(prefix + "ffn_gate.weight"), config.sharedHiddenDim(layer), sharedInput);
         float[] sharedUp =
-            matmul(tensor(prefix + "ffn_up.weight"), config.sharedHiddenDim(), sharedInput);
+            matmul(tensor(prefix + "ffn_up.weight"), config.sharedHiddenDim(layer), sharedInput);
         float[] shared = geluGlu(sharedGate, sharedUp);
         shared = matmul(tensor(prefix + "ffn_down.weight"), config.embeddingDim(), shared);
         shared = rms(shared, tensor(prefix + "post_ffw_norm_1.weight"), config.rmsNormEps());
@@ -834,6 +1467,15 @@ class Gemma4ForwardPassTest {
     }
   }
 
+  /** A norm vector of an explicit length, for tensors narrower than the model width. */
+  private static float[] norm(int seed, int length) {
+    float[] values = new float[length];
+    for (int index = 0; index < values.length; index++) {
+      values[index] = 0.8f + ((seed + index * 3) % 7) * 0.05f;
+    }
+    return values;
+  }
+
   private static float[] norm(int seed) {
     float[] values = new float[4];
     for (int index = 0; index < values.length; index++) {
@@ -876,6 +1518,45 @@ class Gemma4ForwardPassTest {
     private final List<GgufTensorInfo> infos = new ArrayList<>();
     private final Map<String, float[]> values = new HashMap<>();
     private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+
+    /** Writes a BF16 matrix: the top 16 bits of each float, which is exactly what BF16 is. */
+    private void bf16(String name, long[] shape, float[] tensorValues) {
+      GgufTensorInfo info =
+          new GgufTensorInfo(name, shape.length, shape, GgufTensorType.BF16, bytes.size());
+      if (tensorValues.length != info.elementCount()) {
+        throw new IllegalArgumentException(name + " has the wrong value count");
+      }
+      ByteBuffer encoded =
+          ByteBuffer.allocate(tensorValues.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+      for (float value : tensorValues) {
+        encoded.putShort((short) (Float.floatToIntBits(value) >>> 16));
+      }
+      infos.add(info);
+      values.put(name, tensorValues.clone());
+      bytes.writeBytes(encoded.array());
+    }
+
+    /** Writes an F16 matrix, which is how Gemma 4 E4B carries its per-layer projection. */
+    private void f16(String name, long[] shape, float[] tensorValues) {
+      GgufTensorInfo info =
+          new GgufTensorInfo(name, shape.length, shape, GgufTensorType.F16, bytes.size());
+      if (tensorValues.length != info.elementCount()) {
+        throw new IllegalArgumentException(name + " has the wrong value count");
+      }
+      ByteBuffer encoded =
+          ByteBuffer.allocate(tensorValues.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+      for (float value : tensorValues) {
+        encoded.putShort(Float.floatToFloat16(value));
+      }
+      infos.add(info);
+      // The values a loader will read back are the F16-rounded ones, not the originals.
+      float[] rounded = new float[tensorValues.length];
+      for (int index = 0; index < tensorValues.length; index++) {
+        rounded[index] = Float.float16ToFloat(Float.floatToFloat16(tensorValues[index]));
+      }
+      values.put(name, rounded);
+      bytes.writeBytes(encoded.array());
+    }
 
     private void f32(String name, long[] shape, float[] tensorValues) {
       GgufTensorInfo info =

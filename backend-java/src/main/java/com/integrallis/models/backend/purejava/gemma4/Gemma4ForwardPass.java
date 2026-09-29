@@ -102,6 +102,10 @@ final class Gemma4ForwardPass {
   private final int[] groupedExpertRows;
   private final float[] routedOutput;
   private final float[] combinedOutput;
+  private final float[] perLayerInputs;
+  private final float[] perLayerProjection;
+  private final float[] perLayerGate;
+  private final float[] perLayerOutput;
   private final float[] logits;
   private final byte[] quantizedActivation;
   private final float[] quantizedActivationScales;
@@ -208,7 +212,7 @@ final class Gemma4ForwardPass {
             256,
             Math.max(
                 Math.max(dim, maxAttentionOutputDim),
-                Math.max(config.sharedHiddenDim(), config.expertHiddenDim())));
+                Math.max(config.maxSharedHiddenDim(), config.expertHiddenDim())));
 
     this.state = new float[dim];
     this.normalized = new float[dim];
@@ -218,9 +222,10 @@ final class Gemma4ForwardPass {
     this.attentionScores = new float[defaultCache.maxSeqLen()];
     this.projected = new float[dim];
     this.sharedInput = new float[dim];
-    this.sharedGate = new float[config.sharedHiddenDim()];
-    this.sharedUp = new float[config.sharedHiddenDim()];
-    this.sharedActivation = new float[config.sharedHiddenDim()];
+    // Sized for the widest layer: the E-series varies this width per layer.
+    this.sharedGate = new float[config.maxSharedHiddenDim()];
+    this.sharedUp = new float[config.maxSharedHiddenDim()];
+    this.sharedActivation = new float[config.maxSharedHiddenDim()];
     this.sharedOutput = new float[dim];
     this.routerInput = new float[dim];
     this.routerLogits = new float[config.numExperts()];
@@ -237,6 +242,14 @@ final class Gemma4ForwardPass {
     this.groupedExpertRows = new int[expertGroupCapacity];
     this.routedOutput = new float[dim];
     this.combinedOutput = new float[dim];
+    // Zero-length unless this is an E-series variant, which is the only one carrying a second
+    // per-layer embedding table.
+    int perLayerWidth =
+        config.usesPerLayerEmbeddings() ? config.perLayerEmbeddingDim() * config.numLayers() : 0;
+    this.perLayerInputs = new float[perLayerWidth];
+    this.perLayerProjection = new float[perLayerWidth];
+    this.perLayerGate = new float[config.perLayerEmbeddingDim()];
+    this.perLayerOutput = new float[config.usesPerLayerEmbeddings() ? dim : 0];
     this.logits = new float[config.vocabSize()];
     this.quantizedActivation = new byte[maxProjectionInput];
     this.quantizedActivationScales = new float[(maxProjectionInput + 31) / 32];
@@ -253,9 +266,9 @@ final class Gemma4ForwardPass {
     this.batchAttentionOutput = batchBuffer(prefillBatchCapacity, maxAttentionOutputDim);
     this.batchAttentionScores = batchBuffer(prefillBatchCapacity, defaultCache.maxSeqLen());
     this.batchProjected = batchBuffer(prefillBatchCapacity, dim);
-    this.batchSharedGate = batchBuffer(prefillBatchCapacity, config.sharedHiddenDim());
-    this.batchSharedUp = batchBuffer(prefillBatchCapacity, config.sharedHiddenDim());
-    this.batchSharedActivation = batchBuffer(prefillBatchCapacity, config.sharedHiddenDim());
+    this.batchSharedGate = batchBuffer(prefillBatchCapacity, config.maxSharedHiddenDim());
+    this.batchSharedUp = batchBuffer(prefillBatchCapacity, config.maxSharedHiddenDim());
+    this.batchSharedActivation = batchBuffer(prefillBatchCapacity, config.maxSharedHiddenDim());
     this.batchSharedOutput = batchBuffer(prefillBatchCapacity, dim);
     this.batchRouterInput = batchBuffer(prefillBatchCapacity, dim);
     this.batchRouterLogits = batchBuffer(prefillBatchCapacity, config.numExperts());
@@ -506,6 +519,9 @@ final class Gemma4ForwardPass {
 
     weights.embedToken(token, state);
     multiply(state, config.embeddingScale());
+    // Built from the SCALED embedding: llama.cpp applies sqrt(n_embd) to inpL before handing it to
+    // project_per_layer_inputs, so doing this before the scale would change every layer's input.
+    preparePerLayerInputs(token);
     try {
       for (int layer = 0; layer < config.numLayers(); layer++) {
         executeLayer(sequence.cache, layer, position);
@@ -735,10 +751,15 @@ final class Gemma4ForwardPass {
     addBatch(batchState, batchProjected, batchSize * dim);
 
     executeSharedFfnBatch(layerWeights, batchSize);
-    executeRoutedFfnBatch(layer, layerWeights, batchSize);
     int activeElements = batchSize * dim;
-    for (int index = 0; index < activeElements; index++) {
-      batchCombinedOutput[index] = batchSharedOutput[index] + batchRoutedOutput[index];
+    if (config.isDense()) {
+      // Same reason as the single-token path: a dense Gemma 4 has no routed half to add.
+      System.arraycopy(batchSharedOutput, 0, batchCombinedOutput, 0, activeElements);
+    } else {
+      executeRoutedFfnBatch(layer, layerWeights, batchSize);
+      for (int index = 0; index < activeElements; index++) {
+        batchCombinedOutput[index] = batchSharedOutput[index] + batchRoutedOutput[index];
+      }
     }
     normalizeBatchInPlace(batchCombinedOutput, batchSize, dim, layerWeights.combinedFfnPostNorm());
     addBatch(batchState, batchCombinedOutput, activeElements);
@@ -747,7 +768,10 @@ final class Gemma4ForwardPass {
 
   private void executeSharedFfnBatch(Gemma4Weights.LayerWeights layer, int batchSize) {
     int dim = config.embeddingDim();
-    int hidden = config.sharedHiddenDim();
+    // This layer's own width, read off the tensor rather than from the model. On a MatFormer model
+    // the widths differ per layer, and the buffers above are sized for the widest of them, so a
+    // stride taken from anything but this layer's gate projection walks into the next row.
+    int hidden = layer.sharedGateProjection().rows();
     normalizeBatch(batchNormalized, batchState, batchSize, dim, layer.sharedFfnNorm());
     projectDualBatched(
         layer.sharedGateProjection(),
@@ -771,7 +795,12 @@ final class Gemma4ForwardPass {
         });
     projectBatched(
         layer.sharedDownProjection(), batchSharedActivation, batchSize, batchSharedOutput);
-    normalizeBatchInPlace(batchSharedOutput, batchSize, dim, layer.sharedFfnPostNorm());
+    // Same absent norm as the single-token path: post_ffw_norm_1 exists only on the
+    // mixture-of-experts layout. Guarding one branch and not the other is what the dense
+    // prefill/decode equivalence test caught.
+    if (layer.sharedFfnPostNorm().length != 0) {
+      normalizeBatchInPlace(batchSharedOutput, batchSize, dim, layer.sharedFfnPostNorm());
+    }
   }
 
   private void executeRoutedFfnBatch(
@@ -961,8 +990,15 @@ final class Gemma4ForwardPass {
     int valueDim = config.valueDim(layer);
     float[] attentionOutput = attentionOutputs[layer];
 
+    // A layer beyond the owning prefix computes only its query and attends to an earlier layer's
+    // cache, so its own key and value projections are never evaluated -- llama.cpp marks those
+    // tensors not-required for exactly these layers. Computing and storing them would overwrite the
+    // cache the sharing layers are supposed to read.
+    boolean ownsKvCache = config.ownsKvCache(layer);
     TensorOps.rmsNorm(normalized, state, layerWeights.attentionNorm(), dim, config.rmsNormEps());
-    if (layerWeights.valueProjection() == null) {
+    if (!ownsKvCache) {
+      project(layerWeights.queryProjection(), normalized, query);
+    } else if (layerWeights.valueProjection() == null) {
       projectDual(
           layerWeights.queryProjection(), query, layerWeights.keyProjection(), key, normalized);
       System.arraycopy(key, 0, value, 0, valueDim);
@@ -987,11 +1023,14 @@ final class Gemma4ForwardPass {
           headDim,
           config.rmsNormEps());
     }
-    for (int head = 0; head < config.numKvHeads(layer); head++) {
-      int offset = head * headDim;
-      TensorOps.rmsNorm(
-          key, offset, key, offset, layerWeights.keyNorm(), headDim, config.rmsNormEps());
-      Gemma4Math.normalizeWithoutWeight(value, offset, value, offset, headDim, config.rmsNormEps());
+    if (ownsKvCache) {
+      for (int head = 0; head < config.numKvHeads(layer); head++) {
+        int offset = head * headDim;
+        TensorOps.rmsNorm(
+            key, offset, key, offset, layerWeights.keyNorm(), headDim, config.rmsNormEps());
+        Gemma4Math.normalizeWithoutWeight(
+            value, offset, value, offset, headDim, config.rmsNormEps());
+      }
     }
 
     RotaryTable rotary = rotaryTables[layer];
@@ -999,21 +1038,35 @@ final class Gemma4ForwardPass {
     for (int head = 0; head < config.numHeads(); head++) {
       rotary.apply(query, head * headDim, true);
     }
-    for (int head = 0; head < config.numKvHeads(layer); head++) {
-      rotary.apply(key, head * headDim, true);
+    if (ownsKvCache) {
+      for (int head = 0; head < config.numKvHeads(layer); head++) {
+        rotary.apply(key, head * headDim, true);
+      }
+      sequenceCache.store(layer, position, key, 0, value, 0);
     }
 
-    sequenceCache.store(layer, position, key, 0, value, 0);
-    computeAttention(sequenceCache, layer, position, queryDim, keyDim, valueDim, attentionOutput);
+    // The source layer matches this one in head dimension, key-value head count and sliding-window
+    // type -- asserted in kvSourceLayer -- so every value computeAttention derives from it is the
+    // same as this layer's own would have been.
+    int kvLayer = config.kvSourceLayer(layer);
+    computeAttention(sequenceCache, kvLayer, position, queryDim, keyDim, valueDim, attentionOutput);
     project(layerWeights.attentionOutputProjection(), attentionOutput, projected);
     TensorOps.rmsNorm(
         projected, projected, layerWeights.attentionPostNorm(), dim, config.rmsNormEps());
     add(state, projected, dim);
 
     executeSharedFfn(layerWeights);
-    executeRoutedFfn(layer, layerWeights);
-    for (int index = 0; index < dim; index++) {
-      combinedOutput[index] = sharedOutput[index] + routedOutput[index];
+    if (config.isDense()) {
+      // Dense Gemma 4 (12B, 31B) has no routed half at all: no router, no experts, no *_exps
+      // tensors. Its feed-forward output is the gated FFN alone, so the combination below
+      // degenerates
+      // to a copy and the single post_ffw_norm applies to it.
+      System.arraycopy(sharedOutput, 0, combinedOutput, 0, dim);
+    } else {
+      executeRoutedFfn(layer, layerWeights);
+      for (int index = 0; index < dim; index++) {
+        combinedOutput[index] = sharedOutput[index] + routedOutput[index];
+      }
     }
     TensorOps.rmsNorm(
         combinedOutput,
@@ -1022,12 +1075,89 @@ final class Gemma4ForwardPass {
         dim,
         config.rmsNormEps());
     add(state, combinedOutput, dim);
+    applyPerLayerEmbedding(layer, layerWeights);
     multiply(state, layerWeights.layerOutputScale());
+  }
+
+  /**
+   * Builds the per-layer input embeddings for one token, once per token rather than once per layer.
+   *
+   * <p>Transcribed from llama.cpp's {@code build_inp_per_layer} and {@code
+   * project_per_layer_inputs}: the second embedding table's row is scaled by {@code
+   * sqrt(perLayerEmbeddingDim)}; the model projection of the (already scaled) token embedding is
+   * scaled by {@code 1/sqrt(embeddingDim)} and RMS-normalised slice by slice; the two are added and
+   * the sum scaled by {@code 1/sqrt(2)}.
+   *
+   * <p>The layout is layer-major -- slice {@code l} occupies {@code [l * perLayerEmbeddingDim, (l +
+   * 1) * perLayerEmbeddingDim)} -- which is the reshape the reference does and what lets each layer
+   * take a contiguous view.
+   */
+  private void preparePerLayerInputs(int token) {
+    if (!config.usesPerLayerEmbeddings()) {
+      return;
+    }
+    int width = config.perLayerEmbeddingDim();
+    weights.embedTokenPerLayer(token, perLayerInputs);
+    float tableScale = (float) Math.sqrt(width);
+    for (int index = 0; index < perLayerInputs.length; index++) {
+      perLayerInputs[index] *= tableScale;
+    }
+
+    project(weights.perLayerModelProjection(), state, perLayerProjection);
+    float projectionScale = (float) (1.0 / Math.sqrt(config.embeddingDim()));
+    for (int index = 0; index < perLayerProjection.length; index++) {
+      perLayerProjection[index] *= projectionScale;
+    }
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      int offset = layer * width;
+      TensorOps.rmsNorm(
+          perLayerProjection,
+          offset,
+          perLayerProjection,
+          offset,
+          weights.perLayerProjectionNorm(),
+          width,
+          config.rmsNormEps());
+    }
+
+    float inputScale = (float) (1.0 / Math.sqrt(2.0));
+    for (int index = 0; index < perLayerInputs.length; index++) {
+      perLayerInputs[index] = (perLayerProjection[index] + perLayerInputs[index]) * inputScale;
+    }
+  }
+
+  /**
+   * Folds this layer's slice of the per-layer input embedding into the residual stream.
+   *
+   * <p>{@code gelu(inp_gate . x)} is multiplied elementwise by the layer's slice, projected back to
+   * the model width, normalised, and added as a residual -- the reference's order exactly. It sits
+   * after the feed-forward residual and before the layer output scalar.
+   */
+  private void applyPerLayerEmbedding(int layer, Gemma4Weights.LayerWeights layerWeights) {
+    if (!config.usesPerLayerEmbeddings()) {
+      return;
+    }
+    int dim = config.embeddingDim();
+    int width = config.perLayerEmbeddingDim();
+    project(layerWeights.perLayerInputGate(), state, perLayerGate);
+    // The tanh approximation, matching ggml_gelu -- which is what the reference graph calls. The
+    // erf
+    // form (ggml_gelu_erf) is a different function and is not what this path uses.
+    TensorOps.gelu(perLayerGate, 0, perLayerGate, 0, width);
+    int offset = layer * width;
+    for (int index = 0; index < width; index++) {
+      perLayerGate[index] *= perLayerInputs[offset + index];
+    }
+    project(layerWeights.perLayerProjection(), perLayerGate, perLayerOutput);
+    TensorOps.rmsNorm(
+        perLayerOutput, perLayerOutput, layerWeights.perLayerPostNorm(), dim, config.rmsNormEps());
+    add(state, perLayerOutput, dim);
   }
 
   private void executeSharedFfn(Gemma4Weights.LayerWeights layer) {
     int dim = config.embeddingDim();
-    int hidden = config.sharedHiddenDim();
+    // This layer's own width; see executeSharedFfnBatch.
+    int hidden = layer.sharedGateProjection().rows();
     TensorOps.rmsNorm(sharedInput, state, layer.sharedFfnNorm(), dim, config.rmsNormEps());
     projectDual(
         layer.sharedGateProjection(),
@@ -1037,8 +1167,14 @@ final class Gemma4ForwardPass {
         sharedInput);
     TensorOps.geluGlu(sharedActivation, sharedGate, sharedUp, hidden);
     project(layer.sharedDownProjection(), sharedActivation, sharedOutput);
-    TensorOps.rmsNorm(
-        sharedOutput, sharedOutput, layer.sharedFfnPostNorm(), dim, config.rmsNormEps());
+    // post_ffw_norm_1 belongs to the mixture-of-experts layout and is absent on a dense model,
+    // which
+    // carries only post_ffw_norm -- applied once to the combined output by the caller. An empty
+    // vector means "this model does not have this norm", not "normalise by zero".
+    if (layer.sharedFfnPostNorm().length != 0) {
+      TensorOps.rmsNorm(
+          sharedOutput, sharedOutput, layer.sharedFfnPostNorm(), dim, config.rmsNormEps());
+    }
   }
 
   private void executeRoutedFfn(int layerIndex, Gemma4Weights.LayerWeights layer) {
@@ -1506,8 +1642,23 @@ final class Gemma4ForwardPass {
     normalizeBatch(values, values, batchSize, width, normalizationWeight);
   }
 
+  /** Whether prefill takes the batched path, which the E-series deliberately does not. */
+  boolean usesBatchedPrefill() {
+    return batchedPrefill;
+  }
+
   private static boolean supportsBatchedPrefill(
       Gemma4Config config, Gemma4Weights weights, GgufBatchedMatrixKernel batchedMatrixKernel) {
+    // The E-series is deliberately excluded. Its batched layer step has neither the per-layer input
+    // embedding fold nor the key-value sharing, so batching it would compute and STORE key and
+    // value
+    // projections for the sharing layers -- overwriting the very cache those layers are meant to
+    // read, and quietly producing wrong attention rather than failing. Serial prefill is correct
+    // and
+    // merely slower, which is the right trade until the batched step carries both features.
+    if (config.usesPerLayerEmbeddings() || config.kvOwningLayers() < config.numLayers()) {
+      return false;
+    }
     for (int layer = 0; layer < config.numLayers(); layer++) {
       Gemma4Weights.LayerWeights layerWeights = weights.layer(layer);
       if (!isBatchedEligible(layerWeights.queryProjection(), batchedMatrixKernel)
@@ -1517,16 +1668,23 @@ final class Gemma4ForwardPass {
           || !isBatchedEligible(layerWeights.attentionOutputProjection(), batchedMatrixKernel)
           || !isBatchedEligible(layerWeights.sharedGateProjection(), batchedMatrixKernel)
           || !isBatchedEligible(layerWeights.sharedUpProjection(), batchedMatrixKernel)
-          || !isBatchedEligible(layerWeights.sharedDownProjection(), batchedMatrixKernel)
-          || !isBatchedEligible(layerWeights.routerProjection(), batchedMatrixKernel)) {
+          || !isBatchedEligible(layerWeights.sharedDownProjection(), batchedMatrixKernel)) {
         return false;
       }
-      ExpertWeights expert = weights.expertLayout().layer(layer).expert(0);
-      if (!batchedMatrixKernel.isEligible(
-              expert.gateUp().type(), 2, 2 * config.expertHiddenDim(), config.embeddingDim())
-          || !batchedMatrixKernel.isEligible(
-              expert.down().type(), 2, config.embeddingDim(), config.expertHiddenDim())) {
-        return false;
+      // A dense model has no router projection and no expert layout -- expertLayout() is null for
+      // it -- so neither can be probed for batching eligibility. Dereferencing them here is what
+      // would have turned the dense path into an NPE on the first batched prefill.
+      if (!config.isDense()) {
+        if (!isBatchedEligible(layerWeights.routerProjection(), batchedMatrixKernel)) {
+          return false;
+        }
+        ExpertWeights expert = weights.expertLayout().layer(layer).expert(0);
+        if (!batchedMatrixKernel.isEligible(
+                expert.gateUp().type(), 2, 2 * config.expertHiddenDim(), config.embeddingDim())
+            || !batchedMatrixKernel.isEligible(
+                expert.down().type(), 2, config.embeddingDim(), config.expertHiddenDim())) {
+          return false;
+        }
       }
     }
     return true;
@@ -1594,7 +1752,11 @@ final class Gemma4ForwardPass {
       registerF32Scratch(scratch, layerWeights.sharedGateProjection(), batchCapacity);
       registerF32Scratch(scratch, layerWeights.sharedUpProjection(), batchCapacity);
       registerF32Scratch(scratch, layerWeights.sharedDownProjection(), batchCapacity);
-      registerF32Scratch(scratch, layerWeights.routerProjection(), batchCapacity);
+      // Null on a dense model, and registerF32Scratch dereferences it immediately for its type.
+      // Same shape of guard as valueProjection above.
+      if (layerWeights.routerProjection() != null) {
+        registerF32Scratch(scratch, layerWeights.routerProjection(), batchCapacity);
+      }
     }
     return scratch.toArray(F32Scratch[]::new);
   }
