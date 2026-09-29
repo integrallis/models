@@ -120,7 +120,7 @@ All notable changes to models are documented here.
 - **Eight decoder architectures the pure-Java backend could not load before: `lfm2`, `qwen3moe`,
   `mistral3`, `qwen35moe`, `qwen3next`, `gemma3n`, `deepseek2`, and `gpt-oss` from a GGUF.**
 
-  Four of them are qualified on real published weights, measured here on a 16-vCPU m6a.4xlarge. Every
+  Six of them are qualified on real published weights, measured here on a 16-vCPU m6a.4xlarge. Every
   model below scored `correctAnswerRate`, `retrievalRecall`, `citationRecall`, `citationPrecision`,
   `factCoverage` and `abstentionAccuracy` of **1.000 over 27/27 attempts with zero failures**:
 
@@ -132,14 +132,20 @@ All notable changes to models are documented here.
   | `KAT-Coder-V2.5-Dev` Q4_K_M | `qwen35moe` | 21.4 GB | 20.1 s | 130.8 ms |
   | `Qwen3.5-35B-A3B` Q4_K_M | `qwen35moe` | 22.0 GB | 15.4 s | 101.0 ms |
   | `Qwen3-Coder-Next` Q4_K_M | `qwen3next` | 48.5 GB | 38.6 s | 241.0 ms |
+  | `DeepSeek-Coder-V2-Lite-Instruct` Q4_K_M | `deepseek2` | 10.4 GB | 13.6 s | 190.7 ms |
+  | `gemma-3n-E2B-it` Q8_0 | `gemma3n` | 4.8 GB | 25.8 s | 150.8 ms |
   | `gemma-4-E2B-it` Q4_K_M | `gemma4` (already supported, see Fixed) | 3.4 GB | 3.0 s | 58.0 ms |
 
   `Qwen3-Coder-Next` is an 80B-class model answering correctly on all 27 attempts inside a 64 GB box at
   39.2 GB peak RSS — the largest artifact this backend has qualified.
 
-  `mistral3`, `gemma3n`, `deepseek2` and `gpt-oss`-from-GGUF are **implemented and verified against
-  unit-level scalar references only; no published-weights qualification yet**, so nothing in the
-  catalogue claims them.
+  `mistral3` and `gpt-oss`-from-GGUF are **implemented and verified against unit-level scalar
+  references only; no published-weights qualification yet**, so nothing in the catalogue claims them.
+
+  `deepseek2`'s run exercises multi-head latent attention, 64-expert unnormalised routing and the YaRN
+  variant that moves the mscale into the softmax; it is also the first real model to use the
+  `deepseek-llm` pre-tokenizer split added here. `gemma3n`'s exercises AltUp's four parallel residual
+  streams, LAuReL, shared key-value layers, and a softmax scale of 1.0 rather than 1/sqrt(head_dim).
 
   What each needed, since "supports the architecture" hides the work: `lfm2` interleaves attention
   with gated short convolutions over a shift register; `qwen3moe` and `qwen35moe` add routed experts

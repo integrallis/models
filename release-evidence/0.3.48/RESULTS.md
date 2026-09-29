@@ -4,10 +4,11 @@ Release preparation on 2026-09-29. This patch adds eight decoder architectures t
 backend, four defects that only real published weights exposed, the `PERFORMANCE_REDUCED` performance
 tier, and qualification support for sharded Hugging Face bundles. It consumes Vectors 0.1.25.
 
-**What is measured here and what is not.** Ten published models were qualified end to end on this
-campaign's builds. Four of the eight new architectures have no published-weights qualification yet and
-are marked as such below; nothing in the catalogue claims them. No new accelerator support is claimed,
-and no model-selection quality claim is made.
+**What is measured here and what is not.** Twelve published models were qualified end to end on this
+campaign's builds, covering six of the eight new architectures. The remaining two -- `mistral3` and
+`gpt-oss` from a GGUF -- have no published-weights qualification and are marked as such below; nothing
+in the catalogue claims them. No new accelerator support is claimed, and no model-selection quality
+claim is made.
 
 ## Qualified on published weights
 
@@ -40,13 +41,33 @@ correctly on all 27 attempts inside a 64 GB box at 39.2 GB peak RSS.
 Every one of the ten landed in `PERFORMANCE_REDUCED` -- correct, shippable, slower than the USABLE
 latency bound. That is the tier this release introduces, and these are the first records to use it.
 
+## Also qualified: the first published-weights runs for two new architectures
+
+These landed after the table above was written, from the shard carrying the Gemma 4 shared-KV loader
+fix (`models@0.3.47+rerun10-004e2fd48651`). Same harness, same protocol, and again **1.000 on all six
+quality metrics over 27/27 attempts with zero failures**:
+
+| model | arch | artifact | attempts | ttft p50 | tpot p50 | peak RSS | artifact sha256 (16) |
+|---|---|---|---|---|---|---|---|
+| `DeepSeek-Coder-V2-Lite-Instruct` Q4_K_M | `deepseek2` | 10.4 GB | 27/27 | 13.6 s | 190.7 ms | 12.5 GB | `603bd3f8a0281d16` |
+| `gemma-3n-E2B-it` Q8_0 | `gemma3n` | 4.8 GB | 27/27 | 25.8 s | 150.8 ms | 3.5 GB | `038a47c482e7af30` |
+
+`deepseek2` exercises multi-head latent attention, 64-expert **unnormalised** routing, and the YaRN
+variant that moves the mscale into the softmax scale rather than the rotation. It also ran on the
+`deepseek-llm` pre-tokenizer split added in this release, which until this record had no catalogue
+model behind it.
+
+`gemma3n` exercises AltUp's four parallel residual streams with predict/correct, LAuReL low-rank
+residuals, key-value sharing across layers, the `shared_kv_layers` key published as a float where
+Gemma 4 publishes an integer, and a softmax scale of 1.0 rather than 1/sqrt(head_dim).
+
 ## Implemented but NOT qualified on published weights
 
-`mistral3`, `gemma3n`, `deepseek2` and `gpt-oss`-from-GGUF are implemented and verified against
-unit-level scalar references and golden vectors only. **No published-weights run has confirmed any of
-them.** A fleet shard covering the last three, plus a re-run of `gemma-4-E4B-it` after the shared-KV
-loader fix below, was in flight when this record was written; whatever it reports belongs in the next
-release's evidence, not this one.
+`mistral3` and `gpt-oss`-from-GGUF are implemented and verified against unit-level scalar references
+and golden vectors only. **No published-weights run has confirmed either.** At the time of writing,
+the same shard was still running `gpt-oss-20b` and a re-run of `gemma-4-E4B-it` against the loader fix
+below; neither had reported, so neither is claimed here and whatever they report belongs to the next
+release's evidence.
 
 ## The four defects real weights exposed
 
