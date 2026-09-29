@@ -1,0 +1,52 @@
+name: Warm the Gradle distribution
+description: >
+  Fetch and unpack the wrapper's Gradle distribution, retrying transient failures from the
+  distribution host before any build work starts.
+
+# The Gradle wrapper fetches its distribution exactly once and gives up on the first error. That
+# error is not always ours: on 2026-09-29 a push to main failed with
+#
+#   java.io.IOException: Server returned HTTP response code: 500 for URL:
+#     https://github.com/gradle/gradle-distributions/releases/download/v9.4.1/gradle-9.4.1-all.zip
+#     at org.gradle.wrapper.Install.forceFetch
+#
+# before a single task ran, in one job of a six-job matrix whose other five downloaded the same file
+# successfully seconds apart. A matrix multiplies the exposure: every parallel job fetches
+# independently, so the chance that at least one hits a blip grows with the matrix, and one such job
+# fails the whole workflow.
+#
+# gradle/actions/setup-gradle caches the distribution, which removes the fetch on a cache hit but not
+# on a cold cache -- which is exactly when a release branch or a changed wrapper needs it most.
+#
+# `gradlew --version` is enough to trigger the download and unpack, so afterwards the real build step
+# reuses what this step placed in GRADLE_USER_HOME and never touches the network for it.
+# Not applied to native-kernels.yml or release.yml: their Windows matrix legs invoke Gradle through
+# a per-platform `matrix.gradle`, not `./gradlew`, so warming it needs a different command there.
+inputs:
+  working-directory:
+    description: Directory holding the Gradle wrapper. Defaults to the workspace root.
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -uo pipefail
+        for attempt in 1 2 3 4 5; do
+          if ./gradlew --version > /dev/null 2>&1; then
+            echo "Gradle distribution ready (attempt $attempt)."
+            exit 0
+          fi
+          if [ "$attempt" -eq 5 ]; then
+            echo "::error::Could not fetch the Gradle distribution after $attempt attempts."
+            # Run once more without suppressing output so the log carries the real cause.
+            ./gradlew --version
+            exit 1
+          fi
+          delay=$((attempt * 15))
+          echo "Gradle distribution fetch failed (attempt $attempt); retrying in ${delay}s."
+          sleep "$delay"
+        done
