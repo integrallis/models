@@ -220,6 +220,7 @@ class ExecutionPlannerPerformanceCliffTest {
         false,
         false,
         false,
+        false,
         GgufQ8BlockMajorKernel.SCATTERED,
         false,
         PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);

@@ -30,6 +30,9 @@ import com.integrallis.models.backend.purejava.plan.ModelTopology;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.GgufQ6BatchedKernel;
+import com.integrallis.vectors.core.GgufQ8BlockMajorKernel;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -75,7 +78,7 @@ class LlamaForwardPassPerformanceCliffTest {
       };
 
   @Test
-  void groupedQueryLlamaReportsFusedGroupedAttentionNotWiredOnceAcrossPasses() {
+  void groupedQueryLlamaStaysHeadByHeadByDefaultAndReportsTheCliffOnce() {
     try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
       for (int pass = 0; pass < 3; pass++) {
         LlamaForwardPass forwardPass = forwardPass("llama", 2, 1, GgufBatchedMatrixKernel.none());
@@ -83,12 +86,46 @@ class LlamaForwardPassPerformanceCliffTest {
         forwardPass.forward(2, 1);
       }
 
-      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_NOT_WIRED)).isEqualTo(1);
+      // Head-by-head is what non-Granite records were measured on, and the fused path is not
+      // token-preserving (2 of 9 RAG answers changed under Granite when only the attention kernel
+      // was swapped), so the default leaves the speed on the table on purpose. The cliff says so.
+      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED)).isEqualTo(1);
       assertThat(
-              PerformanceCliffs.reported().get(PerformanceCliff.FUSED_GROUPED_ATTENTION_NOT_WIRED))
+              PerformanceCliffs.reported().get(PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED))
           .contains("architecture=llama")
           .contains("group-size=2");
-      assertThat(recording.count(PerformanceCliff.NATIVE_GROUPED_ATTENTION_UNAVAILABLE)).isZero();
+    }
+  }
+
+  @Test
+  void askingForTheFusedPathByNameTakesItAndReportsNoCliff() {
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      fusedForwardPass("llama", 2, 1).forward(1, 0);
+
+      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED)).isZero();
+    }
+  }
+
+  @Test
+  void graniteKeepsTheFusedFallbackItWasQualifiedWithWithoutAskingForIt() {
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      // Granite's published route is the native kernel with the Java FUSED loop as its fallback.
+      // The default knob is off, so this passes only because the forward pass keeps Granite on
+      // fused regardless -- which is the whole point: dropping that would change a published model.
+      forwardPass("granite", 2, 1, GgufBatchedMatrixKernel.none()).forward(1, 0);
+
+      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED)).isZero();
+    }
+  }
+
+  @Test
+  void aModelWithNothingToFuseReportsNoCliff() {
+    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
+      // Group size one: there is no group to fuse, so head-by-head changes nothing and a cliff
+      // would be noise.
+      forwardPass("llama", 2, 2, GgufBatchedMatrixKernel.none()).forward(1, 0);
+
+      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED)).isZero();
     }
   }
 
@@ -97,16 +134,16 @@ class LlamaForwardPassPerformanceCliffTest {
     try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
       forwardPass("llama", 2, 2, GgufBatchedMatrixKernel.none()).forward(1, 0);
 
-      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_NOT_WIRED)).isZero();
+      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED)).isZero();
     }
   }
 
   @Test
-  void graniteTakesTheFusedPathAndThePureJavaBackendReportsNoNativeCliff() {
+  void graniteStillTakesTheFusedPathAndThePureJavaBackendReportsNoNativeCliff() {
     try (PerformanceCliffRecording recording = PerformanceCliffRecording.start()) {
       forwardPass("granite", 2, 1, GgufBatchedMatrixKernel.none()).forward(1, 0);
 
-      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_NOT_WIRED)).isZero();
+      assertThat(recording.count(PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED)).isZero();
       assertThat(recording.count(PerformanceCliff.NATIVE_GROUPED_ATTENTION_UNAVAILABLE)).isZero();
     }
   }
@@ -264,6 +301,42 @@ class LlamaForwardPassPerformanceCliffTest {
   private static LlamaForwardPass forwardPass(
       String architecture, int heads, int kvHeads, GgufBatchedMatrixKernel kernel) {
     return forwardPass(architecture, heads, kvHeads, GgufTensorType.F32, kernel);
+  }
+
+  /** The same model with {@code models.purejava.fusedGroupedAttention=true} asked for by name. */
+  private static LlamaForwardPass fusedForwardPass(String architecture, int heads, int kvHeads) {
+    GgufFile file = buildModel(architecture, heads, kvHeads, GgufTensorType.F32, new Random(7));
+    LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+    LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+    KvCache cache =
+        new KvCache(config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+    return new LlamaForwardPass(
+        config,
+        weights,
+        cache,
+        ExecutionPlanner.plan(
+            RuntimeFingerprint.capture(),
+            ModelTopology.from(config.architecture().metadataId(), config, weights),
+            // PureJavaPlanConfiguration.defaults() with the fused grouped attention knob ON.
+            new PureJavaPlanConfiguration(
+                true,
+                true,
+                GgufQ4Kernel.WIDENED,
+                GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
+                PureJavaPlanConfiguration.DEFAULT_PREFILL_BATCH_SIZE,
+                true,
+                true,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                GgufQ8BlockMajorKernel.SCATTERED,
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT),
+            GgufBatchedMatrixKernel.none()),
+        GgufBatchedMatrixKernel.none());
   }
 
   private static LlamaForwardPass forwardPass(

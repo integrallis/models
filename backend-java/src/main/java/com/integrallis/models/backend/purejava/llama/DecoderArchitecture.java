@@ -29,8 +29,17 @@ import java.util.Locale;
  */
 public enum DecoderArchitecture {
   LLAMA("llama"),
+  GEMMA("gemma"),
+  GEMMA2("gemma2"),
+  HUNYUAN_DENSE("hunyuan-dense"),
+  PHI3("phi3"),
+  // Structurally plain Llama: standard tensor set, interleaved-pair rope (llama.cpp classifies
+  // MISTRAL3 as LLAMA_ROPE_TYPE_NORM, so it stays out of usesNeoxRope). What it adds is
+  // position-dependent attention temperature scaling; see LlamaConfig.attentionTemperatureScale.
+  MISTRAL3("mistral3"),
   QWEN2("qwen2"),
   QWEN3("qwen3"),
+  QWEN3MOE("qwen3moe"),
   GRANITE("granite"),
   SMOLLM3("smollm3"),
   GEMMA3("gemma3"),
