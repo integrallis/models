@@ -16,6 +16,7 @@ one build, or a shard's results stop being attributable. Never overwrite one —
 | models-rag-bench-0.3.47-rerun8.tar    | —      | **superseded, never launched.** gemma3n, deepseek2 and the gpt-oss GGUF loader; shard-30 was re-armed on rerun10 before it fired. sha `c7455c159944` |
 | models-rag-bench-0.3.47-rerun9.tar    | —      | **superseded, never launched.** Same contents as rerun10; its recorded commit was rewritten before launch, so the name was retired rather than repointed |
 | models-rag-bench-0.3.47-rerun10.tar   | 30     | **supersedes rerun8 before launch.** gemma3n, deepseek2 and the gpt-oss GGUF loader, plus the Gemma 4 shared-KV weights-loader fix, so E4B re-runs on the same box. sha `004e2fd48651` |
+| models-rag-bench-0.3.49-rerun11.tar   | 31     | First payload off a released 0.3.49. MXFP4 projections use every core instead of one; re-runs gemma 4 E4B and gpt-oss-20b, E4B first. sha `fbe951608665`, tag `payload/rerun11` |
 
 Payload sha256[0:12] = `cf5f64c49bfe`, reported by the worker as
 `--backend-version models@0.3.47+rerun5-cf5f64c49bfe`, so every result JSON names an artifact that
@@ -160,3 +161,18 @@ cache, so nothing downstream of the loader changed.
 
 Shard-30 therefore runs four jobs: deepseek2, gemma3n, gpt-oss GGUF, and gemma4 E4B.
 
+## rerun11 contents
+
+Payload sha256[0:12] = `fbe951608665`, reported as
+`--backend-version models@0.3.49+rerun11-fbe951608665`, and pinned by the annotated tag
+`payload/rerun11` before the pull request was merged -- see the rerun10 note above for why that tag
+exists.
+
+**Why shard-30 was cut short.** Shard-30 qualified deepseek2 and gemma3n, then spent over 100 minutes on
+gpt-oss-20b without finishing. CloudWatch showed the worker flat at 8% CPU -- one core of sixteen --
+which is what exposed the MXFP4 projection running serially where every other quantization
+parallelises. That made the run a measurement of code already being replaced: it would have produced a
+latency figure for a path that no longer exists, and delayed the E4B re-run behind it by hours. The
+instance was terminated and this payload relaunched with E4B first.
+
+Shard-31 therefore runs two jobs: gemma 4 E4B, then gpt-oss-20b on the parallel MXFP4 kernel.
