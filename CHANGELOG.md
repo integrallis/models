@@ -29,10 +29,24 @@ All notable changes to models are documented here.
   why a summary could report a perfect score for a model that contributed nothing and no reader had
   anything to contradict it. `RagStatisticsTest` pins that exact case.
 
-- **Two architectures added in 0.3.48 look like they have decoder defects**, found by reading the raw
-  output the fallback was hiding: `deepseek2` emits `###` repeated for entire completions and
-  `gemma3n` emits corrupted text, both at 0.0 raw correct. `qwen3next` degenerates into repetition at
-  11.1%. Not yet diagnosed, and not a claim about the cause; the evidence is in the correction file.
+### Fixed
+
+- **DeepSeek-V2 models were prompted with the DeepSeek-V1 format.** The harness rendered
+  `### Instruction:` / `### Response:`, while DeepSeek-Coder-V2-Lite-Instruct's own
+  `tokenizer.chat_template` in the published GGUF uses `User: ` / `Assistant: `. Shown the `###`
+  markers, the model continued the pattern and emitted `###` for entire completions -- which read as a
+  broken decoder until the template was checked. A new `deepseek-v2` template fixes it; `deepseek` is
+  left exactly as it was, because the V1 coder models are already qualified against those markers with
+  their greedy oracles pinned on them. The model has to be re-run on the corrected template before
+  anything is claimed about its decoder.
+
+### Notes
+
+- **`gemma3n` and `qwen3next` still emit incoherent output, and prompting does not explain it.**
+  `gemma3n` produces corrupted text at 0.0 raw correct; `qwen3next` degenerates into repetition at
+  11.1%. The `gemma` template used matches gemma3n's own turn markers read from the published GGUF, and
+  `chatml` matches Qwen's, so a decoder defect is the leading explanation -- stated as a suspicion, not
+  a diagnosis. Evidence in `release-evidence/CORRECTION-2026-09-29.md`.
 
 ### Notes
 
