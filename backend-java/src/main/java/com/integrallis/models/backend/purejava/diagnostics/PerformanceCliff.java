@@ -70,12 +70,17 @@ public enum PerformanceCliff {
       "row-by-row-projection",
       "a batched projection runs one row at a time because its tensor type has no batched kernel"),
   /**
-   * Grouped-query attention runs head by head because the fused grouped kernel is wired only for
-   * Granite, whose pinned numerics it was qualified against.
+   * Grouped-query attention runs head by head because {@code models.purejava.fusedGroupedAttention}
+   * was set to false.
+   *
+   * <p>Until 0.2.0 this reason was {@code fused-grouped-attention-not-wired} and meant the fused
+   * kernel served Granite only. It now serves every model whose group size exceeds one, so the only
+   * way to reach the head-by-head loop is to ask for it. The id changed rather than being kept
+   * stable because records carrying the old one were written when it meant something else.
    */
-  FUSED_GROUPED_ATTENTION_NOT_WIRED(
-      "fused-grouped-attention-not-wired",
-      "grouped-query attention runs head by head: the fused kernel is wired only for Granite"),
+  FUSED_GROUPED_ATTENTION_DISABLED(
+      "fused-grouped-attention-disabled",
+      "grouped-query attention runs head by head: disabled by models.purejava.fusedGroupedAttention"),
   /**
    * An injected native kernel is present on an architecture wired for native grouped attention, but
    * the kernel does not provide it (capability missing or disabled by property).

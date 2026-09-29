@@ -38,6 +38,12 @@ public record LlamaConfig(
     int slidingWindow,
     int slidingWindowPattern,
     float finalLogitSoftcap,
+    float attnLogitSoftcap,
+    float attnTempScale,
+    int ropeDimensions,
+    int numExperts,
+    int numExpertsUsed,
+    int expertHiddenDim,
     RopeScaling ropeScaling,
     GraniteScalars graniteScalars) {
 
@@ -53,6 +59,20 @@ public record LlamaConfig(
     if (keyLength <= 0) throw new IllegalArgumentException("keyLength must be > 0");
     if (valueLength <= 0) throw new IllegalArgumentException("valueLength must be > 0");
     if (vocabSize <= 0) throw new IllegalArgumentException("vocabSize must be > 0");
+    // All three expert fields or none: a half-declared mixture of experts is a malformed model, and
+    // treating it as dense would silently skip the routed feed-forward and produce wrong output.
+    if (!(numExperts == 0 && numExpertsUsed == 0 && expertHiddenDim == 0)) {
+      if (numExperts <= 0) throw new IllegalArgumentException("numExperts must be > 0");
+      if (numExpertsUsed <= 0) throw new IllegalArgumentException("numExpertsUsed must be > 0");
+      if (expertHiddenDim <= 0) throw new IllegalArgumentException("expertHiddenDim must be > 0");
+      if (numExpertsUsed > numExperts) {
+        throw new IllegalArgumentException(
+            "numExpertsUsed must not exceed numExperts: " + numExpertsUsed + " > " + numExperts);
+      }
+    }
+    if (attnTempScale != 0.0f && !Float.isFinite(attnTempScale)) {
+      throw new IllegalArgumentException("attnTempScale must be finite: " + attnTempScale);
+    }
     if (!(ropeFrequencyScale > 0.0f) || !Float.isFinite(ropeFrequencyScale)) {
       throw new IllegalArgumentException(
           "ropeFrequencyScale must be finite and > 0: " + ropeFrequencyScale);
@@ -116,6 +136,16 @@ public record LlamaConfig(
         slidingWindow,
         slidingWindowPattern,
         finalLogitSoftcap,
+        // No attention-logit softcap: only Gemma 2 has one, and it is built through fromMetadata.
+        0.0f,
+        // No attention temperature scaling: only Mistral 3 has it, built through fromMetadata.
+        0.0f,
+        // Full rotary: the rotary width equals the head width unless fromMetadata says otherwise.
+        keyLength,
+        // Dense: mixture-of-experts models are built through fromMetadata.
+        0,
+        0,
+        0,
         RopeScaling.linear(ropeFrequencyScale),
         GraniteScalars.none());
   }
@@ -184,6 +214,11 @@ public record LlamaConfig(
     return keyLength;
   }
 
+  /** Whether rotary embedding covers only part of each head. */
+  public boolean usesPartialRotary() {
+    return ropeDimensions < keyLength;
+  }
+
   /** Total query projection dimension. */
   public int queryDim() {
     return keyLength * numHeads;
@@ -213,8 +248,23 @@ public record LlamaConfig(
    * shared rather than duplicated per architecture.
    */
   private boolean isGemmaFamily() {
-    return architecture == DecoderArchitecture.GEMMA3
+    return architecture == DecoderArchitecture.GEMMA
+        || architecture == DecoderArchitecture.GEMMA2
+        || architecture == DecoderArchitecture.GEMMA3
         || architecture == DecoderArchitecture.GEMMA_EMBEDDING;
+  }
+
+  /**
+   * Whether this is Gemma 1, which shares the family's scaling and activation but not its extra
+   * norms.
+   *
+   * <p>Gemma 1 carries exactly the Llama tensor set -- verified against {@code codegemma-7b-it},
+   * whose blocks hold only {@code attn_{q,k,v,output,norm}} and {@code ffn_{gate,up,down,norm}}.
+   * The post-attention and post-feed-forward norms arrived with Gemma 2, so requiring them here
+   * would reject every Gemma 1 model for a tensor it was never built with.
+   */
+  private boolean isGemma1() {
+    return architecture == DecoderArchitecture.GEMMA;
   }
 
   /**
@@ -228,10 +278,77 @@ public record LlamaConfig(
     return architecture == DecoderArchitecture.GEMMA_EMBEDDING;
   }
 
-  /** Whether the GGUF architecture uses the NeoX split-half rotary layout. */
+  /** Whether the feed-forward network is a mixture of experts rather than a single dense one. */
+  public boolean usesMixtureOfExperts() {
+    return numExperts > 0;
+  }
+
+  /** Whether this model scales query magnitudes by a position-dependent attention temperature. */
+  public boolean usesAttentionTemperatureScaling() {
+    return attnTempScale != 0.0f;
+  }
+
+  /**
+   * The factor the query vector is multiplied by at one position, before attention and after rope.
+   *
+   * <p>Transcribed from llama.cpp's {@code llm_graph_input_attn_temp::set_input}:
+   *
+   * <pre>{@code log(floor((pos + offset) / floorScale) + 1) * scale + 1}</pre>
+   *
+   * <p>The offset is zero for Mistral 3, which sets it explicitly, and the floor is the original
+   * pre-extension context length ({@code n_ctx_orig_yarn}). Mistral 3 3B declares a scale of 0.1
+   * against a 16384-token original context inside a 262144-token window.
+   *
+   * <p><b>This is exactly 1.0 for every position below the floor</b>, because {@code floor(pos /
+   * floorScale)} is then 0 and {@code log(1)} is 0. That is the intended behaviour -- the tuning
+   * exists to temper attention only once a sequence runs past the length the model was trained for
+   * -- but it means any test written at ordinary positions passes without exercising anything.
+   *
+   * @param position the zero-based token position
+   * @return the query scale, 1.0 when temperature scaling is absent or the position is below the
+   *     floor
+   */
+  public float attentionTemperatureScale(int position) {
+    if (attnTempScale == 0.0f) {
+      return 1.0f;
+    }
+    if (position < 0) {
+      throw new IllegalArgumentException("position must be >= 0: " + position);
+    }
+    // llama.cpp's floor is n_ctx_orig_yarn, which it defaults to n_ctx_train when the file declares
+    // no original context length. Requiring the explicit key instead would refuse a Mistral 3 that
+    // used linear or no rope scaling, because RopeScaling.linear records originalContext as zero --
+    // stricter than the reference, and a rejection rather than a wrong number, but still wrong.
+    int floorScale =
+        ropeScaling.originalContext() > 0 ? ropeScaling.originalContext() : contextLength;
+    double steps = Math.floor((double) position / floorScale);
+    return (float) (Math.log(steps + 1.0) * attnTempScale + 1.0);
+  }
+
+  /**
+   * Whether rotary embeddings use the NeoX half-split layout rather than the interleaved-pair one.
+   *
+   * <p>Confirmed against the reference implementation's architecture table rather than inferred: it
+   * classifies LLAMA as the interleaved-pair layout and GEMMA, GEMMA2, GEMMA3, GEMMA_EMBEDDING,
+   * PHI3, QWEN2, QWEN3, QWEN3MOE and HUNYUAN_DENSE as the half-split one. That is exactly the set
+   * below, which also independently confirms the Gemma 1, Gemma 2, Phi-3 and Hunyuan entries added
+   * here rather than leaving them resting on shape resemblance. QWEN3MOE shares one fall-through
+   * with QWEN2 and QWEN3 in that table, and was missing from the set below until the table was
+   * re-read -- an omission that would have given every routed Qwen a silently wrong rotary layout.
+   * Nothing in a GGUF distinguishes the two layouts -- which one a file needs was fixed when its Q
+   * and K rows were written -- so the table is the only place the answer exists, and a wrong choice
+   * yields fluent but degraded text, never an error.
+   *
+   * <p>The algorithm was read and translated, not depended on: this stack is Java plus Rust shims,
+   * and llama.cpp and Ollama serve as benchmark arms that our generated tokens are compared
+   * against.
+   */
   public boolean usesNeoxRope() {
     return architecture == DecoderArchitecture.QWEN2
         || architecture == DecoderArchitecture.QWEN3
+        || architecture == DecoderArchitecture.QWEN3MOE
+        || architecture == DecoderArchitecture.PHI3
+        || architecture == DecoderArchitecture.HUNYUAN_DENSE
         || isGemmaFamily();
   }
 
@@ -280,12 +397,12 @@ public record LlamaConfig(
 
   /** Whether attention output is normalized before its residual addition. */
   public boolean usesPostAttentionNorm() {
-    return isGemmaFamily();
+    return isGemmaFamily() && !isGemma1();
   }
 
   /** Whether feed-forward output is normalized before its residual addition. */
   public boolean usesPostFfnNorm() {
-    return isGemmaFamily();
+    return isGemmaFamily() && !isGemma1();
   }
 
   /** Whether this layer uses bounded sliding-window attention. */
@@ -311,7 +428,7 @@ public record LlamaConfig(
   RotaryTable globalRotaryTable() {
     if (ropeScaling.type() == RopeScalingType.YARN) {
       return RotaryTable.yarn(
-          keyLength,
+          ropeDimensions,
           ropeTheta,
           ropeScaling.factor(),
           ropeScaling.betaFast(),
@@ -319,12 +436,12 @@ public record LlamaConfig(
           ropeScaling.originalContext(),
           true);
     }
-    return new RotaryTable(keyLength, ropeTheta, ropeFrequencyScale);
+    return new RotaryTable(ropeDimensions, ropeTheta, ropeFrequencyScale);
   }
 
   /** Builds the unscaled table used by architectures with alternating sliding-window RoPE. */
   RotaryTable slidingWindowRotaryTable() {
-    return new RotaryTable(keyLength, slidingWindowRopeTheta, 1.0f);
+    return new RotaryTable(ropeDimensions, slidingWindowRopeTheta, 1.0f);
   }
 
   /**
@@ -430,10 +547,50 @@ public record LlamaConfig(
     float rmsNormEps =
         getArchFloatKey(metadata, arch, "attention.layer_norm_rms_epsilon").orElse(1e-5f);
     int slidingWindow = getArchKey(metadata, arch, "attention.sliding_window").orElse(0);
+    // Gemma 2 alternates local and global attention every other layer and publishes no
+    // sliding_window_pattern key, so the generic default of 6 would make five layers in six local
+    // instead of one in two -- wrong attention spans on 26 of 26 layers, with no error. Gemma 3
+    // publishes the key or uses the 6 default.
+    int defaultSlidingWindowPattern = architecture == DecoderArchitecture.GEMMA2 ? 2 : 6;
     int slidingWindowPattern =
-        getArchKey(metadata, arch, "attention.sliding_window_pattern").orElse(6);
+        getArchKey(metadata, arch, "attention.sliding_window_pattern")
+            .orElse(defaultSlidingWindowPattern);
     float finalLogitSoftcap =
         getArchFloatKey(metadata, arch, "final_logit_softcapping").orElse(0.0f);
+    // Gemma 2 softcaps ATTENTION logits as well as final logits; Gemma 3 dropped the attention one.
+    // Zero means no cap, matching the final-logit convention above.
+    float attnLogitSoftcap = getArchFloatKey(metadata, arch, "attn_logit_softcapping").orElse(0.0f);
+    float attnTempScale =
+        getArchFloatKey(metadata, arch, "attention.temperature_scale").orElse(0.0f);
+
+    // Mixture-of-experts feed-forward. Absent means dense, which is every architecture here except
+    // qwen3moe: the three keys arrive together or not at all, and the validator enforces that.
+    int numExperts = getArchKey(metadata, arch, "expert_count").orElse(0);
+    int numExpertsUsed = getArchKey(metadata, arch, "expert_used_count").orElse(0);
+    int expertHiddenDim = getArchKey(metadata, arch, "expert_feed_forward_length").orElse(0);
+
+    // Partial rotary: rope.dimension_count below the head dimension means only the leading dims are
+    // rotated. RotaryTable rotates the whole head and takes no dimension count, so a model needing
+    // partial rotary would load and generate plausible but wrong text. Refused for Phi-3 rather
+    // than
+    // served incorrectly. Scoped to this architecture on purpose: the field is ignored for every
+    // architecture already supported, and newly enforcing it there would reject models that ship
+    // today. phi-3.5-mini and phi-3-mini-4k are full rotary (head_dim 96 = rope dim 96) and load;
+    // phi-4-mini is 128 vs 96 and is refused until RotaryTable takes a rotary width.
+    // The declared rotary width, which may be NARROWER than the head: Phi-4-mini rotates 96 of 128
+    // dimensions and leaves the rest untouched. The rotary tables are built at this width, and both
+    // rope layouts pair strictly inside it -- NeoX pairs i with i + width/2 and the interleaved
+    // form
+    // pairs 2i with 2i+1 -- so the dimensions above it are never written. The frequency denominator
+    // is this width too, matching ggml, which raises freq_base to -2*i/n_dims with n_dims = n_rot.
+    int ropeDimensions = getArchKey(metadata, arch, "rope.dimension_count").orElse(keyLength);
+    if (ropeDimensions <= 0 || ropeDimensions > keyLength || (ropeDimensions & 1) != 0) {
+      throw new IllegalArgumentException(
+          "rope.dimension_count must be positive, even and at most the head dimension "
+              + keyLength
+              + ", but was "
+              + ropeDimensions);
+    }
 
     GraniteScalars graniteScalars =
         architecture == DecoderArchitecture.GRANITE
@@ -462,6 +619,12 @@ public record LlamaConfig(
         slidingWindow,
         slidingWindowPattern,
         finalLogitSoftcap,
+        attnLogitSoftcap,
+        attnTempScale,
+        ropeDimensions,
+        numExperts,
+        numExpertsUsed,
+        expertHiddenDim,
         ropeScaling,
         graniteScalars);
   }
