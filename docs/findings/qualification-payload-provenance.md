@@ -13,8 +13,9 @@ one build, or a shard's results stop being attributable. Never overwrite one —
 | models-rag-bench-0.3.47-rerun5.tar    | 27     | the four defects the shard-20..26 results exposed (see below), plus qwen35moe |
 | models-rag-bench-0.3.47-rerun6.tar    | 28     | the six header-derived fixes below, plus qwen3next |
 | models-rag-bench-0.3.47-rerun7.tar    | —      | **superseded, never launched.** gemma3n + deepseek2; folded into rerun8 before shard-29 launched, so one box runs all three |
-| models-rag-bench-0.3.47-rerun8.tar    | 30     | gemma3n, deepseek2 and the gpt-oss GGUF loader. sha `c7455c159944` |
-| models-rag-bench-0.3.47-rerun9.tar    | 30     | **supersedes rerun8 before launch.** Same three, plus the Gemma 4 shared-KV weights-loader fix, so E4B re-runs on the same box. sha `c19c4b41bf4a` |
+| models-rag-bench-0.3.47-rerun8.tar    | —      | **superseded, never launched.** gemma3n, deepseek2 and the gpt-oss GGUF loader; shard-30 was re-armed on rerun10 before it fired. sha `c7455c159944` |
+| models-rag-bench-0.3.47-rerun9.tar    | —      | **superseded, never launched.** Same contents as rerun10; its recorded commit was rewritten before launch, so the name was retired rather than repointed |
+| models-rag-bench-0.3.47-rerun10.tar   | 30     | **supersedes rerun8 before launch.** gemma3n, deepseek2 and the gpt-oss GGUF loader, plus the Gemma 4 shared-KV weights-loader fix, so E4B re-runs on the same box. sha `004e2fd48651` |
 
 Payload sha256[0:12] = `cf5f64c49bfe`, reported by the worker as
 `--backend-version models@0.3.47+rerun5-cf5f64c49bfe`, so every result JSON names an artifact that
@@ -127,10 +128,17 @@ failures, provenance `models@0.3.47+rerun5-cf5f64c49bfe`.
 - gemma_4_e4b_it_q4_0
 - liquidai_lfm2_5_1_2b_instruct_gguf_q4_k_m
 
-## rerun9 contents
+## rerun10 contents
 
-Payload sha256[0:12] = `c19c4b41bf4a`, reported as
-`--backend-version models@0.3.47+rerun9-c19c4b41bf4a`.
+Payload sha256[0:12] = `004e2fd48651`, reported as
+`--backend-version models@0.3.47+rerun10-004e2fd48651`.
+
+It was built and uploaded once as rerun9 against commit `c19c4b41bf4a`. That commit was then rewritten
+-- a formatter fix belonged in it rather than in the commit after it -- which changed its sha, so the
+payload named a commit that no longer existed. Nothing had launched against rerun9 and no result
+referenced it, so the name was retired and the tar rebuilt as rerun10 rather than the deployed name
+being quietly repointed at a different build. **The lesson is the cheaper one: do not rewrite a commit
+whose sha has already been baked into a deployed payload.**
 
 rerun8 was armed for shard-30 and had not launched, so it was replaced rather than followed. It adds
 one fix to the same three architectures, and adds a fourth job to the shard:
