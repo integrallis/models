@@ -1,5 +1,14 @@
 # Models 0.3.49 release qualification
 
+> **CORRECTED 2026-09-29 — see [CORRECTION-2026-09-29.md](../CORRECTION-2026-09-29.md).**
+> The qualification claims below overstate model quality. `correctAnswerRate` scores the pipeline, not
+> the model: 69% of these attempts were answered by `EXTRACTIVE_FALLBACK`, where the harness replaced
+> the generated answer with text extracted from the retrieved document. Applying this repository's own
+> `RagProductionQualificationPolicy`, **five of the fourteen models qualify, not fourteen**. The
+> architectures load and run real published weights; the quality numbers below do not say what they
+> appear to say.
+
+
 Release preparation on 2026-09-29, hours after 0.3.48. One fix: MXFP4 projections use every core
 instead of one.
 

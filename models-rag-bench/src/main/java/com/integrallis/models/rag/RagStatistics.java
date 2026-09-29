@@ -37,6 +37,8 @@ public final class RagStatistics {
     List<RagRun> unanswerable =
         runs.stream().filter(run -> !caseFor(run, casesById).answerable()).toList();
     Double totalEstimatedApiCostUsd = totalEstimatedApiCost(runs);
+    List<RagRun> modelContributed =
+        runs.stream().filter(run -> run.grounding().decision().modelContributed()).toList();
 
     return new RagBenchmarkSummary(
         totalAttempts,
@@ -65,7 +67,16 @@ public final class RagStatistics {
         average(answerable, run -> run.evaluation().citationRecall()),
         average(answerable, run -> run.evaluation().citationPrecision()),
         average(unanswerable, run -> run.evaluation().correct() ? 1 : 0),
-        average(runs, run -> run.evaluation().correct() ? 1 : 0));
+        average(runs, run -> run.evaluation().correct() ? 1 : 0),
+        // The model's own text, scored before the grounding policy could replace it.
+        average(runs, run -> run.rawEvaluation().correct() ? 1 : 0),
+        // Over totalAttempts, not runs.size(): an attempt that never produced a run did not
+        // produce a model answer either, and the qualification gate thresholds this rate.
+        (double) modelContributed.size() / totalAttempts,
+        average(modelContributed, run -> run.evaluation().correct() ? 1 : 0),
+        average(
+            runs,
+            run -> run.grounding().decision() == GroundingDecision.EXTRACTIVE_FALLBACK ? 1 : 0));
   }
 
   private static Double totalEstimatedApiCost(List<RagRun> runs) {

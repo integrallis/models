@@ -504,7 +504,14 @@ class RagProductionQualificationPolicyTest {
         correctAnswerRate,
         correctAnswerRate,
         abstentionAccuracy,
-        correctAnswerRate);
+        correctAnswerRate,
+        // The four contribution rates this fixture does not vary. The policy reads model
+        // contribution from runs[], not from the summary, so these stay at the grounded rate here
+        // and are exercised against real run lists in RagStatisticsTest.
+        correctAnswerRate,
+        1.0,
+        correctAnswerRate,
+        0.0);
   }
 
   private static RagBenchmarkSettings settings() {

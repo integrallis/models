@@ -1,5 +1,14 @@
 # Models 0.3.48 release qualification
 
+> **CORRECTED 2026-09-29 — see [CORRECTION-2026-09-29.md](../CORRECTION-2026-09-29.md).**
+> The qualification claims below overstate model quality. `correctAnswerRate` scores the pipeline, not
+> the model: 69% of these attempts were answered by `EXTRACTIVE_FALLBACK`, where the harness replaced
+> the generated answer with text extracted from the retrieved document. Applying this repository's own
+> `RagProductionQualificationPolicy`, **five of the fourteen models qualify, not fourteen**. The
+> architectures load and run real published weights; the quality numbers below do not say what they
+> appear to say.
+
+
 Release preparation on 2026-09-29. This patch adds eight decoder architectures to the pure-Java
 backend, four defects that only real published weights exposed, the `PERFORMANCE_REDUCED` performance
 tier, and qualification support for sharded Hugging Face bundles. It consumes Vectors 0.1.25.

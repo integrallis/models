@@ -4,6 +4,36 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Corrected
+
+- **The 0.3.48 and 0.3.49 qualification claims overstate model quality.** Both releases state that
+  fourteen models scored 1.000 on every quality metric. `correctAnswerRate` scores the **pipeline**:
+  under the grounding policy these runs used, an answer that fails citation screening is replaced with
+  text extracted from the retrieved document, and the replacement is what is scored. Across all 14
+  models and 378 attempts, **69% were answered by `EXTRACTIVE_FALLBACK`**, 20% by the model, 11% by
+  retrieval abstention.
+
+  Applying `RagProductionQualificationPolicy` -- this repository's own gate, at a 1/3 model-answer
+  floor and 90% correctness among those answers -- **five of the fourteen qualify**: `lfm2`,
+  `qwen3-30b-a3b-instruct-2507` and `qwen3-coder-30b-a3b` (`qwen3moe`), `kat-coder-v2.5` (`qwen35moe`),
+  and `gemma-4-E4B`. `qwen3next`, `deepseek2`, `gemma3n`, `gpt-oss` and `mistral3` have **no qualifying
+  model**.
+
+  Nothing in the released artifacts is affected, and no catalogue record was ever contributed from
+  these runs. The full correction, including the per-model table and the raw model output, is in
+  `release-evidence/CORRECTION-2026-09-29.md`.
+
+- **The summary now publishes what makes that visible.** `RagBenchmarkSummary` gains
+  `rawCorrectAnswerRate`, `modelAnswerRate`, `modelAnswerCorrectRate` and `extractiveFallbackRate`, and
+  the CLI prints the last three beside `correct=`. They existed only inside `runs[]` before, which is
+  why a summary could report a perfect score for a model that contributed nothing and no reader had
+  anything to contradict it. `RagStatisticsTest` pins that exact case.
+
+- **Two architectures added in 0.3.48 look like they have decoder defects**, found by reading the raw
+  output the fallback was hiding: `deepseek2` emits `###` repeated for entire completions and
+  `gemma3n` emits corrupted text, both at 0.0 raw correct. `qwen3next` degenerates into repetition at
+  11.1%. Not yet diagnosed, and not a claim about the cause; the evidence is in the correction file.
+
 ### Notes
 
 - **`gpt-oss` from a GGUF is qualified on published weights**, measured after 0.3.49 shipped and so not
