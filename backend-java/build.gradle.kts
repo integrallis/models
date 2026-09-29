@@ -1184,3 +1184,67 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).addStringOption("-add-modules", "jdk.incubator.vector")
 }
+
+// The llama.cpp pinned-greedy-token oracles, split by fixture size.
+//
+// Exists because a change to attention numerics cannot be judged by a sample of the oracles. The
+// fused grouped-attention path differs from head-by-head by ~1.4e-6 relative on the attention
+// output -- small, but greedy decoding is a discrete argmax, and swapping only the attention kernel
+// under Granite changed 2 of 9 RAG answers from byte-identical prompts. A published qualification
+// cannot be retracted, so the bar for changing a default is that EVERY pinned expectation still
+// matches.
+//
+// Split into two tasks on purpose: one 7B class can run for 45+ minutes, so a single task reports
+// nothing for most of an hour and tells you least when you most want to stop early. The small tier
+// covers 6 architectures in a fraction of the time.
+val greedyOracleSmall = listOf(
+    "TinyLlamaModelFixtureIntegrationTest",
+    "Qwen3ModelFixtureIntegrationTest",
+    "Qwen25MathModelFixtureIntegrationTest",
+    "EuroLlmModelFixtureIntegrationTest",
+    "Gemma3ModelFixtureIntegrationTest",
+    "MiniCpm5ModelFixtureIntegrationTest",
+    "Qwen25CoderModelFixtureIntegrationTest",
+    "DeepSeekCoderModelFixtureIntegrationTest",
+)
+val greedyOracleLarge = listOf(
+    "SmolLm3ModelFixtureSlowTest",
+    "FinR1LargeModelFixtureSlowTest",
+    "SqlCoderLargeModelFixtureSlowTest",
+    "Qwen3LargeModelFixtureSlowTest",
+    "HuatuoGptO1LargeModelFixtureSlowTest",
+    "DeepSeekR1DistillQwenLargeModelFixtureSlowTest",
+    "DeepSeekCoderLargeModelFixtureSlowTest",
+    "Qwen25CoderLargeModelFixtureSlowTest",
+    "Gemma4LargeModelFixtureSlowTest",
+)
+
+fun Test.greedyOracleSweep(classes: List<String>) {
+    group = "verification"
+    // Must be forwarded explicitly: the default is OFF, so without this the sweep would exercise
+    // head-by-head -- the very baseline the oracles were recorded on -- and pass while proving
+    // nothing about the fused path.
+    providers.systemProperty("models.purejava.fusedGroupedAttention").orNull?.let {
+        systemProperty("models.purejava.fusedGroupedAttention", it)
+    }
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("integration", "slow") }
+    filter {
+        isFailOnNoMatchingTests = false
+        classes.forEach { includeTestsMatching("com.integrallis.models.backend.purejava.$it") }
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "12g"
+}
+
+tasks.register<Test>("greedyOracleSweepSmall") {
+    description = "Pinned llama.cpp greedy oracles, small fixtures (6 architectures)"
+    greedyOracleSweep(greedyOracleSmall)
+}
+
+tasks.register<Test>("greedyOracleSweepLarge") {
+    description = "Pinned llama.cpp greedy oracles, 6B-8B fixtures (slow)"
+    greedyOracleSweep(greedyOracleLarge)
+}
