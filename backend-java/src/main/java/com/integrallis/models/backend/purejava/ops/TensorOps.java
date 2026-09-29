@@ -26,7 +26,13 @@ import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorShape;
 import jdk.incubator.vector.VectorSpecies;
@@ -228,9 +234,115 @@ public final class TensorOps {
               + cols);
     }
     long rowBytes = (long) (cols / Mxfp4Dequantizer.BLOCK_SIZE) * Mxfp4Dequantizer.BLOCK_BYTES;
-    for (int row = 0; row < rows; row++) {
+    int threads = mxfp4Threads(rows, rowBytes, qWeight);
+    if (threads <= 1) {
+      mxfp4Rows(out, x, qWeight, rowBytes, cols, 0, rows);
+      return;
+    }
+    int chunk = (rows + threads - 1) / threads;
+    List<Future<?>> pending = new ArrayList<>(threads);
+    for (int first = chunk; first < rows; first += chunk) {
+      int from = first;
+      int to = Math.min(rows, first + chunk);
+      pending.add(
+          Mxfp4Threads.EXECUTOR.submit(() -> mxfp4Rows(out, x, qWeight, rowBytes, cols, from, to)));
+    }
+    // The calling thread takes the first chunk rather than waiting on all of them, so a matmul on a
+    // one-core host does the same work with no handoff at all.
+    mxfp4Rows(out, x, qWeight, rowBytes, cols, 0, Math.min(rows, chunk));
+    for (Future<?> future : pending) {
+      try {
+        future.get();
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Interrupted during an MXFP4 projection", interrupted);
+      } catch (ExecutionException failed) {
+        Throwable cause = failed.getCause();
+        if (cause instanceof RuntimeException runtime) {
+          throw runtime;
+        }
+        if (cause instanceof Error error) {
+          throw error;
+        }
+        throw new IllegalStateException("MXFP4 projection failed", cause);
+      }
+    }
+  }
+
+  /** One contiguous band of output rows. Reads shared inputs, writes only {@code out[from..to)}. */
+  private static void mxfp4Rows(
+      float[] out, float[] x, MemorySegment qWeight, long rowBytes, int cols, int from, int to) {
+    for (int row = from; row < to; row++) {
       out[row] = Mxfp4Dequantizer.dotProduct(qWeight, row * rowBytes, x, 0, cols);
     }
+  }
+
+  /**
+   * How many threads to split an MXFP4 projection across, 1 meaning "stay on the calling thread".
+   *
+   * <p>Thread count cannot change the result. Each output element is its own dot product over its
+   * own row, so no two threads contribute to one reduction and {@link Mxfp4Dequantizer#dotProduct}
+   * folds each row in the same order it always did. That is what makes this safe in a backend where
+   * a float reduction's order is pinned on purpose: this splits <i>which thread</i> runs a
+   * reduction, never <i>how</i> one is folded. A test asserts the parallel and serial results are
+   * bit-identical rather than close.
+   *
+   * <p>Only above a size threshold, because handing work to another thread costs more than a small
+   * projection takes. The threshold is in weight bytes read, which is what the work actually is.
+   */
+  static int mxfp4Threads(int rows, long rowBytes, MemorySegment weight) {
+    if (rows < 2 || Math.multiplyExact(rows, rowBytes) < MXFP4_PARALLEL_MIN_BYTES) {
+      return 1;
+    }
+    // A segment from a confined arena is readable only by the thread that allocated it, and handing
+    // its rows to a pool thread throws WrongThreadException from inside the dot product rather than
+    // returning a wrong number. The probe is never started and never runs: asking whether some
+    // OTHER
+    // thread could read this segment is exactly the question, since a confined scope answers no for
+    // every thread but its owner while a shared or global one answers yes for all of them. This is
+    // the same property the execution planner already gates thread sharing on.
+    if (!weight.isAccessibleBy(Mxfp4Threads.ACCESS_PROBE)) {
+      return 1;
+    }
+    return Math.min(rows, Mxfp4Threads.COUNT);
+  }
+
+  /**
+   * Weight bytes below which an MXFP4 projection stays on the calling thread.
+   *
+   * <p>Matches vectors-core's own {@code ggufParallelThreshold} of one mebibyte, so MXFP4 and the
+   * K-quant kernels start using threads at the same amount of work rather than at two unrelated
+   * sizes.
+   */
+  private static final long MXFP4_PARALLEL_MIN_BYTES = 1L << 20;
+
+  /**
+   * The pool, created on first use by an MXFP4 model and never by any other.
+   *
+   * <p>A holder class so that a process which loads no MXFP4 weights -- every K-quant model, which
+   * is nearly all of them -- starts no threads at all. Daemon threads, so this never holds up JVM
+   * exit.
+   */
+  private static final class Mxfp4Threads {
+    static final int COUNT = Math.max(1, Runtime.getRuntime().availableProcessors());
+
+    /**
+     * A thread that is never started, used only to ask a segment whether a thread other than the
+     * caller could read it. Deliberately not one of the pool threads: this question has to be
+     * answerable before any work is submitted.
+     */
+    static final Thread ACCESS_PROBE = new Thread(() -> {}, "mxfp4-access-probe");
+
+    static final ExecutorService EXECUTOR =
+        Executors.newFixedThreadPool(
+            COUNT - 1 > 0 ? COUNT - 1 : 1,
+            runnable -> {
+              Thread thread = new Thread(runnable, "mxfp4-projection");
+              thread.setDaemon(true);
+              return thread;
+            });
+
+    private Mxfp4Threads() {}
   }
 
   /**

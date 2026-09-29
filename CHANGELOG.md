@@ -4,6 +4,42 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.49] - 2026-09-29
+
+### Fixed
+
+- **MXFP4 projections use every core instead of one.** Every other quantization hands its whole matrix
+  to vectors-core's `gguf*BatchDotProduct`, which parallelises above a one-mebibyte threshold. MXFP4
+  alone looped rows on the calling thread, so a model whose weights are MXFP4 decoded on a single core
+  while the rest of the catalogue used all of them. Found on a 16-vCPU qualification worker running
+  gpt-oss from a GGUF, sitting at a flat **8% CPU -- about one core** -- where K-quant models pegged the
+  box.
+
+  **Measured 5.15x on 12 cores** on the shape gpt-oss actually uses (one expert, 2880x2880, 4.2 MiB of
+  weights): 11.60 ms to 2.25 ms per projection. Not 12x, because the kernel dequantizes as it reads and
+  is bandwidth-bound rather than compute-bound.
+
+  Two models in the catalogue touch MXFP4: gpt-oss from a GGUF, where every expert is MXFP4 and the
+  effect is the whole model, and Qwen3-Next, where only the shared-expert gate and up are, so the
+  effect is a slice of each layer. **No published number is retracted.** `Qwen3-Coder-Next`'s 241 ms
+  per token was measured on exactly the code that shipped in 0.3.48; it will be faster on this
+  release, and re-measuring it is a new measurement epoch rather than a correction.
+
+  Rows are split, never reductions. Each output element is its own dot product over its own row, so
+  thread count cannot move a bit -- asserted bit-identical to the serial path rather than close, which
+  in a backend that pins float reduction order on purpose is the only assertion worth making.
+
+  The first version of this crashed instead of being slow, which the tests caught: a `MemorySegment`
+  from a confined arena is readable only by the thread that allocated it, so handing its rows to a pool
+  thread throws `WrongThreadException` from inside the dot product. Parallelism is now gated on the
+  segment actually being reachable from another thread -- the same property the execution planner
+  already gates thread sharing on -- and a confined-arena projection stays on the calling thread at any
+  size.
+
+  The scalar float activation is unchanged and still deliberate: the K-quant kernels quantize the
+  activation to Q8 and reduce in integer arithmetic, and an MXFP4 kernel that does the same has to be
+  proven identical to this one first. This release fixes the thread factor only.
+
 ## [0.3.48] - 2026-09-29
 
 ### Changed
