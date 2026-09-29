@@ -120,6 +120,43 @@ class RagBenchmarkCliTest {
   }
 
   @Test
+  void aShardedHuggingFaceDirectoryIsIdentifiedByItsIndex() throws Exception {
+    // gpt-oss-20b ships model-0000x-of-00002.safetensors plus an index and no single
+    // model.safetensors. SafetensorsBundle already loads either shape; rejecting the sharded one
+    // here was the only thing keeping such a model out of a qualification run.
+    Path directory = Files.createTempDirectory("sharded-hf");
+    Files.writeString(
+        directory.resolve("model.safetensors.index.json"),
+        "{\"weight_map\": {\"a\": \"model-00001-of-00002.safetensors\","
+            + " \"b\": \"model-00002-of-00002.safetensors\"}}");
+    Files.write(directory.resolve("model-00001-of-00002.safetensors"), new byte[] {1, 2, 3});
+    Files.write(directory.resolve("model-00002-of-00002.safetensors"), new byte[] {4, 5});
+
+    assertThat(RagBenchmarkCli.artifactIdentity(directory))
+        .isEqualTo(directory.resolve("model.safetensors.index.json"));
+  }
+
+  @Test
+  void aSingleFileBundleStillWinsOverAnIndex() throws Exception {
+    Path directory = Files.createTempDirectory("single-hf");
+    Files.write(directory.resolve("model.safetensors"), new byte[] {9});
+    Files.writeString(directory.resolve("model.safetensors.index.json"), "{}");
+
+    assertThat(RagBenchmarkCli.artifactIdentity(directory))
+        .describedAs("a directory with both must use the single file, as it did before")
+        .isEqualTo(directory.resolve("model.safetensors"));
+  }
+
+  @Test
+  void aDirectoryWithNeitherShapeSaysSo() throws Exception {
+    Path directory = Files.createTempDirectory("empty-hf");
+
+    assertThatThrownBy(() -> RagBenchmarkCli.artifactIdentity(directory))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("model.safetensors.index.json");
+  }
+
+  @Test
   void rejectsAHuggingFaceDirectoryWithoutPrimaryWeights() throws Exception {
     Path modelDirectory = Files.createDirectories(temporaryDirectory.resolve("incomplete-hf"));
     Files.writeString(modelDirectory.resolve("config.json"), "{}");
