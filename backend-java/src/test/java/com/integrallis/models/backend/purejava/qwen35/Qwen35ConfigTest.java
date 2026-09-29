@@ -82,7 +82,110 @@ class Qwen35ConfigTest {
 
     assertThatThrownBy(() -> Qwen35Config.fromMetadata(new GgufMetadata(entries)))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("general.architecture=qwen35");
+        .hasMessageContaining("general.architecture")
+        .hasMessageContaining("qwen35")
+        .hasMessageContaining("found qwen3");
+  }
+
+  @Test
+  void parsesTheRoutedVariantUnderItsOwnPrefix() {
+    // qwen35moe is the same hybrid: the Kwaipilot KAT-Coder-V2.5-Dev header carries the full ssm.*
+    // set, full_attention_interval and the attention keys exactly as qwen35 does, under its own
+    // prefix, plus the expert keys. Only the feed-forward half differs.
+    Qwen35Config config = Qwen35Config.fromMetadata(new GgufMetadata(moeEntries()));
+
+    assertThat(config.usesMixtureOfExperts()).isTrue();
+    assertThat(config.numExperts()).isEqualTo(256);
+    assertThat(config.numExpertsUsed()).isEqualTo(8);
+    assertThat(config.expertHiddenDim()).isEqualTo(512);
+    assertThat(config.sharedExpertHiddenDim()).isEqualTo(512);
+    // The hybrid half is read identically.
+    assertThat(config.numLayers()).isEqualTo(40);
+    // The real numbers also satisfy the existing hybrid validators: inner 4096 / 32 value heads =
+    // 128 = the state size, and 32 value heads divides by 16 key heads.
+    assertThat(config.gdnInnerDim()).isEqualTo(4_096);
+    assertThat(config.fullAttentionInterval()).isEqualTo(4);
+    assertThat(config.attentionHeadDim()).isEqualTo(256);
+  }
+
+  @Test
+  void aFullyRoutedModelMayPublishNoDenseFeedForwardWidth() {
+    // The real file carries no feed_forward_length at all, because every layer is routed. Requiring
+    // it rejected the whole variant.
+    Map<String, GgufMetadataValue> entries = moeEntries();
+    assertThat(entries).doesNotContainKey("qwen35moe.feed_forward_length");
+
+    Qwen35Config config = Qwen35Config.fromMetadata(new GgufMetadata(entries));
+
+    assertThat(config.hiddenDim()).isZero();
+    // And the dense variant still requires it, so the relaxation is scoped to routed models.
+    Map<String, GgufMetadataValue> dense = entries();
+    dense.remove("qwen35.feed_forward_length");
+    assertThatThrownBy(() -> Qwen35Config.fromMetadata(new GgufMetadata(dense)))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void theDenseVariantReportsNoExpertsAndIsUnchanged() {
+    Qwen35Config config = Qwen35Config.fromMetadata(metadata());
+
+    assertThat(config.usesMixtureOfExperts()).isFalse();
+    assertThat(config.numExperts()).isZero();
+    assertThat(config.hiddenDim()).isEqualTo(3_584);
+  }
+
+  @Test
+  void halfDeclaredExpertMetadataIsRefused() {
+    // Treating a half-declared mixture as dense would skip the routed feed-forward silently, and
+    // that
+    // is where nearly all of the model's capacity lives.
+    Map<String, GgufMetadataValue> entries = moeEntries();
+    entries.remove("qwen35moe.expert_shared_feed_forward_length");
+
+    assertThatThrownBy(() -> Qwen35Config.fromMetadata(new GgufMetadata(entries)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("sharedExpertHiddenDim");
+  }
+
+  @Test
+  void anUnrelatedArchitectureIsStillRefused() {
+    Map<String, GgufMetadataValue> entries = entries();
+    entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));
+
+    assertThatThrownBy(() -> Qwen35Config.fromMetadata(new GgufMetadata(entries)))
+        .isInstanceOf(IllegalArgumentException.class)
+        // Every accepted name, so a reader of the failure knows what this decoder does serve.
+        .hasMessageContaining("qwen35")
+        .hasMessageContaining("qwen35moe")
+        .hasMessageContaining("qwen3next");
+  }
+
+  /** The routed variant, keyed as the real Kwaipilot header is. */
+  private static Map<String, GgufMetadataValue> moeEntries() {
+    Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+    entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen35moe"));
+    entries.put("qwen35moe.block_count", uint(40));
+    entries.put("qwen35moe.context_length", uint(262_144));
+    entries.put("qwen35moe.embedding_length", uint(2_048));
+    entries.put("qwen35moe.attention.head_count", uint(16));
+    entries.put("qwen35moe.attention.head_count_kv", uint(2));
+    entries.put("qwen35moe.attention.key_length", uint(256));
+    entries.put("qwen35moe.attention.value_length", uint(256));
+    entries.put("qwen35moe.attention.layer_norm_rms_epsilon", f32(1.0e-6f));
+    entries.put("qwen35moe.rope.freq_base", f32(10_000_000.0f));
+    entries.put("qwen35moe.rope.dimension_count", uint(64));
+    entries.put("qwen35moe.ssm.conv_kernel", uint(4));
+    entries.put("qwen35moe.ssm.state_size", uint(128));
+    entries.put("qwen35moe.ssm.group_count", uint(16));
+    entries.put("qwen35moe.ssm.time_step_rank", uint(32));
+    entries.put("qwen35moe.ssm.inner_size", uint(4_096));
+    entries.put("qwen35moe.full_attention_interval", uint(4));
+    entries.put("qwen35moe.vocab_size", uint(151_936));
+    entries.put("qwen35moe.expert_count", uint(256));
+    entries.put("qwen35moe.expert_used_count", uint(8));
+    entries.put("qwen35moe.expert_feed_forward_length", uint(512));
+    entries.put("qwen35moe.expert_shared_feed_forward_length", uint(512));
+    return entries;
   }
 
   private static GgufMetadata metadata() {
