@@ -112,6 +112,29 @@ class RagProductionQualificationPolicyTest {
   }
 
   @Test
+  void aSlowButSoundModelQualifiesAndCarriesItsTier() {
+    // The point of PERFORMANCE_REDUCED: the model stays in the catalogue, marked. Gating on
+    // {PRODUCTION_READY, USABLE} kept every one of these out, which made the tier a rename.
+    //
+    // The tier argument to summary() is named ignoredTier for a reason -- assess() re-classifies
+    // from the metrics -- so this drives end-to-end p95 to 12s, past the 10s USABLE bound, while
+    // leaving every quality gate at 1.0. That is a real PERFORMANCE_REDUCED, not a label.
+    RagBenchmarkReport candidate =
+        withSummary(
+            report("pure-java", "sha", 200, 12_000),
+            summary(200, 12_000, 1.0, 1.0, RagPerformanceTier.PERFORMANCE_REDUCED));
+    RagBenchmarkReport ollama = report("ollama", "sha", 100, 500);
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.verdict()).isNotEqualTo(RagQualificationVerdict.FAILED_ABSOLUTE_GATE);
+    assertThat(qualification.absoluteTier())
+        .describedAs("the tier must survive into the result so a consumer can filter on it")
+        .isEqualTo(RagPerformanceTier.PERFORMANCE_REDUCED);
+  }
+
+  @Test
   void absoluteRagFailureCannotBeOverriddenByFastRelativePerformance() {
     RagBenchmarkReport candidate =
         withSummary(

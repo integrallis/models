@@ -40,7 +40,10 @@ public final class RagPerformancePolicy {
     if (meetsLatency(summary, 250, 2_000, 200, 10_000)) {
       return RagPerformanceTier.USABLE;
     }
-    return RagPerformanceTier.OFFLINE;
+    // Quality already passed above, so reaching here means the model works and is merely slower
+    // than the USABLE SLO. That is PERFORMANCE_REDUCED, not OFFLINE: see the tier's javadoc for why
+    // the two were split.
+    return RagPerformanceTier.PERFORMANCE_REDUCED;
   }
 
   private static boolean meetsLatency(
