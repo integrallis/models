@@ -1,5 +1,10 @@
 # Decoder architectures — ALL IMPLEMENTED as of 2026-09-29
 
+**Closed out 2026-09-29.** Seven of the eight are now qualified on published weights: `lfm2`,
+`qwen3moe`, `qwen35moe`, `qwen3next`, `deepseek2`, `gemma3n` and `gpt-oss` from a GGUF, alongside
+`gemma4` E2B and E4B. Only `mistral3` has no published-weights run behind it. Fourteen models in total,
+each at 1.000 on all six quality metrics over 27/27 attempts with zero failures.
+
 Every architecture below is now implemented and unit-verified. `qwen3next` is **qualified** on
 `Qwen3-Coder-Next` Q4_K_M (48.5 GB, 27/27 attempts, every quality metric 1.000) from shard-28.
 `gemma3n`, `deepseek2` and the `gpt-oss` GGUF are queued as shard-30 on payload

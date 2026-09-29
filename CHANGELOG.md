@@ -4,6 +4,25 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Notes
+
+- **`gpt-oss` from a GGUF is qualified on published weights**, measured after 0.3.49 shipped and so not
+  claimed by it. `unsloth/gpt-oss-20b-GGUF` Q4_K_M (11.6 GB), on `models@0.3.49+rerun11-fbe951608665`:
+  **1.000 on all six quality metrics over 27/27 attempts with zero failures**, 63.7 s ttft p50 and
+  361.6 ms per token, 11.6 GB peak RSS. It ran on the `gpt-4o` o200k pre-tokenizer split added in
+  0.3.48, which until this run had no catalogue model exercising it.
+
+  That leaves `mistral3` as the only one of the eight new architectures with no published-weights run
+  behind it.
+
+  **The latency is the honest headline.** 361.6 ms per token is the parallel MXFP4 kernel from 0.3.49
+  at work -- the same model on 0.3.48 sat at 8% CPU and had not finished a run after 100 minutes,
+  where this completed in 55 -- but it is still several times slower per token than a K-quant model of
+  comparable size, because the second half of the MXFP4 gap is untouched. The K-quant kernels quantize
+  the activation to Q8 and reduce in integer arithmetic; MXFP4 still multiplies in scalar floats. That
+  kernel is the next piece of work, and it has to be proven identical to the scalar one before it can
+  be adopted.
+
 ## [0.3.49] - 2026-09-29
 
 ### Fixed
