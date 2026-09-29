@@ -60,15 +60,26 @@ reports 1.000.
 
 Reading the models' own text, before substitution, splits the nine failures three ways.
 
-**Incoherent output -- a probable decoder defect.** Two of the architectures added in 0.3.48 emit text
-that is not language:
+**Incoherent output.** Two of the architectures added in 0.3.48 emit text that is not language:
 
 - `deepseek2`: `###\n###\n###...` repeated for the whole completion.
 - `gemma3n`: `You are asking a question, and Y NOTE:\n- **PLEASE NOTE: SEE ALLH1-XXH*C++*XHHN*mll*nnssC++`
 
 Both have `rawCorrectAnswerRate` of 0.0. `qwen3next` degenerates differently -- *"The question asks for
-the amount of the claim and what is the amount of the claim."* -- at 11.1%. These are not weak models;
-this is what a broken decode looks like, and the extractive fallback hid it behind a perfect score.
+the amount of the claim and what is the amount of the claim."* -- at 11.1%.
+
+**`deepseek2` is diagnosed, and it is not the decoder: it is the prompt template.** The harness rendered
+the V1 `### Instruction:` / `### Response:` format, while the published GGUF's own
+`tokenizer.chat_template` for DeepSeek-Coder-V2-Lite-Instruct renders
+`{{ 'User: ' + content + '\n\n' }}` and `'Assistant: '`. The model was shown `###` markers and
+continued the pattern. Fixed by adding a `deepseek-v2` template rather than editing `deepseek`, whose
+V1 coder models are already qualified against the old markers with their greedy oracles pinned on them.
+The model must be re-run on the corrected template before anything is said about its decoder.
+
+**`gemma3n` and `qwen3next` are not explained by prompting.** The `gemma` template this run used matches
+gemma3n's own turn markers (`<start_of_turn>user` / `<end_of_turn>` / `<start_of_turn>model`), read from
+the published GGUF, and `chatml` matches Qwen's. Those two remain open, and a decoder defect is the
+leading explanation rather than a confirmed one.
 
 **Correct content, screened out.** `unsloth_qwen3_6_35b_a3b` reaches 77.8% raw correct and 0% model
 contribution; `gpt-oss` 44.4% and 0%. The model answered well and the answer was rejected, most often

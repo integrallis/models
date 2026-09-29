@@ -190,6 +190,54 @@ class RagPromptRendererTest {
         .endsWith("ANSWER\n<|im_end|>\n<|im_start|>assistant\nAnswer: ");
   }
 
+  /**
+   * DeepSeek-V2 and later use User:/Assistant: turns, not the V1 "### Instruction:" markers.
+   *
+   * <p>Transcribed from the published GGUF's own {@code tokenizer.chat_template}, which for
+   * DeepSeek-Coder-V2-Lite-Instruct renders a user turn as {@code 'User: ' + content + '\n\n'} and
+   * the assistant turn as {@code 'Assistant: '}. A system message becomes bare text before the
+   * first user turn, with no marker of its own, which is why there is no separate system envelope
+   * here.
+   *
+   * <p>Worth a test of its own because the failure is not subtle and does not look like a prompting
+   * problem. Prompting this model with the V1 markers on 2026-09-29 produced "###" repeated for
+   * whole completions -- the model continuing the pattern it had been shown -- which read as a
+   * broken decoder for hours until its chat template was checked.
+   */
+  @Test
+  void deepseekV2ProfileUsesUserAndAssistantTurnsRatherThanInstructionMarkers() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+
+    String prompt =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.DEEPSEEK_V2);
+
+    assertThat(prompt).startsWith("User: You answer questions");
+    assertThat(prompt).contains("[source-1] Policy");
+    assertThat(prompt).endsWith("\n\nAssistant:");
+    assertThat(prompt)
+        .describedAs("the V1 markers are what made this model echo ### for whole completions")
+        .doesNotContain("### Instruction:")
+        .doesNotContain("### Response:");
+
+    // The single-prompt entry point too. Found by mutation: mutating only that branch left this
+    // test green, because render() goes through the role-aware switch -- so both branches need
+    // asserting or half the template is unverified.
+    assertThat(RagPromptTemplate.DEEPSEEK_V2.apply("Just the question?"))
+        .isEqualTo("User: Just the question?\n\nAssistant:");
+
+    // The V1 template is untouched: its models are already qualified against those markers and
+    // their greedy oracles are pinned on them.
+    String v1 =
+        RagPromptRenderer.render(
+            "What is the answer?",
+            List.of(new RetrievedDocument(document, 1.0f, 1)),
+            RagPromptTemplate.DEEPSEEK);
+    assertThat(v1).contains("### Instruction:").contains("### Response:");
+  }
+
   @Test
   void zephyrProfileUsesNativeSystemAndUserTurns() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
