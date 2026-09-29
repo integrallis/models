@@ -650,6 +650,29 @@ class Gemma4ForwardPassTest {
   }
 
   /**
+   * The published E4B shape: a sharing layer whose key and value tensors are <b>absent</b>, not
+   * merely unused.
+   *
+   * <p>Every fixture above gives all three of {@code attn_k}, {@code attn_k_norm} and {@code
+   * attn_v} to every layer, because the loader demanded them -- so no test could have been written
+   * without them, and none noticed that a real file does not have them. Gemma 4 E4B declares {@code
+   * shared_kv_layers=18} over 42 layers and omits all three from {@code blk.24} onwards, and the
+   * loader rejected it outright with "Tensor not found: blk.24.attn_v.weight for sliding attention"
+   * after the weights had been downloaded onto a fleet worker.
+   *
+   * <p>Asserted as equality against the fixture that does carry them, rather than as "it loads":
+   * loading proves the tensors are tolerated, and only identical logits prove nothing silently took
+   * their place.
+   */
+  @Test
+  void aSharingLayerLoadsAndAgreesWhenItsKeyAndValueTensorsAreAbsentEntirely() {
+    float[] withRedundantKv = eSeriesLogits(ToyModel.createESeries(220, 32, 30));
+    float[] withoutAnyKv = eSeriesLogits(ToyModel.createESeriesWithoutSharingLayerKv(220));
+
+    assertThat(withoutAnyKv).containsExactly(withRedundantKv);
+  }
+
+  /**
    * The same tensor as F16, which is how Gemma 4 E4B ships it where E2B ships BF16.
    *
    * <p>Two distinct gaps, one after the other, in the same field of the same tensor: adding BF16
@@ -979,8 +1002,28 @@ class Gemma4ForwardPassTest {
       return createESeries(perLayerSeed, 32, 30);
     }
 
+    /**
+     * {@link #createESeries(int)} with the sharing layer's key and value tensors left out.
+     *
+     * <p>Layer 2 shares layer 0's cache, so a published file carries no {@code attn_k}, {@code
+     * attn_k_norm} or {@code attn_v} for it at all. Omitting them here is the only fixture shape
+     * that exercises the loader the way a real E4B file does.
+     */
+    private static ToyModel createESeriesWithoutSharingLayerKv(int perLayerSeed) {
+      return createESeries(perLayerSeed, 32, 30, /* sharingLayerCarriesKv= */ false);
+    }
+
     private static ToyModel createESeries(
         int perLayerSeed, int sharingLayerKvSeed, int owningLayerKvSeed) {
+      return createESeries(
+          perLayerSeed, sharingLayerKvSeed, owningLayerKvSeed, /* sharingLayerCarriesKv= */ true);
+    }
+
+    private static ToyModel createESeries(
+        int perLayerSeed,
+        int sharingLayerKvSeed,
+        int owningLayerKvSeed,
+        boolean sharingLayerCarriesKv) {
       Gemma4Config config =
           new Gemma4Config(
               4,
@@ -1026,7 +1069,7 @@ class Gemma4ForwardPassTest {
       fixture.f32("per_layer_proj_norm.weight", new long[] {2}, norm(180, 2));
       addESeriesLayer(fixture, 0, true, owningLayerKvSeed);
       addESeriesLayer(fixture, 1, false, 31);
-      addESeriesLayer(fixture, 2, true, sharingLayerKvSeed);
+      addESeriesLayer(fixture, 2, true, sharingLayerKvSeed, sharingLayerCarriesKv);
       return new ToyModel(config, fixture.build(), Map.copyOf(fixture.values));
     }
 
@@ -1124,7 +1167,16 @@ class Gemma4ForwardPassTest {
 
     private static void addESeriesLayer(
         FixtureBuilder fixture, int layer, boolean sliding, int keyValueSeed) {
-      addDenseLayer(fixture, layer, sliding, keyValueSeed);
+      addESeriesLayer(fixture, layer, sliding, keyValueSeed, /* carriesKeyAndValue= */ true);
+    }
+
+    private static void addESeriesLayer(
+        FixtureBuilder fixture,
+        int layer,
+        boolean sliding,
+        int keyValueSeed,
+        boolean carriesKeyAndValue) {
+      addDenseLayer(fixture, layer, sliding, keyValueSeed, 3, carriesKeyAndValue);
       String prefix = "blk." + layer + ".";
       fixture.f32(prefix + "inp_gate.weight", new long[] {4, 2}, matrix(2, 4, 190 + layer));
       fixture.f32(prefix + "proj.weight", new long[] {2, 4}, matrix(4, 2, 200 + layer));
@@ -1148,16 +1200,35 @@ class Gemma4ForwardPassTest {
 
     private static void addDenseLayer(
         FixtureBuilder fixture, int layer, boolean sliding, int keyValueSeed, int hidden) {
+      addDenseLayer(fixture, layer, sliding, keyValueSeed, hidden, /* carriesKeyAndValue= */ true);
+    }
+
+    /**
+     * @param carriesKeyAndValue false writes no {@code attn_k}, {@code attn_k_norm} or {@code
+     *     attn_v} for this layer, which is how a published file stores a layer that shares an
+     *     earlier layer's cache
+     */
+    private static void addDenseLayer(
+        FixtureBuilder fixture,
+        int layer,
+        boolean sliding,
+        int keyValueSeed,
+        int hidden,
+        boolean carriesKeyAndValue) {
       String prefix = "blk." + layer + ".";
       fixture.f32(prefix + "attn_norm.weight", new long[] {4}, norm(11 + layer));
       fixture.f32(prefix + "attn_q.weight", new long[] {4, 4}, matrix(4, 4, 20 + layer));
-      fixture.f32(prefix + "attn_k.weight", new long[] {4, 4}, matrix(4, 4, keyValueSeed));
-      if (sliding) {
-        fixture.f32(prefix + "attn_v.weight", new long[] {4, 4}, matrix(4, 4, keyValueSeed + 10));
+      if (carriesKeyAndValue) {
+        fixture.f32(prefix + "attn_k.weight", new long[] {4, 4}, matrix(4, 4, keyValueSeed));
+        if (sliding) {
+          fixture.f32(prefix + "attn_v.weight", new long[] {4, 4}, matrix(4, 4, keyValueSeed + 10));
+        }
       }
       fixture.f32(prefix + "attn_output.weight", new long[] {4, 4}, matrix(4, 4, 50 + layer));
       fixture.f32(prefix + "attn_q_norm.weight", new long[] {4}, norm(60 + layer));
-      fixture.f32(prefix + "attn_k_norm.weight", new long[] {4}, norm(70 + layer));
+      if (carriesKeyAndValue) {
+        fixture.f32(prefix + "attn_k_norm.weight", new long[] {4}, norm(70 + layer));
+      }
       fixture.f32(prefix + "post_attention_norm.weight", new long[] {4}, norm(80 + layer));
       fixture.f32(prefix + "ffn_norm.weight", new long[] {4}, norm(90 + layer));
       fixture.f32(
