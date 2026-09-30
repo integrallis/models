@@ -61,6 +61,7 @@ class RagCorpusTest {
             RagWorkload.MATH,
             RagWorkload.MULTILINGUAL,
             RagWorkload.SQL,
+            RagWorkload.SUMMARIZATION,
             RagWorkload.TRANSPORTATION);
 
     assertThat(workloads).extracting(RagWorkload::id).doesNotHaveDuplicates();

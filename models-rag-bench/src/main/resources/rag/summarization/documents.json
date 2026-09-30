@@ -1,0 +1,62 @@
+[
+  {
+    "id": "sum-incident-4417",
+    "title": "Incident 4417 postmortem",
+    "text": "Incident 4417 began at 02:14 UTC when the ingest queue backed up behind a stalled consumer. Customer writes were rejected for 38 minutes. The trigger was a schema migration that added a non-null column without a default. Recovery came from rolling the migration back; no data was lost."
+  },
+  {
+    "id": "sum-incident-4502",
+    "title": "Incident 4502 postmortem",
+    "text": "Incident 4502 was a partial read outage lasting 11 minutes. A cache node was evicted during a rolling upgrade while its replica was still warming, so 6 percent of reads fell through to the primary and timed out. The fix was to require a warm replica before eviction."
+  },
+  {
+    "id": "sum-release-2-7",
+    "title": "Beacon 2.7 release notes",
+    "text": "Beacon 2.7 adds streaming export, raises the per-tenant rate limit from 500 to 2000 requests per minute, and removes the deprecated v1 webhook payload. Upgrading requires running the index rebuild task once, which takes about 20 minutes on a million rows."
+  },
+  {
+    "id": "sum-release-2-8",
+    "title": "Beacon 2.8 release notes",
+    "text": "Beacon 2.8 replaces the polling scheduler with an event-driven one, cuts median job latency from 900 to 120 milliseconds, and drops support for Java 17. It is a minor release and needs no migration step."
+  },
+  {
+    "id": "sum-retention-policy",
+    "title": "Data retention policy",
+    "text": "Operational logs are retained for 30 days and then deleted. Audit records are retained for 7 years and cannot be deleted by tenant administrators. Backups are kept for 90 days in the same region as the primary."
+  },
+  {
+    "id": "sum-oncall-rotation",
+    "title": "On-call rotation",
+    "text": "The on-call rotation is one week long and handed over on Tuesday at 10:00 UTC. A secondary responder is paged if the primary does not acknowledge within 10 minutes. Rotations are capped at one shift per engineer per month."
+  },
+  {
+    "id": "sum-capacity-review",
+    "title": "Quarterly capacity review",
+    "text": "Peak traffic grew 34 percent over the quarter, driven mostly by two large tenants. Headroom on the write path fell to 18 percent, which is below the 25 percent target. The review recommends sharding the write path before the next quarter."
+  },
+  {
+    "id": "sum-access-review",
+    "title": "Access review outcome",
+    "text": "The access review found 14 accounts with production write access that no longer needed it, and 3 service accounts with no owner recorded. All 14 were downgraded to read-only and the 3 were assigned owners."
+  },
+  {
+    "id": "sum-cost-report",
+    "title": "Monthly cost report",
+    "text": "Monthly infrastructure spend was 42,000 dollars, down 8 percent after moving cold storage to a cheaper tier. Compute remains the largest line item at 61 percent of the total."
+  },
+  {
+    "id": "sum-deploy-policy",
+    "title": "Deployment policy",
+    "text": "Deployments are allowed between 09:00 and 16:00 UTC on weekdays only. Every deployment must be preceded by a green integration run no older than 2 hours. Emergency fixes may bypass the window with a director approval recorded in the ticket."
+  },
+  {
+    "id": "sum-support-sla",
+    "title": "Support response targets",
+    "text": "Critical tickets are acknowledged within 15 minutes and resolved within 4 hours. Normal tickets are acknowledged within one business day. Targets apply only to tenants on the enterprise plan."
+  },
+  {
+    "id": "sum-migration-plan",
+    "title": "Storage migration plan",
+    "text": "The storage migration runs in three phases: dual-write, backfill, and cutover. Backfill is expected to take 6 days for the largest tenant. Rollback is possible until cutover completes, after which it is not."
+  }
+]
