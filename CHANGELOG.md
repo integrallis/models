@@ -57,12 +57,18 @@ All notable changes to models are documented here.
   markers, the model continued the pattern and emitted `###` for entire completions -- which read as a
   broken decoder until the template was checked. A new `deepseek-v2` template fixes it; `deepseek` is
   left exactly as it was, because the V1 coder models are already qualified against those markers with
-  their greedy oracles pinned on them. The model has to be re-run on the corrected template before
-  anything is claimed about its decoder.
+  their greedy oracles pinned on them.
+
+  **The template was not the cause of its garbage output, and this entry originally implied it was.**
+  Re-run on the corrected template with a 256-token cap, the model emits pure newline tokens for the
+  whole completion: `modelAnswerRate` 0.000, `truncatedAnswerRate` 1.000. `###` under one prompt and
+  `\n` under another are the same degeneracy. The `deepseek2` decoder is defective on real weights; the
+  template fix is right and independent.
 
 ### Notes
 
-- **`gemma3n` and `qwen3next` still emit incoherent output, and prompting does not explain it.**
+- **`deepseek2`, `gemma3n` and `qwen3next` emit incoherent output that prompting does not explain.**
+  `deepseek2` emits only newlines once correctly prompted, which is the strongest evidence of the three.
   `gemma3n` produces corrupted text at 0.0 raw correct; `qwen3next` degenerates into repetition at
   11.1%. The `gemma` template used matches gemma3n's own turn markers read from the published GGUF, and
   `chatml` matches Qwen's, so a decoder defect is the leading explanation -- stated as a suspicion, not

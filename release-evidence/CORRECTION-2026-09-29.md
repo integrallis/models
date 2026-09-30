@@ -68,15 +68,22 @@ Reading the models' own text, before substitution, splits the nine failures thre
 Both have `rawCorrectAnswerRate` of 0.0. `qwen3next` degenerates differently -- *"The question asks for
 the amount of the claim and what is the amount of the claim."* -- at 11.1%.
 
-**`deepseek2` is diagnosed, and it is not the decoder: it is the prompt template.** The harness rendered
-the V1 `### Instruction:` / `### Response:` format, while the published GGUF's own
-`tokenizer.chat_template` for DeepSeek-Coder-V2-Lite-Instruct renders
-`{{ 'User: ' + content + '\n\n' }}` and `'Assistant: '`. The model was shown `###` markers and
-continued the pattern. Fixed by adding a `deepseek-v2` template rather than editing `deepseek`, whose
-V1 coder models are already qualified against the old markers with their greedy oracles pinned on them.
-The model must be re-run on the corrected template before anything is said about its decoder.
+**`deepseek2` had a wrong prompt template AND a broken decoder. The template was not the cause.**
 
-**`gemma3n` and `qwen3next` are not explained by prompting.** The `gemma` template this run used matches
+The harness did render the V1 `### Instruction:` / `### Response:` format while the published GGUF's own
+`tokenizer.chat_template` for DeepSeek-Coder-V2-Lite-Instruct renders `{{ 'User: ' + content + '\n\n' }}`
+and `'Assistant: '`. That was a real defect and is fixed, as a new `deepseek-v2` template rather than an
+edit to `deepseek`, whose V1 coder models are already qualified against the old markers with their
+greedy oracles pinned on them.
+
+It was recorded here, briefly, as the diagnosis. It was not. Re-run on the corrected template with a
+256-token cap (shard-32, `models@0.3.49+rerun12-1e0f2fed6152`), the model emits **pure newline tokens
+for the entire completion** -- `truncatedAnswerRate` 1.000, `modelAnswerRate` 0.000, 24 of 27 attempts
+falling back and 3 abstaining on retrieval. `###` under one prompt and `\n` under another are two
+shapes of the same degeneracy. **The deepseek2 decoder is defective on real weights**, and the
+template fix, while correct, changed nothing about that.
+
+**`gemma3n` and `qwen3next` are not explained by prompting either.** The `gemma` template this run used matches
 gemma3n's own turn markers (`<start_of_turn>user` / `<end_of_turn>` / `<start_of_turn>model`), read from
 the published GGUF, and `chatml` matches Qwen's. Those two remain open, and a decoder defect is the
 leading explanation rather than a confirmed one.
