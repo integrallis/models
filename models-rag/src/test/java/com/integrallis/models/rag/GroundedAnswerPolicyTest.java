@@ -177,6 +177,95 @@ class GroundedAnswerPolicyTest {
     assertThat(answer.decision().modelContributed()).isTrue();
   }
 
+  /**
+   * A bare closing tag, whose opener the prompt supplied.
+   *
+   * <p>DeepSeek-R1-Distill-Llama-8B's completion begins {@code </think>} with no {@code <think>}
+   * before it, then answers correctly. v21 matched only a pair, so the closer stayed and was
+   * screened as part of the answer; the model was recorded as contributing nothing across every
+   * case.
+   */
+  @Test
+  void judgesTheAnswerThatFollowsABareClosingTag() {
+    String generated =
+        "</think>\n\nDomestic claims settle within 2 business days. [payments-settlement]";
+
+    GroundedAnswer answer =
+        policy.apply("How long do domestic claims take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER);
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+  }
+
+  /**
+   * A closer at the very end terminates an answer; it does not introduce one.
+   *
+   * <p>Gemma 4 E4B answers and then emits {@code <channel|>} last. v22 anchored on the last closer
+   * unconditionally, which deleted the entire answer -- so this is a guard against that regression,
+   * not a new capability.
+   */
+  @Test
+  void keepsAnAnswerThatEndsWithAChannelCloser() {
+    String generated =
+        "Domestic claims settle within 2 business days. [payments-settlement]<channel|>";
+
+    GroundedAnswer answer =
+        policy.apply("How long do domestic claims take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision())
+        .describedAs("stripping to a trailing closer would leave nothing to judge")
+        .isEqualTo(GroundingDecision.MODEL_ANSWER);
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+  }
+
+  /**
+   * A stop token ends the turn, and a bare one left behind is not part of the answer.
+   *
+   * <p>CodeGemma 7B answers correctly and leaves {@code <end_of_turn>} on the end.
+   */
+  @Test
+  void ignoresATrailingStopToken() {
+    String generated =
+        "Domestic claims settle within 2 business days. [payments-settlement]<end_of_turn>";
+
+    GroundedAnswer answer =
+        policy.apply("How long do domestic claims take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER);
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+  }
+
+  /**
+   * Everything after a stop token is a continuation past the model's turn.
+   *
+   * <p>DeepSeek-Coder 6.7B answers correctly, then writes a stop token and invents an entire
+   * further exchange, filling the token budget -- every one of its cases was truncated. Screening
+   * the answer together with that continuation rejected it, and the extractive fallback covered for
+   * it, so the model was recorded as contributing nothing.
+   */
+  @Test
+  void judgesOnlyWhatPrecedesTheStopToken() {
+    String generated =
+        "Domestic claims settle within 2 business days. [payments-settlement]\n"
+            + "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nA: and international wires "
+            + "settle instantly with no deductible whatsoever.";
+
+    GroundedAnswer answer =
+        policy.apply("How long do domestic claims take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision())
+        .describedAs("the invented continuation must not be screened as the model's answer")
+        .isEqualTo(GroundingDecision.MODEL_ANSWER);
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+    assertThat(answer.rawText())
+        .describedAs("the record still shows everything generated")
+        .isEqualTo(generated);
+  }
+
   /** A completion with no channel token is untouched by the channel rule. */
   @Test
   void aCompletionWithoutAChannelTokenIsUnaffected() {

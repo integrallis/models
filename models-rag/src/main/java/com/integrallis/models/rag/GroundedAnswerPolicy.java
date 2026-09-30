@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "bounded-context-injection-screened-citation-safe-statement-grounding-v22";
+      "bounded-context-injection-screened-citation-safe-statement-grounding-v23";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
 
   /**
@@ -62,7 +62,36 @@ public final class GroundedAnswerPolicy {
    * and cannot occur in prose, which is what makes anchoring on it safe; models that never emit it
    * are unaffected.
    */
-  private static final Pattern CHANNEL_CLOSED_TRACE = Pattern.compile("(?s)\\A.*<channel\\|>\\s*");
+  private static final Pattern CLOSER_CLOSED_TRACE =
+      Pattern.compile("(?is)\\A.*(?:<channel\\|>|</think>|</thinking>|</reasoning>)\\s*(?=\\S)");
+
+  /**
+   * A closer with nothing after it, which ends an answer rather than introducing one.
+   *
+   * <p>Gemma 4 E4B emits {@code 30 calendar days ... [claims-auto-glass].<channel|>} -- answer
+   * first, closer last. Anchoring on the last closer unconditionally deletes the whole answer,
+   * which is why {@link #CLOSER_CLOSED_TRACE} requires something to follow it and a trailing one is
+   * removed instead.
+   */
+  private static final Pattern TRAILING_CLOSER =
+      Pattern.compile("(?is)\\s*(?:<channel\\|>|</think>|</thinking>|</reasoning>)\\s*\\z");
+
+  /**
+   * End-of-turn control tokens. Everything after the first is a continuation past the model's turn.
+   *
+   * <p>DeepSeek-Coder 6.7B answered correctly and then wrote {@code
+   * <|eot_id|><|start_header_id|>user} and a whole invented exchange, filling the budget; CodeGemma
+   * 7B answered correctly and left a bare {@code <end_of_turn>} behind. Both answers were screened
+   * together with that trailing text and rejected, and the extractive fallback covered for it.
+   * These are the model's own stop tokens, so nothing past them is an answer.
+   *
+   * <p>Distinct from {@code PROMPT_INJECTION_PATTERNS}, which screens retrieved documents before
+   * generation; removing a model's stop token from its own completion does not weaken that.
+   */
+  private static final Pattern TURN_END =
+      Pattern.compile(
+          "(?i)<\\|eot_id\\|>|<\\|im_end\\|>|<end_of_turn>|<\\|end\\|>"
+              + "|<end_of_utterance>|<turn\\|>|<\\|endoftext\\|>|<\\|eom_id\\|>");
 
   private static final Pattern CITATION =
       Pattern.compile("\\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})]");
@@ -287,8 +316,20 @@ public final class GroundedAnswerPolicy {
    * v21 mean what they meant; they are not reinterpreted by this change.
    */
   private static String removeCompleteReasoningTrace(String candidate) {
-    String withoutPairedTrace = REASONING_TRACE.matcher(candidate).replaceFirst("").strip();
-    return CHANNEL_CLOSED_TRACE.matcher(withoutPairedTrace).replaceFirst("").strip();
+    // Order matters: the turn is cut first, or a closer inside an invented continuation would
+    // anchor the
+    // strip and take the real answer with it.
+    String withinTurn = endOfTurn(candidate);
+    String withoutPairedTrace = REASONING_TRACE.matcher(withinTurn).replaceFirst("").strip();
+    String withoutClosedTrace =
+        CLOSER_CLOSED_TRACE.matcher(withoutPairedTrace).replaceFirst("").strip();
+    return TRAILING_CLOSER.matcher(withoutClosedTrace).replaceFirst("").strip();
+  }
+
+  /** The completion up to the model's first stop token. */
+  private static String endOfTurn(String candidate) {
+    Matcher matcher = TURN_END.matcher(candidate);
+    return matcher.find() ? candidate.substring(0, matcher.start()).strip() : candidate;
   }
 
   private static String removeLeadingContextAttribution(String candidate) {
