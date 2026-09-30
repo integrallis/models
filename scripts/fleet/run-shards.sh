@@ -11,14 +11,21 @@ set -u
 S=$(cd "$(dirname "$0")" && pwd)
 BOOTSTRAPS=${BOOTSTRAPS:-$S}
 BUCKET=${BUCKET:-models-qual-077051030817}
-MAX_CONCURRENT=${MAX_CONCURRENT:-4}
+VCPU_QUOTA=${VCPU_QUOTA:-64}
+VCPUS_PER_BOX=${VCPUS_PER_BOX:-16}
 AMI=${AMI:-ami-0045d7fc2ad003464}
 TYPE=${TYPE:-m6a.4xlarge}
 
-held() {
+# vCPUs held, not instances. The quota is 64 vCPU, and a mixed fleet makes an instance count
+# meaningless: one m6a.8xlarge takes 32 where a 4xlarge takes 16, so counting boxes would either
+# overshoot the quota or leave it idle. Every state that still holds capacity is counted, because an
+# instance releases its vCPUs only when it is gone.
+held_vcpus() {
   aws ec2 describe-instances \
     --filters Name=instance-state-name,Values=running,pending,shutting-down,stopping \
-    --query 'length(Reservations[].Instances[])' --output text 2>/dev/null || echo 99
+    --query 'Reservations[].Instances[].InstanceType' --output text 2>/dev/null \
+    | tr '\t' '\n' \
+    | awk '{ if ($0 ~ /8xlarge/) s+=32; else if ($0 ~ /16xlarge/) s+=64; else if ($0 != "") s+=16 } END { print s+0 }'
 }
 
 done_already() {
@@ -42,7 +49,7 @@ for shard in "$@"; do
     echo "shard-$shard already reported STATUS; skipping"
     continue
   fi
-  while [ "$(held)" -ge "$MAX_CONCURRENT" ]; do sleep 20; done
+  while [ $(( $(held_vcpus) + VCPUS_PER_BOX )) -gt "$VCPU_QUOTA" ]; do sleep 20; done
   boot="$BOOTSTRAPS/ud-boot-$shard.sh"
   [ -f "$boot" ] || { echo "shard-$shard: no bootstrap at $boot"; continue; }
   vol=$(volume_for "$shard")
