@@ -4,7 +4,7 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::thread::{self, JoinHandle};
 
 #[cfg(test)]
@@ -106,6 +106,59 @@ const Q4_K_BLOCK_BYTES: usize = 144;
 const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
+
+/// Weight bytes one partition should carry before the barrier that publishes the job is worth
+/// paying for.
+///
+/// Partition count used to be the whole active pool for every job above
+/// `PARALLEL_OUTPUT_THRESHOLD` output elements, which is 64 -- so every real projection was split
+/// across every worker however little it carried. Within one model that is not one regime: a
+/// 2048-wide attention projection streams about 1.2 MB of Q4_K while the feed-forward pair streams
+/// nearer 4.7 MB, and splitting the former sixteen ways leaves each worker a slice smaller than the
+/// publish-and-wait it is bracketed by. Decode is where this bites, because it runs on the order of
+/// two hundred dispatches per token with no batch to amortise them.
+///
+/// Measured against it, on one instance type with the pool halved by
+/// `models.native.kernels.decodeThreads`: a 0.32 GB model gained 26% and a 2.39 GB model 9-11%,
+/// while a Q4_0 model of 2.0 GB lost 2% at eight partitions and 43% at four. A single partition
+/// count cannot serve all of those, which is the argument for deriving it from the work rather than
+/// from the pool.
+///
+/// The default is deliberately low: it removes the clearly bad splits of small projections and
+/// leaves large ones fully parallel, so it cannot slow a job that was already well served by the
+/// whole pool. `JMODELS_MIN_BYTES_PER_PARTITION` overrides it, so the constant can be swept from a
+/// shard manifest without rebuilding the library.
+const DEFAULT_MIN_BYTES_PER_PARTITION: usize = 262_144;
+
+fn min_bytes_per_partition() -> usize {
+    static VALUE: OnceLock<usize> = OnceLock::new();
+    *VALUE.get_or_init(|| {
+        std::env::var("JMODELS_MIN_BYTES_PER_PARTITION")
+            .ok()
+            .and_then(|value| value.trim().parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(DEFAULT_MIN_BYTES_PER_PARTITION)
+    })
+}
+
+/// Partitions for one matrix job: as many as the work supports, never more than the pool offers.
+///
+/// `weight_bytes` is the streamed size of each matrix in the job, which is what a partition
+/// actually costs to execute, so grouped jobs are sized by their total rather than by one member.
+fn partitions_for_matrix(job: &ParallelJob, available: usize, min_bytes: usize) -> usize {
+    if job.output_elements < PARALLEL_OUTPUT_THRESHOLD {
+        return 1;
+    }
+    let min_bytes = min_bytes.max(1);
+    let bytes: usize = job
+        .matrices
+        .iter()
+        .take(job.matrix_count)
+        .filter_map(|matrix| matrix.as_ref())
+        .map(|matrix| matrix.weight_bytes)
+        .sum();
+    (bytes / min_bytes).clamp(1, available)
+}
 const WORKER_SPIN_ITERS: usize = 4_000;
 
 /// Default poll budget before a worker parks: 5 ms, longer than any gap between two dispatches
@@ -279,6 +332,9 @@ struct WorkerPool {
     /// Threads that take rows on the next matrix job, 1..=total_threads. Single-token decode
     /// wants fewer partitions than batched prefill on the same pool.
     active_threads: AtomicUsize,
+    /// Weight bytes one partition should carry. Per context rather than global so a test can drive
+    /// the dispatch path deterministically, the way the poll budget already is.
+    min_bytes_per_partition: AtomicUsize,
     execution: Mutex<()>,
 }
 
@@ -417,6 +473,7 @@ impl WorkerPool {
             shared,
             workers: Vec::with_capacity(total_threads.saturating_sub(1)),
             total_threads,
+            min_bytes_per_partition: AtomicUsize::new(min_bytes_per_partition()),
             active_threads: AtomicUsize::new(total_threads),
             execution: Mutex::new(()),
         };
@@ -451,15 +508,17 @@ impl WorkerPool {
     }
 
     fn execute_matrix(&self, mut job: ParallelJob) -> bool {
-        let partitions = self
+        let available = self
             .active_threads
             .load(Ordering::Acquire)
             .clamp(1, self.total_threads);
+        let partitions = partitions_for_matrix(
+            &job,
+            available,
+            self.min_bytes_per_partition.load(Ordering::Relaxed),
+        );
         job.partitions = partitions;
-        if self.workers.is_empty()
-            || partitions == 1
-            || job.output_elements < PARALLEL_OUTPUT_THRESHOLD
-        {
+        if self.workers.is_empty() || partitions == 1 {
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all matrix buffers for this synchronous execution.
                 unsafe { execute_matrix_job_partition(job, 0, 1) }
@@ -1032,10 +1091,9 @@ unsafe fn execute_gated_delta_net_partition(
                 None => branch,
                 Some(table) => table[branch] as usize,
             };
-            let state_offset =
-                slot * branch_state + head * job.key_dimension * job.value_dimension;
-            let head_state = &mut state
-                [state_offset..state_offset + job.key_dimension * job.value_dimension];
+            let state_offset = slot * branch_state + head * job.key_dimension * job.value_dimension;
+            let head_state =
+                &mut state[state_offset..state_offset + job.key_dimension * job.value_dimension];
             for token in 0..job.token_count {
                 let token_head = branch * branch_gate + token * job.value_head_count + head;
                 let query_offset = branch * branch_query
@@ -5752,6 +5810,79 @@ fn f32_to_f16(value: f32) -> u16 {
 mod tests {
     use super::*;
 
+    const MIN: usize = DEFAULT_MIN_BYTES_PER_PARTITION;
+
+    fn matrix_job_of(weight_bytes: usize) -> MatrixJob {
+        MatrixJob {
+            weights: 0,
+            weight_bytes,
+            output: 0,
+            rows: 1,
+            kernel: DotKernel::Q4K,
+            quantized: 0,
+            quantized_elements: 0,
+            activation_scales: 0,
+            scale_elements: 0,
+            activation_sums: 0,
+            sum_elements: 0,
+            batch_size: 1,
+            cols: 1,
+        }
+    }
+
+    fn parallel_job_of(output_elements: usize, weight_bytes: &[usize]) -> ParallelJob {
+        let mut matrices: [Option<MatrixJob>; MAX_GROUPED_MATRICES] = Default::default();
+        for (slot, bytes) in weight_bytes.iter().enumerate() {
+            matrices[slot] = Some(matrix_job_of(*bytes));
+        }
+        ParallelJob {
+            matrices,
+            matrix_count: weight_bytes.len(),
+            output_elements,
+            partitions: 1,
+        }
+    }
+
+    #[test]
+    fn a_job_below_the_output_threshold_is_never_published() {
+        let job = parallel_job_of(PARALLEL_OUTPUT_THRESHOLD - 1, &[64 << 20]);
+        assert_eq!(partitions_for_matrix(&job, 16, MIN), 1);
+    }
+
+    #[test]
+    fn partitions_follow_the_weight_bytes_the_job_streams() {
+        // Four partitions' worth of work asks for four, not for the whole pool.
+        let job = parallel_job_of(4096, &[4 * MIN]);
+        assert_eq!(partitions_for_matrix(&job, 16, MIN), 4);
+    }
+
+    #[test]
+    fn a_job_larger_than_the_pool_is_clamped_to_it() {
+        let job = parallel_job_of(4096, &[1024 * MIN]);
+        assert_eq!(partitions_for_matrix(&job, 16, MIN), 16);
+        assert_eq!(partitions_for_matrix(&job, 4, MIN), 4);
+    }
+
+    #[test]
+    fn a_job_too_small_for_one_partition_still_runs_on_one() {
+        let job = parallel_job_of(4096, &[1]);
+        assert_eq!(partitions_for_matrix(&job, 16, MIN), 1);
+    }
+
+    #[test]
+    fn a_grouped_job_is_sized_by_every_matrix_it_carries() {
+        // Three matrices of two partitions each is six, not two: the partition executes all of them.
+        let job = parallel_job_of(4096, &[2 * MIN, 2 * MIN, 2 * MIN]);
+        assert_eq!(partitions_for_matrix(&job, 16, MIN), 6);
+    }
+
+    #[test]
+    fn matrices_beyond_the_declared_count_are_not_counted() {
+        let mut job = parallel_job_of(4096, &[4 * MIN, 4 * MIN]);
+        job.matrix_count = 1;
+        assert_eq!(partitions_for_matrix(&job, 16, MIN), 4);
+    }
+
     #[test]
     fn exports_stable_abi_and_capabilities() {
         assert_eq!(jmodels_kernels_abi_version(), 6);
@@ -6260,6 +6391,12 @@ mod tests {
         let mut output = [0_f32; 64 * 3];
         // SAFETY: the test owns the live context until the final destroy call.
         let context_ref = unsafe { &*context };
+        // This test is about publishing and completing a generation, not about how a job is sized, so
+        // every job here must reach the workers regardless of how little it streams.
+        context_ref
+            .workers
+            .min_bytes_per_partition
+            .store(1, Ordering::Relaxed);
         let before = job_generation(
             context_ref
                 .workers
@@ -6327,6 +6464,12 @@ mod tests {
         let mut output = [f32::NAN; 64 * 3];
         // SAFETY: the test owns the live context until the final destroy call.
         let context_ref = unsafe { &*context };
+        // This test is about publishing and completing a generation, not about how a job is sized, so
+        // every job here must reach the workers regardless of how little it streams.
+        context_ref
+            .workers
+            .min_bytes_per_partition
+            .store(1, Ordering::Relaxed);
         let before = job_generation(
             context_ref
                 .workers
@@ -6385,6 +6528,12 @@ mod tests {
         let mut output = [0_f32; 64];
         // SAFETY: the test owns the live context until the final destroy call.
         let context_ref = unsafe { &*context };
+        // This test is about publishing and completing a generation, not about how a job is sized, so
+        // every job here must reach the workers regardless of how little it streams.
+        context_ref
+            .workers
+            .min_bytes_per_partition
+            .store(1, Ordering::Relaxed);
         let before = job_generation(
             context_ref
                 .workers
@@ -7190,8 +7339,8 @@ mod tests {
         let mut expected_state = initial.clone();
         for row in 0..ROWS {
             let slot = slots[row] as usize;
-            let mut row_state = expected_state[slot * STATE_PER_SLOT..(slot + 1) * STATE_PER_SLOT]
-                .to_vec();
+            let mut row_state =
+                expected_state[slot * STATE_PER_SLOT..(slot + 1) * STATE_PER_SLOT].to_vec();
             let mut row_output = vec![0.0_f32; VALUE_HEADS * DIMENSION];
             let query_span = KEY_HEADS * DIMENSION;
             let value_span = VALUE_HEADS * DIMENSION;
@@ -7246,7 +7395,10 @@ mod tests {
         }
 
         // SAFETY: the context was created above and is not used after this call.
-        assert_eq!(unsafe { jmodels_kernels_context_destroy(context) }, STATUS_OK);
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
     }
 
     /// A slot outside the state buffer is rejected rather than written on a worker thread.
@@ -7284,7 +7436,10 @@ mod tests {
             STATUS_INVALID_SHAPE
         );
         // SAFETY: the context was created above and is not used after this call.
-        assert_eq!(unsafe { jmodels_kernels_context_destroy(context) }, STATUS_OK);
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
     }
 
     #[test]
