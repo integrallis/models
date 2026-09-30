@@ -83,7 +83,28 @@ falling back and 3 abstaining on retrieval. `###` under one prompt and `\n` unde
 shapes of the same degeneracy. **The deepseek2 decoder is defective on real weights**, and the
 template fix, while correct, changed nothing about that.
 
-**`gemma3n` and `qwen3next` are not explained by prompting either.** The `gemma` template this run used matches
+**`gemma3n` crashes, and the crash is a bug in shared code.** Re-run at a 256-token cap, the gemma3n job
+did not finish at all:
+
+    ArrayIndexOutOfBoundsException: Index 65537 out of bounds for length 65537
+      at TensorOps.tableTanh
+      at TensorOps.gelu
+      at Gemma3nForwardPass.perLayerContribution
+
+The tabulated tanh interpolates between one slot and the next, and the table holds `TANH_TABLE_SIZE + 1`
+entries so the final interpolation has somewhere to read. A value one float ulp below the table's limit
+of 10 still scales onto that final slot -- adding `10.0f` rounds it to `20.0f`, and `20.0f * scale` is
+exactly `TANH_TABLE_SIZE` -- so the interpolation reads one past the end. Fixed, with a test that
+reproduces the exact exception and fails when the guard is removed.
+
+This is shared code: any architecture whose feed-forward uses GELU could reach it. It is also why the
+shorter run did not find it -- the activation only has to arrive at that one ulp once, and 64 tokens per
+attempt never did.
+
+**It does not explain gemma3n's corrupted text.** That text was produced at 64 tokens with no crash, so
+the corruption is a separate defect and remains open.
+
+**`qwen3next` is not explained by prompting either.** The `gemma` template this run used matches
 gemma3n's own turn markers (`<start_of_turn>user` / `<end_of_turn>` / `<start_of_turn>model`), read from
 the published GGUF, and `chatml` matches Qwen's. Those two remain open, and a decoder defect is the
 leading explanation rather than a confirmed one.

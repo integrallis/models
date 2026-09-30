@@ -31,6 +31,18 @@ All notable changes to models are documented here.
 
 ### Fixed
 
+- **GELU could read past the end of the tanh table.** `ArrayIndexOutOfBoundsException: Index 65537 out
+  of bounds for length 65537`, from `TensorOps.tableTanh` inside `gelu`, which killed a gemma3n
+  qualification run 456 seconds in. The table holds `TANH_TABLE_SIZE + 1` entries so the last
+  interpolation has a neighbour to read, but a value one float ulp below the table's limit still scales
+  onto that last slot -- adding `10.0f` rounds it to `20.0f` and `20.0f * scale` is exactly the size --
+  so the read went one past the end.
+
+  Shared code: any architecture whose feed-forward uses GELU could reach it. No existing measurement
+  changes, because the only inputs affected previously threw. The test reproduces the exact exception,
+  and hits the boundary directly -- a sweep through plausible activations was written first and passed
+  against the crashing version, because the boundary is one ulp wide.
+
 - **A reasoning trace was scored as if it were the answer; grounding policy is now v21.** Screening a
   `<think>` block fails on the block's own terms -- it reasons aloud, so it states things the retrieved
   documents do not support, the whole output is rejected, and the answer that followed is never

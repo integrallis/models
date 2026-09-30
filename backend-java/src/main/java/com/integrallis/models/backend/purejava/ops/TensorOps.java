@@ -1865,7 +1865,12 @@ public final class TensorOps {
     }
   }
 
-  private static float tableTanh(float value) {
+  /**
+   * Package-private so the table's last slot can be tested at the exact input that reaches it. The
+   * boundary is one float ulp wide, so a sweep through plausible activations does not reliably land
+   * on it -- a sweep written first missed it entirely and passed against the crashing version.
+   */
+  static float tableTanh(float value) {
     if (value <= -TANH_TABLE_LIMIT) {
       return -1.0f;
     }
@@ -1874,6 +1879,21 @@ public final class TensorOps {
     }
     float tablePosition = (value + TANH_TABLE_LIMIT) * TANH_TABLE_SCALE;
     int index = (int) tablePosition;
+    // The bounds check above rejects value >= TANH_TABLE_LIMIT, but not every value below the limit
+    // scales to a position below the last slot: for value just under the limit, (value + limit) *
+    // scale
+    // rounds to exactly TANH_TABLE_SIZE in float arithmetic, so index lands on the final entry and
+    // the
+    // interpolation below reads one past it. The table holds SIZE + 1 entries, so that read is
+    // ArrayIndexOutOfBoundsException: Index 65537 out of bounds for length 65537 -- which is how
+    // this
+    // was found, crashing a gemma3n run 456 seconds in, from inside gelu.
+    //
+    // At the final slot there is nothing left to interpolate towards, and the tabulated value is
+    // tanh(limit) to within the table's own resolution, so return it.
+    if (index >= TANH_TABLE_SIZE) {
+      return TANH_TABLE[TANH_TABLE_SIZE];
+    }
     float lower = TANH_TABLE[index];
     return lower + (tablePosition - index) * (TANH_TABLE[index + 1] - lower);
   }
