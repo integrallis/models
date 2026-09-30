@@ -37,8 +37,16 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "bounded-context-injection-screened-citation-safe-statement-grounding-v20";
+      "bounded-context-injection-screened-citation-safe-statement-grounding-v21";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
+
+  /**
+   * A closed reasoning block at the start of a completion, with the tags this catalogue's models
+   * actually emit. Non-greedy so a completion that opens a second block keeps it.
+   */
+  private static final Pattern REASONING_TRACE =
+      Pattern.compile("(?is)\\A\\s*<(think|thinking|reasoning)>.*?</\\1>\\s*");
+
   private static final Pattern CITATION =
       Pattern.compile("\\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})]");
   private static final Pattern ABSTENTION_PATTERN =
@@ -200,7 +208,7 @@ public final class GroundedAnswerPolicy {
       return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.RETRIEVAL_ABSTENTION);
     }
 
-    String candidate = generatedText.strip();
+    String candidate = removeCompleteReasoningTrace(generatedText.strip());
     if (isExplicitAbstention(candidate)) {
       return new GroundedAnswer(generatedText, ABSTENTION, GroundingDecision.MODEL_ABSTENTION);
     }
@@ -235,6 +243,33 @@ public final class GroundedAnswerPolicy {
           generatedText, extractiveAnswer(retrieved), GroundingDecision.EXTRACTIVE_FALLBACK);
     }
     return new GroundedAnswer(generatedText, candidate, GroundingDecision.MODEL_ANSWER);
+  }
+
+  /**
+   * Drops a closed reasoning block, so a model that thinks before answering is judged on the
+   * answer.
+   *
+   * <p>A reasoning trace is not an answer, and screening it as one fails on its own terms: the
+   * trace reasons aloud about the question, so it contains statements the retrieved documents do
+   * not support and {@code hasOnlySupportedClaims} rejects the whole output. The answer that
+   * followed never gets looked at. Measured on 2026-09-29: several models answered correctly after
+   * a {@code <think>} block and were replaced by an extractive answer anyway, reported afterwards
+   * as 0% model contribution.
+   *
+   * <p>Only a <b>closed</b> block is removed, which leaves an unterminated one in place to be
+   * rejected by the ordinary screening -- and it is: a trace that never closes fails the
+   * supported-claim and evidence-anchor checks on its own content. An explicit refusal was written
+   * for that case and then removed, because no input could be found where it changed the decision,
+   * and code whose effect cannot be demonstrated is a claim rather than a safeguard.
+   *
+   * <p>This runs before the abstention check, since a model may reason and then abstain, and that
+   * is an abstention.
+   *
+   * <p>This behaviour is why {@link #POLICY_ID} is v21. The previous policy scored the trace, and
+   * records written under v20 mean what they meant; they are not reinterpreted by this change.
+   */
+  private static String removeCompleteReasoningTrace(String candidate) {
+    return REASONING_TRACE.matcher(candidate).replaceFirst("").strip();
   }
 
   private static String removeLeadingContextAttribution(String candidate) {
