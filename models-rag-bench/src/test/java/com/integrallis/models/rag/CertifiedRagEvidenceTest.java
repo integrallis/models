@@ -36,6 +36,8 @@ class CertifiedRagEvidenceTest {
           .resolve("benchmark-results/certified-20260930/rag");
   private static final Path QWEN3_5_2B_EVIDENCE = TWO_ARM_EVIDENCE.resolve("qwen3.5-2b-q4_k_m");
   private static final Path GEMMA_3_4B_EVIDENCE = TWO_ARM_EVIDENCE.resolve("gemma-3-4b-it-q4_k_m");
+  private static final Path IBM_GRANITE_GRANITE_4_1_8B_GGUF_Q4_K_M_EVIDENCE =
+      TWO_ARM_EVIDENCE.resolve("ibm-granite-granite-4-1-8b-gguf-q4_k_m");
   private static final Path DEEPREINFORCE_AI_ORNITH_1_0_9B_GGUF_Q4_K_M_EVIDENCE =
       TWO_ARM_EVIDENCE.resolve("deepreinforce-ai-ornith-1-0-9b-gguf-q4_k_m");
   private static final Path BARTOWSKI_HUATUOGPT_O1_7B_GGUF_Q4_K_M_EVIDENCE =
@@ -2754,6 +2756,37 @@ class CertifiedRagEvidenceTest {
             comparison -> {
               assertThat(comparison.decodeThroughputRatio()).isBetween(0.984, 0.994);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.17, 1.19);
+            });
+  }
+
+  @Test
+  void ibmGraniteGranite418bGgufQ4KMQualifiesAgainstItsSameHostOllamaComparator() throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            IBM_GRANITE_GRANITE_4_1_8B_GGUF_Q4_K_M_EVIDENCE,
+            "ibm-granite-granite-4-1-8b-gguf-q4_k_m-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama =
+        report(
+            IBM_GRANITE_GRANITE_4_1_8B_GGUF_Q4_K_M_EVIDENCE,
+            "ibm-granite-granite-4-1-8b-gguf-q4_k_m-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.modelAnswerCorrectRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_CORRECT_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.948, 0.958);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.81, 0.83);
             });
   }
 
