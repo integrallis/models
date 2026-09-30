@@ -95,13 +95,13 @@ export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 
 cd /work
-aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-v22.tar" . --only-show-errors
+aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-v23.tar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/fleet-shard-$SHARD.json" /work/shard.json --only-show-errors
-[ -s models-rag-bench-0.3.50-v22.tar ] || { STATUS=NO_DIST; exit 1; }
+[ -s models-rag-bench-0.3.50-v23.tar ] || { STATUS=NO_DIST; exit 1; }
 [ -s /work/models-kernels-linux-x86_64.jar ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 [ -s /work/shard.json ] || { STATUS=NO_SHARD; exit 1; }
-tar xf models-rag-bench-0.3.50-v22.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
+tar xf models-rag-bench-0.3.50-v23.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
 CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
 JOBS=$(python3 -c "import json;print(len(json.load(open('/work/shard.json'))))")
@@ -121,7 +121,7 @@ THREADS=${QUAL_THREADS:-$(nproc 2>/dev/null || echo 8)}
 DECODE_THREAD_DEFAULT="${QUAL_DECODE_THREADS:-}"
 # Baked in, not derived: the worker has no git repository, so `git rev-parse` there would record
 # "local" and the result would name no build at all.
-BACKEND_VERSION="models@0.3.50+v22-542a98fa2290"
+BACKEND_VERSION="models@0.3.50+v23-08d9b5e1cef8"
 STATUS=RUNNING
 
 # The comparator arm. A qualification is comparative: RagProductionQualificationPolicy needs a baseline
@@ -322,6 +322,79 @@ while IFS= read -r job; do
             --comparator "/work/out/$id.comparator.json" \
             --output "/work/out/$id.verdict.json" >> "/work/out/$id.ollama.log" 2>&1
           verdict=$(python3 -c "import json;print(json.load(open('/work/out/$id.verdict.json'))['qualification']['verdict'])" 2>/dev/null || echo NO_VERDICT)
+          # A model is not servable because it answered through one surface. Every catalogued model has to
+          # work through plain Java, LangChain4j and Spring AI, so a qualified candidate is re-run through
+          # the other two and their grounded decisions compared case by case. Performance is not remeasured:
+          # all three hand the identical client to a different application wrapper, so the backend work is
+          # the same and what these arms establish is serving correctness, not speed. One iteration each.
+          if [ "$verdict" = "QUALIFIED" ]; then
+            for fw in langchain4j spring-ai; do
+              java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
+                -Dmodels.native.quantizedDecode=true \
+                $DECODE_THREAD_OPT \
+                -cp "$CP" \
+                com.integrallis.models.rag.RagBenchmarkCli \
+                --framework "$fw" --backend rust-ffm --backend-version "$BACKEND_VERSION" \
+                --model "$gguf" --model-id "$id" --workload "$wl" --prompt-template "$tpl" \
+                --context 2048 --threads "$THREADS" --max-tokens 256 --warmups 0 --iterations 1 \
+                --output "/work/out/$id.$fw.json" >> "/work/out/$id.serving.log" 2>&1
+              say "serving arm $fw for $id rc=$?"
+            done
+            python3 - "$id" >> "/work/out/$id.serving.log" 2>&1 <<'SERVING'
+import json, sys, os
+model = sys.argv[1]
+out = "/work/out"
+
+
+def decisions(path):
+    runs = json.load(open(path))["runs"]
+    return [(r.get("caseId") or r.get("case") or i,
+             (r.get("grounding") or {}).get("decision"))
+            for i, r in enumerate(runs)]
+
+
+base = os.path.join(out, f"{model}.json")
+result = {"model": model, "frameworks": ["plain-java"], "servable": True, "mismatches": [],
+          "missing": []}
+try:
+    reference = dict(decisions(base))
+except Exception as failure:
+    json.dump({"model": model, "servable": False, "error": f"plain-java report unreadable: {failure}"},
+              open(os.path.join(out, f"{model}.serving.json"), "w"), indent=1)
+    raise SystemExit(0)
+for framework in ("langchain4j", "spring-ai"):
+    path = os.path.join(out, f"{model}.{framework}.json")
+    if not os.path.isfile(path):
+        result["servable"] = False
+        result["missing"].append(framework)
+        continue
+    try:
+        other = dict(decisions(path))
+    except Exception as failure:
+        result["servable"] = False
+        result["mismatches"].append({"framework": framework, "error": str(failure)})
+        continue
+    result["frameworks"].append(framework)
+    # The same case must reach the same grounding decision. A framework that drops to the extractive
+    # fallback where plain Java got a model answer is a serving defect in that adapter, not a difference
+    # of opinion, and the model must not be published as though every surface worked.
+    differing = [{"case": str(case), "plain-java": verdict, framework: other.get(case)}
+                 for case, verdict in reference.items() if other.get(case) != verdict]
+    if differing:
+        result["servable"] = False
+        result["mismatches"].extend(differing)
+json.dump(result, open(os.path.join(out, f"{model}.serving.json"), "w"), indent=1)
+print(f"servable={result['servable']} frameworks={result['frameworks']} "
+      f"mismatches={len(result['mismatches'])} missing={result['missing']}")
+SERVING
+            servable=$(python3 -c "import json;print(json.load(open('/work/out/$id.serving.json')).get('servable'))" 2>/dev/null || echo False)
+            say "serving parity for $id: servable=$servable"
+            aws s3 cp "/work/out/$id.serving.json" "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+            aws s3 cp "/work/out/$id.serving.log"  "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+            for fw in langchain4j spring-ai; do
+              [ -s "/work/out/$id.$fw.json" ] && aws s3 cp "/work/out/$id.$fw.json" "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+            done
+          fi
           say "verdict $id: $verdict"
           printf '%s\tverdict\t%s\n' "$id" "$verdict" >> /work/out/progress.tsv
           aws s3 cp "/work/out/$id.comparator.json" "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null

@@ -100,6 +100,22 @@ def main():
         for required in (candidate_path, comparator_path):
             if not required.is_file():
                 raise SystemExit(f"{model_id}: missing {required.name}")
+        # A model is not publishable because one surface worked. LangChain4j and Spring AI should behave
+        # the same as plain Java -- they hand the identical client to a different application wrapper --
+        # but should is not verified, so the shard re-runs both and compares grounded decisions case by
+        # case. No parity record, or a disagreeing one, and the model is not published.
+        serving_path = args.results / f"{model_id}.serving.json"
+        if not serving_path.is_file():
+            skipped.append((model_id, "no serving-parity record"))
+            continue
+        serving = read(serving_path)
+        if not serving.get("servable"):
+            skipped.append((
+                model_id,
+                f"serving parity failed: missing={serving.get('missing')} "
+                f"mismatches={len(serving.get('mismatches') or [])}",
+            ))
+            continue
         report = read(candidate_path)
         catalogued = models[model_id]
         if report["artifactSha256"] != catalogued["sha256"]:
@@ -125,6 +141,11 @@ def main():
             shutil.copy(candidate_path, destination / f"{slug}-rust-ffm-grounded.json")
             shutil.copy(comparator_path, destination / f"{slug}-ollama-grounded.json")
             shutil.copy(verdict_path, destination / "qualification.json")
+            shutil.copy(args.results / f"{model_id}.serving.json", destination / "serving-parity.json")
+            for framework in ("langchain4j", "spring-ai"):
+                arm = args.results / f"{model_id}.{framework}.json"
+                if arm.is_file():
+                    shutil.copy(arm, destination / f"{slug}-{framework}-grounded.json")
         written = destination / f"{slug}-rust-ffm-grounded.json"
         entry = entry_for(written if args.apply else candidate_path, report, verdict, catalogued, relative)
         drift = set(entry) ^ set(allowed)
