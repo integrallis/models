@@ -27,7 +27,10 @@ final class GptOssMxfp4Moe {
   private final int intermediateSize;
   private final float alpha;
   private final float limit;
+  private final boolean fusedShape;
   private final float[] gateUp;
+  private final float[] splitGate;
+  private final float[] splitUp;
   private final float[] activation;
   private final float[] expertOutput;
   private final GgufQ8_0Batch hiddenQ8;
@@ -45,17 +48,25 @@ final class GptOssMxfp4Moe {
     this.limit = limit;
 
     GptOssMxfp4ExpertWeights.Expert first = weights.expert(0);
-    hiddenSize = first.gateUp().columns();
-    if (first.gateUp().rows() % 2 != 0) {
+    hiddenSize = first.hiddenSize();
+    if (first.isFused() && first.gateUp().rows() % 2 != 0) {
       throw new IllegalArgumentException("gate/up projection must contain an even number of rows");
     }
-    intermediateSize = first.gateUp().rows() / 2;
+    intermediateSize = first.intermediateSize();
+    // Before any validation: validateGeometry compares every expert against this, and reading it
+    // from
+    // the not-yet-assigned scratch was a null dereference that took out the whole fused path.
+    fusedShape = first.isFused();
     validateGeometry(first, 0);
     for (int expert = 1; expert < weights.expertCount(); expert++) {
       validateGeometry(weights.expert(expert), expert);
     }
 
     gateUp = new float[Math.multiplyExact(2, intermediateSize)];
+    // Only the split shape needs these, and only one shape is ever present, so the unused pair is
+    // empty rather than a second full-width allocation per layer.
+    splitGate = fusedShape ? new float[0] : new float[intermediateSize];
+    splitUp = fusedShape ? new float[0] : new float[intermediateSize];
     activation = new float[intermediateSize];
     expertOutput = new float[hiddenSize];
     hiddenQ8 = GgufQ8_0Batch.allocate(1, hiddenSize);
@@ -84,15 +95,28 @@ final class GptOssMxfp4Moe {
 
     for (int route = 0; route < selectedExperts.length; route++) {
       GptOssMxfp4ExpertWeights.Expert expert = weights.expert(selectedExperts[route]);
-      if (q8Activations) {
-        expert.gateUp().multiplyQ8(hiddenQ8, gateUp);
+      if (expert.isFused()) {
+        if (q8Activations) {
+          expert.gateUp().multiplyQ8(hiddenQ8, gateUp);
+        } else {
+          expert.gateUp().multiply(hidden, gateUp);
+        }
+        addBias(gateUp, expert.gateUpBias());
+        GptOssMath.swigluOai(gateUp, activation, alpha, limit);
       } else {
-        expert.gateUp().multiply(hidden, gateUp);
+        // The split shape has no Q8 activation fast path: ggufMatmul quantizes the activation
+        // itself
+        // for the quantized types, so asking for it here would quantize twice.
+        expert.gate().multiply(hidden, splitGate);
+        expert.up().multiply(hidden, splitUp);
+        addBias(splitGate, expert.gateBias());
+        addBias(splitUp, expert.upBias());
+        GptOssMath.swigluOaiSplit(splitGate, splitUp, activation, alpha, limit);
       }
-      addBias(gateUp, expert.gateUpBias());
-      GptOssMath.swigluOai(gateUp, activation, alpha, limit);
 
-      if (q8Activations) {
+      if (!expert.isFused()) {
+        expert.splitDown().multiply(activation, expertOutput);
+      } else if (q8Activations) {
         activationQ8.quantize(activation, 1);
         expert.down().multiplyQ8(activationQ8, expertOutput);
       } else {
@@ -108,12 +132,29 @@ final class GptOssMxfp4Moe {
   }
 
   private void validateGeometry(GptOssMxfp4ExpertWeights.Expert expert, int index) {
-    if (expert.gateUp().columns() != hiddenSize
-        || expert.gateUp().rows() != Math.multiplyExact(2, intermediateSize)
-        || expert.gateUpBias().length != Math.multiplyExact(2, intermediateSize)
-        || expert.down().columns() != intermediateSize
-        || expert.down().rows() != hiddenSize
-        || expert.downBias().length != hiddenSize) {
+    // Every expert must have the SAME shape as the first: the scratch buffers and the branch above
+    // are
+    // chosen once from expert 0, so a mixed set would be read with the wrong indexing.
+    if (expert.isFused() != fusedShape) {
+      throw new IllegalArgumentException(
+          "expert " + index + " has a different storage shape from expert 0");
+    }
+    boolean consistent =
+        expert.isFused()
+            ? expert.gateUp().columns() == hiddenSize
+                && expert.gateUp().rows() == Math.multiplyExact(2, intermediateSize)
+                && expert.gateUpBias().length == Math.multiplyExact(2, intermediateSize)
+                && expert.down().columns() == intermediateSize
+                && expert.down().rows() == hiddenSize
+            : expert.gate().columns() == hiddenSize
+                && expert.gate().rows() == intermediateSize
+                && expert.up().columns() == hiddenSize
+                && expert.up().rows() == intermediateSize
+                && expert.gateBias().length == intermediateSize
+                && expert.upBias().length == intermediateSize
+                && expert.splitDown().columns() == intermediateSize
+                && expert.splitDown().rows() == hiddenSize;
+    if (!consistent || expert.downBias().length != hiddenSize) {
       throw new IllegalArgumentException(
           "expert " + index + " has inconsistent projection geometry");
     }

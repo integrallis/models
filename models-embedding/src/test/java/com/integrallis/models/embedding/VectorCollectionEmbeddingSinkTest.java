@@ -19,11 +19,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.api.EmbeddingBackend;
+import com.integrallis.vectors.core.EmbeddingRecipe;
 import com.integrallis.vectors.core.SimilarityFunction;
 import com.integrallis.vectors.db.IndexType;
 import com.integrallis.vectors.db.SearchRequest;
 import com.integrallis.vectors.db.SearchResult;
 import com.integrallis.vectors.db.VectorCollection;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -321,5 +323,152 @@ class VectorCollectionEmbeddingSinkTest {
         return v;
       }
     };
+  }
+
+  private static EmbeddingRecipe nomicRecipe(int dim) {
+    return new EmbeddingRecipe(
+        "nomic-embed-text",
+        "1.5",
+        java.util.Optional.of("a".repeat(64)),
+        dim,
+        SimilarityFunction.COSINE,
+        true,
+        EmbeddingRecipe.Pooling.MEAN,
+        java.util.Optional.of("search_document: "),
+        java.util.Optional.of("search_query: "),
+        8192,
+        EmbeddingRecipe.Truncation.REJECT,
+        java.util.Map.of());
+  }
+
+  @Test
+  void theRecipesDocumentPrefixReachesTheBackend() {
+    // The point of the fix. Before recipes there was nowhere to record an asymmetric prefix and
+    // nothing to apply it, so Nomic and E5 documents were embedded bare -- not an error, just
+    // quietly
+    // worse than the model allows. This asserts on what the BACKEND was handed, because that is the
+    // only thing that decides the vector.
+    List<String> seen = new ArrayList<>();
+    VectorCollection c =
+        VectorCollection.builder()
+            .dimension(DIM)
+            .metric(SimilarityFunction.COSINE)
+            .indexType(IndexType.FLAT)
+            .embeddingRecipe(nomicRecipe(DIM))
+            .build();
+    EmbeddingBackend backend =
+        new EmbeddingBackend() {
+          @Override
+          public int dimension() {
+            return DIM;
+          }
+
+          @Override
+          public float[] embed(String text) {
+            seen.add(text);
+            return new float[] {1, 0, 0, 0};
+          }
+        };
+    try (c) {
+      VectorCollectionEmbeddingSink sink = new VectorCollectionEmbeddingSink(backend, c);
+      sink.put("a", "hello");
+      c.commit();
+
+      assertThat(seen).containsExactly("search_document: hello");
+      // The STORED text stays the caller's original, or a re-embed would prefix it twice.
+      assertThat(c.get("a").text()).isEqualTo("hello");
+    }
+  }
+
+  @Test
+  void theBatchPathPrefixesEveryText() {
+    List<List<String>> batches = new ArrayList<>();
+    VectorCollection c =
+        VectorCollection.builder()
+            .dimension(DIM)
+            .metric(SimilarityFunction.COSINE)
+            .indexType(IndexType.FLAT)
+            .embeddingRecipe(nomicRecipe(DIM))
+            .build();
+    EmbeddingBackend backend =
+        new EmbeddingBackend() {
+          @Override
+          public int dimension() {
+            return DIM;
+          }
+
+          @Override
+          public float[] embed(String text) {
+            throw new AssertionError("putAll must use the batch path");
+          }
+
+          @Override
+          public float[][] embedAll(List<String> texts) {
+            batches.add(List.copyOf(texts));
+            float[][] out = new float[texts.size()][];
+            for (int i = 0; i < texts.size(); i++) {
+              out[i] = new float[] {1, 0, 0, 0};
+            }
+            return out;
+          }
+        };
+    try (c) {
+      new VectorCollectionEmbeddingSink(backend, c)
+          .putAll(List.of("a", "b"), List.of("one", "two"));
+      c.commit();
+      assertThat(batches).containsExactly(List.of("search_document: one", "search_document: two"));
+    }
+  }
+
+  @Test
+  void aCollectionWithNoRecipeEmbedsTheTextUnchanged() {
+    // The prefix is opt-in via the recipe. A collection without one must behave exactly as before,
+    // or this change would silently alter every existing caller's vectors.
+    List<String> seen = new ArrayList<>();
+    VectorCollection c = collection(DIM);
+    EmbeddingBackend backend =
+        new EmbeddingBackend() {
+          @Override
+          public int dimension() {
+            return DIM;
+          }
+
+          @Override
+          public float[] embed(String text) {
+            seen.add(text);
+            return new float[] {1, 0, 0, 0};
+          }
+        };
+    try (c) {
+      new VectorCollectionEmbeddingSink(backend, c).put("a", "hello");
+      assertThat(seen).containsExactly("hello");
+    }
+  }
+
+  @Test
+  void aBackendThatIsNotTheRecipesModelIsRefused() {
+    VectorCollection c =
+        VectorCollection.builder()
+            .dimension(DIM)
+            .metric(SimilarityFunction.COSINE)
+            .indexType(IndexType.FLAT)
+            .embeddingRecipe(nomicRecipe(DIM))
+            .build();
+    EmbeddingBackend wrongWidth =
+        new EmbeddingBackend() {
+          @Override
+          public int dimension() {
+            return DIM + 1;
+          }
+
+          @Override
+          public float[] embed(String text) {
+            return new float[DIM + 1];
+          }
+        };
+    try (c) {
+      assertThatThrownBy(() -> new VectorCollectionEmbeddingSink(wrongWidth, c))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
   }
 }

@@ -134,6 +134,36 @@ public final class GgufTokenizer implements Tokenizer {
   private final boolean addEosToken;
   private final boolean addSpacePrefix;
   private final BpePreTokenizer bpePreTokenizer;
+
+  /**
+   * The {@code tokenizer.ggml.pre} value this model declared, or empty when it declared none.
+   *
+   * @return the declared pre-tokenizer name
+   */
+  public String declaredPreTokenizer() {
+    return bpePreTokenizer.declaredName();
+  }
+
+  /**
+   * Whether the declared byte-level pre-tokenizer is one this build implements.
+   *
+   * <p>False means the model asked for a word-boundary split we do not have and got none, which
+   * changes the token stream and shows up as slightly worse output rather than as an error. A
+   * qualification run should record this beside its scores: the alternative is attributing the loss
+   * to the model.
+   *
+   * @return true when the model declared no pre-tokenizer or declared one we implement
+   */
+  public boolean preTokenizerImplemented() {
+    // Only byte-level BPE consults the pre-tokenizer at all, so a declared name is irrelevant for
+    // every other vocabulary type. Without this guard the answer is a false alarm on a large share
+    // of
+    // real models: 11 of the 80 GGUFs in this catalogue declare pre = "default" while carrying a
+    // SentencePiece vocabulary (tokenizer.ggml.model = llama), where BpePreTokenizer is never
+    // called.
+    return !useByteLevel || bpePreTokenizer.isImplemented();
+  }
+
   private final int unknownTokenId;
   private final char[] byteToChar;
   private final int[] charToByte;

@@ -42,6 +42,7 @@ import java.util.TreeMap;
  *
  * <pre>
  * build     --model M.gguf --model-id ID --corpus C.tsv --out DIR [--pooling last]
+ *           [--document-prefix P --query-prefix Q]
  * evaluate  --model M.gguf --corpus C.tsv --index DIR [--threshold T] [--min-accuracy A]
  * </pre>
  *
@@ -111,7 +112,9 @@ public final class TaskIndexCli {
               cache == null ? backend::embed : cache.wrap(backend::embed),
               modelId,
               out,
-              quantizer);
+              quantizer,
+              options.get("document-prefix"),
+              options.get("query-prefix"));
       long millis = (System.nanoTime() - started) / 1_000_000;
       if (cache != null) {
         cache.save();
@@ -147,6 +150,9 @@ public final class TaskIndexCli {
 
       Map<String, int[]> perTask = new TreeMap<>();
       List<String> misses = new ArrayList<>();
+      // Per-item outcomes, in corpus order, so two arms can be compared as paired observations.
+      // An aggregate accuracy cannot support a paired test: it hides which items moved.
+      List<String> perItem = new ArrayList<>();
       int correct = 0;
       int unclassified = 0;
       for (TaskExemplars.Labelled labelled : held) {
@@ -154,6 +160,7 @@ public final class TaskIndexCli {
         boolean hit = labelled.task().equals(predicted);
         correct += hit ? 1 : 0;
         unclassified += predicted == null ? 1 : 0;
+        perItem.add((hit ? "1\t" : "0\t") + labelled.task() + "\t" + predicted);
         int[] counts = perTask.computeIfAbsent(labelled.task(), key -> new int[2]);
         counts[1]++;
         counts[0] += hit ? 1 : 0;
@@ -181,6 +188,12 @@ public final class TaskIndexCli {
       if (!misses.isEmpty()) {
         System.out.println("first misses:");
         misses.forEach(System.out::println);
+      }
+
+      String perItemPath = options.get("per-item");
+      if (perItemPath != null) {
+        Files.write(Path.of(perItemPath), perItem, StandardCharsets.UTF_8);
+        System.out.printf("per-item outcomes -> %s (%d rows)%n", perItemPath, perItem.size());
       }
 
       if (cache != null) {
@@ -231,8 +244,9 @@ public final class TaskIndexCli {
           usage:
             build     --model M.gguf --model-id ID --corpus C.tsv --out DIR [--pooling last_token]
                       [--dimensions N] [--quantizer NONE|SQ8|SQ4|FP16|PQ|BQ] [--embeddings CACHE]
+                      [--document-prefix P --query-prefix Q]
             evaluate  --model M.gguf --corpus C.tsv --index DIR [--threshold T] [--min-accuracy A]
-                      [--dimensions N] [--embeddings CACHE]
+                      [--dimensions N] [--embeddings CACHE] [--per-item FILE]
           """);
       return 2;
     }

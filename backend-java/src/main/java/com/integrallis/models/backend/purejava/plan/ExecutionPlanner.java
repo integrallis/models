@@ -68,6 +68,7 @@ public final class ExecutionPlanner {
         finalLayerKvOnlyPrefill(topology, configuration, finalLayerPrefillPruning, decisions);
     boolean batchedAttentionScores = batchedAttentionScores(topology, configuration, decisions);
     boolean batchedAttentionValues = batchedAttentionValues(topology, configuration, decisions);
+    boolean fusedGroupedAttention = fusedGroupedAttention(configuration, decisions);
     boolean stagedQuantizedFfn =
         stagedQuantizedFfn(runtime, topology, configuration, prefillBatchSize, decisions);
     boolean stagedQuantizedLayer =
@@ -128,6 +129,7 @@ public final class ExecutionPlanner {
         finalLayerKvOnlyPrefill,
         batchedAttentionScores,
         batchedAttentionValues,
+        fusedGroupedAttention,
         stagedQuantizedFfn,
         stagedQuantizedLayer,
         blockMajorQ8Activations,
@@ -514,6 +516,28 @@ public final class ExecutionPlanner {
                 ? "the model profile selected exact two-row key scoring"
                 : "disabled by models.purejava.batchedAttentionScores",
             Map.of("rows-per-group", enabled ? "2" : "1")));
+    return enabled;
+  }
+
+  /**
+   * Whether grouped-query attention runs through the fused kernels.
+   *
+   * <p>No topology gate: the fused kernels take the group size, head stride and scale as arguments
+   * and are not tied to an architecture. Whether a model has anything to fuse is a property of its
+   * head counts, which the decoder knows and this planner does not, so the forward pass narrows
+   * this to models whose group size exceeds one.
+   */
+  private static boolean fusedGroupedAttention(
+      PureJavaPlanConfiguration configuration, List<OptimizationDecision> decisions) {
+    boolean enabled = configuration.fusedGroupedAttention();
+    decisions.add(
+        new OptimizationDecision(
+            "fused-grouped-attention",
+            enabled ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            enabled
+                ? "one pass over each cached key and value row per group rather than per query head"
+                : "disabled by models.purejava.fusedGroupedAttention",
+            Map.of("cache-passes-per-group", enabled ? "1" : "group-size")));
     return enabled;
   }
 

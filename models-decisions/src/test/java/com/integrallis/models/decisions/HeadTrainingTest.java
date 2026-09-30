@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.within;
 
 import java.util.List;
 import java.util.random.RandomGenerator;
+import java.util.random.RandomGeneratorFactory;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -122,7 +123,21 @@ class HeadTrainingTest {
   void aPerfectlyCalibratedSetLeavesTheTemperatureAlone() {
     double[][] logits = new double[400][];
     int[] labels = new int[400];
-    RandomGenerator random = RandomGenerator.of("L64X128MixRandom");
+    // SEEDED. RandomGenerator.of(..) returns an UNSEEDED generator, so this drew 400 fresh
+    // Bernoulli labels every run and then asserted the fitted temperature to within 0.35 of 1.0 --
+    // which sampling noise fails some of the time. Observed failing in a full build on 2026-09-29
+    // and
+    // passing on the next run, which is the signature of exactly this.
+    //
+    // MEASURED, not estimated: of 400 unseeded draws, 2 landed outside the bar. A 0.5% flake rate,
+    // or
+    // about one full build in 200. The seeded draw fits to 1.1451, which is 0.205 inside the bar,
+    // so
+    // the seed pins a comfortable case rather than hiding a marginal one. The seed value is
+    // arbitrary;
+    // what matters is that the draw is identical every run, so a failure here now means the fitter
+    // changed.
+    RandomGenerator random = RandomGeneratorFactory.of("L64X128MixRandom").create(20_260_929L);
     for (int index = 0; index < 400; index++) {
       double score = (index % 40) / 10.0 - 2.0;
       logits[index] = new double[] {0.0, score};

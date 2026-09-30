@@ -44,6 +44,16 @@ class BundledTaskIndexTest {
       "639d305a2c4fee52779cb16832f365d91bea621d0908f97d501df74872121299";
 
   private static final int EXPECTED_PROMPTS = 1929;
+
+  /**
+   * The prefix both sides of the shipped index were embedded with.
+   *
+   * <p>Pinned because dropping it is worth 4.2 points of held-out accuracy and nothing would
+   * otherwise notice: classification keeps working, just worse. Measured in {@code
+   * docs/findings/embeddinggemma-task-prefix-ab.md}.
+   */
+  private static final String EXPECTED_PREFIX = "task: classification | query: ";
+
   private static final int EXPECTED_DIMENSION = 768;
 
   @Test
@@ -70,6 +80,19 @@ class BundledTaskIndexTest {
     // Shipped as 4-bit codes with no full-precision copy. If this ever reads NONE the artifact
     // grew eightfold without anyone deciding to.
     assertThat(manifest.getProperty("quantizer")).isEqualTo("SQ4");
+    // Both sides, and with the trailing space intact -- Properties would otherwise eat it, and a
+    // prefix that loses its trailing space is a different prompt to the model.
+    assertThat(manifest.getProperty("documentPrefix")).isEqualTo(EXPECTED_PREFIX);
+    assertThat(manifest.getProperty("queryPrefix")).isEqualTo(EXPECTED_PREFIX);
+  }
+
+  @Test
+  void queriesTheShippedIndexThroughThePrefixItRecorded(@TempDir Path cacheRoot)
+      throws IOException {
+    Path expanded = TaskIndexResource.extractTo(cacheRoot);
+    try (TaskIndex index = TaskIndex.open(expanded)) {
+      assertThat(index.queryPrefix()).contains(EXPECTED_PREFIX);
+    }
   }
 
   @Test

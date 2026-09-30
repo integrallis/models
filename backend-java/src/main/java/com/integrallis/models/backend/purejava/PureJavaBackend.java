@@ -40,17 +40,23 @@ import com.integrallis.models.backend.purejava.cact.CactNeedle2Layout;
 import com.integrallis.models.backend.purejava.cact.CactParser;
 import com.integrallis.models.backend.purejava.cact.CactTokenizer;
 import com.integrallis.models.backend.purejava.cact.Needle2Weights;
+import com.integrallis.models.backend.purejava.deepseek2.Deepseek2Config;
+import com.integrallis.models.backend.purejava.deepseek2.Deepseek2ForwardPass;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
+import com.integrallis.models.backend.purejava.gemma3n.Gemma3nConfig;
+import com.integrallis.models.backend.purejava.gemma3n.Gemma3nForwardPass;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Config;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.gptoss.GptOssConfig;
 import com.integrallis.models.backend.purejava.gptoss.GptOssForwardPass;
-import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
 import com.integrallis.models.backend.purejava.huggingface.HuggingFaceEndOfGeneration;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import com.integrallis.models.backend.purejava.internal.ModelMemoryArena;
+import com.integrallis.models.backend.purejava.lfm2.Lfm2Config;
+import com.integrallis.models.backend.purejava.lfm2.Lfm2ForwardPass;
 import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
 import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
@@ -419,8 +425,8 @@ public final class PureJavaBackend
                   runtime,
                   planConfiguration,
                   batchedMatrixKernel);
-        } else if (GptOssHuggingFaceConfig.matches(configPath)) {
-          GptOssHuggingFaceConfig config = GptOssHuggingFaceConfig.parse(configPath);
+        } else if (GptOssConfig.matches(configPath)) {
+          GptOssConfig config = GptOssConfig.parse(configPath);
           tokenizer =
               HuggingFaceTokenizer.fromGptOss(
                   modelPath.resolve("tokenizer.json"),
@@ -477,9 +483,25 @@ public final class PureJavaBackend
                   planConfiguration,
                   backendConfiguration,
                   batchedMatrixKernel);
-        } else if ("qwen35".equals(modelFamily)) {
+        } else if ("qwen35".equals(modelFamily)
+            || "qwen35moe".equals(modelFamily)
+            || "qwen3next".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
-          loaded = loadQwen35(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+          loaded =
+              loadQwen35(
+                  modelPath, file, modelFamily, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("gpt-oss".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
+          loaded = loadGgufGptOss(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("deepseek2".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
+          loaded = loadDeepseek2(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("gemma3n".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
+          loaded = loadGemma3n(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("lfm2".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
+          loaded = loadLfm2(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else if ("bert".equals(modelFamily) || "nomic-bert".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadBert(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
@@ -642,9 +664,51 @@ public final class PureJavaBackend
     return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
   }
 
+  /**
+   * The GGUF release of GPT-OSS, which is the same decoder over a different weight layout.
+   *
+   * <p>Separate from {@link #loadHuggingFaceGptOss} only in where the weights come from: the config
+   * is built from the GGUF header rather than a {@code config.json}, and the graph is handed a GGUF
+   * file.
+   */
+  private static LoadedDecoder loadGgufGptOss(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    GptOssConfig config = GptOssConfig.fromGgufMetadata(file.metadata());
+    String modelFamily = "gpt-oss";
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                modelFamily,
+                config.queryDimension(),
+                config.keyValueDimension(),
+                config.keyValueDimension(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.maxPosition(), planConfiguration);
+    PureJavaDecoder decoder =
+        new GptOssDecoderAdapter(GptOssForwardPass.loadGguf(config, file, contextCapacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            modelFamily,
+            modelName(modelPath, file),
+            config.maxPosition(),
+            config.vocabSize(),
+            config.hiddenSize(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
   private static LoadedDecoder loadHuggingFaceGptOss(
       Path modelPath,
-      GptOssHuggingFaceConfig config,
+      GptOssConfig config,
       SafetensorsTensorSource tensors,
       RuntimeFingerprint runtime,
       PureJavaPlanConfiguration planConfiguration,
@@ -841,9 +905,127 @@ public final class PureJavaBackend
         new Gemma4DecoderAdapter(decoder), metadata, contextCapacity, executionPlan);
   }
 
+  /**
+   * Loads the LFM2 hybrid decoder.
+   *
+   * <p>The execution plan is built from a mapped-architecture topology rather than a per-layer
+   * tensor one: most LFM2 layers have no attention projections at all, so there is no uniform
+   * query, key and value set for the planner to inspect. The attention layers' dimensions are
+   * reported, which is what the plan's kernel choices key on.
+   */
+  private static LoadedDecoder loadDeepseek2(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    Deepseek2Config config = Deepseek2Config.fromMetadata(file.metadata());
+    // Conservative: this decoder runs one token at a time, so the planner has no batched projection
+    // to
+    // choose a kernel for.
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "deepseek2",
+                config.queryDim(),
+                config.cachedKeyDim(),
+                config.cachedValueDim(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
+    PureJavaDecoder decoder =
+        new Deepseek2DecoderAdapter(
+            Deepseek2ForwardPass.fromGgufFile(file, config, contextCapacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "deepseek2",
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadGemma3n(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    Gemma3nConfig config = Gemma3nConfig.fromMetadata(file.metadata());
+    // A conservative topology: this decoder runs one token at a time, so the planner has no batched
+    // projection to choose a kernel for, and reporting the real tensor types would advertise a
+    // batched path that does not exist here.
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "gemma3n", config.queryDim(), config.keyDim(), config.keyDim(), config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
+    PureJavaDecoder decoder =
+        new Gemma3nDecoderAdapter(Gemma3nForwardPass.fromGgufFile(file, config, contextCapacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "gemma3n",
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadLfm2(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    Lfm2Config config = Lfm2Config.fromMetadata(file.metadata());
+    int firstAttentionLayer = -1;
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      if (config.usesAttention(layer)) {
+        firstAttentionLayer = layer;
+        break;
+      }
+    }
+    int keyDim = config.keyDim(firstAttentionLayer);
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "lfm2", config.queryDim(), keyDim, keyDim, config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
+    PureJavaDecoder decoder =
+        new Lfm2DecoderAdapter(Lfm2ForwardPass.fromGgufFile(file, config, contextCapacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "lfm2",
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads(firstAttentionLayer));
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
   private static LoadedDecoder loadQwen35(
       Path modelPath,
       GgufFile file,
+      String modelFamily,
       RuntimeFingerprint runtime,
       PureJavaPlanConfiguration planConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
@@ -854,7 +1036,9 @@ public final class PureJavaBackend
     int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     ModelMetadata metadata =
         new ModelMetadata(
-            "qwen35",
+            // qwen35, qwen35moe and qwen3next share this decoder but are not the same model
+            // family, and the reported architecture is what qualification records against a model.
+            modelFamily,
             modelName(modelPath, file),
             config.contextLength(),
             config.vocabSize(),
@@ -1397,19 +1581,28 @@ public final class PureJavaBackend
         : Math.min(modelContextLength, recommended);
   }
 
-  private static ModelTopology gemma4Topology(GgufFile file, Gemma4Config config) {
+  /** Visible for testing: the shared-key-value mapping here is not reachable through load(). */
+  static ModelTopology gemma4Topology(GgufFile file, Gemma4Config config) {
     List<ModelTopology.LayerTopology> layers = new ArrayList<>(config.numLayers());
     int queryRows = 0;
     int keyRows = 0;
     int valueRows = 0;
     for (int layer = 0; layer < config.numLayers(); layer++) {
       String prefix = "blk." + layer + ".";
-      GgufTensorType key = tensorType(file, prefix + "attn_k.weight");
+      // A shared-key-value layer carries no attn_k or attn_v of its own: it reads the cache another
+      // layer wrote. Reading its own names refused every Gemma 4 E4B with "Tensor not found:
+      // blk.24.attn_k.weight" -- and the honest type to report is the one the plan will actually
+      // multiply, which belongs to the layer this one borrows from.
+      int kvLayer = config.ownsKvCache(layer) ? layer : config.kvSourceLayer(layer);
+      String kvPrefix = "blk." + kvLayer + ".";
+      GgufTensorType key = tensorType(file, kvPrefix + "attn_k.weight");
       layers.add(
           new ModelTopology.LayerTopology(
               tensorType(file, prefix + "attn_q.weight"),
               key,
-              config.usesSlidingWindow(layer) ? tensorType(file, prefix + "attn_v.weight") : key,
+              config.usesSlidingWindow(kvLayer)
+                  ? tensorType(file, kvPrefix + "attn_v.weight")
+                  : key,
               tensorType(file, prefix + "attn_output.weight"),
               tensorType(file, prefix + "ffn_gate.weight"),
               tensorType(file, prefix + "ffn_up.weight"),
@@ -1440,6 +1633,15 @@ public final class PureJavaBackend
               (token, sources) ->
                   environment.put("end-of-generation." + token, String.join(",", sources)));
       environment.put("end-of-generation.chat-template", gguf.chatTemplateEndOfTurnResolution());
+      // The declared byte-level pre-tokenizer, and whether this build implements it. Recorded
+      // because an unimplemented one falls back to no word-boundary splitting at all: the token
+      // stream changes, output gets slightly worse, and nothing fails. Without this in the record
+      // the loss is indistinguishable from the model being bad. BpePreTokenizer has tracked the
+      // fallback since it was written, but only in a package-private diagnostic that no production
+      // caller could reach.
+      environment.put("tokenizer.pre", gguf.declaredPreTokenizer());
+      environment.put(
+          "tokenizer.pre.implemented", Boolean.toString(gguf.preTokenizerImplemented()));
     }
     return new BackendDiagnostics(
         diagnostics.backend(), diagnostics.planVersion(), environment, diagnostics.optimizations());

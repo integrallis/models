@@ -58,6 +58,8 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v6
+      - name: Warm the Gradle distribution
+        uses: ./.github/actions/warm-gradle
       - name: Test Spring adapters and starters
         run: >
           ./gradlew
@@ -83,6 +85,8 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v6
+      - name: Warm the Gradle distribution
+        uses: ./.github/actions/warm-gradle
       - name: Test LangChain4j adapters
         run: >
           ./gradlew

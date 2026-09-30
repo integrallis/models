@@ -34,6 +34,7 @@ public enum RagPromptTemplate {
   GEMMA4("gemma4"),
   PHI3("phi3"),
   DEEPSEEK("deepseek"),
+  DEEPSEEK_V2("deepseek-v2"),
   H2O("h2o"),
   H2O_DIRECT("h2o-direct"),
   MINICPM5_NO_THINK("minicpm5-no-think"),
@@ -121,6 +122,20 @@ public enum RagPromptTemplate {
               .build();
       case DEEPSEEK ->
           result.control("### Instruction:\n").text(prompt).control("\n### Response:\n").build();
+      // DeepSeek-V2 and later replaced the "### Instruction:" format with User:/Assistant: turns.
+      // Kept as a separate template rather than a change to DEEPSEEK: the V1 coder models are
+      // already qualified against the older format and their greedy oracles are pinned on it, so
+      // editing DEEPSEEK in place would silently change evidence that has already been published.
+      //
+      // Transcribed from the published GGUF's own tokenizer.chat_template, which for
+      // DeepSeek-Coder-V2-Lite-Instruct is:
+      //   {{ bos_token }} ... {{ 'User: ' + content + '\n\n' }} ... {{ 'Assistant: ' + ... }}
+      //
+      // Prompting a V2 model with the V1 markers is not a subtle degradation. On 2026-09-29 it
+      // produced "###" repeated for whole completions -- the model continuing the pattern it was
+      // shown -- which looked exactly like a broken decoder until the template was read.
+      case DEEPSEEK_V2 ->
+          result.control("User: ").text(prompt.strip()).control("\n\nAssistant:").build();
       case H2O ->
           result.control("<|prompt|>").text(prompt.strip()).control("</s><|answer|>").build();
       case H2O_DIRECT ->
@@ -227,6 +242,17 @@ public enum RagPromptTemplate {
               .text(userPrompt)
               .control("\n### Response:\n")
               .build();
+      // The system prompt joins the user turn rather than getting a turn of its own: this model's
+      // own chat template renders a system message as bare text before the first "User: ", with no
+      // marker of its own.
+      case DEEPSEEK_V2 ->
+          result
+              .control("User: ")
+              .text(systemPrompt.stripTrailing())
+              .text("\n\n")
+              .text(userPrompt.strip())
+              .control("\n\nAssistant:")
+              .build();
       case H2O, H2O_DIRECT -> {
         result
             .control("<|prompt|>")
@@ -295,7 +321,8 @@ public enum RagPromptTemplate {
     }
     throw new IllegalArgumentException(
         "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
-            + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, phi3, deepseek, h2o, "
+            + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, phi3, deepseek, "
+            + "deepseek-v2, h2o, "
             + "h2o-direct, minicpm5-no-think, granite, granite-documents");
   }
 }

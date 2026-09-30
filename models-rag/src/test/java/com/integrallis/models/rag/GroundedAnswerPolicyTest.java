@@ -118,6 +118,72 @@ class GroundedAnswerPolicyTest {
     assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER_WITH_DERIVED_CITATIONS);
   }
 
+  /**
+   * A model that reasons before answering is judged on the answer, not the reasoning.
+   *
+   * <p>Screening a trace as if it were an answer fails on the trace's own terms: it reasons aloud,
+   * so it states things the retrieved documents do not support and the whole output is rejected.
+   * The answer after it is never examined. Measured on 2026-09-29, where several models answered
+   * correctly after a {@code <think>} block and were reported afterwards as contributing nothing at
+   * all.
+   */
+  @Test
+  void judgesTheAnswerThatFollowsAClosedReasoningBlock() {
+    String generated =
+        "<think>\nOkay, the user wants settlement times. The context says 2 business days.\n</think>\n"
+            + "Domestic claims settle within 2 business days. [payments-settlement]";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER);
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+    assertThat(answer.rawText())
+        .describedAs("the raw text keeps the trace, so the record still shows what was generated")
+        .isEqualTo(generated);
+    assertThat(answer.decision().modelContributed()).isTrue();
+  }
+
+  /**
+   * An unterminated reasoning block is a real failure and stays one.
+   *
+   * <p>Generation that stopped inside the trace produced no answer to judge -- the 64-token cap on
+   * 2026-09-29 did exactly this -- so there is nothing to strip and nothing to credit. Left in
+   * place to fail screening rather than tidied away, which would manufacture an answer out of a
+   * truncation.
+   */
+  @Test
+  void refusesToTreatAnUnterminatedReasoningBlockAsAnAnswer() {
+    // A trace carrying a supported sentence and a trusted citation, to check that an unterminated
+    // block is still not credited: only closed blocks are stripped, so this reaches screening
+    // intact
+    // and is rejected on its own content. Verified by probing the policy directly -- the decision
+    // is
+    // EXTRACTIVE_FALLBACK with or without an explicit refusal, which is why no such refusal exists.
+    String generated =
+        "<think>\nDomestic claims settle within 2 business days. [payments-settlement] and now let me";
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.EXTRACTIVE_FALLBACK);
+    assertThat(answer.decision().modelContributed()).isFalse();
+  }
+
+  /** A model may reason and then abstain, and that is an abstention rather than a bad answer. */
+  @Test
+  void treatsAnAbstentionAfterAReasoningBlockAsAnAbstention() {
+    String generated =
+        "<think>\nThe context says nothing about lunar vehicles.\n</think>\n"
+            + GroundedAnswerPolicy.ABSTENTION;
+
+    GroundedAnswer answer =
+        policy.apply("How long do both payment types take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ABSTENTION);
+  }
+
   @Test
   void preservesLiteralBracketedEllipsisInsteadOfTreatingItAsACitation() {
     String generated = "Domestic claims settle within 2 business days [...].";

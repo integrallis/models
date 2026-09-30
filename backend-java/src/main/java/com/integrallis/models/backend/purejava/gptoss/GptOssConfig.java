@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import com.integrallis.models.backend.purejava.huggingface.HuggingFaceEndOfGeneration;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -29,7 +30,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** Validated GPT-OSS execution contract read from a Hugging Face {@code config.json}. */
-public record GptOssHuggingFaceConfig(
+public record GptOssConfig(
     List<String> architectures,
     int hiddenSize,
     int numLayers,
@@ -62,7 +63,7 @@ public record GptOssHuggingFaceConfig(
   private static final JsonFactory JSON =
       JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
 
-  public GptOssHuggingFaceConfig {
+  public GptOssConfig {
     architectures = List.copyOf(Objects.requireNonNull(architectures, "architectures"));
     hiddenActivation = Objects.requireNonNull(hiddenActivation, "hiddenActivation");
     quantizationMethod = Objects.requireNonNull(quantizationMethod, "quantizationMethod");
@@ -127,7 +128,113 @@ public record GptOssHuggingFaceConfig(
     directTokenId(padTokenId, vocabSize, "padTokenId");
   }
 
-  public static GptOssHuggingFaceConfig parse(Path path) throws IOException {
+  /**
+   * YaRN's ramp bounds. The safetensors {@code config.json} states them; GGUF does not publish
+   * them, and these are the values that release carries.
+   */
+  private static final float DEFAULT_ROPE_BETA_FAST = 32.0f;
+
+  private static final float DEFAULT_ROPE_BETA_SLOW = 1.0f;
+
+  /**
+   * The clamp and the sigmoid steepness of GPT-OSS's gated activation.
+   *
+   * <p>Architecture constants rather than checkpoint choices -- the same numbers the safetensors
+   * release states as {@code swiglu_limit} and {@code hidden_act_alpha}, and what {@code
+   * GptOssMath} is written against. GGUF publishes neither.
+   */
+  private static final float DEFAULT_SWIGLU_LIMIT = 7.0f;
+
+  private static final float DEFAULT_HIDDEN_ACT_ALPHA = 1.702f;
+
+  /** No end-of-generation or padding id is published in a GGUF header under these names. */
+  private static final int UNSPECIFIED_TOKEN_ID = -1;
+
+  /**
+   * Builds the same contract from a GGUF header.
+   *
+   * <p>GPT-OSS ships as both safetensors and GGUF, and the two publish overlapping but not
+   * identical metadata. Everything the graph reads is present in both; the fields that only the
+   * safetensors {@code config.json} carries are filled in here from what the GGUF implies, and each
+   * is called out below because an invented value that nothing reads is still a value someone will
+   * later trust.
+   *
+   * <p>Not read anywhere in the decoder, so these are descriptive only: {@code architectures},
+   * {@code quantizationMethod}, {@code hiddenActivation}. {@code layerTypes} <b>is</b> read,
+   * through {@link #usesSlidingAttention(int)}, and GGUF publishes no pattern -- only the window
+   * size -- so it is derived: the reference defaults this family to a period of 2 with the sliding
+   * layer first, so even layers slide and odd layers attend to everything. Taken from {@code
+   * openai-moe.cpp}, where {@code swa_period = 2} and {@code set_swa_pattern} leaves {@code il % 2
+   * < 1} sliding.
+   *
+   * @param metadata the parsed GGUF header
+   * @return the contract, equivalent to what {@link #parse} produces for the same model
+   */
+  public static GptOssConfig fromGgufMetadata(GgufMetadata metadata) {
+    Objects.requireNonNull(metadata, "metadata");
+    String architecture = metadata.getString("general.architecture").orElse("");
+    if (!"gpt-oss".equals(architecture)) {
+      throw malformed("Expected general.architecture=gpt-oss, found " + architecture);
+    }
+    int numLayers = requiredInt(metadata, "gpt-oss.block_count");
+    int contextLength = requiredInt(metadata, "gpt-oss.context_length");
+
+    List<String> layerTypes = new ArrayList<>(numLayers);
+    for (int layer = 0; layer < numLayers; layer++) {
+      layerTypes.add(layer % 2 == 0 ? "sliding_attention" : "full_attention");
+    }
+
+    return new GptOssConfig(
+        // Descriptive only: nothing in the decoder reads this.
+        List.of("GptOssForCausalLM"),
+        requiredInt(metadata, "gpt-oss.embedding_length"),
+        numLayers,
+        requiredInt(metadata, "gpt-oss.attention.head_count"),
+        requiredInt(metadata, "gpt-oss.attention.head_count_kv"),
+        requiredInt(metadata, "gpt-oss.attention.key_length"),
+        metadata
+            .getUint32("gpt-oss.vocab_size")
+            .or(() -> metadata.getArraySize("tokenizer.ggml.tokens"))
+            .orElseThrow(() -> malformed("Missing GPT-OSS vocabulary size")),
+        contextLength,
+        metadata.getUint32("gpt-oss.rope.scaling.original_context_length").orElse(contextLength),
+        requiredInt(metadata, "gpt-oss.expert_feed_forward_length"),
+        requiredInt(metadata, "gpt-oss.expert_count"),
+        requiredInt(metadata, "gpt-oss.expert_used_count"),
+        requiredInt(metadata, "gpt-oss.attention.sliding_window"),
+        requiredFloat(metadata, "gpt-oss.attention.layer_norm_rms_epsilon"),
+        requiredFloat(metadata, "gpt-oss.rope.freq_base"),
+        metadata.getFloat32("gpt-oss.rope.scaling.factor").orElse(1.0f),
+        DEFAULT_ROPE_BETA_FAST,
+        DEFAULT_ROPE_BETA_SLOW,
+        metadata.getUint32("gpt-oss.rope.scaling.original_context_length").orElse(contextLength),
+        // GGUF publishes neither, and they are architecture constants rather than checkpoint
+        // choices.
+        DEFAULT_SWIGLU_LIMIT,
+        DEFAULT_HIDDEN_ACT_ALPHA,
+        // "silu" is what the safetensors config.json states and what this class validates; the
+        // gated
+        // form is in GptOssMath, not in the name.
+        "silu",
+        "mxfp4",
+        // The published GGUF carries attn_q/k/v/output biases, which is what attentionBias means.
+        true,
+        // It carries its own output.weight, so the head is not tied to the embedding.
+        false,
+        UNSPECIFIED_TOKEN_ID,
+        UNSPECIFIED_TOKEN_ID,
+        layerTypes);
+  }
+
+  private static int requiredInt(GgufMetadata metadata, String key) {
+    return metadata.getUint32(key).orElseThrow(() -> malformed("Missing " + key));
+  }
+
+  private static float requiredFloat(GgufMetadata metadata, String key) {
+    return metadata.getFloat32(key).orElseThrow(() -> malformed("Missing " + key));
+  }
+
+  public static GptOssConfig parse(Path path) throws IOException {
     Objects.requireNonNull(path, "path");
     Fields fields = new Fields();
     try (JsonParser parser = JSON.createParser(path.toFile())) {
@@ -392,7 +499,7 @@ public record GptOssHuggingFaceConfig(
     private boolean tieWordEmbeddings;
     private Integer vocabSize;
 
-    private GptOssHuggingFaceConfig toConfig() {
+    private GptOssConfig toConfig() {
       if (!"gpt_oss".equals(modelType)) {
         throw malformed("GPT-OSS config requires model_type gpt_oss; got " + modelType);
       }
@@ -460,7 +567,7 @@ public record GptOssHuggingFaceConfig(
       boolean hasSliding = schedule.contains("sliding_attention");
       int resolvedSliding = hasSliding ? positive(slidingWindow, "sliding_window") : 0;
 
-      return new GptOssHuggingFaceConfig(
+      return new GptOssConfig(
           resolvedArchitectures,
           resolvedHidden,
           resolvedLayers,

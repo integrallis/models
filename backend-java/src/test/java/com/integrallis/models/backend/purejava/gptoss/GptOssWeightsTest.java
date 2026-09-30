@@ -46,7 +46,11 @@ class GptOssWeightsTest {
 
     assertThat(weights.tokenEmbedding().rows()).isEqualTo(VOCAB);
     assertThat(weights.tokenEmbedding().columns()).isEqualTo(HIDDEN);
-    assertThat(weights.tokenEmbedding().value(0, 0)).isEqualTo(1.0f);
+    // Through row(..) now: the projection abstraction exposes a whole row rather than one element,
+    // because that is the only way the graph reads the embedding.
+    float[] firstRow = new float[HIDDEN];
+    weights.tokenEmbedding().row(0, firstRow);
+    assertThat(firstRow[0]).isEqualTo(1.0f);
     assertThat(weights.output().rows()).isEqualTo(VOCAB);
     assertThat(weights.outputNorm()).startsWith(2.0f).hasSize(HIDDEN);
 
@@ -83,8 +87,8 @@ class GptOssWeightsTest {
         .hasMessageContaining("[64, 32]");
   }
 
-  private static GptOssHuggingFaceConfig config() {
-    return new GptOssHuggingFaceConfig(
+  private static GptOssConfig config() {
+    return new GptOssConfig(
         List.of("GptOssForCausalLM"),
         HIDDEN,
         1,

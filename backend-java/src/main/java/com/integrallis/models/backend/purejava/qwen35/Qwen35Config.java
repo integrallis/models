@@ -20,8 +20,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable execution shape for a dense Qwen3.5 hybrid-attention decoder. */
+/**
+ * Immutable execution shape for a Qwen3.5-family hybrid-attention decoder.
+ *
+ * <p>Covers the dense, routed and Qwen3-Next variants; see {@link #ARCHITECTURES}.
+ *
+ * @param architecture the {@code general.architecture} this was parsed from. Carried rather than
+ *     discarded because it is what the model reports as its family. Derived from the feed-forward
+ *     shape instead -- routed means qwen35moe -- it would call every Qwen3-Next a Qwen3.5-MoE, and
+ *     qualification records results against the reported name.
+ */
 public record Qwen35Config(
+    String architecture,
     int embeddingDim,
     int numLayers,
     int numHeads,
@@ -38,9 +48,27 @@ public record Qwen35Config(
     int gdnKeyHeads,
     int gdnValueHeads,
     int gdnInnerDim,
-    int fullAttentionInterval) {
+    int fullAttentionInterval,
+    int numExperts,
+    int numExpertsUsed,
+    int expertHiddenDim,
+    int sharedExpertHiddenDim) {
+
+  /**
+   * The architectures this contract covers.
+   *
+   * <p>One decoder, three names. They publish the same hybrid keys under their own prefix and
+   * differ only in the feed-forward half and, for Qwen3-Next, in how the Gated DeltaNet packs beta
+   * and alpha. Verified from the published GGUF headers of all three rather than assumed from the
+   * naming.
+   */
+  static final List<String> ARCHITECTURES = List.of("qwen35", "qwen35moe", "qwen3next");
 
   public Qwen35Config {
+    if (!ARCHITECTURES.contains(architecture)) {
+      throw new IllegalArgumentException(
+          "architecture must be one of " + ARCHITECTURES + ": " + architecture);
+    }
     positive("embeddingDim", embeddingDim);
     positive("numLayers", numLayers);
     positive("numHeads", numHeads);
@@ -48,7 +76,14 @@ public record Qwen35Config(
     positive("attentionHeadDim", attentionHeadDim);
     positive("vocabSize", vocabSize);
     positive("contextLength", contextLength);
-    positive("hiddenDim", hiddenDim);
+    // A fully routed Qwen3.5 publishes no feed_forward_length at all -- every layer is expert -- so
+    // a
+    // zero dense width is a shape, not a malformed file. It stays required for the dense variant.
+    if (numExperts == 0) {
+      positive("hiddenDim", hiddenDim);
+    } else if (hiddenDim < 0) {
+      throw new IllegalArgumentException("hiddenDim must not be negative, was " + hiddenDim);
+    }
     finitePositive("ropeTheta", ropeTheta);
     positive("ropeDimension", ropeDimension);
     finitePositive("rmsNormEpsilon", rmsNormEpsilon);
@@ -58,6 +93,22 @@ public record Qwen35Config(
     positive("gdnValueHeads", gdnValueHeads);
     positive("gdnInnerDim", gdnInnerDim);
     positive("fullAttentionInterval", fullAttentionInterval);
+    // All four expert fields together or none. A half-declared mixture would be treated as dense
+    // and
+    // would silently skip the routed feed-forward, which is the whole of the model's capacity.
+    if (!(numExperts == 0
+        && numExpertsUsed == 0
+        && expertHiddenDim == 0
+        && sharedExpertHiddenDim == 0)) {
+      positive("numExperts", numExperts);
+      positive("numExpertsUsed", numExpertsUsed);
+      positive("expertHiddenDim", expertHiddenDim);
+      positive("sharedExpertHiddenDim", sharedExpertHiddenDim);
+      if (numExpertsUsed > numExperts) {
+        throw new IllegalArgumentException(
+            "numExpertsUsed must not exceed numExperts: " + numExpertsUsed + " > " + numExperts);
+      }
+    }
     if (numHeads % numKvHeads != 0) {
       throw new IllegalArgumentException("numHeads must be divisible by numKvHeads");
     }
@@ -73,35 +124,57 @@ public record Qwen35Config(
     }
   }
 
+  /** Whether the feed-forward is routed to experts rather than dense. */
+  public boolean usesMixtureOfExperts() {
+    return numExperts > 0;
+  }
+
+  /** Recurrent state width per expert slice, for the routed feed-forward. */
+  public int expertSliceElements() {
+    return expertHiddenDim * embeddingDim;
+  }
+
   public static Qwen35Config fromMetadata(GgufMetadata metadata) {
     Objects.requireNonNull(metadata, "metadata");
     String architecture = metadata.getString("general.architecture").orElse("");
-    if (!"qwen35".equals(architecture)) {
+    if (!ARCHITECTURES.contains(architecture)) {
+      // A List rather than a Set: this text is a message a user reads, and Set.of iterates in an
+      // unspecified order, so the same refusal would list its alternatives differently per run.
       throw new IllegalArgumentException(
-          "Expected general.architecture=qwen35, found " + architecture);
+          "Expected general.architecture one of " + ARCHITECTURES + ", found " + architecture);
     }
+    // Both variants publish the same hybrid keys under their own prefix; only the feed-forward half
+    // differs. Verified against a Kwaipilot KAT-Coder-V2.5-Dev header, which carries the full ssm.*
+    // set, full_attention_interval and the attention keys exactly as qwen35 does.
+    String prefix = architecture + ".";
 
     return new Qwen35Config(
-        requiredInt(metadata, "qwen35.embedding_length"),
-        requiredInt(metadata, "qwen35.block_count"),
-        requiredInt(metadata, "qwen35.attention.head_count"),
-        requiredInt(metadata, "qwen35.attention.head_count_kv"),
-        requiredInt(metadata, "qwen35.attention.key_length"),
+        architecture,
+        requiredInt(metadata, prefix + "embedding_length"),
+        requiredInt(metadata, prefix + "block_count"),
+        requiredInt(metadata, prefix + "attention.head_count"),
+        requiredInt(metadata, prefix + "attention.head_count_kv"),
+        requiredInt(metadata, prefix + "attention.key_length"),
         metadata
-            .getUint32("qwen35.vocab_size")
+            .getUint32(prefix + "vocab_size")
             .or(() -> metadata.getArraySize("tokenizer.ggml.tokens"))
             .orElseThrow(() -> new IllegalArgumentException("Missing Qwen3.5 vocabulary size")),
-        requiredInt(metadata, "qwen35.context_length"),
-        requiredInt(metadata, "qwen35.feed_forward_length"),
-        requiredFloat(metadata, "qwen35.rope.freq_base"),
-        requiredInt(metadata, "qwen35.rope.dimension_count"),
-        requiredFloat(metadata, "qwen35.attention.layer_norm_rms_epsilon"),
-        requiredInt(metadata, "qwen35.ssm.conv_kernel"),
-        requiredInt(metadata, "qwen35.ssm.state_size"),
-        requiredInt(metadata, "qwen35.ssm.group_count"),
-        requiredInt(metadata, "qwen35.ssm.time_step_rank"),
-        requiredInt(metadata, "qwen35.ssm.inner_size"),
-        requiredInt(metadata, "qwen35.full_attention_interval"));
+        requiredInt(metadata, prefix + "context_length"),
+        // Absent on a fully routed model, where the routed width replaces it.
+        metadata.getUint32(prefix + "feed_forward_length").orElse(0),
+        requiredFloat(metadata, prefix + "rope.freq_base"),
+        requiredInt(metadata, prefix + "rope.dimension_count"),
+        requiredFloat(metadata, prefix + "attention.layer_norm_rms_epsilon"),
+        requiredInt(metadata, prefix + "ssm.conv_kernel"),
+        requiredInt(metadata, prefix + "ssm.state_size"),
+        requiredInt(metadata, prefix + "ssm.group_count"),
+        requiredInt(metadata, prefix + "ssm.time_step_rank"),
+        requiredInt(metadata, prefix + "ssm.inner_size"),
+        requiredInt(metadata, prefix + "full_attention_interval"),
+        metadata.getUint32(prefix + "expert_count").orElse(0),
+        metadata.getUint32(prefix + "expert_used_count").orElse(0),
+        metadata.getUint32(prefix + "expert_feed_forward_length").orElse(0),
+        metadata.getUint32(prefix + "expert_shared_feed_forward_length").orElse(0));
   }
 
   public int attentionQueryDim() {

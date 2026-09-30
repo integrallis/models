@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -152,15 +153,20 @@ public record ModelTopology(
     List<LayerTopology> layers = new ArrayList<>(config.numLayers());
     for (int layer = 0; layer < config.numLayers(); layer++) {
       LlamaWeights.LayerWeights value = weights.layer(layer);
+      // A routed layer has no dense feed-forward, so its planning topology describes the expert
+      // tensors -- the weights the layer actually multiplies. Reporting nulls here would make a
+      // plan's topology unmatchable and tell the kernel chooser nothing about the quantization it
+      // has to handle, which for Qwen3-30B-A3B is Q4_K gate/up against a Q6_K down.
+      LlamaWeights.MoeWeights moe = value.moe();
       layers.add(
           new LayerTopology(
               value.wqType(),
               value.wkType(),
               value.wvType(),
               value.woType(),
-              value.ffnGateType(),
-              value.ffnUpType(),
-              value.ffnDownType()));
+              moe != null ? moe.gateType() : value.ffnGateType(),
+              moe != null ? moe.upType() : value.ffnUpType(),
+              moe != null ? moe.downType() : value.ffnDownType()));
     }
     return new ModelTopology(
         architecture,
@@ -311,11 +317,34 @@ public record ModelTopology(
       LlamaConfig config, LlamaWeights weights) {
     for (int layer = 0; layer < config.numLayers(); layer++) {
       LlamaWeights.LayerWeights value = weights.layer(layer);
-      if (!threadShareable(value.wo(), value.ffnGate(), value.ffnUp(), value.ffnDown())) {
+      if (!threadShareable(value.wo())) {
+        return false;
+      }
+      // A routed layer's dense feed-forward segments are null, exactly as its dense tensor types
+      // are above. Probing them threw a NullPointerException out of model loading for every
+      // Qwen3-30B-A3B in the fleet, which is the whole reason this walks the layer's own shape.
+      if (!threadShareable(feedForwardSegments(value))) {
         return false;
       }
     }
     return true;
+  }
+
+  /** The feed-forward segments a layer actually holds, dense or routed. */
+  private static MemorySegment[] feedForwardSegments(LlamaWeights.LayerWeights layer) {
+    LlamaWeights.MoeWeights moe = layer.moe();
+    if (moe == null) {
+      return new MemorySegment[] {layer.ffnGate(), layer.ffnUp(), layer.ffnDown()};
+    }
+    // The per-expert arrays are slices of one mapped tensor each, so probing every expert asks the
+    // same question many times -- but cheaply, once per load, and without assuming they share an
+    // arena.
+    List<MemorySegment> segments = new ArrayList<>();
+    segments.add(moe.router());
+    segments.addAll(Arrays.asList(moe.gate()));
+    segments.addAll(Arrays.asList(moe.up()));
+    segments.addAll(Arrays.asList(moe.down()));
+    return segments.toArray(new MemorySegment[0]);
   }
 
   private static boolean threadShareable(MemorySegment... segments) {

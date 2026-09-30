@@ -20,15 +20,21 @@ xref:embeddings.adoc#equivalence-gating[Equivalence Gating].
 
 == Supported Runtime Surface
 
-The GGUF runtime recognizes the `bert`, `llama`, `qwen2`, `qwen3`, `qwen35`,
-and `gemma4` metadata prefixes. The `bert` path is a dedicated bidirectional
+The GGUF runtime recognizes the `bert`, `llama`, `qwen2`, `qwen3`, `qwen3moe`,
+`qwen35`, `qwen35moe`, `qwen3next`, `gemma4`, `gemma3n`, `deepseek2`, `lfm2`,
+`mistral3`, and `gpt-oss` metadata prefixes. The `bert` path is a dedicated bidirectional
 encoder with learned-bias LayerNorm, GELU feed-forward layers, WordPiece
 tokenization, and model-declared mean or CLS pooling. Qwen3.5 support is
-currently limited to dense, text-only
-GGUF checkpoints; its MoE, vision, and MTP paths are not supported. The
+covers dense and mixture-of-experts
+text-only GGUF checkpoints; its vision and MTP paths are not supported. A routed
+model runs its expert branch one token at a time, because expert selection
+differs per token and a batched matmul cannot serve rows needing different
+weights. The
 Hugging Face path supports strict Qwen 2/Qwen2.5 BF16, Meta MobileMoE QAT
 INT4, and GPT-OSS MXFP4 Safetensors bundles with either one weight file or an
-indexed shard set. MobileMoE executes its official 60-expert top-4 graph and
+indexed shard set. GPT-OSS also loads from a GGUF, where the experts arrive as a
+single interleaved MXFP4 blob rather than the split blocks and scales the
+Safetensors layout uses. MobileMoE executes its official 60-expert top-4 graph and
 chat template in Java. By default it prepares the mapped checkpoint's projection
 weights as row-major Q8 for Vector API execution; set
 `-Dmodels.mobilemoe.runtimeLayout=packed-int4` to trade latency for a smaller
@@ -37,7 +43,13 @@ implements the official Harmony prompt and tool-call protocol, but its current
 serial prompt prefill does not pass the catalog performance gate. Two
 layer-wise prefill candidates preserved the independent oracle result but were
 31% and 42% slower than the controlled serial baseline, so neither is shipped;
-the next performance gate targets the measured MXFP4 expert hot loop. The CACT path
+the MXFP4 expert hot loop that the next gate targeted is now parallel across
+rows, measured at 5.15x on twelve cores for one 2880x2880 expert matrix, and on a
+sixteen-vCPU host the same model moved from 8% to 78% CPU. Rows are split and
+never reductions, so the result is bit-identical to the serial path. The
+remaining MXFP4 gap is the activation path: the K-quant kernels quantize
+activations to Q8 and reduce in integer arithmetic, while MXFP4 still multiplies
+in scalar floats. The CACT path
 supports the released Needle 2 architecture and mixed CQ2/CQ4
 artifact layout. `ChatTemplate.NEEDLE2` implements its official raw-schema
 prompt protocol, including optional system facts and array-wrapped parallel
@@ -64,6 +76,28 @@ decoders.
 
 Other architectures, multimodal inputs, remaining quantization formats,
 and arbitrary chat templates are not implied by this list.
+
+=== Decoder Architectures Added In 0.3.48
+
+Eight architectures reached format support in 0.3.48: `lfm2`, `qwen3moe`,
+`mistral3`, `qwen35moe`, `qwen3next`, `gemma3n`, `deepseek2`, and `gpt-oss` from
+a GGUF. They are verified against unit-level scalar references and golden
+vectors, and they load and run published weights end to end.
+
+*None of them appears in the qualified list below*, and the distinction at the top
+of this page is why. Format support and a completed benchmark run are not a
+qualification: that needs a candidate report, comparator arms measured on the same
+corpus and host, a passing verdict from the production policy, and committed
+evidence. A campaign on 2026-09-29 produced candidate reports for fourteen
+artifacts across these architectures and no comparator arms, so it produced no
+verdicts. Applying the policy to those reports afterwards, five of the fourteen
+clear its model-contribution gate and nine do not.
+
+Two architectures have defects on published weights, found by comparing against an
+external oracle rather than by any unit test: `deepseek2` emits only newline tokens
+for a whole completion once prompted with its own chat template, and `gemma3n`
+emits corrupted text. `qwen3next` degenerates into repetition. These are open, and
+nothing here claims otherwise.
 
 == Qualified Identities
 

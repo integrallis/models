@@ -30,21 +30,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @Tag("unit")
-class GptOssHuggingFaceConfigTest {
+class GptOssConfigTest {
 
   @Test
   void parsesThePinnedOfficial20BExecutionShape() throws Exception {
     Path path =
-        Path.of(
-            GptOssHuggingFaceConfigTest.class
-                .getResource("/huggingface/gpt-oss-20b-config.json")
-                .toURI());
+        Path.of(GptOssConfigTest.class.getResource("/huggingface/gpt-oss-20b-config.json").toURI());
 
     // openai/gpt-oss-20b at revision 6cee5e81ee83917806bbde320786a8fb61efebee.
     assertThat(sha256(path))
         .isEqualTo("3a2a26ded679375b7928ddeca59764df7cea83220c1961035f6d6e232659e9ce");
-    assertThat(GptOssHuggingFaceConfig.matches(path)).isTrue();
-    GptOssHuggingFaceConfig config = GptOssHuggingFaceConfig.parse(path);
+    assertThat(GptOssConfig.matches(path)).isTrue();
+    GptOssConfig config = GptOssConfig.parse(path);
 
     assertThat(config.architectures()).containsExactly("GptOssForCausalLM");
     assertThat(config.hiddenSize()).isEqualTo(2_880);
@@ -82,7 +79,7 @@ class GptOssHuggingFaceConfigTest {
     Path path = directory.resolve("config.json");
     Files.writeString(path, "{\"model_type\":\"qwen2\"}");
 
-    assertThat(GptOssHuggingFaceConfig.matches(path)).isFalse();
+    assertThat(GptOssConfig.matches(path)).isFalse();
   }
 
   @Test
@@ -93,10 +90,10 @@ class GptOssHuggingFaceConfigTest {
     Path wrongSchedule = directory.resolve("wrong-schedule.json");
     Files.writeString(wrongSchedule, minimalConfig("mxfp4", "[\"cross_attention\"]"));
 
-    assertThatThrownBy(() -> GptOssHuggingFaceConfig.parse(wrongQuantization))
+    assertThatThrownBy(() -> GptOssConfig.parse(wrongQuantization))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("mxfp4");
-    assertThatThrownBy(() -> GptOssHuggingFaceConfig.parse(wrongSchedule))
+    assertThatThrownBy(() -> GptOssConfig.parse(wrongSchedule))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("layer_types");
   }
@@ -106,7 +103,7 @@ class GptOssHuggingFaceConfigTest {
     Path duplicate = directory.resolve("duplicate.json");
     Files.writeString(duplicate, "{\"hidden_size\":32,\"hidden_size\":32}");
 
-    assertThatThrownBy(() -> GptOssHuggingFaceConfig.parse(duplicate))
+    assertThatThrownBy(() -> GptOssConfig.parse(duplicate))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("duplicate config JSON");
   }
@@ -121,8 +118,8 @@ class GptOssHuggingFaceConfigTest {
         .hasMessageContaining("layerTypes");
   }
 
-  private static GptOssHuggingFaceConfig directConfig(int hiddenSize, List<String> layerTypes) {
-    return new GptOssHuggingFaceConfig(
+  private static GptOssConfig directConfig(int hiddenSize, List<String> layerTypes) {
+    return new GptOssConfig(
         List.of("GptOssForCausalLM"),
         hiddenSize,
         1,
