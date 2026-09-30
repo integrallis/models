@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.VectorUtil;
@@ -1883,6 +1884,268 @@ class TensorOpsTest {
           * (1.0f
               + (float)
                   Math.tanh(0.7978845608028654f * value * (1.0f + 0.044715f * value * value)));
+    }
+  }
+
+  /**
+   * Splitting an MXFP4 projection across threads must not move a single bit.
+   *
+   * <p>The serial row loop meant an MXFP4 model decoded on one core while every other quantization
+   * used all of them: the K-quant and Q4_0 types hand the whole matrix to vectors-core's {@code
+   * gguf*BatchDotProduct}, which parallelises above a one-mebibyte threshold, and MXFP4 alone
+   * looped rows on the calling thread. Measured on a 16-vCPU qualification worker running gpt-oss
+   * from a GGUF, whose every expert is MXFP4: a flat 8% CPU, about one core, where the models on
+   * K-quant weights pegged it.
+   *
+   * <p>Asserted bit-identical rather than close, and that is the whole point of the change being
+   * safe. Each output element is its own dot product over its own row, so threads split which
+   * reduction runs where and never how one is folded -- in a backend that pins float reduction
+   * order on purpose, an "approximately equal" assertion here would be admitting the opposite.
+   */
+  @Test
+  void aThreadedMxfp4ProjectionIsBitIdenticalToTheSerialOne() {
+    // Over the one-mebibyte threshold, or this runs on the serial path and proves nothing:
+    // 4096 rows x (512/32 blocks x 17 bytes) = 1,114,112 bytes.
+    int rows = 4096;
+    int cols = 512;
+    int blocksPerRow = cols / Mxfp4Dequantizer.BLOCK_SIZE;
+    long rowBytes = (long) blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES;
+
+    try (Arena arena = Arena.ofShared()) {
+      MemorySegment weight = arena.allocate((long) rows * rowBytes);
+
+      assertThat(TensorOps.mxfp4Threads(rows, rowBytes, weight))
+          .describedAs("this fixture must actually take the threaded path")
+          .isGreaterThan(1);
+      assertThat(TensorOps.mxfp4Threads(2, rowBytes, weight))
+          .describedAs("a projection below the threshold stays on the calling thread")
+          .isEqualTo(1);
+
+      java.util.Random rng = new java.util.Random(20_260_929L);
+      for (int block = 0; block < rows * blocksPerRow; block++) {
+        long base = (long) block * Mxfp4Dequantizer.BLOCK_BYTES;
+        weight.set(ValueLayout.JAVA_BYTE, base, (byte) (120 + (block % 13)));
+        for (int j = 0; j < Mxfp4Dequantizer.BLOCK_SIZE / 2; j++) {
+          weight.set(ValueLayout.JAVA_BYTE, base + 1 + j, (byte) rng.nextInt(256));
+        }
+      }
+      float[] x = new float[cols];
+      for (int i = 0; i < cols; i++) {
+        x[i] = (rng.nextFloat() - 0.5f) * 2.0f;
+      }
+
+      float[] threaded = new float[rows];
+      TensorOps.ggufMatmul(threaded, x, weight, GgufTensorType.MXFP4, rows, cols);
+
+      // The reference is the same kernel the serial loop called, row by row on this thread.
+      float[] serial = new float[rows];
+      for (int row = 0; row < rows; row++) {
+        serial[row] = Mxfp4Dequantizer.dotProduct(weight, row * rowBytes, x, 0, cols);
+      }
+
+      assertThat(threaded).containsExactly(serial);
+      // And the work was real: an all-zero result would satisfy the comparison above.
+      assertThat(threaded[0]).isNotEqualTo(0.0f);
+      assertThat(threaded[rows - 1]).isNotEqualTo(0.0f);
+    }
+  }
+
+  /** Every row is written exactly once, including when the row count does not divide evenly. */
+  @Test
+  void aThreadedMxfp4ProjectionWritesEveryRowWhenChunksAreUneven() {
+    // 4095 is prime to the chunk size on any core count, so the last band is short.
+    int rows = 4095;
+    int cols = 512;
+    int blocksPerRow = cols / Mxfp4Dequantizer.BLOCK_SIZE;
+    long rowBytes = (long) blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES;
+    try (Arena arena = Arena.ofShared()) {
+      MemorySegment weight = arena.allocate((long) rows * rowBytes);
+      assertThat(TensorOps.mxfp4Threads(rows, rowBytes, weight)).isGreaterThan(1);
+      for (int block = 0; block < rows * blocksPerRow; block++) {
+        long base = (long) block * Mxfp4Dequantizer.BLOCK_BYTES;
+        weight.set(ValueLayout.JAVA_BYTE, base, (byte) 127);
+        for (int j = 0; j < Mxfp4Dequantizer.BLOCK_SIZE / 2; j++) {
+          weight.set(ValueLayout.JAVA_BYTE, base + 1 + j, (byte) 0x21);
+        }
+      }
+      float[] x = new float[cols];
+      java.util.Arrays.fill(x, 0.5f);
+
+      float[] threaded = new float[rows];
+      TensorOps.ggufMatmul(threaded, x, weight, GgufTensorType.MXFP4, rows, cols);
+
+      float[] serial = new float[rows];
+      for (int row = 0; row < rows; row++) {
+        serial[row] = Mxfp4Dequantizer.dotProduct(weight, row * rowBytes, x, 0, cols);
+      }
+      assertThat(threaded).containsExactly(serial);
+      // Uniform weights, so a row left unwritten shows up as a zero among identical values.
+      assertThat(threaded).doesNotContain(0.0f);
+    }
+  }
+
+  /**
+   * A confined-arena segment must stay on the calling thread, however large the projection.
+   *
+   * <p>This is the defect the first version of the threaded path had, and it is not a wrong number
+   * but a crash: a segment allocated from {@link Arena#ofConfined()} is readable only by the thread
+   * that allocated it, so a pool thread reading its rows throws {@code WrongThreadException} from
+   * inside the dot product. Big enough to clear the threshold on every axis except that one, so the
+   * only thing keeping it serial is the accessibility check.
+   */
+  @Test
+  void aConfinedMxfp4SegmentIsProjectedOnTheCallingThread() {
+    int rows = 4096;
+    int cols = 512;
+    int blocksPerRow = cols / Mxfp4Dequantizer.BLOCK_SIZE;
+    long rowBytes = (long) blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES;
+
+    try (Arena confined = Arena.ofConfined()) {
+      MemorySegment weight = confined.allocate((long) rows * rowBytes);
+      assertThat(TensorOps.mxfp4Threads(rows, rowBytes, weight))
+          .describedAs("a confined segment may only be read by its owning thread")
+          .isEqualTo(1);
+
+      for (int block = 0; block < rows * blocksPerRow; block++) {
+        long base = (long) block * Mxfp4Dequantizer.BLOCK_BYTES;
+        weight.set(ValueLayout.JAVA_BYTE, base, (byte) 127);
+        for (int j = 0; j < Mxfp4Dequantizer.BLOCK_SIZE / 2; j++) {
+          weight.set(ValueLayout.JAVA_BYTE, base + 1 + j, (byte) 0x21);
+        }
+      }
+      float[] x = new float[cols];
+      java.util.Arrays.fill(x, 0.5f);
+
+      // The assertion is that this returns at all: before the check it threw WrongThreadException.
+      float[] actual = new float[rows];
+      TensorOps.ggufMatmul(actual, x, weight, GgufTensorType.MXFP4, rows, cols);
+
+      float[] expected = new float[rows];
+      for (int row = 0; row < rows; row++) {
+        expected[row] = Mxfp4Dequantizer.dotProduct(weight, row * rowBytes, x, 0, cols);
+      }
+      assertThat(actual).containsExactly(expected);
+      assertThat(actual).doesNotContain(0.0f);
+    }
+  }
+
+  /**
+   * GELU must not throw for inputs that scale onto the last slot of the tanh table.
+   *
+   * <p>The tabulated tanh interpolates between {@code TANH_TABLE[index]} and {@code [index + 1]},
+   * and the table holds one more entry than its size so that the last interpolation has somewhere
+   * to read. A value just under the table's limit still scales to exactly that last slot in float
+   * arithmetic, and the read then goes one past the end.
+   *
+   * <p>Found in production, not here: a gemma3n run died 456 seconds in with {@code
+   * ArrayIndexOutOfBoundsException: Index 65537 out of bounds for length 65537} from inside {@code
+   * gelu}. The activation value only has to arrive at the boundary once, so a larger output budget
+   * -- 256 tokens instead of 64 -- was enough to find it where the shorter run had not. This is
+   * shared code: any architecture whose feed-forward uses GELU could have hit it.
+   *
+   * <p>Asserted as continuity rather than as "it does not throw": at the boundary the result must
+   * still be tanh, so it is checked against {@link Math#tanh} to the table's resolution, and
+   * against the value just inside the boundary so the last slot cannot silently return something
+   * unrelated.
+   */
+  @Test
+  void geluIsFiniteAndContinuousForValuesAtTheTanhTableBoundary() {
+    // gelu applies tanh(0.797884 * v * (1 + 0.044715 * v^2)); the tanh argument reaches the table's
+    // limit of 10 at v of about 2.9, so sweep across and past that with fine steps.
+    float[] input = new float[4001];
+    for (int index = 0; index < input.length; index++) {
+      input[index] = 2.0f + index * 0.001f;
+    }
+    float[] out = new float[input.length];
+
+    TensorOps.gelu(out, 0, input, 0, input.length);
+
+    for (int index = 0; index < input.length; index++) {
+      float value = input[index];
+      double argument = 0.7978845608028654 * value * (1.0 + 0.044715 * value * value);
+      double expected = 0.5 * value * (1.0 + Math.tanh(argument));
+      assertThat(out[index])
+          .describedAs("gelu(%f) with tanh argument %f", value, argument)
+          .isCloseTo((float) expected, within(1.0e-4f));
+    }
+
+    // The boundary itself, hit directly rather than hoped for. The last representable float below
+    // the
+    // table's limit of 10 scales to exactly the final slot, because adding 10.0f rounds it to 20.0f
+    // and
+    // 20.0f * scale is exactly TANH_TABLE_SIZE. That single ulp is the whole bug, and the sweep
+    // above
+    // does not reach it -- written first, it passed against the crashing version.
+    float justInside = Math.nextDown(10.0f);
+    assertThat(TensorOps.tableTanh(justInside))
+        .describedAs("tanh at the table's last slot")
+        .isCloseTo((float) Math.tanh(justInside), within(1.0e-6f));
+
+    // Either side of it, so the last slot cannot return something unrelated and still pass.
+    assertThat(TensorOps.tableTanh(10.0f)).isEqualTo(1.0f);
+    assertThat(TensorOps.tableTanh(Math.nextDown(justInside)))
+        .isCloseTo((float) Math.tanh(Math.nextDown(justInside)), within(1.0e-6f));
+    assertThat(TensorOps.tableTanh(-justInside))
+        .isCloseTo((float) Math.tanh(-justInside), within(1.0e-6f));
+  }
+
+  @Test
+  void ggufMatmulMultipliesMxfp4WeightsInsteadOfRefusingThem() {
+    // Before this, GgufTensorType.MXFP4 fell through to the switch default and ggufMatmul threw
+    // UnsupportedOperationException: an MXFP4 tensor could be decoded but not multiplied. That is
+    // what blocked the GGUF route for gpt-oss, whose expert tensors are MXFP4.
+    int rows = 3;
+    int cols = 64; // two 32-weight blocks per row
+    int blocksPerRow = cols / Mxfp4Dequantizer.BLOCK_SIZE;
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment weight =
+          arena.allocate((long) rows * blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES);
+      java.util.Random rng = new java.util.Random(4242L);
+      for (int block = 0; block < rows * blocksPerRow; block++) {
+        long base = (long) block * Mxfp4Dequantizer.BLOCK_BYTES;
+        weight.set(ValueLayout.JAVA_BYTE, base, (byte) (126 + (block % 5)));
+        for (int j = 0; j < Mxfp4Dequantizer.BLOCK_SIZE / 2; j++) {
+          weight.set(ValueLayout.JAVA_BYTE, base + 1 + j, (byte) rng.nextInt(256));
+        }
+      }
+      float[] x = new float[cols];
+      for (int i = 0; i < cols; i++) {
+        x[i] = (rng.nextFloat() - 0.5f) * 2.0f;
+      }
+
+      float[] actual = new float[rows];
+      TensorOps.ggufMatmul(actual, x, weight, GgufTensorType.MXFP4, rows, cols);
+
+      // Reference: dequantise each row and multiply in plain floats.
+      long rowBytes = (long) blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES;
+      float[] rowWeights = new float[cols];
+      for (int row = 0; row < rows; row++) {
+        Mxfp4Dequantizer.dequantize(weight, row * rowBytes, rowWeights, 0, cols);
+        float expected = 0.0f;
+        for (int i = 0; i < cols; i++) {
+          expected += rowWeights[i] * x[i];
+        }
+        assertThat(actual[row]).isEqualTo(expected, within(1.0e-3f));
+      }
+      // And the result is not trivially zero, so the assertions above have content.
+      boolean anyNonZero = false;
+      for (float value : actual) {
+        anyNonZero |= Math.abs(value) > 1.0e-4f;
+      }
+      assertThat(anyNonZero).describedAs("a zero result would satisfy any tolerance").isTrue();
+    }
+  }
+
+  @Test
+  void ggufMatmulRefusesAnMxfp4RowThatIsNotAWholeNumberOfBlocks() {
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment weight = arena.allocate(Mxfp4Dequantizer.BLOCK_BYTES);
+      float[] x = new float[40];
+      float[] out = new float[1];
+
+      assertThatThrownBy(() -> TensorOps.ggufMatmul(out, x, weight, GgufTensorType.MXFP4, 1, 40))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("MXFP4 row length");
     }
   }
 }

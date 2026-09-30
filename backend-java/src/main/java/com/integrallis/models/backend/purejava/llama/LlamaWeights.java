@@ -38,6 +38,30 @@ public final class LlamaWeights {
   private final GgufTensorType outputType;
   private final LayerWeights[] layers;
 
+  /**
+   * The routed feed-forward of a mixture-of-experts layer, or absent on a dense one.
+   *
+   * <p>Experts are pre-sliced at load rather than on each use: a token routed to eight of 128
+   * experts across 48 layers would otherwise build 1,152 segment views per token. The slices are
+   * exact for quantized weights because an expert occupies a whole number of rows and a row is
+   * {@code columns / blockSize} whole blocks -- the same property the Phi-3 fused split relies on,
+   * asserted rather than assumed in {@link #expertSlices}.
+   *
+   * @param router the gate projection producing one logit per expert
+   * @param gate per-expert gate projections, indexed by expert
+   * @param up per-expert up projections
+   * @param down per-expert down projections
+   */
+  public record MoeWeights(
+      MemorySegment router,
+      GgufTensorType routerType,
+      MemorySegment[] gate,
+      GgufTensorType gateType,
+      MemorySegment[] up,
+      GgufTensorType upType,
+      MemorySegment[] down,
+      GgufTensorType downType) {}
+
   /** Per-layer weight tensors. */
   public record LayerWeights(
       float[] attentionNorm,
@@ -62,7 +86,8 @@ public final class LlamaWeights {
       GgufTensorType ffnUpType,
       MemorySegment ffnDown,
       GgufTensorType ffnDownType,
-      float[] ffnPostNorm) {}
+      float[] ffnPostNorm,
+      MoeWeights moe) {}
 
   private LlamaWeights(
       MemorySegment tokenEmbeddingSegment,
@@ -98,9 +123,13 @@ public final class LlamaWeights {
     for (int i = 0; i < config.numLayers(); i++) {
       String prefix = "blk." + i + ".";
       float[] attnNorm = loadF32Tensor(file, prefix + "attn_norm.weight");
-      GgufTensorData wq = file.getTensor(prefix + "attn_q.weight");
-      GgufTensorData wk = file.getTensor(prefix + "attn_k.weight");
-      GgufTensorData wv = file.getTensor(prefix + "attn_v.weight");
+      // Phi-3 fuses Q, K and V into one attn_qkv tensor and the gate/up projections into one
+      // ffn_up tensor. Split them here so every decoder below sees the same separate projections
+      // as any other Llama-family model.
+      FusedQkv fused = fusedQkv(file, prefix, config);
+      GgufTensorData wq = fused == null ? file.getTensor(prefix + "attn_q.weight") : null;
+      GgufTensorData wk = fused == null ? file.getTensor(prefix + "attn_k.weight") : null;
+      GgufTensorData wv = fused == null ? file.getTensor(prefix + "attn_v.weight") : null;
       float[] qBias = loadOptionalF32Tensor(file, prefix + "attn_q.bias", config.queryDim());
       float[] qNorm = loadOptionalF32Tensor(file, prefix + "attn_q_norm.weight", config.headDim());
       float[] kBias = loadOptionalF32Tensor(file, prefix + "attn_k.bias", config.keyDim());
@@ -112,39 +141,47 @@ public final class LlamaWeights {
               ? loadF32Tensor(file, prefix + "post_attention_norm.weight")
               : new float[0];
       float[] ffnNorm = loadF32Tensor(file, prefix + "ffn_norm.weight");
-      GgufTensorData ffnGate = file.getTensor(prefix + "ffn_gate.weight");
-      GgufTensorData ffnUp = file.getTensor(prefix + "ffn_up.weight");
-      GgufTensorData ffnDown = file.getTensor(prefix + "ffn_down.weight");
+      FusedGateUp fusedFfn = fusedGateUp(file, prefix, config);
+      // A fully routed model publishes no dense feed-forward at all, so these are absent rather
+      // than optional-with-a-default: the routed path reads them from MoeWeights instead.
+      boolean denseFfn = !config.usesMixtureOfExperts();
+      GgufTensorData ffnGate =
+          fusedFfn == null && denseFfn ? file.getTensor(prefix + "ffn_gate.weight") : null;
+      GgufTensorData ffnUp =
+          fusedFfn == null && denseFfn ? file.getTensor(prefix + "ffn_up.weight") : null;
+      GgufTensorData ffnDown = denseFfn ? file.getTensor(prefix + "ffn_down.weight") : null;
       float[] ffnPostNorm =
           config.usesPostFfnNorm()
               ? loadF32Tensor(file, prefix + "post_ffw_norm.weight")
               : new float[0];
 
+      MoeWeights moe = moeWeights(file, prefix, config);
       layers[i] =
           new LayerWeights(
               attnNorm,
-              wq.dataSegment(),
-              wq.type(),
+              fused == null ? wq.dataSegment() : fused.q(),
+              fused == null ? wq.type() : fused.type(),
               qBias,
               qNorm,
-              wk.dataSegment(),
-              wk.type(),
+              fused == null ? wk.dataSegment() : fused.k(),
+              fused == null ? wk.type() : fused.type(),
               kBias,
               kNorm,
-              wv.dataSegment(),
-              wv.type(),
+              fused == null ? wv.dataSegment() : fused.v(),
+              fused == null ? wv.type() : fused.type(),
               vBias,
               wo.dataSegment(),
               wo.type(),
               attentionPostNorm,
               ffnNorm,
-              ffnGate.dataSegment(),
-              ffnGate.type(),
-              ffnUp.dataSegment(),
-              ffnUp.type(),
-              ffnDown.dataSegment(),
-              ffnDown.type(),
-              ffnPostNorm);
+              fusedFfn != null ? fusedFfn.gate() : ffnGate == null ? null : ffnGate.dataSegment(),
+              fusedFfn != null ? fusedFfn.type() : ffnGate == null ? null : ffnGate.type(),
+              fusedFfn != null ? fusedFfn.up() : ffnUp == null ? null : ffnUp.dataSegment(),
+              fusedFfn != null ? fusedFfn.type() : ffnUp == null ? null : ffnUp.type(),
+              ffnDown == null ? null : ffnDown.dataSegment(),
+              ffnDown == null ? null : ffnDown.type(),
+              ffnPostNorm,
+              moe);
     }
 
     return new LlamaWeights(
@@ -248,7 +285,9 @@ public final class LlamaWeights {
               preparedUp.type(),
               preparedDown.data(),
               preparedDown.type(),
-              new float[0]);
+              new float[0],
+              // Safetensors bundles carry no stacked expert tensors: this path is dense.
+              null);
     }
 
     return new LlamaWeights(
@@ -354,7 +393,9 @@ public final class LlamaWeights {
               GgufTensorType.BF16,
               down.data(),
               GgufTensorType.BF16,
-              new float[0]);
+              new float[0],
+              // Safetensors bundles carry no stacked expert tensors: these paths are dense.
+              null);
     }
 
     return new LlamaWeights(
@@ -408,6 +449,220 @@ public final class LlamaWeights {
    */
   private static float[] loadF32Tensor(GgufFile file, String name) {
     return GgufTensorValues.toFloatArray(file.getTensor(name));
+  }
+
+  /**
+   * Whether a tensor is present. {@link GgufFile} exposes no presence check, and absence is
+   * signalled by the "Tensor not found" message, which is the same convention {@link
+   * #loadOptionalF32Tensor} relies on.
+   */
+  private static boolean hasTensor(GgufFile file, String name) {
+    try {
+      file.getTensor(name);
+      return true;
+    } catch (IllegalArgumentException exception) {
+      if (exception.getMessage() != null && exception.getMessage().contains("Tensor not found")) {
+        return false;
+      }
+      throw exception;
+    }
+  }
+
+  /**
+   * Q, K and V sliced out of a fused {@code attn_qkv} tensor, or null when the model is not fused.
+   */
+  private record FusedQkv(MemorySegment q, MemorySegment k, MemorySegment v, GgufTensorType type) {}
+
+  /**
+   * Gate and up sliced out of a fused {@code ffn_up} tensor, or null when the model is not fused.
+   */
+  private record FusedGateUp(MemorySegment gate, MemorySegment up, GgufTensorType type) {}
+
+  /**
+   * Splits Phi-3's fused {@code attn_qkv} into Q, K and V.
+   *
+   * <p>Detected by absence rather than by architecture id: a model either publishes separate
+   * projections or it does not, and keying off the name would silently mis-handle any other model
+   * that fuses them. The stacking order is Q then K then V along the output dimension, with widths
+   * {@code numHeads*headDim}, {@code numKvHeads*headDim} and {@code numKvHeads*headDim} -- verified
+   * against phi-3.5-mini-instruct, whose attn_qkv is [3072 x 5120] with 24 heads and 8 KV heads:
+   * 3072 + 1024 + 1024 = 5120.
+   */
+  private static FusedQkv fusedQkv(GgufFile file, String prefix, LlamaConfig config) {
+    if (hasTensor(file, prefix + "attn_q.weight")) {
+      return null;
+    }
+    GgufTensorData qkv = file.getTensor(prefix + "attn_qkv.weight");
+    int columns = config.embeddingDim();
+    int qRows = config.queryDim();
+    int kvRows = config.keyDim();
+    long expected =
+        (long) (columns / qkv.type().blockSize()) * qkv.type().typeSize() * (qRows + 2L * kvRows);
+    if (qkv.dataSegment().byteSize() != expected) {
+      throw new IllegalArgumentException(
+          prefix
+              + "attn_qkv.weight is "
+              + qkv.dataSegment().byteSize()
+              + " bytes but Q+K+V for this config needs "
+              + expected);
+    }
+    MemorySegment seg = qkv.dataSegment();
+    return new FusedQkv(
+        rowSlice(seg, qkv.type(), columns, 0, qRows, prefix + "attn_qkv(q)"),
+        rowSlice(seg, qkv.type(), columns, qRows, kvRows, prefix + "attn_qkv(k)"),
+        rowSlice(seg, qkv.type(), columns, qRows + kvRows, kvRows, prefix + "attn_qkv(v)"),
+        qkv.type());
+  }
+
+  /**
+   * Splits Phi-3's fused {@code ffn_up} into the gate and up projections.
+   *
+   * <p>Gate first, then up, each {@code hiddenDim} rows wide -- verified against
+   * phi-3.5-mini-instruct, whose ffn_up is [3072 x 16384] against a feed_forward_length of 8192.
+   */
+  private static FusedGateUp fusedGateUp(GgufFile file, String prefix, LlamaConfig config) {
+    if (hasTensor(file, prefix + "ffn_gate.weight")) {
+      return null;
+    }
+    // A routed layer has no dense gate either, and absence is how the Phi-3 fusion is detected, so
+    // without this the mixture-of-experts models fall into the fused split and fail claiming a
+    // malformed ffn_up. Verified on Qwen3-30B-A3B: no layer publishes any dense ffn tensor.
+    if (config.usesMixtureOfExperts()) {
+      return null;
+    }
+    GgufTensorData up = file.getTensor(prefix + "ffn_up.weight");
+    int columns = config.embeddingDim();
+    int hidden = config.hiddenDim();
+    long expected = (long) (columns / up.type().blockSize()) * up.type().typeSize() * (2L * hidden);
+    if (up.dataSegment().byteSize() != expected) {
+      throw new IllegalArgumentException(
+          prefix
+              + "ffn_up.weight is "
+              + up.dataSegment().byteSize()
+              + " bytes but a fused gate+up for this config needs "
+              + expected);
+    }
+    MemorySegment seg = up.dataSegment();
+    return new FusedGateUp(
+        rowSlice(seg, up.type(), columns, 0, hidden, prefix + "ffn_up(gate)"),
+        rowSlice(seg, up.type(), columns, hidden, hidden, prefix + "ffn_up(up)"),
+        up.type());
+  }
+
+  /**
+   * One row-range of a fused projection, as a zero-copy slice.
+   *
+   * <p>Phi-3 publishes a single {@code attn_qkv.weight} holding Q, K and V stacked along the output
+   * dimension, and a single {@code ffn_up.weight} holding the gate and up projections stacked the
+   * same way. Splitting them is a byte-range slice, not a copy, and it is exact for quantized
+   * weights only because the cut lands on a whole number of rows: a row is {@code columns /
+   * blockSize} whole blocks, so no quantization block is ever straddled. Verified on
+   * phi-3.5-mini-instruct, where {@code attn_qkv} is Q5_K [3072 x 5120] and each row is 3072
+   * elements = 12 whole 256-element blocks, and {@code ffn_up} is Q4_K [3072 x 16384].
+   *
+   * <p>Cutting mid-block would silently reinterpret a block's scale bytes as weights, which
+   * produces plausible-looking numbers and slightly wrong output rather than an error -- so the
+   * alignment is asserted rather than assumed.
+   */
+  private static MemorySegment rowSlice(
+      MemorySegment fused, GgufTensorType type, int columns, int firstRow, int rows, String name) {
+    if (columns % type.blockSize() != 0) {
+      throw new IllegalArgumentException(
+          name
+              + ": cannot split a fused "
+              + type
+              + " tensor whose row length "
+              + columns
+              + " is not a multiple of its "
+              + type.blockSize()
+              + "-element quantization block");
+    }
+    long bytesPerRow = (long) (columns / type.blockSize()) * type.typeSize();
+    long offset = bytesPerRow * firstRow;
+    long length = bytesPerRow * rows;
+    if (offset + length > fused.byteSize()) {
+      throw new IllegalArgumentException(
+          name
+              + ": fused tensor is "
+              + fused.byteSize()
+              + " bytes, too small for rows "
+              + firstRow
+              + ".."
+              + (firstRow + rows - 1));
+    }
+    return fused.asSlice(offset, length);
+  }
+
+  /**
+   * Slices one stacked expert tensor into per-expert views.
+   *
+   * <p>GGUF stacks experts along the last dimension, so expert {@code e} occupies rows {@code e *
+   * rows} through {@code (e + 1) * rows - 1}. The cut lands on whole rows, and a row is a whole
+   * number of quantization blocks, so no block is straddled -- straddling one would reinterpret a
+   * block's scale bytes as weights and yield plausible, wrong numbers rather than an error.
+   */
+  private static MemorySegment[] expertSlices(
+      GgufTensorData tensor, int rows, int columns, int experts, String name) {
+    GgufTensorType type = tensor.type();
+    if (columns % type.blockSize() != 0) {
+      throw new IllegalArgumentException(
+          name
+              + ": row length "
+              + columns
+              + " is not a multiple of the "
+              + type.blockSize()
+              + "-element "
+              + type
+              + " block, so experts cannot be sliced exactly");
+    }
+    long bytesPerRow = (long) (columns / type.blockSize()) * type.typeSize();
+    long bytesPerExpert = bytesPerRow * rows;
+    MemorySegment segment = tensor.dataSegment();
+    long expected = bytesPerExpert * experts;
+    if (segment.byteSize() != expected) {
+      throw new IllegalArgumentException(
+          name
+              + " is "
+              + segment.byteSize()
+              + " bytes but "
+              + experts
+              + " experts of "
+              + rows
+              + "x"
+              + columns
+              + " need "
+              + expected);
+    }
+    MemorySegment[] slices = new MemorySegment[experts];
+    for (int expert = 0; expert < experts; expert++) {
+      slices[expert] = segment.asSlice(bytesPerExpert * expert, bytesPerExpert);
+    }
+    return slices;
+  }
+
+  /** The routed feed-forward for one layer, or null when the model is dense. */
+  private static MoeWeights moeWeights(GgufFile file, String prefix, LlamaConfig config) {
+    if (!config.usesMixtureOfExperts()) {
+      return null;
+    }
+    int dim = config.embeddingDim();
+    int hidden = config.expertHiddenDim();
+    int experts = config.numExperts();
+    GgufTensorData router = file.getTensor(prefix + "ffn_gate_inp.weight");
+    GgufTensorData gate = file.getTensor(prefix + "ffn_gate_exps.weight");
+    GgufTensorData up = file.getTensor(prefix + "ffn_up_exps.weight");
+    GgufTensorData down = file.getTensor(prefix + "ffn_down_exps.weight");
+    return new MoeWeights(
+        router.dataSegment(),
+        router.type(),
+        expertSlices(gate, hidden, dim, experts, prefix + "ffn_gate_exps.weight"),
+        gate.type(),
+        expertSlices(up, hidden, dim, experts, prefix + "ffn_up_exps.weight"),
+        up.type(),
+        // The down projection maps hidden back to the embedding dimension, so its rows and columns
+        // are the other way round from gate and up.
+        expertSlices(down, dim, hidden, experts, prefix + "ffn_down_exps.weight"),
+        down.type());
   }
 
   private static float[] loadOptionalF32Tensor(GgufFile file, String name, int expectedLength) {

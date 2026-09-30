@@ -34,6 +34,25 @@ public record GgufFile(
     Objects.requireNonNull(fileSegment, "fileSegment");
   }
 
+  /**
+   * Whether this file carries a tensor by that name.
+   *
+   * <p>For tensors whose absence is a legitimate model shape rather than a fault -- a tied output
+   * head, an optional norm -- so that a loader can ask instead of catching the exception {@link
+   * #getTensor} throws and treating control flow as an error path.
+   *
+   * @param name the tensor name
+   * @return true when the tensor is present
+   */
+  public boolean hasTensor(String name) {
+    for (GgufTensorInfo info : tensorInfos) {
+      if (info.name().equals(name)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Returns the tensor data for a tensor by name. */
   public GgufTensorData getTensor(String name) {
     for (GgufTensorInfo info : tensorInfos) {

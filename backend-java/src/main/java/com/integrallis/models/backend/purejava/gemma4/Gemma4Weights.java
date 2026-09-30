@@ -30,6 +30,12 @@ final class Gemma4Weights {
   private static final Set<GgufTensorType> MATRIX_TYPES =
       Set.of(
           GgufTensorType.F32,
+          // The E-series ships per_layer_model_proj in a half format while its other matrices are
+          // K-quants -- and which half is not consistent across the family: E2B carries BF16, E4B
+          // carries F16. Omitting either rejected those models at load with "unsupported matrix
+          // type", which the synthetic fixtures could not reveal because they are F32 throughout.
+          GgufTensorType.BF16,
+          GgufTensorType.F16,
           GgufTensorType.Q4_0,
           GgufTensorType.Q5_0,
           GgufTensorType.Q8_0,
@@ -67,7 +73,12 @@ final class Gemma4Weights {
       float[] routerScale,
       Matrix routerProjection,
       float[] expertScales,
-      float layerOutputScale) {}
+      float layerOutputScale,
+      // The three below are E-series only: the per-layer input embedding path. Null and empty on
+      // the dense and routed variants, which carry no such tensors at all.
+      Matrix perLayerInputGate,
+      Matrix perLayerProjection,
+      float[] perLayerPostNorm) {}
 
   private final MemorySegment tokenEmbedding;
   private final GgufTensorType tokenEmbeddingType;
@@ -75,6 +86,10 @@ final class Gemma4Weights {
   private final int vocabSize;
   private final float[] outputNorm;
   private final float[] ropeFrequencyFactors;
+  private final MemorySegment perLayerTokenEmbedding;
+  private final GgufTensorType perLayerTokenEmbeddingType;
+  private final Matrix perLayerModelProjection;
+  private final float[] perLayerProjectionNorm;
   private final LayerWeights[] layers;
   private final Gemma4TensorLayout expertLayout;
 
@@ -85,6 +100,10 @@ final class Gemma4Weights {
       int vocabSize,
       float[] outputNorm,
       float[] ropeFrequencyFactors,
+      MemorySegment perLayerTokenEmbedding,
+      GgufTensorType perLayerTokenEmbeddingType,
+      Matrix perLayerModelProjection,
+      float[] perLayerProjectionNorm,
       LayerWeights[] layers,
       Gemma4TensorLayout expertLayout) {
     this.tokenEmbedding = tokenEmbedding;
@@ -93,6 +112,10 @@ final class Gemma4Weights {
     this.vocabSize = vocabSize;
     this.outputNorm = outputNorm;
     this.ropeFrequencyFactors = ropeFrequencyFactors;
+    this.perLayerTokenEmbedding = perLayerTokenEmbedding;
+    this.perLayerTokenEmbeddingType = perLayerTokenEmbeddingType;
+    this.perLayerModelProjection = perLayerModelProjection;
+    this.perLayerProjectionNorm = perLayerProjectionNorm;
     this.layers = layers;
     this.expertLayout = expertLayout;
   }
@@ -106,21 +129,68 @@ final class Gemma4Weights {
     float[] ropeFrequencyFactors =
         vector(file, "rope_freqs.weight", config.fullRopeDimension() / 2);
 
+    // The E-series carries a SECOND embedding table, one slice per layer, projected and gated into
+    // every layer. Absent on the dense and routed variants, which is why these are optional rather
+    // than defaulted: a zero-length table would be indistinguishable from a malformed one.
+    int perLayerWidth = config.perLayerEmbeddingDim() * config.numLayers();
+    GgufTensorData perLayerTokenEmbedding =
+        config.usesPerLayerEmbeddings()
+            ? matrixTensor(file, "per_layer_token_embd.weight", config.vocabSize(), perLayerWidth)
+            : null;
+    Matrix perLayerModelProjection =
+        config.usesPerLayerEmbeddings()
+            ? matrix(file, "per_layer_model_proj.weight", perLayerWidth, config.embeddingDim())
+            : null;
+    float[] perLayerProjectionNorm =
+        config.usesPerLayerEmbeddings()
+            ? vector(file, "per_layer_proj_norm.weight", config.perLayerEmbeddingDim())
+            : new float[0];
+
     LayerWeights[] layers = new LayerWeights[config.numLayers()];
     for (int layer = 0; layer < layers.length; layer++) {
       String prefix = "blk." + layer + ".";
+      // A layer past the owning prefix attends to an earlier layer's cache and never evaluates a
+      // key or a value of its own, so the file carries neither attn_k, attn_k_norm nor attn_v for
+      // it. Gemma 4 E4B declares shared_kv_layers=18 over 42 layers and omits all three from
+      // blk.24 onwards; llama.cpp marks exactly those three not-required for exactly these layers
+      // (models/gemma4.cpp, kv_flags). Requiring them here rejected E4B outright, and it was the
+      // loader alone: the forward pass already skips the key and value projections for a layer that
+      // does not own its cache.
+      boolean ownsKvCache = config.ownsKvCache(layer);
+      Matrix keyProjection =
+          ownsKvCache
+              ? matrix(file, prefix + "attn_k.weight", config.keyDim(layer), config.embeddingDim())
+              : optionalMatrix(
+                  file, prefix + "attn_k.weight", config.keyDim(layer), config.embeddingDim());
+      float[] keyNorm =
+          ownsKvCache
+              ? vector(file, prefix + "attn_k_norm.weight", config.headDim(layer))
+              : optionalVector(file, prefix + "attn_k_norm.weight", config.headDim(layer));
+      // attn_v is optional on every layer and not only the sharing ones, which is how llama.cpp
+      // loads it: a KV-owning layer without one uses its key projection as the value too. That
+      // substitution is only sound while the two have the same width, so it is checked here rather
+      // than assumed -- the forward pass copies keyDim floats into a valueDim buffer, and a file
+      // where the two differ would read past the key or leave the value half-written instead of
+      // reporting anything.
       Matrix valueProjection =
           optionalMatrix(
               file, prefix + "attn_v.weight", config.valueDim(layer), config.embeddingDim());
-      if (config.usesSlidingWindow(layer) && valueProjection == null) {
+      if (ownsKvCache
+          && valueProjection == null
+          && config.keyDim(layer) != config.valueDim(layer)) {
         throw new IllegalArgumentException(
-            "Tensor not found: " + prefix + "attn_v.weight for sliding attention");
+            "Tensor not found: "
+                + prefix
+                + "attn_v.weight, and its key projection cannot stand in for it: keyDim "
+                + config.keyDim(layer)
+                + " != valueDim "
+                + config.valueDim(layer));
       }
       layers[layer] =
           new LayerWeights(
               vector(file, prefix + "attn_norm.weight", config.embeddingDim()),
               matrix(file, prefix + "attn_q.weight", config.queryDim(layer), config.embeddingDim()),
-              matrix(file, prefix + "attn_k.weight", config.keyDim(layer), config.embeddingDim()),
+              keyProjection,
               valueProjection,
               matrix(
                   file,
@@ -128,30 +198,55 @@ final class Gemma4Weights {
                   config.embeddingDim(),
                   config.attentionOutputDim(layer)),
               vector(file, prefix + "attn_q_norm.weight", config.headDim(layer)),
-              vector(file, prefix + "attn_k_norm.weight", config.headDim(layer)),
+              keyNorm,
               vector(file, prefix + "post_attention_norm.weight", config.embeddingDim()),
               vector(file, prefix + "ffn_norm.weight", config.embeddingDim()),
               matrix(
                   file,
                   prefix + "ffn_gate.weight",
-                  config.sharedHiddenDim(),
+                  config.sharedHiddenDim(layer),
                   config.embeddingDim()),
               matrix(
-                  file, prefix + "ffn_up.weight", config.sharedHiddenDim(), config.embeddingDim()),
+                  file,
+                  prefix + "ffn_up.weight",
+                  config.sharedHiddenDim(layer),
+                  config.embeddingDim()),
               matrix(
                   file,
                   prefix + "ffn_down.weight",
                   config.embeddingDim(),
-                  config.sharedHiddenDim()),
-              vector(file, prefix + "pre_ffw_norm_2.weight", config.embeddingDim()),
-              vector(file, prefix + "post_ffw_norm_1.weight", config.embeddingDim()),
-              vector(file, prefix + "post_ffw_norm_2.weight", config.embeddingDim()),
+                  config.sharedHiddenDim(layer)),
+              optionalVector(file, prefix + "pre_ffw_norm_2.weight", config.embeddingDim()),
+              optionalVector(file, prefix + "post_ffw_norm_1.weight", config.embeddingDim()),
+              optionalVector(file, prefix + "post_ffw_norm_2.weight", config.embeddingDim()),
               vector(file, prefix + "post_ffw_norm.weight", config.embeddingDim()),
-              vector(file, prefix + "ffn_gate_inp.scale", config.embeddingDim()),
-              matrix(
-                  file, prefix + "ffn_gate_inp.weight", config.numExperts(), config.embeddingDim()),
-              vector(file, prefix + "ffn_down_exps.scale", config.numExperts()),
-              scalar(file, prefix + "layer_output_scale.weight"));
+              optionalVector(file, prefix + "ffn_gate_inp.scale", config.embeddingDim()),
+              config.isDense()
+                  ? null
+                  : matrix(
+                      file,
+                      prefix + "ffn_gate_inp.weight",
+                      config.numExperts(),
+                      config.embeddingDim()),
+              optionalVector(file, prefix + "ffn_down_exps.scale", config.numExperts()),
+              scalar(file, prefix + "layer_output_scale.weight"),
+              config.usesPerLayerEmbeddings()
+                  ? matrix(
+                      file,
+                      prefix + "inp_gate.weight",
+                      config.perLayerEmbeddingDim(),
+                      config.embeddingDim())
+                  : null,
+              config.usesPerLayerEmbeddings()
+                  ? matrix(
+                      file,
+                      prefix + "proj.weight",
+                      config.embeddingDim(),
+                      config.perLayerEmbeddingDim())
+                  : null,
+              config.usesPerLayerEmbeddings()
+                  ? vector(file, prefix + "post_norm.weight", config.embeddingDim())
+                  : new float[0]);
     }
 
     return new Gemma4Weights(
@@ -161,8 +256,12 @@ final class Gemma4Weights {
         config.vocabSize(),
         outputNorm,
         ropeFrequencyFactors,
+        perLayerTokenEmbedding == null ? null : perLayerTokenEmbedding.dataSegment(),
+        perLayerTokenEmbedding == null ? null : perLayerTokenEmbedding.type(),
+        perLayerModelProjection,
+        perLayerProjectionNorm,
         layers,
-        Gemma4TensorLayout.fromGgufFile(file, config));
+        config.isDense() ? null : Gemma4TensorLayout.fromGgufFile(file, config));
   }
 
   void embedToken(int token, float[] output) {
@@ -182,6 +281,39 @@ final class Gemma4Weights {
 
   float[] outputNorm() {
     return outputNorm;
+  }
+
+  /**
+   * Reads one token's row of the per-layer embedding table.
+   *
+   * @param token the token id
+   * @param output receives {@code perLayerEmbeddingDim * numLayers} values, layer-major
+   */
+  void embedTokenPerLayer(int token, float[] output) {
+    if (perLayerTokenEmbedding == null) {
+      throw new IllegalStateException("this Gemma 4 variant has no per-layer embedding table");
+    }
+    if (token < 0 || token >= vocabSize) {
+      throw new IllegalArgumentException("token out of range: " + token);
+    }
+    GgufTensorValues.dequantizeRow(
+        perLayerTokenEmbedding, perLayerTokenEmbeddingType, token, output.length, output);
+  }
+
+  MemorySegment perLayerTokenEmbedding() {
+    return perLayerTokenEmbedding;
+  }
+
+  GgufTensorType perLayerTokenEmbeddingType() {
+    return perLayerTokenEmbeddingType;
+  }
+
+  Matrix perLayerModelProjection() {
+    return perLayerModelProjection;
+  }
+
+  float[] perLayerProjectionNorm() {
+    return perLayerProjectionNorm;
   }
 
   float[] ropeFrequencyFactors() {
@@ -223,6 +355,26 @@ final class Gemma4Weights {
       throw new IllegalArgumentException(name + " has unsupported matrix type " + tensor.type());
     }
     return tensor;
+  }
+
+  /**
+   * A vector that a dense Gemma 4 does not carry, returned empty rather than throwing.
+   *
+   * <p>The routed half of a Gemma 4 layer owns {@code pre_ffw_norm_2}, {@code post_ffw_norm_1},
+   * {@code post_ffw_norm_2}, {@code ffn_gate_inp.*} and {@code ffn_down_exps.scale}. A dense model
+   * has none of them, and an empty vector is how the forward pass already skips a norm it does not
+   * have.
+   */
+  private static float[] optionalVector(GgufFile file, String name, int length) {
+    try {
+      return vector(file, name, length);
+    } catch (IllegalArgumentException exception) {
+      if (exception.getMessage() != null
+          && exception.getMessage().startsWith("Tensor not found:")) {
+        return new float[0];
+      }
+      throw exception;
+    }
   }
 
   private static float[] vector(GgufFile file, String name, int length) {

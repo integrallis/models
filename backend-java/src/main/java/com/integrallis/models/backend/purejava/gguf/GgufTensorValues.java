@@ -16,8 +16,10 @@
 package com.integrallis.models.backend.purejava.gguf;
 
 import com.integrallis.models.backend.purejava.quant.F16Dequantizer;
+import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q4_0Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q8_0Dequantizer;
+import com.integrallis.models.backend.purejava.quant.TernaryDequantizer;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -89,6 +91,11 @@ public final class GgufTensorValues {
       case Q4_K -> VectorUtil.ggufQ4_KDequantize(source, sourceOffset, output, 0, count);
       case Q5_K -> VectorUtil.ggufQ5_KDequantize(source, sourceOffset, output, 0, count);
       case Q6_K -> VectorUtil.ggufQ6_KDequantize(source, sourceOffset, output, 0, count);
+      case MXFP4 -> Mxfp4Dequantizer.dequantize(source, sourceOffset, output, 0, count);
+      case TQ1_0 -> TernaryDequantizer.dequantizeTq1_0(source, sourceOffset, output, 0, count);
+      case TQ2_0 -> TernaryDequantizer.dequantizeTq2_0(source, sourceOffset, output, 0, count);
+      case PQ2_0 -> TernaryDequantizer.dequantizePq2_0(source, sourceOffset, output, 0, count);
+      case PTQ1_0 -> TernaryDequantizer.dequantizePtq1_0(source, sourceOffset, output, 0, count);
       default -> throw new IllegalArgumentException("Unsupported GGUF tensor type: " + type);
     }
   }

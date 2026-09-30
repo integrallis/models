@@ -47,8 +47,15 @@ public final class RagProductionQualificationPolicy {
     ModelContribution contribution = modelContribution(candidate);
     RagPerformanceTier absoluteTier =
         RagPerformancePolicy.classify(candidate.summary().policyMetrics());
-    if (absoluteTier != RagPerformanceTier.PRODUCTION_READY
-        && absoluteTier != RagPerformanceTier.USABLE) {
+    // A blocklist of real failures, not a whitelist of fast tiers. A model that runs correctly and
+    // passes every quality gate belongs in the catalogue carrying its latency tier, which is what
+    // PERFORMANCE_REDUCED is for -- gating on {PRODUCTION_READY, USABLE} made that tier a rename
+    // with no effect, since all 28 models it covers stayed excluded. The tier travels in the result
+    // (`absoluteTier`), so a consumer that wants only the fast ones filters on it explicitly rather
+    // than having the decision made for it here.
+    if (absoluteTier == RagPerformanceTier.FAILED_QUALITY
+        || absoluteTier == RagPerformanceTier.FAILED_RUNTIME
+        || absoluteTier == RagPerformanceTier.OFFLINE) {
       return result(
           candidate,
           absoluteTier,

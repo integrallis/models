@@ -133,6 +133,40 @@ class Qwen35ForwardPassTest {
   }
 
   @Test
+  void theDenseHybridOutputIsPinned(@TempDir Path directory) throws Exception {
+    // A golden value, captured before the mixture-of-experts work began. greedyOracleSweepSmall
+    // carries NO qwen35 fixture, so nothing else would catch a dense-path regression here -- and
+    // this
+    // decoder already serves eight qualified models. Any edit that changes these numbers changes
+    // what
+    // those models produce.
+    float[] expected = {
+      0.28828445f,
+      -0.15037602f,
+      0.6001534f,
+      0.06923065f,
+      -0.10975063f,
+      0.0049771476f,
+      0.023313804f,
+      0.20573947f
+    };
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(GgufParser.parse(model, arena));
+      Qwen35ForwardPass.Session session = graph.openSession(4);
+      graph.forward(session, 1, 0);
+      float[] second = graph.forward(session, 2, 1);
+
+      for (int index = 0; index < expected.length; index++) {
+        assertThat(second[index])
+            .describedAs("dense qwen35 logit %s", index)
+            .isEqualTo(expected[index], within(SIMD_REDUCTION_TOLERANCE));
+      }
+    }
+  }
+
+  @Test
   void toyHybridGraphPreservesStateAcrossPrefillRewindAndReset(@TempDir Path directory)
       throws Exception {
     Path model = writeToyModel(directory);

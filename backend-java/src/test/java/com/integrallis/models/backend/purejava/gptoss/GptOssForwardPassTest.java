@@ -48,7 +48,7 @@ class GptOssForwardPassTest {
   @Test
   void executesACompleteTokenAgainstAnIndependentScalarOracle(@TempDir Path directory)
       throws IOException {
-    GptOssHuggingFaceConfig config = config();
+    GptOssConfig config = config();
     GptOssWeights weights = GptOssWeights.load(source(directory), config);
     GptOssForwardPass forwardPass = new GptOssForwardPass(config, weights, 8);
     GptOssForwardPass.Session session = forwardPass.openSession();
@@ -61,7 +61,7 @@ class GptOssForwardPassTest {
 
   @Test
   void ownsIndependentSequentialStateAndCanResetIt(@TempDir Path directory) throws IOException {
-    GptOssHuggingFaceConfig config = config();
+    GptOssConfig config = config();
     GptOssForwardPass forwardPass =
         new GptOssForwardPass(config, GptOssWeights.load(source(directory), config), 8);
     GptOssForwardPass.Session first = forwardPass.openSession();
@@ -90,7 +90,7 @@ class GptOssForwardPassTest {
   @Test
   void advancesPromptTokensWithoutLogitsAndRewindsForPrefixReuse(@TempDir Path directory)
       throws IOException {
-    GptOssHuggingFaceConfig config = config();
+    GptOssConfig config = config();
     GptOssForwardPass forwardPass =
         new GptOssForwardPass(config, GptOssWeights.load(source(directory), config), 8);
     GptOssForwardPass.Session session = forwardPass.openSession();
@@ -185,8 +185,8 @@ class GptOssForwardPassTest {
     return output;
   }
 
-  private static GptOssHuggingFaceConfig config() {
-    return new GptOssHuggingFaceConfig(
+  private static GptOssConfig config() {
+    return new GptOssConfig(
         List.of("GptOssForCausalLM"),
         HIDDEN,
         1,

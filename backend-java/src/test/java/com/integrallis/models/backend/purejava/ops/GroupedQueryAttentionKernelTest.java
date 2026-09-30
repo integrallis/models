@@ -213,6 +213,93 @@ class GroupedQueryAttentionKernelTest {
     }
   }
 
+  /**
+   * The whole group, end to end, against the head-by-head loop it replaced.
+   *
+   * <p>This is the measurement the gate rests on. The two paths are <b>not</b> bit-identical and
+   * cannot be made so without giving up the fused reduction: the fused score kernel keeps eight
+   * pinned partial sums where {@code batchDotProductExact} accumulates differently, and the fused
+   * softmax uses a polynomial exponential where {@link TensorOps#softmax} calls {@code Math.exp}.
+   * So the claim is a bound, not an equality, and it is asserted on the attention output rather
+   * than on the intermediates, because the output is what the rest of the network sees.
+   *
+   * <p>Measured on the Qwen3 decode shape (head dim 128, group size 4) the bound holds at 4e-6
+   * relative and does not grow with the number of cached rows: 3.8e-7 at 64 rows, 1.4e-6 at 1024
+   * and 1.4e-6 at 4096. It is flat because each score is a dot product over the head dimension
+   * however long the cache is; what grows with rows is only the chance of sampling a near-zero
+   * score, which is why a relative bound on individual scores would be the wrong assertion and an
+   * absolute bound on the output is the right one.
+   */
+  @Test
+  void theFusedGroupAgreesWithTheHeadByHeadLoopToWithinAFewUlpsOfTheOutput() {
+    int columns = 128;
+    int groupSize = 4;
+    for (int rows : new int[] {1, 64, 301, 1024, 4096}) {
+      Random random = new Random(11L * rows);
+      float[] query = randomArray(random, groupSize * columns);
+      float[] keys = randomArray(random, rows * columns);
+      float[] values = randomArray(random, rows * columns);
+      float scale = (float) (1.0 / Math.sqrt(columns));
+
+      float[] fusedScores = new float[groupSize * rows];
+      GroupedQueryAttentionKernel.scoreGroup(
+          query,
+          0,
+          columns,
+          groupSize,
+          keys,
+          0,
+          columns,
+          rows,
+          columns,
+          scale,
+          fusedScores,
+          0,
+          rows);
+      for (int head = 0; head < groupSize; head++) {
+        GroupedQueryAttentionKernel.softmax(fusedScores, head * rows, rows);
+      }
+      float[] fused = new float[groupSize * columns];
+      GroupedQueryAttentionKernel.accumulateGroup(
+          fused, 0, columns, groupSize, values, 0, columns, rows, columns, fusedScores, 0, rows);
+
+      float[] reference = new float[groupSize * columns];
+      for (int head = 0; head < groupSize; head++) {
+        float[] scores = new float[rows];
+        VectorUtil.batchDotProductExact(
+            query, head * columns, keys, 0, columns, rows, columns, scores, 0);
+        for (int row = 0; row < rows; row++) {
+          scores[row] *= scale;
+        }
+        TensorOps.softmax(scores, 0, rows);
+        VectorUtil.addWeightedRowsInPlace(
+            reference, head * columns, values, 0, columns, scores, 0, rows, columns);
+      }
+
+      float magnitude = 0.0f;
+      for (float value : reference) {
+        magnitude = Math.max(magnitude, Math.abs(value));
+      }
+      for (int index = 0; index < reference.length; index++) {
+        assertThat(fused[index])
+            .as("rows=%d index=%d", rows, index)
+            .isCloseTo(reference[index], org.assertj.core.data.Offset.offset(magnitude * 4e-6f));
+      }
+
+      // Probabilities still sum to one on both paths: the fused softmax's pinned tree sum must not
+      // drift the row away from a distribution as the cache grows.
+      for (int head = 0; head < groupSize; head++) {
+        float total = 0.0f;
+        for (int row = 0; row < rows; row++) {
+          total += fusedScores[head * rows + row];
+        }
+        assertThat(total)
+            .as("rows=%d head=%d", rows, head)
+            .isCloseTo(1.0f, org.assertj.core.data.Offset.offset(1e-4f));
+      }
+    }
+  }
+
   private static float[] randomArray(Random random, int length) {
     float[] values = new float[length];
     for (int index = 0; index < length; index++) {

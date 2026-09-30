@@ -82,4 +82,44 @@ class GptOssMathTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("limit");
   }
+
+  /**
+   * The fused and split activations must agree exactly.
+   *
+   * <p>They are two copies of the same arithmetic, kept separate because the two artifact formats
+   * hand the values over differently and this is the innermost loop of every routed token. Two
+   * copies of a formula need a test that they are the same formula.
+   */
+  @Test
+  void swigluOaiMatchesItsSplitForm() {
+    int size = 7;
+    float[] gate = new float[size];
+    float[] up = new float[size];
+    float[] fused = new float[2 * size];
+    for (int index = 0; index < size; index++) {
+      // Spread across the clamp: some above the limit, some below the negative limit, some inside.
+      gate[index] = (index - 3) * 3.5f;
+      up[index] = (3 - index) * 4.0f;
+      fused[2 * index] = gate[index];
+      fused[2 * index + 1] = up[index];
+    }
+    float[] fromFused = new float[size];
+    float[] fromSplit = new float[size];
+
+    GptOssMath.swigluOai(fused, fromFused, 1.702f, 7.0f);
+    GptOssMath.swigluOaiSplit(gate, up, fromSplit, 1.702f, 7.0f);
+
+    assertThat(fromSplit).containsExactly(fromFused);
+    // And the clamp is actually exercised, or this compares two unclamped paths.
+    assertThat(gate[6]).isGreaterThan(7.0f);
+    assertThat(up[6]).isLessThan(-7.0f);
+  }
+
+  @Test
+  void theSplitActivationRejectsMismatchedLengths() {
+    assertThatThrownBy(
+            () -> GptOssMath.swigluOaiSplit(new float[3], new float[4], new float[3], 1.0f, 1.0f))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("same length");
+  }
 }

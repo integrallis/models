@@ -143,6 +143,32 @@ public final class RotaryTable {
   }
 
   /**
+   * The same YaRN frequency blend with the rotary magnitude supplied rather than derived.
+   *
+   * <p>{@link #yarn} bakes in the generic magnitude {@code 0.1 * ln(factor) + 1}. DeepSeek-V2 does
+   * not use that: it publishes {@code rope.scaling.yarn_log_multiplier} and folds the magnitude
+   * into the attention softmax scale instead, leaving the rotation itself scaled by the reciprocal
+   * of the generic term. The frequency ramp is identical either way, so this shares it rather than
+   * copying it.
+   *
+   * @param attentionFactor the multiplier applied to the rotation's cosine and sine
+   */
+  public static RotaryTable yarnWithAttentionFactor(
+      int rotaryDim,
+      float theta,
+      float factor,
+      float betaFast,
+      float betaSlow,
+      int originalContext,
+      boolean truncateCorrectionRange,
+      float attentionFactor) {
+    RotaryTable generic =
+        yarn(
+            rotaryDim, theta, factor, betaFast, betaSlow, originalContext, truncateCorrectionRange);
+    return new RotaryTable(rotaryDim, theta, 1.0f, null, attentionFactor, generic.frequencies);
+  }
+
+  /**
    * Creates the Llama 3 wavelength-scaled frequencies used by MobileMoE and compatible models.
    *
    * <p>High frequencies remain unchanged, low frequencies are divided by {@code factor}, and the

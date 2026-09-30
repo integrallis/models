@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.backend.purejava.gptoss;
 
+import com.integrallis.models.backend.purejava.gguf.GgufFile;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.models.backend.purejava.tensor.TensorSource;
@@ -28,17 +30,62 @@ import java.util.Objects;
 /** Strict zero-copy mapping of one GPT-OSS layer's Hugging Face MXFP4 expert tensors. */
 final class GptOssMxfp4ExpertWeights {
 
+  /**
+   * One expert's feed-forward, in whichever shape its artifact provides.
+   *
+   * <p><b>Fused</b> is the safetensors shape: one {@code gate_up_proj} whose rows interleave gate
+   * and up, and one bias of the same interleaved layout. <b>Split</b> is the GGUF shape: {@code
+   * ffn_gate_exps} and {@code ffn_up_exps} as separate tensors with separate biases.
+   *
+   * <p>Two shapes rather than one canonical form because converting either way costs a copy of the
+   * weights -- interleaving two tensors, or de-interleaving one -- and these are the largest
+   * tensors in the model. The whole point of this class is that it maps them without copying.
+   */
   static final class Expert {
     private final Mxfp4Matrix gateUp;
     private final float[] gateUpBias;
+    private final GptOssProjection gate;
+    private final float[] gateBias;
+    private final GptOssProjection up;
+    private final float[] upBias;
     private final Mxfp4Matrix down;
+    private final GptOssProjection splitDown;
     private final float[] downBias;
 
+    /** The fused safetensors shape. */
     Expert(Mxfp4Matrix gateUp, float[] gateUpBias, Mxfp4Matrix down, float[] downBias) {
       this.gateUp = Objects.requireNonNull(gateUp, "gateUp");
       this.gateUpBias = Objects.requireNonNull(gateUpBias, "gateUpBias");
       this.down = Objects.requireNonNull(down, "down");
       this.downBias = Objects.requireNonNull(downBias, "downBias");
+      this.gate = null;
+      this.gateBias = null;
+      this.up = null;
+      this.upBias = null;
+      this.splitDown = null;
+    }
+
+    /** The split GGUF shape. */
+    Expert(
+        GptOssProjection gate,
+        float[] gateBias,
+        GptOssProjection up,
+        float[] upBias,
+        GptOssProjection down,
+        float[] downBias) {
+      this.gate = Objects.requireNonNull(gate, "gate");
+      this.gateBias = Objects.requireNonNull(gateBias, "gateBias");
+      this.up = Objects.requireNonNull(up, "up");
+      this.upBias = Objects.requireNonNull(upBias, "upBias");
+      this.splitDown = Objects.requireNonNull(down, "down");
+      this.downBias = Objects.requireNonNull(downBias, "downBias");
+      this.gateUp = null;
+      this.gateUpBias = null;
+      this.down = null;
+    }
+
+    boolean isFused() {
+      return gateUp != null;
     }
 
     Mxfp4Matrix gateUp() {
@@ -49,12 +96,42 @@ final class GptOssMxfp4ExpertWeights {
       return gateUpBias;
     }
 
+    GptOssProjection gate() {
+      return gate;
+    }
+
+    float[] gateBias() {
+      return gateBias;
+    }
+
+    GptOssProjection up() {
+      return up;
+    }
+
+    float[] upBias() {
+      return upBias;
+    }
+
     Mxfp4Matrix down() {
       return down;
     }
 
+    GptOssProjection splitDown() {
+      return splitDown;
+    }
+
     float[] downBias() {
       return downBias;
+    }
+
+    /** The output width, whichever shape this is. */
+    int hiddenSize() {
+      return isFused() ? gateUp.columns() : gate.columns();
+    }
+
+    /** The feed-forward width: half the fused rows, or the split gate's rows. */
+    int intermediateSize() {
+      return isFused() ? gateUp.rows() / 2 : gate.rows();
     }
   }
 
@@ -73,6 +150,122 @@ final class GptOssMxfp4ExpertWeights {
       Objects.requireNonNull(experts[index], "experts[" + index + "]");
     }
     return new GptOssMxfp4ExpertWeights(experts);
+  }
+
+  /**
+   * Maps one layer's experts from a GGUF file, in the split shape.
+   *
+   * <p>GGUF stacks all experts into one tensor per projection -- {@code ffn_gate_exps}, {@code
+   * ffn_up_exps}, {@code ffn_down_exps} -- and stores MXFP4 as a single interleaved block format
+   * rather than the separate blocks and scales the safetensors release uses. So this slices the
+   * stacks by expert and hands each slice over as a {@link GptOssProjection}, which routes to
+   * {@code ggufMatmul} and its MXFP4 case. No copy, and no second implementation of the block
+   * format.
+   *
+   * <p>The biases are stacked the same way, one row of {@code intermediateSize} (or {@code
+   * hiddenSize} for the down projection) per expert.
+   */
+  static GptOssMxfp4ExpertWeights fromGguf(
+      GgufFile file, int layer, int expertCount, int hiddenSize, int intermediateSize) {
+    Objects.requireNonNull(file, "file");
+    if (layer < 0) {
+      throw new IllegalArgumentException("layer must not be negative: " + layer);
+    }
+    requirePositive(expertCount, "expertCount");
+    requireMxfp4Dimension(hiddenSize, "hiddenSize");
+    requireMxfp4Dimension(intermediateSize, "intermediateSize");
+
+    String prefix = "blk." + layer + ".";
+    GgufTensorData gate = file.getTensor(prefix + "ffn_gate_exps.weight");
+    GgufTensorData up = file.getTensor(prefix + "ffn_up_exps.weight");
+    GgufTensorData down = file.getTensor(prefix + "ffn_down_exps.weight");
+    float[][] gateBias =
+        stackedBias(file, prefix + "ffn_gate_exps.bias", expertCount, intermediateSize);
+    float[][] upBias =
+        stackedBias(file, prefix + "ffn_up_exps.bias", expertCount, intermediateSize);
+    float[][] downBias = stackedBias(file, prefix + "ffn_down_exps.bias", expertCount, hiddenSize);
+
+    Expert[] experts = new Expert[expertCount];
+    GptOssProjection[] gateSlices =
+        slices(gate, intermediateSize, hiddenSize, expertCount, prefix + "ffn_gate_exps.weight");
+    GptOssProjection[] upSlices =
+        slices(up, intermediateSize, hiddenSize, expertCount, prefix + "ffn_up_exps.weight");
+    GptOssProjection[] downSlices =
+        slices(down, hiddenSize, intermediateSize, expertCount, prefix + "ffn_down_exps.weight");
+    for (int expert = 0; expert < expertCount; expert++) {
+      experts[expert] =
+          new Expert(
+              gateSlices[expert],
+              gateBias[expert],
+              upSlices[expert],
+              upBias[expert],
+              downSlices[expert],
+              downBias[expert]);
+    }
+    return of(experts);
+  }
+
+  /**
+   * Slices a stacked expert tensor into one projection per expert.
+   *
+   * <p>The cut lands on whole rows, and a row is a whole number of quantization blocks, so no block
+   * is straddled -- straddling one reinterprets a block's scale byte as weights and yields
+   * plausible, wrong numbers rather than an error.
+   */
+  private static GptOssProjection[] slices(
+      GgufTensorData tensor, int rows, int columns, int expertCount, String name) {
+    GgufTensorType type = tensor.type();
+    if (columns % type.blockSize() != 0) {
+      throw new IllegalArgumentException(
+          name
+              + ": row length "
+              + columns
+              + " is not a multiple of the "
+              + type.blockSize()
+              + "-element "
+              + type
+              + " block, so experts cannot be sliced exactly");
+    }
+    long bytesPerRow = (long) (columns / type.blockSize()) * type.typeSize();
+    long bytesPerExpert = bytesPerRow * rows;
+    MemorySegment segment = tensor.dataSegment();
+    long expected = bytesPerExpert * expertCount;
+    if (segment.byteSize() != expected) {
+      throw new IllegalArgumentException(
+          name
+              + " is "
+              + segment.byteSize()
+              + " bytes but "
+              + expertCount
+              + " experts of "
+              + rows
+              + "x"
+              + columns
+              + " need "
+              + expected);
+    }
+    GptOssProjection[] result = new GptOssProjection[expertCount];
+    for (int expert = 0; expert < expertCount; expert++) {
+      result[expert] =
+          GptOssProjection.ofGguf(
+              segment.asSlice(bytesPerExpert * expert, bytesPerExpert), type, rows, columns);
+    }
+    return result;
+  }
+
+  /** One bias row per expert, from a stacked {@code [width, expertCount]} tensor. */
+  private static float[][] stackedBias(GgufFile file, String name, int expertCount, int width) {
+    GgufTensorData tensor = file.getTensor(name);
+    float[] all = GgufTensorValues.toFloatArray(tensor);
+    if (all.length != Math.multiplyExact(expertCount, width)) {
+      throw new IllegalArgumentException(
+          name + " has " + all.length + " values but needs " + expertCount * width);
+    }
+    float[][] rows = new float[expertCount][width];
+    for (int expert = 0; expert < expertCount; expert++) {
+      System.arraycopy(all, expert * width, rows[expert], 0, width);
+    }
+    return rows;
   }
 
   static GptOssMxfp4ExpertWeights load(

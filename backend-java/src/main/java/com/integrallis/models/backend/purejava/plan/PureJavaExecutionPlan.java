@@ -37,6 +37,7 @@ public record PureJavaExecutionPlan(
     boolean finalLayerKvOnlyPrefill,
     boolean batchedAttentionScores,
     boolean batchedAttentionValues,
+    boolean fusedGroupedAttention,
     boolean stagedQuantizedFfn,
     boolean stagedQuantizedLayer,
     boolean blockMajorQ8Activations,

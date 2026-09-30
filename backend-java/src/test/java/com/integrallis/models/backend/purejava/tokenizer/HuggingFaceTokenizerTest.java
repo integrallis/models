@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.integrallis.models.api.Tokenizer;
-import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
+import com.integrallis.models.backend.purejava.gptoss.GptOssConfig;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import com.integrallis.models.runtime.chat.ChatMessage;
 import com.integrallis.models.runtime.chat.ChatTemplate;
@@ -338,8 +338,8 @@ class HuggingFaceTokenizerTest {
             200006, 173781);
   }
 
-  private static GptOssHuggingFaceConfig tinyGptOssConfig() {
-    return new GptOssHuggingFaceConfig(
+  private static GptOssConfig tinyGptOssConfig() {
+    return new GptOssConfig(
         List.of("GptOssForCausalLM"),
         32,
         1,
@@ -370,13 +370,13 @@ class HuggingFaceTokenizerTest {
         List.of("full_attention"));
   }
 
-  private static GptOssHuggingFaceConfig officialGptOssConfig() throws Exception {
+  private static GptOssConfig officialGptOssConfig() throws Exception {
     Path config =
         Path.of(
             HuggingFaceTokenizerTest.class
                 .getResource("/huggingface/gpt-oss-20b-config.json")
                 .toURI());
-    return GptOssHuggingFaceConfig.parse(config);
+    return GptOssConfig.parse(config);
   }
 
   private static Path writeSyntheticConfig(Path directory) throws IOException {

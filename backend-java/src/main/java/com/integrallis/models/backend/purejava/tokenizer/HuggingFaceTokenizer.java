@@ -21,7 +21,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.integrallis.models.api.Tokenizer;
-import com.integrallis.models.backend.purejava.gptoss.GptOssHuggingFaceConfig;
+import com.integrallis.models.backend.purejava.gptoss.GptOssConfig;
 import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfig;
 import com.integrallis.models.backend.purejava.mobilemoe.MobileMoeHuggingFaceConfig;
 import java.io.IOException;
@@ -109,8 +109,7 @@ public final class HuggingFaceTokenizer {
 
   /** Creates the tokenizer and Harmony control vocabulary declared by a GPT-OSS checkpoint. */
   public static Tokenizer fromGptOss(
-      Path tokenizerJson, Path tokenizerConfigJson, GptOssHuggingFaceConfig modelConfig)
-      throws IOException {
+      Path tokenizerJson, Path tokenizerConfigJson, GptOssConfig modelConfig) throws IOException {
     return fromGptOss(tokenizerJson, tokenizerConfigJson, modelConfig, Set.of());
   }
 
@@ -130,7 +129,7 @@ public final class HuggingFaceTokenizer {
   public static Tokenizer fromGptOss(
       Path tokenizerJson,
       Path tokenizerConfigJson,
-      GptOssHuggingFaceConfig modelConfig,
+      GptOssConfig modelConfig,
       Set<Integer> endOfGenerationTokenIds)
       throws IOException {
     Objects.requireNonNull(endOfGenerationTokenIds, "endOfGenerationTokenIds");
