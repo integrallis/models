@@ -77,6 +77,7 @@ def main():
     args = parser.parse_args()
 
     catalog = args.modeljars_repo / "catalog"
+    catalog_dir = catalog
     models = {m["id"]: m for m in read(catalog / "models.json")["models"]}
     qualifications = read(catalog / "qualifications.json")
     already = {e["modelId"] for e in qualifications["entries"]}
@@ -149,6 +150,21 @@ def main():
     for model in models_document["models"]:
         if model["id"] not in ids:
             continue
+        # A declared capability is a qualified one: the build requires the tool-calling flag to agree with
+        # membership of the tool qualification set, and a RAG run says nothing about tool use. Publishing
+        # a model that claims it unmeasured is what that gate exists to stop, so the claim is dropped
+        # until a tool-calling qualification exists for it.
+        tools = catalog_dir / "tool-qualifications.json"
+        tool_qualified = set()
+        if tools.is_file():
+            tool_qualified = {
+                e["modelId"] for e in json.loads(tools.read_text()).get("entries", [])
+                if e.get("qualified")
+            }
+        caps = model.get("capabilities") or []
+        if "tool-calling" in caps and model["id"] not in tool_qualified:
+            model["capabilities"] = [c for c in caps if c != "tool-calling"]
+            print(f"  dropped unqualified tool-calling claim from {model['id']}")
         backends = dict(model["backends"])
         backends["rust-ffm"] = True          # measured here
         order = ["pure-java", "rust-ffm", "llama.cpp"]
