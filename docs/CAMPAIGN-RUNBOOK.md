@@ -7,6 +7,25 @@ the qualification policy, or the catalog.
 **Standing mandate: grow the ModelJars catalog to 100 usable models.** It is 44 (34 RAG + 5
 embedding + 2 reranking + 2 speech + 1 component) against 128 candidates in `catalog/models.json`.
 
+## What the catalog is for
+
+modeljars.org states it on its own front page: **"Discover the power of small and medium-sized models
+for local, in-JVM inference."** Small and medium models are not a priority ordering within the catalog,
+they are the catalog. A model of tens of gigabytes cannot be a JAR dependency for in-process inference;
+it is the tail, never the target.
+
+So: **order every campaign smallest-first, and optimize for the small and medium regime first.** Ranking
+a queue by "proven architecture depth" instead put 42GB and 48GB models early -- 24 of 78 candidates
+were over 12GB and accounted for 620GB of 779GB, while the 43 candidates under 6GB needed 159GB
+altogether. Smallest-first is more models, a quarter of the fleet cost, and the product's real case.
+
+And read results from the small end. The decode-throughput ratio against Ollama was **worst on the
+smallest model** -- 0.506 at 0.32GB, against 0.902 at 1.28GB and 0.699-0.769 at 2-2.4GB. Ollama held a
+near-constant 33-39 GB/s at every size, so it is bandwidth-saturated; ours ranged 11-30 GB/s, so we are
+not. Small models are dominated by fixed per-token cost -- on the order of 200 Java-to-native dispatches
+per token, each partitioned across the whole thread pool however little work it carries -- and not by
+bandwidth. A poor number on a small model is the headline, not an outlier to explain away.
+
 ## The one rule that invalidates everything else
 
 **A verdict requires two arms measured on the same host in the same session.** A candidate arm alone
