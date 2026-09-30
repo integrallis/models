@@ -245,6 +245,8 @@ All notable changes to models are documented here.
     cannot reach. Gemma 4 E4B publishes `per_layer_model_proj` as F16 where E2B publishes BF16, and
     that projection runs per token.
 
+### Fixed
+
 - The same model produced **different output text on different machines**. Every vectorised float
   reduction in the model path sized itself from the host — `SPECIES_PREFERRED` capped by
   `vectors.maxBits` — and a float reduction's last bits are decided by how many partial sums it keeps
