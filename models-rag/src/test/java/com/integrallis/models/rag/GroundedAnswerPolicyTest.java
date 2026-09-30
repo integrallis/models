@@ -146,6 +146,50 @@ class GroundedAnswerPolicyTest {
   }
 
   /**
+   * A trace whose opening token was in the prompt is still a trace.
+   *
+   * <p>Gemma 4's published chat template ends a no-thinking generation prompt with {@code
+   * <|channel>thought\n<channel|>}, so the completion carries only the closing token. The model
+   * reasons anyway, closes the channel itself, and then answers. Transcribed verbatim from Gemma 4
+   * E2B's own output on 2026-09-30, where it was reported as contributing nothing across all 27
+   * cases -- a model-answer rate of 0.000 -- while the text after the closer was a correct grounded
+   * answer the whole time.
+   */
+  @Test
+  void judgesTheAnswerThatFollowsAChannelClosedReasoningBlock() {
+    String generated =
+        "\n1.  **Analyze the request:** The user asks when domestic claims settle.\n"
+            + "2.  **Scan the context:** Look for the settlement window.\n"
+            + "3.  **Formulate the final answer:** Combine the findings into one sentence."
+            + "<channel|>Domestic claims settle within 2 business days. [payments-settlement]";
+
+    GroundedAnswer answer =
+        policy.apply("How long do domestic claims take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision())
+        .describedAs("the answer after the channel closer is what should be judged")
+        .isEqualTo(GroundingDecision.MODEL_ANSWER);
+    assertThat(answer.text())
+        .isEqualTo("Domestic claims settle within 2 business days. [payments-settlement]");
+    assertThat(answer.rawText())
+        .describedAs("the record still shows everything the model generated")
+        .isEqualTo(generated);
+    assertThat(answer.decision().modelContributed()).isTrue();
+  }
+
+  /** A completion with no channel token is untouched by the channel rule. */
+  @Test
+  void aCompletionWithoutAChannelTokenIsUnaffected() {
+    String generated = "Domestic claims settle within 2 business days. [payments-settlement]";
+
+    GroundedAnswer answer =
+        policy.apply("How long do domestic claims take?", List.of(HIGH_CONFIDENCE), generated);
+
+    assertThat(answer.decision()).isEqualTo(GroundingDecision.MODEL_ANSWER);
+    assertThat(answer.text()).isEqualTo(generated);
+  }
+
+  /**
    * An unterminated reasoning block is a real failure and stays one.
    *
    * <p>Generation that stopped inside the trace produced no answer to judge -- the 64-token cap on

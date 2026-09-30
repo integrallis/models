@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "bounded-context-injection-screened-citation-safe-statement-grounding-v21";
+      "bounded-context-injection-screened-citation-safe-statement-grounding-v22";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
 
   /**
@@ -46,6 +46,23 @@ public final class GroundedAnswerPolicy {
    */
   private static final Pattern REASONING_TRACE =
       Pattern.compile("(?is)\\A\\s*<(think|thinking|reasoning)>.*?</\\1>\\s*");
+
+  /**
+   * A reasoning block closed by a channel token, whose <b>opening</b> token was in the prompt.
+   *
+   * <p>Gemma 4's own chat template ends a no-thinking generation prompt with {@code
+   * <|channel>thought\n<channel|>}, so the opener never appears in the completion -- only the
+   * closer does, when the model reasons anyway and then terminates the channel itself. Measured on
+   * Gemma 4 E2B: the completion is five enumerated reasoning steps, then {@code <channel|>}, then a
+   * correct grounded answer. {@link #REASONING_TRACE} cannot match that, because it requires a
+   * pair.
+   *
+   * <p>Greedy to the <b>last</b> closer, so a completion that opens and closes several channels
+   * keeps only what follows the final one. {@code <channel|>} is a control token of that vocabulary
+   * and cannot occur in prose, which is what makes anchoring on it safe; models that never emit it
+   * are unaffected.
+   */
+  private static final Pattern CHANNEL_CLOSED_TRACE = Pattern.compile("(?s)\\A.*<channel\\|>\\s*");
 
   private static final Pattern CITATION =
       Pattern.compile("\\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})]");
@@ -265,11 +282,13 @@ public final class GroundedAnswerPolicy {
    * <p>This runs before the abstention check, since a model may reason and then abstain, and that
    * is an abstention.
    *
-   * <p>This behaviour is why {@link #POLICY_ID} is v21. The previous policy scored the trace, and
-   * records written under v20 mean what they meant; they are not reinterpreted by this change.
+   * <p>This behaviour is why {@link #POLICY_ID} is v22: v21 removed only paired blocks, and a
+   * channel-closed trace survived it and was scored as the answer. Records written under v20 and
+   * v21 mean what they meant; they are not reinterpreted by this change.
    */
   private static String removeCompleteReasoningTrace(String candidate) {
-    return REASONING_TRACE.matcher(candidate).replaceFirst("").strip();
+    String withoutPairedTrace = REASONING_TRACE.matcher(candidate).replaceFirst("").strip();
+    return CHANNEL_CLOSED_TRACE.matcher(withoutPairedTrace).replaceFirst("").strip();
   }
 
   private static String removeLeadingContextAttribution(String candidate) {
