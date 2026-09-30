@@ -95,13 +95,13 @@ export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 
 cd /work
-aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-g4answer.tar" . --only-show-errors
+aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-v22.tar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/fleet-shard-$SHARD.json" /work/shard.json --only-show-errors
-[ -s models-rag-bench-0.3.50-g4answer.tar ] || { STATUS=NO_DIST; exit 1; }
+[ -s models-rag-bench-0.3.50-v22.tar ] || { STATUS=NO_DIST; exit 1; }
 [ -s /work/models-kernels-linux-x86_64.jar ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 [ -s /work/shard.json ] || { STATUS=NO_SHARD; exit 1; }
-tar xf models-rag-bench-0.3.50-g4answer.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
+tar xf models-rag-bench-0.3.50-v22.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
 CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
 JOBS=$(python3 -c "import json;print(len(json.load(open('/work/shard.json'))))")
@@ -121,7 +121,7 @@ THREADS=${QUAL_THREADS:-$(nproc 2>/dev/null || echo 8)}
 DECODE_THREAD_DEFAULT="${QUAL_DECODE_THREADS:-}"
 # Baked in, not derived: the worker has no git repository, so `git rev-parse` there would record
 # "local" and the result would name no build at all.
-BACKEND_VERSION="models@0.3.50+g4answer-4d2395dd0680"
+BACKEND_VERSION="models@0.3.50+v22-542a98fa2290"
 STATUS=RUNNING
 
 # The comparator arm. A qualification is comparative: RagProductionQualificationPolicy needs a baseline
@@ -183,7 +183,10 @@ SUPPORTED_ARCH="llama gemma gemma2 gemma4 phi3 mistral3 hunyuan-dense lfm2 qwen2
 # every token, so the working set is the whole file and anything near RAM turns into page-cache
 # churn. It would report a latency that measures swap, not the model. m6a.2xlarge has 30 GB, and
 # the KV cache, JVM heap and page cache all have to live there too.
-MAX_ARTIFACT_BYTES=22000000000
+# 22GB suits an m6a.4xlarge, where 64GB of RAM has to hold the model for our arm and then again for
+# ollama's. A larger instance can take more, so the ceiling is settable rather than baked in --
+# Qwen3-Coder-Next is 48.5GB and was silently skipped by the fixed limit.
+MAX_ARTIFACT_BYTES=${QUAL_MAX_ARTIFACT_BYTES:-22000000000}
 
 ( sleep ${DEADLINE_SECONDS:-18000}; touch /work/out/STOP ) &
 
@@ -200,6 +203,13 @@ while IFS= read -r job; do
   uri=$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['uri'])" "$job")
   tpl=$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['tpl'])" "$job")
   arch=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('arch',''))" "$job")
+  dt=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('dt') or '')" "$job")
+  wl=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('wl') or 'general')" "$job")
+  [ -z "$dt" ] && dt="$DECODE_THREAD_DEFAULT"
+  DECODE_THREAD_OPT=""
+  if [ -n "$dt" ]; then
+    DECODE_THREAD_OPT="-Dmodels.native.kernels.decodeThreads=$dt"
+  fi
   gguf="/work/models/$id.gguf"
   T0=$(date +%s)
   case " $SUPPORTED_ARCH " in
@@ -258,7 +268,7 @@ while IFS= read -r job; do
         -cp "$CP" \
         com.integrallis.models.rag.RagBenchmarkCli \
         --framework plain-java --backend rust-ffm --backend-version "$BACKEND_VERSION" \
-        --model "$artifact" --model-id "$id" --workload general --prompt-template "$tpl" \
+        --model "$artifact" --model-id "$id" --workload "$wl" --prompt-template "$tpl" \
         --context 2048 --threads 8 --max-tokens 256 --warmups 1 --iterations 3 \
         --output "/work/out/$id.json" > "/work/out/$id.log" 2>&1
       rc=$?
@@ -274,20 +284,14 @@ while IFS= read -r job; do
     continue
   fi
 
-  dt=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('dt') or '')" "$job")
-  [ -z "$dt" ] && dt="$DECODE_THREAD_DEFAULT"
-  DECODE_THREAD_OPT=""
-  if [ -n "$dt" ]; then
-    DECODE_THREAD_OPT="-Dmodels.native.kernels.decodeThreads=$dt"
-  fi
-  say "start $id (arch=$arch decodeThreads=${dt:-pool})"
+  say "start $id (arch=$arch workload=$wl decodeThreads=${dt:-pool})"
   if curl -sfL "$uri" -o "$gguf"; then
     # Every workload field sameWorkload() compares must match between the two arms or the comparator is
     # excluded: workload, corpus, cases, template, topK, max tokens, context, THREADS, grounding policy,
     # minimum retrieval score, and the matched generation controls. Threads are passed explicitly to
     # both for that reason -- a shard that passed --threads 8 to the candidate and let the comparator
     # default to the host's core count was rejected with "benchmark workload differs".
-    ARMS="--workload general --prompt-template $tpl --context 2048 --threads $THREADS"
+    ARMS="--workload $wl --prompt-template $tpl --context 2048 --threads $THREADS"
     ARMS="$ARMS --max-tokens 256 --warmups 1 --iterations 3"
 
     java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
