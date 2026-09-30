@@ -531,10 +531,13 @@ impl WorkerPool {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Matrix(job));
             state.failed = false;
-            self.shared
-                .partitions
-                .0
-                .store(partitions, Ordering::Release);
+            // `shared.partitions` is the pool's ACTIVATION GATE -- a worker parks while its index is
+            // at or beyond it, and only an increase in the active count notifies it again. It is not
+            // this job's partition count, which travels in the generation word and is read back by
+            // every worker as `job_partitions(observed_generation)`. Writing the job's count here
+            // was harmless only while the two were always equal; once a job can ask for fewer
+            // partitions than the pool has threads, it permanently parks every worker above that
+            // count, and the next job that needs them waits for workers that will never wake.
             self.shared
                 .remaining
                 .0
@@ -5874,6 +5877,62 @@ mod tests {
         // Three matrices of two partitions each is six, not two: the partition executes all of them.
         let job = parallel_job_of(4096, &[2 * MIN, 2 * MIN, 2 * MIN]);
         assert_eq!(partitions_for_matrix(&job, 16, MIN), 6);
+    }
+
+    /// Buffers a dispatchable job points at. `slice::from_raw_parts` requires a non-null, aligned
+    /// pointer even for a zero-length slice, and the activation slices are built before the row
+    /// range is consulted, so a job cannot be dispatched with null pointers however few rows it has.
+    struct DispatchableBuffers {
+        quantized: Vec<i8>,
+        scales: Vec<f32>,
+        sums: Vec<i16>,
+    }
+
+    impl DispatchableBuffers {
+        fn new() -> Self {
+            Self { quantized: vec![0; 1], scales: vec![0.0; 1], sums: vec![0; 1] }
+        }
+
+        /// `rows: 0` empties every partition's row range, so the weights pointer -- the one slice
+        /// built only after that range is non-empty -- is never dereferenced, and no kernel runs.
+        /// The job still carries the weight bytes that decide how many partitions it asks for, which
+        /// is the whole point: this exercises the pool's dispatch path, not just the arithmetic.
+        fn job(&self, output_elements: usize, weight_bytes: usize) -> ParallelJob {
+            let mut job = parallel_job_of(output_elements, &[weight_bytes]);
+            let matrix = job.matrices[0].as_mut().expect("matrix");
+            matrix.rows = 0;
+            matrix.quantized = self.quantized.as_ptr() as usize;
+            matrix.activation_scales = self.scales.as_ptr() as usize;
+            matrix.activation_sums = self.sums.as_ptr() as usize;
+            job
+        }
+    }
+
+    #[test]
+    fn a_job_that_wants_fewer_partitions_than_the_pool_has_does_not_park_the_rest() {
+        let pool = WorkerPool::new(4).expect("pool");
+        let buffers = DispatchableBuffers::new();
+        assert_eq!(pool.shared.partitions.0.load(Ordering::Acquire), 4);
+
+        // Two partitions' worth of weight on a four-thread pool.
+        let small = buffers.job(4096, 2 * MIN);
+        assert_eq!(partitions_for_matrix(&small, 4, MIN), 2);
+        assert!(pool.execute_matrix(small));
+
+        // The activation gate must still say four. Publishing a job must not shrink it: a worker
+        // parks while its index is at or beyond this value and is woken only when the ACTIVE count
+        // rises, so a job-sized value strands every worker above it for the rest of the pool's
+        // life -- and the next job that needs them then waits forever.
+        assert_eq!(
+            pool.shared.partitions.0.load(Ordering::Acquire),
+            4,
+            "publishing a job must not change the pool's activation gate"
+        );
+
+        // With the gate intact this completes; with it clobbered it waits on parked workers.
+        let full = buffers.job(4096, 64 * MIN);
+        assert_eq!(partitions_for_matrix(&full, 4, MIN), 4);
+        assert!(pool.execute_matrix(full));
     }
 
     #[test]
