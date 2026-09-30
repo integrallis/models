@@ -250,3 +250,43 @@ missing model but is only a missing publish step. Verify the artifacts, not the 
 each: `./gradlew verifyReleaseMetadata` in models, and in modeljars `npm test`,
 `npm run catalog:verify-components`, `npm run catalog:verify-compositions`,
 `npm run catalog:profiles:check`, plus the smoke gate against `origin/main` as the previous file.
+
+## An unmeasured change must never ride a release branch
+
+A work-proportional matrix-partitioning rewrite was committed to the 0.3.51 release branch with its
+own message admitting the gain "still has to be measured on x86". It hung the native kernel. A job
+sized from its weight bytes asks for fewer partitions than the pool has threads, and the matrix
+dispatch path stored that count into `shared.partitions` — the worker pool's **activation gate**,
+where a worker parks while its own index is at or beyond the value and is woken again only when the
+ACTIVE thread count rises. One small projection therefore parked every worker above its partition
+count permanently, and the next job needing them waited on threads that would never run. Small model
+on a wide box: the exact case this catalogue exists to serve.
+
+It was caught by an A/B on one host with one variable, after **1183 tests and thirty green CI checks
+passed over it**. Three rules follow, and none of them is optional:
+
+1. **`shared.partitions` is the activation gate, never job state.** A job's partition count travels
+   in the generation word and every worker reads it back with `job_partitions(...)`. The dispatch
+   path must not write the gate at all.
+2. **Test the plumbing, not only the arithmetic.** All six tests written for the partitioning policy
+   checked `partitions_for_matrix`'s return value and not one of them published a job through the
+   pool, so every one of them passed with the hang present. A kernel-pool change is only tested by a
+   test that dispatches. (Same lesson as the decoder plumbing surfaces: graph, planner and adapter
+   are different surfaces and a graph test covers one of them.)
+3. **A release branch carries the release and nothing else.** A performance idea belongs on its own
+   branch, behind its own A/B, with the old library as one arm. If it is not measured it does not
+   ship, however plausible the mechanism.
+
+## Published evidence must be measured on the library that ships
+
+The release also moved the default grounding policy from v21 to v23, while fifty of the sixty-five
+published qualifications had been measured under v2–v22. A catalogue entry that says QUALIFIED on the
+strength of a policy the shipped library no longer uses is not describing the shipped library, and
+`correctAnswerRate` is a pipeline metric, so the pipeline that produced it is part of the claim.
+
+The fix is not to rewrite the historical `groundingPolicy` field — that records what the
+qualification actually measured and must stay true. It is to give **every** published model a
+default-configuration smoke produced by the shipped library, so each entry carries a current proof
+that the model answers its whole workload correctly under library defaults. Run the smoke across the
+whole catalogue whenever the released library changes the grounding policy, the decoder, or the
+kernel — not only across the entries that are new.
