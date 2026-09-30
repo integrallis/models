@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.50] - 2026-09-30
+
 ### Corrected
 
 - **The 0.3.48 and 0.3.49 qualification claims overstate model quality.** Both releases state that
@@ -243,6 +245,8 @@ All notable changes to models are documented here.
     cannot reach. Gemma 4 E4B publishes `per_layer_model_proj` as F16 where E2B publishes BF16, and
     that projection runs per token.
 
+### Fixed
+
 - The same model produced **different output text on different machines**. Every vectorised float
   reduction in the model path sized itself from the host — `SPECIES_PREFERRED` capped by
   `vectors.maxBits` — and a float reduction's last bits are decided by how many partial sums it keeps
@@ -396,6 +400,9 @@ All notable changes to models are documented here.
 
 - Corrected a `backend-cuda` contract table that asserted the score dot product matches the CPU. It
   was never tested and it does not: the Java path uses a lane-striped `FloatVector` fold.
+
+### Changed
+- Accelerator capacity gate: `AcceleratorEligibility.select` now takes a `DeviceMemoryRequest` and adds up weights under the plan shape the kernel actually builds (`PlanShapeStrategy`), per-plan device scratch, and any device-resident KV cache, reporting the result as an itemised `DeviceBudget` with an eager-readiness estimate from the measured 16.5 plans/s A40-4Q rate. It also refuses a tensor at or above the 2 GiB TornadoVM `ByteArray` limit, refuses a plan set whose readiness would exceed 120 s, and refuses a file-size-only budget above 8 GiB of weights instead of gating on a number that omits KV, plan scratch and tensor size. Ineligibility messages now name what was needed, what was available, and which unimplemented plan shape would have fit. The budget for the qualified Qwen3 0.6B Q4_0 profiles is unchanged at 1,074.2 MiB. A 27B-class Q4_K_M model does not fit any device under the shipped plan shape; the arithmetic is in `benchmark-results/2026-09-18-gpu-large-model/LARGE-MODEL-MEMORY.md`.
 
 ## [0.3.47] - 2026-09-25
 

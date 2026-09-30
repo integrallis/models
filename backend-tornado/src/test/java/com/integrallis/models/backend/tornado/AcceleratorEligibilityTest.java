@@ -47,7 +47,9 @@ class AcceleratorEligibilityTest {
             List.of(device("NVIDIA A16", "PTX", "GPU", 2 * GIB, 512 * MIB)), 900 * MIB, true);
 
     assertThat(decision.eligible()).isFalse();
-    assertThat(decision.reason()).contains("device memory");
+    assertThat(decision.reason()).contains("NVIDIA A16 has 1.50 GiB usable of 2.00 GiB");
+    assertThat(decision.reason()).contains("needs 2.01 GiB");
+    assertThat(decision.reason()).contains("weights 1.76 GiB (PER_SHAPE_WHOLE_MODEL)");
   }
 
   @Test
@@ -61,7 +63,7 @@ class AcceleratorEligibilityTest {
             false);
 
     assertThat(decision.eligible()).isFalse();
-    assertThat(decision.reason()).contains("qualified NVIDIA GPU");
+    assertThat(decision.reason()).contains("PTX or CUDA backend on a GPU device");
   }
 
   @Test
@@ -97,7 +99,14 @@ class AcceleratorEligibilityTest {
     assertThat(withSmallMirror.requiredBytes())
         .isEqualTo(withoutAttention.requiredBytes() + (256L << 20));
     assertThat(withHugeMirror.eligible()).isFalse();
-    assertThat(withHugeMirror.reason()).contains("insufficient device memory");
+    // The itemised message this gate now produces, which says more than the generic string this
+    // test
+    // asserted before the capacity gate landed: it names the mirror as the KV line item and how far
+    // short the device is, so a reader can see that the reservation is what closed the gate.
+    assertThat(withHugeMirror.reason())
+        .contains("KV 16.00 GiB")
+        .contains("short by")
+        .contains("NVIDIA A40");
   }
 
   @Test

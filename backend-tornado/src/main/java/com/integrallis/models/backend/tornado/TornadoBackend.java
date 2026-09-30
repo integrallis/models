@@ -67,7 +67,10 @@ public final class TornadoBackend {
           0);
     }
     AcceleratorEligibility.Decision decision =
-        AcceleratorEligibility.select(devices, modelBytes, options.accelerateDecode());
+        AcceleratorEligibility.select(
+            devices,
+            DeviceMemoryRequest.ofModelFile(
+                modelLabel(model), modelBytes, options.accelerateDecode()));
     if (!decision.eligible()) {
       return fallback(
           model, backendConfiguration, options, decision.reason(), decision.requiredBytes());
@@ -196,6 +199,11 @@ public final class TornadoBackend {
       AcceleratorEligibility.DeviceCapabilities device, long reservedBytes) {
     long safeCapacity = device.globalMemoryBytes() - device.globalMemoryBytes() / 4L;
     return Math.max(1L, safeCapacity - reservedBytes);
+  }
+
+  private static String modelLabel(Path model) {
+    Path fileName = model.getFileName();
+    return fileName == null ? model.toString() : fileName.toString();
   }
 
   private static long size(Path model) {
