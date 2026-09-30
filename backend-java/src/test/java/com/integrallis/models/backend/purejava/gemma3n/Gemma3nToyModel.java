@@ -119,8 +119,17 @@ final class Gemma3nToyModel {
         EPSILON,
         SLIDING_WINDOW,
         SLIDING,
-        sparsity);
+        sparsity,
+        SOFTCAP);
   }
+
+  /**
+   * Small enough that the toy logits actually reach the cap, so a test can see it applied.
+   *
+   * <p>4.0 was tried first and the toy's largest logit is 0.94, so the cap did nothing and the test
+   * proved nothing -- the assertion that the logits reach towards the bound is what caught that.
+   */
+  static final float SOFTCAP = 0.5f;
 
   static Gemma3nToyModel create() {
     return create(Map.of(), false);

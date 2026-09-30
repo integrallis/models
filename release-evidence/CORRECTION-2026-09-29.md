@@ -102,7 +102,38 @@ shorter run did not find it -- the activation only has to arrive at that one ulp
 attempt never did.
 
 **It does not explain gemma3n's corrupted text.** That text was produced at 64 tokens with no crash, so
-the corruption is a separate defect and remains open.
+the corruption is a separate defect.
+
+**What the oracle comparison established.** The published E2B GGUF was fetched locally, sha256 verified
+against the artifact the fleet ran, and llama.cpp was used as an external oracle -- for testing only,
+nothing of it linked or copied. On `"The capital of France is"` the oracle answers
+`" Paris.\n\nThis is a true statement."`; our decoder answers `" Paris, France d'Aquiisiturii-"`. The
+weights are therefore fine and the defect is ours.
+
+Prompt tokenisation matches exactly (6 tokens: 2 818 5279 529 7001 563), and the first generated token
+matches (9079, `" Paris"`). Feeding the 7-token prompt with `" Paris"` already included still diverges,
+so this is not the incremental-decode path. The raw logits differ grossly rather than subtly: reference
+`-15.6992, 2.3187, -5.7929` against ours `-27.1088, -12.1220, -10.7436`, roughly double the magnitude
+with sign flips, and the reference's own choice (`.`) sits 5.4 logits below our pick.
+
+**Checked against the reference and found correct**, so these are excluded: prompt template and
+tokenisation, the embedding scale of sqrt(n_embd), the feed-forward order, activation sparsity's
+presence and its `relu(x - (mean + k*std))` with the `n - 1` denominator, the stream merge, the L2
+magnitude and the rescale, and the KV ring capacity.
+
+**Found and fixed: the final logit softcap was missing entirely.** The reference's graph ends in SCALE,
+TANH, SCALE around the output projection -- `30 * tanh(logit / 30)` -- and gemma3n's published header
+declares no softcapping key, so the reference's hparams default of 30 applies. Our decoder applied
+nothing. Confirmed numerically: the reference's raw `-15.6992` leaves as `-14.4074`, and
+`30 * tanh(-15.6992 / 30)` is `-14.41`; after the fix our `-27.1088` leaves as `-21.5418`, which is
+`30 * tanh(-27.1088 / 30)`.
+
+**The softcap is not the corruption, and was never going to be.** It is monotonic, so it cannot change
+which token a greedy decode selects, and the generated text is byte-identical before and after. It is a
+real defect for anything reading a probability, a temperature or a logprob, and it is fixed -- but the
+upstream divergence that produces `-27.11` where the reference produces `-15.70` is still open. Locating
+it needs a per-layer tensor comparison against `llama-eval-callback`, which needs a dump facility this
+decoder does not yet have.
 
 **`qwen3next` is not explained by prompting either.** The `gemma` template this run used matches
 gemma3n's own turn markers (`<start_of_turn>user` / `<end_of_turn>` / `<start_of_turn>model`), read from

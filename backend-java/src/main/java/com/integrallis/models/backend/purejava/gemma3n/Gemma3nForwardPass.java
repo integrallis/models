@@ -212,6 +212,14 @@ public final class Gemma3nForwardPass {
     mergeStreams(dim, altup, active0);
     TensorOps.rmsNorm(merged, merged, weights.outputNorm(), dim, config.rmsNormEpsilon());
     project(weights.output(), merged, logits);
+    // The bounded final-logit transform, which this decoder shipped without. Monotonic, so it
+    // cannot
+    // change which token a greedy decode picks -- but it decides every logit's value, so a
+    // temperature,
+    // a probability or a logprob taken from these is wrong without it. Verified against the
+    // reference's
+    // own graph, whose last three nodes are SCALE, TANH, SCALE around the output projection.
+    TensorOps.softcap(logits, config.finalLogitSoftcap());
     nextPosition++;
     return logits;
   }

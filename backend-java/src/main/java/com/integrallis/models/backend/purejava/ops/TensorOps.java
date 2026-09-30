@@ -96,6 +96,26 @@ public final class TensorOps {
     }
   }
 
+  /**
+   * The bounded final-logit transform the Gemma family applies: {@code cap * tanh(logit / cap)}.
+   *
+   * <p>Shared because two architectures need the identical formula. Monotonic, so it cannot change
+   * which token a greedy decode selects -- but it decides every logit's <i>value</i>, so anything
+   * turning logits into probabilities, applying a temperature, or reporting a logprob is wrong
+   * without it. gemma3n shipped without it: its published header carries no softcapping key at all,
+   * and the reference's default of 30 applies, which was confirmed against the reference's own
+   * graph dump (raw -15.6992 becoming -14.4074, and 30*tanh(-15.6992/30) = -14.41).
+   */
+  public static void softcap(float[] logits, float cap) {
+    Objects.requireNonNull(logits, "logits");
+    if (!(cap > 0.0f) || !Float.isFinite(cap)) {
+      throw new IllegalArgumentException("cap must be finite and > 0: " + cap);
+    }
+    for (int index = 0; index < logits.length; index++) {
+      logits[index] = cap * (float) Math.tanh(logits[index] / cap);
+    }
+  }
+
   /** Layer normalization with learned scale and bias over one contiguous row. */
   public static void layerNorm(
       float[] out,

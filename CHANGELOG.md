@@ -31,6 +31,20 @@ All notable changes to models are documented here.
 
 ### Fixed
 
+- **gemma3n never applied its final logit softcap.** The reference's graph ends in SCALE, TANH, SCALE
+  around the output projection -- `30 * tanh(logit / 30)` -- and gemma3n's published header declares no
+  softcapping key, so the reference's hparams default of 30 applies. Our decoder applied nothing, while
+  gemma4 has applied its own since it shipped. The formula now lives in `TensorOps.softcap` with gemma4
+  delegating to it, so there is one implementation.
+
+  Confirmed numerically against a dump of the reference graph: raw `-15.6992` leaves as `-14.4074`, and
+  `30 * tanh(-15.6992 / 30)` is `-14.41`.
+
+  **This is not why gemma3n produces corrupted text.** The transform is monotonic, so it cannot change
+  which token a greedy decode picks, and the generated text is byte-identical before and after -- which
+  is also why nothing noticed its absence. It matters for any consumer reading a probability, a
+  temperature or a logprob from these logits.
+
 - **GELU could read past the end of the tanh table.** `ArrayIndexOutOfBoundsException: Index 65537 out
   of bounds for length 65537`, from `TensorOps.tableTanh` inside `gelu`, which killed a gemma3n
   qualification run 456 seconds in. The table holds `TANH_TABLE_SIZE + 1` entries so the last

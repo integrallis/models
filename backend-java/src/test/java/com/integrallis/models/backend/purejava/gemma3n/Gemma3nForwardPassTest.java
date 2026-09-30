@@ -37,6 +37,42 @@ class Gemma3nForwardPassTest {
 
   private static final float TOLERANCE = 1.0e-4f;
 
+  /**
+   * Every logit is bounded by the softcap, and bounded the way the reference bounds it.
+   *
+   * <p>gemma3n shipped without this. Its published header declares no softcapping key -- all 42
+   * were checked -- so the reference's hparams default of 30 applies, and the reference's graph
+   * ends in SCALE, TANH, SCALE around the output projection. Confirmed numerically against a dump
+   * of that graph: a raw logit of -15.6992 leaves as -14.4074, and 30 * tanh(-15.6992 / 30) is
+   * -14.41.
+   *
+   * <p>The transform is monotonic, so its absence cannot change which token a greedy decode selects
+   * -- and that is exactly why nothing noticed. It decides every logit's <i>value</i>, so a
+   * temperature, a probability or a logprob read from an uncapped logit is wrong.
+   */
+  @Test
+  void everyLogitIsBoundedByTheFinalSoftcap() {
+    Gemma3nForwardPass pass = Gemma3nTestAccess.toyForwardPass();
+    {
+      float[] logits = pass.forward(1, 0);
+
+      for (int index = 0; index < logits.length; index++) {
+        assertThat(Math.abs(logits[index]))
+            .describedAs("logit %d must be inside the cap", index)
+            .isLessThan(Gemma3nToyModel.SOFTCAP);
+      }
+      // And at least one logit is near enough the bound that the cap is actually doing something --
+      // otherwise this passes on a model whose logits were all small anyway.
+      float largest = 0.0f;
+      for (float logit : logits) {
+        largest = Math.max(largest, Math.abs(logit));
+      }
+      assertThat(largest)
+          .describedAs("the toy logits must actually reach towards the cap")
+          .isGreaterThan(Gemma3nToyModel.SOFTCAP * 0.8f);
+    }
+  }
+
   @Test
   void theCompleteGraphMatchesAnIndependentScalarReference() {
     Gemma3nToyModel model = Gemma3nToyModel.create();
