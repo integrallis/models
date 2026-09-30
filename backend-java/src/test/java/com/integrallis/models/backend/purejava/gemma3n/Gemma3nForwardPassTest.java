@@ -73,6 +73,38 @@ class Gemma3nForwardPassTest {
     }
   }
 
+  /**
+   * A golden vector over the whole graph, which is the only thing that would have caught the
+   * missing per-layer scale.
+   *
+   * <p>The scalar reference and the decoder agreed with each other both before and after that fix,
+   * because the reference had the same omission -- two implementations of one misreading. A
+   * cross-check between them cannot fail on a shared misunderstanding, so this pins the numbers
+   * themselves. They were captured from the decoder after its output was confirmed byte-identical
+   * to llama.cpp on the published gemma-3n-E2B-it Q8_0 weights, where before the fix it emitted
+   * corrupted text.
+   *
+   * <p>If any scale in this graph is dropped or doubled, these values move and this fails.
+   */
+  @Test
+  void theToyGraphMatchesACapturedGoldenVector() {
+    Gemma3nForwardPass pass = Gemma3nTestAccess.toyForwardPass();
+    float[] logits = pass.forward(1, 0);
+
+    assertThat(logits).hasSize(Gemma3nToyModel.VOCAB);
+    assertThat(logits[0]).isCloseTo(GOLDEN_LOGITS[0], within(1.0e-5f));
+    for (int index = 0; index < GOLDEN_LOGITS.length; index++) {
+      assertThat(logits[index])
+          .describedAs("golden logit %d", index)
+          .isCloseTo(GOLDEN_LOGITS[index], within(1.0e-5f));
+    }
+  }
+
+  /** Captured from the fixed decoder; see {@link #theToyGraphMatchesACapturedGoldenVector()}. */
+  private static final float[] GOLDEN_LOGITS = {
+    -0.4073379f, 0.4791633f, -0.4687418f, -0.4448003f, 0.4707506f
+  };
+
   @Test
   void theCompleteGraphMatchesAnIndependentScalarReference() {
     Gemma3nToyModel model = Gemma3nToyModel.create();

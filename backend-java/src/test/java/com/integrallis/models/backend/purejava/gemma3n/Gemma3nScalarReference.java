@@ -73,6 +73,12 @@ final class Gemma3nScalarReference {
     // --- the second embedding table, one slice per layer
     float[] table =
         row(model.tensor("per_layer_token_embd.weight"), token, perLayer * config.numLayers());
+    // Scaled by sqrt(perLayerEmbeddingDim), which the reference does at the input
+    // (`tok_embd_scale = sqrtf(n_embd_altup)`). This reference omitted it for the same reason the
+    // decoder did, so the two agreed with each other and disagreed with the real model: on
+    // published
+    // weights the decoder emitted corrupted text while this test passed.
+    scale(table, (float) Math.sqrt(perLayer));
     float[] projected =
         matmul(
             model.tensor("per_layer_model_proj.weight"),

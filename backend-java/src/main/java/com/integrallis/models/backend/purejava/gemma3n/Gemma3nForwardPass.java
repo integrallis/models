@@ -266,6 +266,23 @@ public final class Gemma3nForwardPass {
    */
   private void preparePerLayerInputs(int token) {
     weights.embedPerLayerToken(token, perLayerInputs);
+    // The per-layer table is scaled by sqrt(perLayerEmbeddingDim), which this decoder did not do.
+    // The
+    // reference scales it at the input (`tok_embd_scale = sqrtf(n_embd_altup)`,
+    // build_inp_per_layer),
+    // and the omission is visible in a dump of that graph: the raw row sums to -6.881351 and the
+    // scaled tensor to -110.101616, exactly 16x for this model's width of 256.
+    //
+    // Being 16x small here is not a small error. This vector is blended half and half with the
+    // projected active stream, then gates the per-layer contribution added to the inactive streams
+    // at
+    // every one of the 30 layers, so the streams drift further from the reference at every layer.
+    // It is
+    // the defect behind the corrupted text this decoder produced on real weights.
+    float perLayerScale = (float) Math.sqrt(config.perLayerEmbeddingDim());
+    for (int index = 0; index < perLayerInputs.length; index++) {
+      perLayerInputs[index] *= perLayerScale;
+    }
     project(weights.perLayerModelProjection(), active, perLayerProjected);
     float scale = (float) (1.0 / Math.sqrt(config.embeddingDim()));
     int width = config.perLayerEmbeddingDim();
