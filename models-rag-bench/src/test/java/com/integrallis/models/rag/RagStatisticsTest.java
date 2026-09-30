@@ -50,7 +50,7 @@ class RagStatisticsTest {
 
     RagBenchmarkSummary summary =
         RagStatistics.summarize(
-            List.of(knownRun, unknownRun), 3, Map.of("known", answerable, "unknown", unknown));
+            List.of(knownRun, unknownRun), 3, Map.of("known", answerable, "unknown", unknown), 0);
 
     assertThat(summary.totalAttempts()).isEqualTo(3);
     assertThat(summary.successfulAttempts()).isEqualTo(2);
@@ -102,7 +102,7 @@ class RagStatisticsTest {
     // One attempt the model actually answered, correctly.
     runs.add(substituted(answerable, hit, GroundingDecision.MODEL_ANSWER, correct, correct));
 
-    RagBenchmarkSummary summary = RagStatistics.summarize(runs, 9, Map.of("known", answerable));
+    RagBenchmarkSummary summary = RagStatistics.summarize(runs, 9, Map.of("known", answerable), 20);
 
     assertThat(summary.correctAnswerRate())
         .describedAs("the pipeline answered every attempt correctly")
@@ -115,12 +115,72 @@ class RagStatisticsTest {
         .describedAs("of the answers the model did contribute, all were correct")
         .isEqualTo(1.0);
     assertThat(summary.extractiveFallbackRate()).isEqualTo(8.0 / 9.0);
+    // Each fixture run reports 11 output tokens against a 20-token cap, so nothing was cut off.
+    assertThat(summary.truncatedAnswerRate())
+        .describedAs("no run hit the output cap")
+        .isEqualTo(0.0);
 
     assertThat(summary.modelAnswerRate())
         .describedAs(
             "below RagProductionQualificationPolicy's model-answer floor, so a report like this"
                 + " is not a qualification however good correctAnswerRate looks")
         .isLessThan(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+  }
+
+  /**
+   * An answer cut off at the output cap is reported as truncated, not merely as a failure.
+   *
+   * <p>The other way a capable model reports badly. At a 64-token cap on 2026-09-29, a thinking
+   * model spent the whole budget on its reasoning trace and gpt-oss was cut off mid-word --
+   * *"...Windshield repair has a 75 dollar deductible"* -- while answering correctly. Neither could
+   * reach the citation the grounding policy screens for, so both were replaced by an extractive
+   * answer and scored exactly like a model with nothing to say.
+   */
+  @Test
+  void aSummaryShowsWhenAnswersWereCutOffAtTheOutputCap() {
+    RagCase answerable = new RagCase("known", "question", List.of("source"), List.of("fact"), true);
+    RagDocument source = new RagDocument("source", "Source", "fact");
+    RetrievedDocument hit = new RetrievedDocument(source, 1, 1);
+    RagEvaluation wrong = new RagEvaluation(1, 1, 0, 0, 0, false, false);
+    RagEvaluation correct = new RagEvaluation(1, 1, 1, 1, 1, false, true);
+
+    // Three attempts that ran to the 64-token cap, one that stopped well short of it.
+    List<RagRun> runs = new java.util.ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+      runs.add(capped(answerable, hit, 64, wrong, correct));
+    }
+    runs.add(capped(answerable, hit, 12, correct, correct));
+
+    RagBenchmarkSummary summary = RagStatistics.summarize(runs, 4, Map.of("known", answerable), 64);
+
+    assertThat(summary.truncatedAnswerRate()).isEqualTo(0.75);
+    assertThat(summary.correctAnswerRate())
+        .describedAs("the pipeline still reports every answer correct")
+        .isEqualTo(1.0);
+  }
+
+  private static RagRun capped(
+      RagCase testCase,
+      RetrievedDocument hit,
+      int outputTokens,
+      RagEvaluation rawEvaluation,
+      RagEvaluation evaluation) {
+    return new RagRun(
+        "plain-java",
+        "test",
+        "model",
+        testCase.id(),
+        List.of(hit),
+        "hash",
+        10,
+        5,
+        1_250,
+        new GenerationResult(
+            "cut off mid-sent", 100, 20, 10, outputTokens, 200, 1_200, 500, 20, 1_000, 30, 0.001),
+        new GroundedAnswer(
+            "cut off mid-sent", "fact [source]", GroundingDecision.EXTRACTIVE_FALLBACK),
+        rawEvaluation,
+        evaluation);
   }
 
   private static RagRun substituted(

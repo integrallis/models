@@ -45,7 +45,8 @@ public record RagBenchmarkSummary(
     double rawCorrectAnswerRate,
     double modelAnswerRate,
     double modelAnswerCorrectRate,
-    double extractiveFallbackRate) {
+    double extractiveFallbackRate,
+    double truncatedAnswerRate) {
 
   /**
    * The share of attempts whose answer came from the model, and how often that answer was right.
@@ -61,6 +62,14 @@ public record RagBenchmarkSummary(
    * five passed {@link RagProductionQualificationPolicy}'s model-contribution gate. The numbers
    * needed to see that were only in {@code runs[]}, so every consumer that read the summary -- a
    * report, a release note, a person -- read the pipeline's score as the model's.
+   *
+   * <p>{@code truncatedAnswerRate} is the share of attempts that stopped because they hit the
+   * output token cap rather than because the model finished. It belongs with these because it is
+   * the other way a good model reports badly: an answer cut off mid-sentence cannot carry the
+   * citation the grounding policy screens for, so it fails screening and is replaced --
+   * indistinguishable, in the old summary, from a model that had nothing to say. Measured on
+   * 2026-09-29 at a 64-token cap, where a thinking model spent the whole budget on its reasoning
+   * trace and gpt-oss was cut off mid-word while answering correctly.
    *
    * <p>{@code rawCorrectAnswerRate} scores the model's own text before grounding; {@code
    * modelAnswerRate} and {@code modelAnswerCorrectRate} are the two quantities the qualification

@@ -511,6 +511,7 @@ class RagProductionQualificationPolicyTest {
         correctAnswerRate,
         1.0,
         correctAnswerRate,
+        0.0,
         0.0);
   }
 
