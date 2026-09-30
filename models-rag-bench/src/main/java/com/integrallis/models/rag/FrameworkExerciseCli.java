@@ -150,9 +150,20 @@ public final class FrameworkExerciseCli {
         String langchainOut = trimmed(langchain.chat(text));
         backend.reset();
         String springOut = trimmed(spring.call(text));
+        // The same surface, run again last, with the same prompt and the same greedy options. All
+        // three adapters render through template.render(messages) and receive identical options, so
+        // a disagreement can only come from the adapter or from the run itself -- and those have
+        // different fixes. Without this arm the two are indistinguishable, and a backend that does
+        // not return to its initial state between calls reads as a broken adapter.
+        backend.reset();
+        String plainRepeat =
+            trimmed(plain.generate(template.render(List.of(ChatMessage.user(text))), options));
         row.put("plainJava", plainOut);
         row.put("langchain4j", langchainOut);
         row.put("springAi", springOut);
+        row.put("plainJavaRepeat", plainRepeat);
+        boolean reproducible = plainOut.equals(plainRepeat);
+        row.put("plainJavaReproducible", reproducible);
         boolean identical = plainOut.equals(langchainOut) && plainOut.equals(springOut);
         row.put("identicalAcrossSurfaces", identical);
         row.put("empty", plainOut.isBlank());
@@ -166,6 +177,9 @@ public final class FrameworkExerciseCli {
     report.put("promptsAgreeingAcrossSurfaces", agreeing);
     report.put("promptCount", PROMPTS.size());
     report.put("allSurfacesAgree", agreeing == PROMPTS.size());
+    report.put(
+        "plainJavaReproducibleForEveryPrompt",
+        results.stream().allMatch(row -> (Boolean) row.get("plainJavaReproducible")));
     report.put("anyEmptyAnswer", results.stream().anyMatch(row -> (Boolean) row.get("empty")));
 
     String rendered = JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report);
