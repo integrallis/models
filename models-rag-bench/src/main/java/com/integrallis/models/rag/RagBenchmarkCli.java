@@ -85,6 +85,10 @@ public final class RagBenchmarkCli {
       RagQualificationCli.main(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && args[0].equals("framework-exercise")) {
+      FrameworkExerciseCli.main(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     RagBenchmarkConfiguration configuration = parse(args);
     RagBenchmarkReport report = run(configuration);
     write(configuration.output(), report);
