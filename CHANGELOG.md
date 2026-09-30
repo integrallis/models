@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.50] - 2026-09-30
+
 ### Corrected
 
 - **The 0.3.48 and 0.3.49 qualification claims overstate model quality.** Both releases state that
