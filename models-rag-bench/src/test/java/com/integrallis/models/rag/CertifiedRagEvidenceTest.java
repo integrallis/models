@@ -36,6 +36,14 @@ class CertifiedRagEvidenceTest {
           .resolve("benchmark-results/certified-20260930/rag");
   private static final Path QWEN3_5_2B_EVIDENCE = TWO_ARM_EVIDENCE.resolve("qwen3.5-2b-q4_k_m");
   private static final Path GEMMA_3_4B_EVIDENCE = TWO_ARM_EVIDENCE.resolve("gemma-3-4b-it-q4_k_m");
+  private static final Path QWEN_QWEN2_5_CODER_1_5B_INSTRUCT_GGUF_Q4_K_M_EVIDENCE =
+      TWO_ARM_EVIDENCE.resolve("qwen-qwen2-5-coder-1-5b-instruct-gguf-q4_k_m");
+  private static final Path MRADERMACHER_POPIT_QWEN3_4B_MEDICAL_SFT_1128_GGUF_Q4_K_M_EVIDENCE =
+      TWO_ARM_EVIDENCE.resolve("mradermacher-popit-qwen3-4b-medical-sft-1128-gguf-q4_k_m");
+  private static final Path KING3DJBL_NEXUS_LEGAL_GGUF_Q5_K_M_EVIDENCE =
+      TWO_ARM_EVIDENCE.resolve("king3djbl-nexus-legal-gguf-q5_k_m");
+  private static final Path JANHQ_JAN_V3_5_4B_GGUF_Q4_K_M_EVIDENCE =
+      TWO_ARM_EVIDENCE.resolve("janhq-jan-v3-5-4b-gguf-q4_k_m");
   private static final Path UNSLOTH_GEMMA_4_12B_IT_GGUF_Q4_K_M_EVIDENCE =
       TWO_ARM_EVIDENCE.resolve("unsloth-gemma-4-12b-it-gguf-q4_k_m");
   private static final Path MISTRALAI_MINISTRAL_3_3B_INSTRUCT_2512_GGUF_Q4_K_M_EVIDENCE =
@@ -3359,6 +3367,132 @@ class CertifiedRagEvidenceTest {
             comparison -> {
               assertThat(comparison.decodeThroughputRatio()).isBetween(0.911, 0.921);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(0.87, 0.89);
+            });
+  }
+
+  @Test
+  void janhqJanV354bGgufQ4KMQualifiesAgainstItsSameHostOllamaComparator() throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            JANHQ_JAN_V3_5_4B_GGUF_Q4_K_M_EVIDENCE,
+            "janhq-jan-v3-5-4b-gguf-q4_k_m-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama =
+        report(
+            JANHQ_JAN_V3_5_4B_GGUF_Q4_K_M_EVIDENCE,
+            "janhq-jan-v3-5-4b-gguf-q4_k_m-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.modelAnswerCorrectRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_CORRECT_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.819, 0.829);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.3, 1.32);
+            });
+  }
+
+  @Test
+  void king3djblNexusLegalGgufQ5KMQualifiesAgainstItsSameHostOllamaComparator() throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            KING3DJBL_NEXUS_LEGAL_GGUF_Q5_K_M_EVIDENCE,
+            "king3djbl-nexus-legal-gguf-q5_k_m-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama =
+        report(
+            KING3DJBL_NEXUS_LEGAL_GGUF_Q5_K_M_EVIDENCE,
+            "king3djbl-nexus-legal-gguf-q5_k_m-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.modelAnswerCorrectRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_CORRECT_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.871, 0.881);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.15, 1.17);
+            });
+  }
+
+  @Test
+  void mradermacherPopitQwen34bMedicalSft1128GgufQ4KMQualifiesAgainstItsSameHostOllamaComparator()
+      throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            MRADERMACHER_POPIT_QWEN3_4B_MEDICAL_SFT_1128_GGUF_Q4_K_M_EVIDENCE,
+            "mradermacher-popit-qwen3-4b-medical-sft-1128-gguf-q4_k_m-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama =
+        report(
+            MRADERMACHER_POPIT_QWEN3_4B_MEDICAL_SFT_1128_GGUF_Q4_K_M_EVIDENCE,
+            "mradermacher-popit-qwen3-4b-medical-sft-1128-gguf-q4_k_m-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.modelAnswerCorrectRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_CORRECT_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.826, 0.836);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.28, 1.3);
+            });
+  }
+
+  @Test
+  void qwenQwen25Coder15bInstructGgufQ4KMQualifiesAgainstItsSameHostOllamaComparator()
+      throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            QWEN_QWEN2_5_CODER_1_5B_INSTRUCT_GGUF_Q4_K_M_EVIDENCE,
+            "qwen-qwen2-5-coder-1-5b-instruct-gguf-q4_k_m-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama =
+        report(
+            QWEN_QWEN2_5_CODER_1_5B_INSTRUCT_GGUF_Q4_K_M_EVIDENCE,
+            "qwen-qwen2-5-coder-1-5b-instruct-gguf-q4_k_m-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.modelAnswerCorrectRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_CORRECT_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.87, 0.88);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.25, 1.27);
             });
   }
 

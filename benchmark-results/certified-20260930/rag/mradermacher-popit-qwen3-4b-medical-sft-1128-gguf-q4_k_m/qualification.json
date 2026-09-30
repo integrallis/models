@@ -1,0 +1,36 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/work/out/mradermacher_popit_qwen3_4b_medical_sft_1128_gguf_q4_k_m.json",
+    "sha256" : "8190b974f8ead0eba2478651e9e14220da850387734557ad38bc8bd283436641"
+  },
+  "comparators" : [ {
+    "path" : "/work/out/mradermacher_popit_qwen3_4b_medical_sft_1128_gguf_q4_k_m.comparator.json",
+    "sha256" : "e06e82abdf9d54d7b127bdb363ce629ce16be2bde613d6a15acbcfdc2c943e55"
+  } ],
+  "qualification" : {
+    "modelId" : "mradermacher_popit_qwen3_4b_medical_sft_1128_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "07b3cc6981e8d7b1185169def28fb8f951028dd237e40d50d0c03a450502e7d8",
+    "absoluteTier" : "USABLE",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 9,
+    "modelAnswerRate" : 0.3333333333333333,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.831266687238042,
+      "endToEndLatencyRatio" : 1.292485230420699,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}
