@@ -95,13 +95,13 @@ export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 
 cd /work
-aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-longrope.tar" . --only-show-errors
+aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-g4answer.tar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/fleet-shard-$SHARD.json" /work/shard.json --only-show-errors
-[ -s models-rag-bench-0.3.50-longrope.tar ] || { STATUS=NO_DIST; exit 1; }
+[ -s models-rag-bench-0.3.50-g4answer.tar ] || { STATUS=NO_DIST; exit 1; }
 [ -s /work/models-kernels-linux-x86_64.jar ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 [ -s /work/shard.json ] || { STATUS=NO_SHARD; exit 1; }
-tar xf models-rag-bench-0.3.50-longrope.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
+tar xf models-rag-bench-0.3.50-g4answer.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
 CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
 JOBS=$(python3 -c "import json;print(len(json.load(open('/work/shard.json'))))")
@@ -114,13 +114,14 @@ THREADS=${QUAL_THREADS:-$(nproc 2>/dev/null || echo 8)}
 # cores. A bandwidth-bound single-row matmul usually peaks at or below the physical core count, so this
 # is the one knob worth sweeping before writing kernel code. Ours only; the declared --threads budget is
 # unchanged for both arms.
-DECODE_THREAD_OPT=""
-if [ -n "${QUAL_DECODE_THREADS:-}" ]; then
-  DECODE_THREAD_OPT="-Dmodels.native.kernels.decodeThreads=$QUAL_DECODE_THREADS"
-fi
+# Measured on shard-40/51/52 across 16, 8 and 4 decode threads: every K-quant model was faster at 8
+# than at 16 (+3% on a 1.28GB model, +11% at 2.39GB, +26% at 0.32GB), while the one Q4_0 model got
+# slower at 8 and collapsed at 4 -- a different kernel with a different optimum. So the thread count is
+# per job, read from the manifest, rather than one value imposed on the whole shard.
+DECODE_THREAD_DEFAULT="${QUAL_DECODE_THREADS:-}"
 # Baked in, not derived: the worker has no git repository, so `git rev-parse` there would record
 # "local" and the result would name no build at all.
-BACKEND_VERSION="models@0.3.50+longrope-77a9c6809d5b"
+BACKEND_VERSION="models@0.3.50+g4answer-4d2395dd0680"
 STATUS=RUNNING
 
 # The comparator arm. A qualification is comparative: RagProductionQualificationPolicy needs a baseline
@@ -273,7 +274,13 @@ while IFS= read -r job; do
     continue
   fi
 
-  say "start $id (arch=$arch)"
+  dt=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('dt') or '')" "$job")
+  [ -z "$dt" ] && dt="$DECODE_THREAD_DEFAULT"
+  DECODE_THREAD_OPT=""
+  if [ -n "$dt" ]; then
+    DECODE_THREAD_OPT="-Dmodels.native.kernels.decodeThreads=$dt"
+  fi
+  say "start $id (arch=$arch decodeThreads=${dt:-pool})"
   if curl -sfL "$uri" -o "$gguf"; then
     # Every workload field sameWorkload() compares must match between the two arms or the comparator is
     # excluded: workload, corpus, cases, template, topK, max tokens, context, THREADS, grounding policy,
