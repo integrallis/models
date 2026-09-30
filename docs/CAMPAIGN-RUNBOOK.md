@@ -56,6 +56,26 @@ launching any shard, confirm the comparator arm executed by checking for `$id.co
   in the change, not a re-grading of the model. Prove the catalog is unchanged
   (`CertifiedRagEvidenceTest`) before landing anything that touches the policy.
 
+## Reasoning preambles are a prompt problem, not a decoder problem
+
+Gemma 4 E2B returned a model-answer rate of 0.000 with 0.889 of its answers coming from the extractive
+fallback, and two thirds of its outputs truncated. The cause was a plain-prose reasoning preamble headed
+`Thinking Process:` that consumed the whole 256-token budget before any answer appeared. The v21
+grounding policy strips closed `<think>`, `<thinking>` and `<reasoning>` blocks; this is none of those.
+
+**Check the comparator before blaming the decoder.** Ollama receives the same rendered prompt and failed
+identically, opening with the same text, which settles it as model behaviour under this workload rather
+than a defect on our side. Our envelope was already byte-for-byte the published chat template's: with
+thinking disabled the reference emits `<|turn>model\n<|channel>thought\n<channel|>` -- an immediately
+closed thought channel -- and no system turn unless one is supplied.
+
+The fix is an answer prefill, which is what the chatml family already does: `gemma4-answer` keeps the
+envelope identical and appends `Answer: `, exactly as `chatml-answer` does. A template is declared per
+model, recorded in the evidence and applied to both arms, so the comparison stays matched and no gate
+moves. **Raising `--max-tokens` to rescue such a model would be tuning the benchmark to the answer** --
+it changes the workload for every model and must be a declared protocol change re-run across the board,
+never a per-model rescue.
+
 ## llama.cpp and Ollama
 
 Benchmark comparators and external oracles **only**. Our code is Java plus Rust shims, always. We may
