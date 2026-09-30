@@ -1,0 +1,1901 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-09-30T17:28:07.077299018Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.50+g4answer-4d2395dd0680",
+  "modelId" : "qwen3_8b_q4_k_m",
+  "model" : "/work/models/qwen3_8b_q4_k_m.gguf",
+  "artifactSha256" : "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "artifactSizeBytes" : 5027783488,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v21",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topK" : "1",
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-14-254",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971658752,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen3, group-size=4",
+      "gguf-chunks-per-thread" : "2",
+      "gguf-executor" : "persistent",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "architecture" : "amd64",
+      "model-architecture" : "qwen3",
+      "gguf-parallel" : "true",
+      "vector-api" : "true",
+      "end-of-generation.151645" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "end-of-generation.151643" : "vocabulary-text",
+      "native-quantized-decode" : "true",
+      "native-kernel-decode-threads" : "8",
+      "compiler" : "hotspot-c2",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "kernel-runtime" : "rust-ffm",
+      "sve" : "false",
+      "java-version" : "25.0.4.1",
+      "native-kernel-threads" : "16",
+      "projection-layers" : "36",
+      "fast-scalar-fma" : "true",
+      "vm-vendor" : "Eclipse Adoptium",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "native-q5-0-grouped" : "false",
+      "native-kernel-abi" : "6",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "transformer-runtime" : "java",
+      "q4-short-pairwise-supported" : "true",
+      "processors" : "16",
+      "tokenizer.pre.implemented" : "true",
+      "java-feature" : "25",
+      "native-gated-delta-net" : "false",
+      "java-executor-poll-millis" : "0",
+      "fast-vector-fma" : "true",
+      "tokenizer.pre" : "qwen2",
+      "active-vector-bits" : "256",
+      "os" : "Linux",
+      "native-load-warmup" : "false",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "gguf-threads" : "16",
+      "end-of-generation.chat-template" : "resolved:151645",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation-token-ids" : "151643,151645",
+      "native-grouped-attention" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v13",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "18"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "batch-size" : "32",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "16",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "load-warmup",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.loadWarmup",
+      "settings" : {
+        "property" : "models.native.loadWarmup",
+        "sequence-state" : "reset-after-warmup"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "caller-owned-java-array",
+        "abi" : "6",
+        "property" : "models.native.gatedDeltaNet"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "6",
+        "property" : "models.native.gatedDeltaNet"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "property" : "models.native.q5_0.grouped",
+        "qualification" : "model-and-platform-specific"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel",
+      "settings" : {
+        "property" : "models.native.quantizedDecode",
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 522.816358,
+    "retrievalMillis" : {
+      "p50" : 1.227708,
+      "p95" : 2.0606936
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.4918020000040997,
+      "p95" : 1.7915653000007297
+    },
+    "ttftMillis" : {
+      "p50" : 1795.412867,
+      "p95" : 2180.499246
+    },
+    "tpotMillis" : {
+      "p50" : 144.49280563819096,
+      "p95" : 145.59567003696304
+    },
+    "endToEndMillis" : {
+      "p50" : 30617.043205,
+      "p95" : 38902.0545184
+    },
+    "p50PrefillTokensPerSecond" : 37.439708092945004,
+    "p50DecodeTokensPerSecond" : 6.9207597955014695,
+    "peakRssBytes" : 5365223424,
+    "totalCpuMillis" : 7110360.0,
+    "totalInputTokens" : 4593,
+    "totalCacheReadInputTokens" : 2871,
+    "totalCacheWriteInputTokens" : 1722,
+    "totalOutputTokens" : 5556,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.7777777777777778,
+    "modelAnswerRate" : 0.5555555555555556,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.3333333333333333,
+    "truncatedAnswerRate" : 0.1111111111111111
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c98b1a9e299af5dab1c81fb866ce891f5288532eba56984b2263e55e87f367a",
+    "retrievalMillis" : 2.147354,
+    "frameworkOverheadMillis" : 1.7509179999979096,
+    "endToEndMillis" : 27838.984771,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 175,
+      "cacheReadInputTokens" : 150,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 188,
+      "ttftMillis" : 689.204329,
+      "totalMillis" : 27835.086499,
+      "prefillTokensPerSecond" : 36.31797418409732,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5334306816,
+      "cpuMillis" : 227370.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the time frame to report an auto glass claim and the deductible. I need to check the provided context.\n\nLooking at the context from [claims-auto-glass], it says Northstar Mutual requires claims to be reported through the Aurora portal within 30 calendar days. Also, the deductible for windshield repair is $75. The user didn't mention needing a police report, but the question is about the time and deductible. \n\nSo the answer should include both the 30-day period and the $75 deductible. The sources are from the same context entry, so I'll cite that ID. Make sure to format it correctly with the citation at the end. No other info is needed, so the answer is straightforward.\n</think>\n\nYou have 30 calendar days to report an auto glass claim, and the deductible is $75 [claims-auto-glass].",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9bac66c4cd1be06f8af7f1e20bba73e90f20a93e95ebd6445aee83f09f963333",
+    "retrievalMillis" : 1.820254,
+    "frameworkOverheadMillis" : 1.6785240000026533,
+    "endToEndMillis" : 30579.034548,
+    "generation" : {
+      "text" : "The form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 200,
+      "ttftMillis" : 1846.702371,
+      "totalMillis" : 30575.53577,
+      "prefillTokensPerSecond" : 36.29623308667724,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5334351872,
+      "cpuMillis" : 258370.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the form used for trip interruption claims and the reimbursement limit.\n\nFirst, I'll check the provided context. The relevant part is from [claims-travel], which states: \"Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler.\"\n\nSo, the form mentioned is T-19. The reimbursement limit is $3,500 per traveler. The answer needs to include both the form and the limit, citing the source. Since the context has the necessary info, I don't need to say INSUFFICIENT_CONTEXT. I'll format the answer with the form and limit, then add the citation as [claims-travel].\n</think>\n\nThe form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "The form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d8ac07be5ecbf49c6e3987c048195ef6675271932ca9553d9e96508db29d477d",
+    "retrievalMillis" : 1.735238,
+    "frameworkOverheadMillis" : 1.7089559999985795,
+    "endToEndMillis" : 31090.727586,
+    "generation" : {
+      "text" : "Behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 204,
+      "ttftMillis" : 1859.086813,
+      "totalMillis" : 31087.283392,
+      "prefillTokensPerSecond" : 36.05599062456848,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5334405120,
+      "cpuMillis" : 262600.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking two things: whether a referral is needed for behavioral health telemedicine and what the copay is.\n\nFirst, I'll check the context provided. The relevant part is from [health-telemedicine]. It says, \"In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited.\"\n\nSo, the first part of the answer is that a referral isn't needed. The second part is the copay of $15 per visit. The context clearly states both points. I need to make sure I'm not adding any extra information. Since both answers are present in the context, I can cite the source. The answer should be a single sentence with the citations at the end. Let me structure that correctly.\n</think>\n\nBehavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "text" : "Behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "380c007011a7f5db80c7048eace219a980cfd3610c794d6a2564cdd1758eaa2d",
+    "retrievalMillis" : 1.573909,
+    "frameworkOverheadMillis" : 1.59874900000068,
+    "endToEndMillis" : 32192.608256,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 211,
+      "ttftMillis" : 1719.88328,
+      "totalMillis" : 32189.435598,
+      "prefillTokensPerSecond" : 37.22589793388182,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5334786048,
+      "cpuMillis" : 270250.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the settlement times for approved domestic ACH claims and international claim wires.\n\nFirst, I need to check the context provided. The context is from the \"payments-settlement\" section. It says that approved domestic claims paid by ACH settle within 2 business days. Then for international claim wires, it mentions they settle within 5 business days and may incur a fee.\n\nSo the answer should state both times: 2 business days for domestic ACH and 5 for international wires. I need to make sure to include both parts. Also, the user wants the answer in one short sentence with citations. The context entry is labeled [payments-settlement], so that's the citation. I should check if there are other IDs, but in this case, it's just one. So the answer would mention both settlement times and cite the source correctly.\n</think>\n\nApproved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "text" : "Approved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "2c3474424e6ad74d141ff736bdad09e820bb4d67be4aa7ad3eeaa78d0c95cb72",
+    "retrievalMillis" : 1.388826,
+    "frameworkOverheadMillis" : 1.5617380000003322,
+    "endToEndMillis" : 29812.806394,
+    "generation" : {
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 103,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 195,
+      "ttftMillis" : 1752.006872,
+      "totalMillis" : 29809.85583,
+      "prefillTokensPerSecond" : 36.545214918480326,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5351112704,
+      "cpuMillis" : 251280.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the merchant chargeback evidence deadline and upload format.\n\nFirst, I need to check the provided context. The context given is from the \"payments-chargeback\" section. It states that merchants must submit chargeback evidence within 7 calendar days of notification. Also, the evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nSo, the deadline is 7 calendar days, and the format is a PDF under 10 MB. The answer needs to include both parts. The supporting source is the payments-chargeback context, so I should cite that. I need to make sure I don't add any extra information not in the context. Since everything required is covered, the answer should be straightforward.\n</think>\n\nThe merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d2f53b19f41f7d91dc6f7dd6b315e7cab5343d34960adaee9fb6abe494fda55a",
+    "retrievalMillis" : 2.197787,
+    "frameworkOverheadMillis" : 2.068639000000985,
+    "endToEndMillis" : 28045.191416,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 182,
+      "ttftMillis" : 1984.111288,
+      "totalMillis" : 28040.92499,
+      "prefillTokensPerSecond" : 34.80097956042087,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5352218624,
+      "cpuMillis" : 238810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking for the production break-glass code name and the number of managers required to approve it.\n\nFirst, I'll check the provided context. The relevant part is from [security-access]: \"Production emergency access The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers...\" \n\nSo the code name is Cobalt-17, and it needs two managers. The answer should include both parts. The citation is [security-access]. I need to make sure I only use the information given and not add anything else. Since everything is covered in the context, I don't need to say INSUFFICIENT_CONTEXT. Let me phrase it concisely.\n</think>\n\nThe production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "text" : "The production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b590af5ae835c55e27f24d72da74dcba9d7ec08b7d7906b1e65dbf463422745a",
+    "retrievalMillis" : 1.588649,
+    "frameworkOverheadMillis" : 1.7060160000037285,
+    "endToEndMillis" : 33696.534669,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 216,
+      "ttftMillis" : 2396.036184,
+      "totalMillis" : 33693.240004,
+      "prefillTokensPerSecond" : 35.06860269099975,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5353549824,
+      "cpuMillis" : 287180.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the header that makes the Claims API creates idempotent and the replay window duration.\n\nFirst, I need to check the provided context. The context given is from [api-idempotency], which states that Claims API clients send the Idempotency-Key header on create requests. It also mentions that keys remain valid for a 24-hour replay window. \n\nSo, the header in question is the Idempotency-Key. The replay window is 24 hours. The answer needs to include both parts: the header and the time. The supporting source is [api-idempotency]. I should make sure to cite that correctly. Since the context directly answers both parts, there's no need to mention insufficient context. The answer should be concise, one sentence with the citations at the end.\n</think>\n\nThe Claims API uses the Idempotency-Key header to ensure idempotency, with keys valid for a 24-hour replay window [api-idempotency].",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "63d22ca7667495eef75d9900690e54a3b799f12319e7a4edd419369137dc9633",
+    "retrievalMillis" : 1.804703,
+    "frameworkOverheadMillis" : 1.5387059999993653,
+    "endToEndMillis" : 38942.246673,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 256,
+      "ttftMillis" : 1854.41451,
+      "totalMillis" : 38938.903264,
+      "prefillTokensPerSecond" : 35.60496569574035,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5355773952,
+      "cpuMillis" : 325120.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about how quickly a priority one incident is acknowledged and which route escalates it.\n\nFirst, I need to look at the provided context. The context given is from \"support-escalation\" and mentions that a priority one incident must be acknowledged within 15 minutes. Then, if it's unresolved after 30 minutes, the NORTHSTAR-P1 pages the incident commander.\n\nSo, the acknowledgment time is 15 minutes. The escalation route is NORTHSTAR-P1, which is triggered after 30 minutes of unresolved time. The question is asking for both the acknowledgment speed and the escalation route. \n\nI need to make sure I'm not missing any other details. The context only provides these two points. There's no mention of other escalation routes or times. So the answer should include both the 15-minute acknowledgment and the NORTHSTAR-P1 escalation after 30 minutes. \n\nI should check if the answer is fully supported by the context. The first part is directly stated, and the second part is also stated. No other information is needed. So the answer should be concise, citing the relevant source ID. The source here is support-escalation, so the citation would be",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "21f3713cf382940c25f833bcac879a6a3bc2f3fa15142355a21bb94e5c03f042",
+    "retrievalMillis" : 1.020484,
+    "frameworkOverheadMillis" : 1.5550469999980123,
+    "endToEndMillis" : 30318.775658,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 200,
+      "ttftMillis" : 1795.47709,
+      "totalMillis" : 30316.200127,
+      "prefillTokensPerSecond" : 37.88879103037566,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5358194688,
+      "cpuMillis" : 256160.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the deductible for damage to a lunar rover. The context provided is from [claims-auto-glass], which talks about Northstar Mutual's auto glass claims. It mentions a $75 deductible for windshield repair and that a police report isn't required. \n\nWait, the question is about a lunar rover, which isn't mentioned anywhere in the context. The context is specifically about auto glass claims, probably for vehicles. There's no information about lunar rovers or any other type of deductible. Since the context doesn't cover lunar rovers, I should check if there's any other source mentioned. But the user only provided one context entry. \n\nSo, the answer must be that there's insufficient context. The provided information doesn't address lunar rovers at all. The deductible mentioned is for auto glass, not related to space vehicles. Therefore, I can't provide an answer based on the given data.\n</think>\n\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c98b1a9e299af5dab1c81fb866ce891f5288532eba56984b2263e55e87f367a",
+    "retrievalMillis" : 1.858486,
+    "frameworkOverheadMillis" : 1.639682000000903,
+    "endToEndMillis" : 27570.7462,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 175,
+      "cacheReadInputTokens" : 150,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 188,
+      "ttftMillis" : 660.62078,
+      "totalMillis" : 27567.248032,
+      "prefillTokensPerSecond" : 37.881361056331635,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5359366144,
+      "cpuMillis" : 225060.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the time frame to report an auto glass claim and the deductible. I need to check the provided context.\n\nLooking at the context from [claims-auto-glass], it says Northstar Mutual requires claims to be reported through the Aurora portal within 30 calendar days. Also, the deductible for windshield repair is $75. The user didn't mention needing a police report, but the question is about the time and deductible. \n\nSo the answer should include both the 30-day period and the $75 deductible. The sources are from the same context entry, so I'll cite that ID. Make sure to format it correctly with the citation at the end. No other info is needed, so the answer is straightforward.\n</think>\n\nYou have 30 calendar days to report an auto glass claim, and the deductible is $75 [claims-auto-glass].",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9bac66c4cd1be06f8af7f1e20bba73e90f20a93e95ebd6445aee83f09f963333",
+    "retrievalMillis" : 1.44307,
+    "frameworkOverheadMillis" : 1.433499999999185,
+    "endToEndMillis" : 30626.392907,
+    "generation" : {
+      "text" : "The form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 200,
+      "ttftMillis" : 1821.333812,
+      "totalMillis" : 30623.516337,
+      "prefillTokensPerSecond" : 36.79685064916062,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5359984640,
+      "cpuMillis" : 258660.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the form used for trip interruption claims and the reimbursement limit.\n\nFirst, I'll check the provided context. The relevant part is from [claims-travel], which states: \"Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler.\"\n\nSo, the form mentioned is T-19. The reimbursement limit is $3,500 per traveler. The answer needs to include both the form and the limit, citing the source. Since the context has the necessary info, I don't need to say INSUFFICIENT_CONTEXT. I'll format the answer with the form and limit, then add the citation as [claims-travel].\n</think>\n\nThe form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "The form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d8ac07be5ecbf49c6e3987c048195ef6675271932ca9553d9e96508db29d477d",
+    "retrievalMillis" : 1.269599,
+    "frameworkOverheadMillis" : 1.480583000000479,
+    "endToEndMillis" : 31154.857557,
+    "generation" : {
+      "text" : "Behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 204,
+      "ttftMillis" : 1838.406184,
+      "totalMillis" : 31152.107375,
+      "prefillTokensPerSecond" : 36.45819118209771,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5360648192,
+      "cpuMillis" : 262990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking two things: whether a referral is needed for behavioral health telemedicine and what the copay is.\n\nFirst, I'll check the context provided. The relevant part is from [health-telemedicine]. It says, \"In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited.\"\n\nSo, the first part of the answer is that a referral isn't needed. The second part is the copay of $15 per visit. The context clearly states both points. I need to make sure I'm not adding any extra information. Since both answers are present in the context, I can cite the source. The answer should be a single sentence with the citations at the end. Let me structure that correctly.\n</think>\n\nBehavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "text" : "Behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "380c007011a7f5db80c7048eace219a980cfd3610c794d6a2564cdd1758eaa2d",
+    "retrievalMillis" : 1.217016,
+    "frameworkOverheadMillis" : 1.4209890000020096,
+    "endToEndMillis" : 31881.643248,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 211,
+      "ttftMillis" : 1643.247435,
+      "totalMillis" : 31879.005243,
+      "prefillTokensPerSecond" : 38.96193459534798,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5361197056,
+      "cpuMillis" : 267350.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the settlement times for approved domestic ACH claims and international claim wires.\n\nFirst, I need to check the context provided. The context is from the \"payments-settlement\" section. It says that approved domestic claims paid by ACH settle within 2 business days. Then for international claim wires, it mentions they settle within 5 business days and may incur a fee.\n\nSo the answer should state both times: 2 business days for domestic ACH and 5 for international wires. I need to make sure to include both parts. Also, the user wants the answer in one short sentence with citations. The context entry is labeled [payments-settlement], so that's the citation. I should check if there are other IDs, but in this case, it's just one. So the answer would mention both settlement times and cite the source correctly.\n</think>\n\nApproved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "text" : "Approved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "2c3474424e6ad74d141ff736bdad09e820bb4d67be4aa7ad3eeaa78d0c95cb72",
+    "retrievalMillis" : 1.000103,
+    "frameworkOverheadMillis" : 1.409167999998317,
+    "endToEndMillis" : 29600.744998,
+    "generation" : {
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 103,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 195,
+      "ttftMillis" : 1627.584824,
+      "totalMillis" : 29598.335727,
+      "prefillTokensPerSecond" : 39.33422009136624,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5361737728,
+      "cpuMillis" : 249080.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the merchant chargeback evidence deadline and upload format.\n\nFirst, I need to check the provided context. The context given is from the \"payments-chargeback\" section. It states that merchants must submit chargeback evidence within 7 calendar days of notification. Also, the evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nSo, the deadline is 7 calendar days, and the format is a PDF under 10 MB. The answer needs to include both parts. The supporting source is the payments-chargeback context, so I should cite that. I need to make sure I don't add any extra information not in the context. Since everything required is covered, the answer should be straightforward.\n</think>\n\nThe merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d2f53b19f41f7d91dc6f7dd6b315e7cab5343d34960adaee9fb6abe494fda55a",
+    "retrievalMillis" : 1.256039,
+    "frameworkOverheadMillis" : 1.3941869999980554,
+    "endToEndMillis" : 27852.135154,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 182,
+      "ttftMillis" : 1806.571577,
+      "totalMillis" : 27849.484928,
+      "prefillTokensPerSecond" : 38.2050508756065,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5362425856,
+      "cpuMillis" : 236560.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking for the production break-glass code name and the number of managers required to approve it.\n\nFirst, I'll check the provided context. The relevant part is from [security-access]: \"Production emergency access The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers...\" \n\nSo the code name is Cobalt-17, and it needs two managers. The answer should include both parts. The citation is [security-access]. I need to make sure I only use the information given and not add anything else. Since everything is covered in the context, I don't need to say INSUFFICIENT_CONTEXT. Let me phrase it concisely.\n</think>\n\nThe production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "text" : "The production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b590af5ae835c55e27f24d72da74dcba9d7ec08b7d7906b1e65dbf463422745a",
+    "retrievalMillis" : 1.227708,
+    "frameworkOverheadMillis" : 1.4918020000040997,
+    "endToEndMillis" : 33699.481668,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 216,
+      "ttftMillis" : 2156.784429,
+      "totalMillis" : 33696.762158,
+      "prefillTokensPerSecond" : 38.95876849243864,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5363138560,
+      "cpuMillis" : 286060.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the header that makes the Claims API creates idempotent and the replay window duration.\n\nFirst, I need to check the provided context. The context given is from [api-idempotency], which states that Claims API clients send the Idempotency-Key header on create requests. It also mentions that keys remain valid for a 24-hour replay window. \n\nSo, the header in question is the Idempotency-Key. The replay window is 24 hours. The answer needs to include both parts: the header and the time. The supporting source is [api-idempotency]. I should make sure to cite that correctly. Since the context directly answers both parts, there's no need to mention insufficient context. The answer should be concise, one sentence with the citations at the end.\n</think>\n\nThe Claims API uses the Idempotency-Key header to ensure idempotency, with keys valid for a 24-hour replay window [api-idempotency].",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "63d22ca7667495eef75d9900690e54a3b799f12319e7a4edd419369137dc9633",
+    "retrievalMillis" : 1.664904,
+    "frameworkOverheadMillis" : 1.7912020000076154,
+    "endToEndMillis" : 38857.782415,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 256,
+      "ttftMillis" : 1794.110108,
+      "totalMillis" : 38854.326309,
+      "prefillTokensPerSecond" : 36.804831923920545,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5363318784,
+      "cpuMillis" : 324230.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about how quickly a priority one incident is acknowledged and which route escalates it.\n\nFirst, I need to look at the provided context. The context given is from \"support-escalation\" and mentions that a priority one incident must be acknowledged within 15 minutes. Then, if it's unresolved after 30 minutes, the NORTHSTAR-P1 pages the incident commander.\n\nSo, the acknowledgment time is 15 minutes. The escalation route is NORTHSTAR-P1, which is triggered after 30 minutes of unresolved time. The question is asking for both the acknowledgment speed and the escalation route. \n\nI need to make sure I'm not missing any other details. The context only provides these two points. There's no mention of other escalation routes or times. So the answer should include both the 15-minute acknowledgment and the NORTHSTAR-P1 escalation after 30 minutes. \n\nI should check if the answer is fully supported by the context. The first part is directly stated, and the second part is also stated. No other information is needed. So the answer should be concise, citing the relevant source ID. The source here is support-escalation, so the citation would be",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "21f3713cf382940c25f833bcac879a6a3bc2f3fa15142355a21bb94e5c03f042",
+    "retrievalMillis" : 0.7961,
+    "frameworkOverheadMillis" : 1.4145790000002307,
+    "endToEndMillis" : 30533.43321,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 200,
+      "ttftMillis" : 1777.154209,
+      "totalMillis" : 30531.222531,
+      "prefillTokensPerSecond" : 38.2766522506606,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5363339264,
+      "cpuMillis" : 257730.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the deductible for damage to a lunar rover. The context provided is from [claims-auto-glass], which talks about Northstar Mutual's auto glass claims. It mentions a $75 deductible for windshield repair and that a police report isn't required. \n\nWait, the question is about a lunar rover, which isn't mentioned anywhere in the context. The context is specifically about auto glass claims, probably for vehicles. There's no information about lunar rovers or any other type of deductible. Since the context doesn't cover lunar rovers, I should check if there's any other source mentioned. But the user only provided one context entry. \n\nSo, the answer must be that there's insufficient context. The provided information doesn't address lunar rovers at all. The deductible mentioned is for auto glass, not related to space vehicles. Therefore, I can't provide an answer based on the given data.\n</think>\n\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c98b1a9e299af5dab1c81fb866ce891f5288532eba56984b2263e55e87f367a",
+    "retrievalMillis" : 1.162703,
+    "frameworkOverheadMillis" : 1.3886569999958738,
+    "endToEndMillis" : 27577.89825,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 175,
+      "cacheReadInputTokens" : 150,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 188,
+      "ttftMillis" : 659.180218,
+      "totalMillis" : 27575.34689,
+      "prefillTokensPerSecond" : 37.965404511096445,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5363372032,
+      "cpuMillis" : 225160.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the time frame to report an auto glass claim and the deductible. I need to check the provided context.\n\nLooking at the context from [claims-auto-glass], it says Northstar Mutual requires claims to be reported through the Aurora portal within 30 calendar days. Also, the deductible for windshield repair is $75. The user didn't mention needing a police report, but the question is about the time and deductible. \n\nSo the answer should include both the 30-day period and the $75 deductible. The sources are from the same context entry, so I'll cite that ID. Make sure to format it correctly with the citation at the end. No other info is needed, so the answer is straightforward.\n</think>\n\nYou have 30 calendar days to report an auto glass claim, and the deductible is $75 [claims-auto-glass].",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9bac66c4cd1be06f8af7f1e20bba73e90f20a93e95ebd6445aee83f09f963333",
+    "retrievalMillis" : 1.170303,
+    "frameworkOverheadMillis" : 1.3794270000034885,
+    "endToEndMillis" : 30617.043205,
+    "generation" : {
+      "text" : "The form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 200,
+      "ttftMillis" : 1830.172961,
+      "totalMillis" : 30614.493475,
+      "prefillTokensPerSecond" : 36.61886558372584,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5363429376,
+      "cpuMillis" : 258810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the form used for trip interruption claims and the reimbursement limit.\n\nFirst, I'll check the provided context. The relevant part is from [claims-travel], which states: \"Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler.\"\n\nSo, the form mentioned is T-19. The reimbursement limit is $3,500 per traveler. The answer needs to include both the form and the limit, citing the source. Since the context has the necessary info, I don't need to say INSUFFICIENT_CONTEXT. I'll format the answer with the form and limit, then add the citation as [claims-travel].\n</think>\n\nThe form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "The form used for trip interruption is T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d8ac07be5ecbf49c6e3987c048195ef6675271932ca9553d9e96508db29d477d",
+    "retrievalMillis" : 1.194094,
+    "frameworkOverheadMillis" : 1.4322690000008151,
+    "endToEndMillis" : 31165.849029,
+    "generation" : {
+      "text" : "Behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 204,
+      "ttftMillis" : 1790.225381,
+      "totalMillis" : 31163.222666,
+      "prefillTokensPerSecond" : 37.439708092945004,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5363638272,
+      "cpuMillis" : 262930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking two things: whether a referral is needed for behavioral health telemedicine and what the copay is.\n\nFirst, I'll check the context provided. The relevant part is from [health-telemedicine]. It says, \"In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited.\"\n\nSo, the first part of the answer is that a referral isn't needed. The second part is the copay of $15 per visit. The context clearly states both points. I need to make sure I'm not adding any extra information. Since both answers are present in the context, I can cite the source. The answer should be a single sentence with the citations at the end. Let me structure that correctly.\n</think>\n\nBehavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "text" : "Behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "380c007011a7f5db80c7048eace219a980cfd3610c794d6a2564cdd1758eaa2d",
+    "retrievalMillis" : 1.080597,
+    "frameworkOverheadMillis" : 1.411710000000312,
+    "endToEndMillis" : 32111.334408,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 211,
+      "ttftMillis" : 1677.643294,
+      "totalMillis" : 32108.842101,
+      "prefillTokensPerSecond" : 38.16741581372243,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5363736576,
+      "cpuMillis" : 269210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the settlement times for approved domestic ACH claims and international claim wires.\n\nFirst, I need to check the context provided. The context is from the \"payments-settlement\" section. It says that approved domestic claims paid by ACH settle within 2 business days. Then for international claim wires, it mentions they settle within 5 business days and may incur a fee.\n\nSo the answer should state both times: 2 business days for domestic ACH and 5 for international wires. I need to make sure to include both parts. Also, the user wants the answer in one short sentence with citations. The context entry is labeled [payments-settlement], so that's the citation. I should check if there are other IDs, but in this case, it's just one. So the answer would mention both settlement times and cite the source correctly.\n</think>\n\nApproved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "text" : "Approved domestic ACH claims settle within 2 business days and international claim wires settle within 5 business days [payments-settlement].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "2c3474424e6ad74d141ff736bdad09e820bb4d67be4aa7ad3eeaa78d0c95cb72",
+    "retrievalMillis" : 1.143222,
+    "frameworkOverheadMillis" : 1.7917209999977786,
+    "endToEndMillis" : 29431.936302,
+    "generation" : {
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 103,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 195,
+      "ttftMillis" : 1649.533346,
+      "totalMillis" : 29429.001359,
+      "prefillTokensPerSecond" : 38.81791312477774,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5365047296,
+      "cpuMillis" : 247780.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the merchant chargeback evidence deadline and upload format.\n\nFirst, I need to check the provided context. The context given is from the \"payments-chargeback\" section. It states that merchants must submit chargeback evidence within 7 calendar days of notification. Also, the evidence is uploaded as a PDF under 10 MB in the Disputes console.\n\nSo, the deadline is 7 calendar days, and the format is a PDF under 10 MB. The answer needs to include both parts. The supporting source is the payments-chargeback context, so I should cite that. I need to make sure I don't add any extra information not in the context. Since everything required is covered, the answer should be straightforward.\n</think>\n\nThe merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days, and the upload format is a PDF under 10 MB [payments-chargeback].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d2f53b19f41f7d91dc6f7dd6b315e7cab5343d34960adaee9fb6abe494fda55a",
+    "retrievalMillis" : 1.222946,
+    "frameworkOverheadMillis" : 1.6619939999982307,
+    "endToEndMillis" : 27611.417974,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 182,
+      "ttftMillis" : 1795.412867,
+      "totalMillis" : 27608.533034,
+      "prefillTokensPerSecond" : 38.4481035282923,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5365096448,
+      "cpuMillis" : 234530.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking for the production break-glass code name and the number of managers required to approve it.\n\nFirst, I'll check the provided context. The relevant part is from [security-access]: \"Production emergency access The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers...\" \n\nSo the code name is Cobalt-17, and it needs two managers. The answer should include both parts. The citation is [security-access]. I need to make sure I only use the information given and not add anything else. Since everything is covered in the context, I don't need to say INSUFFICIENT_CONTEXT. Let me phrase it concisely.\n</think>\n\nThe production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "text" : "The production break-glass code name is Cobalt-17, requiring approval from two on-call managers [security-access].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b590af5ae835c55e27f24d72da74dcba9d7ec08b7d7906b1e65dbf463422745a",
+    "retrievalMillis" : 0.886086,
+    "frameworkOverheadMillis" : 1.4118690000032075,
+    "endToEndMillis" : 33471.925926,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 84,
+      "outputTokens" : 216,
+      "ttftMillis" : 2190.662739,
+      "totalMillis" : 33469.627971,
+      "prefillTokensPerSecond" : 38.35337458711491,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5365141504,
+      "cpuMillis" : 284470.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about the header that makes the Claims API creates idempotent and the replay window duration.\n\nFirst, I need to check the provided context. The context given is from [api-idempotency], which states that Claims API clients send the Idempotency-Key header on create requests. It also mentions that keys remain valid for a 24-hour replay window. \n\nSo, the header in question is the Idempotency-Key. The replay window is 24 hours. The answer needs to include both parts: the header and the time. The supporting source is [api-idempotency]. I should make sure to cite that correctly. Since the context directly answers both parts, there's no need to mention insufficient context. The answer should be concise, one sentence with the citations at the end.\n</think>\n\nThe Claims API uses the Idempotency-Key header to ensure idempotency, with keys valid for a 24-hour replay window [api-idempotency].",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "63d22ca7667495eef75d9900690e54a3b799f12319e7a4edd419369137dc9633",
+    "retrievalMillis" : 0.826061,
+    "frameworkOverheadMillis" : 1.3566260000006878,
+    "endToEndMillis" : 38921.028277,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 256,
+      "ttftMillis" : 1788.968397,
+      "totalMillis" : 38918.84559,
+      "prefillTokensPerSecond" : 36.90343141491177,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5365190656,
+      "cpuMillis" : 324720.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's tackle this question. The user is asking about how quickly a priority one incident is acknowledged and which route escalates it.\n\nFirst, I need to look at the provided context. The context given is from \"support-escalation\" and mentions that a priority one incident must be acknowledged within 15 minutes. Then, if it's unresolved after 30 minutes, the NORTHSTAR-P1 pages the incident commander.\n\nSo, the acknowledgment time is 15 minutes. The escalation route is NORTHSTAR-P1, which is triggered after 30 minutes of unresolved time. The question is asking for both the acknowledgment speed and the escalation route. \n\nI need to make sure I'm not missing any other details. The context only provides these two points. There's no mention of other escalation routes or times. So the answer should include both the 15-minute acknowledgment and the NORTHSTAR-P1 escalation after 30 minutes. \n\nI should check if the answer is fully supported by the context. The first part is directly stated, and the second part is also stated. No other information is needed. So the answer should be concise, citing the relevant source ID. The source here is support-escalation, so the citation would be",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen3 8B Awq Compatible Instruct",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "21f3713cf382940c25f833bcac879a6a3bc2f3fa15142355a21bb94e5c03f042",
+    "retrievalMillis" : 0.717746,
+    "frameworkOverheadMillis" : 1.4485710000008112,
+    "endToEndMillis" : 30537.288351,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 200,
+      "ttftMillis" : 1807.773916,
+      "totalMillis" : 30535.122034,
+      "prefillTokensPerSecond" : 37.6275662755518,
+      "loadMillis" : 522.816358,
+      "peakRssBytes" : 5365223424,
+      "cpuMillis" : 257890.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nOkay, let's see. The user is asking about the deductible for damage to a lunar rover. The context provided is from [claims-auto-glass], which talks about Northstar Mutual's auto glass claims. It mentions a $75 deductible for windshield repair and that a police report isn't required. \n\nWait, the question is about a lunar rover, which isn't mentioned anywhere in the context. The context is specifically about auto glass claims, probably for vehicles. There's no information about lunar rovers or any other type of deductible. Since the context doesn't cover lunar rovers, I should check if there's any other source mentioned. But the user only provided one context entry. \n\nSo, the answer must be that there's insufficient context. The provided information doesn't address lunar rovers at all. The deductible mentioned is for auto glass, not related to space vehicles. Therefore, I can't provide an answer based on the given data.\n</think>\n\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

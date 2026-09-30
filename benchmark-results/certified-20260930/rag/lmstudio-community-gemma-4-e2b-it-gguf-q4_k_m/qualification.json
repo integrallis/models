@@ -1,0 +1,36 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/work/out/lmstudio_community_gemma_4_e2b_it_gguf_q4_k_m.json",
+    "sha256" : "997593557748fdbdf11173c422b801889b680a6ea3188db48d8f737bf921bedf"
+  },
+  "comparators" : [ {
+    "path" : "/work/out/lmstudio_community_gemma_4_e2b_it_gguf_q4_k_m.comparator.json",
+    "sha256" : "72d82b78ae170fad9cf7bf3b2d93564a89fea2609850550510825db398c670d6"
+  } ],
+  "qualification" : {
+    "modelId" : "lmstudio_community_gemma_4_e2b_it_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "6c950d754366dd8b372fd17a40497ba5f130a46d833b4c5bccc9f6bb6382ce1e",
+    "absoluteTier" : "PERFORMANCE_REDUCED",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 15,
+    "modelAnswerRate" : 0.5555555555555556,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.9527948447855494,
+      "endToEndLatencyRatio" : 1.3067560196605128,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}
