@@ -1,0 +1,13 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 18, 2026 3:39:43 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Sep 18, 2026 3:39:43 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+START arm=member:BIG label=BIG-think dataset=gsm8k items=50 thinking=on weights=[1.0] substitution=null
+   1/50 gsm8k-test-0000              pred=18           gold=18           correct tokens=1428 352225 ms
+   2/50 gsm8k-test-0001              pred=3            gold=3            correct tokens=1341 319800 ms
+   3/50 gsm8k-test-0002              pred=70000        gold=70000        correct tokens=5193 1305390 ms
+   4/50 gsm8k-test-0003              pred=540          gold=540          correct tokens=894 222590 ms
+   5/50 gsm8k-test-0004              pred=20           gold=20           correct tokens=2165 523772 ms
+   6/50 gsm8k-test-0005              pred=64           gold=64           correct tokens=3382 813819 ms
+   7/50 gsm8k-test-0006              pred=260          gold=260          correct tokens=1331 318056 ms
