@@ -12,7 +12,8 @@
 # get-console-output needs no key, no agent and no bucket, and the buffer survives
 # termination. It is therefore the only channel that reports a failure that happens BEFORE
 # the tooling is installed, which is where the failures actually were.
-SHARD=40
+# Supplied by the bootstrap so one worker script drives every shard; 40 only as a safety default.
+SHARD=${SHARD:-40}
 DEADLINE_SECONDS=18000
 BUCKET=models-qual-077051030817
 LOG=/var/log/qual-worker.log
@@ -94,21 +95,32 @@ export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 
 cd /work
-aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-twoarm.tar" . --only-show-errors
+aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-longrope.tar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/fleet-shard-$SHARD.json" /work/shard.json --only-show-errors
-[ -s models-rag-bench-0.3.50-twoarm.tar ] || { STATUS=NO_DIST; exit 1; }
+[ -s models-rag-bench-0.3.50-longrope.tar ] || { STATUS=NO_DIST; exit 1; }
 [ -s /work/models-kernels-linux-x86_64.jar ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 [ -s /work/shard.json ] || { STATUS=NO_SHARD; exit 1; }
-tar xf models-rag-bench-0.3.50-twoarm.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
+tar xf models-rag-bench-0.3.50-longrope.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
 CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
 JOBS=$(python3 -c "import json;print(len(json.load(open('/work/shard.json'))))")
 say "payload ok, $JOBS jobs"
-THREADS=$(nproc 2>/dev/null || echo 8)
+# QUAL_THREADS lets a shard pin the thread count. Both arms receive it -- the CLI sends
+# num_thread to ollama and n_threads to llama.cpp -- so a sweep stays a matched comparison and
+# sameWorkload() still admits the comparator.
+THREADS=${QUAL_THREADS:-$(nproc 2>/dev/null || echo 8)}
+# Decode runs on decodeThreadCount, which defaults to the whole pool -- 16 SMT threads on 8 physical
+# cores. A bandwidth-bound single-row matmul usually peaks at or below the physical core count, so this
+# is the one knob worth sweeping before writing kernel code. Ours only; the declared --threads budget is
+# unchanged for both arms.
+DECODE_THREAD_OPT=""
+if [ -n "${QUAL_DECODE_THREADS:-}" ]; then
+  DECODE_THREAD_OPT="-Dmodels.native.kernels.decodeThreads=$QUAL_DECODE_THREADS"
+fi
 # Baked in, not derived: the worker has no git repository, so `git rev-parse` there would record
 # "local" and the result would name no build at all.
-BACKEND_VERSION="models@0.3.50+twoarm-58597cec65f3"
+BACKEND_VERSION="models@0.3.50+longrope-77a9c6809d5b"
 STATUS=RUNNING
 
 # The comparator arm. A qualification is comparative: RagProductionQualificationPolicy needs a baseline
@@ -244,7 +256,7 @@ while IFS= read -r job; do
         -Dmodels.native.quantizedDecode=true \
         -cp "$CP" \
         com.integrallis.models.rag.RagBenchmarkCli \
-        --framework plain-java --backend rust-ffm --backend-version models@0.3.49+twoarm-58597cec65f3 \
+        --framework plain-java --backend rust-ffm --backend-version "$BACKEND_VERSION" \
         --model "$artifact" --model-id "$id" --workload general --prompt-template "$tpl" \
         --context 2048 --threads 8 --max-tokens 256 --warmups 1 --iterations 3 \
         --output "/work/out/$id.json" > "/work/out/$id.log" 2>&1
@@ -273,6 +285,7 @@ while IFS= read -r job; do
 
     java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
       -Dmodels.native.quantizedDecode=true \
+      $DECODE_THREAD_OPT \
       -cp "$CP" \
       com.integrallis.models.rag.RagBenchmarkCli \
       --framework plain-java --backend rust-ffm --backend-version "$BACKEND_VERSION" \
