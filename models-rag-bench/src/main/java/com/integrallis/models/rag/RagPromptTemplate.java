@@ -32,6 +32,7 @@ public enum RagPromptTemplate {
   MOBILE_MOE("mobilemoe"),
   GEMMA("gemma"),
   GEMMA4("gemma4"),
+  GEMMA4_ANSWER("gemma4-answer"),
   PHI3("phi3"),
   DEEPSEEK("deepseek"),
   DEEPSEEK_V2("deepseek-v2"),
@@ -108,12 +109,16 @@ public enum RagPromptTemplate {
               .text(prompt.strip())
               .control("<end_of_turn>\n<start_of_turn>model\n")
               .build();
-      case GEMMA4 ->
-          result
-              .control("<|turn>user\n")
-              .text(prompt.strip())
-              .control("<turn|>\n<|turn>model\n<|channel>thought\n<channel|>")
-              .build();
+      case GEMMA4, GEMMA4_ANSWER -> {
+        result
+            .control("<|turn>user\n")
+            .text(prompt.strip())
+            .control("<turn|>\n<|turn>model\n<|channel>thought\n<channel|>");
+        if (this == GEMMA4_ANSWER) {
+          result.text("Answer: ");
+        }
+        yield result.build();
+      }
       case PHI3 ->
           result
               .control("<|user|>\n")
@@ -218,14 +223,18 @@ public enum RagPromptTemplate {
               .text(userPrompt.strip())
               .control("<end_of_turn>\n<start_of_turn>model\n")
               .build();
-      case GEMMA4 ->
-          result
-              .control("<|turn>system\n")
-              .text(systemPrompt.strip())
-              .control("<turn|>\n<|turn>user\n")
-              .text(userPrompt.strip())
-              .control("<turn|>\n<|turn>model\n<|channel>thought\n<channel|>")
-              .build();
+      case GEMMA4, GEMMA4_ANSWER -> {
+        result
+            .control("<|turn>system\n")
+            .text(systemPrompt.strip())
+            .control("<turn|>\n<|turn>user\n")
+            .text(userPrompt.strip())
+            .control("<turn|>\n<|turn>model\n<|channel>thought\n<channel|>");
+        if (this == GEMMA4_ANSWER) {
+          result.text("Answer: ");
+        }
+        yield result.build();
+      }
       case PHI3 ->
           result
               .control("<|system|>\n")
@@ -321,7 +330,8 @@ public enum RagPromptTemplate {
     }
     throw new IllegalArgumentException(
         "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
-            + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, phi3, deepseek, "
+            + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, gemma4-answer, phi3, "
+            + "deepseek, "
             + "deepseek-v2, h2o, "
             + "h2o-direct, minicpm5-no-think, granite, granite-documents");
   }
