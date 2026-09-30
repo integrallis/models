@@ -102,13 +102,21 @@ def main():
     for directory in args.results:
         if not directory.is_dir():
             continue
-        subprocess.run(
+        imported = subprocess.run(
             [sys.executable, str(importer), str(directory),
              "--models-repo", str(args.models_repo),
              "--modeljars-repo", str(args.modeljars_repo),
              "--date", args.date, "--apply"],
-            check=True, stdout=subprocess.DEVNULL,
+            check=False, capture_output=True, text=True,
         )
+        # Importer output is surfaced, not swallowed. Discarding it once let a run report "0 added" while
+        # three models were sitting there importable, and the reason was invisible.
+        for line in (imported.stdout or "").splitlines():
+            print(f"  {line}")
+        if imported.returncode != 0:
+            print(f"  IMPORT FAILED for {directory} (exit {imported.returncode})")
+            for line in (imported.stderr or "").splitlines()[-6:]:
+                print(f"    {line}")
 
     test_path = (args.models_repo
                  / "models-rag-bench/src/test/java/com/integrallis/models/rag/CertifiedRagEvidenceTest.java")
