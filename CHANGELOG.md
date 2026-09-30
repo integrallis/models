@@ -31,6 +31,26 @@ All notable changes to models are documented here.
 
 ### Fixed
 
+- **A reasoning trace was scored as if it were the answer; grounding policy is now v21.** Screening a
+  `<think>` block fails on the block's own terms -- it reasons aloud, so it states things the retrieved
+  documents do not support, the whole output is rejected, and the answer that followed is never
+  examined. Several models answered correctly after a trace and were reported as contributing nothing.
+  A closed `<think>`, `<thinking>` or `<reasoning>` block is now removed before screening, with
+  `rawText` still carrying the full generation. `POLICY_ID` becomes v21 because this changes which
+  decision a completion receives, and records written under v20 keep their meaning rather than being
+  reinterpreted.
+
+  An explicit refusal for *unterminated* traces was written and then removed: probing the policy showed
+  the decision is `EXTRACTIVE_FALLBACK` with or without it on every input tried, because ordinary
+  screening already rejects such text. Code whose effect cannot be demonstrated is a claim, not a
+  safeguard.
+
+- **The output token cap defaults to 256, not 64.** The campaign never chose 64 -- it inherited the CLI
+  default, and at 64 most attempts were truncated. A grounded answer here is one short sentence plus a
+  bracketed source id, and a model that reasons first needs room for both, so the old default could not
+  express a passing answer for a whole class of models. 256 is a floor that lets them finish, not a
+  tuned optimum. Every report records the cap it ran with, so older records stay interpretable.
+
 - **DeepSeek-V2 models were prompted with the DeepSeek-V1 format.** The harness rendered
   `### Instruction:` / `### Response:`, while DeepSeek-Coder-V2-Lite-Instruct's own
   `tokenizer.chat_template` in the published GGUF uses `User: ` / `Assistant: `. Shown the `###`
