@@ -207,4 +207,55 @@ class RagCorpusTest {
     assertThat(evaluation.factCoverage()).isEqualTo(1.0);
     assertThat(evaluation.correct()).isTrue();
   }
+
+  /**
+   * Every answerable case must survive the grounding screen its own documents will face.
+   *
+   * <p>Not a hand-written restatement of the rule: it calls {@link GroundedAnswerPolicy#assess}
+   * with the case's relevant documents, so it cannot drift from the policy and cannot be satisfied
+   * by a rule that only looks right. Scores are set above the floor on purpose -- retrieval quality
+   * is a separate concern, and what is being checked here is the part a corpus author controls:
+   * document size, absence of injection markers, and the named-entity overlap between a question
+   * and its source.
+   *
+   * <p>Written after authoring a workload that failed every case. Retrieval was fine -- the correct
+   * document came back at 4.3 to 7.7 against a floor of 2.0 -- but seven of nine questions were
+   * rejected as QUESTION_MISMATCH, because every one began with the capitalised word "Summarize",
+   * which counts as a named entity and appeared in no document. The two that passed were the two
+   * that also named a product the document mentions. A corpus can retrieve perfectly and still be
+   * unusable, and nothing caught it until three models had been run against it.
+   */
+  @Test
+  void everyAnswerableCasePassesTheGroundingContextScreen() {
+    GroundedAnswerPolicy policy = GroundedAnswerPolicy.productionDefault();
+    List<String> rejected = new java.util.ArrayList<>();
+    for (RagWorkload workload : RagWorkload.values()) {
+      RagCorpus corpus = RagCorpus.load(workload);
+      java.util.Map<String, RagDocument> byId = new java.util.HashMap<>();
+      corpus.documents().forEach(document -> byId.put(document.id(), document));
+      for (RagCase ragCase : corpus.cases()) {
+        if (!ragCase.answerable()) {
+          continue;
+        }
+        List<GroundingDocument> retrieved = new java.util.ArrayList<>();
+        int rank = 1;
+        for (String id : ragCase.relevantDocumentIds()) {
+          RagDocument document = byId.get(id);
+          assertThat(document)
+              .describedAs(
+                  "%s case %s names a document that does not exist: %s",
+                  workload.id(), ragCase.id(), id)
+              .isNotNull();
+          retrieved.add(
+              new GroundingDocument(
+                  document.id(), document.title(), document.text(), 8.0f, rank++));
+        }
+        GroundingContextDecision decision = policy.assess(ragCase.question(), retrieved);
+        if (decision != GroundingContextDecision.ACCEPTED) {
+          rejected.add(workload.id() + "/" + ragCase.id() + " -> " + decision);
+        }
+      }
+    }
+    assertThat(rejected).isEmpty();
+  }
 }
