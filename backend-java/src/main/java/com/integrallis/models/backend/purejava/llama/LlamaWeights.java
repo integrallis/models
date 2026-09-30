@@ -37,6 +37,8 @@ public final class LlamaWeights {
   private final MemorySegment outputSegment;
   private final GgufTensorType outputType;
   private final LayerWeights[] layers;
+  private final float[] ropeFactorsLong;
+  private final float[] ropeFactorsShort;
 
   /**
    * The routed feed-forward of a mixture-of-experts layer, or absent on a dense one.
@@ -97,6 +99,28 @@ public final class LlamaWeights {
       MemorySegment outputSegment,
       GgufTensorType outputType,
       LayerWeights[] layers) {
+    this(
+        tokenEmbeddingSegment,
+        tokenEmbeddingType,
+        embeddingDim,
+        outputNormWeight,
+        outputSegment,
+        outputType,
+        layers,
+        null,
+        null);
+  }
+
+  private LlamaWeights(
+      MemorySegment tokenEmbeddingSegment,
+      GgufTensorType tokenEmbeddingType,
+      int embeddingDim,
+      float[] outputNormWeight,
+      MemorySegment outputSegment,
+      GgufTensorType outputType,
+      LayerWeights[] layers,
+      float[] ropeFactorsLong,
+      float[] ropeFactorsShort) {
     this.tokenEmbeddingSegment = tokenEmbeddingSegment;
     this.tokenEmbeddingType = tokenEmbeddingType;
     this.embeddingDim = embeddingDim;
@@ -104,6 +128,28 @@ public final class LlamaWeights {
     this.outputSegment = outputSegment;
     this.outputType = outputType;
     this.layers = layers;
+    this.ropeFactorsLong = ropeFactorsLong;
+    this.ropeFactorsShort = ropeFactorsShort;
+  }
+
+  /**
+   * LongRoPE divisors for a context above {@code rope.scaling.original_context_length}, or null
+   * when the model publishes none.
+   *
+   * @return the long-context divisors, or null
+   */
+  public float[] ropeFactorsLong() {
+    return ropeFactorsLong == null ? null : ropeFactorsLong.clone();
+  }
+
+  /**
+   * LongRoPE divisors for a context within {@code rope.scaling.original_context_length}, or null
+   * when the model publishes none.
+   *
+   * @return the short-context divisors, or null
+   */
+  public float[] ropeFactorsShort() {
+    return ropeFactorsShort == null ? null : ropeFactorsShort.clone();
   }
 
   /** Loads weights from a parsed GGUF file using the standard Llama tensor naming convention. */
@@ -191,7 +237,11 @@ public final class LlamaWeights {
         outputNorm,
         output.dataSegment(),
         output.type(),
-        layers);
+        layers,
+        emptyToNull(
+            loadOptionalF32Tensor(file, "rope_factors_long.weight", config.ropeDimensions() / 2)),
+        emptyToNull(
+            loadOptionalF32Tensor(file, "rope_factors_short.weight", config.ropeDimensions() / 2)));
   }
 
   /**
@@ -663,6 +713,17 @@ public final class LlamaWeights {
         // are the other way round from gate and up.
         expertSlices(down, dim, hidden, experts, prefix + "ffn_down_exps.weight"),
         down.type());
+  }
+
+  /**
+   * Absent means null here, not an empty array.
+   *
+   * <p>{@link #loadOptionalF32Tensor} reports a missing tensor as a zero-length array, which is
+   * truthy enough to reach a constructor that then rejects it for having the wrong length. Every
+   * model without LongRoPE divisors takes that path, so the distinction is not cosmetic.
+   */
+  private static float[] emptyToNull(float[] values) {
+    return values == null || values.length == 0 ? null : values;
   }
 
   private static float[] loadOptionalF32Tensor(GgufFile file, String name, int expectedLength) {

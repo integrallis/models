@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 /** Per-position rotary factors shared by attention heads and transformer layers. */
 public final class RotaryTable {
@@ -93,6 +94,33 @@ public final class RotaryTable {
     }
     this.cosine = new float[pairCount];
     this.sine = new float[pairCount];
+  }
+
+  /**
+   * LongRoPE: per-pair frequency divisors published as tensors, plus an attention magnitude.
+   *
+   * <p>Phi-3.5 and Phi-4 carry {@code rope_factors_long.weight} and {@code
+   * rope_factors_short.weight} and select between them on the requested context, and they publish
+   * {@code rope.scaling.attn_factor} rather than a {@code rope.scaling.type}. Dropping either the
+   * divisors or the magnitude leaves every angle wrong at every position, which does not fail a
+   * shape check -- it just stops the model from answering.
+   *
+   * @param rotaryDim the rotary width
+   * @param theta the frequency base
+   * @param frequencyScale the linear position scale, 1.0 when unscaled
+   * @param frequencyFactors one divisor per pair, {@code rotaryDim / 2} entries
+   * @param attentionFactor the magnitude applied to both cosine and sine
+   * @return the table
+   */
+  public static RotaryTable longRope(
+      int rotaryDim,
+      float theta,
+      float frequencyScale,
+      float[] frequencyFactors,
+      float attentionFactor) {
+    Objects.requireNonNull(frequencyFactors, "frequencyFactors");
+    return new RotaryTable(
+        rotaryDim, theta, frequencyScale, frequencyFactors, attentionFactor, null);
   }
 
   /**
