@@ -36,6 +36,7 @@ public final class KvCache {
   private final int valueDim;
   private final SharedPrefix sharedPrefix;
   private final int localStartPosition;
+  private final long sequenceId = SequenceIdentities.next();
   private int allocatedSequenceCapacity;
   private float[] keys;
   private float[] values;
@@ -726,6 +727,16 @@ public final class KvCache {
   /** Returns the immutable shared prefix length, or zero for an ordinary cache. */
   public int sharedPrefixLength() {
     return localStartPosition;
+  }
+
+  /**
+   * Stable non-zero identity of this sequence, distinct for every cache including forks.
+   *
+   * <p>A fork and its source report the same layer, position, and shape to an attention kernel, so
+   * any implementation that retains state across calls needs this to tell them apart.
+   */
+  public long sequenceId() {
+    return sequenceId;
   }
 
   /** Returns a caller-owned contiguous-storage snapshot for diagnostics and tests. */

@@ -37,4 +37,21 @@ class TornadoBackendOptionsTest {
         .isThrownBy(() -> new TornadoBackendOptions(true, true, false, 3))
         .withMessageContaining("executionBatchSize");
   }
+
+  @Test
+  void attentionAccelerationIsOffByDefaultAndOptedIntoExplicitly() {
+    TornadoBackendOptions defaults = TornadoBackendOptions.defaults();
+
+    assertThat(defaults.accelerateAttention()).isFalse();
+    assertThat(defaults.withAcceleratedAttention().accelerateAttention()).isTrue();
+    assertThat(defaults.withAcceleratedAttention().executionBatchSize())
+        .isEqualTo(defaults.executionBatchSize());
+    assertThat(defaults.withAcceleratedAttention().accelerateDecode())
+        .isEqualTo(defaults.accelerateDecode());
+  }
+
+  @Test
+  void theProjectionOnlyConstructorLeavesAttentionOnTheVectorApi() {
+    assertThat(new TornadoBackendOptions(true, true, false, 8).accelerateAttention()).isFalse();
+  }
 }

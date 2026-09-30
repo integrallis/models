@@ -86,12 +86,35 @@ public final class AcceleratorEligibility {
    */
   public static Decision select(
       List<DeviceCapabilities> devices, long modelSizeBytes, boolean accelerateDecode) {
+    return select(devices, modelSizeBytes, accelerateDecode, 0L);
+  }
+
+  /**
+   * Applies the same policy with an extra reservation for state the accelerator holds for the life
+   * of a sequence rather than the life of the model — today, accelerated attention's
+   * device-resident KV mirror. Passing zero reproduces the projection-only budget exactly.
+   */
+  public static Decision select(
+      List<DeviceCapabilities> devices,
+      long modelSizeBytes,
+      boolean accelerateDecode,
+      long retainedSequenceBytes) {
     Objects.requireNonNull(devices, "devices");
+    if (retainedSequenceBytes < 0) {
+      throw new IllegalArgumentException("retainedSequenceBytes must not be negative");
+    }
     if (modelSizeBytes <= 0) {
       return Decision.ineligible("model size must be positive", 0, null);
     }
+    // The retained mirror is a device-resident KV cache, which is what the request already models,
+    // so
+    // this overload expresses itself through that rather than adding a parallel notion of retained
+    // bytes. Merging this branch onto the request/budget API left the argument accepted and then
+    // discarded, which the retained-reservation test caught.
     return select(
-        devices, DeviceMemoryRequest.ofModelFile("model", modelSizeBytes, accelerateDecode));
+        devices,
+        DeviceMemoryRequest.ofModelFile("model", modelSizeBytes, accelerateDecode)
+            .withDeviceKvCacheBytes(retainedSequenceBytes));
   }
 
   /** Selects a device for a fully specified device-memory request. */

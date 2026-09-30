@@ -18,22 +18,33 @@ package com.integrallis.models.backend.tornado;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Owns the automatically selected accelerated or Vector API backend. */
 public final class TornadoBackendRuntime implements AutoCloseable {
   private PureJavaBackend backend;
   private final TornadoBackendStatus status;
   private final TornadoGgufBatchedMatrixKernel kernel;
+  private final TornadoCausalAttentionKernel attentionKernel;
 
   TornadoBackendRuntime(PureJavaBackend backend, TornadoBackendStatus status) {
-    this(backend, status, null);
+    this(backend, status, null, null);
   }
 
   TornadoBackendRuntime(
       PureJavaBackend backend, TornadoBackendStatus status, TornadoGgufBatchedMatrixKernel kernel) {
+    this(backend, status, kernel, null);
+  }
+
+  TornadoBackendRuntime(
+      PureJavaBackend backend,
+      TornadoBackendStatus status,
+      TornadoGgufBatchedMatrixKernel kernel,
+      TornadoCausalAttentionKernel attentionKernel) {
     this.backend = Objects.requireNonNull(backend, "backend");
     this.status = Objects.requireNonNull(status, "status");
     this.kernel = kernel;
+    this.attentionKernel = attentionKernel;
   }
 
   /** Returns the loaded backend used by the ordinary Models generation pipeline. */
@@ -69,6 +80,17 @@ public final class TornadoBackendRuntime implements AutoCloseable {
   /** Number of distinct compiled device execution plans, or zero when not accelerated. */
   public int projectionPlanCount() {
     return kernel == null ? 0 : kernel.projectionPlanCount();
+  }
+
+  /**
+   * What accelerated attention did, when it is installed.
+   *
+   * <p>Empty means no attention kernel was installed at all, which is a different statement from a
+   * kernel that ran and refused every step; the latter reports itself through {@link
+   * TornadoAttentionRouting#refusalReasons()}.
+   */
+  public Optional<TornadoAttentionRouting> attentionRouting() {
+    return Optional.ofNullable(attentionKernel).map(TornadoCausalAttentionKernel::routing);
   }
 
   @Override

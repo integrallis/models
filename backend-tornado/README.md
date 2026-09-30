@@ -31,5 +31,15 @@ Run the hardware gate with the `accelerator-profile` command of `models-bench`, 
 TornadoVM launcher (see the models-bench README). It reports the selected device, readiness time,
 prefill and decode throughput, and how many projections reached the device per GGUF weight format.
 
+The single-token decode step of causal grouped-query attention can additionally run on the device
+behind `TornadoBackendOptions.withAcceleratedAttention()`. Prefill chunks stay on the Vector API,
+because a layer holds one KV mirror and a prefill chunk is a different execution shape. It is off by
+default and outside the qualified scope: its kernel and routing are covered off-device, but no real-hardware parity or performance
+gate has been run for it, and the only real-model device-attention measurement this codebase has is
+a negative one on prefill (A16, 2026-08-29). The device keeps a KV mirror per sequence per layer;
+the host cache and its physical prefix sharing are unchanged, but two branches of one shared prefix
+each rebuild their own mirror. `TornadoBackendRuntime.attentionRouting()` reports what actually ran,
+so a kernel that never accepted a step cannot be mistaken for one that ran and did not help.
+
 See the published [Java GPU acceleration guide](https://integrallis.github.io/models/docs/models/current/gpu-acceleration.html)
 for dependencies, launcher requirements, status reporting, and measured evidence.

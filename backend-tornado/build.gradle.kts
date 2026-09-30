@@ -35,7 +35,11 @@ val hardwareIntegrationClasses =
         "**/TornadoBackend.class",
         "**/TornadoBackendRuntime.class",
         "**/TornadoRuntimeDevices.class",
-        "**/TornadoGgufBatchedMatrixKernel*.class"
+        "**/TornadoGgufBatchedMatrixKernel*.class",
+        // The attention plan is the TaskGraph/ExecutionPlan wiring only; the kernel it dispatches,
+        // the shape arithmetic, and the routing that decides whether to dispatch at all are all
+        // covered off-device.
+        "**/TornadoAttentionPlan.class"
     )
 
 tasks.withType<JacocoReport>().configureEach {

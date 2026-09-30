@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.tornado;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -76,5 +77,42 @@ class AcceleratorEligibilityTest {
   private static AcceleratorEligibility.DeviceCapabilities device(
       String name, String backend, String type, long memory, long allocation) {
     return new AcceleratorEligibility.DeviceCapabilities(name, backend, type, memory, allocation);
+  }
+
+  @Test
+  void aRetainedSequenceReservationRaisesTheRequiredBytesAndCanCloseTheGate() {
+    List<AcceleratorEligibility.DeviceCapabilities> devices =
+        List.of(
+            new AcceleratorEligibility.DeviceCapabilities(
+                "NVIDIA A40", "PTX", "GPU", 8L << 30, 4L << 30));
+    long modelBytes = 2L << 30;
+
+    AcceleratorEligibility.Decision withoutAttention =
+        AcceleratorEligibility.select(devices, modelBytes, false);
+    AcceleratorEligibility.Decision withSmallMirror =
+        AcceleratorEligibility.select(devices, modelBytes, false, 256L << 20);
+    AcceleratorEligibility.Decision withHugeMirror =
+        AcceleratorEligibility.select(devices, modelBytes, false, 16L << 30);
+
+    assertThat(withoutAttention.eligible()).isTrue();
+    assertThat(withSmallMirror.eligible()).isTrue();
+    assertThat(withSmallMirror.requiredBytes())
+        .isEqualTo(withoutAttention.requiredBytes() + (256L << 20));
+    assertThat(withHugeMirror.eligible()).isFalse();
+    // The itemised message this gate now produces, which says more than the generic string this
+    // test
+    // asserted before the capacity gate landed: it names the mirror as the KV line item and how far
+    // short the device is, so a reader can see that the reservation is what closed the gate.
+    assertThat(withHugeMirror.reason())
+        .contains("KV 16.00 GiB")
+        .contains("short by")
+        .contains("NVIDIA A40");
+  }
+
+  @Test
+  void aNegativeRetainedSequenceReservationIsRejected() {
+    assertThatThrownBy(() -> AcceleratorEligibility.select(List.of(), 1L, false, -1L))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("retainedSequenceBytes");
   }
 }
