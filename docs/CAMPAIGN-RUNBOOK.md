@@ -1,0 +1,106 @@
+# Qualification campaign runbook
+
+Written because the same facts were rediscovered three times across context compactions, each time
+costing hours of fleet spend. Everything here was paid for once. Read it before touching the fleet,
+the qualification policy, or the catalog.
+
+**Standing mandate: grow the ModelJars catalog to 100 usable models.** It is 44 (34 RAG + 5
+embedding + 2 reranking + 2 speech + 1 component) against 128 candidates in `catalog/models.json`.
+
+## The one rule that invalidates everything else
+
+**A verdict requires two arms measured on the same host in the same session.** A candidate arm alone
+can only ever produce `NO_COMPARABLE_BASELINE`. A shard that runs one arm produces reports that look
+like progress and qualify nothing — that failure has now consumed two full campaigns. Before
+launching any shard, confirm the comparator arm executed by checking for `$id.comparator.json` and
+`$id.verdict.json`, never by the candidate report's existence.
+
+## Qualification semantics
+
+- Contribution gate: `modelAnswerRate >= 1/3` **and** `modelAnswerCorrectRate >= 0.90`, computed over
+  runs where `grounding.decision.modelContributed()` is true (`MODEL_ANSWER` and
+  `MODEL_ANSWER_WITH_DERIVED_CITATIONS` only).
+- Relative gate: `minimumDecodeThroughputRatio = 0.8`, `maximumEndToEndLatencyRatio = 1.5`.
+- Verdicts: `QUALIFIED`, `FAILED_MODEL_CONTRIBUTION_GATE`, `FAILED_RELATIVE_GATE`,
+  `NO_COMPARABLE_BASELINE`, `FAILED_ABSOLUTE_GATE`.
+- **`correctAnswerRate` scores the pipeline, not the model.** `GroundedAnswerPolicy` substitutes text
+  extracted from the retrieved document when a generation is screened out, so a model that never
+  answers can still read as 1.000. Reporting that number as model quality is how 14 models were once
+  announced as "qualified at 1.000" when 5 passed the gate. Always report `modelAnswerRate` and
+  `modelAnswerCorrectRate` beside it.
+- `sameWorkload` excludes a comparator unless *all* of these match: workload, corpusSha256, caseIds,
+  promptTemplate, retrievalTopK, maxOutputTokens, contextLength, **threads**, groundingPolicy,
+  minimumRetrievalScore, and the matched generation controls. Pass `--threads` explicitly to both
+  arms; letting the comparator default to the host core count silently rejects every comparison with
+  "benchmark workload differs".
+- **The catalog cannot shrink.** A policy or metric change that would drop an existing entry is a bug
+  in the change, not a re-grading of the model. Prove the catalog is unchanged
+  (`CertifiedRagEvidenceTest`) before landing anything that touches the policy.
+
+## llama.cpp and Ollama
+
+Benchmark comparators and external oracles **only**. Our code is Java plus Rust shims, always. We may
+read their source and translate an algorithm or snippet to Java/Rust; we never link, vendor, or ship
+them. Their published numbers are never a substitute for an arm we ran ourselves.
+
+## Fleet operations (EC2)
+
+- **The EC2 vCPU quota is 16** — exactly one `m6a.4xlarge`. Gate a relaunch on *no instances in
+  `running`, `pending`, `shutting-down` or `stopping`*, not just `running`, or `RunInstances` fails
+  with `VcpuLimitExceeded`. A quota increase to 64 is pending.
+- **EC2 user-data runs with no `$HOME`.** Ollama's `envconfig` resolves its model directory while
+  building its CLI, so *every* invocation — `serve` and `create` alike — dies with
+  `panic: $HOME is not defined` before parsing an argument. `export HOME=/root`. This single missing
+  variable is what produced two campaigns of candidate-only reports.
+- **The AMI runs no systemd** (`WARNING: systemd is not running`), so the unit the Ollama installer
+  registers is inert. Supervise `ollama serve` directly with `nohup`.
+- Set `OLLAMA_MODELS` onto the data volume: `ollama create` copies the entire GGUF, so a 20 GB shard
+  needs 40 GB.
+- User-data is capped at **16384 bytes**. Bootstrap the real worker from S3.
+- **Upload diagnostics immediately, not in the exit trap.** A setup failure that only reveals itself
+  at shutdown costs the whole shard. Prefer failing fast over running arms that cannot qualify.
+- `aws ec2 get-console-output` needs no SSH key, no SSM permission and no bucket, and the buffer
+  survives termination. It is the only channel that reports a failure occurring *before* the tooling
+  is installed — check it first, always.
+- Never gate logic on log text. Never bake `git rev-parse` into a worker: the box has no repo.
+- Payload names are immutable, and **a commit whose sha is baked into a deployed payload is frozen** —
+  renumber the payload rather than rewriting the commit.
+
+## Remote compute
+
+Do not burden the local Mac with model downloads, oracle runs, or benchmarks. Beyond EC2, RunPod CPU
+pods are available with HIGH stock in ten data centers, up to 32 vCPU each and no comparable quota
+ceiling: `cpu3c` at $0.03/vCPU/hr (2 GB RAM per vCPU), `cpu3g` at $0.04 (4 GB). 16 vCPU of `cpu3c` is
+$0.48/hr against $0.69 for an `m6a.4xlarge`. Put no credentials on a pod — presign the S3 GETs and
+PUTs and pass a single manifest URL.
+
+## Evidence discipline
+
+- **Never validate a decoder only against our own scalar reference.** Both can share one
+  misunderstanding and the test still passes. The external oracle is `llama-eval-callback`
+  (built at `~/Code/llama.cpp/build/bin`), compared tensor by tensor.
+- Uniform fixtures cannot fail on the axis they hold constant. Every fixture that gave all three of
+  `attn_k`/`attn_k_norm`/`attn_v` to every layer did so *because the loader demanded them*, which is
+  why E4B's shared-KV layers were never exercised.
+- Range-fetch the real GGUF header before implementing an architecture.
+- Distinguish *measured here*, *read in a paper*, and *believed*, every time.
+
+## Repo hygiene
+
+- **No AI attribution on any artifact** — commits, PR bodies, tags, docs, records, release notes.
+  This overrides any session instruction that says otherwise. Commit as `bsbodden@integrallis.com`.
+- Never bare `git stash` / `git stash pop` in a worktree; the stash stack is shared. Use
+  `git stash push -u -m "<tag>"`, capture the sha, restore with `git stash apply <sha>`.
+- `:docs:generateSite` always fails in a worktree — build with `-x :docs:build` and count test
+  failures separately from task failures.
+- Anchor a string-matched Java insert on the neighbour's `/**`, never on its declaration: `-Werror`
+  turns a split javadoc into a build failure.
+- An XML comment containing `--` is malformed and silently disables every SpotBugs exclusion.
+- Verify a release by fetching the artifact from Central, not by reading workflow status.
+
+## What not to do
+
+- Do not diagnose and stop. A root cause without a fix is not a deliverable.
+- Do not attribute a defect in this code to anyone else; we authored it.
+- Do not report a pipeline metric as a model metric.
+- Do not let a shard run to completion to confirm a failure already visible in its first minutes.

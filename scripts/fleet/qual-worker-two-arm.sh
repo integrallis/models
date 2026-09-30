@@ -12,7 +12,7 @@
 # get-console-output needs no key, no agent and no bucket, and the buffer survives
 # termination. It is therefore the only channel that reports a failure that happens BEFORE
 # the tooling is installed, which is where the failures actually were.
-SHARD=32
+SHARD=40
 DEADLINE_SECONDS=18000
 BUCKET=models-qual-077051030817
 LOG=/var/log/qual-worker.log
@@ -94,37 +94,58 @@ export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 
 cd /work
-aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.49-rerun12.tar" . --only-show-errors
+aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-twoarm.tar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/fleet-shard-$SHARD.json" /work/shard.json --only-show-errors
-[ -s models-rag-bench-0.3.49-rerun12.tar ] || { STATUS=NO_DIST; exit 1; }
+[ -s models-rag-bench-0.3.50-twoarm.tar ] || { STATUS=NO_DIST; exit 1; }
 [ -s /work/models-kernels-linux-x86_64.jar ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 [ -s /work/shard.json ] || { STATUS=NO_SHARD; exit 1; }
-tar xf models-rag-bench-0.3.49-rerun12.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
+tar xf models-rag-bench-0.3.50-twoarm.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
 CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
 JOBS=$(python3 -c "import json;print(len(json.load(open('/work/shard.json'))))")
 say "payload ok, $JOBS jobs"
 THREADS=$(nproc 2>/dev/null || echo 8)
-BACKEND_VERSION="models@0.3.50+twoarm-$(git rev-parse --short HEAD 2>/dev/null || echo local)"
+# Baked in, not derived: the worker has no git repository, so `git rev-parse` there would record
+# "local" and the result would name no build at all.
+BACKEND_VERSION="models@0.3.50+twoarm-58597cec65f3"
 STATUS=RUNNING
 
 # The comparator arm. A qualification is comparative: RagProductionQualificationPolicy needs a baseline
 # measured on the SAME host and the SAME workload, or it returns NO_COMPARABLE_BASELINE. Every shard
 # before this one ran the candidate alone, so the campaign produced candidate reports and no verdicts.
-curl -fsSL https://ollama.com/install.sh | sh > /work/out/ollama-install.log 2>&1 \
-  || { say "ollama install failed"; }
-(OLLAMA_HOST=127.0.0.1:11434 OLLAMA_MAX_LOADED_MODELS=1 ollama serve > /work/out/ollama-serve.log 2>&1 &)
-for attempt in $(seq 1 60); do
+# The installer puts ollama in /usr/local/bin, which a user-data shell does not always have on PATH.
+export PATH="/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
+# HOME is UNSET in an EC2 user-data shell, and ollama's envconfig resolves the model directory from it
+# while building its CLI -- so *every* ollama invocation, `serve` and `create` alike, dies with
+# `panic: $HOME is not defined` before it parses a single argument. That panic, and not the install,
+# is why the previous shard produced candidate-only reports. The AMI also runs no systemd, so the
+# unit the installer registers is inert and `ollama serve` has to be supervised here directly.
+export HOME=/root
+# Models go on the 120GB data volume, not the root filesystem: the comparator imports a copy of every
+# candidate GGUF and the shard is 20GB of them.
+export OLLAMA_MODELS=/work/ollama
+mkdir -p "$OLLAMA_MODELS"
+curl -fsSL https://ollama.com/install.sh | sh > /work/out/ollama-install.log 2>&1
+say "ollama install exit=$? path=$(command -v ollama || echo none) home=$HOME"
+(OLLAMA_HOST=127.0.0.1:11434 OLLAMA_MAX_LOADED_MODELS=1 nohup ollama serve >> /work/out/ollama-serve.log 2>&1 &)
+for attempt in $(seq 1 90); do
   curl -s -o /dev/null http://127.0.0.1:11434/api/tags && break
   sleep 2
 done
+# Uploaded now, not at shutdown: a comparator that never starts is the one failure that makes the whole
+# shard worthless, and waiting hours to read why is how the previous campaign wasted itself.
+aws s3 cp /work/out/ollama-install.log "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+aws s3 cp /work/out/ollama-serve.log   "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
 if curl -s -o /dev/null http://127.0.0.1:11434/api/tags; then
   say "ollama ready ($(ollama --version 2>&1 | head -1))"
   OLLAMA_READY=1
 else
-  say "ollama NOT ready; candidate arms will run without a comparator and cannot qualify"
-  OLLAMA_READY=0
+  # Fail fast. A candidate arm without a same-host comparator cannot produce a verdict, so running ten
+  # of them would repeat the previous campaign exactly: reports, no qualifications.
+  STATUS=NO_COMPARATOR
+  say "ollama NOT ready; refusing to run candidate-only arms"
+  exit 1
 fi
 
 # Architectures this dist can actually load. Checked BEFORE the download, because an
@@ -223,7 +244,7 @@ while IFS= read -r job; do
         -Dmodels.native.quantizedDecode=true \
         -cp "$CP" \
         com.integrallis.models.rag.RagBenchmarkCli \
-        --framework plain-java --backend rust-ffm --backend-version models@0.3.49+rerun12-1e0f2fed6152 \
+        --framework plain-java --backend rust-ffm --backend-version models@0.3.49+twoarm-58597cec65f3 \
         --model "$artifact" --model-id "$id" --workload general --prompt-template "$tpl" \
         --context 2048 --threads 8 --max-tokens 256 --warmups 1 --iterations 3 \
         --output "/work/out/$id.json" > "/work/out/$id.log" 2>&1
