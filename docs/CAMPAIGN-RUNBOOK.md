@@ -196,3 +196,57 @@ not elicit citations the way the general corpus's do.
 So a text-to-SQL qualification wants its own policy -- correctness of the emitted query against a schema,
 not citation grounding -- and running that corpus under the RAG gate measures the wrong thing. Do not
 loosen the grounding gate to accommodate it.
+
+## Publishing a qualified model is four gates, not one merge
+
+Qualifying a model and publishing it are separate achievements. Everything below was discovered by
+running the gates locally against a branch that looked ready to merge; every one of them would
+otherwise have failed after the merge, when the fix is expensive.
+
+**1. Every newly qualified model needs a default-configuration smoke record.**
+`tools/qualification-smoke-gate.mjs` in modeljars refuses any entry that is new or whose evidence
+changed unless it carries `defaultConfigurationSmoke`. The record asserts a run under the *public
+library defaults*:
+
+- no `-Dmodels.*` property of any kind (`tuningSystemProperties` must be empty)
+- `backendDiagnostics.environment["native-quantized-decode"] == "false"`
+- `warmups == 0`, `iterations == 1`, `generationControls.promptCache == "longest-common-prefix"`
+- `correctAnswerRate == 1` **and** `abstentionAccuracy == 1`, with `failures` empty
+
+The qualification runs cannot stand in for this: they deliberately enable `quantizedDecode` and a
+tuned decode thread count, and they qualify at `modelAnswerCorrectRate >= 0.90`, not at a perfect
+pipeline score. `scripts/run-controlled-rag-qualification.sh` already emits exactly this record; the
+fleet equivalent must reproduce its jq predicate rather than invent one.
+
+The gate fetches the report over plain HTTP from
+`raw.githubusercontent.com/integrallis/models/<modelsRevision>/<report>`, so `modelsRevision` in
+`catalog/qualifications.json` must name a commit that is **reachable on `main`** after the models
+release merges. Pointing it at a feature-branch commit works until the branch is squashed away.
+
+**2. The reports the catalog names must exist at the paths it names.** Entries carry `report` and
+`reportSha256`; the files themselves live in the fleet's result bucket until someone lands them.
+Match them by SHA-256, never by filename — that way the evidence and the claim about it cannot
+disagree. Check the *branch worktree*, not the stale `main` checkout, or you will "discover" that
+already-landed evidence is missing.
+
+**3. `catalog/model-profiles.json` is generated and gated.** `npm run catalog:profiles:check` fails
+on a stale file. Regenerate with `npm run catalog:profiles` after any qualification lands.
+
+**4. Markers reach Maven Central only by explicit dispatch.** A push to `main` runs
+`model-artifacts` and publishes markers to **GitHub Packages only** — its `maven-central` job is
+guarded by `inputs.target == 'maven-central'` and therefore never runs on push. The Pages deploy,
+meanwhile, hard-verifies every marker's POM and JAR against `repo1.maven.org` before it will
+publish the site. So the order is:
+
+1. merge the catalog to `main` (GitHub Packages)
+2. `workflow_dispatch` **model-artifacts** with `target=maven-central`
+3. `workflow_dispatch` **finalize-central** to validate and publish those USER_MANAGED deployments
+4. only then `workflow_dispatch` **pages**
+
+Dispatching pages before Central has synchronized fails the deploy on a 404 that looks like a
+missing model but is only a missing publish step. Verify the artifacts, not the workflow status.
+
+**Run the gates locally before merging.** All four are runnable on a laptop in under a minute
+each: `./gradlew verifyReleaseMetadata` in models, and in modeljars `npm test`,
+`npm run catalog:verify-components`, `npm run catalog:verify-compositions`,
+`npm run catalog:profiles:check`, plus the smoke gate against `origin/main` as the previous file.
